@@ -45,6 +45,14 @@ char const* ActionTypeName(std::uint8_t type)
     return "action";
 }
 
+// Milliseconds on a monotonic clock, for the policy's cooldowns and fight timer.
+std::uint64_t nowMs()
+{
+    return static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
+                                          std::chrono::steady_clock::now().time_since_epoch())
+                                          .count());
+}
+
 void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& running, PolicyOptions options)
 {
     BotPolicy policy(options);
@@ -79,7 +87,7 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
 
             // One publish per snapshot tick: the core applies the newest action set it sees for each tick.
             std::string error;
-            if (!session.PublishActions(policy.Decide(view), error))
+            if (!session.PublishActions(policy.Decide(view, nowMs()), error))
                 std::cerr << "forever-bots: could not publish actions: " << error << "\n";
         }
         std::this_thread::sleep_for(kPumpInterval);
@@ -128,6 +136,7 @@ int main(int argc, char** argv)
 
     PolicyOptions policyOptions;
     policyOptions.TestSpell = settings.TestSpell;
+    policyOptions.ClassId = settings.Class;
 
     // The bots we may control: MaxBots from config, capped at what the core granted for Tier 2. Without a Tier 2 region
     // there is nothing to drive, so no bots are requested. The core enforces the same bound (ModuleBotOwnership).

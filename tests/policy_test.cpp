@@ -6,6 +6,7 @@
 
 using forever_module::ActionType;
 using forever_module::BotAction;
+using forever_module::BotActionStatus;
 using forever_module::BotSnapshot;
 using forever_module::MakeUnitRef;
 using forever_module::NearbyUnit;
@@ -192,8 +193,99 @@ void StatusNamesAreReadable()
     CHECK(std::string(ActionStatusName(forever_module::BotActionStatus::kOnCooldown)) == "on cooldown");
 }
 
+// A hostile at `x` yards with the given health percent (max_health is set, so the percent is real).
+NearbyUnit Hostile(std::uint64_t counter, float x, std::uint32_t healthPct)
+{
+    NearbyUnit unit = Unit(8, counter, x, true, healthPct);
+    unit.max_health = 100;
+    return unit;
+}
+
+// A warrior fighting one hostile, with the rotation on.
+BotPolicy WarriorPolicy()
+{
+    PolicyOptions options;
+    options.ClassId = 1;
+    return BotPolicy(options);
+}
+
+bool HasCast(std::vector<BotAction> const& actions, std::uint32_t spell)
+{
+    for (BotAction const& action : actions)
+        if (action.type == ActionType::kCastSpell && action.spell_id == spell)
+            return true;
+    return false;
+}
+
+void WarriorExecutesALowTarget()
+{
+    BotPolicy policy = WarriorPolicy();
+    auto actions = policy.Decide(View(1, 0, { Hostile(2, 3.0f, 15) }), 1000);
+    CHECK(actions.size() == 2);
+    CHECK(HasCast(actions, 5308));
+    if (HasCast(actions, 5308))
+    {
+        for (BotAction const& action : actions)
+            if (action.type == ActionType::kCastSpell)
+                CHECK(action.target_guid == MakeUnitRef(8, 1, 2));
+    }
+}
+
+void GlobalCooldownSpacesCasts()
+{
+    BotPolicy policy = WarriorPolicy();
+    CHECK(HasCast(policy.Decide(View(1, 0, { Hostile(2, 3.0f, 15) }), 1000), 5308));
+    // Before the global cooldown ends: no cast, and the attack is unchanged.
+    CHECK(policy.Decide(View(2, 0, { Hostile(2, 3.0f, 15) }), 1200).empty());
+    // After it: Execute again.
+    CHECK(HasCast(policy.Decide(View(3, 0, { Hostile(2, 3.0f, 15) }), 2600), 5308));
+}
+
+void RefusedCastFallsThrough()
+{
+    BotPolicy policy = WarriorPolicy();
+    CHECK(HasCast(policy.Decide(View(1, 0, { Hostile(2, 3.0f, 15) }), 1000), 5308));
+
+    // The core refused Execute as out of range: the policy waits a second and uses the next row that is allowed (Rend).
+    BotSnapshot refused;
+    refused.guid = 0;
+    NearbyUnit unit = Hostile(2, 3.0f, 15);
+    WorldTickSnapshotView view = View(2, 0, { unit });
+    view.bots[0].last_action_sequence = 1;
+    view.bots[0].last_action_type = uint8_t(ActionType::kCastSpell);
+    view.bots[0].last_action_spell = 5308;
+    view.bots[0].last_action_status = BotActionStatus::kOutOfRange;
+    auto actions = policy.Decide(view, 2600);
+    CHECK(!HasCast(actions, 5308));
+    CHECK(HasCast(actions, 772)); // Rend
+}
+
+void ChargeWhileOpening()
+{
+    BotPolicy policy = WarriorPolicy();
+    // A target 12 yards away at the start of the fight: approach, and Charge.
+    auto actions = policy.Decide(View(1, 0, { Hostile(2, 12.0f, 100) }), 1000);
+    CHECK(actions.size() == 2);
+    CHECK(actions.size() >= 1 && actions[0].type == ActionType::kFollow);
+    CHECK(HasCast(actions, 100));
+}
+
+void ApproachesADistantTarget()
+{
+    BotPolicy policy = WarriorPolicy();
+    // Well past the opener: no Charge; the bot walks in and nothing else is in melee reach.
+    CHECK(HasCast(policy.Decide(View(1, 0, { Hostile(2, 12.0f, 100) }), 1000), 100));
+    auto later = policy.Decide(View(2, 0, { Hostile(2, 12.0f, 100) }), 10000);
+    CHECK(later.empty()); // the follow is unchanged and no row is allowed at 12 yards
+}
+
 int main()
 {
+    WarriorExecutesALowTarget();
+    GlobalCooldownSpacesCasts();
+    RefusedCastFallsThrough();
+    ChargeWhileOpening();
+    ApproachesADistantTarget();
     TestCastOnItsOwnTimer();
     NoTestCastWhenOff();
     StatusNamesAreReadable();
