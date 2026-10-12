@@ -15,7 +15,8 @@ void RotatingFile::Open()
     std::error_code ec;
     auto const size = fs::file_size(_path, ec);
     _bytes = ec ? 0 : size;
-    _out.open(_path, std::ios::app);
+    // Binary, so '\n' is one byte on every platform. In text mode Windows writes CRLF, and the byte count drifts.
+    _out.open(_path, std::ios::app | std::ios::binary);
 }
 
 void RotatingFile::WriteLine(std::string const& line)

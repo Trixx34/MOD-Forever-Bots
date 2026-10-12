@@ -64,6 +64,8 @@ void ReopenAppendsAndCountsExistingBytes()
     CHECK(again.CurrentBytes() == 6); // "first\n" is already there
     again.WriteLine("second");
     CHECK(Read(path) == "first\nsecond\n");
+    // The count the rotation uses must match the bytes on disk, on every platform.
+    CHECK(again.CurrentBytes() == fs::file_size(path));
 }
 
 void KeepZeroTruncates()
