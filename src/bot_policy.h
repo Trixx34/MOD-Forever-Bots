@@ -12,6 +12,7 @@
 #include "forever_module/tier2_session.h"
 
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <unordered_map>
 #include <unordered_set>
@@ -24,6 +25,8 @@ struct PolicyOptions
     std::uint32_t TestSpell = 0;
     std::uint64_t CastEveryTicks = 20;
     std::uint32_t ClassId = 0;
+    // The class of each bot, when bots differ (random picks). Unset, or returning 0, falls back to ClassId.
+    std::function<std::uint32_t(std::uint64_t botGuid)> ClassOf;
 };
 
 // Name of an action status, for logs.

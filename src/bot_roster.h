@@ -11,6 +11,9 @@ class BotRoster
 public:
     explicit BotRoster(std::uint32_t maxBots);
 
+    // Changes the cap, for a config reload. Bots already owned are kept even if the cap goes below their count.
+    void SetMaxBots(std::uint32_t maxBots) { _maxBots = maxBots; }
+
     // Whether another control request may be sent. Counts owned bots plus requests still waiting for a reply.
     bool CanRequest() const;
 

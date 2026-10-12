@@ -2,25 +2,31 @@
 //
 // Usage: forever-bots <tier1-endpoint>. The core passes the endpoint when it spawns the module.
 //
-// Two loops run. Run() (the Tier 1 loop) handles control replies and revocations on this thread. A pump thread reads
-// each new Tier 2 snapshot and publishes the bot actions BotPolicy decides on. The pump touches only the Tier 2
-// region, so the two loops share no state.
+// Two loops run. Run() (the Tier 1 loop) handles control replies, revocations and the spawn ramp on this thread. A pump
+// thread reads each new Tier 2 snapshot and publishes the bot actions BotPolicy decides on. The pump touches only the
+// Tier 2 region and the ClassTable (locked), so the two loops share no other state.
 
+#include "bot_pick.h"
 #include "bot_policy.h"
+#include "bot_ramp.h"
 #include "bot_roster.h"
 #include "bot_settings.h"
 #include "bot_store.h"
 #include "bot_telemetry.h"
+#include "rotating_file.h"
 
 #include "forever_module/module_client.h"
 #include "forever_module/tier2_session.h"
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstdint>
-#include <fstream>
+#include <ctime>
+#include <exception>
 #include <iostream>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <thread>
 #include <unordered_map>
@@ -28,12 +34,21 @@
 
 namespace {
 
-// Tier 2 bounds asked for at handshake. The core may grant less. Handshake comes before config, so the bot
-// count asked for here is the ceiling; MaxBots from config limits how many bots are actually spawned.
+// Tier 2 bounds asked for at handshake. The core may grant less. Handshake comes before config, so the bot count asked
+// for here is the ceiling; MaxBots from config limits how many bots are actually spawned. Every bot may act each tick, so
+// the action buffer holds two actions per bot ceiling slot.
 constexpr std::uint32_t kRequestedNearbyUnits = 16;
-constexpr std::uint32_t kRequestedActions = 16;
+constexpr std::uint32_t kRequestedActions = 2 * kMaxBotsCeiling;
 
 constexpr std::chrono::milliseconds kPumpInterval(5);
+constexpr std::uint64_t kPumpReportMs = 60000;
+
+// The spawn ramp. Every kRampInterval the module asks for up to kSpawnsPerRampTick new bots: 2 spawn requests a second at
+// the defaults. The core logs bots in at most Bot.Login.MaxPerSecond a second, so a ramp step of 100 bots takes about 50
+// seconds to spawn and about 10 seconds more to log in.
+constexpr std::chrono::milliseconds kRampInterval(5000);
+constexpr std::uint32_t kSpawnsPerRampTick = 10;
+constexpr std::uint64_t kSpawnBackoffMs = 30000; // after a refused spawn, wait this long before the next
 
 char const* ActionTypeName(std::uint8_t type)
 {
@@ -48,7 +63,7 @@ char const* ActionTypeName(std::uint8_t type)
     return "action";
 }
 
-// Milliseconds on a monotonic clock, for the policy's cooldowns and fight timer.
+// Milliseconds on a monotonic clock, for the policy's cooldowns, the fight timer and the ramp.
 std::uint64_t nowMs()
 {
     return static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -56,8 +71,116 @@ std::uint64_t nowMs()
                                           .count());
 }
 
+// Seconds since local midnight, for the ramp's stop time.
+std::uint32_t LocalSecondsOfDay()
+{
+    std::time_t const now = std::time(nullptr);
+    std::tm local{};
+#ifdef _WIN32
+    localtime_s(&local, &now);
+#else
+    localtime_r(&now, &local);
+#endif
+    return static_cast<std::uint32_t>(local.tm_hour * 3600 + local.tm_min * 60 + local.tm_sec);
+}
+
+// The state the ramp and the reclaim share. Everything in it is used on the Run() thread only.
+struct RunContext
+{
+    forever_module::ModuleClient& Client;
+    BotRoster& Roster;
+    pick::ClassTable& Classes;
+    BotSettings& Settings; // updated by a config reload
+    pick::Stream Rng;
+    std::uint64_t StartMs;
+    std::uint32_t StartSecOfDay;
+    std::uint64_t BackoffUntilMs = 0;
+    bool StopLogged = false;
+    bool Halted = false; // a fixed race and class with no valid combination: nothing is spawned
+};
+
+forever_module::SpawnParams ParamsFor(RaceClass const& combo)
+{
+    forever_module::SpawnParams params;
+    params.set_race(combo.Race);
+    params.set_class_id(combo.Class);
+    return params;
+}
+
+// Stored value of a bot's row: "race class". Old rows hold "1" and carry no race or class.
+bool ParseRaceClass(std::string const& value, RaceClass& combo)
+{
+    auto const space = value.find(' ');
+    if (space == std::string::npos)
+        return false;
+    try
+    {
+        combo.Race = static_cast<std::uint32_t>(std::stoul(value.substr(0, space)));
+        combo.Class = static_cast<std::uint32_t>(std::stoul(value.substr(space + 1)));
+    }
+    catch (std::exception const&)
+    {
+        return false;
+    }
+    return true;
+}
+
+// One ramp step: spawns up to kSpawnsPerRampTick bots when the run's target is above the bots owned or pending. Stops
+// for good at the stop time, and backs off for a while after a refused spawn.
+void RampTick(RunContext& run)
+{
+    std::uint64_t const now = nowMs();
+    std::uint64_t const elapsed = now - run.StartMs;
+    if (RunStopped(run.Settings.Ramp, run.StartSecOfDay, elapsed))
+    {
+        if (!run.StopLogged)
+        {
+            run.StopLogged = true;
+            std::cerr << "forever-bots: stop time reached after " << elapsed / 60000 << " minutes; no more bots are added\n";
+        }
+        return;
+    }
+    if (run.Halted || now < run.BackoffUntilMs)
+        return;
+
+    std::uint32_t const target = std::min(RampTarget(run.Settings.Ramp, elapsed), run.Roster.MaxBots());
+    std::uint32_t spawned = 0;
+    while (spawned < kSpawnsPerRampTick && run.Roster.Owned().size() + run.Roster.PendingCount() < target &&
+           run.Roster.CanRequest())
+    {
+        RaceClass combo{};
+        std::string reason;
+        if (!pick::Pick(run.Rng, run.Settings.Race, run.Settings.Class, combo, reason))
+        {
+            run.Halted = true;
+            std::cerr << "forever-bots: " << reason << "; no bots are spawned\n";
+            return;
+        }
+
+        ++spawned;
+        run.Roster.NoteRequestSent(0);
+        run.Client.RequestControl(0, ParamsFor(combo), [&run, combo](forever_module::ControlResponse const& reply)
+        {
+            if (!reply.granted())
+            {
+                run.Roster.OnDenied(0);
+                run.BackoffUntilMs = nowMs() + kSpawnBackoffMs;
+                std::cerr << "forever-bots: spawn refused for race " << combo.Race << " class " << combo.Class << ": "
+                          << reply.reason() << "; waiting 30 s\n";
+                return;
+            }
+
+            std::uint64_t const guid = reply.bot_guid();
+            run.Roster.OnGranted(0, guid);
+            run.Classes.Set(guid, combo.Class);
+            run.Client.StoreSet(bot_store::KeyFor(guid), std::to_string(combo.Race) + " " + std::to_string(combo.Class));
+            std::cerr << "forever-bots: spawned bot " << guid << " race " << combo.Race << " class " << combo.Class << "\n";
+        });
+    }
+}
+
 void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& running, PolicyOptions options,
-               std::string const& telemetryPath, std::uint32_t summarySec)
+               std::string const& telemetryPath, BotSettings const& settings)
 {
     BotPolicy policy(options);
     bool sawSnapshot = false;
@@ -65,28 +188,32 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
     // Last action sequence seen per bot, so each result is reported once.
     std::unordered_map<std::uint64_t, std::uint32_t> seenSequence;
 
-    // The telemetry file is appended to, so a restart adds to the same record. Every line is flushed as it is written.
-    std::ofstream telemetryOut;
+    // Timing of the policy, reported once a minute so the cost at the current bot count is in the log.
+    std::uint64_t reportedAt = nowMs();
+    std::uint64_t ticks = 0;
+    std::uint64_t decideTotalUs = 0;
+    std::uint64_t decideMaxUs = 0;
+    std::uint64_t actionsTotal = 0;
+    std::size_t lastBotCount = 0;
+
+    // The telemetry file is appended to, so a restart adds to the same record. It rotates at TelemetryMaxMB.
+    std::unique_ptr<RotatingFile> telemetryFile;
     std::unique_ptr<BotTelemetry> telemetry;
     if (!telemetryPath.empty())
     {
-        telemetryOut.open(telemetryPath, std::ios::app);
-        if (telemetryOut)
+        telemetryFile = std::make_unique<RotatingFile>(telemetryPath,
+                                                       std::uint64_t(settings.TelemetryMaxMB) * 1024 * 1024,
+                                                       settings.TelemetryKeep);
+        if (telemetryFile->IsOpen())
         {
-            telemetryOut.seekp(0, std::ios::end);
-            if (telemetryOut.tellp() == 0)
-                telemetryOut << BotTelemetry::Header() << '\n';
-            telemetryOut.flush();
+            if (telemetryFile->CurrentBytes() == 0)
+                telemetryFile->WriteLine(BotTelemetry::Header());
             BotTelemetry::Options telemetryOptions;
-            telemetryOptions.SummaryEveryMs = std::uint64_t(summarySec) * 1000;
+            telemetryOptions.SummaryEveryMs = std::uint64_t(settings.TelemetrySummarySec) * 1000;
             telemetry = std::make_unique<BotTelemetry>(
-                [&telemetryOut](std::string const& line)
-                {
-                    telemetryOut << line << '\n';
-                    telemetryOut.flush();
-                },
-                telemetryOptions);
-            std::cerr << "forever-bots: telemetry to " << telemetryPath << " (summary every " << summarySec << " s)\n";
+                [file = telemetryFile.get()](std::string const& line) { file->WriteLine(line); }, telemetryOptions);
+            std::cerr << "forever-bots: telemetry to " << telemetryPath << " (summary every " << settings.TelemetrySummarySec
+                      << " s, rotated at " << settings.TelemetryMaxMB << " MB, keeping " << settings.TelemetryKeep << ")\n";
         }
         else
         {
@@ -122,9 +249,32 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
                 telemetry->Observe(view, nowMs());
 
             // One publish per snapshot tick: the core applies the newest action set it sees for each tick.
+            auto const started = std::chrono::steady_clock::now();
+            std::vector<forever_module::BotAction> actions = policy.Decide(view, nowMs());
+            auto const decideUs = static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(
+                                                                 std::chrono::steady_clock::now() - started)
+                                                                 .count());
+            ++ticks;
+            decideTotalUs += decideUs;
+            decideMaxUs = std::max(decideMaxUs, decideUs);
+            actionsTotal += actions.size();
+            lastBotCount = view.bots.size();
+
             std::string error;
-            if (!session.PublishActions(policy.Decide(view, nowMs()), error))
+            if (!session.PublishActions(std::move(actions), error))
                 std::cerr << "forever-bots: could not publish actions: " << error << "\n";
+        }
+
+        std::uint64_t const now = nowMs();
+        if (now - reportedAt >= kPumpReportMs && ticks > 0)
+        {
+            std::cerr << "forever-bots: pump: " << lastBotCount << " bots, decide avg " << decideTotalUs / ticks << " us, max "
+                      << decideMaxUs << " us over " << ticks << " ticks, " << actionsTotal / ticks << " actions per tick\n";
+            reportedAt = now;
+            ticks = 0;
+            decideTotalUs = 0;
+            decideMaxUs = 0;
+            actionsTotal = 0;
         }
         std::this_thread::sleep_for(kPumpInterval);
     }
@@ -155,38 +305,57 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    // Config is delivered right after the handshake, so the callback has already run once when OnConfig returns.
-    // Later re-deliveries come on the Run() thread; they are logged but do not change the bots already spawned.
+    // Tier 2 is granted at handshake: there is a region only if the core accepted it.
+    bool const tier2Granted = !client.tier2_region_name().empty();
+    std::uint32_t const grantedBots = client.negotiated_bounds().max_bots;
+
+    // Config is delivered right after the handshake, so the first callback has already run when OnConfig returns. A later
+    // re-delivery (a core reload) updates the ramp, the random picks and the cap, on the Run() thread. The telemetry file
+    // and the test spell take effect at restart.
     BotSettings settings;
     bool configured = false;
-    client.OnConfig([&settings, &configured](std::unordered_map<std::string, std::string> const& config)
+    BotRoster roster(0); // the cap is set once the settings are known
+    client.OnConfig([&settings, &configured, &roster, tier2Granted, grantedBots](
+                        std::unordered_map<std::string, std::string> const& config)
     {
         std::vector<std::string> warnings;
         BotSettings const parsed = ParseBotSettings(config, warnings);
         for (std::string const& warning : warnings)
             std::cerr << "forever-bots: config: " << warning << "\n";
-        if (!configured)
-            settings = parsed;
-        configured = true;
-    });
 
-    PolicyOptions policyOptions;
-    policyOptions.TestSpell = settings.TestSpell;
-    policyOptions.ClassId = settings.Class;
+        if (!configured)
+        {
+            settings = parsed;
+            configured = true;
+            return;
+        }
+
+        settings.MaxBots = parsed.MaxBots;
+        settings.Race = parsed.Race;
+        settings.Class = parsed.Class;
+        settings.Ramp = parsed.Ramp;
+        roster.SetMaxBots(EffectiveMaxBots(parsed.MaxBots, grantedBots, tier2Granted));
+        std::cerr << "forever-bots: config reloaded: MaxBots " << roster.MaxBots() << ", ramp " << settings.Ramp.Initial << " +"
+                  << settings.Ramp.Step << " every " << settings.Ramp.StepMinutes << " min to " << settings.Ramp.Cap
+                  << " (owned " << roster.Owned().size() << ")\n";
+    });
 
     // The bots we may control: MaxBots from config, capped at what the core granted for Tier 2. Without a Tier 2 region
     // there is nothing to drive, so no bots are requested. The core enforces the same bound (ModuleBotOwnership).
-    bool const tier2Granted = !client.tier2_region_name().empty();
-    std::uint32_t const grantedBots = client.negotiated_bounds().max_bots;
     std::uint32_t const maxBots = EffectiveMaxBots(settings.MaxBots, grantedBots, tier2Granted);
     if (maxBots != settings.MaxBots)
     {
         std::cerr << "forever-bots: MaxBots " << settings.MaxBots << " limited to " << maxBots << " (Tier 2 grant "
                   << grantedBots << (tier2Granted ? "" : ", no Tier 2 region") << ")\n";
     }
+    roster.SetMaxBots(maxBots);
 
-    // Shared between the callbacks below; all of them run on the thread that calls Run().
-    BotRoster roster(maxBots);
+    pick::ClassTable classes;
+    RunContext run{ client, roster, classes, settings, pick::Stream(settings.RandomSeed), nowMs(), LocalSecondsOfDay() };
+    std::cerr << "forever-bots: random seed " << settings.RandomSeed << ", race " << settings.Race << ", class "
+              << settings.Class << " (0 = random), ramp " << settings.Ramp.Initial << " +" << settings.Ramp.Step << " every "
+              << settings.Ramp.StepMinutes << " min to " << settings.Ramp.Cap << ", stop at " << settings.Ramp.StopSecOfDay / 3600
+              << ":" << (settings.Ramp.StopSecOfDay / 60) % 60 << " local\n";
 
     client.OnControlRevoked([&roster](std::uint64_t botGuid, std::string const& reason)
     {
@@ -194,78 +363,65 @@ int main(int argc, char** argv)
             std::cerr << "forever-bots: control of bot " << botGuid << " revoked: " << reason << "\n";
     });
 
-    forever_module::SpawnParams params;
-    params.set_race(settings.Race);
-    params.set_class_id(settings.Class);
-
-    // Bots from last run are rows in the module store (bot/<guid>). They are listed first, on the Run() thread, and the
-    // bots are requested when the list arrives: reclaim up to the cap, then spawn for the rest. A revoke keeps the row,
-    // since the core revokes every bot at shutdown; only "character not found" removes one.
-    auto startBots = [&roster, &client, &params](std::vector<std::uint64_t> const& saved)
+    // Bots from last run are rows in the module store (bot/<guid>). Each row's value is "race class", read before the
+    // bot is requested so the rotation knows its class. A revoke keeps the row, since the core revokes every bot at
+    // shutdown; only "character not found" removes one. Spawning for the rest is the ramp's job.
+    auto reclaim = [&run](std::uint64_t guid)
     {
-        for (std::uint64_t guid : saved)
+        run.Roster.NoteRequestSent(guid);
+        run.Client.StoreGet(bot_store::KeyFor(guid), [&run, guid](forever_module::ActionReply const& stored)
         {
-            if (!roster.CanRequest())
-                break;
-            roster.NoteRequestSent(guid);
-            client.RequestControl(guid, {}, [&roster, &client, guid](forever_module::ControlResponse const& reply)
+            RaceClass combo{};
+            if (stored.found() && ParseRaceClass(stored.value(), combo))
+                run.Classes.Set(guid, combo.Class);
+            else
+                std::cerr << "forever-bots: bot " << guid << " has no saved class; its rotation is off until it is set\n";
+
+            run.Client.RequestControl(guid, {}, [&run, guid](forever_module::ControlResponse const& reply)
             {
                 if (reply.granted())
                 {
-                    roster.OnGranted(guid, reply.bot_guid());
+                    run.Roster.OnGranted(guid, reply.bot_guid());
                     std::cerr << "forever-bots: reclaimed bot " << guid << "\n";
                     return;
                 }
-                roster.OnDenied(guid);
+                run.Roster.OnDenied(guid);
                 if (reply.reason() == "character not found")
-                    client.StoreDelete(bot_store::KeyFor(guid));
+                    run.Client.StoreDelete(bot_store::KeyFor(guid));
                 std::cerr << "forever-bots: could not reclaim bot " << guid << ": " << reply.reason() << "\n";
             });
-        }
-
-        while (roster.CanRequest())
-        {
-            roster.NoteRequestSent(0);
-            client.RequestControl(0, params, [&roster, &client](forever_module::ControlResponse const& reply)
-            {
-                if (!reply.granted())
-                {
-                    roster.OnDenied(0);
-                    std::cerr << "forever-bots: spawn refused: " << reply.reason() << "\n";
-                    return;
-                }
-                roster.OnGranted(0, reply.bot_guid());
-                client.StoreSet(bot_store::KeyFor(reply.bot_guid()), "1");
-                std::cerr << "forever-bots: controlling bot " << reply.bot_guid() << "\n";
-            });
-        }
+        });
     };
 
-    client.StoreList(bot_store::KeyPrefix, [&client, &startBots](forever_module::ActionReply const& reply)
+    client.StoreList(bot_store::KeyPrefix, [&run, &reclaim](forever_module::ActionReply const& reply)
     {
-        std::vector<std::uint64_t> saved;
         if (!reply.success())
         {
             std::cerr << "forever-bots: could not read saved bots (" << reply.reason() << "); spawning without reclaim\n";
+            return;
         }
-        else
+        for (int i = 0; i < reply.keys_size(); ++i)
         {
-            for (int i = 0; i < reply.keys_size(); ++i)
-            {
-                std::uint64_t guid = 0;
-                if (bot_store::GuidFromKey(reply.keys(i), guid))
-                    saved.push_back(guid);
-            }
+            std::uint64_t guid = 0;
+            if (bot_store::GuidFromKey(reply.keys(i), guid) && run.Roster.CanRequest())
+                reclaim(guid);
         }
-        startBots(saved);
     });
+
+    client.AddTimer(kRampInterval, [&run] { RampTick(run); });
+
+    // The policy's class lookup: a bot's own class, or the configured class (0 = none) for a bot the table does not know.
+    PolicyOptions policyOptions;
+    policyOptions.TestSpell = settings.TestSpell;
+    policyOptions.ClassId = settings.Class;
+    policyOptions.ClassOf = [&classes](std::uint64_t botGuid) { return classes.Get(botGuid); };
 
     // Tier 2 is granted at handshake, so there is a region only if the core accepted it.
     std::atomic<bool> running{true};
     std::thread pump;
     if (forever_module::Tier2Session* session = client.AttachTier2())
         pump = std::thread(PumpTier2, std::ref(*session), std::cref(running), policyOptions, std::cref(settings.TelemetryFile),
-                           settings.TelemetrySummarySec);
+                           std::cref(settings));
     else
         std::cerr << "forever-bots: no Tier 2 region (" << client.tier2_error() << "); bots will not be driven\n";
 
