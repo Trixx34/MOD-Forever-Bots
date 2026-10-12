@@ -13,6 +13,9 @@ struct BotSettings
     std::uint32_t MaxBots = 1;
     std::uint32_t Race = 1;   // Human
     std::uint32_t Class = 1;  // Warrior
+    // Spell cast at the attack target on a timer (0 = off). A test of the cast path and its refusal reports, until the
+    // class rotations exist. Config key TestSpell.
+    std::uint32_t TestSpell = 0;
 };
 
 // The most bots any configuration may ask for; also the Tier 2 bot bound requested at handshake.

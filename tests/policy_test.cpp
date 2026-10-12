@@ -2,6 +2,7 @@
 #include "bot_policy.h"
 
 #include <cstdio>
+#include <string>
 
 using forever_module::ActionType;
 using forever_module::BotAction;
@@ -152,8 +153,50 @@ void OnlyChangesArePublished()
 
 } // namespace
 
+// Test casts: a bot fighting a hostile gets the test spell at its target on its own timer, after the attack decision.
+void TestCastOnItsOwnTimer()
+{
+    PolicyOptions options;
+    options.TestSpell = 585;
+    options.CastEveryTicks = 20;
+    BotPolicy policy(options);
+
+    auto first = policy.Decide(View(1, 0, { Unit(8, 2, 5.0f, true) }));
+    CHECK(first.size() == 2);
+    if (first.size() == 2)
+    {
+        CHECK(first[0].type == ActionType::kAttackTarget);
+        CHECK(first[1].type == ActionType::kCastSpell && first[1].spell_id == 585);
+        CHECK(first[1].target_guid == MakeUnitRef(8, 1, 2));
+    }
+
+    // Same fight, before the interval: nothing new.
+    CHECK(policy.Decide(View(10, 0, { Unit(8, 2, 5.0f, true) })).empty());
+
+    // After the interval: only the cast, since the attack is unchanged.
+    auto later = policy.Decide(View(21, 0, { Unit(8, 2, 5.0f, true) }));
+    CHECK(later.size() == 1 && later[0].type == ActionType::kCastSpell);
+}
+
+void NoTestCastWhenOff()
+{
+    BotPolicy policy;
+    auto first = policy.Decide(View(1, 0, { Unit(8, 2, 5.0f, true) }));
+    CHECK(first.size() == 1 && first[0].type == ActionType::kAttackTarget);
+    CHECK(policy.Decide(View(100, 0, { Unit(8, 2, 5.0f, true) })).empty());
+}
+
+void StatusNamesAreReadable()
+{
+    CHECK(std::string(ActionStatusName(forever_module::BotActionStatus::kOutOfRange)) == "out of range");
+    CHECK(std::string(ActionStatusName(forever_module::BotActionStatus::kOnCooldown)) == "on cooldown");
+}
+
 int main()
 {
+    TestCastOnItsOwnTimer();
+    NoTestCastWhenOff();
+    StatusNamesAreReadable();
     AttacksClosestHostile();
     KeepsCurrentThreatTarget();
     FollowsPlayerWhenNoEnemy();
