@@ -56,6 +56,16 @@ void UnknownKeysAreIgnored()
     CHECK(warnings.empty());
 }
 
+void TestSpellIsOptional()
+{
+    std::vector<std::string> warnings;
+    CHECK(ParseBotSettings({}, warnings).TestSpell == 0);
+    CHECK(ParseBotSettings({ { "TestSpell", "585" } }, warnings).TestSpell == 585);
+    CHECK(warnings.empty());
+    CHECK(ParseBotSettings({ { "TestSpell", "-1" } }, warnings).TestSpell == 0);
+    CHECK(warnings.size() == 1);
+}
+
 void EffectiveMaxBotsIsCappedByGrant()
 {
     CHECK(EffectiveMaxBots(4, 16, true) == 4);  // config below the grant
@@ -74,6 +84,7 @@ int main()
     InvalidValuesFallBackWithWarnings();
     UnknownKeysAreIgnored();
     EffectiveMaxBotsIsCappedByGrant();
+    TestSpellIsOptional();
 
     if (failures == 0)
         std::printf("settings_test: all checks passed\n");

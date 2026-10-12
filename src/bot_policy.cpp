@@ -51,6 +51,26 @@ bool IsPlayer(NearbyUnit const& unit)
 
 } // namespace
 
+char const* ActionStatusName(forever_module::BotActionStatus status)
+{
+    using forever_module::BotActionStatus;
+    switch (status)
+    {
+        case BotActionStatus::kNone: return "none";
+        case BotActionStatus::kApplied: return "applied";
+        case BotActionStatus::kRefused: return "refused";
+        case BotActionStatus::kUnknownSpell: return "unknown spell";
+        case BotActionStatus::kNotKnown: return "spell not known";
+        case BotActionStatus::kOutOfRange: return "out of range";
+        case BotActionStatus::kOnCooldown: return "on cooldown";
+        case BotActionStatus::kNotEnoughPower: return "not enough power";
+        case BotActionStatus::kNoLineOfSight: return "no line of sight";
+        case BotActionStatus::kInvalidTarget: return "invalid target";
+        case BotActionStatus::kNotOnline: return "not online";
+    }
+    return "unknown";
+}
+
 std::vector<BotAction> BotPolicy::Decide(forever_module::WorldTickSnapshotView const& view)
 {
     std::vector<BotAction> actions;
@@ -94,19 +114,37 @@ std::vector<BotAction> BotPolicy::Decide(forever_module::WorldTickSnapshotView c
         }
 
         auto const last = _last.find(bot.guid);
-        if (last != _last.end() && last->second.Type == wanted.Type && last->second.Target == wanted.Target)
-            continue;
+        if (last == _last.end() || last->second.Type != wanted.Type || last->second.Target != wanted.Target)
+        {
+            BotAction action;
+            action.bot_guid = bot.guid;
+            action.type = wanted.Type;
+            action.target_guid = wanted.Target;
+            actions.push_back(action);
+            _last[bot.guid] = wanted;
+        }
 
-        BotAction action;
-        action.bot_guid = bot.guid;
-        action.type = wanted.Type;
-        action.target_guid = wanted.Target;
-        actions.push_back(action);
-        _last[bot.guid] = wanted;
+        // Test cast: at the current attack target, on its own timer, after the attack decision above.
+        if (_options.TestSpell != 0 && wanted.Type == ActionType::kAttackTarget && wanted.Target != 0)
+        {
+            auto const lastCast = _lastCastTick.find(bot.guid);
+            if (lastCast == _lastCastTick.end() || view.tick_number >= lastCast->second + _options.CastEveryTicks)
+            {
+                BotAction cast;
+                cast.bot_guid = bot.guid;
+                cast.type = ActionType::kCastSpell;
+                cast.spell_id = _options.TestSpell;
+                cast.target_guid = wanted.Target;
+                actions.push_back(cast);
+                _lastCastTick[bot.guid] = view.tick_number;
+            }
+        }
     }
 
     for (auto it = _last.begin(); it != _last.end();)
         it = present.count(it->first) ? std::next(it) : _last.erase(it);
+    for (auto it = _lastCastTick.begin(); it != _lastCastTick.end();)
+        it = present.count(it->first) ? std::next(it) : _lastCastTick.erase(it);
 
     return actions;
 }

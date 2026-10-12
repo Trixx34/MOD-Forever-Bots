@@ -18,6 +18,7 @@
 #include <chrono>
 #include <cstdint>
 #include <iostream>
+#include <string>
 #include <thread>
 #include <unordered_map>
 #include <vector>
@@ -31,15 +32,46 @@ constexpr std::uint32_t kRequestedActions = 16;
 
 constexpr std::chrono::milliseconds kPumpInterval(5);
 
-void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& running)
+char const* ActionTypeName(std::uint8_t type)
 {
-    BotPolicy policy;
+    switch (static_cast<forever_module::ActionType>(type))
+    {
+        case forever_module::ActionType::kCastSpell: return "cast";
+        case forever_module::ActionType::kMoveTo: return "move";
+        case forever_module::ActionType::kAttackTarget: return "attack";
+        case forever_module::ActionType::kFollow: return "follow";
+        case forever_module::ActionType::kStop: return "stop";
+    }
+    return "action";
+}
+
+void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& running, PolicyOptions options)
+{
+    BotPolicy policy(options);
     bool sawSnapshot = false;
     std::uint64_t lastTick = 0;
+    // Last action sequence seen per bot, so each result is reported once.
+    std::unordered_map<std::uint64_t, std::uint32_t> seenSequence;
 
     while (running)
     {
         forever_module::WorldTickSnapshotView const& view = session.ReadLatestSnapshot();
+
+        // Report what the core did with each action: a refusal is logged with its reason, once per action.
+        for (forever_module::BotSnapshot const& bot : view.bots)
+        {
+            auto seen = seenSequence.find(bot.guid);
+            if (bot.last_action_sequence == 0 || (seen != seenSequence.end() && seen->second == bot.last_action_sequence))
+                continue;
+            seenSequence[bot.guid] = bot.last_action_sequence;
+            if (bot.last_action_status != forever_module::BotActionStatus::kApplied)
+            {
+                std::cerr << "forever-bots: bot " << bot.guid << " " << ActionTypeName(bot.last_action_type)
+                          << (bot.last_action_spell ? " spell " + std::to_string(bot.last_action_spell) : std::string())
+                          << " not done: " << ActionStatusName(bot.last_action_status) << "\n";
+            }
+        }
+
         if (!sawSnapshot || view.tick_number != lastTick)
         {
             sawSnapshot = true;
@@ -93,6 +125,9 @@ int main(int argc, char** argv)
             settings = parsed;
         configured = true;
     });
+
+    PolicyOptions policyOptions;
+    policyOptions.TestSpell = settings.TestSpell;
 
     // The bots we may control: MaxBots from config, capped at what the core granted for Tier 2. Without a Tier 2 region
     // there is nothing to drive, so no bots are requested. The core enforces the same bound (ModuleBotOwnership).
@@ -184,7 +219,7 @@ int main(int argc, char** argv)
     std::atomic<bool> running{true};
     std::thread pump;
     if (forever_module::Tier2Session* session = client.AttachTier2())
-        pump = std::thread(PumpTier2, std::ref(*session), std::cref(running));
+        pump = std::thread(PumpTier2, std::ref(*session), std::cref(running), policyOptions);
     else
         std::cerr << "forever-bots: no Tier 2 region (" << client.tier2_error() << "); bots will not be driven\n";
 

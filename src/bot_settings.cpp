@@ -59,5 +59,6 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     // Race and class ids are validated by the core when it creates the character; here only the range is checked.
     ReadKey(config, "Race", 1, std::numeric_limits<std::uint8_t>::max(), settings.Race, warnings);
     ReadKey(config, "Class", 1, std::numeric_limits<std::uint8_t>::max(), settings.Class, warnings);
+    ReadKey(config, "TestSpell", 0, std::numeric_limits<std::int32_t>::max(), settings.TestSpell, warnings);
     return settings;
 }
