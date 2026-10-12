@@ -100,6 +100,47 @@ void DeadUnitsAreNotAttacked()
     CHECK(actions.size() == 1 && actions[0].type == ActionType::kStop);
 }
 
+// A bot's health and max health, with the bot's own threat target. Builds on View().
+WorldTickSnapshotView Hurt(std::uint32_t health, std::vector<NearbyUnit> nearby, std::uint64_t threat = 0)
+{
+    WorldTickSnapshotView view = View(1, threat, std::move(nearby));
+    view.bots[0].health = health;
+    return view;
+}
+
+void RetreatsBelowThirtyPercent()
+{
+    BotPolicy policy;
+    // 250 of 1000 is below 30%: a hostile is near and it is fighting, but it follows the player instead.
+    auto actions = policy.Decide(Hurt(250, { Unit(8, 2, 5.0f, true), Unit(2, 7, 12.0f, false) }, MakeUnitRef(8, 1, 9)));
+    CHECK(actions.size() == 1);
+    if (actions.size() == 1)
+    {
+        CHECK(actions[0].type == ActionType::kFollow);
+        CHECK(actions[0].target_guid == MakeUnitRef(2, 1, 7));
+    }
+}
+
+void RetreatWithNoPlayerStops()
+{
+    BotPolicy policy;
+    auto actions = policy.Decide(Hurt(100, { Unit(8, 2, 5.0f, true) }));
+    CHECK(actions.size() == 1 && actions[0].type == ActionType::kStop);
+}
+
+void ThirtyPercentIsNotLow()
+{
+    BotPolicy policy;
+    auto actions = policy.Decide(Hurt(300, { Unit(8, 2, 5.0f, true) }));
+    CHECK(actions.size() == 1 && actions[0].type == ActionType::kAttackTarget);
+}
+
+void DeadBotGetsNoOrders()
+{
+    BotPolicy policy;
+    CHECK(policy.Decide(Hurt(0, { Unit(8, 2, 5.0f, true) })).empty());
+}
+
 void OnlyChangesArePublished()
 {
     BotPolicy policy;
@@ -118,6 +159,10 @@ int main()
     FollowsPlayerWhenNoEnemy();
     StopsWhenNothingNearby();
     DeadUnitsAreNotAttacked();
+    RetreatsBelowThirtyPercent();
+    RetreatWithNoPlayerStops();
+    ThirtyPercentIsNotLow();
+    DeadBotGetsNoOrders();
     OnlyChangesArePublished();
 
     if (failures == 0)
