@@ -4,9 +4,10 @@ Bot control as a ForeverBots module. The core creates and controls bots; this mo
 
 ## Status
 
-First slice: the module connects to the core, asks for one bot with `RequestControl`, tracks the bots it owns, and
-logs revocations. It does not drive bots yet. Tier 2 bot actions (`Tier2Session::PublishActions`) are not in the
-SDK, so `tier2_participates` is `false`.
+The module connects to the core, asks for one bot with `RequestControl`, tracks the bots it owns, and logs
+revocations. It requests Tier 2 and drives its bots from snapshots: a pump thread reads each new snapshot and
+publishes actions from `BotPolicy`. The policy is a placeholder (fight the threat target or the closest hostile,
+else follow the closest player, else stand still).
 
 ## Build
 
@@ -20,11 +21,13 @@ Without `FOREVER_MODULE_SDK_SOURCE`, CMake fetches `Trixx34/forever-module-sdk` 
 
 - `module.json`: manifest (name, protocol version, Tier 1 hooks).
 - `src/bot_roster.{h,cpp}`: owned bots, pending requests, the max-bots cap. No SDK dependency.
-- `src/main.cpp`: handshake, control requests, revocation callbacks.
-- `tests/roster_test.cpp`: unit tests for the roster.
+- `src/bot_policy.{h,cpp}`: decides actions from one snapshot. No SDK state; only the snapshot types.
+- `src/main.cpp`: handshake, control requests, revocations, and the Tier 2 pump thread.
+- `tests/roster_test.cpp`, `tests/policy_test.cpp`: unit tests on hand-built data.
 
 ## Open items
 
 - Spawn race and class are hard-coded defaults (Human, Warrior) until module config is delivered by the core.
-- Max bots is a fixed default of 1 until the core's Tier 2 grant is used.
-- No bot behavior yet; that needs Tier 2 actions in the SDK.
+- Max bots is a fixed default of 1, not the core's Tier 2 grant.
+- The policy does not use spell cooldowns (the core does not fill them yet) or the bot's health.
+- Not yet tested against a running worldserver.
