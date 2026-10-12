@@ -8,6 +8,7 @@
 
 #include "bot_policy.h"
 #include "bot_roster.h"
+#include "bot_settings.h"
 
 #include "forever_module/module_client.h"
 #include "forever_module/tier2_session.h"
@@ -17,15 +18,13 @@
 #include <cstdint>
 #include <iostream>
 #include <thread>
+#include <unordered_map>
+#include <vector>
 
 namespace {
 
-// Spawn defaults until module config from the core is wired up (the core sends an empty config today).
-constexpr std::uint32_t kDefaultMaxBots = 1;
-constexpr std::uint32_t kDefaultRace = 1;    // Human
-constexpr std::uint32_t kDefaultClass = 1;   // Warrior
-
-// Tier 2 bounds asked for at handshake. The core may grant less.
+// Tier 2 bounds asked for at handshake. The core may grant less. Handshake comes before config, so the bot
+// count asked for here is the ceiling; MaxBots from config limits how many bots are actually spawned.
 constexpr std::uint32_t kRequestedNearbyUnits = 16;
 constexpr std::uint32_t kRequestedActions = 16;
 
@@ -68,7 +67,7 @@ int main(int argc, char** argv)
     manifest.module_name = "forever-bots";
     manifest.module_version = "0.1.0";
     manifest.tier2_participates = true;
-    manifest.requested_max_bots = kDefaultMaxBots;
+    manifest.requested_max_bots = kMaxBotsCeiling;
     manifest.requested_max_nearby_units = kRequestedNearbyUnits;
     manifest.requested_max_actions = kRequestedActions;
 
@@ -79,8 +78,23 @@ int main(int argc, char** argv)
         return 1;
     }
 
+    // Config is delivered right after the handshake, so the callback has already run once when OnConfig returns.
+    // Later re-deliveries come on the Run() thread; they are logged but do not change the bots already spawned.
+    BotSettings settings;
+    bool configured = false;
+    client.OnConfig([&settings, &configured](std::unordered_map<std::string, std::string> const& config)
+    {
+        std::vector<std::string> warnings;
+        BotSettings const parsed = ParseBotSettings(config, warnings);
+        for (std::string const& warning : warnings)
+            std::cerr << "forever-bots: config: " << warning << "\n";
+        if (!configured)
+            settings = parsed;
+        configured = true;
+    });
+
     // Shared between the callbacks below; all of them run on the thread that calls Run().
-    BotRoster roster(kDefaultMaxBots);
+    BotRoster roster(settings.MaxBots);
 
     client.OnControlRevoked([&roster](std::uint64_t botGuid, std::string const& reason)
     {
@@ -89,8 +103,8 @@ int main(int argc, char** argv)
     });
 
     forever_module::SpawnParams params;
-    params.set_race(kDefaultRace);
-    params.set_class_id(kDefaultClass);
+    params.set_race(settings.Race);
+    params.set_class_id(settings.Class);
 
     while (roster.CanRequest())
     {

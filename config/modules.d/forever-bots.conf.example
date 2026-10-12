@@ -1,0 +1,10 @@
+# Settings for the forever-bots module. Copy this file to modules.d/forever-bots.conf in the same
+# directory as worldserver.conf. The core loads every .conf file there at start-up and sends each
+# Module.forever-bots.<Key> entry to the module, with the prefix removed.
+
+# Most bots the module controls at once (1..16).
+Module.forever-bots.MaxBots = 1
+
+# Race and class the module spawns bots with. Valid ids for the core's race and class tables.
+Module.forever-bots.Race = 1
+Module.forever-bots.Class = 1

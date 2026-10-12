@@ -9,6 +9,16 @@ revocations. It requests Tier 2 and drives its bots from snapshots: a pump threa
 publishes actions from `BotPolicy`. The policy is a placeholder (fight the threat target or the closest hostile,
 else follow the closest player, else stand still).
 
+## Configuration
+
+The core sends the module the `Module.forever-bots.<Key>` entries from `modules.d/forever-bots.conf` (next to
+`worldserver.conf`), with the prefix removed. See `config/modules.d/forever-bots.conf.example`:
+
+- `MaxBots` (1..16, default 1): bots the module controls at once.
+- `Race` and `Class` (default 1 and 1): the race and class to spawn bots with.
+
+Invalid values fall back to the defaults, with a line in the module's log.
+
 ## Build
 
     cmake -S . -B build -DFOREVER_MODULE_SDK_SOURCE=/path/to/forever-module-sdk
@@ -22,12 +32,12 @@ Without `FOREVER_MODULE_SDK_SOURCE`, CMake fetches `Trixx34/forever-module-sdk` 
 - `module.json`: manifest (name, protocol version, Tier 1 hooks).
 - `src/bot_roster.{h,cpp}`: owned bots, pending requests, the max-bots cap. No SDK dependency.
 - `src/bot_policy.{h,cpp}`: decides actions from one snapshot. No SDK state; only the snapshot types.
-- `src/main.cpp`: handshake, control requests, revocations, and the Tier 2 pump thread.
-- `tests/roster_test.cpp`, `tests/policy_test.cpp`: unit tests on hand-built data.
+- `src/bot_settings.{h,cpp}`: reads the module's config (MaxBots, Race, Class).
+- `src/main.cpp`: handshake, config, control requests, revocations, and the Tier 2 pump thread.
+- `tests/roster_test.cpp`, `tests/policy_test.cpp`, `tests/settings_test.cpp`: unit tests on hand-built data.
 
 ## Open items
 
-- Spawn race and class are hard-coded defaults (Human, Warrior) until module config is delivered by the core.
-- Max bots is a fixed default of 1, not the core's Tier 2 grant.
+- Max bots is read from config but not checked against the core's Tier 2 grant.
 - The policy does not use spell cooldowns (the core does not fill them yet) or the bot's health.
 - Not yet tested against a running worldserver.
