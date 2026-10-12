@@ -409,8 +409,67 @@ void RefusedSitIsRetriedLater()
     CHECK(RestAt(policy.Decide(Hurt(600, {}, 0), 3500), spell) >= 0 && spell == 1);
 }
 
+// Whether `actions` holds a kVendor with this spell_id, or a kTrain.
+bool HasVendor(std::vector<BotAction> const& actions, std::uint32_t services)
+{
+    for (BotAction const& action : actions)
+        if (action.type == ActionType::kVendor && action.spell_id == services)
+            return true;
+    return false;
+}
+
+bool HasTrain(std::vector<BotAction> const& actions)
+{
+    for (BotAction const& action : actions)
+        if (action.type == ActionType::kTrain)
+            return true;
+    return false;
+}
+
+void ServicesWhenIdleOnTimerAndOnLevelUp()
+{
+    PolicyOptions options;
+    options.ServiceEveryMs = 600000;
+    options.TrainEveryMs = 600000;
+    BotPolicy policy(options);
+
+    WorldTickSnapshotView first = View(1, 0, {});
+    first.bots[0].level = 10;
+    auto actions = policy.Decide(first, 1000);
+    CHECK(HasVendor(actions, 7)); // sell grey, repair, equip
+    CHECK(HasTrain(actions));     // first check
+
+    // Nothing again until the timers run out, and no level has changed.
+    WorldTickSnapshotView soon = View(2, 0, {});
+    soon.bots[0].level = 10;
+    CHECK(!HasVendor(policy.Decide(soon, 2000), 7));
+    CHECK(!HasTrain(policy.Decide(soon, 2000)));
+
+    // A level-up checks the trainer at once, even though the timer has not run out.
+    WorldTickSnapshotView levelled = View(3, 0, {});
+    levelled.bots[0].level = 11;
+    CHECK(HasTrain(policy.Decide(levelled, 3000)));
+
+    // The vendor visit repeats on its own timer.
+    WorldTickSnapshotView later = View(4, 0, {});
+    later.bots[0].level = 11;
+    CHECK(HasVendor(policy.Decide(later, 601000), 7));
+}
+
+void NoServicesInAFight()
+{
+    BotPolicy policy;
+    WorldTickSnapshotView fighting = View(1, MakeUnitRef(8, 1, 2), { Hostile(2, 3.0f, 100) });
+    fighting.bots[0].level = 10;
+    auto actions = policy.Decide(fighting, 1000);
+    CHECK(!HasVendor(actions, 7));
+    CHECK(!HasTrain(actions));
+}
+
 int main()
 {
+    ServicesWhenIdleOnTimerAndOnLevelUp();
+    NoServicesInAFight();
     RestsWhenHurtAndIdle();
     NoRestAtFullHealthOrWithAPlayerNear();
     StandsBeforeAFight();

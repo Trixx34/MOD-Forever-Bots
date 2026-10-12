@@ -70,6 +70,17 @@ void RampSettings()
     CHECK(ParseBotSettings({ { "BotsCap", "1501" } }, warnings).Ramp.Cap == 1500);
 }
 
+void ServiceSettings()
+{
+    std::vector<std::string> warnings;
+    BotSettings const defaults = ParseBotSettings({}, warnings);
+    CHECK(defaults.ServiceEverySec == 600 && defaults.TrainEverySec == 600);
+    BotSettings const s = ParseBotSettings({ { "ServiceEverySec", "300" }, { "TrainEverySec", "30" } }, warnings);
+    CHECK(s.ServiceEverySec == 300);
+    CHECK(s.TrainEverySec == 600); // 30 is below the minimum: default, with a warning
+    CHECK(warnings.size() == 1);
+}
+
 void TelemetryRotationSettings()
 {
     std::vector<std::string> warnings;
@@ -138,6 +149,7 @@ int main()
     RandomRaceAndClass();
     RampSettings();
     TelemetryRotationSettings();
+    ServiceSettings();
     InvalidValuesFallBackWithWarnings();
     UnknownKeysAreIgnored();
     EffectiveMaxBotsIsCappedByGrant();

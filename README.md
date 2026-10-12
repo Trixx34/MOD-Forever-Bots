@@ -65,6 +65,18 @@ Without `FOREVER_MODULE_SDK_SOURCE`, CMake fetches `Trixx34/forever-module-sdk` 
 - Telemetry rotates at `TelemetryMaxMB`, keeping `TelemetryKeep` older files (`src/rotating_file.h`).
 - The pump logs its decide time and actions per tick once a minute.
 
+## Milestones: M2 to M4
+
+- M2 combat: rotation, approach, over-pull control, cooldown skips, Rend tracking, and rest (sit when idle and below 90%
+  health, stand before anything moves or fights). Flee is the 30% disengage: the snapshot has no fleeing state, so a
+  fleeing target is not detected.
+- M3 vendor: `kVendor` (spell_id bits: 1 sell grey items, 2 repair, 4 equip the best gear by item level). Runs on a timer
+  for an idle bot, when an NPC with the vendor or repair flag is in interaction range.
+- M4 trainers: `kTrain` learns the trainer's spells the bot can take now, lowest level first, through the core's teach
+  checks. Runs on a timer and at once after a level-up, when a trainer is in interaction range.
+- Services are opt-in in the policy (zero interval is off). The module turns them on from `ServiceEverySec` and
+  `TrainEverySec`. A refused service is logged at most once per bot every ten minutes.
+
 ## Telemetry (overnight runs)
 
 The pump writes one CSV line per event and one summary line per bot every `TelemetrySummarySec` seconds, appended to

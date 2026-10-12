@@ -31,3 +31,9 @@ Module.forever-bots.TelemetrySummarySec = 60
 # The telemetry file rotates at TelemetryMaxMB, keeping TelemetryKeep older files (file.1 is the newest).
 #   Module.forever-bots.TelemetryMaxMB = 256
 #   Module.forever-bots.TelemetryKeep = 8
+
+# Services (M3, M4): an idle bot visits a vendor (sell grey, repair, equip) every ServiceEverySec seconds, and checks its
+# trainer every TrainEverySec seconds (and at once after a level-up). The bot must be in interaction range of the NPC,
+# which the core checks: walking there is travel (M6), not done yet.
+#   Module.forever-bots.ServiceEverySec = 600
+#   Module.forever-bots.TrainEverySec = 600
