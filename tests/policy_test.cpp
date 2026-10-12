@@ -344,8 +344,77 @@ void RendIsNotRecastWhileActive()
     CHECK(HasCast(policy.Decide(View(3, 0, { Hostile(2, 3.0f, 100) }), 24000), 772));
 }
 
+// The rest action in `actions`: its spell_id (1 sit, 0 stand) and its position in the list, or -1 if there is none.
+int RestAt(std::vector<BotAction> const& actions, std::uint32_t& spellId)
+{
+    for (std::size_t i = 0; i < actions.size(); ++i)
+    {
+        if (actions[i].type == ActionType::kRest)
+        {
+            spellId = actions[i].spell_id;
+            return static_cast<int>(i);
+        }
+    }
+    return -1;
+}
+
+void RestsWhenHurtAndIdle()
+{
+    BotPolicy policy;
+    std::uint32_t spell = 99;
+    CHECK(RestAt(policy.Decide(Hurt(600, {}), 1000), spell) >= 0);
+    CHECK(spell == 1); // sit down
+}
+
+void NoRestAtFullHealthOrWithAPlayerNear()
+{
+    BotPolicy policy;
+    std::uint32_t spell = 99;
+    CHECK(RestAt(policy.Decide(View(1, 0, {}), 1000), spell) < 0); // full health
+
+    BotPolicy withPlayer;
+    CHECK(RestAt(withPlayer.Decide(Hurt(600, { Unit(2, 7, 4.0f, false, 100) }), 1000), spell) < 0); // a player to follow
+}
+
+void StandsBeforeAFight()
+{
+    BotPolicy policy;
+    std::uint32_t spell = 99;
+    CHECK(RestAt(policy.Decide(Hurt(600, {}), 1000), spell) >= 0 && spell == 1);
+
+    // A hostile attacks the bot: the stand goes out before the attack in the same action set.
+    auto actions = policy.Decide(Hurt(600, { Hostile(2, 3.0f, 100) }, MakeUnitRef(8, 1, 2)), 2000);
+    int const stand = RestAt(actions, spell);
+    CHECK(stand >= 0 && spell == 0);
+    int attack = -1;
+    for (std::size_t i = 0; i < actions.size(); ++i)
+        if (actions[i].type == ActionType::kAttackTarget)
+            attack = static_cast<int>(i);
+    CHECK(attack >= 0 && stand < attack);
+}
+
+void RefusedSitIsRetriedLater()
+{
+    BotPolicy policy;
+    std::uint32_t spell = 99;
+    CHECK(RestAt(policy.Decide(Hurt(600, {}), 1000), spell) >= 0 && spell == 1);
+
+    // The core refused the sit (in combat): the bot is not sitting, and it does not try again for a second.
+    WorldTickSnapshotView refused = Hurt(600, {});
+    refused.bots[0].last_action_sequence = 1;
+    refused.bots[0].last_action_type = uint8_t(ActionType::kRest);
+    refused.bots[0].last_action_status = BotActionStatus::kRefused;
+    CHECK(RestAt(policy.Decide(refused, 2000), spell) < 0);
+    CHECK(RestAt(policy.Decide(Hurt(600, {}, 0), 2500), spell) < 0);
+    CHECK(RestAt(policy.Decide(Hurt(600, {}, 0), 3500), spell) >= 0 && spell == 1);
+}
+
 int main()
 {
+    RestsWhenHurtAndIdle();
+    NoRestAtFullHealthOrWithAPlayerNear();
+    StandsBeforeAFight();
+    RefusedSitIsRetriedLater();
     OverPullIsSkipped();
     SmallGroupIsPulled();
     ThreatTargetIsFoughtInAGroup();

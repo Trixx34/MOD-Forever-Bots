@@ -26,6 +26,7 @@ constexpr float kPullRadius = 10.0f;         // yards: hostiles this close to a 
 constexpr std::size_t kMaxPull = 3;          // a group larger than this is not pulled (over-pull control)
 constexpr std::uint32_t kRend = 772;         // warrior rank 1; the bleed lasts 21 seconds
 constexpr std::uint64_t kRendDurationMs = 21000;
+constexpr std::uint32_t kRestBelowPct = 90;  // an idle bot below this health sits down to rest
 
 // Duration of the damage-over-time effect a spell leaves on its target, or 0 for spells the policy does not track.
 std::uint64_t DotDurationMs(std::uint32_t spell)
@@ -128,6 +129,14 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
         return;
     state.LastSequence = bot.last_action_sequence;
 
+    // The core refuses a sit while in combat: the bot is not sitting, and the sit waits a second.
+    if (bot.last_action_type == uint8_t(ActionType::kRest) && bot.last_action_status == BotActionStatus::kRefused)
+    {
+        state.Sitting = false;
+        state.RestRetryAtMs = nowMs + kRetryMs;
+        return;
+    }
+
     if (bot.last_action_type != uint8_t(ActionType::kCastSpell) || bot.last_action_spell == 0)
         return;
 
@@ -217,6 +226,26 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         {
             state.InFight = false;
             wanted = player ? Decision{ ActionType::kFollow, player->guid } : Decision{ ActionType::kStop, 0 };
+        }
+
+        // Rest: sit down while idle and hurt, and stand before anything moves or fights. The stand goes out before the
+        // movement below, in the same action set, so the bot never moves sitting.
+        // Idle means no fight and no player to follow, with no live hostile anywhere near: a sitting bot is easy prey.
+        bool enemyNear = false;
+        for (NearbyUnit const& unit : nearby)
+            enemyNear = enemyNear || IsLiveHostile(unit);
+        bool const idle = !hasTarget && !enemyNear && wanted.Type == ActionType::kStop;
+        bool const hurtEnough = bot.max_health > 0 && std::uint64_t(bot.health) * 100 < std::uint64_t(bot.max_health) * kRestBelowPct;
+        bool const stillHurt = bot.max_health > 0 && bot.health < bot.max_health;
+        bool const sitWanted = idle && (state.Sitting ? stillHurt : hurtEnough) && nowMs >= state.RestRetryAtMs;
+        if (sitWanted != state.Sitting)
+        {
+            BotAction rest;
+            rest.bot_guid = bot.guid;
+            rest.type = ActionType::kRest;
+            rest.spell_id = sitWanted ? 1 : 0;
+            actions.push_back(rest);
+            state.Sitting = sitWanted;
         }
 
         if (!state.Last || state.Last->Type != wanted.Type || state.Last->Target != wanted.Target)

@@ -7,6 +7,8 @@
 // else follow the closest player or stand still. A threat target is always fought. Decisions are sent when they change.
 // A refused cast is retried after a while, and its spell is not used again before then. A spell the snapshot reports as on
 // cooldown is skipped. Rend's bleed is tracked per target, since the snapshot has no auras, so it is not recast while active.
+// Rest (M2): an idle bot below 90% health sits down, and stays sat until its health is full. It stands before it moves,
+// follows or fights. A sit refused in combat is retried after a second.
 #pragma once
 
 #include "forever_module/tier2_session.h"
@@ -66,6 +68,8 @@ private:
         std::unordered_map<std::uint32_t, std::uint64_t> CastTarget; // spell -> target of the last cast sent for it
         std::unordered_map<std::uint32_t, Dot> Dots;     // spell -> effect on a target, while it lasts
         std::optional<std::uint64_t> LastTestCastTick;
+        bool Sitting = false;                            // sat down to rest; stands before it moves or fights
+        std::uint64_t RestRetryAtMs = 0;                 // a refused sit is not tried again before this
     };
 
     void ReadResult(BotState& state, forever_module::BotSnapshot const& bot, std::uint64_t nowMs);
