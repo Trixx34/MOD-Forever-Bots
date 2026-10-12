@@ -1,5 +1,6 @@
 #include "bot_settings.h"
 
+#include <algorithm>
 #include <charconv>
 #include <limits>
 #include <system_error>
@@ -43,6 +44,13 @@ void ReadKey(std::unordered_map<std::string, std::string> const& config, char co
 }
 
 } // namespace
+
+std::uint32_t EffectiveMaxBots(std::uint32_t configured, std::uint32_t grantedMaxBots, bool tier2Granted)
+{
+    if (!tier2Granted)
+        return 0;
+    return std::min(configured, grantedMaxBots);
+}
 
 BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const& config, std::vector<std::string>& warnings)
 {

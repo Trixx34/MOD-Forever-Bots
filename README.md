@@ -17,7 +17,8 @@ The core sends the module the `Module.forever-bots.<Key>` entries from `modules.
 - `MaxBots` (1..16, default 1): bots the module controls at once.
 - `Race` and `Class` (default 1 and 1): the race and class to spawn bots with.
 
-Invalid values fall back to the defaults, with a line in the module's log.
+Invalid values fall back to the defaults, with a line in the module's log. The bots spawned are capped at the core's
+Tier 2 grant, and none are requested when there is no Tier 2 region.
 
 ## Build
 
@@ -38,6 +39,5 @@ Without `FOREVER_MODULE_SDK_SOURCE`, CMake fetches `Trixx34/forever-module-sdk` 
 
 ## Open items
 
-- Max bots is read from config but not checked against the core's Tier 2 grant.
 - The policy does not use spell cooldowns (the core does not fill them yet) or the bot's health.
 - Not yet tested against a running worldserver.
