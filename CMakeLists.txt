@@ -22,12 +22,15 @@ find_package(Threads REQUIRED)
 add_library(forever_bots_roster STATIC src/bot_roster.cpp)
 target_include_directories(forever_bots_roster PUBLIC src)
 
+add_library(forever_bots_settings STATIC src/bot_settings.cpp)
+target_include_directories(forever_bots_settings PUBLIC src)
+
 add_library(forever_bots_policy STATIC src/bot_policy.cpp)
 target_include_directories(forever_bots_policy PUBLIC src)
 target_link_libraries(forever_bots_policy PUBLIC forever_module_sdk)
 
 add_executable(forever-bots src/main.cpp)
-target_link_libraries(forever-bots PRIVATE forever_bots_roster forever_bots_policy forever_module_sdk Threads::Threads)
+target_link_libraries(forever-bots PRIVATE forever_bots_roster forever_bots_policy forever_bots_settings forever_module_sdk Threads::Threads)
 
 enable_testing()
 add_executable(roster_test tests/roster_test.cpp)
@@ -37,3 +40,7 @@ add_test(NAME roster COMMAND roster_test)
 add_executable(policy_test tests/policy_test.cpp)
 target_link_libraries(policy_test PRIVATE forever_bots_policy)
 add_test(NAME policy COMMAND policy_test)
+
+add_executable(settings_test tests/settings_test.cpp)
+target_link_libraries(settings_test PRIVATE forever_bots_settings)
+add_test(NAME settings COMMAND settings_test)
