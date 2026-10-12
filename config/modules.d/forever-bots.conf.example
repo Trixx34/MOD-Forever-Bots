@@ -12,3 +12,22 @@ Module.forever-bots.Class = 1
 # Leave TelemetryFile empty to turn it off. TelemetrySummarySec is the seconds between summary lines per bot (1..3600).
 Module.forever-bots.TelemetryFile = forever-bots-telemetry.csv
 Module.forever-bots.TelemetrySummarySec = 60
+
+# Scale run (1500 bots): Race and Class may be "random" (a seeded pick over the valid combinations; see src/bot_pick.h).
+# RandomSeed makes the same bots come back for the same seed.
+#   Module.forever-bots.Race = random
+#   Module.forever-bots.Class = random
+#   Module.forever-bots.RandomSeed = 20261012
+#
+# The ramp: start at BotsInitial, add BotsStep every BotsStepMinutes, never above BotsCap, and stop adding at BotsStopTime
+# (local time). The core ends the run at the same time (Bot.Run.StopTime in worldserver.conf).
+#   Module.forever-bots.MaxBots = 1500
+#   Module.forever-bots.BotsInitial = 300
+#   Module.forever-bots.BotsStep = 100
+#   Module.forever-bots.BotsStepMinutes = 15
+#   Module.forever-bots.BotsCap = 1500
+#   Module.forever-bots.BotsStopTime = 06:00
+#
+# The telemetry file rotates at TelemetryMaxMB, keeping TelemetryKeep older files (file.1 is the newest).
+#   Module.forever-bots.TelemetryMaxMB = 256
+#   Module.forever-bots.TelemetryKeep = 8

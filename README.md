@@ -48,10 +48,22 @@ Without `FOREVER_MODULE_SDK_SOURCE`, CMake fetches `Trixx34/forever-module-sdk` 
 - `src/bot_policy.{h,cpp}`: decides actions from snapshots: approach, attack, rotation casts, retries, disengage.
 - `src/combat_rotation.{h,cpp}`: rotation rules (ported from the forever branch), warrior rows, facts from a snapshot.
 - `src/bot_telemetry.{h,cpp}`: the CSV record of what each bot did (see Telemetry below). No SDK dependency beyond snapshot types.
-- `src/bot_settings.{h,cpp}`: reads the module's config (MaxBots, Race, Class, TestSpell, TelemetryFile, TelemetrySummarySec).
+- `src/bot_settings.{h,cpp}`: reads the module's config (MaxBots, Race, Class, RandomSeed, the Bots* ramp keys, TestSpell, telemetry keys).
+- `src/bot_pick.{h,cpp}`, `src/bot_ramp.{h,cpp}`, `src/rotating_file.{h,cpp}`: the random pick, the ramp schedule, and the rotating telemetry file.
 - `src/bot_store.{h,cpp}`: the store row keys (`bot/<guid>`) for the bots the module controls.
 - `src/main.cpp`: handshake, config, control requests, revocations, and the Tier 2 pump thread.
 - `tests/*_test.cpp`: unit tests for each library (roster, policy, rotation, settings, bot store, telemetry).
+
+## Scale run (up to 1500 bots)
+
+- `Race` and `Class` accept `random`: a seeded pick over the Forever valid combinations (`src/bot_pick.h`, from the Wowhead
+  Forever grid, patch 1.60.1). The core validates each pick (`Player::Create`), so a stale entry costs one refused spawn.
+- The ramp (`src/bot_ramp.h`) asks for `BotsInitial` bots, adds `BotsStep` every `BotsStepMinutes`, never above `BotsCap`,
+  and stops adding at `BotsStopTime` local time. It runs on a 5 s SDK timer on the `Run()` thread, and spawns at most 10 per
+  tick. A refused spawn waits 30 s.
+- A config reload updates the ramp, the random picks and the cap. No bot is logged out.
+- Telemetry rotates at `TelemetryMaxMB`, keeping `TelemetryKeep` older files (`src/rotating_file.h`).
+- The pump logs its decide time and actions per tick once a minute.
 
 ## Telemetry (overnight runs)
 
