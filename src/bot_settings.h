@@ -30,6 +30,10 @@ struct BotSettings
     std::uint32_t TelemetryKeep = 5;
     // Seconds between summary lines per bot (config key TelemetrySummarySec, 1..3600).
     std::uint32_t TelemetrySummarySec = 60;
+    // Seconds between vendor visits (sell grey, repair, equip) and between trainer checks, for an idle bot. A level-up
+    // triggers a trainer check at once. Config keys ServiceEverySec and TrainEverySec (60..86400).
+    std::uint32_t ServiceEverySec = 600;
+    std::uint32_t TrainEverySec = 600;
 };
 
 // The most bots any configuration may ask for; also the Tier 2 bot bound requested at handshake.

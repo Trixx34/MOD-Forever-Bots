@@ -29,6 +29,10 @@ struct PolicyOptions
     std::uint32_t ClassId = 0;
     // The class of each bot, when bots differ (random picks). Unset, or returning 0, falls back to ClassId.
     std::function<std::uint32_t(std::uint64_t botGuid)> ClassOf;
+    // Vendor visits and trainer checks for an idle bot (M3, M4). A level-up checks the trainer at once. Zero turns that
+    // service off; the module turns them on from its settings.
+    std::uint64_t ServiceEveryMs = 0;
+    std::uint64_t TrainEveryMs = 0;
 };
 
 // Name of an action status, for logs.
@@ -70,6 +74,9 @@ private:
         std::optional<std::uint64_t> LastTestCastTick;
         bool Sitting = false;                            // sat down to rest; stands before it moves or fights
         std::uint64_t RestRetryAtMs = 0;                 // a refused sit is not tried again before this
+        std::uint64_t NextServiceMs = 0;                 // next vendor visit (sell grey, repair, equip)
+        std::uint64_t NextTrainMs = 0;                   // next trainer check
+        std::uint32_t LastTrainLevel = 0;                // the level at the last trainer check
     };
 
     void ReadResult(BotState& state, forever_module::BotSnapshot const& bot, std::uint64_t nowMs);

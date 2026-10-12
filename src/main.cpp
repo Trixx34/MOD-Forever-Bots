@@ -42,6 +42,7 @@ constexpr std::uint32_t kRequestedActions = 2 * kMaxBotsCeiling;
 
 constexpr std::chrono::milliseconds kPumpInterval(5);
 constexpr std::uint64_t kPumpReportMs = 60000;
+constexpr std::uint64_t kServiceNoticeMs = 600000; // a refused vendor or trainer is logged once per bot per ten minutes
 
 // The spawn ramp. Every kRampInterval the module asks for up to kSpawnsPerRampTick new bots: 2 spawn requests a second at
 // the defaults. The core logs bots in at most Bot.Login.MaxPerSecond a second, so a ramp step of 100 bots takes about 50
@@ -59,6 +60,9 @@ char const* ActionTypeName(std::uint8_t type)
         case forever_module::ActionType::kAttackTarget: return "attack";
         case forever_module::ActionType::kFollow: return "follow";
         case forever_module::ActionType::kStop: return "stop";
+        case forever_module::ActionType::kRest: return "rest";
+        case forever_module::ActionType::kVendor: return "vendor";
+        case forever_module::ActionType::kTrain: return "train";
     }
     return "action";
 }
@@ -187,6 +191,7 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
     std::uint64_t lastTick = 0;
     // Last action sequence seen per bot, so each result is reported once.
     std::unordered_map<std::uint64_t, std::uint32_t> seenSequence;
+    std::unordered_map<std::uint64_t, std::uint64_t> serviceNoticeMs; // bot -> when a service refusal was last logged
 
     // Timing of the policy, reported once a minute so the cost at the current bot count is in the log.
     std::uint64_t reportedAt = nowMs();
@@ -234,6 +239,18 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
             seenSequence[bot.guid] = bot.last_action_sequence;
             if (bot.last_action_status != forever_module::BotActionStatus::kApplied)
             {
+                // A vendor or trainer is refused whenever no NPC is in range, the normal state of an idle bot. Those are
+                // logged at most once per bot every ten minutes, so 1500 bots do not flood the log.
+                bool const service = bot.last_action_type == static_cast<std::uint8_t>(forever_module::ActionType::kVendor) ||
+                                     bot.last_action_type == static_cast<std::uint8_t>(forever_module::ActionType::kTrain);
+                if (service)
+                {
+                    std::uint64_t const now = nowMs();
+                    auto const last = serviceNoticeMs.find(bot.guid);
+                    if (last != serviceNoticeMs.end() && now - last->second < kServiceNoticeMs)
+                        continue;
+                    serviceNoticeMs[bot.guid] = now;
+                }
                 std::cerr << "forever-bots: bot " << bot.guid << " " << ActionTypeName(bot.last_action_type)
                           << (bot.last_action_spell ? " spell " + std::to_string(bot.last_action_spell) : std::string())
                           << " not done: " << ActionStatusName(bot.last_action_status) << "\n";
@@ -414,6 +431,8 @@ int main(int argc, char** argv)
     PolicyOptions policyOptions;
     policyOptions.TestSpell = settings.TestSpell;
     policyOptions.ClassId = settings.Class;
+    policyOptions.ServiceEveryMs = std::uint64_t(settings.ServiceEverySec) * 1000;
+    policyOptions.TrainEveryMs = std::uint64_t(settings.TrainEverySec) * 1000;
     policyOptions.ClassOf = [&classes](std::uint64_t botGuid) { return classes.Get(botGuid); };
 
     // Tier 2 is granted at handshake, so there is a region only if the core accepted it.

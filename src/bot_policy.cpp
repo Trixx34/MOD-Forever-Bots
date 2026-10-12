@@ -26,6 +26,10 @@ constexpr float kPullRadius = 10.0f;         // yards: hostiles this close to a 
 constexpr std::size_t kMaxPull = 3;          // a group larger than this is not pulled (over-pull control)
 constexpr std::uint32_t kRend = 772;         // warrior rank 1; the bleed lasts 21 seconds
 constexpr std::uint64_t kRendDurationMs = 21000;
+// kVendor's spell_id bits (the core's ModuleBotActions): sell grey items, repair, equip the best gear.
+constexpr std::uint32_t kServiceSell = 1;
+constexpr std::uint32_t kServiceRepair = 2;
+constexpr std::uint32_t kServiceEquip = 4;
 constexpr std::uint32_t kRestBelowPct = 90;  // an idle bot below this health sits down to rest
 
 // Duration of the damage-over-time effect a spell leaves on its target, or 0 for spells the policy does not track.
@@ -246,6 +250,29 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             rest.spell_id = sitWanted ? 1 : 0;
             actions.push_back(rest);
             state.Sitting = sitWanted;
+        }
+
+        // Services (M3, M4) for an idle bot: a vendor visit on a timer (sell grey, repair, equip), and a trainer check on a
+        // timer or at once after a level-up. The core refuses both when no NPC is in interaction range, which is expected
+        // until travel (M6) takes bots to them.
+        if (idle && _options.ServiceEveryMs != 0 && nowMs >= state.NextServiceMs)
+        {
+            BotAction vendor;
+            vendor.bot_guid = bot.guid;
+            vendor.type = ActionType::kVendor;
+            vendor.spell_id = kServiceSell | kServiceRepair | kServiceEquip;
+            actions.push_back(vendor);
+            state.NextServiceMs = nowMs + _options.ServiceEveryMs;
+        }
+        bool const levelUp = bot.level != 0 && bot.level != state.LastTrainLevel;
+        if (idle && _options.TrainEveryMs != 0 && (levelUp || nowMs >= state.NextTrainMs))
+        {
+            BotAction train;
+            train.bot_guid = bot.guid;
+            train.type = ActionType::kTrain;
+            actions.push_back(train);
+            state.LastTrainLevel = bot.level;
+            state.NextTrainMs = nowMs + _options.TrainEveryMs;
         }
 
         if (!state.Last || state.Last->Type != wanted.Type || state.Last->Target != wanted.Target)
