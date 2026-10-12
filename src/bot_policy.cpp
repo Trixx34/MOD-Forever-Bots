@@ -2,6 +2,7 @@
 
 #include "combat_rotation.h"
 
+#include <cmath>
 #include <iterator>
 #include <limits>
 #include <span>
@@ -21,6 +22,53 @@ constexpr std::uint64_t kGlobalCooldownMs = 1500;
 constexpr std::uint64_t kRetryMs = 1000;     // out of range, invalid target, refused, not enough power
 constexpr std::uint64_t kCooldownRetryMs = 2000;
 constexpr std::uint64_t kNotKnownRetryMs = 60000; // the spell may be learned later
+constexpr float kPullRadius = 10.0f;         // yards: hostiles this close to a candidate are pulled with it
+constexpr std::size_t kMaxPull = 3;          // a group larger than this is not pulled (over-pull control)
+constexpr std::uint32_t kRend = 772;         // warrior rank 1; the bleed lasts 21 seconds
+constexpr std::uint64_t kRendDurationMs = 21000;
+
+// Duration of the damage-over-time effect a spell leaves on its target, or 0 for spells the policy does not track.
+std::uint64_t DotDurationMs(std::uint32_t spell)
+{
+    return spell == kRend ? kRendDurationMs : 0;
+}
+
+float DistanceBetween(NearbyUnit const& a, NearbyUnit const& b)
+{
+    float const dx = a.pos_x - b.pos_x;
+    float const dy = a.pos_y - b.pos_y;
+    return std::sqrt(dx * dx + dy * dy);
+}
+
+bool IsLiveHostile(NearbyUnit const& unit);
+
+// The closest live hostile that is not part of a group larger than kMaxPull, or nullptr. A group is the hostiles within
+// kPullRadius of the candidate, the candidate included. Units already attacking the bot are not chosen here; the policy
+// fights its threat target whatever the group size.
+NearbyUnit const* PullTarget(BotSnapshot const& bot, std::span<NearbyUnit const> units)
+{
+    NearbyUnit const* best = nullptr;
+    float bestDist = std::numeric_limits<float>::max();
+    for (NearbyUnit const& candidate : units)
+    {
+        if (!IsLiveHostile(candidate))
+            continue;
+        float const dist = rotation::DistanceYards(bot, candidate);
+        if (dist >= bestDist)
+            continue;
+
+        std::size_t group = 0;
+        for (NearbyUnit const& other : units)
+            if (IsLiveHostile(other) && DistanceBetween(candidate, other) <= kPullRadius)
+                ++group;
+        if (group > kMaxPull)
+            continue;
+
+        bestDist = dist;
+        best = &candidate;
+    }
+    return best;
+}
 
 // The closest unit in `units` that satisfies `wanted`, or nullptr.
 NearbyUnit const* Closest(BotSnapshot const& bot, std::span<NearbyUnit const> units, bool (*wanted)(NearbyUnit const&))
@@ -84,6 +132,13 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
         return;
 
     std::uint32_t const spell = bot.last_action_spell;
+    if (bot.last_action_status == BotActionStatus::kApplied && DotDurationMs(spell) != 0)
+    {
+        auto const cast = state.CastTarget.find(spell);
+        if (cast != state.CastTarget.end() && cast->second != 0)
+            state.Dots[spell] = Dot{ cast->second, nowMs + DotDurationMs(spell) };
+    }
+
     switch (bot.last_action_status)
     {
         case BotActionStatus::kNotKnown:
@@ -136,7 +191,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 if (unit.guid == targetRef)
                     targetUnit = &unit;
         }
-        else if (NearbyUnit const* hostile = Closest(bot, nearby, IsLiveHostile))
+        else if (NearbyUnit const* hostile = PullTarget(bot, nearby))
         {
             targetUnit = hostile;
             targetRef = hostile->guid;
@@ -198,14 +253,27 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         if (nowMs < state.NextCastMs)
             continue;
         rotation::Facts const facts = rotation::FactsFor(bot, nearby, targetUnit, state.InFight ? nowMs - state.FightStartMs : 0);
+
+        // Spells the core reports as cooling down right now.
+        std::unordered_set<std::uint32_t> cooling;
+        for (forever_module::SpellCooldown const& cooldown : bot.spell_cooldowns)
+            if (cooldown.spell_id != 0 && cooldown.remaining_ms != 0)
+                cooling.insert(cooldown.spell_id);
+
         for (rotation::Row const& row : rotation::RowsForClass(_options.ClassId))
         {
             auto const retry = state.RetryAtMs.find(row.Spell);
             if (retry != state.RetryAtMs.end() && nowMs < retry->second)
                 continue;
+            if (cooling.count(row.Spell))
+                continue;
             if (row.OnTarget && (distance < row.MinRange || (row.MaxRange > 0.0f && distance > row.MaxRange)))
                 continue;
             if (!rotation::Allowed(row.When, facts))
+                continue;
+            // The effect is still on the target: recasting only refreshes it.
+            auto const dot = state.Dots.find(row.Spell);
+            if (row.OnTarget && dot != state.Dots.end() && dot->second.Target == targetRef && nowMs < dot->second.UntilMs)
                 continue;
 
             BotAction cast;
@@ -214,6 +282,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             cast.spell_id = row.Spell;
             cast.target_guid = row.OnTarget ? targetRef : 0;
             actions.push_back(cast);
+            state.CastTarget[row.Spell] = cast.target_guid;
             state.NextCastMs = nowMs + kGlobalCooldownMs;
             break;
         }

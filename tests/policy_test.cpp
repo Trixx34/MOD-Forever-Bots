@@ -279,8 +279,78 @@ void ApproachesADistantTarget()
     CHECK(later.empty()); // the follow is unchanged and no row is allowed at 12 yards
 }
 
+void OverPullIsSkipped()
+{
+    // Four hostiles within 3 to 6 yards: a group of four is more than the bot pulls. No target, so the bot only stops.
+    BotPolicy policy = WarriorPolicy();
+    auto actions = policy.Decide(View(1, 0, { Hostile(2, 3.0f, 100), Hostile(3, 4.0f, 100), Hostile(4, 5.0f, 100), Hostile(5, 6.0f, 100) }), 1000);
+    CHECK(actions.size() == 1 && actions[0].type == ActionType::kStop);
+    for (BotAction const& action : actions)
+        CHECK(action.type != ActionType::kAttackTarget && action.type != ActionType::kCastSpell);
+}
+
+void SmallGroupIsPulled()
+{
+    // Three hostiles together is the most the bot pulls: it attacks the closest.
+    BotPolicy policy = WarriorPolicy();
+    auto actions = policy.Decide(View(1, 0, { Hostile(2, 3.0f, 100), Hostile(3, 4.0f, 100), Hostile(4, 5.0f, 100) }), 1000);
+    bool attacked = false;
+    for (BotAction const& action : actions)
+        if (action.type == ActionType::kAttackTarget && action.target_guid == MakeUnitRef(8, 1, 2))
+            attacked = true;
+    CHECK(attacked);
+}
+
+void ThreatTargetIsFoughtInAGroup()
+{
+    // A group of four, but one of them is already attacking the bot: it is fought, even though a pull would be refused.
+    BotPolicy policy = WarriorPolicy();
+    auto actions = policy.Decide(View(1, MakeUnitRef(8, 1, 5), { Hostile(2, 3.0f, 100), Hostile(3, 4.0f, 100), Hostile(4, 5.0f, 100), Hostile(5, 6.0f, 100) }), 1000);
+    bool followedAttacker = false;
+    for (BotAction const& action : actions)
+        if (action.type == ActionType::kFollow && action.target_guid == MakeUnitRef(8, 1, 5))
+            followedAttacker = true;
+    CHECK(followedAttacker); // the attacker is 6 yards away: the bot walks to it
+}
+
+void CooldownSkipsTheSpell()
+{
+    // Execute is on cooldown in the snapshot, so the target at 15% health gets Rend instead.
+    BotPolicy policy = WarriorPolicy();
+    WorldTickSnapshotView view = View(1, 0, { Hostile(2, 3.0f, 15) });
+    view.bots[0].spell_cooldowns[0].spell_id = 5308;
+    view.bots[0].spell_cooldowns[0].remaining_ms = 5000;
+    auto actions = policy.Decide(view, 1000);
+    CHECK(!HasCast(actions, 5308));
+    CHECK(HasCast(actions, 772));
+}
+
+void RendIsNotRecastWhileActive()
+{
+    BotPolicy policy = WarriorPolicy();
+    CHECK(HasCast(policy.Decide(View(1, 0, { Hostile(2, 3.0f, 100) }), 1000), 772));
+
+    // Rend was applied at 2600 ms, so it lasts until 23600 ms. Until then the bot uses the next allowed row (Heroic Strike).
+    WorldTickSnapshotView applied = View(2, 0, { Hostile(2, 3.0f, 100) });
+    applied.bots[0].last_action_sequence = 1;
+    applied.bots[0].last_action_type = uint8_t(ActionType::kCastSpell);
+    applied.bots[0].last_action_spell = 772;
+    applied.bots[0].last_action_status = BotActionStatus::kApplied;
+    auto actions = policy.Decide(applied, 2600);
+    CHECK(!HasCast(actions, 772));
+    CHECK(HasCast(actions, 78));
+
+    // After it wears off, Rend is cast again.
+    CHECK(HasCast(policy.Decide(View(3, 0, { Hostile(2, 3.0f, 100) }), 24000), 772));
+}
+
 int main()
 {
+    OverPullIsSkipped();
+    SmallGroupIsPulled();
+    ThreatTargetIsFoughtInAGroup();
+    CooldownSkipsTheSpell();
+    RendIsNotRecastWhileActive();
     WarriorExecutesALowTarget();
     GlobalCooldownSpacesCasts();
     RefusedCastFallsThrough();
