@@ -28,7 +28,7 @@ target_include_directories(forever_bots_settings PUBLIC src)
 add_library(forever_bots_store STATIC src/bot_store.cpp)
 target_include_directories(forever_bots_store PUBLIC src)
 
-add_library(forever_bots_policy STATIC src/bot_policy.cpp)
+add_library(forever_bots_policy STATIC src/bot_policy.cpp src/combat_rotation.cpp)
 target_include_directories(forever_bots_policy PUBLIC src)
 target_link_libraries(forever_bots_policy PUBLIC forever_module_sdk)
 
@@ -51,3 +51,7 @@ add_test(NAME settings COMMAND settings_test)
 add_executable(bot_store_test tests/bot_store_test.cpp)
 target_link_libraries(bot_store_test PRIVATE forever_bots_store)
 add_test(NAME bot_store COMMAND bot_store_test)
+
+add_executable(rotation_test tests/rotation_test.cpp)
+target_link_libraries(rotation_test PRIVATE forever_bots_policy)
+add_test(NAME rotation COMMAND rotation_test)
