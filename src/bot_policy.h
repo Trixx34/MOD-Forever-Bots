@@ -3,8 +3,10 @@
 //
 // Behaviour, in order: below 30% health disengage (follow the closest player, or stand still); with a target, approach it
 // when it is more than 5 yards away, otherwise attack it, and cast the class rotation (combat_rotation.h) once per global
-// cooldown; with no target, follow the closest player or stand still. Decisions are sent when they change. A refused cast
-// is retried after a while, and its spell is not used again before then.
+// cooldown; with no target, pull the closest hostile unless it is part of a group of more than three (over-pull control),
+// else follow the closest player or stand still. A threat target is always fought. Decisions are sent when they change.
+// A refused cast is retried after a while, and its spell is not used again before then. A spell the snapshot reports as on
+// cooldown is skipped. Rend's bleed is tracked per target, since the snapshot has no auras, so it is not recast while active.
 #pragma once
 
 #include "forever_module/tier2_session.h"
@@ -43,6 +45,13 @@ private:
         std::uint64_t Target = 0;
     };
 
+    // A damage-over-time effect the policy believes is on a target, from an accepted cast.
+    struct Dot
+    {
+        std::uint64_t Target = 0;
+        std::uint64_t UntilMs = 0;
+    };
+
     struct BotState
     {
         std::optional<Decision> Last;                    // the last movement or attack decision sent
@@ -51,6 +60,8 @@ private:
         std::uint64_t NextCastMs = 0;                    // global cooldown: no rotation cast before this
         std::uint32_t LastSequence = 0;                  // last action result seen
         std::unordered_map<std::uint32_t, std::uint64_t> RetryAtMs; // spell -> time it may be cast again
+        std::unordered_map<std::uint32_t, std::uint64_t> CastTarget; // spell -> target of the last cast sent for it
+        std::unordered_map<std::uint32_t, Dot> Dots;     // spell -> effect on a target, while it lasts
         std::optional<std::uint64_t> LastTestCastTick;
     };
 
