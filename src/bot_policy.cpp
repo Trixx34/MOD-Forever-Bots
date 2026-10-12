@@ -61,9 +61,22 @@ std::vector<BotAction> BotPolicy::Decide(forever_module::WorldTickSnapshotView c
         BotSnapshot const& bot = view.bots[i];
         present.insert(bot.guid);
 
+        // A dead bot gets no orders; its last decision stays in place until it is alive again.
+        if (bot.health == 0)
+            continue;
+
         std::span<NearbyUnit const> nearby = view.NearbyOf(i);
+        NearbyUnit const* player = Closest(bot, nearby, IsPlayer);
+
+        // Below 30% health the bot disengages: it follows the closest player, or stands still if none is near.
+        bool const lowHealth = static_cast<std::uint64_t>(bot.health) * 10 < static_cast<std::uint64_t>(bot.max_health) * 3;
+
         Decision wanted;
-        if (bot.threat_target_guid != 0)
+        if (lowHealth)
+        {
+            wanted = player ? Decision{ ActionType::kFollow, player->guid } : Decision{ ActionType::kStop, 0 };
+        }
+        else if (bot.threat_target_guid != 0)
         {
             wanted = { ActionType::kAttackTarget, bot.threat_target_guid };
         }
@@ -71,7 +84,7 @@ std::vector<BotAction> BotPolicy::Decide(forever_module::WorldTickSnapshotView c
         {
             wanted = { ActionType::kAttackTarget, hostile->guid };
         }
-        else if (NearbyUnit const* player = Closest(bot, nearby, IsPlayer))
+        else if (player)
         {
             wanted = { ActionType::kFollow, player->guid };
         }

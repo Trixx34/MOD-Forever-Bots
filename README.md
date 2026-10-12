@@ -6,8 +6,9 @@ Bot control as a ForeverBots module. The core creates and controls bots; this mo
 
 The module connects to the core, asks for one bot with `RequestControl`, tracks the bots it owns, and logs
 revocations. It requests Tier 2 and drives its bots from snapshots: a pump thread reads each new snapshot and
-publishes actions from `BotPolicy`. The policy is a placeholder (fight the threat target or the closest hostile,
-else follow the closest player, else stand still).
+publishes actions from `BotPolicy`. The policy is a placeholder: below 30% health a bot disengages (follows the closest
+player, or stands still); otherwise it fights its threat target or the closest hostile, else follows the closest player,
+else stands still. A dead bot gets no orders.
 
 ## Configuration
 
@@ -43,5 +44,5 @@ Without `FOREVER_MODULE_SDK_SOURCE`, CMake fetches `Trixx34/forever-module-sdk` 
 
 ## Open items
 
-- The policy does not use spell cooldowns (the core does not fill them yet) or the bot's health.
+- The policy does not use spell cooldowns (the core does not fill them yet).
 - Not yet tested against a running worldserver.
