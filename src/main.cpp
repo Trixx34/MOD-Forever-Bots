@@ -1,15 +1,22 @@
-// forever-bots: asks the core for bots and keeps track of the ones it controls.
+// forever-bots: asks the core for bots, then drives the ones it controls from Tier 2 snapshots.
 //
 // Usage: forever-bots <tier1-endpoint>. The core passes the endpoint when it spawns the module.
-// This slice only requests and tracks control. It does not drive the bots yet: Tier 2 actions are not
-// implemented in the SDK, so tier2_participates stays false.
+//
+// Two loops run. Run() (the Tier 1 loop) handles control replies and revocations on this thread. A pump thread reads
+// each new Tier 2 snapshot and publishes the bot actions BotPolicy decides on. The pump touches only the Tier 2
+// region, so the two loops share no state.
 
+#include "bot_policy.h"
 #include "bot_roster.h"
 
 #include "forever_module/module_client.h"
+#include "forever_module/tier2_session.h"
 
+#include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <iostream>
+#include <thread>
 
 namespace {
 
@@ -17,6 +24,35 @@ namespace {
 constexpr std::uint32_t kDefaultMaxBots = 1;
 constexpr std::uint32_t kDefaultRace = 1;    // Human
 constexpr std::uint32_t kDefaultClass = 1;   // Warrior
+
+// Tier 2 bounds asked for at handshake. The core may grant less.
+constexpr std::uint32_t kRequestedNearbyUnits = 16;
+constexpr std::uint32_t kRequestedActions = 16;
+
+constexpr std::chrono::milliseconds kPumpInterval(5);
+
+void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& running)
+{
+    BotPolicy policy;
+    bool sawSnapshot = false;
+    std::uint64_t lastTick = 0;
+
+    while (running)
+    {
+        forever_module::WorldTickSnapshotView const& view = session.ReadLatestSnapshot();
+        if (!sawSnapshot || view.tick_number != lastTick)
+        {
+            sawSnapshot = true;
+            lastTick = view.tick_number;
+
+            // One publish per snapshot tick: the core applies the newest action set it sees for each tick.
+            std::string error;
+            if (!session.PublishActions(policy.Decide(view), error))
+                std::cerr << "forever-bots: could not publish actions: " << error << "\n";
+        }
+        std::this_thread::sleep_for(kPumpInterval);
+    }
+}
 
 } // namespace
 
@@ -31,7 +67,10 @@ int main(int argc, char** argv)
     forever_module::ModuleManifest manifest;
     manifest.module_name = "forever-bots";
     manifest.module_version = "0.1.0";
-    manifest.tier2_participates = false;
+    manifest.tier2_participates = true;
+    manifest.requested_max_bots = kDefaultMaxBots;
+    manifest.requested_max_nearby_units = kRequestedNearbyUnits;
+    manifest.requested_max_actions = kRequestedActions;
 
     forever_module::ModuleClient client(std::move(manifest));
     if (!client.Connect(argv[1]) || !client.Handshake())
@@ -69,6 +108,18 @@ int main(int argc, char** argv)
         });
     }
 
+    // Tier 2 is granted at handshake, so there is a region only if the core accepted it.
+    std::atomic<bool> running{true};
+    std::thread pump;
+    if (forever_module::Tier2Session* session = client.AttachTier2())
+        pump = std::thread(PumpTier2, std::ref(*session), std::cref(running));
+    else
+        std::cerr << "forever-bots: no Tier 2 region (" << client.tier2_error() << "); bots will not be driven\n";
+
     client.Run();
+
+    running = false;
+    if (pump.joinable())
+        pump.join();
     return 0;
 }
