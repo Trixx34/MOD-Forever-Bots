@@ -1,0 +1,8 @@
+{
+  "name": "forever-bots",
+  "version": "0.1.0",
+  "protocol_version": "1",
+  "tier1": {
+    "hooks": []
+  }
+}
