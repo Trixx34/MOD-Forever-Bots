@@ -1,1 +1,2 @@
 # MOD-Forever-Bots
+init
