@@ -64,16 +64,6 @@ void EffectiveMaxBotsIsCappedByGrant()
     CHECK(EffectiveMaxBots(3, 5, false) == 0);  // no Tier 2 region: no bots, whatever the grant says
 }
 
-void StateFileSetting()
-{
-    std::vector<std::string> warnings;
-    CHECK(ParseBotSettings({}, warnings).StateFile == "forever-bots.state");
-    CHECK(ParseBotSettings({ { "StateFile", "/var/forever/bots.state" } }, warnings).StateFile == "/var/forever/bots.state");
-    CHECK(warnings.empty());
-    CHECK(ParseBotSettings({ { "StateFile", "" } }, warnings).StateFile == "forever-bots.state");
-    CHECK(warnings.size() == 1);
-}
-
 } // namespace
 
 int main()
@@ -84,7 +74,6 @@ int main()
     InvalidValuesFallBackWithWarnings();
     UnknownKeysAreIgnored();
     EffectiveMaxBotsIsCappedByGrant();
-    StateFileSetting();
 
     if (failures == 0)
         std::printf("settings_test: all checks passed\n");

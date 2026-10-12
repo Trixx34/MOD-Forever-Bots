@@ -13,8 +13,6 @@ struct BotSettings
     std::uint32_t MaxBots = 1;
     std::uint32_t Race = 1;   // Human
     std::uint32_t Class = 1;  // Warrior
-    // Where the module keeps the guids of the bots it controls, so a restart can take them back.
-    std::string StateFile = "forever-bots.state";
 };
 
 // The most bots any configuration may ask for; also the Tier 2 bot bound requested at handshake.
