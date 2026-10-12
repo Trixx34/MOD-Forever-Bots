@@ -56,6 +56,14 @@ void UnknownKeysAreIgnored()
     CHECK(warnings.empty());
 }
 
+void EffectiveMaxBotsIsCappedByGrant()
+{
+    CHECK(EffectiveMaxBots(4, 16, true) == 4);  // config below the grant
+    CHECK(EffectiveMaxBots(16, 2, true) == 2);  // config above the grant: the grant wins
+    CHECK(EffectiveMaxBots(3, 0, true) == 0);   // a grant of zero allows no bots
+    CHECK(EffectiveMaxBots(3, 5, false) == 0);  // no Tier 2 region: no bots, whatever the grant says
+}
+
 } // namespace
 
 int main()
@@ -65,6 +73,7 @@ int main()
     MaxBotsIsCapped();
     InvalidValuesFallBackWithWarnings();
     UnknownKeysAreIgnored();
+    EffectiveMaxBotsIsCappedByGrant();
 
     if (failures == 0)
         std::printf("settings_test: all checks passed\n");

@@ -93,8 +93,19 @@ int main(int argc, char** argv)
         configured = true;
     });
 
+    // The bots we may control: MaxBots from config, capped at what the core granted for Tier 2. Without a Tier 2 region
+    // there is nothing to drive, so no bots are requested. The core enforces the same bound (ModuleBotOwnership).
+    bool const tier2Granted = !client.tier2_region_name().empty();
+    std::uint32_t const grantedBots = client.negotiated_bounds().max_bots;
+    std::uint32_t const maxBots = EffectiveMaxBots(settings.MaxBots, grantedBots, tier2Granted);
+    if (maxBots != settings.MaxBots)
+    {
+        std::cerr << "forever-bots: MaxBots " << settings.MaxBots << " limited to " << maxBots << " (Tier 2 grant "
+                  << grantedBots << (tier2Granted ? "" : ", no Tier 2 region") << ")\n";
+    }
+
     // Shared between the callbacks below; all of them run on the thread that calls Run().
-    BotRoster roster(settings.MaxBots);
+    BotRoster roster(maxBots);
 
     client.OnControlRevoked([&roster](std::uint64_t botGuid, std::string const& reason)
     {

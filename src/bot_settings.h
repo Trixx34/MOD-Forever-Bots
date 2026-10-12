@@ -18,6 +18,10 @@ struct BotSettings
 // The most bots any configuration may ask for; also the Tier 2 bot bound requested at handshake.
 constexpr std::uint32_t kMaxBotsCeiling = 16;
 
+// The number of bots the module may control: the configured MaxBots, capped at the Tier 2 bot grant the core returned at
+// handshake. Without a Tier 2 region the module cannot drive bots, so it asks for none.
+std::uint32_t EffectiveMaxBots(std::uint32_t configured, std::uint32_t grantedMaxBots, bool tier2Granted);
+
 // Reads the settings from the config the core delivered. Missing or invalid values fall back to the defaults, and each
 // fallback adds one line to `warnings` so the operator can see it in the module's log.
 BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const& config, std::vector<std::string>& warnings);
