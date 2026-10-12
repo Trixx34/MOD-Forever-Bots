@@ -47,12 +47,32 @@ Without `FOREVER_MODULE_SDK_SOURCE`, CMake fetches `Trixx34/forever-module-sdk` 
 - `src/bot_roster.{h,cpp}`: owned bots, pending requests, the max-bots cap. No SDK dependency.
 - `src/bot_policy.{h,cpp}`: decides actions from snapshots: approach, attack, rotation casts, retries, disengage.
 - `src/combat_rotation.{h,cpp}`: rotation rules (ported from the forever branch), warrior rows, facts from a snapshot.
-- `src/bot_settings.{h,cpp}`: reads the module's config (MaxBots, Race, Class).
+- `src/bot_telemetry.{h,cpp}`: the CSV record of what each bot did (see Telemetry below). No SDK dependency beyond snapshot types.
+- `src/bot_settings.{h,cpp}`: reads the module's config (MaxBots, Race, Class, TestSpell, TelemetryFile, TelemetrySummarySec).
 - `src/bot_store.{h,cpp}`: the store row keys (`bot/<guid>`) for the bots the module controls.
 - `src/main.cpp`: handshake, config, control requests, revocations, and the Tier 2 pump thread.
-- `tests/roster_test.cpp`, `tests/policy_test.cpp`, `tests/settings_test.cpp`, `tests/bot_store_test.cpp`, `tests/rotation_test.cpp`: unit tests.
+- `tests/*_test.cpp`: unit tests for each library (roster, policy, rotation, settings, bot store, telemetry).
+
+## Telemetry (overnight runs)
+
+The pump writes one CSV line per event and one summary line per bot every `TelemetrySummarySec` seconds, appended to
+`TelemetryFile` (relative to the module's working directory, default `forever-bots-telemetry.csv`). The header is written when the
+file is new. Each line is self-contained: it carries the bot's running totals.
+
+Columns: `time_ms` (module clock), `kind`, `bot` (guid), `level`, `health_pct`, `power_pct`, `in_fight`, `fights`,
+`targets_gone`, `deaths`, `casts_applied`, `refusals`, `stuck_episodes`, `longest_fight_ms`, `health_lost`, `detail`.
+
+Kinds: `summary`, `fight_start`, `fight_end` (detail: reason, target, duration, health lost), `target_switch`,
+`death`, `alive`, `level`, `stuck`, `unstuck`.
+
+- `fight_end` reason `target_gone` means the target was not in view when the threat dropped: usually a kill, but also a
+  leash or a target that left. `no_threat` means the target was still alive and in view.
+- `stuck` means a fight had no change in health, position or target for 60 seconds (`StuckAfterMs`).
+- If the summary lines stop, the module has stopped.
 
 ## Open items
 
-- The policy does not use spell cooldowns (the core does not fill them yet).
+- Resting is not implemented: the protocol has no action to sit or regenerate.
+- Rend's bleed is estimated (21 seconds per accepted cast) because the snapshot has no auras.
+- The fleeing condition in the rotation is always false; the snapshot does not report it.
 - Not yet tested against a running worldserver.

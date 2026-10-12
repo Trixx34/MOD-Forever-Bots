@@ -32,8 +32,12 @@ add_library(forever_bots_policy STATIC src/bot_policy.cpp src/combat_rotation.cp
 target_include_directories(forever_bots_policy PUBLIC src)
 target_link_libraries(forever_bots_policy PUBLIC forever_module_sdk)
 
+add_library(forever_bots_telemetry STATIC src/bot_telemetry.cpp)
+target_include_directories(forever_bots_telemetry PUBLIC src)
+target_link_libraries(forever_bots_telemetry PUBLIC forever_module_sdk)
+
 add_executable(forever-bots src/main.cpp)
-target_link_libraries(forever-bots PRIVATE forever_bots_roster forever_bots_policy forever_bots_settings forever_bots_store forever_module_sdk Threads::Threads)
+target_link_libraries(forever-bots PRIVATE forever_bots_roster forever_bots_policy forever_bots_settings forever_bots_store forever_bots_telemetry forever_module_sdk Threads::Threads)
 
 enable_testing()
 add_executable(roster_test tests/roster_test.cpp)
@@ -55,3 +59,7 @@ add_test(NAME bot_store COMMAND bot_store_test)
 add_executable(rotation_test tests/rotation_test.cpp)
 target_link_libraries(rotation_test PRIVATE forever_bots_policy)
 add_test(NAME rotation COMMAND rotation_test)
+
+add_executable(telemetry_test tests/telemetry_test.cpp)
+target_link_libraries(telemetry_test PRIVATE forever_bots_telemetry)
+add_test(NAME telemetry COMMAND telemetry_test)

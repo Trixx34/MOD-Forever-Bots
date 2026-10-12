@@ -10,6 +10,7 @@
 #include "bot_roster.h"
 #include "bot_settings.h"
 #include "bot_store.h"
+#include "bot_telemetry.h"
 
 #include "forever_module/module_client.h"
 #include "forever_module/tier2_session.h"
@@ -17,7 +18,9 @@
 #include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <fstream>
 #include <iostream>
+#include <memory>
 #include <string>
 #include <thread>
 #include <unordered_map>
@@ -53,13 +56,43 @@ std::uint64_t nowMs()
                                           .count());
 }
 
-void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& running, PolicyOptions options)
+void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& running, PolicyOptions options,
+               std::string const& telemetryPath, std::uint32_t summarySec)
 {
     BotPolicy policy(options);
     bool sawSnapshot = false;
     std::uint64_t lastTick = 0;
     // Last action sequence seen per bot, so each result is reported once.
     std::unordered_map<std::uint64_t, std::uint32_t> seenSequence;
+
+    // The telemetry file is appended to, so a restart adds to the same record. Every line is flushed as it is written.
+    std::ofstream telemetryOut;
+    std::unique_ptr<BotTelemetry> telemetry;
+    if (!telemetryPath.empty())
+    {
+        telemetryOut.open(telemetryPath, std::ios::app);
+        if (telemetryOut)
+        {
+            telemetryOut.seekp(0, std::ios::end);
+            if (telemetryOut.tellp() == 0)
+                telemetryOut << BotTelemetry::Header() << '\n';
+            telemetryOut.flush();
+            BotTelemetry::Options telemetryOptions;
+            telemetryOptions.SummaryEveryMs = std::uint64_t(summarySec) * 1000;
+            telemetry = std::make_unique<BotTelemetry>(
+                [&telemetryOut](std::string const& line)
+                {
+                    telemetryOut << line << '\n';
+                    telemetryOut.flush();
+                },
+                telemetryOptions);
+            std::cerr << "forever-bots: telemetry to " << telemetryPath << " (summary every " << summarySec << " s)\n";
+        }
+        else
+        {
+            std::cerr << "forever-bots: cannot open telemetry file " << telemetryPath << "; telemetry is off\n";
+        }
+    }
 
     while (running)
     {
@@ -84,6 +117,9 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
         {
             sawSnapshot = true;
             lastTick = view.tick_number;
+
+            if (telemetry)
+                telemetry->Observe(view, nowMs());
 
             // One publish per snapshot tick: the core applies the newest action set it sees for each tick.
             std::string error;
@@ -228,7 +264,8 @@ int main(int argc, char** argv)
     std::atomic<bool> running{true};
     std::thread pump;
     if (forever_module::Tier2Session* session = client.AttachTier2())
-        pump = std::thread(PumpTier2, std::ref(*session), std::cref(running), policyOptions);
+        pump = std::thread(PumpTier2, std::ref(*session), std::cref(running), policyOptions, std::cref(settings.TelemetryFile),
+                           settings.TelemetrySummarySec);
     else
         std::cerr << "forever-bots: no Tier 2 region (" << client.tier2_error() << "); bots will not be driven\n";
 

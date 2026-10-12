@@ -16,6 +16,10 @@ struct BotSettings
     // Spell cast at the attack target on a timer (0 = off). A test of the cast path and its refusal reports, until the
     // class rotations exist. Config key TestSpell.
     std::uint32_t TestSpell = 0;
+    // The telemetry CSV the bots write to (config key TelemetryFile, relative to the module's folder). Empty turns it off.
+    std::string TelemetryFile = "forever-bots-telemetry.csv";
+    // Seconds between summary lines per bot (config key TelemetrySummarySec, 1..3600).
+    std::uint32_t TelemetrySummarySec = 60;
 };
 
 // The most bots any configuration may ask for; also the Tier 2 bot bound requested at handshake.

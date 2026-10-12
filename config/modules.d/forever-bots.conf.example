@@ -7,3 +7,8 @@ Module.forever-bots.MaxBots = 1
 # Race and class the module spawns bots with. Valid ids for the core's race and class tables.
 Module.forever-bots.Race = 1
 Module.forever-bots.Class = 1
+
+# Telemetry: one CSV line per event and per summary interval, appended to this file (relative to the module's working directory; use an absolute path to be sure).
+# Leave TelemetryFile empty to turn it off. TelemetrySummarySec is the seconds between summary lines per bot (1..3600).
+Module.forever-bots.TelemetryFile = forever-bots-telemetry.csv
+Module.forever-bots.TelemetrySummarySec = 60
