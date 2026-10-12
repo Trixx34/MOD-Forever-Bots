@@ -59,5 +59,13 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     // Race and class ids are validated by the core when it creates the character; here only the range is checked.
     ReadKey(config, "Race", 1, std::numeric_limits<std::uint8_t>::max(), settings.Race, warnings);
     ReadKey(config, "Class", 1, std::numeric_limits<std::uint8_t>::max(), settings.Class, warnings);
+
+    if (auto const it = config.find("StateFile"); it != config.end())
+    {
+        if (it->second.empty())
+            warnings.push_back("Module.forever-bots.StateFile is empty; using " + settings.StateFile + ".");
+        else
+            settings.StateFile = it->second;
+    }
     return settings;
 }
