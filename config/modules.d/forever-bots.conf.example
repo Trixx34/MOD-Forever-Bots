@@ -1,5 +1,4 @@
-# Settings for the forever-bots module. Copy this file to modules.d/forever-bots.conf in the same
-# directory as worldserver.conf. The core loads every .conf file there at start-up and sends each
+# Settings for the forever-bots module. Copy this file to worldserver.conf.d/modules.d/forever-bots.conf (under the config directory). The core loads every .conf file under worldserver.conf.d at start-up and sends each
 # Module.forever-bots.<Key> entry to the module, with the prefix removed.
 
 # Most bots the module controls at once (1..16).

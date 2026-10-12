@@ -18,8 +18,8 @@ says the character does not exist, not on a revoke, because the core revokes eve
 
 ## Configuration
 
-The core sends the module the `Module.forever-bots.<Key>` entries from `modules.d/forever-bots.conf` (next to
-`worldserver.conf`), with the prefix removed. See `config/modules.d/forever-bots.conf.example`:
+The core sends the module the `Module.forever-bots.<Key>` entries from `worldserver.conf.d/modules.d/forever-bots.conf`
+(under the config directory), with the prefix removed. See `config/modules.d/forever-bots.conf.example`:
 
 - `MaxBots` (1..16, default 1): bots the module controls at once.
 - `Race` and `Class` (default 1 and 1): the race and class to spawn bots with.
