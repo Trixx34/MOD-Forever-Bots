@@ -65,6 +65,33 @@ void ZeroGrantKeepsNothing()
     CHECK(roster.PendingCount() == 0);
 }
 
+void RaisingTheCapAllowsMoreBots()
+{
+    // A config reload raises the cap: the roster may now request more, and the bots it already owns stay.
+    BotRoster roster(1);
+    roster.NoteRequestSent(0);
+    roster.OnGranted(0, 101);
+    CHECK(!roster.CanRequest());
+    roster.SetMaxBots(300);
+    CHECK(roster.CanRequest());
+    CHECK(roster.Owned().count(101) == 1);
+}
+
+void LoweringTheCapKeepsOwnedBots()
+{
+    // Lowering below the owned count stops new requests but takes nothing back.
+    BotRoster roster(3);
+    for (std::uint64_t guid = 101; guid <= 103; ++guid)
+    {
+        roster.NoteRequestSent(0);
+        roster.OnGranted(0, guid);
+    }
+    roster.SetMaxBots(2);
+    CHECK(!roster.CanRequest());
+    CHECK(roster.Owned().size() == 3);
+    CHECK(roster.MaxBots() == 2);
+}
+
 } // namespace
 
 int main()
@@ -73,6 +100,8 @@ int main()
     DeniedRequestFreesSlot();
     RevokeRemovesOwnership();
     ZeroGrantKeepsNothing();
+    RaisingTheCapAllowsMoreBots();
+    LoweringTheCapKeepsOwnedBots();
 
     if (failures == 0)
         std::printf("roster_test: all checks passed\n");

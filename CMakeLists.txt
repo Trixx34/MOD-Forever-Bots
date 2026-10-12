@@ -22,7 +22,7 @@ find_package(Threads REQUIRED)
 add_library(forever_bots_roster STATIC src/bot_roster.cpp)
 target_include_directories(forever_bots_roster PUBLIC src)
 
-add_library(forever_bots_settings STATIC src/bot_settings.cpp)
+add_library(forever_bots_settings STATIC src/bot_settings.cpp src/bot_ramp.cpp src/bot_pick.cpp)
 target_include_directories(forever_bots_settings PUBLIC src)
 
 add_library(forever_bots_store STATIC src/bot_store.cpp)
@@ -32,12 +32,15 @@ add_library(forever_bots_policy STATIC src/bot_policy.cpp src/combat_rotation.cp
 target_include_directories(forever_bots_policy PUBLIC src)
 target_link_libraries(forever_bots_policy PUBLIC forever_module_sdk)
 
+add_library(forever_bots_files STATIC src/rotating_file.cpp)
+target_include_directories(forever_bots_files PUBLIC src)
+
 add_library(forever_bots_telemetry STATIC src/bot_telemetry.cpp)
 target_include_directories(forever_bots_telemetry PUBLIC src)
 target_link_libraries(forever_bots_telemetry PUBLIC forever_module_sdk)
 
 add_executable(forever-bots src/main.cpp)
-target_link_libraries(forever-bots PRIVATE forever_bots_roster forever_bots_policy forever_bots_settings forever_bots_store forever_bots_telemetry forever_module_sdk Threads::Threads)
+target_link_libraries(forever-bots PRIVATE forever_bots_roster forever_bots_policy forever_bots_settings forever_bots_store forever_bots_telemetry forever_bots_files forever_module_sdk Threads::Threads)
 
 enable_testing()
 add_executable(roster_test tests/roster_test.cpp)
@@ -63,3 +66,15 @@ add_test(NAME rotation COMMAND rotation_test)
 add_executable(telemetry_test tests/telemetry_test.cpp)
 target_link_libraries(telemetry_test PRIVATE forever_bots_telemetry)
 add_test(NAME telemetry COMMAND telemetry_test)
+
+add_executable(pick_test tests/pick_test.cpp)
+target_link_libraries(pick_test PRIVATE forever_bots_settings)
+add_test(NAME pick COMMAND pick_test)
+
+add_executable(ramp_test tests/ramp_test.cpp)
+target_link_libraries(ramp_test PRIVATE forever_bots_settings)
+add_test(NAME ramp COMMAND ramp_test)
+
+add_executable(rotating_file_test tests/rotating_file_test.cpp)
+target_link_libraries(rotating_file_test PRIVATE forever_bots_files)
+add_test(NAME rotating_file COMMAND rotating_file_test)

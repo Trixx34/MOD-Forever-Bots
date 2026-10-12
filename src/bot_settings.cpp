@@ -1,5 +1,7 @@
 #include "bot_settings.h"
 
+#include "bot_pick.h"
+
 #include <algorithm>
 #include <charconv>
 #include <limits>
@@ -43,6 +45,37 @@ void ReadKey(std::unordered_map<std::string, std::string> const& config, char co
         warnings.push_back(std::string("Module.forever-bots.") + key + ": " + reason + "; using " + std::to_string(value) + ".");
 }
 
+// Reads a race or class id. The word "random" means pick (0); otherwise a valid id.
+void ReadIdOrRandom(std::unordered_map<std::string, std::string> const& config, char const* key, std::uint32_t& value,
+                    std::vector<std::string>& warnings)
+{
+    auto const it = config.find(key);
+    if (it == config.end())
+        return;
+
+    if (it->second == "random")
+    {
+        value = pick::kRandom;
+        return;
+    }
+    // Race and class ids are validated by the core when it creates the character; here only the range is checked.
+    ReadKey(config, key, 1, std::numeric_limits<std::uint8_t>::max(), value, warnings);
+}
+
+// Reads a clock time for the ramp's stop. Keeps the default and warns if it is not HH:MM or HH:MM:SS.
+void ReadStopTime(std::unordered_map<std::string, std::string> const& config, std::uint32_t& stopSecOfDay,
+                  std::vector<std::string>& warnings)
+{
+    auto const it = config.find("BotsStopTime");
+    if (it == config.end())
+        return;
+
+    if (auto const parsed = ParseClock(it->second))
+        stopSecOfDay = *parsed;
+    else
+        warnings.push_back("Module.forever-bots.BotsStopTime: '" + it->second + "' is not HH:MM; using the default.");
+}
+
 } // namespace
 
 std::uint32_t EffectiveMaxBots(std::uint32_t configured, std::uint32_t grantedMaxBots, bool tier2Granted)
@@ -56,12 +89,21 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
 {
     BotSettings settings;
     ReadKey(config, "MaxBots", 1, kMaxBotsCeiling, settings.MaxBots, warnings);
-    // Race and class ids are validated by the core when it creates the character; here only the range is checked.
-    ReadKey(config, "Race", 1, std::numeric_limits<std::uint8_t>::max(), settings.Race, warnings);
-    ReadKey(config, "Class", 1, std::numeric_limits<std::uint8_t>::max(), settings.Class, warnings);
+    ReadIdOrRandom(config, "Race", settings.Race, warnings);
+    ReadIdOrRandom(config, "Class", settings.Class, warnings);
+    ReadKey(config, "RandomSeed", 0, std::numeric_limits<std::uint32_t>::max(), settings.RandomSeed, warnings);
     ReadKey(config, "TestSpell", 0, std::numeric_limits<std::int32_t>::max(), settings.TestSpell, warnings);
+
+    ReadKey(config, "BotsInitial", 0, kMaxBotsCeiling, settings.Ramp.Initial, warnings);
+    ReadKey(config, "BotsStep", 0, kMaxBotsCeiling, settings.Ramp.Step, warnings);
+    ReadKey(config, "BotsStepMinutes", 1, 1440, settings.Ramp.StepMinutes, warnings);
+    ReadKey(config, "BotsCap", 1, kMaxBotsCeiling, settings.Ramp.Cap, warnings);
+    ReadStopTime(config, settings.Ramp.StopSecOfDay, warnings);
+
     if (auto const it = config.find("TelemetryFile"); it != config.end())
         settings.TelemetryFile = it->second;
+    ReadKey(config, "TelemetryMaxMB", 1, 10240, settings.TelemetryMaxMB, warnings);
+    ReadKey(config, "TelemetryKeep", 0, 50, settings.TelemetryKeep, warnings);
     ReadKey(config, "TelemetrySummarySec", 1, 3600, settings.TelemetrySummarySec, warnings);
     return settings;
 }

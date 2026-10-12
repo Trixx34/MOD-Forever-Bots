@@ -260,7 +260,11 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             if (cooldown.spell_id != 0 && cooldown.remaining_ms != 0)
                 cooling.insert(cooldown.spell_id);
 
-        for (rotation::Row const& row : rotation::RowsForClass(_options.ClassId))
+        std::uint32_t classId = _options.ClassId;
+        if (_options.ClassOf)
+            if (std::uint32_t const own = _options.ClassOf(bot.guid))
+                classId = own;
+        for (rotation::Row const& row : rotation::RowsForClass(classId))
         {
             auto const retry = state.RetryAtMs.find(row.Spell);
             if (retry != state.RetryAtMs.end() && nowMs < retry->second)

@@ -34,10 +34,49 @@ void ReadsValidValues()
 void MaxBotsIsCapped()
 {
     std::vector<std::string> warnings;
-    BotSettings const s = ParseBotSettings({ { "MaxBots", "99" } }, warnings);
-    CHECK(s.MaxBots == 1); // out of range: the default, with a warning
+    CHECK(ParseBotSettings({ { "MaxBots", "1500" } }, warnings).MaxBots == 1500); // the ceiling itself
+    CHECK(warnings.empty());
+    BotSettings const s = ParseBotSettings({ { "MaxBots", "1501" } }, warnings);
+    CHECK(s.MaxBots == 1); // above the ceiling: the default, with a warning
     CHECK(warnings.size() == 1);
-    CHECK(ParseBotSettings({ { "MaxBots", "16" } }, warnings).MaxBots == 16);
+}
+
+void RandomRaceAndClass()
+{
+    std::vector<std::string> warnings;
+    BotSettings const s = ParseBotSettings({ { "Race", "random" }, { "Class", "random" }, { "RandomSeed", "42" } }, warnings);
+    CHECK(s.Race == 0 && s.Class == 0); // 0 means random
+    CHECK(s.RandomSeed == 42);
+    CHECK(warnings.empty());
+    CHECK(ParseBotSettings({ { "Race", "random" } }, warnings).RandomSeed == 1); // seed default
+    CHECK(ParseBotSettings({}, warnings).RandomSeed == 1);
+}
+
+void RampSettings()
+{
+    std::vector<std::string> warnings;
+    BotSettings const defaults = ParseBotSettings({}, warnings);
+    CHECK(defaults.Ramp.Initial == 300 && defaults.Ramp.Step == 100 && defaults.Ramp.StepMinutes == 15);
+    CHECK(defaults.Ramp.Cap == 1500 && defaults.Ramp.StopSecOfDay == 6 * 3600);
+
+    BotSettings const s = ParseBotSettings({ { "BotsInitial", "50" }, { "BotsStep", "25" }, { "BotsStepMinutes", "5" },
+                                              { "BotsCap", "400" }, { "BotsStopTime", "05:30" } }, warnings);
+    CHECK(s.Ramp.Initial == 50 && s.Ramp.Step == 25 && s.Ramp.StepMinutes == 5 && s.Ramp.Cap == 400);
+    CHECK(s.Ramp.StopSecOfDay == 5 * 3600 + 30 * 60);
+    CHECK(warnings.empty());
+
+    CHECK(ParseBotSettings({ { "BotsStopTime", "25:00" } }, warnings).Ramp.StopSecOfDay == 6 * 3600); // kept, warned
+    CHECK(!warnings.empty());
+    CHECK(ParseBotSettings({ { "BotsCap", "1501" } }, warnings).Ramp.Cap == 1500);
+}
+
+void TelemetryRotationSettings()
+{
+    std::vector<std::string> warnings;
+    BotSettings const s = ParseBotSettings({ { "TelemetryMaxMB", "256" }, { "TelemetryKeep", "8" } }, warnings);
+    CHECK(s.TelemetryMaxMB == 256 && s.TelemetryKeep == 8);
+    CHECK(ParseBotSettings({}, warnings).TelemetryMaxMB == 64);
+    CHECK(warnings.empty());
 }
 
 void InvalidValuesFallBackWithWarnings()
@@ -96,6 +135,9 @@ int main()
     TelemetrySettings();
     ReadsValidValues();
     MaxBotsIsCapped();
+    RandomRaceAndClass();
+    RampSettings();
+    TelemetryRotationSettings();
     InvalidValuesFallBackWithWarnings();
     UnknownKeysAreIgnored();
     EffectiveMaxBotsIsCappedByGrant();
