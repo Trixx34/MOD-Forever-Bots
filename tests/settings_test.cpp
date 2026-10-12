@@ -74,11 +74,26 @@ void EffectiveMaxBotsIsCappedByGrant()
     CHECK(EffectiveMaxBots(3, 5, false) == 0);  // no Tier 2 region: no bots, whatever the grant says
 }
 
+void TelemetrySettings()
+{
+    std::vector<std::string> warnings;
+    BotSettings const defaults = ParseBotSettings({}, warnings);
+    CHECK(defaults.TelemetryFile == "forever-bots-telemetry.csv");
+    CHECK(defaults.TelemetrySummarySec == 60);
+
+    BotSettings const off = ParseBotSettings({ { "TelemetryFile", "" } }, warnings);
+    CHECK(off.TelemetryFile.empty()); // empty turns telemetry off
+    CHECK(ParseBotSettings({ { "TelemetrySummarySec", "300" } }, warnings).TelemetrySummarySec == 300);
+    CHECK(ParseBotSettings({ { "TelemetrySummarySec", "0" } }, warnings).TelemetrySummarySec == 60);
+    CHECK(!warnings.empty()); // the zero interval is refused with a warning
+}
+
 } // namespace
 
 int main()
 {
     DefaultsWhenEmpty();
+    TelemetrySettings();
     ReadsValidValues();
     MaxBotsIsCapped();
     InvalidValuesFallBackWithWarnings();

@@ -60,5 +60,8 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadKey(config, "Race", 1, std::numeric_limits<std::uint8_t>::max(), settings.Race, warnings);
     ReadKey(config, "Class", 1, std::numeric_limits<std::uint8_t>::max(), settings.Class, warnings);
     ReadKey(config, "TestSpell", 0, std::numeric_limits<std::int32_t>::max(), settings.TestSpell, warnings);
+    if (auto const it = config.find("TelemetryFile"); it != config.end())
+        settings.TelemetryFile = it->second;
+    ReadKey(config, "TelemetrySummarySec", 1, 3600, settings.TelemetrySummarySec, warnings);
     return settings;
 }
