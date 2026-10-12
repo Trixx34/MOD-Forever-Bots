@@ -9,7 +9,7 @@
 #include "bot_policy.h"
 #include "bot_roster.h"
 #include "bot_settings.h"
-#include "bot_state_file.h"
+#include "bot_store.h"
 
 #include "forever_module/module_client.h"
 #include "forever_module/tier2_session.h"
@@ -108,73 +108,77 @@ int main(int argc, char** argv)
     // Shared between the callbacks below; all of them run on the thread that calls Run().
     BotRoster roster(maxBots);
 
-    // The guids of the bots this module has controlled. A revoke does not remove a guid: the core revokes every bot
-    // at shutdown, and the bot still exists afterwards. Only "character not found" removes one.
-    BotStateFile state(settings.StateFile);
-    {
-        std::vector<std::string> stateWarnings;
-        std::string stateError;
-        if (!state.Load(stateWarnings, stateError))
-            std::cerr << "forever-bots: " << stateError << "; the bots from last run will not be reclaimed\n";
-        for (std::string const& warning : stateWarnings)
-            std::cerr << "forever-bots: " << warning << "\n";
-    }
-
     client.OnControlRevoked([&roster](std::uint64_t botGuid, std::string const& reason)
     {
         if (roster.OnRevoked(botGuid, reason))
             std::cerr << "forever-bots: control of bot " << botGuid << " revoked: " << reason << "\n";
     });
 
-    // Take back the bots from last run first, up to the cap. The rest stay in the state file for a later run with a
-    // higher MaxBots.
-    std::vector<std::uint64_t> const saved = state.Guids();
-    for (std::uint64_t guid : saved)
-    {
-        if (!roster.CanRequest())
-            break;
-        roster.NoteRequestSent(guid);
-        client.RequestControl(guid, {}, [&roster, &state, guid](forever_module::ControlResponse const& reply)
-        {
-            if (reply.granted())
-            {
-                roster.OnGranted(guid, reply.bot_guid());
-                std::cerr << "forever-bots: reclaimed bot " << guid << "\n";
-                return;
-            }
-            roster.OnDenied(guid);
-            if (reply.reason() == "character not found")
-            {
-                std::string error;
-                if (!state.Remove(guid, error))
-                    std::cerr << "forever-bots: " << error << "\n";
-            }
-            std::cerr << "forever-bots: could not reclaim bot " << guid << ": " << reply.reason() << "\n";
-        });
-    }
-
     forever_module::SpawnParams params;
     params.set_race(settings.Race);
     params.set_class_id(settings.Class);
 
-    while (roster.CanRequest())
+    // Bots from last run are rows in the module store (bot/<guid>). They are listed first, on the Run() thread, and the
+    // bots are requested when the list arrives: reclaim up to the cap, then spawn for the rest. A revoke keeps the row,
+    // since the core revokes every bot at shutdown; only "character not found" removes one.
+    auto startBots = [&roster, &client, &params](std::vector<std::uint64_t> const& saved)
     {
-        roster.NoteRequestSent(0);
-        client.RequestControl(0, params, [&roster, &state](forever_module::ControlResponse const& reply)
+        for (std::uint64_t guid : saved)
         {
-            if (!reply.granted())
+            if (!roster.CanRequest())
+                break;
+            roster.NoteRequestSent(guid);
+            client.RequestControl(guid, {}, [&roster, &client, guid](forever_module::ControlResponse const& reply)
             {
-                roster.OnDenied(0);
-                std::cerr << "forever-bots: spawn refused: " << reply.reason() << "\n";
-                return;
+                if (reply.granted())
+                {
+                    roster.OnGranted(guid, reply.bot_guid());
+                    std::cerr << "forever-bots: reclaimed bot " << guid << "\n";
+                    return;
+                }
+                roster.OnDenied(guid);
+                if (reply.reason() == "character not found")
+                    client.StoreDelete(bot_store::KeyFor(guid));
+                std::cerr << "forever-bots: could not reclaim bot " << guid << ": " << reply.reason() << "\n";
+            });
+        }
+
+        while (roster.CanRequest())
+        {
+            roster.NoteRequestSent(0);
+            client.RequestControl(0, params, [&roster, &client](forever_module::ControlResponse const& reply)
+            {
+                if (!reply.granted())
+                {
+                    roster.OnDenied(0);
+                    std::cerr << "forever-bots: spawn refused: " << reply.reason() << "\n";
+                    return;
+                }
+                roster.OnGranted(0, reply.bot_guid());
+                client.StoreSet(bot_store::KeyFor(reply.bot_guid()), "1");
+                std::cerr << "forever-bots: controlling bot " << reply.bot_guid() << "\n";
+            });
+        }
+    };
+
+    client.StoreList(bot_store::KeyPrefix, [&client, &startBots](forever_module::ActionReply const& reply)
+    {
+        std::vector<std::uint64_t> saved;
+        if (!reply.success())
+        {
+            std::cerr << "forever-bots: could not read saved bots (" << reply.reason() << "); spawning without reclaim\n";
+        }
+        else
+        {
+            for (int i = 0; i < reply.keys_size(); ++i)
+            {
+                std::uint64_t guid = 0;
+                if (bot_store::GuidFromKey(reply.keys(i), guid))
+                    saved.push_back(guid);
             }
-            roster.OnGranted(0, reply.bot_guid());
-            std::string error;
-            if (!state.Add(reply.bot_guid(), error))
-                std::cerr << "forever-bots: " << error << "\n";
-            std::cerr << "forever-bots: controlling bot " << reply.bot_guid() << "\n";
-        });
-    }
+        }
+        startBots(saved);
+    });
 
     // Tier 2 is granted at handshake, so there is a region only if the core accepted it.
     std::atomic<bool> running{true};

@@ -8,7 +8,3 @@ Module.forever-bots.MaxBots = 1
 # Race and class the module spawns bots with. Valid ids for the core's race and class tables.
 Module.forever-bots.Race = 1
 Module.forever-bots.Class = 1
-
-# File where the module keeps the guids of its bots, so a restart takes them back instead of spawning new ones.
-# A relative path is relative to the directory the worldserver starts the module from.
-Module.forever-bots.StateFile = "forever-bots.state"

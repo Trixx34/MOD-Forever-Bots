@@ -10,6 +10,12 @@ publishes actions from `BotPolicy`. The policy is a placeholder: below 30% healt
 player, or stands still); otherwise it fights its threat target or the closest hostile, else follows the closest player,
 else stands still. A dead bot gets no orders.
 
+## Stored state
+
+The bots the module controls are rows in the core's module store (doc 15): `bot/<guid>`. On start the module lists
+these rows and takes its bots back first, up to `MaxBots`, spawning only for the rest. A row is removed only when the core
+says the character does not exist, not on a revoke, because the core revokes every bot at shutdown.
+
 ## Configuration
 
 The core sends the module the `Module.forever-bots.<Key>` entries from `modules.d/forever-bots.conf` (next to
@@ -17,9 +23,6 @@ The core sends the module the `Module.forever-bots.<Key>` entries from `modules.
 
 - `MaxBots` (1..16, default 1): bots the module controls at once.
 - `Race` and `Class` (default 1 and 1): the race and class to spawn bots with.
-- `StateFile` (default `forever-bots.state`): the guids of the bots the module controls. On start the module takes
-  these back first, up to `MaxBots`, and spawns only for the rest. A guid is removed only when the core says the
-  character does not exist, not on a revoke, because the core revokes every bot at shutdown.
 
 Invalid values fall back to the defaults, with a line in the module's log. The bots spawned are capped at the core's
 Tier 2 grant, and none are requested when there is no Tier 2 region.
@@ -37,10 +40,10 @@ Without `FOREVER_MODULE_SDK_SOURCE`, CMake fetches `Trixx34/forever-module-sdk` 
 - `module.json`: manifest (name, protocol version, Tier 1 hooks).
 - `src/bot_roster.{h,cpp}`: owned bots, pending requests, the max-bots cap. No SDK dependency.
 - `src/bot_policy.{h,cpp}`: decides actions from one snapshot. No SDK state; only the snapshot types.
-- `src/bot_settings.{h,cpp}`: reads the module's config (MaxBots, Race, Class, StateFile).
-- `src/bot_state_file.{h,cpp}`: the saved bot guids, written atomically.
+- `src/bot_settings.{h,cpp}`: reads the module's config (MaxBots, Race, Class).
+- `src/bot_store.{h,cpp}`: the store row keys (`bot/<guid>`) for the bots the module controls.
 - `src/main.cpp`: handshake, config, control requests, revocations, and the Tier 2 pump thread.
-- `tests/roster_test.cpp`, `tests/policy_test.cpp`, `tests/settings_test.cpp`, `tests/bot_state_file_test.cpp`: unit tests.
+- `tests/roster_test.cpp`, `tests/policy_test.cpp`, `tests/settings_test.cpp`, `tests/bot_store_test.cpp`: unit tests.
 
 ## Open items
 
