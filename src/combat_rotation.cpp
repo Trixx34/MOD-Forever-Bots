@@ -37,7 +37,7 @@ constexpr Row kHunterRows[] = {
 
 constexpr Row kRogueRows[] = {
     { 1766, { Cond::TargetCasting, 0 }, true, 0.0f, 5.0f },  // Kick to interrupt a cast
-    { 2098, { Cond::SelfPowerAbove, 60 }, true, 0.0f, 5.0f }, // Eviscerate with energy to spend (combo points are not in the snapshot)
+    { 2098, { Cond::ComboPointsAtLeast, 5 }, true, 0.0f, 5.0f }, // Eviscerate at five combo points, counted by the policy
     { 1752, { Cond::Always, 0 }, true, 0.0f, 5.0f },         // Sinister Strike
 };
 
@@ -109,6 +109,7 @@ bool Allowed(Rule const& rule, Facts const& f)
         case Cond::TargetFleeing:  return f.TargetFleeing;
         case Cond::Opener:         return f.FightMs < std::uint64_t(std::max(rule.Param, 0)) * 1000u;
         case Cond::TargetStrong:   return f.TargetElite || f.TargetLevelDiff >= std::max(rule.Param, 1);
+        case Cond::ComboPointsAtLeast: return f.ComboPoints >= rule.Param;
     }
     return false;
 }

@@ -25,6 +25,7 @@ enum class Cond : std::uint8_t
     TargetFleeing,
     Opener,            // Param: seconds from the start of the fight
     TargetStrong,      // the target is elite, or Param or more levels above the bot
+    ComboPointsAtLeast, // Param: combo points the bot holds on its target, counted from its own Sinister Strikes
 };
 
 // What a rule reads. Built from a snapshot by FactsFor().
@@ -39,6 +40,7 @@ struct Facts
     bool TargetElite = false;
     std::int32_t TargetLevelDiff = 0;
     std::uint64_t FightMs = 0;
+    std::int32_t ComboPoints = 0;
 };
 
 struct Rule
