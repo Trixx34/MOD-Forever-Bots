@@ -140,9 +140,6 @@ void ClassTableRemembersEachBot()
     CHECK(table.Get(103) == 0); // unknown bots read as 0
     table.Set(101, 5);          // a later set replaces the class
     CHECK(table.Get(101) == 5);
-    CHECK(table.GetRace(101) == 0); // no race set yet
-    table.SetRace(101, 2);
-    CHECK(table.GetRace(101) == 2 && table.Get(101) == 5); // the race and the class are kept apart
     CHECK(table.Size() == 2);
 }
 

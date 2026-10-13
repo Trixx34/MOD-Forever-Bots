@@ -773,13 +773,23 @@ void NoPartyActionsInCombat()
     CHECK(!HasGroup(PartyPolicy(5).Decide(view, 0), 12, 1));
 }
 
-// Travel (M6). Bot 10 is race 1, whose vendor stands at x = 100 on the bot's map; services are on every 60 s.
+// Travel (M6). The core gives each bot its nearest vendor on its map (layout 6); services are on every 60 s. The vendor
+// stands at x = 100.
+void SetVendor(WorldTickSnapshotView& view, float x)
+{
+    for (BotSnapshot& bot : view.bots)
+    {
+        bot.vendor_x = x;
+        bot.vendor_y = 0.0f;
+        bot.vendor_z = 0.0f;
+        bot.vendor_valid = 1;
+    }
+}
+
 BotPolicy VendorPolicy(bool party = false)
 {
     PolicyOptions options;
     options.ServiceEveryMs = 60000;
-    options.RaceOf = [](std::uint64_t) { return std::uint32_t(1); };
-    options.VendorByRace[1] = { 100.0f, 0.0f, 0.0f };
     if (party)
     {
         options.PartySize = 5;
@@ -791,7 +801,9 @@ BotPolicy VendorPolicy(bool party = false)
 
 void IdleBotWalksToItsVendor()
 {
-    auto const actions = VendorPolicy().Decide(PartyView({ 10 }), 0);
+    WorldTickSnapshotView view = PartyView({ 10 });
+    SetVendor(view, 100.0f);
+    auto const actions = VendorPolicy().Decide(view, 0);
     bool found = false;
     for (BotAction const& action : actions)
         if (action.type == ActionType::kMoveTo && action.bot_guid == 10)
@@ -806,6 +818,7 @@ void IdleBotWalksToItsVendor()
 void VendorVisitWhenInReach()
 {
     WorldTickSnapshotView view = PartyView({ 10 });
+    SetVendor(view, 100.0f);
     view.bots[0].pos_x = 98.0f; // two yards from the vendor
     auto const actions = VendorPolicy().Decide(view, 0);
     CHECK(HasAction(actions, 10, ActionType::kVendor));
@@ -816,6 +829,7 @@ void TravelIsDroppedAfterTheTimeout()
 {
     BotPolicy policy = VendorPolicy();
     WorldTickSnapshotView view = PartyView({ 10 });
+    SetVendor(view, 100.0f);
     CHECK(HasAction(policy.Decide(view, 0), 10, ActionType::kMoveTo));
     auto const stuck = policy.Decide(view, 200000); // still far away after the timeout
     CHECK(!HasAction(stuck, 10, ActionType::kMoveTo));
@@ -826,6 +840,7 @@ void TravelIsDroppedAfterTheTimeout()
 void WalkingBotDoesNotSit()
 {
     WorldTickSnapshotView view = PartyView({ 10 });
+    SetVendor(view, 100.0f);
     view.bots[0].health = 500; // hurt enough to sit, if it were idle
     auto const actions = VendorPolicy().Decide(view, 0);
     CHECK(HasAction(actions, 10, ActionType::kMoveTo));
@@ -833,9 +848,19 @@ void WalkingBotDoesNotSit()
         CHECK(!(action.type == ActionType::kRest && action.spell_id == 1));
 }
 
+void NoVendorOnTheMapMeansNoWalk()
+{
+    // The map has no vendor: the visit is tried where the bot stands (the core refuses it if no NPC is in range).
+    auto const actions = VendorPolicy().Decide(PartyView({ 10 }), 0);
+    CHECK(!HasAction(actions, 10, ActionType::kMoveTo));
+    CHECK(HasAction(actions, 10, ActionType::kVendor));
+}
+
 void PartyMembersDoNotWalkAlone()
 {
-    auto const actions = VendorPolicy(true).Decide(PartyView({ 10, 11, 12, 13, 14 }), 0);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    SetVendor(view, 100.0f);
+    auto const actions = VendorPolicy(true).Decide(view, 0);
     CHECK(!HasAction(actions, 10, ActionType::kMoveTo));
     CHECK(HasAction(actions, 12, ActionType::kMoveTo)); // the leader walks; the members follow it
 }
@@ -847,6 +872,7 @@ int main()
     TravelIsDroppedAfterTheTimeout();
     WalkingBotDoesNotSit();
     PartyMembersDoNotWalkAlone();
+    NoVendorOnTheMapMeansNoWalk();
     PartyOffByDefault();
     LeaderInvitesItsMembers();
     OnlyTheFirstPartyIsFormed();

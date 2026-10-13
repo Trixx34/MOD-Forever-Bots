@@ -125,19 +125,6 @@ std::uint32_t ClassTable::Get(std::uint64_t botGuid) const
     return it == _classes.end() ? 0 : it->second;
 }
 
-void ClassTable::SetRace(std::uint64_t botGuid, std::uint32_t race)
-{
-    std::lock_guard<std::mutex> lock(_mutex);
-    _races[botGuid] = race;
-}
-
-std::uint32_t ClassTable::GetRace(std::uint64_t botGuid) const
-{
-    std::lock_guard<std::mutex> lock(_mutex);
-    auto const it = _races.find(botGuid);
-    return it == _races.end() ? 0 : it->second;
-}
-
 std::size_t ClassTable::Size() const
 {
     std::lock_guard<std::mutex> lock(_mutex);

@@ -44,17 +44,5 @@ Module.forever-bots.TelemetrySummarySec = 60
 #   Module.forever-bots.PartySize = 5
 #   Module.forever-bots.PartyCount = 1
 
-# Travel (M6): where each race's vendor stands in its start city, as "x y z" on the bot's start map, keyed by race id
-# (1 Human, 2 Orc, 3 Dwarf, 4 Night Elf, 5 Undead, 6 Tauren, 7 Gnome, 8 Troll, 10 Blood Elf, 11 Draenei, 22 Worgen).
-# An idle bot due a vendor visit (ServiceEverySec) walks there, then visits. A race with no entry does not travel.
-# Start maps: 0 for Human, Dwarf, Gnome and Undead; 1 for Orc, Troll, Night Elf and Tauren. The module does not check the
-# map, so a bot must stay on its start map. Positions are the vendor nearest each race's start (sim world DB, Classic
-# start).
-#   Module.forever-bots.VendorPos1 = -8909.46 -104.16 82.03     # Human: Janos Hammerknuckle (Northshire, map 0)
-#   Module.forever-bots.VendorPos2 = -565.43 -4214.20 41.67     # Orc: Duokna (Valley of Trials, map 1)
-#   Module.forever-bots.VendorPos3 = -6226.67 320.05 383.14     # Dwarf: Adlin Pridedrift (Coldridge Valley, map 0)
-#   Module.forever-bots.VendorPos4 = 10436.70 794.84 1322.79    # Night Elf: Keina (Shadowglen, map 1)
-#   Module.forever-bots.VendorPos5 = 1836.77 1641.04 97.71      # Undead: Kayla Smithe (Deathknell, map 0)
-#   Module.forever-bots.VendorPos6 = -2940.84 -245.96 53.89     # Tauren: Moodan Sungrain (Camp Narache, map 1)
-#   Module.forever-bots.VendorPos7 = -6226.67 320.05 383.14     # Gnome: Adlin Pridedrift (shares the Dwarf start, map 0)
-#   Module.forever-bots.VendorPos8 = -565.43 -4214.20 41.67     # Troll: Duokna (shares the Orc start, map 1)
+# Travel (M6): an idle bot due a vendor visit (ServiceEverySec) walks to the nearest vendor on its own map and visits it.
+# The core finds the vendor (layout 6 core). Needs no position settings.
