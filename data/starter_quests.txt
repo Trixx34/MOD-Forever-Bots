@@ -9,6 +9,17 @@ start Human
 anchor 0 -8902.6 -162.6 82.0
 # 783 A Threat Within: Deputy Willem -> Marshal McBride, no objective
 quest 783 giver -8933.5 -136.5 83.4 ender -8902.6 -162.6 82.0
+# 5261 Eagan Peltskinner: Deputy Willem -> Eagan Peltskinner, no objective
+quest 5261 giver -8933.5 -136.5 83.4 ender -8869.2 -163.2 81.0
+# 33 Wolves Across the Border: 8 Tough Wolf Meat, dropped by Young Wolves and Timber Wolves
+quest 33 giver -8869.2 -163.2 81.0 ender -8869.2 -163.2 81.0
+hunt 33 0 8 299,69
+area 33 -8856.4 -133.2 81.4
+area 33 -8838.5 -133.4 81.3
+area 33 -8825.9 -167.9 80.0
+area 33 -8817.7 -182.3 82.3
+area 33 -8806.2 -143.2 83.6
+area 33 -8800.2 -206.3 82.8
 # 7 Kobold Camp Cleanup: 10 Kobold Vermin
 quest 7 giver -8902.6 -162.6 82.0 ender -8902.6 -162.6 82.0
 hunt 7 0 10 6
@@ -47,10 +58,38 @@ area 788 -721.3 -4183.7 30.2
 area 788 -717.0 -4150.8 30.1
 area 788 -682.7 -4287.0 40.6
 area 788 -486.3 -4144.7 54.7
+# 789 Sting of the Scorpid: 10 Scorpid Worker tails
+quest 789 giver -600.1 -4186.2 41.3 ender -600.1 -4186.2 41.3
+hunt 789 0 10 3124
+area 789 -585.4 -4151.6 76.5
+area 789 -546.4 -4148.1 73.5
+area 789 -579.6 -4118.1 74.3
+area 789 -607.1 -4113.0 75.0
+area 789 -550.2 -4117.0 67.1
+area 789 -680.3 -4145.7 36.1
 
 # Coldridge Valley (Dwarf, Gnome)
 start Dwarf
 anchor 0 -6216.5 339.0 383.5
+# 179 Dwarven Outfitters: Sten Stoutarm, 8 Tough Wolf Meat from Ragged Young Wolves and Ragged Timber Wolves
+quest 179 giver -6214.9 328.2 383.7 ender -6214.9 328.2 383.7
+hunt 179 0 8 705,704
+area 179 -6252.8 387.1 383.3
+area 179 -6272.1 285.6 382.6
+area 179 -6287.2 328.1 376.5
+area 179 -6245.9 395.6 385.9
+area 179 -6286.1 352.9 378.2
+area 179 -6295.2 321.0 376.8
+# 170 A New Threat: Balir Frosthammer, 6 Rockjaw Troggs and 6 Burly Rockjaw Troggs
+quest 170 giver -6216.5 339.0 383.5 ender -6216.5 339.0 383.5
+hunt 170 0 6 707
+hunt 170 1 6 724
+area 170 -6323.3 322.4 378.4
+area 170 -6303.4 270.5 380.6
+area 170 -6318.8 292.8 380.2
+area 170 -6340.5 332.8 379.3
+area 170 -6328.2 307.6 379.3
+area 170 -6298.9 243.3 390.9
 # 183 The Boar Hunter: Talin Keeneye, 12 Small Crag Boars
 quest 183 giver -6222.5 689.0 385.0 ender -6222.5 689.0 385.0
 hunt 183 0 12 708
@@ -90,6 +129,17 @@ area 457 10505.0 696.2 1319.2
 area 457 10555.1 769.5 1312.7
 area 457 10582.2 784.1 1310.5
 area 457 10529.5 946.6 1315.7
+# 458 The Woodland Protector: Melithar Staghelm -> Tarindrella, no objective
+quest 458 giver 10389.8 763.5 1320.3 ender 10296.9 870.2 1335.9
+# 459 The Woodland Protector: Tarindrella, 8 items from Grell creatures
+quest 459 giver 10296.9 870.2 1335.9 ender 10296.9 870.2 1335.9
+hunt 459 0 8 1988,1989
+area 459 10281.9 948.0 1337.7
+area 459 10265.9 943.0 1342.2
+area 459 10291.7 956.9 1335.7
+area 459 10285.1 961.6 1337.6
+area 459 10333.4 1018.8 1337.8
+area 459 10349.6 1018.1 1336.7
 
 # Deathknell (Undead)
 start Undead
@@ -112,3 +162,13 @@ area 3901 1939.1 1543.0 90.1
 area 3901 1984.8 1591.6 82.7
 area 3901 1979.5 1572.1 79.1
 area 3901 1976.8 1550.0 86.0
+# 376 The Damned: Novice Elreth, 6 + 6 items (objective 0 = item 3265 from creatures 1508/1509, objective 1 = item 3264 from 1512/1513)
+quest 376 giver 1847.7 1638.7 97.0 ender 1847.7 1638.7 97.0
+hunt 376 0 6 1508,1509
+hunt 376 1 6 1512,1513
+area 376 1907.3 1665.8 83.6
+area 376 1867.0 1672.4 92.6
+area 376 1841.7 1680.2 97.8
+area 376 1859.2 1704.6 94.0
+area 376 1812.2 1703.9 105.5
+area 376 1907.4 1691.1 85.2
