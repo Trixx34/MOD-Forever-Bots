@@ -60,3 +60,8 @@ Module.forever-bots.TelemetrySummarySec = 60
 #   Module.forever-bots.Hub1_1 = 2490.5 1903.5 351.2
 #   Module.forever-bots.Hub1_2 = -3698.6 -4492.0 25.3
 #   Module.forever-bots.Hub1_3 = 6475.8 481.2 9.9
+
+# Quests (M5). The starter quest data file (see data/starter_quests.txt and src/quest_data.h). A bot near one of its starts accepts
+# the quests of that start in order, hunts their targets, and hands them in; a bot with no start nearby grinds as before. Empty
+# turns quests off.
+# QuestFile = data/starter_quests.txt

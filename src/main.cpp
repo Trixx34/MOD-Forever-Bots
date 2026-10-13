@@ -449,6 +449,15 @@ int main(int argc, char** argv)
     for (auto const& [mapId, spots] : settings.Hubs)
         for (auto const& spot : spots)
             policyOptions.HubsByMap[mapId].push_back({ spot[0], spot[1], spot[2] });
+    if (!settings.QuestFile.empty())
+    {
+        std::vector<std::string> questWarnings;
+        auto quests = std::make_shared<QuestData>(LoadQuestData(settings.QuestFile, questWarnings));
+        for (std::string const& warning : questWarnings)
+            std::cerr << "forever-bots: " << warning << "\n";
+        std::cerr << "forever-bots: quests: " << quests->Starts.size() << " start(s) from " << settings.QuestFile << "\n";
+        policyOptions.Quests = std::move(quests);
+    }
     policyOptions.ClassOf = [&classes](std::uint64_t botGuid) { return classes.Get(botGuid); };
 
     // Tier 2 is granted at handshake, so there is a region only if the core accepted it.

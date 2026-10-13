@@ -28,7 +28,7 @@ target_include_directories(forever_bots_settings PUBLIC src)
 add_library(forever_bots_store STATIC src/bot_store.cpp)
 target_include_directories(forever_bots_store PUBLIC src)
 
-add_library(forever_bots_policy STATIC src/bot_policy.cpp src/combat_rotation.cpp)
+add_library(forever_bots_policy STATIC src/bot_policy.cpp src/combat_rotation.cpp src/quest_data.cpp src/quest_planner.cpp)
 target_include_directories(forever_bots_policy PUBLIC src)
 target_link_libraries(forever_bots_policy PUBLIC forever_module_sdk)
 
@@ -50,6 +50,10 @@ add_test(NAME roster COMMAND roster_test)
 add_executable(policy_test tests/policy_test.cpp)
 target_link_libraries(policy_test PRIVATE forever_bots_policy)
 add_test(NAME policy COMMAND policy_test)
+
+add_executable(quest_test tests/quest_test.cpp)
+target_link_libraries(quest_test PRIVATE forever_bots_policy)
+add_test(NAME quest COMMAND quest_test)
 
 add_executable(settings_test tests/settings_test.cpp)
 target_link_libraries(settings_test PRIVATE forever_bots_settings)

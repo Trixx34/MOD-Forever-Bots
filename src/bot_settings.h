@@ -44,6 +44,8 @@ struct BotSettings
     // Hubs (M7): where an idle bot walks when it has seen nothing for a while, per map, in the order given by n. Config keys
     // Hub<map>_<n> = "x y z" (n counts from 1).
     std::map<std::uint32_t, std::vector<std::array<float, 3>>> Hubs;
+    // Quests (M5): the starter quest data file (config key QuestFile, see quest_data.h). Empty turns quests off.
+    std::string QuestFile;
 };
 
 // The most bots any configuration may ask for; also the Tier 2 bot bound requested at handshake.

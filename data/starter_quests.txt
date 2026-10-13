@@ -1,0 +1,49 @@
+# Starter quests for the bots (M5). Format: see src/quest_data.h. Built from the sim world database (quest_template, quest_objectives,
+# creature_queststarter/questender, creature spawns): positions are the NPCs' spawn points, hunting areas are real spawn points of
+# the quest's target creatures within about 250 yards of the quest giver. Quests are done in the order given.
+# A start covers every race that begins at its anchor. More starts (Dwarf, Night Elf, Undead, Tauren) need the targets' spawn points,
+# which the first export did not ask for; they are added the same way.
+
+# Northshire Valley (Human)
+start Human
+anchor 0 -8902.6 -162.6 82.0
+# 783 A Threat Within: Deputy Willem -> Marshal McBride, no objective
+quest 783 giver -8933.5 -136.5 83.4 ender -8902.6 -162.6 82.0
+# 7 Kobold Camp Cleanup: 10 Kobold Vermin
+quest 7 giver -8902.6 -162.6 82.0 ender -8902.6 -162.6 82.0
+hunt 7 0 10 6
+area 7 -8796.8 -173.2 81.7
+area 7 -8803.8 -225.3 83.1
+area 7 -8792.7 -133.7 82.6
+area 7 -8778.5 -128.5 82.8
+area 7 -8809.5 -233.9 82.5
+# 15 Investigate Echo Ridge: 10 Kobold Workers
+quest 15 giver -8902.6 -162.6 82.0 ender -8902.6 -162.6 82.0
+hunt 15 0 10 257
+area 15 -8819.4 -226.3 83.2
+area 15 -8813.3 -244.1 82.3
+area 15 -8766.6 -156.7 82.4
+area 15 -8770.1 -117.7 83.5
+area 15 -8791.0 -104.7 83.4
+# 21 Skirmish at Echo Ridge: 12 Kobold Laborers
+quest 21 giver -8902.6 -162.6 82.0 ender -8902.6 -162.6 82.0
+hunt 21 0 12 80
+area 21 -8671.7 -124.3 92.6
+area 21 -8659.3 -123.9 91.4
+area 21 -8655.2 -126.9 89.7
+# 54 Report to Goldshire: Marshal McBride -> Marshal Dughan, the letter comes with the quest
+quest 54 giver -8902.6 -162.6 82.0 ender -9465.5 74.0 56.8
+
+# Valley of Trials (Orc, Troll)
+start Orc
+anchor 1 -600.1 -4186.2 41.3
+# 4641 Your Place in the World: Kaltunk -> Gornek, no objective
+quest 4641 giver -607.4 -4251.3 39.0 ender -600.1 -4186.2 41.3
+# 788 Cutting Teeth: 10 Mottled Boars
+quest 788 giver -600.1 -4186.2 41.3 ender -600.1 -4186.2 41.3
+hunt 788 0 10 3098
+area 788 -714.9 -4221.4 40.3
+area 788 -721.3 -4183.7 30.2
+area 788 -717.0 -4150.8 30.1
+area 788 -682.7 -4287.0 40.6
+area 788 -486.3 -4144.7 54.7

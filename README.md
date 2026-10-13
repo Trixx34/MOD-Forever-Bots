@@ -129,3 +129,12 @@ Without `FOREVER_MODULE_SDK_SOURCE`, CMake fetches `Trixx34/forever-module-sdk` 
   because the snapshot has no auras. A fleeing target is not detected.
 - Hub positions come from the sim's quest-giver clusters and may sit in rock; a bot that cannot reach one gives up after 3 minutes.
 - Classes 6 and 10 are not spawned.
+
+## Quests (M5)
+
+With `QuestFile` set (see `data/starter_quests.txt`), a bot that is near the anchor of one of the file's starts does the start's quests
+in order: it walks to the giver and accepts the quest (core action `kQuest`), hunts the quest's targets (it pulls only those creatures,
+walking between the quest's hunting areas when none is near, and still fights back when attacked), walks to the ender and hands the
+quest in (the core picks the reward). A quest with no progress for 10 minutes is abandoned and left alone for an hour; a refused accept
+or hand-in blocks that quest for a minute. Party members follow their leader and do no quests. The data format is documented in
+`src/quest_data.h`; `tests/quest_test.cpp` covers it.

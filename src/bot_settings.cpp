@@ -155,5 +155,7 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadKey(config, "PartySize", 0, 5, settings.PartySize, warnings);
     ReadKey(config, "PartyCount", 1, 100, settings.PartyCount, warnings);
     ReadHubs(config, settings.Hubs, warnings);
+    if (auto const it = config.find("QuestFile"); it != config.end())
+        settings.QuestFile = it->second;
     return settings;
 }

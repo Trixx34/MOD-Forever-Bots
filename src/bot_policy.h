@@ -15,10 +15,12 @@
 #pragma once
 
 #include "forever_module/tier2_session.h"
+#include "quest_planner.h"
 
 #include <cstdint>
 #include <functional>
 #include <map>
+#include <memory>
 #include <optional>
 #include <unordered_map>
 #include <unordered_set>
@@ -52,6 +54,8 @@ struct PolicyOptions
     // Hubs (M7): the places an idle bot walks to when it has seen nothing for a while, per map, in order. The bot's map
     // comes from its snapshot. A map with no hubs has no wandering.
     std::map<std::uint32_t, std::vector<Point>> HubsByMap;
+    // Quests (M5): the starter quest data. Unset or empty means the bots do no quests and grind as before.
+    std::shared_ptr<QuestData const> Quests;
 };
 
 // Name of an action status, for logs.
@@ -60,7 +64,7 @@ char const* ActionStatusName(forever_module::BotActionStatus status);
 class BotPolicy
 {
 public:
-    explicit BotPolicy(PolicyOptions options = {}) : _options(options) {}
+    explicit BotPolicy(PolicyOptions options = {}) : _options(options), _quests(options.Quests) {}
 
     // Actions for the bots in `view`. nowMs is a monotonic clock in milliseconds (cooldowns, retries, fight time).
     // Decisions are sent only when they change; casts follow the rotation, the global cooldown and the retries.
@@ -114,6 +118,7 @@ private:
         std::size_t NextHub = 0;                         // index of the hub to walk to next, on the bot's map
         bool Traveling = false;                          // walking to the vendor for a visit
         std::uint64_t TravelStartMs = 0;                 // when this walk began; it is dropped after kTravelTimeoutMs
+        QuestMemory Quest;                               // the quest planner's memory of this bot
         std::unordered_map<std::uint64_t, std::uint64_t> InvitedAtMs; // member guid -> when this bot last invited it
     };
 
@@ -121,4 +126,5 @@ private:
 
     std::unordered_map<std::uint64_t, BotState> _bots; // bot guid -> state
     PolicyOptions _options;
+    QuestPlanner _quests;
 };
