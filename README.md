@@ -1,37 +1,104 @@
 # MOD-Forever-Bots
 
-Bot control as a ForeverBots module. The core creates and controls bots; this module decides what they do.
+Bot AI as a ForeverBots module. The core creates, logs in and moves the bots; this module decides what each bot does: it reads a
+snapshot of every bot each tick and publishes actions (move, follow, attack, cast, rest, vendor, party, loot). Goal: bots that level
+from 1 to 60 and, in a party of five, clear a dungeon.
 
 ## Status
 
-M2 (combat, in progress): the policy approaches a target beyond 5 yards, attacks within it, and casts the class rotation
-once per global cooldown. The warrior rotation (`src/combat_rotation.cpp`) is ported from the forever branch's rules.
-Refused casts are retried after a short wait. Not yet verified on a sim server.
+Built and unit-tested (9 test suites). Run on a dedicated sim worldserver with 300, 500 and 1000 bots: spawn and login, the ramp,
+the safety valves, telemetry and the pump all work. What is **not yet verified** on the sim: sustained combat and kills (the last run
+found bots could not see neutral creatures, now fixed), experience and levelling, vendor and hub walks, parties and looting.
 
-Earlier status:
+| Milestone | State |
+|---|---|
+| M1 facts and feedback | done |
+| M2 combat: rotation, approach, over-pull control, rest | built, not verified |
+| M3 vendor, M4 trainer | built; the trainer check is off by default (bots learn spells on level-up) |
+| M6 travel to a vendor | built, not verified |
+| M7 hubs, looting, safe pulls | built, not verified |
+| M8 parties | built, not verified |
+| M5 quests 1 to 10, levelling 1 to 60, M9 dungeon | not started |
 
-The module connects to the core, asks for one bot with `RequestControl`, tracks the bots it owns, and logs
-revocations. It requests Tier 2 and drives its bots from snapshots: a pump thread reads each new snapshot and
-publishes actions from `BotPolicy`. The policy is a placeholder: below 30% health a bot disengages (follows the closest
-player, or stands still); otherwise it fights its threat target or the closest hostile, else follows the closest player,
-else stands still. A dead bot gets no orders.
+## Needs
+
+- The SDK at layout 7 with the loot action (`forever-module-sdk`, branch `m7-quest-share-sdk` or later).
+- The core with bot support (`BotMgr`), the Tier 2 snapshot at layout 7 and the loot action (branch `m7-quest-share-core` or later).
+  The core keeps a byte-identical copy of the SDK's `tier2_layout.h`; a mismatch is refused at region attach.
 
 ## Stored state
 
-The bots the module controls are rows in the core's module store (doc 15): `bot/<guid>`. On start the module lists
-these rows and takes its bots back first, up to `MaxBots`, spawning only for the rest. A row is removed only when the core
-says the character does not exist, not on a revoke, because the core revokes every bot at shutdown.
+The bots the module controls are rows in the core's module store (doc 15): `bot/<guid>`, holding the race and class. On start the
+module lists these rows and takes its bots back first, up to `MaxBots`, spawning only for the rest. A row is removed only when the
+core says the character does not exist, not on a revoke, because the core revokes every bot at shutdown. Clear the module's store rows
+whenever the bot characters are deleted, or the module tries to reclaim characters that no longer exist.
 
 ## Configuration
 
-The core sends the module the `Module.forever-bots.<Key>` entries from `worldserver.conf.d/modules.d/forever-bots.conf`
-(under the config directory), with the prefix removed. See `config/modules.d/forever-bots.conf.example`:
+The core sends the module the `Module.forever-bots.<Key>` entries from `worldserver.conf.d/modules.d/forever-bots.conf` (under the
+config directory), with the prefix removed. See `config/modules.d/forever-bots.conf.example`. A bad value keeps the default and writes a
+line to the module's stderr. A config reload updates the ramp, the random picks and the cap without logging out any bot.
 
-- `MaxBots` (1..16, default 1): bots the module controls at once.
-- `Race` and `Class` (default 1 and 1): the race and class to spawn bots with.
+| Key | Default | Meaning |
+|---|---|---|
+| `MaxBots` | 1 | Bots controlled at once, 1 to 1500 (capped by the core's Tier 2 grant) |
+| `Race`, `Class` | 1, 1 | A race and class id, or `random` (a seeded pick over the Forever valid combinations, including the Skyborne races 95 and 96) |
+| `RandomSeed` | 1 | Seed for the random picks |
+| `BotsInitial`, `BotsStep`, `BotsStepMinutes`, `BotsCap`, `BotsStopTime` | 300, 100, 15, 1500, 06:00 | The ramp: start count, bots added per step, minutes per step, the cap, and the local time it stops adding |
+| `ServiceEverySec` | 600 | Seconds between vendor visits for an idle bot (60 to 86400) |
+| `TrainEverySec` | 0 (off) | Seconds between trainer checks, also after a level-up (0, or 60 to 86400) |
+| `PartySize`, `PartyCount` | 0 (off), 1 | Bots per party (at most 5) and number of parties |
+| `Hub<map>_<n>` | none | Hub positions `"x y z"` per map, in order |
+| `TestSpell` | 0 (off) | A spell cast at the target every few ticks instead of the rotation, to test the cast path |
+| `TelemetryFile`, `TelemetryMaxMB`, `TelemetryKeep`, `TelemetrySummarySec` | `forever-bots-telemetry.csv`, 64, 5, 60 | The telemetry file (empty turns it off), its rotation, and the summary interval |
 
-Invalid values fall back to the defaults, with a line in the module's log. The bots spawned are capped at the core's
-Tier 2 grant, and none are requested when there is no Tier 2 region.
+The core has its own bot limits in `worldserver.conf`: `Bot.Login.MaxPerSecond`, `Bot.Limit.MaxBots`, `Bot.Limit.MaxWorldDiffMs`,
+`Bot.Limit.MaxDbQueue`, `Bot.Run.StopTime`, `Bot.Spread.SpacingYards`, `Bot.Spread.MaxRadiusYards` and the `Modules.Tier2.*` keys.
+
+## How a bot behaves
+
+Each tick the policy (`src/bot_policy.cpp`) reads the bot's snapshot and sends an action only when the decision changes.
+
+- **Target.** The bot's own threat target is always fought. Otherwise it picks the closest creature the core marks as fightable
+  (hostile, or a neutral "yellow" creature that is not a critter or an NPC with a role; never one a player cannot attack, such as a
+  trainer). It skips a creature more than two levels above it and elites, and does not pull a group of more than three within 10 yards.
+- **Refused targets.** A unit whose attack is refused, that a cast reports with no valid target, or that the bot walks toward for 30 s
+  without reaching, is avoided for 30 s, doubling on each repeat up to 2 minutes.
+- **Approach and attack.** Melee classes close to 5 yards, ranged classes (hunter, priest, shaman, mage, warlock, druid) to 25. A ranged
+  bot below 15% power walks in to melee. Below 30% health a bot disengages.
+- **Rotation** (`src/combat_rotation.cpp`). Every spawned class has rank 1 rows; the core casts the highest rank known. A row is skipped
+  until the bot reaches the level a trainer teaches it (`LearnLevel`, from the Forever trainer data). One cast per global cooldown; a
+  refused cast is retried after a while. Damage-over-time spells and self buffs are not recast while their effect runs; a rogue counts its
+  own combo points.
+- **Rest.** An idle bot below 90% health sits and stays sat until healed, and stands before it moves or fights.
+- **Vendor and travel.** An idle bot due a visit walks to the nearest vendor on its map (found by the core, since a bot sees only 40
+  yards) and visits within 4 yards: sell grey items, repair, equip the best gear. A walk over 3 minutes is dropped until the next interval.
+- **Hubs.** A bot idle for 30 s with nothing in view walks to the next hub of its map and waits a full interval there before walking on.
+- **Loot.** A creature the bot fought, once dead and within 25 yards, is looted once when the bot is out of combat. The core runs the
+  bot's own loot handlers, so loot rights, group rules and bag space are the core's. The item-looted event fires, so
+  auto-vendor-trash sells a bot's grey drops.
+- **Parties.** With `PartySize` set, the lowest-guid bots are cut into parties. The leader (the first warrior, else the lowest guid)
+  invites; members accept, leave a foreign party, follow the leader when more than 8 yards away and fight the leader's target.
+
+The spell ids are rank 1 ids from the classic spell tables. They were checked against the Forever trainer data: every trainable one has
+its vanilla level. Sunder Armor (7386) has no trainer row there. The module logs once per spell id the core does not know.
+
+## Telemetry
+
+The pump writes one CSV line per event and one summary line per bot every `TelemetrySummarySec`, appended to `TelemetryFile`
+(relative to the module's working directory). The header is written when the file is new. Each line carries the bot's running totals.
+
+Columns: `time_ms`, `kind`, `bot`, `level`, `health_pct`, `power_pct`, `in_fight`, `fights`, `targets_gone`, `deaths`,
+`casts_applied`, `refusals`, `stuck_episodes`, `longest_fight_ms`, `health_lost`, `detail`.
+
+Kinds: `summary`, `fight_start`, `fight_end` (detail: reason, target, duration, health lost), `target_switch`, `death`, `alive`,
+`level`, `stuck`, `unstuck`.
+
+- `casts_applied` counts every applied action (move, follow, stop, rest and the rest included), not only spells.
+- A fight starts when the bot's own attack target is set. `fight_end` reason `target_gone` means the target was not in view when the
+  threat dropped (usually a kill, also a leash or a target that left); `no_threat` means it was still alive and in view.
+- `stuck` is a fight with no change in health, position or target for 60 seconds.
+- If the summary lines stop, the module has stopped.
 
 ## Build
 
@@ -39,96 +106,25 @@ Tier 2 grant, and none are requested when there is no Tier 2 region.
     cmake --build build
     ctest --test-dir build
 
-Without `FOREVER_MODULE_SDK_SOURCE`, CMake fetches `Trixx34/forever-module-sdk` (`main`).
+Without `FOREVER_MODULE_SDK_SOURCE`, CMake fetches `Trixx34/forever-module-sdk` (`main`), which does not yet have layout 7.
 
 ## Layout
 
 - `module.json`: manifest (name, protocol version, Tier 1 hooks).
-- `src/bot_roster.{h,cpp}`: owned bots, pending requests, the max-bots cap. No SDK dependency.
-- `src/bot_policy.{h,cpp}`: decides actions from snapshots: approach, attack, rotation casts, retries, disengage.
-- `src/combat_rotation.{h,cpp}`: rotation rules (ported from the forever branch), warrior rows, facts from a snapshot.
-- `src/bot_telemetry.{h,cpp}`: the CSV record of what each bot did (see Telemetry below). No SDK dependency beyond snapshot types.
-- `src/bot_settings.{h,cpp}`: reads the module's config (MaxBots, Race, Class, RandomSeed, the Bots* ramp keys, TestSpell, telemetry keys).
-- `src/bot_pick.{h,cpp}`, `src/bot_ramp.{h,cpp}`, `src/rotating_file.{h,cpp}`: the random pick, the ramp schedule, and the rotating telemetry file.
-- `src/bot_store.{h,cpp}`: the store row keys (`bot/<guid>`) for the bots the module controls.
-- `src/main.cpp`: handshake, config, control requests, revocations, and the Tier 2 pump thread.
-- `tests/*_test.cpp`: unit tests for each library (roster, policy, rotation, settings, bot store, telemetry).
+- `src/bot_policy.{h,cpp}`: the decisions from snapshots (target, approach, rotation, rest, services, travel, hubs, loot, parties).
+- `src/combat_rotation.{h,cpp}`: rotation rules per class, learn levels, facts from a snapshot.
+- `src/bot_roster.{h,cpp}`: owned bots, pending requests, the cap. No SDK dependency.
+- `src/bot_settings.{h,cpp}`: the module's config. `src/bot_pick.{h,cpp}`: valid race/class combinations and the seeded pick.
+- `src/bot_ramp.{h,cpp}`: the ramp schedule. `src/bot_store.{h,cpp}`: the store row keys.
+- `src/bot_telemetry.{h,cpp}`, `src/rotating_file.{h,cpp}`: the telemetry CSV and its rotating file.
+- `src/main.cpp`: handshake, config, control requests, revocations, the ramp timer and the Tier 2 pump thread.
+- `tests/*_test.cpp`: unit tests for each library.
 
-## Scale run (up to 1500 bots)
+## Known gaps
 
-- `Race` and `Class` accept `random`: a seeded pick over the Forever valid combinations (`src/bot_pick.h`, from the Wowhead
-  Forever grid, patch 1.60.1). The core validates each pick (`Player::Create`), so a stale entry costs one refused spawn.
-- The ramp (`src/bot_ramp.h`) asks for `BotsInitial` bots, adds `BotsStep` every `BotsStepMinutes`, never above `BotsCap`,
-  and stops adding at `BotsStopTime` local time. It runs on a 5 s SDK timer on the `Run()` thread, and spawns at most 10 per
-  tick. A refused spawn waits 30 s.
-- A config reload updates the ramp, the random picks and the cap. No bot is logged out.
-- Telemetry rotates at `TelemetryMaxMB`, keeping `TelemetryKeep` older files (`src/rotating_file.h`).
-- The pump logs its decide time and actions per tick once a minute.
-
-## Class rotations
-
-Every class the module spawns has a rotation (`src/combat_rotation.cpp`): warrior, paladin, hunter, rogue, priest, shaman,
-mage, warlock and druid. Rows are rank 1 spell ids; the core casts the highest rank known. Ranged classes (hunter, priest,
-shaman, mage, warlock, druid) approach to 25 yards instead of 5. Damage-over-time spells are not recast while the effect
-runs on the same target, and self buffs (Seal of Righteousness, Power Word: Shield) are not recast while up
-(`DotDurationMs` in `bot_policy.cpp`). A rogue counts its own combo points: each applied Sinister Strike on the target adds
-one, and Eviscerate fires at five. A ranged bot below 15% power walks to melee range.
-
-The spell ids and durations are from memory of the classic spell tables. The module logs once per spell id the core does
-not know ("is not in the core's spell table"), so a wrong id shows up in the sim log. Auto Shot (75) is the hunter's last
-row and its repeated casts are not yet checked on the sim.
-
-## Milestones: M2 to M4
-
-- M2 combat: rotation, approach, over-pull control, cooldown skips, Rend tracking, and rest (sit when idle and below 90%
-  health, stand before anything moves or fights). Flee is the 30% disengage: the snapshot has no fleeing state, so a
-  fleeing target is not detected.
-- M3 vendor: `kVendor` (spell_id bits: 1 sell grey items, 2 repair, 4 equip the best gear by item level). Runs on a timer
-  for an idle bot, when an NPC with the vendor or repair flag is in interaction range.
-- M4 trainers: `kTrain` learns the trainer's spells the bot can take now, lowest level first, through the core's teach
-  checks. Runs on a timer and at once after a level-up, when a trainer is in interaction range.
-- Services are opt-in in the policy (zero interval is off). The module turns the vendor visit on from `ServiceEverySec`
-  (default 600). The trainer check is off by default (`TrainEverySec` 0), since bots learn their spells on level-up; set
-  `TrainEverySec` to turn it on. A refused service is logged at most once per bot every ten minutes.
-- M8 parties: `kGroup` invites, accepts and leaves (spell_id 1, 2, 3; layout 5). With `PartySize` set, the first
-  `PartyCount` parties of `PartySize` bots (lowest guids first) form: the leader (its first warrior, else its lowest-guid
-  bot) invites each member not in the party, members accept, leave a foreign party, follow the leader when more than 8
-  yards away and fight the leader's target when they have none. Party actions run only out of combat. Off by default.
-- M6 travel: an idle bot due a vendor visit walks to the nearest vendor on its own map (`kMoveTo`), and visits once within
-  4 yards. The core finds the vendor from the creature spawns and reports it in the snapshot (layout 6), since a bot
-  only sees units within 40 yards. The lookup repeats after the bot moves 100 yards. A walk longer than 3 minutes is
-  dropped until the next interval. A walking bot neither sits nor trains. Party members do not walk alone; they follow
-  their leader. Trainers are not travelled to: bots learn their spells on level-up.
-- M7 hubs: a bot idle for 30 s (not fighting, following or walking to a vendor, and seeing nothing) walks to the next hub
-  of its map (`Hub<map>_<n>` settings, in order), waits there for a full interval, then walks to the next. A hurt bot
-  rests rather than walks; a party member follows its leader; anything seen stops the walk. A walk longer than 3 minutes
-  is dropped. Hubs come from the sim's quest-giver clusters (see the config example).
-- Loot (M7): a creature the bot fought, once it is dead, within 25 yards and the bot is out of combat, is looted once (`kLoot`)
-  within two minutes of the fight. The core opens the corpse through the bot's own loot handlers, so loot rights, group rules and
-  bag space are the core's. The item-looted event fires, so auto-vendor-trash sells a bot's grey drops too.
-- Refused targets: a unit whose melee attack is refused, or that a cast reports with no valid target, is avoided for 30 s.
-  The bot picks the next closest hostile (or, if it is a party member, its leader's target when that is not avoided).
-
-## Telemetry (overnight runs)
-
-The pump writes one CSV line per event and one summary line per bot every `TelemetrySummarySec` seconds, appended to
-`TelemetryFile` (relative to the module's working directory, default `forever-bots-telemetry.csv`). The header is written when the
-file is new. Each line is self-contained: it carries the bot's running totals.
-
-Columns: `time_ms` (module clock), `kind`, `bot` (guid), `level`, `health_pct`, `power_pct`, `in_fight`, `fights`,
-`targets_gone`, `deaths`, `casts_applied`, `refusals`, `stuck_episodes`, `longest_fight_ms`, `health_lost`, `detail`.
-
-Kinds: `summary`, `fight_start`, `fight_end` (detail: reason, target, duration, health lost), `target_switch`,
-`death`, `alive`, `level`, `stuck`, `unstuck`.
-
-- `fight_end` reason `target_gone` means the target was not in view when the threat dropped: usually a kill, but also a
-  leash or a target that left. `no_threat` means the target was still alive and in view.
-- `stuck` means a fight had no change in health, position or target for 60 seconds (`StuckAfterMs`).
-- If the summary lines stop, the module has stopped.
-
-## Open items
-
-- Resting is not implemented: the protocol has no action to sit or regenerate.
-- Rend's bleed is estimated (21 seconds per accepted cast) because the snapshot has no auras.
-- The fleeing condition in the rotation is always false; the snapshot does not report it.
-- Not yet tested against a running worldserver.
+- No quest, levelling or dungeon logic yet (M5, M7 levelling, M9). Bots fight what they meet and wander between hubs.
+- The rotations follow the vanilla kits; Forever's changed abilities (for example Holy Strike, Demonic Brand) are not used yet.
+- A hunter has no pet handling, and Auto Shot's repeated casts are unchecked. Rend's bleed is estimated (21 s per accepted cast)
+  because the snapshot has no auras. A fleeing target is not detected.
+- Hub positions come from the sim's quest-giver clusters and may sit in rock; a bot that cannot reach one gives up after 3 minutes.
+- Classes 6 and 10 are not spawned.
