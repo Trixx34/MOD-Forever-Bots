@@ -383,6 +383,8 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
                     if (actions[i].type == forever_module::ActionType::kTeleport)
                         std::cerr << "forever-bots: scenario " << extras.Scenario->Name << ": teleport bot " << actions[i].bot_guid << " to map "
                                   << actions[i].spell_id << " (" << actions[i].dest_x << ", " << actions[i].dest_y << ", " << actions[i].dest_z << ")\n";
+                for (std::string const& boss : director->TakeNewBossKills())
+                    std::cerr << "forever-bots: scenario " << extras.Scenario->Name << ": boss killed: " << boss << "\n";
                 if (auto const result = director->TakeResult())
                 {
                     std::string const line = FormatScenarioResult(*result);
@@ -634,6 +636,7 @@ int main(int argc, char** argv)
             plan.Route.push_back({ point[0], point[1], point[2] });
         plan.DurationMs = std::uint64_t(settings.Scenario.DurationSec) * 1000;
         plan.Gear = settings.Scenario.Gear;
+        plan.Bosses = settings.Scenario.Bosses;
         plan.ClassOf = policyOptions.ClassOf;
         extras.Scenario = std::move(plan);
         extras.ScenarioResultFile = settings.Scenario.ResultFile;

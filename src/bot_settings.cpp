@@ -152,6 +152,24 @@ void ReadScenario(std::unordered_map<std::string, std::string> const& config, Sc
         scenario.HasEntry = ParseNumbers(it->second, scenario.Entry.data(), 4);
     if (!scenario.HasEntry)
         warnings.push_back("Module.forever-bots.ScenarioEntry: missing or not four numbers (map x y z); the scenario cannot enter its map.");
+    if (auto const it = config.find("ScenarioBosses"); it != config.end())
+    {
+        std::istringstream list(it->second);
+        std::string item;
+        while (std::getline(list, item, ','))
+        {
+            std::size_t const colon = item.find(':');
+            std::string const number = item.substr(0, colon);
+            std::uint32_t entry = 0;
+            if (std::from_chars(number.data(), number.data() + number.size(), entry).ec == std::errc{} && entry > 0)
+            {
+                std::string name = colon == std::string::npos ? std::to_string(entry) : item.substr(colon + 1);
+                scenario.Bosses.emplace_back(entry, name);
+            }
+            else
+                warnings.push_back("Module.forever-bots.ScenarioBosses: '" + item + "' is not entry[:name]; ignored.");
+        }
+    }
     if (auto const it = config.find("ScenarioResultFile"); it != config.end())
         scenario.ResultFile = it->second;
 

@@ -416,8 +416,45 @@ void SettingsDropAScenarioWithoutARoster()
 
 } // namespace
 
+
+void CountsBossesSeenDead()
+{
+    std::uint64_t t, tick;
+    std::vector<BotSnapshot> bots;
+    ScenarioPlan plan = Plan();
+    plan.Bosses = { { 644, "Rhahk'Zor" }, { 646, "Mr. Smite" } };
+    ScenarioDirector director(plan);
+    std::vector<BotAction> actions;
+    bots = { Bot(1, 36, 0, 0, 2, 3), Bot(2, 36, 0, 0, 1, 3), Bot(3, 36, 0, 0, 1, 3) };
+    t = 1000;
+    tick = 1;
+    for (int i = 0; i < 12 && director.Phase() != ScenarioPhase::Running; ++i)
+        director.Decide(View(++tick, bots), t += 3000, actions);
+    CHECK(director.Phase() == ScenarioPhase::Running);
+
+    // Rhahk'Zor's corpse is in bot 2's view (health 0); a living Mr. Smite does not count.
+    WorldTickSnapshotView view = View(++tick, bots);
+    view.bots[1].nearby_count = 1;
+    view.bots[2].nearby_count = 1;
+    view.nearby[1].guid = forever_module::MakeUnitRef(8, 644, 5);
+    view.nearby[1].health = 0;
+    view.nearby[2].guid = forever_module::MakeUnitRef(8, 646, 6);
+    view.nearby[2].health = 500;
+    director.Decide(view, t += 1000, actions);
+    auto const fresh = director.TakeNewBossKills();
+    CHECK(fresh.size() == 1 && fresh[0] == "Rhahk'Zor");
+    CHECK(director.TakeNewBossKills().empty());
+
+    bots[0].health = bots[1].health = bots[2].health = 0; // a wipe ends it
+    director.Decide(View(++tick, bots), t += 1000, actions);
+    auto const result = director.TakeResult();
+    CHECK(result && result->BossesTotal == 2 && result->BossesKilled.size() == 1);
+    CHECK(FormatScenarioResult(*result).find("bosses=1/2 killed=Rhahk'Zor") != std::string::npos);
+}
+
 int main()
 {
+    CountsBossesSeenDead();
     WaitsForTheWholeRoster();
     DressesThenGroupsThenEnters();
     CompletesWhenTheLeaderReachesTheLastPoint();

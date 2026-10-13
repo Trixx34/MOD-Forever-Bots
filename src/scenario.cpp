@@ -41,11 +41,20 @@ void ScenarioDirector::Finish(std::string outcome, std::uint64_t nowMs)
     result.RouteSize = std::uint32_t(_plan.Route.size());
     result.RosterSize = _plan.RosterSize;
     result.PartyFormed = _partyFormed;
+    result.BossesTotal = std::uint32_t(_plan.Bosses.size());
+    result.BossesKilled = _bossKills;
     for (auto const& [guid, dead] : _everDead)
         if (dead)
             ++result.Deaths;
     _result = result;
     _phase = ScenarioPhase::Done;
+}
+
+std::vector<std::string> ScenarioDirector::TakeNewBossKills()
+{
+    std::vector<std::string> fresh(_bossKills.begin() + std::ptrdiff_t(_bossKillsReported), _bossKills.end());
+    _bossKillsReported = _bossKills.size();
+    return fresh;
 }
 
 std::optional<ScenarioResult> ScenarioDirector::TakeResult()
@@ -232,6 +241,20 @@ void ScenarioDirector::Decide(forever_module::WorldTickSnapshotView const& view,
                     if (Distance2d(*leader, _plan.Route[i]) <= kRoutePointReachYards)
                         _furthest = std::max<std::uint32_t>(_furthest, std::uint32_t(i + 1));
             }
+            // A boss counts as killed once any bot sees its corpse (a creature of that entry with no health).
+            if (!_plan.Bosses.empty())
+            {
+                for (std::size_t b = 0; b < bots.size(); ++b)
+                    for (forever_module::NearbyUnit const& unit : view.NearbyOf(b))
+                    {
+                        if (unit.health != 0 || forever_module::UnitRefType(unit.guid) != 8)
+                            continue;
+                        for (auto const& [entry, name] : _plan.Bosses)
+                            if (entry == forever_module::UnitRefEntry(unit.guid) &&
+                                std::find(_bossKills.begin(), _bossKills.end(), name) == _bossKills.end())
+                                _bossKills.push_back(name);
+                    }
+            }
             if (!_plan.Route.empty() && _furthest >= _plan.Route.size())
                 Finish("complete", nowMs);
             else if (aliveCount() == 0)
@@ -255,5 +278,13 @@ std::string FormatScenarioResult(ScenarioResult const& result)
     out << "scenario " << result.Name << ": outcome=" << result.Outcome << " furthest=" << result.Furthest << "/" << result.RouteSize
         << " deaths=" << result.Deaths << " alive=" << result.Alive << "/" << result.RosterSize << " run=" << result.RunMs / 1000 << "s"
         << " party=" << (result.PartyFormed ? "yes" : "no");
+    if (result.BossesTotal != 0)
+    {
+        out << " bosses=" << result.BossesKilled.size() << "/" << result.BossesTotal << " killed=";
+        for (std::size_t i = 0; i < result.BossesKilled.size(); ++i)
+            out << (i ? "," : "") << result.BossesKilled[i];
+        if (result.BossesKilled.empty())
+            out << "none";
+    }
     return out.str();
 }
