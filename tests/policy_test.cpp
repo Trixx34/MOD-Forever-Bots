@@ -993,8 +993,23 @@ void InvalidCastTargetIsNotCastAtAgain()
     CHECK(!HasCast(policy.Decide(view, 1000), 585)); // the wolf is avoided: no target, no cast
 }
 
+// A target the bot cannot reach is given up after kApproachTimeoutMs of walking toward it.
+void UnreachableTargetIsGivenUp()
+{
+    BotPolicy policy;
+    NearbyUnit const far = Hostile(7, 30.0f, 100); // 30 yards, beyond melee range
+    WorldTickSnapshotView view = PartyView({ 10 });
+    AddNearby(view, 0, far);
+    CHECK(HasAction(policy.Decide(view, 0), 10, ActionType::kFollow, far.guid));
+    CHECK(!HasAction(policy.Decide(view, 29000), 10, ActionType::kStop)); // still walking: not given up yet
+    auto const given = policy.Decide(view, 31000);
+    CHECK(!HasAction(given, 10, ActionType::kFollow, far.guid));
+    CHECK(!HasAction(policy.Decide(view, 32000), 10, ActionType::kFollow, far.guid)); // avoided: not picked again
+}
+
 int main()
 {
+    UnreachableTargetIsGivenUp();
     RefusedAttackPicksAnotherTarget();
     InvalidCastTargetIsNotCastAtAgain();
     IdleBotWandersToAHubAfterAWhile();

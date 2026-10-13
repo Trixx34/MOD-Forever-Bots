@@ -48,6 +48,7 @@ constexpr std::uint32_t kPlayerType = 2;     // unit reference type of a player 
 constexpr std::uint64_t kInviteRetryMs = 15000; // a member is invited again this long after the last invite
 constexpr std::uint64_t kPartyRetryMs = 2000;   // a party action refused, or just sent, is not repeated before this
 constexpr float kFollowLeaderYards = 8.0f;      // a member this close to its leader stays where it is
+constexpr std::uint64_t kApproachTimeoutMs = 30000; // walking to a target this long without reaching it: avoid the target
 constexpr std::uint64_t kAvoidMs = 30000;        // a target that refused an attack or a cast is skipped for this long
 constexpr std::uint64_t kWanderIdleMs = 30000;   // idle for this long, seeing nothing, before walking to a hub
 constexpr std::uint64_t kWanderTimeoutMs = 180000; // a walk to a hub longer than this is dropped
@@ -417,7 +418,33 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             // A ranged bot that has run out of power closes to melee range: its spells are spent.
             bool const outOfPower = bot.max_power > 0 && std::uint64_t(bot.power) * 100 < std::uint64_t(bot.max_power) * kOutOfPowerPct;
             float const approach = outOfPower ? kMeleeApproachYards : rotation::ApproachYards(classId);
-            wanted = distance > approach ? Decision{ ActionType::kFollow, targetRef } : Decision{ ActionType::kAttackTarget, targetRef };
+            if (distance <= approach)
+            {
+                state.Approaching = false;
+                wanted = Decision{ ActionType::kAttackTarget, targetRef };
+            }
+            else
+            {
+                // Walking to a target that never gets in range (behind a wall, or unreachable) is given up after a while:
+                // the target is avoided, and the bot picks another one next tick.
+                if (!state.Approaching || state.ApproachTarget != targetRef)
+                {
+                    state.Approaching = true;
+                    state.ApproachTarget = targetRef;
+                    state.ApproachSinceMs = nowMs;
+                    wanted = Decision{ ActionType::kFollow, targetRef };
+                }
+                else if (nowMs - state.ApproachSinceMs > kApproachTimeoutMs)
+                {
+                    state.Approaching = false;
+                    state.AvoidUntilMs[targetRef] = nowMs + kAvoidMs;
+                    wanted = Decision{ ActionType::kStop, 0 };
+                }
+                else
+                {
+                    wanted = Decision{ ActionType::kFollow, targetRef };
+                }
+            }
         }
         else
         {
