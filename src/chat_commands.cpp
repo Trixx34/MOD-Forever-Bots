@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <charconv>
 #include <cmath>
 #include <vector>
 
@@ -73,6 +74,25 @@ bool IsOrderVerb(ChatVerb verb)
         case ChatVerb::Heal:
         case ChatVerb::Passive:
         case ChatVerb::Aggressive:
+        case ChatVerb::Summon:
+        case ChatVerb::Revive:
+        case ChatVerb::Mount:
+        case ChatVerb::Dismount:
+            return true;
+        default:
+            return false;
+    }
+}
+
+bool IsControlVerb(ChatVerb verb)
+{
+    switch (verb)
+    {
+        case ChatVerb::Role:
+        case ChatVerb::Stance:
+        case ChatVerb::Focus:
+        case ChatVerb::FocusOff:
+        case ChatVerb::Distance:
             return true;
         default:
             return false;
@@ -95,6 +115,15 @@ char const* ChatVerbName(ChatVerb verb)
         case ChatVerb::Heal: return "heal";
         case ChatVerb::Passive: return "passive";
         case ChatVerb::Aggressive: return "aggressive";
+        case ChatVerb::Summon: return "summon";
+        case ChatVerb::Revive: return "revive";
+        case ChatVerb::Mount: return "mount";
+        case ChatVerb::Dismount: return "dismount";
+        case ChatVerb::Role: return "role";
+        case ChatVerb::Stance: return "stance";
+        case ChatVerb::Focus: return "focus";
+        case ChatVerb::FocusOff: return "focus off";
+        case ChatVerb::Distance: return "distance";
         case ChatVerb::None: break;
     }
     return "none";
@@ -129,7 +158,7 @@ bool ParseChatSelector(std::string_view token, ChatSelector& out)
     return true;
 }
 
-std::optional<ChatCommand> ParseChatCommand(std::string_view text, bool orders)
+std::optional<ChatCommand> ParseChatCommand(std::string_view text, bool orders, bool control)
 {
     std::vector<std::string> words = Words(text);
     if (words.empty() || words.size() > 4)
@@ -154,7 +183,7 @@ std::optional<ChatCommand> ParseChatCommand(std::string_view text, bool orders)
     std::string const arg = args >= 1 ? words[at + 1] : std::string();
     auto const finish = [&](ChatVerb result) -> std::optional<ChatCommand>
     {
-        if (IsOrderVerb(result) && !orders)
+        if ((IsOrderVerb(result) && !orders) || (IsControlVerb(result) && !control))
             return std::nullopt;
         command.Verb = result;
         return command;
@@ -162,6 +191,41 @@ std::optional<ChatCommand> ParseChatCommand(std::string_view text, bool orders)
 
     if (verb == "follow") return args == 0 ? finish(ChatVerb::Follow) : (args == 1 && arg == "off" ? finish(ChatVerb::FollowOff) : std::nullopt);
     if (verb == "stay") return args == 0 ? finish(ChatVerb::Stay) : (args == 1 && arg == "off" ? finish(ChatVerb::StayOff) : std::nullopt);
+    if (verb == "role")
+    {
+        if (args == 1 && (arg == "tank" || arg == "healer" || arg == "dps" || arg == "auto"))
+        {
+            command.Arg = arg;
+            return finish(ChatVerb::Role);
+        }
+        return std::nullopt;
+    }
+    if (verb == "stance")
+    {
+        if (args == 1 && (arg == "aggressive" || arg == "defensive" || arg == "passive"))
+        {
+            command.Arg = arg;
+            return finish(ChatVerb::Stance);
+        }
+        return std::nullopt;
+    }
+    if (verb == "focus") return args == 0 ? finish(ChatVerb::Focus) : (args == 1 && arg == "off" ? finish(ChatVerb::FocusOff) : std::nullopt);
+    if (verb == "distance")
+    {
+        if (args != 1)
+            return std::nullopt;
+        if (arg == "default")
+        {
+            command.Arg = arg;
+            return finish(ChatVerb::Distance);
+        }
+        float yards = 0.0f;
+        auto const parsed = std::from_chars(arg.data(), arg.data() + arg.size(), yards);
+        if (parsed.ec != std::errc{} || parsed.ptr != arg.data() + arg.size() || yards < 3.0f || yards > 40.0f)
+            return std::nullopt;
+        command.Value = yards;
+        return finish(ChatVerb::Distance);
+    }
     if (verb == "goto") return args == 1 && arg == "here" ? finish(ChatVerb::GotoHere) : std::nullopt;
     if (args != 0)
         return std::nullopt;
@@ -172,6 +236,10 @@ std::optional<ChatCommand> ParseChatCommand(std::string_view text, bool orders)
     if (verb == "heal") return finish(ChatVerb::Heal);
     if (verb == "passive") return finish(ChatVerb::Passive);
     if (verb == "aggressive") return finish(ChatVerb::Aggressive);
+    if (verb == "summon") return finish(ChatVerb::Summon);
+    if (verb == "revive") return finish(ChatVerb::Revive);
+    if (verb == "mount") return finish(ChatVerb::Mount);
+    if (verb == "dismount") return finish(ChatVerb::Dismount);
     return std::nullopt;
 }
 

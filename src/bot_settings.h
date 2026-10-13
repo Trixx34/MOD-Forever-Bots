@@ -93,6 +93,7 @@ struct BotSettings
     // stop, pull, heal, passive and aggressive. Only the bots of the speaker's own group obey.
     bool ChatCommands = false;
     bool ChatOrders = false;
+    bool ChatControl = false;   // the control panel: role, stance, focus, distance
     std::uint32_t AutoGearEveryLevels = 5;
     ScenarioSettings Scenario;
 };

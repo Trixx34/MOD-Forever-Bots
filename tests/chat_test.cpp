@@ -357,6 +357,126 @@ void AltsAreNotAutoGeared()
     CHECK(!Has(actions, 11, ActionType::kAutoGear));
 }
 
+
+void ParsesSecondSlice()
+{
+    CHECK(!ParseChatCommand("summon", false));
+    CHECK(ParseChatCommand("summon", true)->Verb == ChatVerb::Summon);
+    CHECK(ParseChatCommand("all revive", true)->Verb == ChatVerb::Revive);
+    CHECK(ParseChatCommand("mount", true)->Verb == ChatVerb::Mount && ParseChatCommand("dismount", true)->Verb == ChatVerb::Dismount);
+    CHECK(!ParseChatCommand("role tank", true)); // control needs its own switch
+    auto cmd = ParseChatCommand("role tank", false, true);
+    CHECK(cmd && cmd->Verb == ChatVerb::Role && cmd->Arg == "tank");
+    CHECK(!ParseChatCommand("role boss", false, true));
+    cmd = ParseChatCommand("rogue stance defensive", false, true);
+    CHECK(cmd && cmd->Verb == ChatVerb::Stance && cmd->Arg == "defensive" && cmd->Selector.Matches(4));
+    CHECK(ParseChatCommand("focus", false, true)->Verb == ChatVerb::Focus);
+    CHECK(ParseChatCommand("focus off", false, true)->Verb == ChatVerb::FocusOff);
+    cmd = ParseChatCommand("distance 15", false, true);
+    CHECK(cmd && cmd->Verb == ChatVerb::Distance && cmd->Value == 15.0f);
+    CHECK(ParseChatCommand("distance default", false, true)->Arg == "default");
+    CHECK(!ParseChatCommand("distance 2", false, true) && !ParseChatCommand("distance 50", false, true) && !ParseChatCommand("distance far", false, true));
+}
+
+bool HasType(std::vector<BotAction> const& actions, std::uint64_t bot, ActionType type)
+{
+    return Has(actions, bot, type);
+}
+
+void SummonSendsTheOrderToEachBotInTheGroup()
+{
+    BotPolicy policy = Policy();
+    WorldTickSnapshotView view = Group();
+    policy.ApplyChat(view, Ctx(), *ParseChatCommand("summon", true), 1000);
+    auto const actions = policy.Decide(view, 1000);
+    int summons = 0;
+    for (BotAction const& action : actions)
+        if (action.type == ActionType::kSummon)
+        {
+            ++summons;
+            CHECK(action.target_guid == PlayerRef());
+        }
+    CHECK(summons == 5);
+    CHECK(!HasType(policy.Decide(view, 1100), 10, ActionType::kSummon)); // once
+}
+
+void ReviveIsForTheDeadAndMountForTheLiving()
+{
+    BotPolicy policy = Policy();
+    WorldTickSnapshotView view = Group();
+    view.bots[2].health = 0;
+    view.bots[2].life_state = 1;
+    auto lines = policy.ApplyChat(view, Ctx(), *ParseChatCommand("revive", true), 1000);
+    CHECK(!lines.empty() && lines[0].find("refused") != std::string::npos); // four of them are not dead
+    auto actions = policy.Decide(view, 1000);
+    CHECK(HasType(actions, 12, ActionType::kRevive) && !HasType(actions, 10, ActionType::kRevive));
+
+    lines = policy.ApplyChat(view, Ctx(), *ParseChatCommand("mount", true), 1100);
+    actions = policy.Decide(view, 1100);
+    CHECK(HasType(actions, 10, ActionType::kMount) && !HasType(actions, 12, ActionType::kMount));
+}
+
+void RoleTankLetsAnyClassPull()
+{
+    BotPolicy policy = Policy();
+    WorldTickSnapshotView view = Group();
+    NearbyUnit mob;
+    mob.guid = MakeUnitRef(8, 7, 3);
+    mob.pos_x = 20.0f;
+    mob.health = 100;
+    mob.is_hostile = true;
+    view.nearby[2 * view.max_nearby_units] = mob; // the mage sees it
+    view.bots[2].nearby_count = 1;
+    BotPolicy::ChatContext ctx = Ctx();
+    ctx.TargetRef = mob.guid;
+    policy.ApplyChat(view, ctx, *ParseChatCommand("mage role tank", false, true), 1000);
+    auto lines = policy.ApplyChat(view, ctx, *ParseChatCommand("mage pull", true), 1100);
+    CHECK(lines.empty());
+}
+
+void DefensiveBotsWaitForTheGroupToFight()
+{
+    BotPolicy policy = Policy();
+    WorldTickSnapshotView view = Group();
+    NearbyUnit mob;
+    mob.guid = MakeUnitRef(8, 7, 3);
+    mob.pos_x = 10.0f;
+    mob.health = 100;
+    mob.is_hostile = true;
+    view.nearby[2 * view.max_nearby_units] = mob;
+    view.bots[2].nearby_count = 1;
+    policy.ApplyChat(view, Ctx(), *ParseChatCommand("stance defensive", false, true), 1000);
+    auto actions = policy.Decide(view, 1000);
+    CHECK(!Has(actions, 12, ActionType::kFollow, mob.guid) && !Has(actions, 12, ActionType::kAttackTarget));
+    view.bots[0].in_combat = 1; // somebody in the group is fighting
+    actions = policy.Decide(view, 2000);
+    CHECK(Has(actions, 12, ActionType::kFollow, mob.guid) || Has(actions, 12, ActionType::kAttackTarget));
+}
+
+void FocusTargetIsAttackedFirst()
+{
+    BotPolicy policy = Policy();
+    WorldTickSnapshotView view = Group();
+    NearbyUnit near, far;
+    near.guid = MakeUnitRef(8, 7, 3);
+    near.pos_x = 5.0f;
+    near.health = 100;
+    near.is_hostile = true;
+    far.guid = MakeUnitRef(8, 8, 4);
+    far.pos_x = 20.0f;
+    far.health = 100;
+    far.is_hostile = true;
+    view.nearby[0] = near;
+    view.nearby[1] = far;
+    view.bots[0].nearby_count = 2;
+    view.bots[0].in_combat = 1;
+    BotPolicy::ChatContext ctx = Ctx();
+    ctx.TargetRef = far.guid;
+    policy.ApplyChat(view, ctx, *ParseChatCommand("warrior focus", false, true), 1000);
+    auto const actions = policy.Decide(view, 1000);
+    CHECK(Has(actions, 10, ActionType::kFollow, far.guid) || Has(actions, 10, ActionType::kAttackTarget, far.guid));
+}
+
 } // namespace
 
 int main()
@@ -380,6 +500,12 @@ int main()
     PassiveBotsDoNotAssist();
     AcceptsAPlayersInvite();
     AltsAreNotAutoGeared();
+    ParsesSecondSlice();
+    SummonSendsTheOrderToEachBotInTheGroup();
+    ReviveIsForTheDeadAndMountForTheLiving();
+    RoleTankLetsAnyClassPull();
+    DefensiveBotsWaitForTheGroupToFight();
+    FocusTargetIsAttackedFirst();
     if (failures == 0)
         std::printf("chat_test: all checks passed\n");
     return failures == 0 ? 0 : 1;

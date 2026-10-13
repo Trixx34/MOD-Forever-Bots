@@ -728,15 +728,17 @@ int main(int argc, char** argv)
                 set(false, "Bot commands are off (ChatCommands = 0 in the module's config).");
                 return reply;
             }
-            auto const parsed = ParseChatCommand(rest, settings.ChatOrders);
+            auto const parsed = ParseChatCommand(rest, settings.ChatOrders, settings.ChatControl);
             if (!parsed)
             {
                 set(false, "Usage: .bots [all|tank|healer|dps|<class>] follow [off] | stay [off] | release | status | autogear" +
-                               std::string(settings.ChatOrders ? " | stop | passive | aggressive" : "") +
-                               ". goto here, pull and heal: say them in party chat.");
+                               std::string(settings.ChatOrders ? " | stop | passive | aggressive | summon | revive | mount | dismount" : "") +
+                               std::string(settings.ChatControl ? " | role <tank|healer|dps|auto> | stance <aggressive|defensive|passive> | distance <yards>|default" : "") +
+                               ". goto here, pull, heal and focus: say them in party chat.");
                 return reply;
             }
-            if (parsed->Verb == ChatVerb::GotoHere || parsed->Verb == ChatVerb::Pull || parsed->Verb == ChatVerb::Heal)
+            if (parsed->Verb == ChatVerb::GotoHere || parsed->Verb == ChatVerb::Pull || parsed->Verb == ChatVerb::Heal ||
+                parsed->Verb == ChatVerb::Focus)
             {
                 set(false, std::string(ChatVerbName(parsed->Verb)) + " needs your position or target: say it in party chat.");
                 return reply;
@@ -772,7 +774,7 @@ int main(int argc, char** argv)
         if (!settings.ChatCommands || notify.event_payload_case() != forever_module::EventNotify::kPlayerChat)
             return;
         forever_module::PlayerChatEvent const& chat = notify.player_chat();
-        auto const parsed = ParseChatCommand(chat.text(), settings.ChatOrders);
+        auto const parsed = ParseChatCommand(chat.text(), settings.ChatOrders, settings.ChatControl);
         if (!parsed)
             return; // ordinary chat
         CommandQueue::ChatItem item;

@@ -539,13 +539,18 @@ std::vector<std::string> BotPolicy::ApplyChat(WorldTickSnapshotView const& view,
                     line += ", power " + std::to_string(state.SeenPowerPct) + "%";
                 if (state.ChatStay) line += ", stay";
                 if (state.ChatFollow != 0) line += ", following you";
-                if (state.Passive) line += ", passive";
+                if (state.Stance_ == BotState::Stance::Passive) line += ", passive";
+                if (state.Stance_ == BotState::Stance::Defensive) line += ", defensive";
+                if (state.Role_ != BotState::Role::Auto)
+                    line += state.Role_ == BotState::Role::Tank ? ", role tank" : state.Role_ == BotState::Role::Healer ? ", role healer" : ", role dps";
+                if (state.Focus != 0) line += ", focus set";
+                if (state.FollowYards > 0.0f) line += ", follow " + std::to_string(int(state.FollowYards)) + "y";
                 if (state.GotoActive) line += ", walking to you";
                 lines.push_back(std::move(line));
                 break;
             }
             case ChatVerb::Pull:
-                if (classId != kWarriorClass)
+                if (classId != kWarriorClass && state.Role_ != BotState::Role::Tank)
                     refuse("not a tank");
                 else if (chat.TargetRef == 0 || forever_module::UnitRefType(chat.TargetRef) != 8)
                     refuse("select a creature first");
@@ -566,10 +571,73 @@ std::vector<std::string> BotPolicy::ApplyChat(WorldTickSnapshotView const& view,
                     state.ForcedHeal = chat.TargetRef;
                 break;
             case ChatVerb::Passive:
-                state.Passive = true;
+                state.Stance_ = BotState::Stance::Passive;
                 break;
             case ChatVerb::Aggressive:
-                state.Passive = false;
+                state.Stance_ = BotState::Stance::Aggressive;
+                break;
+            case ChatVerb::Stance:
+                state.Stance_ = command.Arg == "passive" ? BotState::Stance::Passive
+                                : command.Arg == "defensive" ? BotState::Stance::Defensive : BotState::Stance::Aggressive;
+                break;
+            case ChatVerb::Role:
+                state.Role_ = command.Arg == "tank" ? BotState::Role::Tank : command.Arg == "healer" ? BotState::Role::Healer
+                              : command.Arg == "dps" ? BotState::Role::Dps : BotState::Role::Auto;
+                break;
+            case ChatVerb::Focus:
+                if (chat.TargetRef == 0 || forever_module::UnitRefType(chat.TargetRef) != 8)
+                    refuse("select a creature first");
+                else
+                    state.Focus = chat.TargetRef;
+                break;
+            case ChatVerb::FocusOff:
+                state.Focus = 0;
+                break;
+            case ChatVerb::Distance:
+                state.FollowYards = command.Arg == "default" ? 0.0f : command.Value;
+                state.FollowWalking = false;
+                break;
+            case ChatVerb::Summon:
+                if (bot.life_state != 0)
+                    refuse("dead");
+                else
+                {
+                    forever_module::BotAction summon;
+                    summon.bot_guid = bot.guid;
+                    summon.type = ActionType::kSummon;
+                    summon.target_guid = issuerRef;
+                    summon.dest_x = float(index);
+                    state.OrderAction = summon;
+                    state.GotoActive = false;
+                    state.Last.reset();
+                }
+                break;
+            case ChatVerb::Revive:
+                if (bot.life_state == 0)
+                    refuse("not dead");
+                else
+                {
+                    forever_module::BotAction revive;
+                    revive.bot_guid = bot.guid;
+                    revive.type = ActionType::kRevive;
+                    revive.target_guid = issuerRef;
+                    revive.dest_x = float(index);
+                    state.OrderAction = revive;
+                    state.ReleaseNow = false;
+                }
+                break;
+            case ChatVerb::Mount:
+            case ChatVerb::Dismount:
+                if (bot.life_state != 0)
+                    refuse("dead");
+                else
+                {
+                    forever_module::BotAction mount;
+                    mount.bot_guid = bot.guid;
+                    mount.type = ActionType::kMount;
+                    mount.spell_id = command.Verb == ChatVerb::Mount ? 1u : 0u;
+                    state.OrderAction = mount;
+                }
                 break;
             case ChatVerb::None:
                 break;
@@ -610,7 +678,9 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             std::size_t leader = start;
             for (std::size_t p = start; p < end; ++p)
             {
-                if (ClassFor(_options, guids[p]) == kWarriorClass)
+                auto const known = _bots.find(guids[p]);
+                bool const tankRole = known != _bots.end() && known->second.Role_ == BotState::Role::Tank;
+                if (tankRole || (ClassFor(_options, guids[p]) == kWarriorClass && (known == _bots.end() || known->second.Role_ == BotState::Role::Auto)))
                 {
                     leader = p;
                     break;
@@ -701,6 +771,11 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         present.insert(bot.guid);
         BotState& state = _bots[bot.guid];
         ReadResult(state, bot, nowMs);
+        if (state.OrderAction)
+        {
+            actions.push_back(*state.OrderAction);
+            state.OrderAction.reset();
+        }
         state.SeenHealthPct = bot.max_health ? std::uint32_t(std::uint64_t(bot.health) * 100 / bot.max_health) : 100;
         state.SeenPowerPct = bot.max_power ? std::uint32_t(std::uint64_t(bot.power) * 100 / bot.max_power) : 100;
         state.SeenLife = bot.life_state;
@@ -952,14 +1027,32 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             if (auto const at = indexOf.find(partyLeader); at != indexOf.end())
                 leaderSnap = &view.bots[at->second];
         }
-        bool const atLeader = leaderSnap && Distance2d(bot, *leaderSnap) <= kFollowLeaderYards;
+        bool const atLeader = leaderSnap && Distance2d(bot, *leaderSnap) <= (state.FollowYards > 0.0f ? state.FollowYards : kFollowLeaderYards);
 
         // Who an idle bot follows: a member its leader (and stays put once close), else the closest player.
         std::uint64_t followRef = player ? player->guid : 0;
         if (partyMember && leaderSnap)
             followRef = atLeader ? 0 : leaderRef;
         if (state.ChatFollow != 0)
+        {
             followRef = state.ChatFollow; // told to follow the speaker
+            if (state.FollowYards > 0.0f)
+            {
+                // A follow distance: walk when farther than it, stop within half of it (the speaker has to be in view to tell).
+                for (NearbyUnit const& unit : nearby)
+                    if (unit.guid == state.ChatFollow)
+                    {
+                        float const distanceToSpeaker = rotation::DistanceYards(bot, unit);
+                        if (distanceToSpeaker <= state.FollowYards * 0.5f)
+                            state.FollowWalking = false;
+                        else if (distanceToSpeaker > state.FollowYards)
+                            state.FollowWalking = true;
+                        if (!state.FollowWalking)
+                            followRef = 0;
+                        break;
+                    }
+            }
+        }
         if (state.ChatStay)
             followRef = 0;                // told to hold the position
 
@@ -1080,7 +1173,30 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         if (targetRef != 0 && avoided(targetRef))
             targetRef = 0; // it refused us: the bot does not fight it for now
         // Chat orders: a passive or staying bot starts no fight of its own; a pull order points the bot at the speaker's target.
-        bool const noSelfPull = (state.Passive || state.ChatStay) && bot.in_combat == 0;
+        bool groupFighting = false;
+        if (bot.group_leader_guid != 0)
+            for (BotSnapshot const& other : view.bots)
+                groupFighting = groupFighting || (other.group_leader_guid == bot.group_leader_guid && other.in_combat != 0 && other.life_state == 0);
+        if (partyLeader != 0 && partyFighting(partyLeader))
+            groupFighting = true;
+        bool const noSelfPull = (state.Stance_ == BotState::Stance::Passive || state.ChatStay ||
+                                 (state.Stance_ == BotState::Stance::Defensive && !groupFighting)) && bot.in_combat == 0;
+        if (state.Focus != 0 && (bot.in_combat != 0 || groupFighting))
+        {
+            if (FindLiveMob(nearby, state.Focus))
+            {
+                state.FocusMissingMs = 0;
+                if (!avoided(state.Focus))
+                    targetRef = state.Focus; // the focus target first
+            }
+            else if (state.FocusMissingMs == 0)
+                state.FocusMissingMs = nowMs;
+            else if (nowMs - state.FocusMissingMs > 30000)
+            {
+                state.Focus = 0; // out of view for a good while: forgotten
+                state.FocusMissingMs = 0;
+            }
+        }
         if (state.ForcedTarget != 0)
         {
             if (nowMs >= state.ForcedUntilMs || !FindLiveMob(nearby, state.ForcedTarget))
@@ -1504,7 +1620,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         // Healing: a healer class in a party heals the party member (itself included) with the least health, below kHealBelowPct, in range.
         if (partyLeader != 0 && nowMs >= state.NextCastMs && !(bot.casting_spell != 0 && bot.cast_remaining_ms != 0))
         {
-            std::uint32_t const healSpell = HealSpellFor(classId, bot.level);
+            std::uint32_t const healSpell = state.Role_ == BotState::Role::Dps ? 0u : HealSpellFor(classId, bot.level);
             auto const retry = healSpell != 0 ? state.RetryAtMs.find(healSpell) : state.RetryAtMs.end();
             if (healSpell != 0 && (retry == state.RetryAtMs.end() || nowMs >= retry->second))
             {

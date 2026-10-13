@@ -178,7 +178,15 @@ private:
         // Chat orders (chat_commands.h).
         bool ChatStay = false;                           // hold the position
         std::uint64_t ChatFollow = 0;                    // follow this player reference (0 = no order)
-        bool Passive = false;                            // fight only what attacks the bot
+        enum class Stance : std::uint8_t { Aggressive, Defensive, Passive };
+        Stance Stance_ = Stance::Aggressive;             // aggressive: fights what the group fights or meets; defensive: only what attacks it or the group; passive: only what attacks it
+        enum class Role : std::uint8_t { Auto, Tank, Healer, Dps };
+        Role Role_ = Role::Auto;                         // overrides what the class gives (tank pulls and leads, dps does not heal on its own)
+        std::uint64_t FocusMissingMs = 0;                // since when the focus target has not been in view
+        std::uint64_t Focus = 0;                         // the creature attacked first in a fight
+        float FollowYards = 0.0f;                        // follow distance (0 = the default)
+        bool FollowWalking = false;                      // walking after the speaker (hysteresis between FollowYards and half of it)
+        std::optional<forever_module::BotAction> OrderAction; // a summon, revive or mount order, sent on this bot's next turn
         bool GotoActive = false;                         // walking to GotoPoint
         Point GotoPoint;
         std::uint64_t GotoUntilMs = 0;

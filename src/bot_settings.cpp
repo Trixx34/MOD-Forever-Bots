@@ -290,6 +290,7 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadBool(config, "AutoGearing", settings.AutoGearing, warnings);
     ReadBool(config, "ChatCommands", settings.ChatCommands, warnings);
     ReadBool(config, "ChatOrders", settings.ChatOrders, warnings);
+    ReadBool(config, "ChatControl", settings.ChatControl, warnings);
     ReadKey(config, "AutoGearEveryLevels", 1, 60, settings.AutoGearEveryLevels, warnings);
     ReadScenario(config, settings.Scenario, warnings);
     if (auto const it = config.find("QuestFile"); it != config.end())

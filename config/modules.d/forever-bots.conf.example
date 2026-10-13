@@ -76,7 +76,8 @@ Module.forever-bots.TelemetrySummarySec = 60
 # aggressive. A selector may come first: all, tank, healer, dps, a class name (rogue, rogues), or a comma list: "healer follow", "rogue,mage stay".
 #   .bots follow | .bots healer stay | .bots status | .bots autogear     (goto here, pull and heal are party chat only: they use your position / target)
 # ChatCommands = 0
-# ChatOrders = 0
+# ChatOrders = 0     (adds stop, pull, heal, passive, aggressive, summon, revive, mount, dismount; summon/revive/mount need Bot.Chat.Orders.Enabled in the core)
+# ChatControl = 0    (the control panel: role tank|healer|dps|auto, stance aggressive|defensive|passive, focus [off], distance <yards>|default)
 #   With ChatCommands = 1 a bot also accepts a party invite from a player. Dot commands: .bots spawn <race id> <class id> [level] | list |
 #   alt add <name> | alt remove <name> | alt list (alts need Bot.Alt.Enabled = 1 in the core's worldserver.conf).
 # AutoGearEveryLevels = 5

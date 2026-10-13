@@ -144,7 +144,10 @@ or hand-in blocks that quest for a minute. Party members follow their leader and
 **Chat commands.** With `ChatCommands = 1` the leader of a group commands its bots by typing in party or raid chat, or by whispering one bot:
 `[selector] verb`. Selectors: `all` (default), `tank`, `healer`, `dps`, a class name, or a comma list. Verbs: `follow [off]`, `stay [off]`, `goto here`,
 `release` (a dead bot releases its spirit now), `status` (one line per bot, sent back to you). `ChatOrders = 1` adds `stop`, `pull` (the tank
-attacks your selected target), `heal` (a healer heals your selected friend), `passive`, `aggressive`. Only the bots of the speaker's own group obey;
+attacks your selected target), `heal` (a healer heals your selected friend), `passive`, `aggressive`, `summon` (the bots come to you), `revive`
+(a dead bot is resurrected at 35% health and brought to you), `mount` and `dismount` (summon, revive and mount also need `Bot.Chat.Orders.Enabled = 1` in
+the core). `ChatControl = 1` adds the control panel: `role tank|healer|dps|auto`, `stance aggressive|defensive|passive`, `focus [off]` (your selected
+target is attacked first in a fight), `distance <yards>|default` (how far from you a following bot stops). Only the bots of the speaker's own group obey;
 other chat is ignored. The core forwards only a group leader's lines in a group with a bot, and whispers to a bot (hook `PlayerScript.OnChat`).
 A bot accepts a party invite from a player when `ChatCommands = 1`, so the player invites bots with the normal /invite and then commands them.
 More dot commands (they need the module-command permission): `.bots spawn <race id> <class id> [level]`, `.bots list`, and alts: `.bots alt add <name>`
