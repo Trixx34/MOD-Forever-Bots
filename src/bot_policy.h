@@ -23,6 +23,14 @@
 #include <unordered_set>
 #include <vector>
 
+// A place in the world, for travel (M6).
+struct Point
+{
+    float X = 0.0f;
+    float Y = 0.0f;
+    float Z = 0.0f;
+};
+
 // Options for the policy. TestSpell (0 = off) replaces the rotation: it is cast at the target every CastEveryTicks
 // ticks, which exercises the cast path (milestone M1). ClassId selects the rotation (0 = none).
 struct PolicyOptions
@@ -40,6 +48,10 @@ struct PolicyOptions
     // leader is its first warrior, else its lowest-guid bot. PartySize 0 turns parties off.
     std::uint32_t PartySize = 0;
     std::uint32_t PartyCount = 1;
+    // Travel (M6): the vendor position of each race, and the race of each bot (unset or 0 = no race). An idle bot due a
+    // vendor visit walks to its race's vendor; a bot with no entry, or a party member, does not travel.
+    std::unordered_map<std::uint32_t, Point> VendorByRace;
+    std::function<std::uint32_t(std::uint64_t botGuid)> RaceOf;
 };
 
 // Name of an action status, for logs.
@@ -59,6 +71,7 @@ private:
     {
         forever_module::ActionType Type = forever_module::ActionType::kStop;
         std::uint64_t Target = 0;
+        Point Dest;                                      // kMoveTo destination
     };
 
     // A damage-over-time effect the policy believes is on a target, from an accepted cast.
@@ -87,6 +100,8 @@ private:
         std::uint64_t ComboTarget = 0;
         std::uint32_t LastTrainLevel = 0;                // the level at the last trainer check
         std::uint64_t PartyRetryAtMs = 0;                // a party action is not sent again before this
+        bool Traveling = false;                          // walking to the vendor for a visit
+        std::uint64_t TravelStartMs = 0;                 // when this walk began; it is dropped after kTravelTimeoutMs
         std::unordered_map<std::uint64_t, std::uint64_t> InvitedAtMs; // member guid -> when this bot last invited it
     };
 

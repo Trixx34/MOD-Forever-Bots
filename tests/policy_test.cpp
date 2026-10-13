@@ -773,8 +773,80 @@ void NoPartyActionsInCombat()
     CHECK(!HasGroup(PartyPolicy(5).Decide(view, 0), 12, 1));
 }
 
+// Travel (M6). Bot 10 is race 1, whose vendor stands at x = 100 on the bot's map; services are on every 60 s.
+BotPolicy VendorPolicy(bool party = false)
+{
+    PolicyOptions options;
+    options.ServiceEveryMs = 60000;
+    options.RaceOf = [](std::uint64_t) { return std::uint32_t(1); };
+    options.VendorByRace[1] = { 100.0f, 0.0f, 0.0f };
+    if (party)
+    {
+        options.PartySize = 5;
+        options.PartyCount = 1;
+        options.ClassOf = WarriorLeads;
+    }
+    return BotPolicy(options);
+}
+
+void IdleBotWalksToItsVendor()
+{
+    auto const actions = VendorPolicy().Decide(PartyView({ 10 }), 0);
+    bool found = false;
+    for (BotAction const& action : actions)
+        if (action.type == ActionType::kMoveTo && action.bot_guid == 10)
+        {
+            found = true;
+            CHECK(action.dest_x == 100.0f && action.dest_y == 0.0f);
+        }
+    CHECK(found);
+    CHECK(!HasAction(actions, 10, ActionType::kVendor)); // the visit waits until the bot is in reach
+}
+
+void VendorVisitWhenInReach()
+{
+    WorldTickSnapshotView view = PartyView({ 10 });
+    view.bots[0].pos_x = 98.0f; // two yards from the vendor
+    auto const actions = VendorPolicy().Decide(view, 0);
+    CHECK(HasAction(actions, 10, ActionType::kVendor));
+    CHECK(!HasAction(actions, 10, ActionType::kMoveTo));
+}
+
+void TravelIsDroppedAfterTheTimeout()
+{
+    BotPolicy policy = VendorPolicy();
+    WorldTickSnapshotView view = PartyView({ 10 });
+    CHECK(HasAction(policy.Decide(view, 0), 10, ActionType::kMoveTo));
+    auto const stuck = policy.Decide(view, 200000); // still far away after the timeout
+    CHECK(!HasAction(stuck, 10, ActionType::kMoveTo));
+    CHECK(HasAction(stuck, 10, ActionType::kStop));  // the walk is over
+    CHECK(!HasAction(stuck, 10, ActionType::kVendor));
+}
+
+void WalkingBotDoesNotSit()
+{
+    WorldTickSnapshotView view = PartyView({ 10 });
+    view.bots[0].health = 500; // hurt enough to sit, if it were idle
+    auto const actions = VendorPolicy().Decide(view, 0);
+    CHECK(HasAction(actions, 10, ActionType::kMoveTo));
+    for (BotAction const& action : actions)
+        CHECK(!(action.type == ActionType::kRest && action.spell_id == 1));
+}
+
+void PartyMembersDoNotWalkAlone()
+{
+    auto const actions = VendorPolicy(true).Decide(PartyView({ 10, 11, 12, 13, 14 }), 0);
+    CHECK(!HasAction(actions, 10, ActionType::kMoveTo));
+    CHECK(HasAction(actions, 12, ActionType::kMoveTo)); // the leader walks; the members follow it
+}
+
 int main()
 {
+    IdleBotWalksToItsVendor();
+    VendorVisitWhenInReach();
+    TravelIsDroppedAfterTheTimeout();
+    WalkingBotDoesNotSit();
+    PartyMembersDoNotWalkAlone();
     PartyOffByDefault();
     LeaderInvitesItsMembers();
     OnlyTheFirstPartyIsFormed();

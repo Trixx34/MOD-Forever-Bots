@@ -48,6 +48,8 @@ constexpr std::uint32_t kPlayerType = 2;     // unit reference type of a player 
 constexpr std::uint64_t kInviteRetryMs = 15000; // a member is invited again this long after the last invite
 constexpr std::uint64_t kPartyRetryMs = 2000;   // a party action refused, or just sent, is not repeated before this
 constexpr float kFollowLeaderYards = 8.0f;      // a member this close to its leader stays where it is
+constexpr float kVendorReachYards = 4.0f;       // a bot this close to its vendor can use it (the core allows 5)
+constexpr std::uint64_t kTravelTimeoutMs = 180000; // a walk to the vendor longer than this is dropped for now
 
 // Duration of the damage-over-time effect a spell leaves on its target, or 0 for spells the policy does not track. Rank 1
 // durations: while the effect runs, the policy does not recast the spell on the same target.
@@ -156,6 +158,13 @@ float Distance2d(BotSnapshot const& a, BotSnapshot const& b)
 {
     float const dx = a.pos_x - b.pos_x;
     float const dy = a.pos_y - b.pos_y;
+    return std::sqrt(dx * dx + dy * dy);
+}
+
+float DistanceTo(BotSnapshot const& bot, Point const& point)
+{
+    float const dx = bot.pos_x - point.X;
+    float const dy = bot.pos_y - point.Y;
     return std::sqrt(dx * dx + dy * dy);
 }
 
@@ -385,15 +394,54 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             wanted = followRef ? Decision{ ActionType::kFollow, followRef } : Decision{ ActionType::kStop, 0 };
         }
 
+        bool enemyNear = false;
+        for (NearbyUnit const& unit : nearby)
+            enemyNear = enemyNear || IsLiveMob(unit);
+        bool idle = !hasTarget && !enemyNear && wanted.Type == ActionType::kStop;
+
+        // Services and travel (M6). An idle bot due a vendor visit walks to its race's vendor, unless it is a party member
+        // (it follows its leader). The visit is sent once the bot is in reach. A walk longer than kTravelTimeoutMs is dropped
+        // and the visit waits for its next interval. A walking bot is not idle, so it neither sits nor trains on the way.
+        if (idle && _options.ServiceEveryMs != 0 && nowMs >= state.NextServiceMs)
+        {
+            std::uint32_t const race = _options.RaceOf ? _options.RaceOf(bot.guid) : 0;
+            auto const spot = _options.VendorByRace.find(race);
+            bool const hasVendor = !partyMember && spot != _options.VendorByRace.end();
+            if (hasVendor && DistanceTo(bot, spot->second) > kVendorReachYards)
+            {
+                if (!state.Traveling)
+                {
+                    state.Traveling = true;
+                    state.TravelStartMs = nowMs;
+                }
+                if (nowMs - state.TravelStartMs <= kTravelTimeoutMs)
+                {
+                    wanted = Decision{ ActionType::kMoveTo, 0, spot->second };
+                    idle = false;
+                }
+                else
+                {
+                    state.Traveling = false;
+                    state.NextServiceMs = nowMs + _options.ServiceEveryMs;
+                }
+            }
+            else
+            {
+                state.Traveling = false;
+                BotAction vendor;
+                vendor.bot_guid = bot.guid;
+                vendor.type = ActionType::kVendor;
+                vendor.spell_id = kServiceSell | kServiceRepair | kServiceEquip;
+                actions.push_back(vendor);
+                state.NextServiceMs = nowMs + _options.ServiceEveryMs;
+            }
+        }
+
         // Rest: sit down while idle and hurt, and stand before anything moves or fights. The stand goes out before the
         // movement below, in the same action set, so the bot never moves sitting.
         // Idle means no fight and no player to follow, with no live hostile anywhere near: a sitting bot is easy prey.
         // Creatures only: a hostile player that is not attacking the bot does not stop it from resting (its threat target
         // already does, through hasTarget).
-        bool enemyNear = false;
-        for (NearbyUnit const& unit : nearby)
-            enemyNear = enemyNear || IsLiveMob(unit);
-        bool const idle = !hasTarget && !enemyNear && wanted.Type == ActionType::kStop;
         bool const hurtEnough = bot.max_health > 0 && std::uint64_t(bot.health) * 100 < std::uint64_t(bot.max_health) * kRestBelowPct;
         bool const stillHurt = bot.max_health > 0 && bot.health < bot.max_health;
         bool const sitWanted = idle && (state.Sitting ? stillHurt : hurtEnough) && nowMs >= state.RestRetryAtMs;
@@ -407,18 +455,6 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             state.Sitting = sitWanted;
         }
 
-        // Services (M3, M4) for an idle bot: a vendor visit on a timer (sell grey, repair, equip), and a trainer check on a
-        // timer or at once after a level-up. The core refuses both when no NPC is in interaction range, which is expected
-        // until travel (M6) takes bots to them.
-        if (idle && _options.ServiceEveryMs != 0 && nowMs >= state.NextServiceMs)
-        {
-            BotAction vendor;
-            vendor.bot_guid = bot.guid;
-            vendor.type = ActionType::kVendor;
-            vendor.spell_id = kServiceSell | kServiceRepair | kServiceEquip;
-            actions.push_back(vendor);
-            state.NextServiceMs = nowMs + _options.ServiceEveryMs;
-        }
         bool const levelUp = bot.level != 0 && bot.level != state.LastTrainLevel;
         if (idle && _options.TrainEveryMs != 0 && (levelUp || nowMs >= state.NextTrainMs))
         {
@@ -475,12 +511,16 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             }
         }
 
-        if (!state.Last || state.Last->Type != wanted.Type || state.Last->Target != wanted.Target)
+        if (!state.Last || state.Last->Type != wanted.Type || state.Last->Target != wanted.Target ||
+            state.Last->Dest.X != wanted.Dest.X || state.Last->Dest.Y != wanted.Dest.Y || state.Last->Dest.Z != wanted.Dest.Z)
         {
             BotAction action;
             action.bot_guid = bot.guid;
             action.type = wanted.Type;
             action.target_guid = wanted.Target;
+            action.dest_x = wanted.Dest.X;
+            action.dest_y = wanted.Dest.Y;
+            action.dest_z = wanted.Dest.Z;
             actions.push_back(action);
             state.Last = wanted;
         }
