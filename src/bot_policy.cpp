@@ -92,7 +92,7 @@ bool IsLiveMob(NearbyUnit const& unit);
 // kPullRadius of the candidate, the candidate included. Units already attacking the bot are not chosen here; the policy
 // fights its threat target whatever the group size.
 NearbyUnit const* PullTarget(BotSnapshot const& bot, std::span<NearbyUnit const> units,
-                            std::function<bool(std::uint64_t)> const& avoided)
+                            std::function<bool(std::uint64_t)> const& avoided, bool defending)
 {
     NearbyUnit const* best = nullptr;
     float bestDist = std::numeric_limits<float>::max();
@@ -100,9 +100,10 @@ NearbyUnit const* PullTarget(BotSnapshot const& bot, std::span<NearbyUnit const>
     {
         if (!IsLiveMob(candidate) || avoided(candidate.guid))
             continue;
-        // Not worth the fight: well above the bot's level, or an elite. (A level of 0 is unknown and not judged.) A creature that
-        // attacks the bot is still fought, since it comes in as the threat target.
-        if (bot.level != 0 && ((candidate.level != 0 && candidate.level > bot.level + kMaxLevelAbove) || candidate.elite))
+        // Not worth pulling: well above the bot's level, or an elite. (A level of 0 is unknown and not judged.) A bot that is already
+        // in combat is being attacked, and the snapshot does not say by what: it fights the closest creature, whatever its level, since
+        // standing still until it dies is worse. The same goes for the pack-size rule below.
+        if (!defending && bot.level != 0 && ((candidate.level != 0 && candidate.level > bot.level + kMaxLevelAbove) || candidate.elite))
             continue;
         float const dist = rotation::DistanceYards(bot, candidate);
         if (dist >= bestDist)
@@ -112,7 +113,7 @@ NearbyUnit const* PullTarget(BotSnapshot const& bot, std::span<NearbyUnit const>
         for (NearbyUnit const& other : units)
             if (IsLiveMob(other) && DistanceBetween(candidate, other) <= kPullRadius)
                 ++group;
-        if (group > kMaxPull)
+        if (!defending && group > kMaxPull)
             continue;
 
         bestDist = dist;
@@ -413,7 +414,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 if (unit.guid == targetRef)
                     targetUnit = &unit;
         }
-        else if (NearbyUnit const* hostile = PullTarget(bot, nearby, avoided))
+        else if (NearbyUnit const* hostile = PullTarget(bot, nearby, avoided, bot.in_combat != 0))
         {
             targetUnit = hostile;
             targetRef = hostile->guid;

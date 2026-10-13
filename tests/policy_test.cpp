@@ -1139,8 +1139,47 @@ void NoLootForADistantCorpse()
     CHECK(!HasAction(policy.Decide(after, 1000), 10, ActionType::kLoot));
 }
 
+// A bot in combat with no attack target of its own is being attacked: it fights back, even a creature it would not pull.
+void BotFightsBackAgainstAStrongAttacker()
+{
+    NearbyUnit strong = Hostile(7, 2.0f, 100);
+    strong.level = 9;
+    strong.elite = 1;
+    WorldTickSnapshotView view = PartyView({ 10 });
+    view.bots[0].level = 1;
+    AddNearby(view, 0, strong);
+
+    BotPolicy calm;
+    CHECK(!HasAction(calm.Decide(view, 0), 10, ActionType::kAttackTarget, strong.guid)); // not pulled when the bot is not in combat
+
+    view.bots[0].in_combat = 1; // the same creature is now hitting the bot
+    BotPolicy attacked;
+    CHECK(HasAction(attacked.Decide(view, 0), 10, ActionType::kAttackTarget, strong.guid));
+}
+
+void BotInCombatIgnoresThePackLimit()
+{
+    WorldTickSnapshotView view = PartyView({ 10 });
+    for (std::uint64_t counter = 1; counter <= 4; ++counter) // four creatures within 10 yards of each other: more than the limit of three
+        AddNearby(view, 0, Hostile(counter, 2.0f + float(counter) * 0.5f, 100));
+    BotPolicy calm;
+    bool pulled = false;
+    for (BotAction const& action : calm.Decide(view, 0))
+        pulled = pulled || action.type == ActionType::kAttackTarget || action.type == ActionType::kFollow;
+    CHECK(!pulled); // a pack of four is not pulled
+
+    view.bots[0].in_combat = 1;
+    BotPolicy attacked;
+    bool fights = false;
+    for (BotAction const& action : attacked.Decide(view, 0))
+        fights = fights || action.type == ActionType::kAttackTarget;
+    CHECK(fights);
+}
+
 int main()
 {
+    BotFightsBackAgainstAStrongAttacker();
+    BotInCombatIgnoresThePackLimit();
     BotLootsTheCreatureItKilled();
     NoLootWhileInCombat();
     NoLootForACorpseItDidNotFight();
