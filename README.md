@@ -93,10 +93,11 @@ row and its repeated casts are not yet checked on the sim.
   `PartyCount` parties of `PartySize` bots (lowest guids first) form: the leader (its first warrior, else its lowest-guid
   bot) invites each member not in the party, members accept, leave a foreign party, follow the leader when more than 8
   yards away and fight the leader's target when they have none. Party actions run only out of combat. Off by default.
-- M6 travel: an idle bot due a vendor visit walks to its race's vendor (`VendorPos<race>` settings, `kMoveTo` to the
-  position), and visits once within 4 yards. A walk longer than 3 minutes is dropped until the next interval. A walking
-  bot neither sits nor trains. Party members do not walk alone; they follow their leader. Travel is on the bot's own map
-  only. Trainers are not travelled to: bots learn their spells on level-up.
+- M6 travel: an idle bot due a vendor visit walks to the nearest vendor on its own map (`kMoveTo`), and visits once within
+  4 yards. The core finds the vendor from the creature spawns and reports it in the snapshot (layout 6), since a bot
+  only sees units within 40 yards. The lookup repeats after the bot moves 100 yards. A walk longer than 3 minutes is
+  dropped until the next interval. A walking bot neither sits nor trains. Party members do not walk alone; they follow
+  their leader. Trainers are not travelled to: bots learn their spells on level-up.
 
 ## Telemetry (overnight runs)
 

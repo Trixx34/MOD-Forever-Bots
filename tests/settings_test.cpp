@@ -136,20 +136,6 @@ void PartySettings()
     CHECK(warnings.size() == 1);
 }
 
-void VendorSpotSettings()
-{
-    std::vector<std::string> warnings;
-    CHECK(ParseBotSettings({}, warnings).VendorSpots.empty()); // no vendors until configured
-    BotSettings const s = ParseBotSettings({ { "VendorPos1", "-8866.5 -132.25 83.0" }, { "VendorPos10", "1 2 3" } }, warnings);
-    CHECK(s.VendorSpots.size() == 2);
-    CHECK(s.VendorSpots.at(1)[0] == -8866.5f && s.VendorSpots.at(1)[1] == -132.25f && s.VendorSpots.at(1)[2] == 83.0f);
-    CHECK(s.VendorSpots.at(10)[2] == 3.0f);
-    CHECK(warnings.empty());
-    BotSettings const bad = ParseBotSettings({ { "VendorPos2", "abc" }, { "VendorPos3", "1 2" }, { "VendorPos4", "1 2 3 4" } }, warnings);
-    CHECK(bad.VendorSpots.empty());
-    CHECK(warnings.size() == 3);
-}
-
 void TelemetrySettings()
 {
     std::vector<std::string> warnings;
@@ -181,7 +167,6 @@ int main()
     EffectiveMaxBotsIsCappedByGrant();
     TestSpellIsOptional();
     PartySettings();
-    VendorSpotSettings();
 
     if (failures == 0)
         std::printf("settings_test: all checks passed\n");

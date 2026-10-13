@@ -399,15 +399,16 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             enemyNear = enemyNear || IsLiveMob(unit);
         bool idle = !hasTarget && !enemyNear && wanted.Type == ActionType::kStop;
 
-        // Services and travel (M6). An idle bot due a vendor visit walks to its race's vendor, unless it is a party member
-        // (it follows its leader). The visit is sent once the bot is in reach. A walk longer than kTravelTimeoutMs is dropped
-        // and the visit waits for its next interval. A walking bot is not idle, so it neither sits nor trains on the way.
+        // Services and travel (M6). An idle bot due a vendor visit walks to the nearest vendor on its map, unless it is a
+        // party member (it follows its leader). The visit is sent once the bot is in reach. A walk longer than
+        // kTravelTimeoutMs is dropped and the visit waits for its next interval. A walking bot is not idle, so it neither
+        // sits nor trains on the way.
         if (idle && _options.ServiceEveryMs != 0 && nowMs >= state.NextServiceMs)
         {
-            std::uint32_t const race = _options.RaceOf ? _options.RaceOf(bot.guid) : 0;
-            auto const spot = _options.VendorByRace.find(race);
-            bool const hasVendor = !partyMember && spot != _options.VendorByRace.end();
-            if (hasVendor && DistanceTo(bot, spot->second) > kVendorReachYards)
+            // The nearest vendor on the bot's map, found by the core (layout 6). None on the map, or a party member: no walk.
+            Point const vendor{ bot.vendor_x, bot.vendor_y, bot.vendor_z };
+            bool const hasVendor = !partyMember && bot.vendor_valid != 0;
+            if (hasVendor && DistanceTo(bot, vendor) > kVendorReachYards)
             {
                 if (!state.Traveling)
                 {
@@ -416,7 +417,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 }
                 if (nowMs - state.TravelStartMs <= kTravelTimeoutMs)
                 {
-                    wanted = Decision{ ActionType::kMoveTo, 0, spot->second };
+                    wanted = Decision{ ActionType::kMoveTo, 0, vendor };
                     idle = false;
                 }
                 else

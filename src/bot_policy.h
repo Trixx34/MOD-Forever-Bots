@@ -48,10 +48,6 @@ struct PolicyOptions
     // leader is its first warrior, else its lowest-guid bot. PartySize 0 turns parties off.
     std::uint32_t PartySize = 0;
     std::uint32_t PartyCount = 1;
-    // Travel (M6): the vendor position of each race, and the race of each bot (unset or 0 = no race). An idle bot due a
-    // vendor visit walks to its race's vendor; a bot with no entry, or a party member, does not travel.
-    std::unordered_map<std::uint32_t, Point> VendorByRace;
-    std::function<std::uint32_t(std::uint64_t botGuid)> RaceOf;
 };
 
 // Name of an action status, for logs.

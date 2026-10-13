@@ -4,9 +4,7 @@
 
 #include "bot_ramp.h"
 
-#include <array>
 #include <cstdint>
-#include <map>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -40,9 +38,6 @@ struct BotSettings
     // cut from the lowest-guid bots (config key PartyCount, 1..100).
     std::uint32_t PartySize = 0;
     std::uint32_t PartyCount = 1;
-    // Where each race's vendor stands in its start city (M6, config keys VendorPos<race> = "x y z"). A bot due a vendor
-    // visit walks there. A race with no entry does not travel.
-    std::map<std::uint32_t, std::array<float, 3>> VendorSpots;
 };
 
 // The most bots any configuration may ask for; also the Tier 2 bot bound requested at handshake.
