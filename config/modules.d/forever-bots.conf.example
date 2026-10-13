@@ -32,10 +32,11 @@ Module.forever-bots.TelemetrySummarySec = 60
 #   Module.forever-bots.TelemetryMaxMB = 256
 #   Module.forever-bots.TelemetryKeep = 8
 
-# Services (M3, M4): an idle bot visits a vendor (sell grey, repair, equip) every ServiceEverySec seconds, and checks its
-# trainer every TrainEverySec seconds (and at once after a level-up). The bot must be in interaction range of the NPC,
-# which the core checks: walking there is travel (M6), not done yet.
+# Services (M3): an idle bot visits a vendor (sell grey, repair, equip) every ServiceEverySec seconds. The bot must be in
+# interaction range of the NPC, which the core checks; it walks to the nearest vendor first (M6).
 #   Module.forever-bots.ServiceEverySec = 600
+# The trainer check (M4) is off by default, since bots learn their spells on level-up. TrainEverySec (60..86400) turns it
+# on: the bot checks the trainer every that many seconds, and at once after a level-up, when a trainer is in range.
 #   Module.forever-bots.TrainEverySec = 600
 
 # Parties (M8): PartyCount parties of PartySize bots, cut from the lowest-guid bots in guid order. PartySize 0 turns
