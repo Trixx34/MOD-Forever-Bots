@@ -156,6 +156,8 @@ offline), `.bots alt remove <name>` logs it out, `.bots alt list`. An alt is you
 trainer spells or talents, and it cannot be played while it is a bot. Alts are not remembered across a restart.
 `.bots <verb>` does the same as a dot command (`.bots autogear` dresses the group's bots); `goto here`, `pull` and `heal` are party chat only.
 
+**Rotations.** With `RotationFile` set, the classes use rows from a file (levels 1 to 60, damage-over-time lengths, and upkeep buffs such as Power Word: Fortitude, armor spells and Battle Shout cast out of combat, on the bot or its whole group). The file is made from a spec of spell names and the core's ability dump by `tools/make_rotations.py`; see `doc/rotations.md`.
+
 **Grind spots.** With `GrindFile` set, an idle bot walks to a place that suits its level (nearest first, not back to the last two) instead of the hubs of its map. The file is made from the world database with `tools/make_grind_spots.py`; see `doc/grind-spots.md`.
 
 **Auto gear.** With `AutoGearing = 1` the core dresses each bot for its class and level (best usable item per slot, uncommon quality at
