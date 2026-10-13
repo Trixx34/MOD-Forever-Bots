@@ -466,8 +466,28 @@ void NoServicesInAFight()
     CHECK(!HasTrain(actions));
 }
 
+void HostilePlayersAreNotAttacked()
+{
+    // Another bot of the other faction, hostile and alive, three yards away: the bot does not attack it.
+    BotPolicy policy;
+    NearbyUnit rival = Unit(2, 7, 3.0f, true, 100); // player (type 2), hostile
+    rival.max_health = 100;
+    auto actions = policy.Decide(View(1, 0, { rival }), 1000);
+    for (BotAction const& action : actions)
+        CHECK(action.type != ActionType::kAttackTarget);
+
+    // A creature at the same range is attacked.
+    BotPolicy creature;
+    auto mob = creature.Decide(View(1, 0, { Hostile(2, 3.0f, 100) }), 1000);
+    bool attacked = false;
+    for (BotAction const& action : mob)
+        attacked = attacked || action.type == ActionType::kAttackTarget;
+    CHECK(attacked);
+}
+
 int main()
 {
+    HostilePlayersAreNotAttacked();
     ServicesWhenIdleOnTimerAndOnLevelUp();
     NoServicesInAFight();
     RestsWhenHurtAndIdle();
