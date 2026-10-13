@@ -49,6 +49,7 @@ constexpr std::uint64_t kInviteRetryMs = 15000; // a member is invited again thi
 constexpr std::uint64_t kPartyRetryMs = 2000;   // a party action refused, or just sent, is not repeated before this
 constexpr float kFollowLeaderYards = 8.0f;      // a member this close to its leader stays where it is
 constexpr std::uint64_t kApproachTimeoutMs = 30000; // walking to a target this long without reaching it: avoid the target
+constexpr std::uint32_t kMaxLevelAbove = 2;      // a bot does not pull a creature more than this many levels above it
 constexpr std::uint64_t kAvoidMs = 30000;        // a target that refused an attack or a cast is skipped for this long
 constexpr std::uint32_t kMaxAvoidDoublings = 2;  // each repeat avoid doubles the time: 30 s, 60 s, then 120 s at most
 constexpr std::uint64_t kWanderIdleMs = 30000;   // idle for this long, seeing nothing, before walking to a hub
@@ -96,6 +97,10 @@ NearbyUnit const* PullTarget(BotSnapshot const& bot, std::span<NearbyUnit const>
     for (NearbyUnit const& candidate : units)
     {
         if (!IsLiveMob(candidate) || avoided(candidate.guid))
+            continue;
+        // Not worth the fight: well above the bot's level, or an elite. (A level of 0 is unknown and not judged.) A creature that
+        // attacks the bot is still fought, since it comes in as the threat target.
+        if (bot.level != 0 && ((candidate.level != 0 && candidate.level > bot.level + kMaxLevelAbove) || candidate.elite))
             continue;
         float const dist = rotation::DistanceYards(bot, candidate);
         if (dist >= bestDist)

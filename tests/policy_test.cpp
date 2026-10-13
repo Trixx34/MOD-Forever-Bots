@@ -1027,8 +1027,52 @@ void RepeatedlyAvoidedTargetIsLeftLonger()
     CHECK(HasAction(policy.Decide(view, 457000), 10, ActionType::kFollow, trainer.guid));  // free after 120 s
 }
 
+// Pulls the bot can win: not well above its level, not an elite. A creature already attacking the bot is still fought.
+void BotDoesNotPullAboveItsLevel()
+{
+    NearbyUnit strong = Hostile(7, 2.0f, 100);
+    strong.level = 6; // five above a level-1 bot
+    NearbyUnit fair = Hostile(8, 6.0f, 100);
+    fair.level = 3;   // two above: fine
+    WorldTickSnapshotView view = PartyView({ 10 });
+    view.bots[0].level = 1;
+    AddNearby(view, 0, strong);
+    AddNearby(view, 0, fair);
+    BotPolicy policy;
+    auto const actions = policy.Decide(view, 0);
+    CHECK(!HasAction(actions, 10, ActionType::kAttackTarget, strong.guid));
+    CHECK(HasAction(actions, 10, ActionType::kFollow, fair.guid) || HasAction(actions, 10, ActionType::kAttackTarget, fair.guid));
+}
+
+void BotDoesNotPullAnElite()
+{
+    NearbyUnit elite = Hostile(7, 2.0f, 100);
+    elite.level = 1;
+    elite.elite = 1;
+    WorldTickSnapshotView view = PartyView({ 10 });
+    view.bots[0].level = 1;
+    AddNearby(view, 0, elite);
+    BotPolicy policy;
+    CHECK(!HasAction(policy.Decide(view, 0), 10, ActionType::kAttackTarget, elite.guid));
+}
+
+void CreatureAttackingTheBotIsFoughtWhateverItsLevel()
+{
+    NearbyUnit strong = Hostile(7, 2.0f, 100);
+    strong.level = 9;
+    WorldTickSnapshotView view = PartyView({ 10 });
+    view.bots[0].level = 1;
+    view.bots[0].threat_target_guid = strong.guid; // it is already fighting the bot
+    AddNearby(view, 0, strong);
+    BotPolicy policy;
+    CHECK(HasAction(policy.Decide(view, 0), 10, ActionType::kAttackTarget, strong.guid));
+}
+
 int main()
 {
+    BotDoesNotPullAboveItsLevel();
+    BotDoesNotPullAnElite();
+    CreatureAttackingTheBotIsFoughtWhateverItsLevel();
     RepeatedlyAvoidedTargetIsLeftLonger();
     UnreachableTargetIsGivenUp();
     RefusedAttackPicksAnotherTarget();
