@@ -107,5 +107,7 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadKey(config, "TelemetrySummarySec", 1, 3600, settings.TelemetrySummarySec, warnings);
     ReadKey(config, "ServiceEverySec", 60, 86400, settings.ServiceEverySec, warnings);
     ReadKey(config, "TrainEverySec", 60, 86400, settings.TrainEverySec, warnings);
+    ReadKey(config, "PartySize", 0, 5, settings.PartySize, warnings);
+    ReadKey(config, "PartyCount", 1, 100, settings.PartyCount, warnings);
     return settings;
 }

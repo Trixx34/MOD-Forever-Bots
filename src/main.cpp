@@ -64,6 +64,7 @@ char const* ActionTypeName(std::uint8_t type)
         case forever_module::ActionType::kRest: return "rest";
         case forever_module::ActionType::kVendor: return "vendor";
         case forever_module::ActionType::kTrain: return "train";
+        case forever_module::ActionType::kGroup: return "group";
     }
     return "action";
 }
@@ -442,6 +443,8 @@ int main(int argc, char** argv)
     policyOptions.ClassId = settings.Class;
     policyOptions.ServiceEveryMs = std::uint64_t(settings.ServiceEverySec) * 1000;
     policyOptions.TrainEveryMs = std::uint64_t(settings.TrainEverySec) * 1000;
+    policyOptions.PartySize = settings.PartySize;
+    policyOptions.PartyCount = settings.PartyCount;
     policyOptions.ClassOf = [&classes](std::uint64_t botGuid) { return classes.Get(botGuid); };
 
     // Tier 2 is granted at handshake, so there is a region only if the core accepted it.

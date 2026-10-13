@@ -37,3 +37,9 @@ Module.forever-bots.TelemetrySummarySec = 60
 # which the core checks: walking there is travel (M6), not done yet.
 #   Module.forever-bots.ServiceEverySec = 600
 #   Module.forever-bots.TrainEverySec = 600
+
+# Parties (M8): PartyCount parties of PartySize bots, cut from the lowest-guid bots in guid order. PartySize 0 turns
+# parties off (the default); at most 5. A party's leader is its first warrior, else its lowest-guid bot. The core applies
+# the invites and the group rules; the module only sends the actions. Needs the core with layout 5 (party state).
+#   Module.forever-bots.PartySize = 5
+#   Module.forever-bots.PartyCount = 1

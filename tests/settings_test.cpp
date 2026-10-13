@@ -124,6 +124,18 @@ void EffectiveMaxBotsIsCappedByGrant()
     CHECK(EffectiveMaxBots(3, 5, false) == 0);  // no Tier 2 region: no bots, whatever the grant says
 }
 
+void PartySettings()
+{
+    std::vector<std::string> warnings;
+    BotSettings const defaults = ParseBotSettings({}, warnings);
+    CHECK(defaults.PartySize == 0 && defaults.PartyCount == 1); // no parties until configured
+    BotSettings const s = ParseBotSettings({ { "PartySize", "5" }, { "PartyCount", "20" } }, warnings);
+    CHECK(s.PartySize == 5 && s.PartyCount == 20);
+    CHECK(warnings.empty());
+    CHECK(ParseBotSettings({ { "PartySize", "6" } }, warnings).PartySize == 0); // a party holds at most five
+    CHECK(warnings.size() == 1);
+}
+
 void TelemetrySettings()
 {
     std::vector<std::string> warnings;
@@ -154,6 +166,7 @@ int main()
     UnknownKeysAreIgnored();
     EffectiveMaxBotsIsCappedByGrant();
     TestSpellIsOptional();
+    PartySettings();
 
     if (failures == 0)
         std::printf("settings_test: all checks passed\n");

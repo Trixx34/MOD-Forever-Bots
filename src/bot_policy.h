@@ -9,6 +9,9 @@
 // cooldown is skipped. Rend's bleed is tracked per target, since the snapshot has no auras, so it is not recast while active.
 // Rest (M2): an idle bot below 90% health sits down, and stays sat until its health is full. It stands before it moves,
 // follows or fights. A sit refused in combat is retried after a second.
+// Parties (M8): with PartySize set, bots are cut into parties. The leader invites its members and a member accepts the
+// invite, leaves any other party, follows its leader when it is more than 8 yards away, and fights the leader's target
+// when it has none of its own. Party actions are sent only out of combat.
 #pragma once
 
 #include "forever_module/tier2_session.h"
@@ -33,6 +36,10 @@ struct PolicyOptions
     // service off; the module turns them on from its settings.
     std::uint64_t ServiceEveryMs = 0;
     std::uint64_t TrainEveryMs = 0;
+    // Parties (M8). PartyCount parties of PartySize bots are cut from the lowest-guid bots, in guid order. Each party's
+    // leader is its first warrior, else its lowest-guid bot. PartySize 0 turns parties off.
+    std::uint32_t PartySize = 0;
+    std::uint32_t PartyCount = 1;
 };
 
 // Name of an action status, for logs.
@@ -79,6 +86,8 @@ private:
         std::uint32_t ComboPoints = 0;                   // combo points on ComboTarget, from the bot's own Sinister Strikes
         std::uint64_t ComboTarget = 0;
         std::uint32_t LastTrainLevel = 0;                // the level at the last trainer check
+        std::uint64_t PartyRetryAtMs = 0;                // a party action is not sent again before this
+        std::unordered_map<std::uint64_t, std::uint64_t> InvitedAtMs; // member guid -> when this bot last invited it
     };
 
     void ReadResult(BotState& state, forever_module::BotSnapshot const& bot, std::uint64_t nowMs);
