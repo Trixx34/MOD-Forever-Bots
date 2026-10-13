@@ -48,6 +48,7 @@ constexpr std::uint32_t kPlayerType = 2;     // unit reference type of a player 
 constexpr std::uint64_t kInviteRetryMs = 15000; // a member is invited again this long after the last invite
 constexpr std::uint64_t kPartyRetryMs = 2000;   // a party action refused, or just sent, is not repeated before this
 constexpr float kFollowLeaderYards = 8.0f;      // a member this close to its leader stays where it is
+constexpr std::uint64_t kAvoidMs = 30000;        // a target that refused an attack or a cast is skipped for this long
 constexpr std::uint64_t kWanderIdleMs = 30000;   // idle for this long, seeing nothing, before walking to a hub
 constexpr std::uint64_t kWanderTimeoutMs = 180000; // a walk to a hub longer than this is dropped
 constexpr float kHubReachYards = 10.0f;          // a bot this close to its hub has arrived
@@ -85,13 +86,14 @@ bool IsLiveMob(NearbyUnit const& unit);
 // The closest live hostile that is not part of a group larger than kMaxPull, or nullptr. A group is the hostiles within
 // kPullRadius of the candidate, the candidate included. Units already attacking the bot are not chosen here; the policy
 // fights its threat target whatever the group size.
-NearbyUnit const* PullTarget(BotSnapshot const& bot, std::span<NearbyUnit const> units)
+NearbyUnit const* PullTarget(BotSnapshot const& bot, std::span<NearbyUnit const> units,
+                            std::function<bool(std::uint64_t)> const& avoided)
 {
     NearbyUnit const* best = nullptr;
     float bestDist = std::numeric_limits<float>::max();
     for (NearbyUnit const& candidate : units)
     {
-        if (!IsLiveMob(candidate))
+        if (!IsLiveMob(candidate) || avoided(candidate.guid))
             continue;
         float const dist = rotation::DistanceYards(bot, candidate);
         if (dist >= bestDist)
@@ -223,10 +225,26 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
         return;
     }
 
+    // A melee attack refused or with no valid target: that unit is avoided for kAvoidMs, so the bot picks another.
+    if (bot.last_action_type == uint8_t(ActionType::kAttackTarget) &&
+        (bot.last_action_status == BotActionStatus::kRefused || bot.last_action_status == BotActionStatus::kInvalidTarget))
+    {
+        if (state.Last && state.Last->Type == ActionType::kAttackTarget && state.Last->Target != 0)
+            state.AvoidUntilMs[state.Last->Target] = nowMs + kAvoidMs;
+        return;
+    }
+
     if (bot.last_action_type != uint8_t(ActionType::kCastSpell) || bot.last_action_spell == 0)
         return;
 
     std::uint32_t const spell = bot.last_action_spell;
+    if (bot.last_action_status == BotActionStatus::kInvalidTarget)
+    {
+        // The cast had no valid target: that unit is avoided too, so the next cast goes to another one.
+        auto const cast = state.CastTarget.find(spell);
+        if (cast != state.CastTarget.end() && cast->second != 0)
+            state.AvoidUntilMs[cast->second] = nowMs + kAvoidMs;
+    }
     if (bot.last_action_status == BotActionStatus::kApplied)
     {
         // The target of the cast as sent: 0 for a spell on the bot itself (a self buff such as a seal).
@@ -319,6 +337,8 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         present.insert(bot.guid);
         BotState& state = _bots[bot.guid];
         ReadResult(state, bot, nowMs);
+        for (auto it = state.AvoidUntilMs.begin(); it != state.AvoidUntilMs.end();)
+            it = nowMs >= it->second ? state.AvoidUntilMs.erase(it) : std::next(it);
 
         // A dead bot gets no orders; its last decision stays in place until it is alive again.
         if (bot.health == 0)
@@ -354,8 +374,16 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         // The target is the threat target (even when it is out of view), otherwise the closest live hostile. A member with
         // no threat of its own fights its leader's target, when that is in view.
         NearbyUnit const* targetUnit = nullptr;
+        auto const avoided = [&state, nowMs](std::uint64_t ref)
+        {
+            auto const until = state.AvoidUntilMs.find(ref);
+            return until != state.AvoidUntilMs.end() && nowMs < until->second;
+        };
         std::uint64_t targetRef = bot.threat_target_guid;
-        if (targetRef == 0 && partyMember && leaderSnap && leaderSnap->threat_target_guid != 0)
+        if (targetRef != 0 && avoided(targetRef))
+            targetRef = 0; // it refused us: the bot does not fight it for now
+        if (targetRef == 0 && partyMember && leaderSnap && leaderSnap->threat_target_guid != 0 &&
+            !avoided(leaderSnap->threat_target_guid))
         {
             if (NearbyUnit const* assist = FindLiveMob(nearby, leaderSnap->threat_target_guid))
                 targetRef = assist->guid;
@@ -366,7 +394,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 if (unit.guid == targetRef)
                     targetUnit = &unit;
         }
-        else if (NearbyUnit const* hostile = PullTarget(bot, nearby))
+        else if (NearbyUnit const* hostile = PullTarget(bot, nearby, avoided))
         {
             targetUnit = hostile;
             targetRef = hostile->guid;
@@ -591,6 +619,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 cast.spell_id = _options.TestSpell;
                 cast.target_guid = targetRef;
                 actions.push_back(cast);
+                state.CastTarget[_options.TestSpell] = targetRef;
                 state.LastTestCastTick = view.tick_number;
             }
             continue;

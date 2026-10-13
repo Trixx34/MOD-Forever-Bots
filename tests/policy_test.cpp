@@ -955,8 +955,48 @@ void PartyMembersDoNotWanderAlone()
     CHECK(WalkTo(policy.Decide(view, 30000), 10) < 0.0f); // a member: it follows its leader
 }
 
+// Refused targets (M7 fix). A bot that is refused an attack, or a cast with no valid target, picks another unit.
+void RefusedAttackPicksAnotherTarget()
+{
+    BotPolicy policy;
+    NearbyUnit const wolf = Hostile(7, 2.0f, 100);
+    NearbyUnit const boar = Hostile(8, 3.0f, 100);
+    WorldTickSnapshotView view = PartyView({ 10 });
+    AddNearby(view, 0, wolf);
+    AddNearby(view, 0, boar);
+    CHECK(HasAction(policy.Decide(view, 0), 10, ActionType::kAttackTarget, wolf.guid)); // the closest first
+
+    view.bots[0].last_action_sequence = 1;
+    view.bots[0].last_action_type = static_cast<std::uint8_t>(ActionType::kAttackTarget);
+    view.bots[0].last_action_status = BotActionStatus::kRefused;
+    auto const actions = policy.Decide(view, 1000);
+    CHECK(HasAction(actions, 10, ActionType::kAttackTarget, boar.guid));
+    CHECK(!HasAction(actions, 10, ActionType::kAttackTarget, wolf.guid));
+}
+
+void InvalidCastTargetIsNotCastAtAgain()
+{
+    PolicyOptions options;
+    options.TestSpell = 585;
+    options.CastEveryTicks = 1;
+    BotPolicy policy(options);
+    NearbyUnit const wolf = Hostile(7, 2.0f, 100);
+    WorldTickSnapshotView view = PartyView({ 10 });
+    AddNearby(view, 0, wolf);
+    CHECK(HasCast(policy.Decide(view, 0), 585));
+
+    view.bots[0].last_action_sequence = 1;
+    view.bots[0].last_action_type = static_cast<std::uint8_t>(ActionType::kCastSpell);
+    view.bots[0].last_action_spell = 585;
+    view.bots[0].last_action_status = BotActionStatus::kInvalidTarget;
+    view.tick_number = 2;
+    CHECK(!HasCast(policy.Decide(view, 1000), 585)); // the wolf is avoided: no target, no cast
+}
+
 int main()
 {
+    RefusedAttackPicksAnotherTarget();
+    InvalidCastTargetIsNotCastAtAgain();
     IdleBotWandersToAHubAfterAWhile();
     ArrivalMovesOnToTheNextHubAfterAnInterval();
     NoHubsOnTheBotsMapMeansNoWalk();
