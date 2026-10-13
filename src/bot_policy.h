@@ -105,6 +105,8 @@ private:
         bool Approaching = false;                        // walking to its target, not yet in range
         std::uint64_t ApproachTarget = 0;
         std::uint64_t ApproachSinceMs = 0;               // when it started walking to ApproachTarget
+        std::unordered_map<std::uint64_t, std::uint64_t> FoughtAtMs;   // creature -> when it was last the bot's target (to loot it)
+        std::unordered_map<std::uint64_t, std::uint64_t> LootedUntilMs; // creature -> not looted again before this
         bool Idling = false;                             // seeing nothing and doing nothing since IdleSinceMs
         std::uint64_t IdleSinceMs = 0;
         bool Wandering = false;                          // walking to a hub

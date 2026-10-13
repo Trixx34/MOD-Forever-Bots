@@ -1080,8 +1080,71 @@ void CreatureAttackingTheBotIsFoughtWhateverItsLevel()
     CHECK(HasAction(policy.Decide(view, 0), 10, ActionType::kAttackTarget, strong.guid));
 }
 
+// Looting (M7). A bot loots the creature it fought once that is dead, close, and the bot is out of combat. Once per corpse.
+void BotLootsTheCreatureItKilled()
+{
+    BotPolicy policy;
+    NearbyUnit const alive = Hostile(7, 2.0f, 100);
+    WorldTickSnapshotView fight = PartyView({ 10 });
+    AddNearby(fight, 0, alive);
+    policy.Decide(fight, 0); // it targets the creature
+
+    NearbyUnit dead = Hostile(7, 2.0f, 0); // the same creature, dead
+    WorldTickSnapshotView after = PartyView({ 10 });
+    AddNearby(after, 0, dead);
+    auto const actions = policy.Decide(after, 1000);
+    bool looted = false;
+    for (BotAction const& action : actions)
+        if (action.type == ActionType::kLoot && action.bot_guid == 10)
+        {
+            looted = true;
+            CHECK(action.target_guid == dead.guid);
+        }
+    CHECK(looted);
+    CHECK(!HasAction(policy.Decide(after, 2000), 10, ActionType::kLoot)); // once per corpse
+}
+
+void NoLootWhileInCombat()
+{
+    BotPolicy policy;
+    NearbyUnit const alive = Hostile(7, 2.0f, 100);
+    WorldTickSnapshotView fight = PartyView({ 10 });
+    AddNearby(fight, 0, alive);
+    policy.Decide(fight, 0);
+
+    WorldTickSnapshotView after = PartyView({ 10 });
+    after.bots[0].in_combat = 1;
+    AddNearby(after, 0, Hostile(7, 2.0f, 0));
+    CHECK(!HasAction(policy.Decide(after, 1000), 10, ActionType::kLoot));
+    after.bots[0].in_combat = 0; // out of combat: now it loots
+    CHECK(HasAction(policy.Decide(after, 2000), 10, ActionType::kLoot));
+}
+
+void NoLootForACorpseItDidNotFight()
+{
+    BotPolicy policy;
+    WorldTickSnapshotView view = PartyView({ 10 });
+    AddNearby(view, 0, Hostile(7, 2.0f, 0)); // dead when first seen, never its target
+    CHECK(!HasAction(policy.Decide(view, 0), 10, ActionType::kLoot));
+}
+
+void NoLootForADistantCorpse()
+{
+    BotPolicy policy;
+    WorldTickSnapshotView fight = PartyView({ 10 });
+    AddNearby(fight, 0, Hostile(7, 2.0f, 100));
+    policy.Decide(fight, 0);
+    WorldTickSnapshotView after = PartyView({ 10 });
+    AddNearby(after, 0, Hostile(7, 30.0f, 0)); // 30 yards: beyond the 25 the bot asks within
+    CHECK(!HasAction(policy.Decide(after, 1000), 10, ActionType::kLoot));
+}
+
 int main()
 {
+    BotLootsTheCreatureItKilled();
+    NoLootWhileInCombat();
+    NoLootForACorpseItDidNotFight();
+    NoLootForADistantCorpse();
     BotDoesNotPullAboveItsLevel();
     BotDoesNotPullAnElite();
     CreatureAttackingTheBotIsFoughtWhateverItsLevel();
