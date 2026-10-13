@@ -46,6 +46,7 @@ float DistanceBetween(NearbyUnit const& a, NearbyUnit const& b)
 }
 
 bool IsLiveHostile(NearbyUnit const& unit);
+bool IsLiveMob(NearbyUnit const& unit);
 
 // The closest live hostile that is not part of a group larger than kMaxPull, or nullptr. A group is the hostiles within
 // kPullRadius of the candidate, the candidate included. Units already attacking the bot are not chosen here; the policy
@@ -56,7 +57,7 @@ NearbyUnit const* PullTarget(BotSnapshot const& bot, std::span<NearbyUnit const>
     float bestDist = std::numeric_limits<float>::max();
     for (NearbyUnit const& candidate : units)
     {
-        if (!IsLiveHostile(candidate))
+        if (!IsLiveMob(candidate))
             continue;
         float const dist = rotation::DistanceYards(bot, candidate);
         if (dist >= bestDist)
@@ -98,6 +99,13 @@ bool IsLiveHostile(NearbyUnit const& unit)
 {
     return unit.is_hostile && unit.health > 0 &&
            (forever_module::UnitRefType(unit.guid) == 8 || forever_module::UnitRefType(unit.guid) == 2);
+}
+
+// A live creature the bot may pick as its own target. Players are never picked: bots of the other faction would otherwise
+// fight each other, and a player that attacks the bot still comes in as the threat target.
+bool IsLiveMob(NearbyUnit const& unit)
+{
+    return unit.is_hostile && unit.health > 0 && forever_module::UnitRefType(unit.guid) == 8;
 }
 
 bool IsPlayer(NearbyUnit const& unit)
