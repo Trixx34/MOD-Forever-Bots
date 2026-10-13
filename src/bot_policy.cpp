@@ -58,6 +58,7 @@ constexpr std::uint64_t kWanderIdleMs = 30000;   // idle for this long, seeing n
 constexpr std::uint64_t kWanderTimeoutMs = 180000; // a walk to a hub longer than this is dropped
 constexpr float kHubReachYards = 10.0f;          // a bot this close to its hub has arrived
 constexpr float kVendorReachYards = 4.0f;       // a bot this close to its vendor can use it (the core allows 5)
+constexpr std::uint32_t kRepairBelowPct = 50;    // worn gear below this durability sends the bot to a repairman, not just any vendor
 constexpr std::uint64_t kTravelTimeoutMs = 180000; // a walk to the vendor longer than this is dropped for now
 
 // Duration of the damage-over-time effect a spell leaves on its target, or 0 for spells the policy does not track. Rank 1
@@ -502,9 +503,12 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         // sits nor trains on the way.
         if (idle && _options.ServiceEveryMs != 0 && nowMs >= state.NextServiceMs)
         {
-            // The nearest vendor on the bot's map, found by the core (layout 6). None on the map, or a party member: no walk.
-            Point const vendor{ bot.vendor_x, bot.vendor_y, bot.vendor_z };
-            bool const hasVendor = !partyMember && bot.vendor_valid != 0;
+            // The nearest vendor on the bot's map, found by the core (layout 6); the nearest repairman instead when the gear is worn
+            // (layout 9). None on the map, or a party member: no walk.
+            bool const needRepair = bot.repair_valid != 0 && bot.durability_pct < kRepairBelowPct;
+            Point const vendor = needRepair ? Point{ bot.repair_x, bot.repair_y, bot.repair_z }
+                                            : Point{ bot.vendor_x, bot.vendor_y, bot.vendor_z };
+            bool const hasVendor = !partyMember && (needRepair || bot.vendor_valid != 0);
             if (hasVendor && DistanceTo(bot, vendor) > kVendorReachYards)
             {
                 if (!state.Traveling)

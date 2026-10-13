@@ -827,6 +827,37 @@ void IdleBotWalksToItsVendor()
     CHECK(!HasAction(actions, 10, ActionType::kVendor)); // the visit waits until the bot is in reach
 }
 
+void WornGearSendsTheBotToTheRepairman()
+{
+    WorldTickSnapshotView view = PartyView({ 10 });
+    SetVendor(view, 100.0f);
+    view.bots[0].repair_x = -200.0f;
+    view.bots[0].repair_valid = 1;
+    view.bots[0].durability_pct = 20;
+    auto const actions = VendorPolicy().Decide(view, 0);
+    bool found = false;
+    for (BotAction const& action : actions)
+        if (action.type == ActionType::kMoveTo && action.bot_guid == 10)
+        {
+            found = true;
+            CHECK(action.dest_x == -200.0f); // the repairman, not the vendor at x = 100
+        }
+    CHECK(found);
+}
+
+void GoodGearGoesToTheNearestVendor()
+{
+    WorldTickSnapshotView view = PartyView({ 10 });
+    SetVendor(view, 100.0f);
+    view.bots[0].repair_x = -200.0f;
+    view.bots[0].repair_valid = 1;
+    view.bots[0].durability_pct = 90;
+    auto const actions = VendorPolicy().Decide(view, 0);
+    for (BotAction const& action : actions)
+        if (action.type == ActionType::kMoveTo && action.bot_guid == 10)
+            CHECK(action.dest_x == 100.0f);
+}
+
 void VendorVisitWhenInReach()
 {
     WorldTickSnapshotView view = PartyView({ 10 });
@@ -1198,6 +1229,8 @@ int main()
     HurtBotRestsInsteadOfWalking();
     PartyMembersDoNotWanderAlone();
     IdleBotWalksToItsVendor();
+    WornGearSendsTheBotToTheRepairman();
+    GoodGearGoesToTheNearestVendor();
     VendorVisitWhenInReach();
     TravelIsDroppedAfterTheTimeout();
     WalkingBotDoesNotSit();
