@@ -212,6 +212,26 @@ struct CommandQueue
     std::vector<std::pair<std::uint64_t, std::string>> Replies; // speaker character guid, text
 };
 
+// The alts this module controls (characters of players' accounts playing as bots): name (lower case) to bot guid. Read by the pump thread
+// (IsAlt) and written on the Run() thread.
+struct AltRegistry
+{
+    std::mutex Lock;
+    std::map<std::string, std::uint64_t> ByName;
+    std::map<std::uint64_t, std::string> ByGuid;
+    bool Has(std::uint64_t guid)
+    {
+        std::lock_guard<std::mutex> lock(Lock);
+        return ByGuid.count(guid) != 0;
+    }
+};
+
+std::string LowerCopy(std::string text)
+{
+    std::transform(text.begin(), text.end(), text.begin(), [](unsigned char c) { return char(std::tolower(c)); });
+    return text;
+}
+
 // What the pump needs beyond the policy: the scenario (if one is configured) and the command queue.
 struct PumpExtras
 {
@@ -531,15 +551,25 @@ int main(int argc, char** argv)
               << settings.Ramp.StepMinutes << " min to " << settings.Ramp.Cap << ", stop at " << settings.Ramp.StopSecOfDay / 3600
               << ":" << (settings.Ramp.StopSecOfDay / 60) % 60 << " local\n";
 
-    client.OnControlRevoked([&roster](std::uint64_t botGuid, std::string const& reason)
+    auto alts = std::make_shared<AltRegistry>();
+    client.OnControlRevoked([&roster, alts](std::uint64_t botGuid, std::string const& reason)
     {
+        {
+            std::lock_guard<std::mutex> lock(alts->Lock);
+            auto const it = alts->ByGuid.find(botGuid);
+            if (it != alts->ByGuid.end())
+            {
+                alts->ByName.erase(it->second);
+                alts->ByGuid.erase(it);
+            }
+        }
         if (roster.OnRevoked(botGuid, reason))
             std::cerr << "forever-bots: control of bot " << botGuid << " revoked: " << reason << "\n";
     });
 
     // .autogear: a player in a party types it (as a chat command) and the bots that player leads are dressed for their level.
     auto commands = std::make_shared<CommandQueue>();
-    client.OnRequest("CommandScript", [commands, &settings](forever_module::EventRequest const& request) -> forever_module::EventReply
+    client.OnRequest("CommandScript", [commands, alts, &run, &settings](forever_module::EventRequest const& request) -> forever_module::EventReply
     {
         forever_module::EventReply reply;
         std::string text = request.command().command_text();
@@ -554,6 +584,136 @@ int main(int argc, char** argv)
                 reply.mutable_command()->set_success(ok);
                 reply.mutable_command()->set_result_text(message);
             };
+            // .bots alt add <name> | alt remove <name> | alt list, .bots spawn <race> <class> [level], .bots list. The answer comes back as a message
+            // to the player when the core has decided.
+            std::uint64_t const issuerCounter = request.command().issuer_guid() & forever_module::kUnitRefCounterMask;
+            auto const words = [&rest]
+            {
+                std::vector<std::string> out;
+                std::istringstream in(rest);
+                std::string word;
+                while (in >> word)
+                    out.push_back(word);
+                return out;
+            }();
+            auto const tell = [&run, issuerCounter](std::string const& text) { run.Client.SendPlayerMessage(issuerCounter, text); };
+            if (!words.empty() && words[0] == "alt")
+            {
+                if (words.size() == 2 && words[1] == "list")
+                {
+                    std::lock_guard<std::mutex> lock(alts->Lock);
+                    std::string names;
+                    for (auto const& [name, guid] : alts->ByName)
+                        names += (names.empty() ? "" : ", ") + name;
+                    set(true, names.empty() ? "No alts are playing as bots." : "Alts as bots: " + names);
+                    return reply;
+                }
+                if (words.size() == 3 && words[1] == "add")
+                {
+                    std::string const name = words[2];
+                    if (!run.Roster.CanRequest())
+                    {
+                        set(false, "The module cannot take another bot (its bot limit is reached).");
+                        return reply;
+                    }
+                    forever_module::SpawnParams params;
+                    params.set_alt_name(name);
+                    params.set_owner_guid(issuerCounter);
+                    run.Roster.NoteRequestSent(0);
+                    run.Client.RequestControl(0, params, [&run, alts, tell, name](forever_module::ControlResponse const& response)
+                    {
+                        if (!response.granted())
+                        {
+                            run.Roster.OnDenied(0);
+                            tell("Cannot make " + name + " a bot: " + response.reason());
+                            return;
+                        }
+                        std::uint64_t const guid = response.bot_guid();
+                        run.Roster.OnGranted(0, guid);
+                        if (response.class_id() != 0)
+                            run.Classes.Set(guid, response.class_id());
+                        {
+                            std::lock_guard<std::mutex> lock(alts->Lock);
+                            alts->ByName[LowerCopy(name)] = guid;
+                            alts->ByGuid[guid] = LowerCopy(name);
+                        }
+                        std::cerr << "forever-bots: alt " << name << " is bot " << guid << "\n";
+                        tell(name + " is logging in as a bot. Invite it to your group to command it.");
+                    });
+                    set(true, "Asking the server to log " + name + " in as a bot.");
+                    return reply;
+                }
+                if (words.size() == 3 && words[1] == "remove")
+                {
+                    std::uint64_t guid = 0;
+                    {
+                        std::lock_guard<std::mutex> lock(alts->Lock);
+                        auto const it = alts->ByName.find(LowerCopy(words[2]));
+                        if (it != alts->ByName.end())
+                        {
+                            guid = it->second;
+                            alts->ByGuid.erase(guid);
+                            alts->ByName.erase(it);
+                        }
+                    }
+                    if (guid == 0)
+                    {
+                        set(false, words[2] + " is not an alt playing as a bot.");
+                        return reply;
+                    }
+                    run.Roster.OnRevoked(guid, "alt removed");
+                    run.Client.ReleaseControl(guid); // the core logs an alt out when the module lets it go
+                    set(true, words[2] + " is being logged out.");
+                    return reply;
+                }
+                set(false, "Usage: .bots alt add <name> | alt remove <name> | alt list");
+                return reply;
+            }
+            if (!words.empty() && words[0] == "spawn")
+            {
+                std::uint32_t race = 0, cls = 0, level = 0;
+                auto const number = [](std::string const& text, std::uint32_t& out)
+                {
+                    return std::from_chars(text.data(), text.data() + text.size(), out).ec == std::errc{};
+                };
+                if (words.size() < 3 || words.size() > 4 || !number(words[1], race) || !number(words[2], cls) || (words.size() == 4 && !number(words[3], level)) ||
+                    race == 0 || cls == 0)
+                {
+                    set(false, "Usage: .bots spawn <race id> <class id> [level]");
+                    return reply;
+                }
+                if (!run.Roster.CanRequest())
+                {
+                    set(false, "The module cannot take another bot (its bot limit is reached).");
+                    return reply;
+                }
+                forever_module::SpawnParams params = ParamsFor(RaceClass{ race, cls });
+                if (level != 0)
+                    params.set_level(level);
+                run.Roster.NoteRequestSent(0);
+                run.Client.RequestControl(0, params, [&run, tell, race, cls](forever_module::ControlResponse const& response)
+                {
+                    if (!response.granted())
+                    {
+                        run.Roster.OnDenied(0);
+                        tell("Spawn refused: " + response.reason());
+                        return;
+                    }
+                    std::uint64_t const guid = response.bot_guid();
+                    run.Roster.OnGranted(0, guid);
+                    run.Classes.Set(guid, cls);
+                    run.Client.StoreSet(bot_store::KeyFor(guid), std::to_string(race) + " " + std::to_string(cls));
+                    tell("Spawned bot " + std::to_string(guid) + " (race " + std::to_string(race) + ", class " + std::to_string(cls) + ").");
+                });
+                set(true, "Spawning a bot.");
+                return reply;
+            }
+            if (words.size() == 1 && words[0] == "list")
+            {
+                set(true, "This module controls " + std::to_string(run.Roster.Owned().size()) + " bot(s), " + std::to_string(run.Roster.PendingCount()) +
+                              " request(s) pending (limit " + std::to_string(run.Roster.MaxBots()) + ").");
+                return reply;
+            }
             if (rest == "autogear")
             {
                 {
@@ -720,6 +880,8 @@ int main(int argc, char** argv)
     }
     policyOptions.ClassOf = [&classes](std::uint64_t botGuid) { return classes.Get(botGuid); };
     policyOptions.AutoGearing = settings.AutoGearing;
+    policyOptions.AcceptInvites = settings.ChatCommands;
+    policyOptions.IsAlt = [alts](std::uint64_t guid) { return alts->Has(guid); };
     policyOptions.OnEvent = [](std::string const& line) { std::cerr << "forever-bots: event " << line << "\n"; };
     policyOptions.AutoGearEveryLevels = settings.AutoGearEveryLevels;
     PumpExtras extras;

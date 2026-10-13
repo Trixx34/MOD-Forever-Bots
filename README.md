@@ -146,6 +146,11 @@ or hand-in blocks that quest for a minute. Party members follow their leader and
 `release` (a dead bot releases its spirit now), `status` (one line per bot, sent back to you). `ChatOrders = 1` adds `stop`, `pull` (the tank
 attacks your selected target), `heal` (a healer heals your selected friend), `passive`, `aggressive`. Only the bots of the speaker's own group obey;
 other chat is ignored. The core forwards only a group leader's lines in a group with a bot, and whispers to a bot (hook `PlayerScript.OnChat`).
+A bot accepts a party invite from a player when `ChatCommands = 1`, so the player invites bots with the normal /invite and then commands them.
+More dot commands (they need the module-command permission): `.bots spawn <race id> <class id> [level]`, `.bots list`, and alts: `.bots alt add <name>`
+logs a character of your own account in as a bot (the core needs `Bot.Alt.Enabled = 1`; you must be playing another character, the alt must be
+offline), `.bots alt remove <name>` logs it out, `.bots alt list`. An alt is your own character: it gets no auto gear, no equip service and no free
+trainer spells or talents, and it cannot be played while it is a bot. Alts are not remembered across a restart.
 `.bots <verb>` does the same as a dot command (`.bots autogear` dresses the group's bots); `goto here`, `pull` and `heal` are party chat only.
 
 **Auto gear.** With `AutoGearing = 1` the core dresses each bot for its class and level (best usable item per slot, uncommon quality at

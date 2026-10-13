@@ -73,6 +73,7 @@ constexpr std::uint64_t kTankHeadStartMs = 2500;    // the others join a fight t
 // Healing: a healer class heals the party member with the lowest health below this share, within this range.
 constexpr std::uint32_t kHealBelowPct = 60;
 constexpr float kHealRangeYards = 30.0f;
+constexpr std::uint64_t kAcceptInviteRetryMs = 3000; // an invite from a player is answered again after this long if it is still pending
 constexpr std::uint64_t kGotoTimeoutMs = 90000;     // a goto order is dropped after this long
 constexpr std::uint64_t kPullOrderMs = 30000;      // a pull order is dropped after this long, or when the target is gone
 constexpr std::uint64_t kCloserAfterLosMs = 5000;   // after a line-of-sight refusal the bot closes to melee range for this long
@@ -978,8 +979,9 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         // Auto gear: out of combat, once when the bot first appears (if AutoGearing) and after it has gained some levels, or when asked.
         if (bot.in_combat == 0 && nowMs >= state.GearRetryMs)
         {
-            bool const due = _options.AutoGearing && (state.GearedAtLevel == 0 || bot.level >= state.GearedAtLevel + _options.AutoGearEveryLevels);
-            if (due || state.GearRequested)
+            bool const alt = _options.IsAlt && _options.IsAlt(bot.guid);
+            bool const due = !alt && _options.AutoGearing && (state.GearedAtLevel == 0 || bot.level >= state.GearedAtLevel + _options.AutoGearEveryLevels);
+            if (due || (state.GearRequested && !alt))
             {
                 BotAction gear;
                 gear.bot_guid = bot.guid;
@@ -1372,6 +1374,18 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             actions.push_back(train);
             state.LastTrainLevel = bot.level;
             state.NextTrainMs = nowMs + _options.TrainEveryMs;
+        }
+
+        // A player's party invite is accepted (AcceptInvites, from the chat command switch): the player then commands the bot in chat.
+        if (_options.AcceptInvites && bot.group_invite_from != 0 && bot.in_combat == 0 && nowMs >= state.InviteAcceptAtMs &&
+            forever_module::UnitRefType(bot.group_invite_from) == kPlayerType)
+        {
+            BotAction accept;
+            accept.bot_guid = bot.guid;
+            accept.type = ActionType::kGroup;
+            accept.spell_id = kGroupAccept;
+            actions.push_back(accept);
+            state.InviteAcceptAtMs = nowMs + kAcceptInviteRetryMs;
         }
 
         // Party actions (M8), out of combat. The leader invites each member that is not in its party yet, and invites a

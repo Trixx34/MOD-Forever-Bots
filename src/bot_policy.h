@@ -74,6 +74,10 @@ struct PolicyOptions
     // Receives one line per notable decision (a heal cast, a pull held back or released), for the run logs. Unset = silent.
     std::function<void(std::string const&)> OnEvent;
     std::uint32_t AutoGearEveryLevels = 5;
+    // Chat commands: a bot accepts a party invite from a player (a human leader), so the player can bring bots into a group and command them.
+    bool AcceptInvites = false;
+    // Alts (a player's own characters playing as bots): never dressed by the module.
+    std::function<bool(std::uint64_t botGuid)> IsAlt;
     // Dead-bot recovery. Portal: the instance door on the outside map (PortalMap) that leads to PortalInsideMap; a ghost released outside walks
     // there when its corpse is inside. Without it such a ghost gives up (corpse_run_failed).
     bool HasPortal = false;
@@ -154,6 +158,7 @@ private:
         std::uint32_t ComboPoints = 0;                   // combo points on ComboTarget, from the bot's own Sinister Strikes
         std::uint64_t ComboTarget = 0;
         std::uint32_t LastTrainLevel = 0;                // the level at the last trainer check
+        std::uint64_t InviteAcceptAtMs = 0;              // a player's invite is not answered again before this
         std::uint64_t PartyRetryAtMs = 0;                // a party action is not sent again before this
         std::unordered_map<std::uint64_t, std::uint64_t> AvoidUntilMs; // unit -> until when the bot picks another target
         std::unordered_map<std::uint64_t, std::uint32_t> AvoidCount;   // unit -> how many times it has been avoided

@@ -324,6 +324,39 @@ void PassiveBotsDoNotAssist()
     CHECK(Has(actions, 12, ActionType::kFollow, mob.guid) || Has(actions, 12, ActionType::kAttackTarget));
 }
 
+void AcceptsAPlayersInvite()
+{
+    PolicyOptions options;
+    options.ClassOf = ClassOf;
+    options.AcceptInvites = true;
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = Group();
+    view.bots[0].group_leader_guid = 0;
+    view.bots[0].group_invite_from = PlayerRef();
+    auto actions = policy.Decide(view, 1000);
+    bool accepted = false;
+    for (BotAction const& action : actions)
+        accepted = accepted || (action.bot_guid == 10 && action.type == ActionType::kGroup && action.spell_id == 2);
+    CHECK(accepted);
+
+    BotPolicy off = Policy(); // the switch is off by default
+    actions = off.Decide(view, 1000);
+    for (BotAction const& action : actions)
+        CHECK(!(action.bot_guid == 10 && action.type == ActionType::kGroup));
+}
+
+void AltsAreNotAutoGeared()
+{
+    PolicyOptions options;
+    options.ClassOf = ClassOf;
+    options.AutoGearing = true;
+    options.IsAlt = [](std::uint64_t guid) { return guid == 11; };
+    BotPolicy policy(options);
+    auto const actions = policy.Decide(Group(), 1000);
+    CHECK(Has(actions, 10, ActionType::kAutoGear));
+    CHECK(!Has(actions, 11, ActionType::kAutoGear));
+}
+
 } // namespace
 
 int main()
@@ -345,6 +378,8 @@ int main()
     ReleaseOnlyForTheDead();
     StatusGivesALinePerBot();
     PassiveBotsDoNotAssist();
+    AcceptsAPlayersInvite();
+    AltsAreNotAutoGeared();
     if (failures == 0)
         std::printf("chat_test: all checks passed\n");
     return failures == 0 ? 0 : 1;

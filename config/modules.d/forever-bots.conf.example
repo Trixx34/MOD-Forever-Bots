@@ -77,6 +77,8 @@ Module.forever-bots.TelemetrySummarySec = 60
 #   .bots follow | .bots healer stay | .bots status | .bots autogear     (goto here, pull and heal are party chat only: they use your position / target)
 # ChatCommands = 0
 # ChatOrders = 0
+#   With ChatCommands = 1 a bot also accepts a party invite from a player. Dot commands: .bots spawn <race id> <class id> [level] | list |
+#   alt add <name> | alt remove <name> | alt list (alts need Bot.Alt.Enabled = 1 in the core's worldserver.conf).
 # AutoGearEveryLevels = 5
 
 # A scenario (doc 19 of the core): a repeatable test. A fixed roster is spawned at the staging place, dressed, put in one party,
