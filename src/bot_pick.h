@@ -53,10 +53,14 @@ public:
     void Set(std::uint64_t botGuid, std::uint32_t classId);
     // 0 for a bot that is not in the table.
     std::uint32_t Get(std::uint64_t botGuid) const;
+    // The race of a bot (M6: each race starts in its own city, and its vendor is there). 0 when unknown.
+    void SetRace(std::uint64_t botGuid, std::uint32_t race);
+    std::uint32_t GetRace(std::uint64_t botGuid) const;
     std::size_t Size() const;
 
 private:
     mutable std::mutex _mutex;
     std::unordered_map<std::uint64_t, std::uint32_t> _classes;
+    std::unordered_map<std::uint64_t, std::uint32_t> _races;
 };
 } // namespace pick

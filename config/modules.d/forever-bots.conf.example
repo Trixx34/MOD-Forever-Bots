@@ -43,3 +43,8 @@ Module.forever-bots.TelemetrySummarySec = 60
 # the invites and the group rules; the module only sends the actions. Needs the core with layout 5 (party state).
 #   Module.forever-bots.PartySize = 5
 #   Module.forever-bots.PartyCount = 1
+
+# Travel (M6): where each race's vendor stands in its start city, as "x y z" on the bot's start map, keyed by race id
+# (1 Human, 2 Orc, 3 Dwarf, 4 Night Elf, 5 Undead, 6 Tauren, 7 Gnome, 8 Troll, 10 Blood Elf, 11 Draenei, 22 Worgen).
+# An idle bot due a vendor visit (ServiceEverySec) walks there, then visits. A race with no entry does not travel.
+#   Module.forever-bots.VendorPos1 = -8866.5 -132.25 83.0

@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <charconv>
 #include <limits>
+#include <sstream>
 #include <system_error>
 
 namespace
@@ -43,6 +44,27 @@ void ReadKey(std::unordered_map<std::string, std::string> const& config, char co
         value = parsed;
     else
         warnings.push_back(std::string("Module.forever-bots.") + key + ": " + reason + "; using " + std::to_string(value) + ".");
+}
+
+// Reads VendorPos<race> = "x y z" for every race id. A value that is not three numbers is dropped with a warning.
+void ReadVendorSpots(std::unordered_map<std::string, std::string> const& config,
+                     std::map<std::uint32_t, std::array<float, 3>>& spots, std::vector<std::string>& warnings)
+{
+    for (std::uint32_t race = 1; race <= std::numeric_limits<std::uint8_t>::max(); ++race)
+    {
+        std::string const key = "VendorPos" + std::to_string(race);
+        auto const it = config.find(key);
+        if (it == config.end())
+            continue;
+
+        std::istringstream in(it->second);
+        std::array<float, 3> spot{};
+        std::string trailing;
+        if (!(in >> spot[0] >> spot[1] >> spot[2]) || (in >> trailing))
+            warnings.push_back("Module.forever-bots." + key + ": '" + it->second + "' is not three numbers; ignored.");
+        else
+            spots[race] = spot;
+    }
 }
 
 // Reads a race or class id. The word "random" means pick (0); otherwise a valid id.
@@ -109,5 +131,6 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadKey(config, "TrainEverySec", 60, 86400, settings.TrainEverySec, warnings);
     ReadKey(config, "PartySize", 0, 5, settings.PartySize, warnings);
     ReadKey(config, "PartyCount", 1, 100, settings.PartyCount, warnings);
+    ReadVendorSpots(config, settings.VendorSpots, warnings);
     return settings;
 }

@@ -179,6 +179,7 @@ void RampTick(RunContext& run)
             std::uint64_t const guid = reply.bot_guid();
             run.Roster.OnGranted(0, guid);
             run.Classes.Set(guid, combo.Class);
+            run.Classes.SetRace(guid, combo.Race);
             run.Client.StoreSet(bot_store::KeyFor(guid), std::to_string(combo.Race) + " " + std::to_string(combo.Class));
             std::cerr << "forever-bots: spawned bot " << guid << " race " << combo.Race << " class " << combo.Class << "\n";
         });
@@ -400,7 +401,10 @@ int main(int argc, char** argv)
         {
             RaceClass combo{};
             if (stored.found() && ParseRaceClass(stored.value(), combo))
+            {
                 run.Classes.Set(guid, combo.Class);
+                run.Classes.SetRace(guid, combo.Race);
+            }
             else
                 std::cerr << "forever-bots: bot " << guid << " has no saved class; its rotation is off until it is set\n";
 
@@ -446,6 +450,9 @@ int main(int argc, char** argv)
     policyOptions.PartySize = settings.PartySize;
     policyOptions.PartyCount = settings.PartyCount;
     policyOptions.ClassOf = [&classes](std::uint64_t botGuid) { return classes.Get(botGuid); };
+    policyOptions.RaceOf = [&classes](std::uint64_t botGuid) { return classes.GetRace(botGuid); };
+    for (auto const& [race, spot] : settings.VendorSpots)
+        policyOptions.VendorByRace[race] = { spot[0], spot[1], spot[2] };
 
     // Tier 2 is granted at handshake, so there is a region only if the core accepted it.
     std::atomic<bool> running{true};
