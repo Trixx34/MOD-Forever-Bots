@@ -149,6 +149,7 @@ std::uint32_t LearnLevel(std::uint32_t spell)
         case 6343: return 6;   // Thunder Clap
         case 853: return 8;    // Hammer of Justice
         case 8092: return 10;  // Mind Blast
+        case 2054: return 16;  // Heal
         case 8050: return 10;  // Flame Shock
         case 122: return 10;   // Frost Nova
         case 707: return 10;   // Immolate

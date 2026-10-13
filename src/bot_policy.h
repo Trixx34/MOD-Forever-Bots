@@ -9,6 +9,10 @@
 // cooldown is skipped. Rend's bleed is tracked per target, since the snapshot has no auras, so it is not recast while active.
 // Rest (M2): an idle bot below 90% health sits down, and stays sat until its health is full. It stands before it moves,
 // follows or fights. A sit refused in combat is retried after a second.
+// Dungeon party control (route active): the leader (tank) pulls only when every living member has 80% health, mana users 60% mana, and all
+// are within 30 yards (sitting to recover meanwhile; never longer than two minutes); members do not pull and join a fight 2.5 s after
+// the tank; a healer class (priest, paladin, shaman, druid) heals the party member below 60% health; a cast refused for line of sight
+// makes the bot close to melee range for five seconds.
 // Parties (M8): with PartySize set, bots are cut into parties. The leader invites its members and a member accepts the
 // invite, leaves any other party, follows its leader when it is more than 8 yards away, and fights the leader's target
 // when it has none of its own. Party actions are sent only out of combat.
@@ -130,6 +134,8 @@ private:
         bool Traveling = false;                          // walking to the vendor for a visit
         std::uint64_t TravelStartMs = 0;                 // when this walk began; it is dropped after kTravelTimeoutMs
         std::unordered_set<std::uint32_t> CastTimeSpells; // spells the core refused because the bot was moving: they need it standing
+        std::uint64_t CloserUntilMs = 0;                 // closing to melee range after a line-of-sight refusal, until this time
+        std::uint64_t HoldSinceMs = 0;                   // the party leader waits for the party to be ready since this time (0 = not waiting)
         std::uint32_t GearedAtLevel = 0;                 // the level at the last auto gear (0 = not yet)
         bool GearRequested = false;                      // the .autogear command asked for it
         std::uint64_t GearRetryMs = 0;                   // no auto gear before this
