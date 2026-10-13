@@ -34,6 +34,10 @@ struct BotSettings
     // triggers a trainer check at once. Config keys ServiceEverySec and TrainEverySec (60..86400).
     std::uint32_t ServiceEverySec = 600;
     std::uint32_t TrainEverySec = 600;
+    // Parties (M8): PartySize bots per party (config key PartySize, 0 = no parties, at most 5) and PartyCount parties,
+    // cut from the lowest-guid bots (config key PartyCount, 1..100).
+    std::uint32_t PartySize = 0;
+    std::uint32_t PartyCount = 1;
 };
 
 // The most bots any configuration may ask for; also the Tier 2 bot bound requested at handshake.

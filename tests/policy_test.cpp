@@ -610,8 +610,181 @@ void RangedBotWithoutPowerWalksIn()
     CHECK(followed);
 }
 
+// Parties (M8). Bots on the origin with four nearby slots each; callers set positions and the party fields.
+WorldTickSnapshotView PartyView(std::vector<std::uint64_t> const& guids)
+{
+    WorldTickSnapshotView view;
+    view.tick_number = 1;
+    view.max_nearby_units = 4;
+    for (std::uint64_t guid : guids)
+    {
+        BotSnapshot bot;
+        bot.guid = guid;
+        bot.health = 1000;
+        bot.max_health = 1000;
+        view.bots.push_back(bot);
+    }
+    view.nearby.resize(guids.size() * view.max_nearby_units);
+    return view;
+}
+
+void AddNearby(WorldTickSnapshotView& view, std::size_t botIndex, NearbyUnit const& unit)
+{
+    view.nearby[botIndex * view.max_nearby_units + view.bots[botIndex].nearby_count++] = unit;
+}
+
+// Bot 12 is the warrior; the other bots are priests (class 5) and so follow it.
+std::uint32_t WarriorLeads(std::uint64_t guid)
+{
+    return guid == 12 ? 1 : 5;
+}
+
+BotPolicy PartyPolicy(std::uint32_t size, std::uint32_t count = 1)
+{
+    PolicyOptions options;
+    options.PartySize = size;
+    options.PartyCount = count;
+    options.ClassOf = WarriorLeads;
+    return BotPolicy(options);
+}
+
+std::uint64_t PlayerOf(std::uint64_t counter)
+{
+    return MakeUnitRef(2, 0, counter);
+}
+
+bool HasGroup(std::vector<BotAction> const& actions, std::uint64_t bot, std::uint32_t spell, std::uint64_t target = 0)
+{
+    for (BotAction const& action : actions)
+        if (action.type == ActionType::kGroup && action.bot_guid == bot && action.spell_id == spell &&
+            (target == 0 || action.target_guid == target))
+            return true;
+    return false;
+}
+
+bool HasAnyGroup(std::vector<BotAction> const& actions, std::uint64_t bot)
+{
+    for (BotAction const& action : actions)
+        if (action.type == ActionType::kGroup && action.bot_guid == bot)
+            return true;
+    return false;
+}
+
+// An action of `type` for `bot` with `target` as its target (any target when 0).
+bool HasAction(std::vector<BotAction> const& actions, std::uint64_t bot, ActionType type, std::uint64_t target = 0)
+{
+    for (BotAction const& action : actions)
+        if (action.type == type && action.bot_guid == bot && (target == 0 || action.target_guid == target))
+            return true;
+    return false;
+}
+
+void PartyOffByDefault()
+{
+    auto const actions = PartyPolicy(0).Decide(PartyView({ 10, 11, 12, 13, 14 }), 0);
+    for (BotAction const& action : actions)
+        CHECK(action.type != ActionType::kGroup);
+}
+
+void LeaderInvitesItsMembers()
+{
+    auto const actions = PartyPolicy(5).Decide(PartyView({ 10, 11, 12, 13, 14 }), 0);
+    CHECK(HasGroup(actions, 12, 1, PlayerOf(10)));
+    CHECK(HasGroup(actions, 12, 1, PlayerOf(11)));
+    CHECK(HasGroup(actions, 12, 1, PlayerOf(13)));
+    CHECK(HasGroup(actions, 12, 1, PlayerOf(14)));
+    CHECK(!HasGroup(actions, 12, 1, PlayerOf(12))); // not itself
+    CHECK(!HasAnyGroup(actions, 10));                // members invite no one
+}
+
+void OnlyTheFirstPartyIsFormed()
+{
+    // Ten bots, two parties of five: the first party's leader (bot 12) invites its members; bots 15..19 are not
+    // partied, so nobody invites them.
+    std::vector<std::uint64_t> guids = { 10, 11, 12, 13, 14, 15, 16, 17, 18, 19 };
+    auto const actions = PartyPolicy(5, 1).Decide(PartyView(guids), 0);
+    CHECK(HasGroup(actions, 12, 1, PlayerOf(10)));
+    for (std::uint64_t unpartied : { 15, 16, 17, 18, 19 })
+        CHECK(!HasAnyGroup(actions, unpartied));
+}
+
+void InvitesWaitForTheRetry()
+{
+    BotPolicy policy = PartyPolicy(5);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    CHECK(HasGroup(policy.Decide(view, 0), 12, 1));
+    CHECK(!HasGroup(policy.Decide(view, 1000), 12, 1)); // still waiting for the answer
+    CHECK(HasGroup(policy.Decide(view, 16000), 12, 1)); // invited again after the retry
+}
+
+void InvitedMemberIsNotInvitedAgain()
+{
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    view.bots[0].group_invite_from = PlayerOf(12); // bot 10 has the invite waiting
+    CHECK(!HasGroup(PartyPolicy(5).Decide(view, 0), 12, 1, PlayerOf(10)));
+}
+
+void MemberAcceptsItsLeadersInvite()
+{
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    view.bots[1].group_invite_from = PlayerOf(12);
+    auto const actions = PartyPolicy(5).Decide(view, 0);
+    CHECK(HasGroup(actions, 11, 2));
+    CHECK(!HasAnyGroup(actions, 10));
+}
+
+void MemberLeavesAForeignParty()
+{
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    view.bots[1].group_role = 1;
+    view.bots[1].group_leader_guid = PlayerOf(99);
+    CHECK(HasGroup(PartyPolicy(5).Decide(view, 0), 11, 3));
+
+    // In its own party already: nothing to do.
+    view.bots[1].group_leader_guid = PlayerOf(12);
+    auto const actions = PartyPolicy(5).Decide(view, 0);
+    CHECK(!HasGroup(actions, 11, 3));
+    CHECK(!HasAnyGroup(actions, 11));
+}
+
+void MemberFollowsItsLeaderUntilClose()
+{
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    view.bots[1].pos_x = 30.0f; // bot 11, far from the leader at the origin
+    CHECK(HasAction(PartyPolicy(5).Decide(view, 0), 11, ActionType::kFollow, PlayerOf(12)));
+
+    view.bots[1].pos_x = 3.0f; // close enough: it holds where it is
+    CHECK(!HasAction(PartyPolicy(5).Decide(view, 0), 11, ActionType::kFollow));
+}
+
+void MemberFightsItsLeadersTarget()
+{
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    NearbyUnit const wolf = Hostile(7, 2.0f, 100);
+    view.bots[2].threat_target_guid = wolf.guid; // the leader is fighting the wolf
+    AddNearby(view, 1, wolf);                    // bot 11 sees it
+    CHECK(HasAction(PartyPolicy(5).Decide(view, 0), 11, ActionType::kAttackTarget, wolf.guid));
+}
+
+void NoPartyActionsInCombat()
+{
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    view.bots[2].in_combat = 1;
+    CHECK(!HasGroup(PartyPolicy(5).Decide(view, 0), 12, 1));
+}
+
 int main()
 {
+    PartyOffByDefault();
+    LeaderInvitesItsMembers();
+    OnlyTheFirstPartyIsFormed();
+    InvitesWaitForTheRetry();
+    InvitedMemberIsNotInvitedAgain();
+    MemberAcceptsItsLeadersInvite();
+    MemberLeavesAForeignParty();
+    MemberFollowsItsLeaderUntilClose();
+    MemberFightsItsLeadersTarget();
+    NoPartyActionsInCombat();
     SealIsNotRecastWhileUp();
     EviscerateAtFivePoints();
     HostilePlayerDoesNotBlockRest();

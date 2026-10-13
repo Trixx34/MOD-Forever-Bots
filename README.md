@@ -89,6 +89,10 @@ row and its repeated casts are not yet checked on the sim.
   checks. Runs on a timer and at once after a level-up, when a trainer is in interaction range.
 - Services are opt-in in the policy (zero interval is off). The module turns them on from `ServiceEverySec` and
   `TrainEverySec`. A refused service is logged at most once per bot every ten minutes.
+- M8 parties: `kGroup` invites, accepts and leaves (spell_id 1, 2, 3; layout 5). With `PartySize` set, the first
+  `PartyCount` parties of `PartySize` bots (lowest guids first) form: the leader (its first warrior, else its lowest-guid
+  bot) invites each member not in the party, members accept, leave a foreign party, follow the leader when more than 8
+  yards away and fight the leader's target when they have none. Party actions run only out of combat. Off by default.
 
 ## Telemetry (overnight runs)
 

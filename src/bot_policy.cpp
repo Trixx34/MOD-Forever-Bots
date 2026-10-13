@@ -2,6 +2,7 @@
 
 #include "combat_rotation.h"
 
+#include <algorithm>
 #include <cmath>
 #include <iterator>
 #include <limits>
@@ -37,6 +38,16 @@ constexpr std::uint32_t kMaxComboPoints = 5;
 constexpr std::uint32_t kOutOfPowerPct = 15;
 constexpr float kMeleeApproachYards = 5.0f;
 constexpr std::uint32_t kRestBelowPct = 90;  // an idle bot below this health sits down to rest
+// Parties (M8). kGroup's spell_id (the core's ModuleBotActions): invite the bot named by target_guid, accept the bot's
+// pending invite, leave the party.
+constexpr std::uint32_t kGroupInvite = 1;
+constexpr std::uint32_t kGroupAccept = 2;
+constexpr std::uint32_t kGroupLeave = 3;
+constexpr std::uint32_t kWarriorClass = 1;
+constexpr std::uint32_t kPlayerType = 2;     // unit reference type of a player (MakeUnitRef's highType)
+constexpr std::uint64_t kInviteRetryMs = 15000; // a member is invited again this long after the last invite
+constexpr std::uint64_t kPartyRetryMs = 2000;   // a party action refused, or just sent, is not repeated before this
+constexpr float kFollowLeaderYards = 8.0f;      // a member this close to its leader stays where it is
 
 // Duration of the damage-over-time effect a spell leaves on its target, or 0 for spells the policy does not track. Rank 1
 // durations: while the effect runs, the policy does not recast the spell on the same target.
@@ -126,6 +137,37 @@ bool IsPlayer(NearbyUnit const& unit)
     return forever_module::UnitRefType(unit.guid) == 2 && unit.health > 0 && !unit.is_hostile;
 }
 
+// The live creature in `units` with this reference, or nullptr.
+NearbyUnit const* FindLiveMob(std::span<NearbyUnit const> units, std::uint64_t guid)
+{
+    for (NearbyUnit const& unit : units)
+        if (unit.guid == guid && IsLiveMob(unit))
+            return &unit;
+    return nullptr;
+}
+
+// A player's unit reference, from its character guid counter (the same reference the core's party actions take).
+std::uint64_t PlayerRef(std::uint64_t counter)
+{
+    return forever_module::MakeUnitRef(static_cast<std::uint8_t>(kPlayerType), 0, counter);
+}
+
+float Distance2d(BotSnapshot const& a, BotSnapshot const& b)
+{
+    float const dx = a.pos_x - b.pos_x;
+    float const dy = a.pos_y - b.pos_y;
+    return std::sqrt(dx * dx + dy * dy);
+}
+
+// The class of a bot: its own from the class table, else the configured class (0 = none).
+std::uint32_t ClassFor(PolicyOptions const& options, std::uint64_t guid)
+{
+    if (options.ClassOf)
+        if (std::uint32_t const own = options.ClassOf(guid))
+            return own;
+    return options.ClassId;
+}
+
 } // namespace
 
 char const* ActionStatusName(BotActionStatus status)
@@ -159,6 +201,13 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
     {
         state.Sitting = false;
         state.RestRetryAtMs = nowMs + kRetryMs;
+        return;
+    }
+
+    // A party action refused (no invite waiting, a full party): the party waits a moment before the next one.
+    if (bot.last_action_type == uint8_t(ActionType::kGroup) && bot.last_action_status == BotActionStatus::kRefused)
+    {
+        state.PartyRetryAtMs = nowMs + kPartyRetryMs;
         return;
     }
 
@@ -214,6 +263,44 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
     std::vector<BotAction> actions;
     std::unordered_set<std::uint64_t> present;
 
+    // Parties (M8): the lowest-guid bots, in guid order, cut into parties of PartySize. Computed once per tick.
+    std::unordered_map<std::uint64_t, std::size_t> indexOf; // bot guid -> index in view.bots
+    for (std::size_t i = 0; i < view.bots.size(); ++i)
+        indexOf[view.bots[i].guid] = i;
+
+    std::unordered_map<std::uint64_t, std::uint64_t> leaderOf;                // bot guid -> its party's leader
+    std::unordered_map<std::uint64_t, std::vector<std::uint64_t>> membersOf;  // leader guid -> the other members
+    if (_options.PartySize != 0)
+    {
+        std::vector<std::uint64_t> guids;
+        guids.reserve(view.bots.size());
+        for (BotSnapshot const& bot : view.bots)
+            guids.push_back(bot.guid);
+        std::sort(guids.begin(), guids.end());
+
+        std::size_t const partied = std::min<std::size_t>(guids.size(), std::size_t(_options.PartySize) * _options.PartyCount);
+        for (std::size_t start = 0; start < partied; start += _options.PartySize)
+        {
+            std::size_t const end = std::min<std::size_t>(start + _options.PartySize, partied);
+            std::size_t leader = start;
+            for (std::size_t p = start; p < end; ++p)
+            {
+                if (ClassFor(_options, guids[p]) == kWarriorClass)
+                {
+                    leader = p;
+                    break;
+                }
+            }
+            std::uint64_t const leaderGuid = guids[leader];
+            for (std::size_t p = start; p < end; ++p)
+            {
+                leaderOf[guids[p]] = leaderGuid;
+                if (p != leader)
+                    membersOf[leaderGuid].push_back(guids[p]);
+            }
+        }
+    }
+
     for (std::size_t i = 0; i < view.bots.size(); ++i)
     {
         BotSnapshot const& bot = view.bots[i];
@@ -230,14 +317,37 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         bool const lowHealth = bot.max_health > 0 && std::uint64_t(bot.health) * 100 < std::uint64_t(bot.max_health) * kDisengagePct;
 
         // The bot's class: its own (from the class table) or the configured one. Ranged classes approach to range.
-        std::uint32_t classId = _options.ClassId;
-        if (_options.ClassOf)
-            if (std::uint32_t const own = _options.ClassOf(bot.guid))
-                classId = own;
+        std::uint32_t const classId = ClassFor(_options, bot.guid);
 
-        // The target is the threat target (even when it is out of view), otherwise the closest live hostile.
+        // The bot's party: a leader is the bot that invites, a member follows its leader. The leader's snapshot is the one
+        // this tick's view holds, when the leader is online.
+        auto const led = leaderOf.find(bot.guid);
+        std::uint64_t const partyLeader = led == leaderOf.end() ? 0 : led->second;
+        bool const partyLeaderBot = partyLeader != 0 && partyLeader == bot.guid;
+        bool const partyMember = partyLeader != 0 && !partyLeaderBot;
+        std::uint64_t const leaderRef = partyLeader != 0 ? PlayerRef(partyLeader) : 0;
+        BotSnapshot const* leaderSnap = nullptr;
+        if (partyMember)
+        {
+            if (auto const at = indexOf.find(partyLeader); at != indexOf.end())
+                leaderSnap = &view.bots[at->second];
+        }
+        bool const atLeader = leaderSnap && Distance2d(bot, *leaderSnap) <= kFollowLeaderYards;
+
+        // Who an idle bot follows: a member its leader (and stays put once close), else the closest player.
+        std::uint64_t followRef = player ? player->guid : 0;
+        if (partyMember && leaderSnap)
+            followRef = atLeader ? 0 : leaderRef;
+
+        // The target is the threat target (even when it is out of view), otherwise the closest live hostile. A member with
+        // no threat of its own fights its leader's target, when that is in view.
         NearbyUnit const* targetUnit = nullptr;
         std::uint64_t targetRef = bot.threat_target_guid;
+        if (targetRef == 0 && partyMember && leaderSnap && leaderSnap->threat_target_guid != 0)
+        {
+            if (NearbyUnit const* assist = FindLiveMob(nearby, leaderSnap->threat_target_guid))
+                targetRef = assist->guid;
+        }
         if (targetRef != 0)
         {
             for (NearbyUnit const& unit : nearby)
@@ -255,7 +365,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         Decision wanted;
         if (lowHealth)
         {
-            wanted = player ? Decision{ ActionType::kFollow, player->guid } : Decision{ ActionType::kStop, 0 };
+            wanted = followRef ? Decision{ ActionType::kFollow, followRef } : Decision{ ActionType::kStop, 0 };
         }
         else if (targetRef != 0)
         {
@@ -272,7 +382,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         else
         {
             state.InFight = false;
-            wanted = player ? Decision{ ActionType::kFollow, player->guid } : Decision{ ActionType::kStop, 0 };
+            wanted = followRef ? Decision{ ActionType::kFollow, followRef } : Decision{ ActionType::kStop, 0 };
         }
 
         // Rest: sit down while idle and hurt, and stand before anything moves or fights. The stand goes out before the
@@ -318,6 +428,51 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             actions.push_back(train);
             state.LastTrainLevel = bot.level;
             state.NextTrainMs = nowMs + _options.TrainEveryMs;
+        }
+
+        // Party actions (M8), out of combat. The leader invites each member that is not in its party yet, and invites a
+        // member again only after kInviteRetryMs. A member accepts its leader's invite, and leaves a party that is not its
+        // leader's. Each is sent once; a refused one is retried after kPartyRetryMs.
+        if (_options.PartySize != 0 && bot.in_combat == 0 && nowMs >= state.PartyRetryAtMs)
+        {
+            if (partyLeaderBot)
+            {
+                for (std::uint64_t member : membersOf[bot.guid])
+                {
+                    auto const at = indexOf.find(member);
+                    if (at == indexOf.end())
+                        continue; // not online
+                    BotSnapshot const& other = view.bots[at->second];
+                    if (other.group_leader_guid == leaderRef || other.group_invite_from == leaderRef)
+                        continue; // in this party already, or invited and waiting for the answer
+                    auto const invited = state.InvitedAtMs.find(member);
+                    if (invited != state.InvitedAtMs.end() && nowMs < invited->second + kInviteRetryMs)
+                        continue;
+
+                    BotAction invite;
+                    invite.bot_guid = bot.guid;
+                    invite.type = ActionType::kGroup;
+                    invite.spell_id = kGroupInvite;
+                    invite.target_guid = PlayerRef(member);
+                    actions.push_back(invite);
+                    state.InvitedAtMs[member] = nowMs;
+                }
+            }
+            else if (partyMember)
+            {
+                BotAction party;
+                party.bot_guid = bot.guid;
+                party.type = ActionType::kGroup;
+                if (bot.group_role == 0 && bot.group_invite_from == leaderRef)
+                    party.spell_id = kGroupAccept;
+                else if (bot.group_role != 0 && bot.group_leader_guid != leaderRef)
+                    party.spell_id = kGroupLeave;
+                if (party.spell_id != 0)
+                {
+                    actions.push_back(party);
+                    state.PartyRetryAtMs = nowMs + kPartyRetryMs;
+                }
+            }
         }
 
         if (!state.Last || state.Last->Type != wanted.Type || state.Last->Target != wanted.Target)
