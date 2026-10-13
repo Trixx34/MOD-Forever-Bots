@@ -71,6 +71,10 @@ Module.forever-bots.TelemetrySummarySec = 60
 # player in a party can type .autogear to dress the bots that player leads.
 # AutoGearing = 0
 #
+# Grind spots (leveling): idle bots walk to the spots that suit their level instead of their map's hubs. The file is made from the world database
+# (tools/make_grind_spots.py, doc/grind-spots.md).
+# GrindFile = "data/grind_spots.txt"
+#
 # Chat commands (party chat, raid chat, or a whisper to one bot; or the .bots dot command). Both are off by default. Only the leader of a group
 # can command the bots in it. ChatCommands: follow [off], stay [off], goto here, release, status. ChatOrders adds: stop, pull, heal, passive,
 # aggressive. A selector may come first: all, tank, healer, dps, a class name (rogue, rogues), or a comma list: "healer follow", "rogue,mage stay".

@@ -73,6 +73,7 @@ constexpr std::uint64_t kTankHeadStartMs = 2500;    // the others join a fight t
 // Healing: a healer class heals the party member with the lowest health below this share, within this range.
 constexpr std::uint32_t kHealBelowPct = 60;
 constexpr float kHealRangeYards = 30.0f;
+constexpr std::size_t kGrindMemory = 2;           // grind spots remembered as just visited
 constexpr std::uint64_t kAcceptInviteRetryMs = 3000; // an invite from a player is answered again after this long if it is still pending
 constexpr std::uint64_t kGotoTimeoutMs = 90000;     // a goto order is dropped after this long
 constexpr std::uint64_t kPullOrderMs = 30000;      // a pull order is dropped after this long, or when the target is gone
@@ -1427,7 +1428,50 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         // next walk. A hurt bot rests instead, and a party member follows its leader. Anything that comes near stops the walk.
         bool const healthy = bot.max_health == 0 || std::uint64_t(bot.health) * 100 >= std::uint64_t(bot.max_health) * kRestBelowPct;
         auto const hubs = _options.HubsByMap.find(bot.map_id);
-        if (idle && healthy && !partyMember && !state.ChatStay && state.ChatFollow == 0 && hubs != _options.HubsByMap.end() && !hubs->second.empty())
+        bool const grindMode = _options.Grind && !_options.Grind->Spots.empty() && bot.level != 0;
+        if (idle && healthy && grindMode && !partyMember && !state.ChatStay && state.ChatFollow == 0)
+        {
+            // Leveling: after a quiet spell the bot walks to a grind spot that suits its level (nearest first, not the ones it just left), and
+            // stays to fight what lives there until it sees nothing for a while again.
+            if (state.Wandering)
+            {
+                bool const arrived = DistanceTo(bot, state.GrindTarget) <= kHubReachYards;
+                bool const timedOut = nowMs - state.WanderStartMs > kWanderTimeoutMs;
+                if (arrived || timedOut)
+                {
+                    state.Wandering = false;
+                    state.IdleSinceMs = nowMs;
+                }
+                else
+                {
+                    wanted = Decision{ ActionType::kMoveTo, 0, state.GrindTarget };
+                    idle = false;
+                }
+            }
+            else if (nowMs - state.IdleSinceMs >= kWanderIdleMs)
+            {
+                std::uint8_t const side = _options.SideOf ? _options.SideOf(bot.guid) : std::uint8_t(0);
+                std::vector<std::size_t> const spots = GrindSpotsFor(*_options.Grind, bot.map_id, bot.level, side, bot.pos_x, bot.pos_y, state.GrindVisited);
+                if (!spots.empty())
+                {
+                    GrindSpot const& spot = _options.Grind->Spots[spots.front()];
+                    state.GrindTarget = Point{ spot.X, spot.Y, spot.Z };
+                    state.GrindVisited.push_back(spots.front());
+                    if (state.GrindVisited.size() > kGrindMemory)
+                        state.GrindVisited.erase(state.GrindVisited.begin());
+                    state.Wandering = true;
+                    state.WanderStartMs = nowMs;
+                    wanted = Decision{ ActionType::kMoveTo, 0, state.GrindTarget };
+                    idle = false;
+                    if (_options.OnEvent)
+                        _options.OnEvent("grind_spot: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id) +
+                                         " spot=" + std::to_string(spots.front()) + " levels=" + std::to_string(spot.MinLevel) + "-" + std::to_string(spot.MaxLevel));
+                }
+                else
+                    state.IdleSinceMs = nowMs; // nothing on this map for this level: look again later
+            }
+        }
+        else if (idle && healthy && !partyMember && !state.ChatStay && state.ChatFollow == 0 && hubs != _options.HubsByMap.end() && !hubs->second.empty())
         {
             std::vector<Point> const& list = hubs->second;
             if (state.Wandering)

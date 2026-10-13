@@ -108,6 +108,7 @@ struct RunContext
     forever_module::ModuleClient& Client;
     BotRoster& Roster;
     pick::ClassTable& Classes;
+    pick::ClassTable& Races;   // race of each bot (same table type; the value is a race id), for its faction
     BotSettings& Settings; // updated by a config reload
     pick::Stream Rng;
     std::uint64_t StartMs;
@@ -191,6 +192,7 @@ void RampTick(RunContext& run)
             std::uint64_t const guid = reply.bot_guid();
             run.Roster.OnGranted(0, guid);
             run.Classes.Set(guid, combo.Class);
+            run.Races.Set(guid, combo.Race);
             run.Client.StoreSet(bot_store::KeyFor(guid), std::to_string(combo.Race) + " " + std::to_string(combo.Class));
             std::cerr << "forever-bots: spawned bot " << guid << " race " << combo.Race << " class " << combo.Class << "\n";
         });
@@ -275,6 +277,7 @@ void ScenarioSpawnTick(RunContext& run, std::size_t& spawned)
         std::uint64_t const guid = reply.bot_guid();
         run.Roster.OnGranted(0, guid);
         run.Classes.Set(guid, combo.Class);
+        run.Races.Set(guid, combo.Race);
         std::cerr << "forever-bots: scenario bot " << guid << " race " << combo.Race << " class " << combo.Class << "\n";
     });
 }
@@ -545,7 +548,8 @@ int main(int argc, char** argv)
     roster.SetMaxBots(maxBots);
 
     pick::ClassTable classes;
-    RunContext run{ client, roster, classes, settings, pick::Stream(settings.RandomSeed), nowMs(), LocalSecondsOfDay() };
+    pick::ClassTable races;
+    RunContext run{ client, roster, classes, races, settings, pick::Stream(settings.RandomSeed), nowMs(), LocalSecondsOfDay() };
     std::cerr << "forever-bots: random seed " << settings.RandomSeed << ", race " << settings.Race << ", class "
               << settings.Class << " (0 = random), ramp " << settings.Ramp.Initial << " +" << settings.Ramp.Step << " every "
               << settings.Ramp.StepMinutes << " min to " << settings.Ramp.Cap << ", stop at " << settings.Ramp.StopSecOfDay / 3600
@@ -632,6 +636,8 @@ int main(int argc, char** argv)
                         run.Roster.OnGranted(0, guid);
                         if (response.class_id() != 0)
                             run.Classes.Set(guid, response.class_id());
+                        if (response.race() != 0)
+                            run.Races.Set(guid, response.race());
                         {
                             std::lock_guard<std::mutex> lock(alts->Lock);
                             alts->ByName[LowerCopy(name)] = guid;
@@ -702,6 +708,7 @@ int main(int argc, char** argv)
                     std::uint64_t const guid = response.bot_guid();
                     run.Roster.OnGranted(0, guid);
                     run.Classes.Set(guid, cls);
+                    run.Races.Set(guid, race);
                     run.Client.StoreSet(bot_store::KeyFor(guid), std::to_string(race) + " " + std::to_string(cls));
                     tell("Spawned bot " + std::to_string(guid) + " (race " + std::to_string(race) + ", class " + std::to_string(cls) + ").");
                 });
@@ -810,7 +817,7 @@ int main(int argc, char** argv)
         {
             RaceClass combo{};
             if (stored.found() && ParseRaceClass(stored.value(), combo))
-                run.Classes.Set(guid, combo.Class);
+                run.Classes.Set(guid, combo.Class), run.Races.Set(guid, combo.Race);
             else
                 std::cerr << "forever-bots: bot " << guid << " has no saved class; its rotation is off until it is set\n";
 
@@ -880,6 +887,16 @@ int main(int argc, char** argv)
         std::cerr << "forever-bots: quests: " << quests->Starts.size() << " start(s) from " << settings.QuestFile << "\n";
         policyOptions.Quests = std::move(quests);
     }
+    if (!settings.GrindFile.empty())
+    {
+        std::vector<std::string> grindWarnings;
+        auto grind = std::make_shared<GrindData>(LoadGrindData(settings.GrindFile, grindWarnings));
+        for (std::string const& warning : grindWarnings)
+            std::cerr << "forever-bots: " << warning << "\n";
+        std::cerr << "forever-bots: grind spots: " << grind->Spots.size() << " from " << settings.GrindFile << "\n";
+        policyOptions.Grind = std::move(grind);
+    }
+    policyOptions.SideOf = [&races](std::uint64_t botGuid) { return SideOfRace(races.Get(botGuid)); };
     policyOptions.ClassOf = [&classes](std::uint64_t botGuid) { return classes.Get(botGuid); };
     policyOptions.AutoGearing = settings.AutoGearing;
     policyOptions.AcceptInvites = settings.ChatCommands;

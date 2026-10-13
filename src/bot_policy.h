@@ -25,6 +25,7 @@
 
 #include "forever_module/tier2_session.h"
 #include "chat_commands.h"
+#include "grind_data.h"
 #include "quest_planner.h"
 
 #include <cstdint>
@@ -74,6 +75,10 @@ struct PolicyOptions
     // Receives one line per notable decision (a heal cast, a pull held back or released), for the run logs. Unset = silent.
     std::function<void(std::string const&)> OnEvent;
     std::uint32_t AutoGearEveryLevels = 5;
+    // Grind spots (leveling): the places an idle bot walks to for its level, instead of its map's hubs. SideOf gives a bot's faction (1 Alliance,
+    // 2 Horde, 0 unknown).
+    std::shared_ptr<GrindData const> Grind;
+    std::function<std::uint8_t(std::uint64_t botGuid)> SideOf;
     // Chat commands: a bot accepts a party invite from a player (a human leader), so the player can bring bots into a group and command them.
     bool AcceptInvites = false;
     // Alts (a player's own characters playing as bots): never dressed by the module.
@@ -171,6 +176,8 @@ private:
         std::uint64_t IdleSinceMs = 0;
         bool Wandering = false;                          // walking to a hub
         std::uint64_t WanderStartMs = 0;                 // when this walk began; dropped after kWanderTimeoutMs
+        Point GrindTarget;                               // the grind spot being walked to
+        std::vector<std::size_t> GrindVisited;           // the last spots visited (indexes), so the bot moves on instead of going back and forth
         std::size_t NextHub = 0;                         // index of the hub to walk to next, on the bot's map
         bool Traveling = false;                          // walking to the vendor for a visit
         std::uint64_t TravelStartMs = 0;                 // when this walk began; it is dropped after kTravelTimeoutMs
