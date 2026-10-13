@@ -65,6 +65,11 @@ struct Row
 // Rows in priority order, for a class id (1 = warrior). Empty for a class id without rows.
 std::span<Row const> RowsForClass(std::uint32_t classId);
 
+// The level at which a trainer teaches the rank 1 spell, from the Forever trainer data (the spell ids in the rows are the same as in
+// vanilla, and so are these levels). 0 for a spell a class has from level 1 and for a spell not in the table; a bot below the learn
+// level of a spell does not know it yet, so the rotation skips the row until the bot reaches it.
+std::uint32_t LearnLevel(std::uint32_t spell);
+
 // How far the bot approaches its target before it attacks or casts: 25 yards for the ranged classes, 5 for the rest.
 float ApproachYards(std::uint32_t classId);
 

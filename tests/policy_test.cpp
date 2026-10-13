@@ -550,6 +550,18 @@ void RogueKicksACastingTarget()
     CHECK(HasCast(actions, 1766)); // Kick
 }
 
+void SpellsAboveTheBotsLevelAreNotCast()
+{
+    NearbyUnit caster = Hostile(2, 3.0f, 100);
+    caster.casting = 1;
+    WorldTickSnapshotView low = View(1, 0, { caster });
+    low.bots[0].level = 1; // Kick is learned at level 12
+    CHECK(!HasCast(ClassPolicy(4).Decide(low, 1000), 1766));
+    WorldTickSnapshotView high = View(1, 0, { caster });
+    high.bots[0].level = 12;
+    CHECK(HasCast(ClassPolicy(4).Decide(high, 1000), 1766));
+}
+
 void SealIsNotRecastWhileUp()
 {
     // The seal lasts 30 s on the bot: cast once, then not again until it has worn off.
@@ -1107,6 +1119,7 @@ int main()
     WarlockDotIsNotRecastWhileRunning();
     PriestShieldsItselfWhenHurt();
     RogueKicksACastingTarget();
+    SpellsAboveTheBotsLevelAreNotCast();
     HostilePlayersAreNotAttacked();
     ServicesWhenIdleOnTimerAndOnLevelUp();
     NoServicesInAFight();

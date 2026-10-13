@@ -131,6 +131,36 @@ std::span<Row const> RowsForClass(std::uint32_t classId)
     }
 }
 
+// Trainer levels of the rank 1 rotation spells, read from the baseline trainer_spell rows of the Forever world data. Sunder Armor
+// (7386) has no trainer row there, so it is not gated.
+std::uint32_t LearnLevel(std::uint32_t spell)
+{
+    switch (spell)
+    {
+        case 100: return 4;    // Charge
+        case 772: return 4;    // Rend
+        case 1978: return 4;   // Serpent Sting
+        case 589: return 4;    // Shadow Word: Pain
+        case 8042: return 4;   // Earth Shock
+        case 172: return 4;    // Corruption
+        case 8921: return 4;   // Moonfire
+        case 3044: return 6;   // Arcane Shot
+        case 2136: return 6;   // Fire Blast
+        case 6343: return 6;   // Thunder Clap
+        case 853: return 8;    // Hammer of Justice
+        case 8092: return 10;  // Mind Blast
+        case 8050: return 10;  // Flame Shock
+        case 122: return 10;   // Frost Nova
+        case 707: return 10;   // Immolate
+        case 2687: return 10;  // Bloodrage
+        case 1766: return 12;  // Kick
+        case 1160: return 14;  // Demoralizing Shout
+        case 845: return 20;   // Cleave
+        case 5308: return 24;  // Execute
+        default: return 0;
+    }
+}
+
 // Yards a bot approaches its target to: casters and hunters stand off at range, melee classes close to 5 yards.
 float ApproachYards(std::uint32_t classId)
 {
