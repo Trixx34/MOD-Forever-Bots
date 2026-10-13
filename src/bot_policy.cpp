@@ -16,7 +16,6 @@ using forever_module::WorldTickSnapshotView;
 
 namespace {
 
-constexpr float kMeleeRange = 5.0f;          // yards: approach beyond this, attack within it
 constexpr float kDisengagePct = 30.0f;       // below this health the bot stops fighting
 constexpr std::uint64_t kGlobalCooldownMs = 1500;
 constexpr std::uint64_t kRetryMs = 1000;     // out of range, invalid target, refused, not enough power
@@ -32,10 +31,21 @@ constexpr std::uint32_t kServiceRepair = 2;
 constexpr std::uint32_t kServiceEquip = 4;
 constexpr std::uint32_t kRestBelowPct = 90;  // an idle bot below this health sits down to rest
 
-// Duration of the damage-over-time effect a spell leaves on its target, or 0 for spells the policy does not track.
+// Duration of the damage-over-time effect a spell leaves on its target, or 0 for spells the policy does not track. Rank 1
+// durations: while the effect runs, the policy does not recast the spell on the same target.
 std::uint64_t DotDurationMs(std::uint32_t spell)
 {
-    return spell == kRend ? kRendDurationMs : 0;
+    switch (spell)
+    {
+        case kRend: return kRendDurationMs;
+        case 172: return 18000;  // Corruption
+        case 707: return 15000;  // Immolate
+        case 589: return 18000;  // Shadow Word: Pain
+        case 1978: return 15000; // Serpent Sting
+        case 8050: return 12000; // Flame Shock
+        case 8921: return 12000; // Moonfire
+        default: return 0;
+    }
 }
 
 float DistanceBetween(NearbyUnit const& a, NearbyUnit const& b)
@@ -203,6 +213,12 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         NearbyUnit const* player = Closest(bot, nearby, IsPlayer);
         bool const lowHealth = bot.max_health > 0 && std::uint64_t(bot.health) * 100 < std::uint64_t(bot.max_health) * kDisengagePct;
 
+        // The bot's class: its own (from the class table) or the configured one. Ranged classes approach to range.
+        std::uint32_t classId = _options.ClassId;
+        if (_options.ClassOf)
+            if (std::uint32_t const own = _options.ClassOf(bot.guid))
+                classId = own;
+
         // The target is the threat target (even when it is out of view), otherwise the closest live hostile.
         NearbyUnit const* targetUnit = nullptr;
         std::uint64_t targetRef = bot.threat_target_guid;
@@ -232,7 +248,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 state.InFight = true;
                 state.FightStartMs = nowMs;
             }
-            wanted = distance > kMeleeRange ? Decision{ ActionType::kFollow, targetRef } : Decision{ ActionType::kAttackTarget, targetRef };
+            wanted = distance > rotation::ApproachYards(classId) ? Decision{ ActionType::kFollow, targetRef } : Decision{ ActionType::kAttackTarget, targetRef };
         }
         else
         {
@@ -324,10 +340,6 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             if (cooldown.spell_id != 0 && cooldown.remaining_ms != 0)
                 cooling.insert(cooldown.spell_id);
 
-        std::uint32_t classId = _options.ClassId;
-        if (_options.ClassOf)
-            if (std::uint32_t const own = _options.ClassOf(bot.guid))
-                classId = own;
         for (rotation::Row const& row : rotation::RowsForClass(classId))
         {
             auto const retry = state.RetryAtMs.find(row.Spell);

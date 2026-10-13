@@ -485,8 +485,77 @@ void HostilePlayersAreNotAttacked()
     CHECK(attacked);
 }
 
+// A policy for one class with its rotation on, and no per-bot class table.
+BotPolicy ClassPolicy(std::uint32_t classId)
+{
+    PolicyOptions options;
+    options.ClassId = classId;
+    return BotPolicy(options);
+}
+
+// The guid of the cast with this spell, or 0 if there is none.
+std::uint64_t CastTargetOf(std::vector<BotAction> const& actions, std::uint32_t spell)
+{
+    for (BotAction const& action : actions)
+        if (action.type == ActionType::kCastSpell && action.spell_id == spell)
+            return action.target_guid;
+    return 0;
+}
+
+void MageCastsFromRange()
+{
+    // A mage at 12 yards casts Fireball and does not walk into melee.
+    auto actions = ClassPolicy(8).Decide(View(1, 0, { Hostile(2, 12.0f, 100) }), 1000);
+    CHECK(HasCast(actions, 133));
+    for (BotAction const& action : actions)
+        CHECK(action.type != ActionType::kFollow);
+
+    // At 30 yards it approaches first.
+    auto far = ClassPolicy(8).Decide(View(1, 0, { Hostile(2, 30.0f, 100) }), 1000);
+    bool approached = false;
+    for (BotAction const& action : far)
+        approached = approached || (action.type == ActionType::kFollow && action.target_guid == MakeUnitRef(8, 1, 2));
+    CHECK(approached);
+}
+
+void WarlockDotIsNotRecastWhileRunning()
+{
+    BotPolicy policy = ClassPolicy(9);
+    CHECK(HasCast(policy.Decide(View(1, 0, { Hostile(2, 12.0f, 100) }), 1000), 172)); // Corruption
+
+    // Corruption landed at 2600 ms and runs 18 s: the next cast is Immolate, not Corruption.
+    WorldTickSnapshotView landed = View(2, 0, { Hostile(2, 12.0f, 100) });
+    landed.bots[0].last_action_sequence = 1;
+    landed.bots[0].last_action_type = uint8_t(ActionType::kCastSpell);
+    landed.bots[0].last_action_spell = 172;
+    landed.bots[0].last_action_status = BotActionStatus::kApplied;
+    auto actions = policy.Decide(landed, 2600);
+    CHECK(!HasCast(actions, 172));
+    CHECK(HasCast(actions, 707));
+}
+
+void PriestShieldsItselfWhenHurt()
+{
+    // Hurt to 40%, with a mob at 12 yards: Power Word: Shield goes on the bot itself (target 0).
+    auto actions = ClassPolicy(5).Decide(Hurt(400, { Hostile(2, 12.0f, 100) }, MakeUnitRef(8, 1, 2)), 1000);
+    CHECK(HasCast(actions, 17));
+    CHECK(CastTargetOf(actions, 17) == 0);
+}
+
+void RogueKicksACastingTarget()
+{
+    NearbyUnit caster = Hostile(2, 3.0f, 100);
+    caster.casting = 1;
+    auto actions = ClassPolicy(4).Decide(View(1, 0, { caster }), 1000);
+    CHECK(HasCast(actions, 1766)); // Kick
+}
+
 int main()
 {
+    MageCastsFromRange();
+    WarlockDotIsNotRecastWhileRunning();
+    PriestShieldsItselfWhenHurt();
+    RogueKicksACastingTarget();
     HostilePlayersAreNotAttacked();
     ServicesWhenIdleOnTimerAndOnLevelUp();
     NoServicesInAFight();
