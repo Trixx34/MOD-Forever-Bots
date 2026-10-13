@@ -366,6 +366,7 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
             break;
         case BotActionStatus::kBusy:
             state.RetryAtMs[spell] = nowMs + kBusyRetryMs; // another cast is in progress: soon, not after the long retry
+            state.NextCastMs = std::max(state.NextCastMs, nowMs + kBusyRetryMs * 2); // and no other spell is tried meanwhile
             break;
         case BotActionStatus::kMoving:
             state.CastTimeSpells.insert(spell);            // remembered: the bot stops before this spell from now on
@@ -520,28 +521,46 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             if (partyLeaderBot)
             {
                 bool ready = true;
+                std::string not_ready_reason;
                 auto const checkReady = [&](BotSnapshot const& member)
                 {
                     if (member.health == 0)
                         return;
                     if (member.max_health > 0 && std::uint64_t(member.health) * 100 < std::uint64_t(member.max_health) * kPartyReadyHealthPct)
+                    {
                         ready = false;
-                    if (member.power_type == 0 && member.max_power > 0 &&
-                        std::uint64_t(member.power) * 100 < std::uint64_t(member.max_power) * kPartyReadyPowerPct)
+                        not_ready_reason = "health bot=" + std::to_string(member.guid) + " pct=" + std::to_string(std::uint64_t(member.health) * 100 / member.max_health);
+                    }
+                    else if (member.power_type == 0 && member.max_power > 0 &&
+                             std::uint64_t(member.power) * 100 < std::uint64_t(member.max_power) * kPartyReadyPowerPct)
+                    {
                         ready = false;
-                    if (Distance2d(bot, member) > kRouteWaitYards)
+                        not_ready_reason = "mana bot=" + std::to_string(member.guid) + " pct=" + std::to_string(std::uint64_t(member.power) * 100 / member.max_power);
+                    }
+                    else if (Distance2d(bot, member) > kRouteWaitYards)
+                    {
                         ready = false;
+                        not_ready_reason = "far bot=" + std::to_string(member.guid);
+                    }
                 };
                 checkReady(bot);
                 for (std::uint64_t member : membersOf[bot.guid])
                     if (auto const at = indexOf.find(member); at != indexOf.end())
                         checkReady(view.bots[at->second]);
                 if (ready)
+                {
+                    if (state.HoldSinceMs != 0 && _options.OnEvent)
+                        _options.OnEvent("pull hold ended: leader=" + std::to_string(bot.guid) + " waited_ms=" + std::to_string(nowMs - state.HoldSinceMs));
                     state.HoldSinceMs = 0;
+                }
                 else
                 {
                     if (state.HoldSinceMs == 0)
+                    {
                         state.HoldSinceMs = nowMs;
+                        if (_options.OnEvent)
+                            _options.OnEvent("pull hold started: leader=" + std::to_string(bot.guid) + " reason=" + not_ready_reason);
+                    }
                     dungeonHold = nowMs - state.HoldSinceMs < kPullHoldMaxMs;
                 }
             }
@@ -963,6 +982,9 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                         heal.target_guid = hurt->guid == bot.guid ? 0 : PlayerRef(hurt->guid);
                         actions.push_back(heal);
                         state.CastTarget[healSpell] = heal.target_guid;
+                        if (_options.OnEvent)
+                            _options.OnEvent("heal: healer=" + std::to_string(bot.guid) + " spell=" + std::to_string(healSpell) +
+                                             " target=" + std::to_string(hurt->guid) + " target_hp_pct=" + std::to_string(hurtPct));
                         state.NextCastMs = nowMs + kGlobalCooldownMs;
                     }
                     continue;
