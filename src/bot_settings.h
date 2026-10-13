@@ -4,7 +4,9 @@
 
 #include "bot_ramp.h"
 
+#include <array>
 #include <cstdint>
+#include <map>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -38,6 +40,9 @@ struct BotSettings
     // cut from the lowest-guid bots (config key PartyCount, 1..100).
     std::uint32_t PartySize = 0;
     std::uint32_t PartyCount = 1;
+    // Hubs (M7): where an idle bot walks when it has seen nothing for a while, per map, in the order given by n. Config keys
+    // Hub<map>_<n> = "x y z" (n counts from 1).
+    std::map<std::uint32_t, std::vector<std::array<float, 3>>> Hubs;
 };
 
 // The most bots any configuration may ask for; also the Tier 2 bot bound requested at handshake.

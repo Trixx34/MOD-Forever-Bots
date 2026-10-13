@@ -136,6 +136,20 @@ void PartySettings()
     CHECK(warnings.size() == 1);
 }
 
+void HubSettings()
+{
+    std::vector<std::string> warnings;
+    CHECK(ParseBotSettings({}, warnings).Hubs.empty()); // no hubs until configured
+    BotSettings const s = ParseBotSettings({ { "Hub1_2", "900 0 0" }, { "Hub1_1", "500 0 0" }, { "Hub0_1", "1 2 3" } }, warnings);
+    CHECK(s.Hubs.size() == 2);
+    CHECK(s.Hubs.at(1).size() == 2 && s.Hubs.at(1)[0][0] == 500.0f && s.Hubs.at(1)[1][0] == 900.0f); // in order n
+    CHECK(s.Hubs.at(0)[0][2] == 3.0f);
+    CHECK(warnings.empty());
+    BotSettings const bad = ParseBotSettings({ { "Hub2", "1 2 3" }, { "Hub2_1", "1 2" }, { "Hubx_1", "1 2 3" } }, warnings);
+    CHECK(bad.Hubs.empty());
+    CHECK(warnings.size() == 3);
+}
+
 void TelemetrySettings()
 {
     std::vector<std::string> warnings;
@@ -167,6 +181,7 @@ int main()
     EffectiveMaxBotsIsCappedByGrant();
     TestSpellIsOptional();
     PartySettings();
+    HubSettings();
 
     if (failures == 0)
         std::printf("settings_test: all checks passed\n");

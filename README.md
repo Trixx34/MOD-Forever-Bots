@@ -98,6 +98,10 @@ row and its repeated casts are not yet checked on the sim.
   only sees units within 40 yards. The lookup repeats after the bot moves 100 yards. A walk longer than 3 minutes is
   dropped until the next interval. A walking bot neither sits nor trains. Party members do not walk alone; they follow
   their leader. Trainers are not travelled to: bots learn their spells on level-up.
+- M7 hubs: a bot idle for 30 s (not fighting, following or walking to a vendor, and seeing nothing) walks to the next hub
+  of its map (`Hub<map>_<n>` settings, in order), waits there for a full interval, then walks to the next. A hurt bot
+  rests rather than walks; a party member follows its leader; anything seen stops the walk. A walk longer than 3 minutes
+  is dropped. Hubs come from the sim's quest-giver clusters (see the config example).
 
 ## Telemetry (overnight runs)
 

@@ -445,6 +445,9 @@ int main(int argc, char** argv)
     policyOptions.TrainEveryMs = std::uint64_t(settings.TrainEverySec) * 1000;
     policyOptions.PartySize = settings.PartySize;
     policyOptions.PartyCount = settings.PartyCount;
+    for (auto const& [mapId, spots] : settings.Hubs)
+        for (auto const& spot : spots)
+            policyOptions.HubsByMap[mapId].push_back({ spot[0], spot[1], spot[2] });
     policyOptions.ClassOf = [&classes](std::uint64_t botGuid) { return classes.Get(botGuid); };
 
     // Tier 2 is granted at handshake, so there is a region only if the core accepted it.
