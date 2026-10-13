@@ -17,6 +17,7 @@
 //   ScenarioEntry = "36 -14.57 -385.48 62.46"  (map x y z: where the party is teleported to)
 //   ScenarioDurationSec = 1200        ScenarioRoute<n> = "x y z" (n counts from 1)
 //   ScenarioGear<classId> = "item,item,..."  (optional: items granted instead of auto gear for that class)
+//   ScenarioBosses = "644:Rhahk'Zor,643:Sneed,..."  (creature entry[:name] of each boss; the result counts the ones seen dead)
 //   ScenarioResultFile = "scenario-results.log"
 struct ScenarioSettings
 {
@@ -30,6 +31,7 @@ struct ScenarioSettings
     std::uint32_t DurationSec = 1200;
     std::vector<std::array<float, 3>> Route;
     std::map<std::uint32_t, std::vector<std::uint32_t>> Gear;
+    std::vector<std::pair<std::uint32_t, std::string>> Bosses; // creature entry, name
     std::string ResultFile = "scenario-results.log";
 };
 

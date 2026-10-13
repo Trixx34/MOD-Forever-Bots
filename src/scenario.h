@@ -36,6 +36,7 @@ struct ScenarioPlan
     std::vector<ScenarioPoint> Route;
     std::uint64_t DurationMs = 1200000;
     std::map<std::uint32_t, std::vector<std::uint32_t>> Gear; // class id -> item entries to grant and equip
+    std::vector<std::pair<std::uint32_t, std::string>> Bosses; // creature entry and name of each boss; one seen dead counts as killed
     std::function<std::uint32_t(std::uint64_t)> ClassOf;      // bot guid -> class id
 };
 
@@ -60,6 +61,8 @@ struct ScenarioResult
     std::uint32_t Alive = 0;
     std::uint32_t RosterSize = 0;
     bool PartyFormed = true;        // false when the grouping phase timed out
+    std::uint32_t BossesTotal = 0;  // bosses the plan lists
+    std::vector<std::string> BossesKilled; // names of the ones seen dead, in the order they were seen
 };
 
 constexpr std::uint64_t kDressPauseMs = 1500;
@@ -84,6 +87,9 @@ public:
     // The result, once, after the scenario has ended.
     std::optional<ScenarioResult> TakeResult();
 
+    // Bosses seen dead since the last call, by name (for the log as they happen).
+    std::vector<std::string> TakeNewBossKills();
+
 private:
     void Finish(std::string outcome, std::uint64_t nowMs);
 
@@ -98,6 +104,8 @@ private:
     std::uint64_t _runStartMs = 0;
     std::map<std::uint64_t, bool> _everDead;
     std::uint32_t _furthest = 0;
+    std::vector<std::string> _bossKills;    // names, in the order seen dead
+    std::size_t _bossKillsReported = 0;
     bool _partyFormed = true;
     std::optional<ScenarioResult> _result;
     bool _resultTaken = false;
