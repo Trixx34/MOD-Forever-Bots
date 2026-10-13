@@ -61,7 +61,8 @@ Each tick the policy (`src/bot_policy.cpp`) reads the bot's snapshot and sends a
 
 - **Target.** The bot's own threat target is always fought. Otherwise it picks the closest creature the core marks as fightable
   (hostile, or a neutral "yellow" creature that is not a critter or an NPC with a role; never one a player cannot attack, such as a
-  trainer). It skips a creature more than two levels above it and elites, and does not pull a group of more than three within 10 yards.
+  trainer). It skips a creature more than two levels above it and elites, and does not pull a group of more than three within 10 yards;
+  but a bot that is in combat with no target of its own is being attacked, and fights back against the closest creature whatever its level.
 - **Refused targets.** A unit whose attack is refused, that a cast reports with no valid target, or that the bot walks toward for 30 s
   without reaching, is avoided for 30 s, doubling on each repeat up to 2 minutes.
 - **Approach and attack.** Melee classes close to 5 yards, ranged classes (hunter, priest, shaman, mage, warlock, druid) to 25. A ranged
