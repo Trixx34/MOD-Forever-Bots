@@ -280,6 +280,79 @@ void WithoutAutoGearingOnlyTheCommandDressesABot()
     CHECK(Count(policy.Decide(View(3, bots), 30000), ActionType::kAutoGear, 10) == 0); // once per request
 }
 
+// ---- casts that cannot work (layout 10) ----
+
+WorldTickSnapshotView MageFacingAMob(BotSnapshot bot)
+{
+    WorldTickSnapshotView view;
+    view.tick_number = 1;
+    view.max_nearby_units = 2;
+    bot.nearby_count = 1;
+    bot.threat_target_guid = forever_module::MakeUnitRef(8, 6, 1);
+    view.bots.push_back(bot);
+    view.nearby.resize(2);
+    view.nearby[0].guid = forever_module::MakeUnitRef(8, 6, 1);
+    view.nearby[0].pos_x = 20.0f;
+    view.nearby[0].health = 100;
+    view.nearby[0].max_health = 100;
+    view.nearby[0].is_hostile = true;
+    return view;
+}
+
+BotPolicy MagePolicy()
+{
+    PolicyOptions options;
+    options.ClassId = 8;
+    return BotPolicy(options);
+}
+
+void NoCastWhileAnotherCastRuns()
+{
+    BotSnapshot bot = Bot(10, 0, 0, 0);
+    bot.power = bot.max_power = 1000;
+    BotPolicy policy = MagePolicy();
+    CHECK(Count(policy.Decide(MageFacingAMob(bot), 1000), ActionType::kCastSpell, 10) == 1); // standing and idle: it casts
+    BotPolicy busy = MagePolicy();
+    bot.casting_spell = 133;
+    bot.cast_remaining_ms = 1500;
+    CHECK(Count(busy.Decide(MageFacingAMob(bot), 1000), ActionType::kCastSpell, 10) == 0);
+}
+
+void StopsBeforeASpellWithACastTimeWhileMoving()
+{
+    BotSnapshot bot = Bot(10, 0, 0, 0);
+    bot.power = bot.max_power = 1000;
+    bot.moving = 1;
+    BotPolicy policy = MagePolicy();
+    auto const actions = policy.Decide(MageFacingAMob(bot), 1000);
+    CHECK(Count(actions, ActionType::kCastSpell, 10) == 0);
+    CHECK(Count(actions, ActionType::kStop, 10) >= 1);
+    bot.moving = 0;
+    CHECK(Count(policy.Decide(MageFacingAMob(bot), 2600), ActionType::kCastSpell, 10) == 1); // standing: the cast follows
+}
+
+void RefusedAsMovingIsLearnedAndRetriedSoon()
+{
+    BotSnapshot bot = Bot(10, 0, 0, 0);
+    bot.power = bot.max_power = 1000;
+    BotPolicy policy = MagePolicy();
+    auto first = policy.Decide(MageFacingAMob(bot), 1000);
+    std::uint32_t spell = 0;
+    for (BotAction const& action : first)
+        if (action.type == ActionType::kCastSpell)
+            spell = action.spell_id;
+    CHECK(spell != 0);
+
+    bot.last_action_type = std::uint8_t(ActionType::kCastSpell);
+    bot.last_action_status = forever_module::BotActionStatus::kBusy;
+    bot.last_action_spell = spell;
+    bot.last_action_sequence = 1;
+    CHECK(Count(policy.Decide(MageFacingAMob(bot), 1100), ActionType::kCastSpell, 10) == 0); // retry waits 300 ms
+    bot.last_action_sequence = 1;
+    // The global cooldown (1.5 s) has passed too, and the 300 ms busy retry long ago: the cast is tried again.
+    CHECK(Count(policy.Decide(MageFacingAMob(bot), 3000), ActionType::kCastSpell, 10) == 1);
+}
+
 // ---- settings ----
 
 void SettingsReadAScenario()
@@ -325,6 +398,9 @@ int main()
     LeaderMovesOnAfterTheFirstPoint();
     AutoGearingDressesEachBotOnceAndAgainAfterLevels();
     WithoutAutoGearingOnlyTheCommandDressesABot();
+    NoCastWhileAnotherCastRuns();
+    StopsBeforeASpellWithACastTimeWhileMoving();
+    RefusedAsMovingIsLearnedAndRetriedSoon();
     SettingsReadAScenario();
     SettingsDropAScenarioWithoutARoster();
     if (failures == 0)

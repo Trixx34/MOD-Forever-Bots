@@ -129,6 +129,7 @@ private:
         std::size_t NextHub = 0;                         // index of the hub to walk to next, on the bot's map
         bool Traveling = false;                          // walking to the vendor for a visit
         std::uint64_t TravelStartMs = 0;                 // when this walk began; it is dropped after kTravelTimeoutMs
+        std::unordered_set<std::uint32_t> CastTimeSpells; // spells the core refused because the bot was moving: they need it standing
         std::uint32_t GearedAtLevel = 0;                 // the level at the last auto gear (0 = not yet)
         bool GearRequested = false;                      // the .autogear command asked for it
         std::uint64_t GearRetryMs = 0;                   // no auto gear before this
