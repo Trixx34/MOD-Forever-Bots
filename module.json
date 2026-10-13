@@ -3,6 +3,6 @@
   "version": "0.1.0",
   "protocol_version": "4",
   "tier1": {
-    "hooks": []
+    "hooks": ["CommandScript"]
   }
 }

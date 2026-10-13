@@ -11,6 +11,28 @@
 #include <unordered_map>
 #include <vector>
 
+// A scenario (doc 19): a repeatable test situation. Config keys (all optional; Scenario names it and turns it on):
+//   Scenario = deadmines_a            ScenarioRoster = "1:1,1:5,7:8"   (race:class for each bot)
+//   ScenarioLevel = 18                ScenarioStaging = "0 -8913 554 94"  (map x y z: where the bots log in)
+//   ScenarioEntry = "36 -14.57 -385.48 62.46"  (map x y z: where the party is teleported to)
+//   ScenarioDurationSec = 1200        ScenarioRoute<n> = "x y z" (n counts from 1)
+//   ScenarioGear<classId> = "item,item,..."  (optional: items granted instead of auto gear for that class)
+//   ScenarioResultFile = "scenario-results.log"
+struct ScenarioSettings
+{
+    std::string Name;                                    // empty: no scenario
+    std::vector<std::array<std::uint32_t, 2>> Roster;    // race, class
+    std::uint32_t Level = 18;
+    bool HasStaging = false;
+    std::array<float, 4> Staging{};                      // map, x, y, z
+    bool HasEntry = false;
+    std::array<float, 4> Entry{};
+    std::uint32_t DurationSec = 1200;
+    std::vector<std::array<float, 3>> Route;
+    std::map<std::uint32_t, std::vector<std::uint32_t>> Gear;
+    std::string ResultFile = "scenario-results.log";
+};
+
 struct BotSettings
 {
     // Most bots this module controls at once. Never more than kMaxBotsCeiling (the Tier 2 request is sized to it).
@@ -46,6 +68,11 @@ struct BotSettings
     std::map<std::uint32_t, std::vector<std::array<float, 3>>> Hubs;
     // Quests (M5): the starter quest data file (config key QuestFile, see quest_data.h). Empty turns quests off.
     std::string QuestFile;
+    // Auto gear (config key AutoGearing, 0 or 1): the core dresses every bot for its level when it first appears and after it gains
+    // AutoGearEveryLevels levels. Off by default; when it is off, the .autogear command in a party does it for that party's bots.
+    bool AutoGearing = false;
+    std::uint32_t AutoGearEveryLevels = 5;
+    ScenarioSettings Scenario;
 };
 
 // The most bots any configuration may ask for; also the Tier 2 bot bound requested at handshake.

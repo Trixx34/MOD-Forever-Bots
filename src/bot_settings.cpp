@@ -87,6 +87,109 @@ void ReadHubs(std::unordered_map<std::string, std::string> const& config,
         hubs[mapId].push_back(spot);
 }
 
+
+bool ReadBool(std::unordered_map<std::string, std::string> const& config, char const* key, bool& value, std::vector<std::string>& warnings)
+{
+    auto const it = config.find(key);
+    if (it == config.end())
+        return false;
+    if (it->second == "1" || it->second == "true")
+        value = true;
+    else if (it->second == "0" || it->second == "false")
+        value = false;
+    else
+        warnings.push_back(std::string("Module.forever-bots.") + key + ": '" + it->second + "' is not 0 or 1; using the default.");
+    return true;
+}
+
+// "a b c ..." into exactly `count` numbers.
+bool ParseNumbers(std::string const& text, float* out, std::size_t count)
+{
+    std::istringstream in(text);
+    std::string trailing;
+    for (std::size_t i = 0; i < count; ++i)
+        if (!(in >> out[i]))
+            return false;
+    return !(in >> trailing);
+}
+
+void ReadScenario(std::unordered_map<std::string, std::string> const& config, ScenarioSettings& scenario, std::vector<std::string>& warnings)
+{
+    auto const name = config.find("Scenario");
+    if (name == config.end() || name->second.empty())
+        return;
+    scenario.Name = name->second;
+
+    if (auto const roster = config.find("ScenarioRoster"); roster != config.end())
+    {
+        std::istringstream list(roster->second);
+        std::string item;
+        while (std::getline(list, item, ','))
+        {
+            auto const colon = item.find(':');
+            std::uint32_t race = 0, cls = 0;
+            if (colon != std::string::npos && std::from_chars(item.data(), item.data() + colon, race).ec == std::errc{} &&
+                std::from_chars(item.data() + colon + 1, item.data() + item.size(), cls).ec == std::errc{} && race > 0 && cls > 0)
+                scenario.Roster.push_back({ race, cls });
+            else
+                warnings.push_back("Module.forever-bots.ScenarioRoster: '" + item + "' is not race:class; ignored.");
+        }
+    }
+    if (scenario.Roster.empty())
+    {
+        warnings.push_back("Module.forever-bots.Scenario: the roster is empty; the scenario is off.");
+        scenario.Name.clear();
+        return;
+    }
+    if (scenario.Roster.size() > 5)
+        scenario.Roster.resize(5);
+
+    ReadKey(config, "ScenarioLevel", 1, 60, scenario.Level, warnings);
+    ReadKey(config, "ScenarioDurationSec", 30, 86400, scenario.DurationSec, warnings);
+    if (auto const it = config.find("ScenarioStaging"); it != config.end())
+        scenario.HasStaging = ParseNumbers(it->second, scenario.Staging.data(), 4);
+    if (auto const it = config.find("ScenarioEntry"); it != config.end())
+        scenario.HasEntry = ParseNumbers(it->second, scenario.Entry.data(), 4);
+    if (!scenario.HasEntry)
+        warnings.push_back("Module.forever-bots.ScenarioEntry: missing or not four numbers (map x y z); the scenario cannot enter its map.");
+    if (auto const it = config.find("ScenarioResultFile"); it != config.end())
+        scenario.ResultFile = it->second;
+
+    std::vector<std::pair<std::uint32_t, std::array<float, 3>>> route;
+    for (auto const& [key, value] : config)
+    {
+        if (key.rfind("ScenarioRoute", 0) == 0)
+        {
+            std::uint32_t n = 0;
+            std::array<float, 3> point{};
+            if (std::from_chars(key.data() + 13, key.data() + key.size(), n).ec == std::errc{} && n > 0 && ParseNumbers(value, point.data(), 3))
+                route.emplace_back(n, point);
+            else
+                warnings.push_back("Module.forever-bots." + key + ": not ScenarioRoute<n> = \"x y z\"; ignored.");
+        }
+        else if (key.rfind("ScenarioGear", 0) == 0)
+        {
+            std::uint32_t classId = 0;
+            if (std::from_chars(key.data() + 12, key.data() + key.size(), classId).ec != std::errc{} || classId == 0)
+            {
+                warnings.push_back("Module.forever-bots." + key + ": not ScenarioGear<classId>; ignored.");
+                continue;
+            }
+            std::istringstream list(value);
+            std::string item;
+            while (std::getline(list, item, ','))
+            {
+                std::uint32_t entry = 0;
+                if (std::from_chars(item.data(), item.data() + item.size(), entry).ec == std::errc{} && entry > 0)
+                    scenario.Gear[classId].push_back(entry);
+            }
+        }
+    }
+    std::sort(route.begin(), route.end(), [](auto const& a, auto const& b) { return a.first < b.first; });
+    for (auto const& [n, point] : route)
+        scenario.Route.push_back(point);
+}
+
 // Reads a race or class id. The word "random" means pick (0); otherwise a valid id.
 void ReadIdOrRandom(std::unordered_map<std::string, std::string> const& config, char const* key, std::uint32_t& value,
                     std::vector<std::string>& warnings)
@@ -155,6 +258,9 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadKey(config, "PartySize", 0, 5, settings.PartySize, warnings);
     ReadKey(config, "PartyCount", 1, 100, settings.PartyCount, warnings);
     ReadHubs(config, settings.Hubs, warnings);
+    ReadBool(config, "AutoGearing", settings.AutoGearing, warnings);
+    ReadKey(config, "AutoGearEveryLevels", 1, 60, settings.AutoGearEveryLevels, warnings);
+    ReadScenario(config, settings.Scenario, warnings);
     if (auto const it = config.find("QuestFile"); it != config.end())
         settings.QuestFile = it->second;
     return settings;

@@ -14,6 +14,7 @@
 #include "bot_store.h"
 #include "bot_telemetry.h"
 #include "rotating_file.h"
+#include "scenario.h"
 
 #include "forever_module/module_client.h"
 #include "forever_module/tier2_session.h"
@@ -24,8 +25,11 @@
 #include <cstdint>
 #include <ctime>
 #include <exception>
+#include <fstream>
 #include <iostream>
 #include <memory>
+#include <mutex>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -66,6 +70,10 @@ char const* ActionTypeName(std::uint8_t type)
         case forever_module::ActionType::kTrain: return "train";
         case forever_module::ActionType::kGroup: return "group";
         case forever_module::ActionType::kLoot: return "loot";
+        case forever_module::ActionType::kQuest: return "quest";
+        case forever_module::ActionType::kTeleport: return "teleport";
+        case forever_module::ActionType::kGrant: return "grant";
+        case forever_module::ActionType::kAutoGear: return "autogear";
     }
     return "action";
 }
@@ -186,10 +194,67 @@ void RampTick(RunContext& run)
     }
 }
 
+// Issuers of the .autogear command, handed from the Run() thread (where the command arrives) to the pump thread.
+struct CommandQueue
+{
+    std::mutex Lock;
+    std::vector<std::uint64_t> AutoGear; // player guids that typed .autogear
+};
+
+// What the pump needs beyond the policy: the scenario (if one is configured) and the command queue.
+struct PumpExtras
+{
+    std::optional<ScenarioPlan> Scenario;
+    std::string ScenarioResultFile;
+    std::shared_ptr<CommandQueue> Commands;
+};
+
+// The scenario's bot to spawn next, one per tick of the spawn timer, with its level and its staging place.
+void ScenarioSpawnTick(RunContext& run, std::size_t& spawned)
+{
+    ScenarioSettings const& scenario = run.Settings.Scenario;
+    if (spawned >= scenario.Roster.size() || !run.Roster.CanRequest() || nowMs() < run.BackoffUntilMs)
+        return;
+
+    RaceClass const combo{ scenario.Roster[spawned][0], scenario.Roster[spawned][1] };
+    forever_module::SpawnParams params = ParamsFor(combo);
+    params.set_level(scenario.Level);
+    if (scenario.HasStaging)
+    {
+        params.set_place(true);
+        params.set_map_id(static_cast<std::uint32_t>(scenario.Staging[0]));
+        params.set_pos_x(scenario.Staging[1]);
+        params.set_pos_y(scenario.Staging[2]);
+        params.set_pos_z(scenario.Staging[3]);
+    }
+    ++spawned;
+    run.Roster.NoteRequestSent(0);
+    run.Client.RequestControl(0, params, [&run, combo, &spawned](forever_module::ControlResponse const& reply)
+    {
+        if (!reply.granted())
+        {
+            run.Roster.OnDenied(0);
+            run.BackoffUntilMs = nowMs() + kSpawnBackoffMs;
+            if (spawned > 0)
+                --spawned; // try this roster entry again
+            std::cerr << "forever-bots: scenario spawn refused for race " << combo.Race << " class " << combo.Class << ": "
+                      << reply.reason() << "; waiting 30 s\n";
+            return;
+        }
+        std::uint64_t const guid = reply.bot_guid();
+        run.Roster.OnGranted(0, guid);
+        run.Classes.Set(guid, combo.Class);
+        std::cerr << "forever-bots: scenario bot " << guid << " race " << combo.Race << " class " << combo.Class << "\n";
+    });
+}
+
 void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& running, PolicyOptions options,
-               std::string const& telemetryPath, BotSettings const& settings)
+               std::string const& telemetryPath, BotSettings const& settings, PumpExtras extras)
 {
     BotPolicy policy(options);
+    std::optional<ScenarioDirector> director;
+    if (extras.Scenario)
+        director.emplace(*extras.Scenario);
     bool sawSnapshot = false;
     std::uint64_t lastTick = 0;
     // Last action sequence seen per bot, so each result is reported once.
@@ -278,7 +343,41 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
 
             // One publish per snapshot tick: the core applies the newest action set it sees for each tick.
             auto const started = std::chrono::steady_clock::now();
+            // .autogear commands: the bots led by the player who typed it are dressed at this tick.
+            if (extras.Commands)
+            {
+                std::vector<std::uint64_t> issuers;
+                {
+                    std::lock_guard<std::mutex> lock(extras.Commands->Lock);
+                    issuers.swap(extras.Commands->AutoGear);
+                }
+                for (std::uint64_t issuer : issuers)
+                {
+                    std::uint64_t const ref = forever_module::MakeUnitRef(2, 0, issuer & forever_module::kUnitRefCounterMask);
+                    for (forever_module::BotSnapshot const& bot : view.bots)
+                        if (bot.group_leader_guid == ref)
+                            policy.RequestAutoGear(bot.guid);
+                }
+            }
+            if (director)
+                policy.SetRouteActive(director->RouteActive());
             std::vector<forever_module::BotAction> actions = policy.Decide(view, nowMs());
+            if (director)
+            {
+                director->Decide(view, nowMs(), actions);
+                policy.SetRouteActive(director->RouteActive());
+                if (auto const result = director->TakeResult())
+                {
+                    std::string const line = FormatScenarioResult(*result);
+                    std::cerr << "forever-bots: " << line << "\n";
+                    if (!extras.ScenarioResultFile.empty())
+                    {
+                        std::ofstream out(extras.ScenarioResultFile, std::ios::app);
+                        if (out)
+                            out << line << "\n";
+                    }
+                }
+            }
             auto const decideUs = static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(
                                                                  std::chrono::steady_clock::now() - started)
                                                                  .count());
@@ -325,6 +424,7 @@ int main(int argc, char** argv)
     manifest.requested_max_bots = kMaxBotsCeiling;
     manifest.requested_max_nearby_units = kRequestedNearbyUnits;
     manifest.requested_max_actions = kRequestedActions;
+    manifest.tier1_hooks = { "CommandScript" };
 
     forever_module::ModuleClient client(std::move(manifest));
     if (!client.Connect(argv[1]) || !client.Handshake())
@@ -391,6 +491,27 @@ int main(int argc, char** argv)
             std::cerr << "forever-bots: control of bot " << botGuid << " revoked: " << reason << "\n";
     });
 
+    // .autogear: a player in a party types it (as a chat command) and the bots that player leads are dressed for their level.
+    auto commands = std::make_shared<CommandQueue>();
+    client.OnRequest("CommandScript", [commands](forever_module::EventRequest const& request) -> forever_module::EventReply
+    {
+        forever_module::EventReply reply;
+        std::string text = request.command().command_text();
+        std::transform(text.begin(), text.end(), text.begin(), [](unsigned char c) { return char(std::tolower(c)); });
+        if (text != "autogear")
+        {
+            reply.mutable_command()->set_success(false); // not ours: no text, so the core tries the next module
+            return reply;
+        }
+        {
+            std::lock_guard<std::mutex> lock(commands->Lock);
+            commands->AutoGear.push_back(request.command().issuer_guid());
+        }
+        reply.mutable_command()->set_success(true);
+        reply.mutable_command()->set_result_text("Your party's bots are being dressed for their level.");
+        return reply;
+    });
+
     // Bots from last run are rows in the module store (bot/<guid>). Each row's value is "race class", read before the
     // bot is requested so the rotation knows its class. A revoke keeps the row, since the core revokes every bot at
     // shutdown; only "character not found" removes one. Spawning for the rest is the ramp's job.
@@ -421,6 +542,18 @@ int main(int argc, char** argv)
         });
     };
 
+    bool const scenarioOn = !settings.Scenario.Name.empty();
+    std::size_t scenarioSpawned = 0;
+    if (scenarioOn)
+    {
+        roster.SetMaxBots(std::min<std::uint32_t>(std::uint32_t(settings.Scenario.Roster.size()), maxBots));
+        std::cerr << "forever-bots: scenario " << settings.Scenario.Name << ": " << settings.Scenario.Roster.size() << " bots at level "
+                  << settings.Scenario.Level << ", route of " << settings.Scenario.Route.size() << " point(s), "
+                  << settings.Scenario.DurationSec << " s\n";
+        client.AddTimer(std::chrono::milliseconds(3000), [&run, &scenarioSpawned] { ScenarioSpawnTick(run, scenarioSpawned); });
+    }
+
+    if (!scenarioOn)
     client.StoreList(bot_store::KeyPrefix, [&run, &reclaim](forever_module::ActionReply const& reply)
     {
         if (!reply.success())
@@ -436,7 +569,8 @@ int main(int argc, char** argv)
         }
     });
 
-    client.AddTimer(kRampInterval, [&run] { RampTick(run); });
+    if (!scenarioOn)
+        client.AddTimer(kRampInterval, [&run] { RampTick(run); });
 
     // The policy's class lookup: a bot's own class, or the configured class (0 = none) for a bot the table does not know.
     PolicyOptions policyOptions;
@@ -459,13 +593,40 @@ int main(int argc, char** argv)
         policyOptions.Quests = std::move(quests);
     }
     policyOptions.ClassOf = [&classes](std::uint64_t botGuid) { return classes.Get(botGuid); };
+    policyOptions.AutoGearing = settings.AutoGearing;
+    policyOptions.AutoGearEveryLevels = settings.AutoGearEveryLevels;
+    PumpExtras extras;
+    extras.Commands = commands;
+    if (scenarioOn)
+    {
+        // The scenario takes over the party, the route and the dressing: no vendor walks, no ramp, one party of the whole roster.
+        policyOptions.PartySize = std::uint32_t(settings.Scenario.Roster.size());
+        policyOptions.PartyCount = 1;
+        policyOptions.ServiceEveryMs = 0;
+        policyOptions.AutoGearing = false;
+        for (auto const& point : settings.Scenario.Route)
+            policyOptions.Route.push_back({ point[0], point[1], point[2] });
+
+        ScenarioPlan plan;
+        plan.Name = settings.Scenario.Name;
+        plan.RosterSize = std::uint32_t(settings.Scenario.Roster.size());
+        plan.EntryMap = static_cast<std::uint32_t>(settings.Scenario.Entry[0]);
+        plan.Entry = { settings.Scenario.Entry[1], settings.Scenario.Entry[2], settings.Scenario.Entry[3] };
+        for (auto const& point : settings.Scenario.Route)
+            plan.Route.push_back({ point[0], point[1], point[2] });
+        plan.DurationMs = std::uint64_t(settings.Scenario.DurationSec) * 1000;
+        plan.Gear = settings.Scenario.Gear;
+        plan.ClassOf = policyOptions.ClassOf;
+        extras.Scenario = std::move(plan);
+        extras.ScenarioResultFile = settings.Scenario.ResultFile;
+    }
 
     // Tier 2 is granted at handshake, so there is a region only if the core accepted it.
     std::atomic<bool> running{true};
     std::thread pump;
     if (forever_module::Tier2Session* session = client.AttachTier2())
         pump = std::thread(PumpTier2, std::ref(*session), std::cref(running), policyOptions, std::cref(settings.TelemetryFile),
-                           std::cref(settings));
+                           std::cref(settings), std::move(extras));
     else
         std::cerr << "forever-bots: no Tier 2 region (" << client.tier2_error() << "); bots will not be driven\n";
 

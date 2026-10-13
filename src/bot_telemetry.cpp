@@ -53,7 +53,28 @@ void BotTelemetry::Observe(WorldTickSnapshotView const& view, std::uint64_t nowM
             record.Deaths++;
             if (record.Target != 0)
                 EndFight(record, bot, nowMs, "died", false);
-            Write("death", bot, record, nowMs, "");
+            // Where it died, and the nearest live hostile creature: the snapshot does not name the killer, but this is most often it.
+            std::ostringstream where;
+            where << "map=" << bot.map_id << " x=" << std::lround(bot.pos_x) << " y=" << std::lround(bot.pos_y) << " z=" << std::lround(bot.pos_z);
+            NearbyUnit const* nearest = nullptr;
+            float nearestSq = 0.0f;
+            for (NearbyUnit const& unit : view.NearbyOf(i))
+            {
+                if (!unit.is_hostile || unit.health == 0 || forever_module::UnitRefType(unit.guid) != 8)
+                    continue;
+                float const dx = unit.pos_x - bot.pos_x;
+                float const dy = unit.pos_y - bot.pos_y;
+                if (!nearest || dx * dx + dy * dy < nearestSq)
+                {
+                    nearest = &unit;
+                    nearestSq = dx * dx + dy * dy;
+                }
+            }
+            if (nearest)
+                where << " nearest_hostile=" << forever_module::UnitRefEntry(nearest->guid) << " level=" << nearest->level
+                      << " dist=" << std::lround(std::sqrt(nearestSq)) << (nearest->elite ? " elite" : "");
+            where << (bot.in_combat ? " in_combat" : "");
+            Write("death", bot, record, nowMs, where.str());
         }
         else if (bot.health != 0 && !record.Alive)
         {
