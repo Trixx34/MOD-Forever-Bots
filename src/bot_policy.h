@@ -101,6 +101,9 @@ private:
         std::uint32_t LastTrainLevel = 0;                // the level at the last trainer check
         std::uint64_t PartyRetryAtMs = 0;                // a party action is not sent again before this
         std::unordered_map<std::uint64_t, std::uint64_t> AvoidUntilMs; // unit -> until when the bot picks another target
+        bool Approaching = false;                        // walking to its target, not yet in range
+        std::uint64_t ApproachTarget = 0;
+        std::uint64_t ApproachSinceMs = 0;               // when it started walking to ApproachTarget
         bool Idling = false;                             // seeing nothing and doing nothing since IdleSinceMs
         std::uint64_t IdleSinceMs = 0;
         bool Wandering = false;                          // walking to a hub
