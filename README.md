@@ -138,3 +138,16 @@ walking between the quest's hunting areas when none is near, and still fights ba
 quest in (the core picks the reward). A quest with no progress for 10 minutes is abandoned and left alone for an hour; a refused accept
 or hand-in blocks that quest for a minute. Party members follow their leader and do no quests. The data format is documented in
 `src/quest_data.h`; `tests/quest_test.cpp` covers it.
+
+## Auto gear and scenarios
+
+**Auto gear.** With `AutoGearing = 1` the core dresses each bot for its class and level (best usable item per slot, uncommon quality at
+most) when it first appears and after every `AutoGearEveryLevels` levels. With it off, a player who leads a party can type `.autogear`
+(a chat command the module claims) and the bots that player leads are dressed. It gears bots only, not the player's own characters.
+
+**Scenarios.** A scenario is a repeatable test situation: `Scenario = <name>` with a roster, a staging place, an entry, a route and a
+duration (see `config/modules.d/forever-bots.conf.example`). The module spawns the roster at the staging place, dresses it (auto gear,
+or the class's `ScenarioGear<class>` list), waits for the party to form, teleports the leader to the entry and then the members, and
+lets the leader walk the route (it waits for members more than 30 yards behind and while its health is under 80%). One result line is
+written when it ends: `scenario <name>: outcome=<complete|wipe|timeout|enter_failed> furthest=3/7 deaths=2 alive=3/5 run=412s`.
+`tests/scenario_test.cpp` covers the director, the route and the settings.

@@ -59,6 +59,9 @@ constexpr std::uint64_t kWanderTimeoutMs = 180000; // a walk to a hub longer tha
 constexpr float kHubReachYards = 10.0f;          // a bot this close to its hub has arrived
 constexpr float kVendorReachYards = 4.0f;       // a bot this close to its vendor can use it (the core allows 5)
 constexpr std::uint32_t kRepairBelowPct = 50;    // worn gear below this durability sends the bot to a repairman, not just any vendor
+constexpr float kRoutePointReachYards = 6.0f;    // the leader has arrived at a route waypoint this close to it
+constexpr float kRouteWaitYards = 30.0f;         // the leader waits for a member farther behind than this
+constexpr std::uint32_t kRouteMinHealthPct = 80; // and for its own health to be at least this
 constexpr std::uint64_t kTravelTimeoutMs = 180000; // a walk to the vendor longer than this is dropped for now
 
 // Duration of the damage-over-time effect a spell leaves on its target, or 0 for spells the policy does not track. Rank 1
@@ -244,6 +247,14 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
         return;
     }
 
+    // Auto gear refused (in combat, switched off in the core): tried again after a while.
+    if (bot.last_action_type == uint8_t(ActionType::kAutoGear) && bot.last_action_status == BotActionStatus::kRefused)
+    {
+        state.GearedAtLevel = 0;
+        state.GearRetryMs = nowMs + 60000;
+        return;
+    }
+
     // A quest action refused (not eligible, bags full, no NPC in reach): the quest is left alone for a while.
     if (bot.last_action_type == uint8_t(ActionType::kQuest) && bot.last_action_status == BotActionStatus::kRefused)
     {
@@ -404,9 +415,27 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         if (partyMember && leaderSnap)
             followRef = atLeader ? 0 : leaderRef;
 
+        // Auto gear: out of combat, once when the bot first appears (if AutoGearing) and after it has gained some levels, or when asked.
+        if (bot.in_combat == 0 && nowMs >= state.GearRetryMs)
+        {
+            bool const due = _options.AutoGearing && (state.GearedAtLevel == 0 || bot.level >= state.GearedAtLevel + _options.AutoGearEveryLevels);
+            if (due || state.GearRequested)
+            {
+                BotAction gear;
+                gear.bot_guid = bot.guid;
+                gear.type = ActionType::kAutoGear;
+                gear.spell_id = (classId == kWarriorClass && _options.PartySize != 0) ? 1u : 0u; // a warrior in a party tanks
+                actions.push_back(gear);
+                state.GearedAtLevel = bot.level != 0 ? bot.level : 1;
+                state.GearRequested = false;
+                state.GearRetryMs = nowMs + 10000;
+            }
+        }
+
         // Quests (M5): the planner's step for this bot. A party member follows its leader instead, and a hurt or fighting bot
         // leaves quests alone until it is done.
         QuestStep questStep;
+        bool routeBusy = false;
         if (_quests.Enabled() && !partyMember && !lowHealth && bot.in_combat == 0)
             questStep = _quests.Next(bot, state.Quest, nowMs);
         std::vector<std::uint32_t> const noEntries;
@@ -467,6 +496,15 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             float const approach = outOfPower ? kMeleeApproachYards : rotation::ApproachYards(classId);
             if (distance <= approach)
             {
+                // A ranged bot that has walked into casting range stops there: the core's follow keeps running it into the target,
+                // and a spell with a cast time fails while the caster moves.
+                if (state.Approaching && approach > kMeleeApproachYards + 0.5f)
+                {
+                    BotAction stop;
+                    stop.bot_guid = bot.guid;
+                    stop.type = ActionType::kStop;
+                    actions.push_back(stop);
+                }
                 state.Approaching = false;
                 wanted = Decision{ ActionType::kAttackTarget, targetRef };
             }
@@ -497,6 +535,35 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         {
             state.InFight = false;
             wanted = followRef ? Decision{ ActionType::kFollow, followRef } : Decision{ ActionType::kStop, 0 };
+            // Dungeon route (doc 19): the leader of a party walks the route while it is healthy and its members are close. Otherwise
+            // it stands (and so rests), and the party catches up.
+            if (_routeActive && partyLeaderBot && !_options.Route.empty() && state.RouteIndex < _options.Route.size())
+            {
+                bool together = true;
+                for (std::uint64_t member : membersOf[bot.guid])
+                {
+                    auto const at = indexOf.find(member);
+                    if (at == indexOf.end() || view.bots[at->second].health == 0)
+                        continue;
+                    together = together && Distance2d(bot, view.bots[at->second]) <= kRouteWaitYards;
+                }
+                bool const strong = bot.max_health == 0 ||
+                                    std::uint64_t(bot.health) * 100 >= std::uint64_t(bot.max_health) * kRouteMinHealthPct;
+                Point const* waypoint = &_options.Route[state.RouteIndex];
+                float const dx = bot.pos_x - waypoint->X;
+                float const dy = bot.pos_y - waypoint->Y;
+                if (std::sqrt(dx * dx + dy * dy) <= kRoutePointReachYards)
+                {
+                    ++state.RouteIndex; // arrived: on to the next point in the same tick
+                    waypoint = state.RouteIndex < _options.Route.size() ? &_options.Route[state.RouteIndex] : nullptr;
+                }
+                if (waypoint && together && strong)
+                {
+                    wanted = Decision{ ActionType::kMoveTo, 0, *waypoint };
+                    routeBusy = true;
+                }
+            }
+
             switch (questStep.Kind)
             {
                 case QuestStepKind::WalkTo:
@@ -531,7 +598,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         bool enemyNear = false;
         for (NearbyUnit const& unit : nearby)
             enemyNear = enemyNear || IsLiveMob(unit);
-        bool idle = !hasTarget && !enemyNear && wanted.Type == ActionType::kStop && questStep.Kind == QuestStepKind::None;
+        bool idle = !hasTarget && !enemyNear && wanted.Type == ActionType::kStop && questStep.Kind == QuestStepKind::None && !routeBusy;
 
         // Seeing nothing and doing nothing, for hubs (M7): the idle time starts when the bot first is idle, and any activity
         // resets it.

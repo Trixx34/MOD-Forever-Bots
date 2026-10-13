@@ -56,6 +56,11 @@ struct PolicyOptions
     std::map<std::uint32_t, std::vector<Point>> HubsByMap;
     // Quests (M5): the starter quest data. Unset or empty means the bots do no quests and grind as before.
     std::shared_ptr<QuestData const> Quests;
+    // Dungeon route (doc 19): the waypoints the party leader walks, in order, while the route is active (SetRouteActive). Empty = none.
+    std::vector<Point> Route;
+    // Auto gear (AutoGearing setting): every bot is dressed for its level when it first appears, and again after AutoGearEveryLevels levels.
+    bool AutoGearing = false;
+    std::uint32_t AutoGearEveryLevels = 5;
 };
 
 // Name of an action status, for logs.
@@ -68,6 +73,12 @@ public:
 
     // Actions for the bots in `view`. nowMs is a monotonic clock in milliseconds (cooldowns, retries, fight time).
     // Decisions are sent only when they change; casts follow the rotation, the global cooldown and the retries.
+    // Turns the dungeon route on or off (the scenario director does, once the party is inside).
+    void SetRouteActive(bool active) { _routeActive = active; }
+
+    // Dress this bot for its level at the next tick (the .autogear command).
+    void RequestAutoGear(std::uint64_t botGuid) { _bots[botGuid].GearRequested = true; }
+
     std::vector<forever_module::BotAction> Decide(forever_module::WorldTickSnapshotView const& view, std::uint64_t nowMs = 0);
 
 private:
@@ -118,6 +129,10 @@ private:
         std::size_t NextHub = 0;                         // index of the hub to walk to next, on the bot's map
         bool Traveling = false;                          // walking to the vendor for a visit
         std::uint64_t TravelStartMs = 0;                 // when this walk began; it is dropped after kTravelTimeoutMs
+        std::uint32_t GearedAtLevel = 0;                 // the level at the last auto gear (0 = not yet)
+        bool GearRequested = false;                      // the .autogear command asked for it
+        std::uint64_t GearRetryMs = 0;                   // no auto gear before this
+        std::size_t RouteIndex = 0;                      // the leader's next route waypoint
         QuestMemory Quest;                               // the quest planner's memory of this bot
         std::unordered_map<std::uint64_t, std::uint64_t> InvitedAtMs; // member guid -> when this bot last invited it
     };
@@ -127,4 +142,5 @@ private:
     std::unordered_map<std::uint64_t, BotState> _bots; // bot guid -> state
     PolicyOptions _options;
     QuestPlanner _quests;
+    bool _routeActive = false;
 };

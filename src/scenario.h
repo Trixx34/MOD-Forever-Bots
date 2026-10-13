@@ -1,0 +1,108 @@
+// Scenario (doc 19): a repeatable test situation for the bots. A fixed roster is spawned at a staging place, dressed with a given
+// gear list, formed into a party, teleported into a dungeon, and let loose on a route of waypoints for a set time. The result is one
+// line: how far the party got, how many died, how it ended. Pure logic over snapshots, unit-tested in tests/scenario_test.cpp.
+//
+// Phases, in order:
+//   Waiting  until the whole roster is in the world and alive
+//   Dressing one grant per bot per tick for each item of its class's gear list, then an equip service, then a pause
+//   Grouping until the policy's party logic has put everyone in one party (or kGroupingTimeoutMs)
+//   Entering the leader teleports to the entry; kMembersDelayMs after it arrives the members follow; all there -> Running
+//   Running  the route is active; ends on the time limit, a wipe, or the leader reaching the last waypoint
+//   Done
+#pragma once
+
+#include "forever_module/tier2_session.h"
+
+#include <cstdint>
+#include <functional>
+#include <map>
+#include <optional>
+#include <string>
+#include <vector>
+
+struct ScenarioPoint
+{
+    float X = 0.0f;
+    float Y = 0.0f;
+    float Z = 0.0f;
+};
+
+struct ScenarioPlan
+{
+    std::string Name;
+    std::uint32_t RosterSize = 5;
+    std::uint32_t EntryMap = 0;
+    ScenarioPoint Entry;
+    std::vector<ScenarioPoint> Route;
+    std::uint64_t DurationMs = 1200000;
+    std::map<std::uint32_t, std::vector<std::uint32_t>> Gear; // class id -> item entries to grant and equip
+    std::function<std::uint32_t(std::uint64_t)> ClassOf;      // bot guid -> class id
+};
+
+enum class ScenarioPhase
+{
+    Waiting,
+    Dressing,
+    Grouping,
+    Entering,
+    Running,
+    Done,
+};
+
+struct ScenarioResult
+{
+    std::string Name;
+    std::string Outcome;            // complete, wipe, timeout, enter_failed
+    std::uint64_t RunMs = 0;        // time spent in Running
+    std::uint32_t Furthest = 0;     // route points the leader reached (0..RouteSize)
+    std::uint32_t RouteSize = 0;
+    std::uint32_t Deaths = 0;       // bots that were seen dead at least once
+    std::uint32_t Alive = 0;
+    std::uint32_t RosterSize = 0;
+    bool PartyFormed = true;        // false when the grouping phase timed out
+};
+
+constexpr std::uint64_t kDressPauseMs = 1500;
+constexpr std::uint64_t kEquipPauseMs = 3000;
+constexpr std::uint64_t kGroupingTimeoutMs = 120000;
+constexpr std::uint64_t kMembersDelayMs = 3000;
+constexpr std::uint64_t kEnterRetryMs = 10000;
+constexpr std::uint64_t kEnterTimeoutMs = 90000;
+constexpr float kRoutePointReachYards = 15.0f; // the leader counts as having reached a waypoint this close to it
+
+class ScenarioDirector
+{
+public:
+    explicit ScenarioDirector(ScenarioPlan plan) : _plan(std::move(plan)) {}
+
+    // Call once per snapshot tick. Appends the director's actions for this tick.
+    void Decide(forever_module::WorldTickSnapshotView const& view, std::uint64_t nowMs, std::vector<forever_module::BotAction>& actions);
+
+    ScenarioPhase Phase() const { return _phase; }
+    bool RouteActive() const { return _phase == ScenarioPhase::Running; }
+
+    // The result, once, after the scenario has ended.
+    std::optional<ScenarioResult> TakeResult();
+
+private:
+    void Finish(std::string outcome, std::uint64_t nowMs);
+
+    ScenarioPlan _plan;
+    ScenarioPhase _phase = ScenarioPhase::Waiting;
+    std::uint64_t _phaseSinceMs = 0;
+    bool _phaseStarted = false;
+    std::map<std::uint64_t, std::size_t> _nextGrant;   // bot -> index of the next gear item to grant
+    bool _equipSent = false;
+    std::uint64_t _lastEnterMs = 0;
+    std::uint64_t _leaderArrivedMs = 0;
+    std::uint64_t _runStartMs = 0;
+    std::map<std::uint64_t, bool> _everDead;
+    std::uint32_t _furthest = 0;
+    bool _partyFormed = true;
+    std::optional<ScenarioResult> _result;
+    bool _resultTaken = false;
+    std::uint64_t _lastTick = ~0ull;
+};
+
+// One line of text for the log: "scenario <name>: outcome=... furthest=3/7 deaths=2 alive=3/5 run=412s".
+std::string FormatScenarioResult(ScenarioResult const& result);

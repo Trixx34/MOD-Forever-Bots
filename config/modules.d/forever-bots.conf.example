@@ -65,3 +65,25 @@ Module.forever-bots.TelemetrySummarySec = 60
 # the quests of that start in order, hunts their targets, and hands them in; a bot with no start nearby grinds as before. Empty
 # turns quests off.
 # QuestFile = data/starter_quests.txt
+
+# Auto gear. 1 = the core dresses every bot for its class and level when it first appears and after it gains AutoGearEveryLevels levels
+# (best usable item per slot, uncommon quality at most; Bot.AutoGear.MaxQuality in the core's config). Off by default. With it off, a
+# player in a party can type .autogear to dress the bots that player leads.
+# AutoGearing = 0
+# AutoGearEveryLevels = 5
+
+# A scenario (doc 19 of the core): a repeatable test. A fixed roster is spawned at the staging place, dressed, put in one party,
+# teleported to the entry, and walked along the route by its leader for the duration. One result line is written to stderr and to
+# ScenarioResultFile: how it ended (complete, wipe, timeout, enter_failed), the furthest route point, deaths. The core needs
+# Bot.Actions.Teleport = 1 for it. Use MaxBots >= the roster size; the ramp and the saved bots are not used while a scenario is set.
+# Scenario = deadmines_a
+# ScenarioRoster = 1:1,1:5,7:8,7:8,1:4          # race:class: Human warrior, Human priest, Gnome mage x2, Human rogue
+# ScenarioLevel = 18
+# ScenarioStaging = 0 -8913.2 554.5 93.8        # map x y z: where the bots log in (a city, so nothing attacks them)
+# ScenarioEntry = 36 -14.57 -385.48 62.46       # map x y z: where the party enters the dungeon
+# ScenarioDurationSec = 1200
+# ScenarioRoute1 = -191.7 -453.2 54.6           # the leader walks these in order
+# ScenarioRoute2 = -289.5 -513.0 49.7
+# ScenarioRoute3 = -177.4 -574.5 19.3
+# ScenarioGear1 = 1234,5678                     # optional: items granted to a class instead of auto gear (needs Bot.Actions.Grant)
+# ScenarioResultFile = scenario-results.log
