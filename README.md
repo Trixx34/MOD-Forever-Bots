@@ -65,6 +65,14 @@ Without `FOREVER_MODULE_SDK_SOURCE`, CMake fetches `Trixx34/forever-module-sdk` 
 - Telemetry rotates at `TelemetryMaxMB`, keeping `TelemetryKeep` older files (`src/rotating_file.h`).
 - The pump logs its decide time and actions per tick once a minute.
 
+## Class rotations
+
+Every class the module spawns has a rotation (`src/combat_rotation.cpp`): warrior, paladin, hunter, rogue, priest, shaman,
+mage, warlock and druid. Rows are rank 1 spell ids; the core casts the highest rank known. Ranged classes (hunter, priest,
+shaman, mage, warlock, druid) approach to 25 yards instead of 5. Damage-over-time spells are not recast while the effect
+runs on the same target (`DotDurationMs` in `bot_policy.cpp`). The spell ids and durations are from memory of the classic
+spell tables and are not yet checked on the sim.
+
 ## Milestones: M2 to M4
 
 - M2 combat: rotation, approach, over-pull control, cooldown skips, Rend tracking, and rest (sit when idle and below 90%

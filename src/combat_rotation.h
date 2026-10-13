@@ -60,8 +60,11 @@ struct Row
     float MaxRange;
 };
 
-// Rows in priority order, for a class id (1 = warrior). Empty for classes without rows yet.
+// Rows in priority order, for a class id (1 = warrior). Empty for a class id without rows.
 std::span<Row const> RowsForClass(std::uint32_t classId);
+
+// How far the bot approaches its target before it attacks or casts: 25 yards for the ranged classes, 5 for the rest.
+float ApproachYards(std::uint32_t classId);
 
 // Distance in yards on the ground between the bot and a unit in the snapshot.
 float DistanceYards(forever_module::BotSnapshot const& bot, forever_module::NearbyUnit const& unit);

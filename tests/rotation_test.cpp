@@ -56,7 +56,7 @@ void Rows()
     auto const warrior = rotation::RowsForClass(1);
     CHECK(!warrior.empty());
     CHECK(warrior.front().Spell == 5308);     // Execute first
-    CHECK(rotation::RowsForClass(9).empty()); // no rotation for classes not written yet
+    CHECK(rotation::RowsForClass(6).empty()); // no rotation for a class id without rows
     for (auto const& row : warrior)
         CHECK(row.Spell != 0);
 }
@@ -111,8 +111,28 @@ void FactsFromSnapshot()
 
 } // namespace
 
+void EveryClassHasRows()
+{
+    // The classes with rotations: all nine except the ones the module does not spawn yet.
+    for (std::uint32_t cls : { 1u, 2u, 3u, 4u, 5u, 7u, 8u, 9u, 11u })
+        CHECK(!rotation::RowsForClass(cls).empty());
+    CHECK(rotation::RowsForClass(6).empty()); // unknown here: no rotation, the bot melees
+}
+
+void RangedClassesApproachToRange()
+{
+    CHECK(rotation::ApproachYards(8) == 25.0f);  // mage
+    CHECK(rotation::ApproachYards(9) == 25.0f);  // warlock
+    CHECK(rotation::ApproachYards(3) == 25.0f);  // hunter
+    CHECK(rotation::ApproachYards(1) == 5.0f);   // warrior
+    CHECK(rotation::ApproachYards(4) == 5.0f);   // rogue
+    CHECK(rotation::ApproachYards(2) == 5.0f);   // paladin
+}
+
 int main()
 {
+    EveryClassHasRows();
+    RangedClassesApproachToRange();
     Conditions();
     Rows();
     FactsFromSnapshot();
