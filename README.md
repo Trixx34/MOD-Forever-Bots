@@ -102,6 +102,8 @@ row and its repeated casts are not yet checked on the sim.
   of its map (`Hub<map>_<n>` settings, in order), waits there for a full interval, then walks to the next. A hurt bot
   rests rather than walks; a party member follows its leader; anything seen stops the walk. A walk longer than 3 minutes
   is dropped. Hubs come from the sim's quest-giver clusters (see the config example).
+- Refused targets: a unit whose melee attack is refused, or that a cast reports with no valid target, is avoided for 30 s.
+  The bot picks the next closest hostile (or, if it is a party member, its leader's target when that is not avoided).
 
 ## Telemetry (overnight runs)
 

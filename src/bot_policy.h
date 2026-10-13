@@ -100,6 +100,7 @@ private:
         std::uint64_t ComboTarget = 0;
         std::uint32_t LastTrainLevel = 0;                // the level at the last trainer check
         std::uint64_t PartyRetryAtMs = 0;                // a party action is not sent again before this
+        std::unordered_map<std::uint64_t, std::uint64_t> AvoidUntilMs; // unit -> until when the bot picks another target
         bool Idling = false;                             // seeing nothing and doing nothing since IdleSinceMs
         std::uint64_t IdleSinceMs = 0;
         bool Wandering = false;                          // walking to a hub
