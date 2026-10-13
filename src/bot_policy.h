@@ -76,6 +76,8 @@ private:
         std::uint64_t RestRetryAtMs = 0;                 // a refused sit is not tried again before this
         std::uint64_t NextServiceMs = 0;                 // next vendor visit (sell grey, repair, equip)
         std::uint64_t NextTrainMs = 0;                   // next trainer check
+        std::uint32_t ComboPoints = 0;                   // combo points on ComboTarget, from the bot's own Sinister Strikes
+        std::uint64_t ComboTarget = 0;
         std::uint32_t LastTrainLevel = 0;                // the level at the last trainer check
     };
 

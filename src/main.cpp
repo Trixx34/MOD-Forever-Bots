@@ -30,6 +30,7 @@
 #include <string>
 #include <thread>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace {
@@ -192,6 +193,7 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
     // Last action sequence seen per bot, so each result is reported once.
     std::unordered_map<std::uint64_t, std::uint32_t> seenSequence;
     std::unordered_map<std::uint64_t, std::uint64_t> serviceNoticeMs; // bot -> when a service refusal was last logged
+    std::unordered_set<std::uint32_t> unknownSpellsReported; // spell ids the core does not know, reported once each
 
     // Timing of the policy, reported once a minute so the cost at the current bot count is in the log.
     std::uint64_t reportedAt = nowMs();
@@ -237,6 +239,13 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
             if (bot.last_action_sequence == 0 || (seen != seenSequence.end() && seen->second == bot.last_action_sequence))
                 continue;
             seenSequence[bot.guid] = bot.last_action_sequence;
+            // A spell id the core does not know is a mistake in the rotation tables: say so once per id.
+            if (bot.last_action_status == forever_module::BotActionStatus::kUnknownSpell && bot.last_action_spell != 0)
+            {
+                if (unknownSpellsReported.insert(bot.last_action_spell).second)
+                    std::cerr << "forever-bots: spell " << bot.last_action_spell << " is not in the core's spell table; check the rotation id\n";
+                continue;
+            }
             if (bot.last_action_status != forever_module::BotActionStatus::kApplied)
             {
                 // A vendor or trainer is refused whenever no NPC is in range, the normal state of an idle bot. Those are

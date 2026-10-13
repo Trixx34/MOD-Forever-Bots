@@ -29,6 +29,13 @@ constexpr std::uint64_t kRendDurationMs = 21000;
 constexpr std::uint32_t kServiceSell = 1;
 constexpr std::uint32_t kServiceRepair = 2;
 constexpr std::uint32_t kServiceEquip = 4;
+// Combo points: the rogue's Sinister Strike spell and the spend, and the points a finisher needs.
+constexpr std::uint32_t kSinisterStrike = 1752;
+constexpr std::uint32_t kEviscerate = 2098;
+constexpr std::uint32_t kMaxComboPoints = 5;
+// A ranged bot below this share of its power walks to melee range and fights there, since its spells are spent.
+constexpr std::uint32_t kOutOfPowerPct = 15;
+constexpr float kMeleeApproachYards = 5.0f;
 constexpr std::uint32_t kRestBelowPct = 90;  // an idle bot below this health sits down to rest
 
 // Duration of the damage-over-time effect a spell leaves on its target, or 0 for spells the policy does not track. Rank 1
@@ -44,6 +51,8 @@ std::uint64_t DotDurationMs(std::uint32_t spell)
         case 1978: return 15000; // Serpent Sting
         case 8050: return 12000; // Flame Shock
         case 8921: return 12000; // Moonfire
+        case 21084: return 30000; // Seal of Righteousness (self)
+        case 17: return 30000;    // Power Word: Shield (self)
         default: return 0;
     }
 }
@@ -55,7 +64,6 @@ float DistanceBetween(NearbyUnit const& a, NearbyUnit const& b)
     return std::sqrt(dx * dx + dy * dy);
 }
 
-bool IsLiveHostile(NearbyUnit const& unit);
 bool IsLiveMob(NearbyUnit const& unit);
 
 // The closest live hostile that is not part of a group larger than kMaxPull, or nullptr. A group is the hostiles within
@@ -75,7 +83,7 @@ NearbyUnit const* PullTarget(BotSnapshot const& bot, std::span<NearbyUnit const>
 
         std::size_t group = 0;
         for (NearbyUnit const& other : units)
-            if (IsLiveHostile(other) && DistanceBetween(candidate, other) <= kPullRadius)
+            if (IsLiveMob(other) && DistanceBetween(candidate, other) <= kPullRadius)
                 ++group;
         if (group > kMaxPull)
             continue;
@@ -105,12 +113,6 @@ NearbyUnit const* Closest(BotSnapshot const& bot, std::span<NearbyUnit const> un
     return best;
 }
 
-bool IsLiveHostile(NearbyUnit const& unit)
-{
-    return unit.is_hostile && unit.health > 0 &&
-           (forever_module::UnitRefType(unit.guid) == 8 || forever_module::UnitRefType(unit.guid) == 2);
-}
-
 // A live creature the bot may pick as its own target. Players are never picked: bots of the other faction would otherwise
 // fight each other, and a player that attacks the bot still comes in as the threat target.
 bool IsLiveMob(NearbyUnit const& unit)
@@ -118,9 +120,10 @@ bool IsLiveMob(NearbyUnit const& unit)
     return unit.is_hostile && unit.health > 0 && forever_module::UnitRefType(unit.guid) == 8;
 }
 
+// A friendly player the bot may follow. A hostile player is not followed: it would lead the bot into a fight.
 bool IsPlayer(NearbyUnit const& unit)
 {
-    return forever_module::UnitRefType(unit.guid) == 2 && unit.health > 0;
+    return forever_module::UnitRefType(unit.guid) == 2 && unit.health > 0 && !unit.is_hostile;
 }
 
 } // namespace
@@ -163,11 +166,24 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
         return;
 
     std::uint32_t const spell = bot.last_action_spell;
-    if (bot.last_action_status == BotActionStatus::kApplied && DotDurationMs(spell) != 0)
+    if (bot.last_action_status == BotActionStatus::kApplied)
     {
+        // The target of the cast as sent: 0 for a spell on the bot itself (a self buff such as a seal).
         auto const cast = state.CastTarget.find(spell);
-        if (cast != state.CastTarget.end() && cast->second != 0)
-            state.Dots[spell] = Dot{ cast->second, nowMs + DotDurationMs(spell) };
+        if (cast != state.CastTarget.end())
+        {
+            if (DotDurationMs(spell) != 0)
+                state.Dots[spell] = Dot{ cast->second, nowMs + DotDurationMs(spell) };
+
+            if (spell == kSinisterStrike)
+            {
+                // A Sinister Strike on a new target starts the count again.
+                state.ComboPoints = (state.ComboTarget == cast->second) ? std::min(state.ComboPoints + 1, kMaxComboPoints) : 1;
+                state.ComboTarget = cast->second;
+            }
+        }
+        if (spell == kEviscerate)
+            state.ComboPoints = 0;
     }
 
     switch (bot.last_action_status)
@@ -248,7 +264,10 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 state.InFight = true;
                 state.FightStartMs = nowMs;
             }
-            wanted = distance > rotation::ApproachYards(classId) ? Decision{ ActionType::kFollow, targetRef } : Decision{ ActionType::kAttackTarget, targetRef };
+            // A ranged bot that has run out of power closes to melee range: its spells are spent.
+            bool const outOfPower = bot.max_power > 0 && std::uint64_t(bot.power) * 100 < std::uint64_t(bot.max_power) * kOutOfPowerPct;
+            float const approach = outOfPower ? kMeleeApproachYards : rotation::ApproachYards(classId);
+            wanted = distance > approach ? Decision{ ActionType::kFollow, targetRef } : Decision{ ActionType::kAttackTarget, targetRef };
         }
         else
         {
@@ -259,9 +278,11 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         // Rest: sit down while idle and hurt, and stand before anything moves or fights. The stand goes out before the
         // movement below, in the same action set, so the bot never moves sitting.
         // Idle means no fight and no player to follow, with no live hostile anywhere near: a sitting bot is easy prey.
+        // Creatures only: a hostile player that is not attacking the bot does not stop it from resting (its threat target
+        // already does, through hasTarget).
         bool enemyNear = false;
         for (NearbyUnit const& unit : nearby)
-            enemyNear = enemyNear || IsLiveHostile(unit);
+            enemyNear = enemyNear || IsLiveMob(unit);
         bool const idle = !hasTarget && !enemyNear && wanted.Type == ActionType::kStop;
         bool const hurtEnough = bot.max_health > 0 && std::uint64_t(bot.health) * 100 < std::uint64_t(bot.max_health) * kRestBelowPct;
         bool const stillHurt = bot.max_health > 0 && bot.health < bot.max_health;
@@ -332,7 +353,13 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         // Class rotation: the first row that is off cooldown, in range and allowed by its rule. One cast per global cooldown.
         if (nowMs < state.NextCastMs)
             continue;
-        rotation::Facts const facts = rotation::FactsFor(bot, nearby, targetUnit, state.InFight ? nowMs - state.FightStartMs : 0);
+        rotation::Facts facts = rotation::FactsFor(bot, nearby, targetUnit, state.InFight ? nowMs - state.FightStartMs : 0);
+        if (state.ComboTarget != targetRef)
+        {
+            state.ComboTarget = targetRef;
+            state.ComboPoints = 0;
+        }
+        facts.ComboPoints = int32_t(state.ComboPoints);
 
         // Spells the core reports as cooling down right now.
         std::unordered_set<std::uint32_t> cooling;
@@ -351,9 +378,10 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 continue;
             if (!rotation::Allowed(row.When, facts))
                 continue;
-            // The effect is still on the target: recasting only refreshes it.
+            // The effect is still up (on the target, or on the bot for a self buff): recasting only refreshes it.
             auto const dot = state.Dots.find(row.Spell);
-            if (row.OnTarget && dot != state.Dots.end() && dot->second.Target == targetRef && nowMs < dot->second.UntilMs)
+            bool const sameTarget = dot != state.Dots.end() && dot->second.Target == (row.OnTarget ? targetRef : 0);
+            if (sameTarget && nowMs < dot->second.UntilMs)
                 continue;
 
             BotAction cast;

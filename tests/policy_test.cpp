@@ -550,8 +550,72 @@ void RogueKicksACastingTarget()
     CHECK(HasCast(actions, 1766)); // Kick
 }
 
+void SealIsNotRecastWhileUp()
+{
+    // The seal lasts 30 s on the bot: cast once, then not again until it has worn off.
+    BotPolicy policy = ClassPolicy(2);
+    auto first = policy.Decide(View(1, 0, { Hostile(2, 3.0f, 100) }), 1000);
+    CHECK(HasCast(first, 21084));
+    CHECK(CastTargetOf(first, 21084) == 0); // on the bot itself
+
+    WorldTickSnapshotView applied = View(2, 0, { Hostile(2, 3.0f, 100) });
+    applied.bots[0].last_action_sequence = 1;
+    applied.bots[0].last_action_type = uint8_t(ActionType::kCastSpell);
+    applied.bots[0].last_action_spell = 21084;
+    applied.bots[0].last_action_status = BotActionStatus::kApplied;
+    CHECK(!HasCast(policy.Decide(applied, 2600), 21084));
+    CHECK(HasCast(policy.Decide(View(3, 0, { Hostile(2, 3.0f, 100) }), 33000), 21084));
+}
+
+void EviscerateAtFivePoints()
+{
+    // Five Sinister Strikes that land on one target give five combo points: the next finisher is Eviscerate.
+    BotPolicy policy = ClassPolicy(4);
+    CHECK(HasCast(policy.Decide(View(1, 0, { Hostile(2, 3.0f, 100) }), 1000), 1752));
+    for (std::uint32_t i = 1; i <= 5; ++i)
+    {
+        WorldTickSnapshotView landed = View(1 + i, 0, { Hostile(2, 3.0f, 100) });
+        landed.bots[0].last_action_sequence = i;
+        landed.bots[0].last_action_type = uint8_t(ActionType::kCastSpell);
+        landed.bots[0].last_action_spell = 1752;
+        landed.bots[0].last_action_status = BotActionStatus::kApplied;
+        auto actions = policy.Decide(landed, 1000 + 1600 * i);
+        if (i < 5)
+            CHECK(HasCast(actions, 1752) && !HasCast(actions, 2098));
+        else
+            CHECK(HasCast(actions, 2098));
+    }
+}
+
+void HostilePlayerDoesNotBlockRest()
+{
+    // A hostile player three yards away is neither followed nor a reason not to sit down.
+    BotPolicy policy;
+    std::uint32_t spell = 99;
+    NearbyUnit rival = Unit(2, 9, 3.0f, true, 100);
+    rival.max_health = 100;
+    CHECK(RestAt(policy.Decide(Hurt(600, { rival }), 1000), spell) >= 0 && spell == 1);
+}
+
+void RangedBotWithoutPowerWalksIn()
+{
+    // A mage with 5% mana, a mob at 12 yards: it closes to melee range instead of standing at range with nothing to cast.
+    WorldTickSnapshotView view = View(1, 0, { Hostile(2, 12.0f, 100) });
+    view.bots[0].power = 5;
+    view.bots[0].max_power = 100;
+    auto actions = ClassPolicy(8).Decide(view, 1000);
+    bool followed = false;
+    for (BotAction const& action : actions)
+        followed = followed || (action.type == ActionType::kFollow && action.target_guid == MakeUnitRef(8, 1, 2));
+    CHECK(followed);
+}
+
 int main()
 {
+    SealIsNotRecastWhileUp();
+    EviscerateAtFivePoints();
+    HostilePlayerDoesNotBlockRest();
+    RangedBotWithoutPowerWalksIn();
     MageCastsFromRange();
     WarlockDotIsNotRecastWhileRunning();
     PriestShieldsItselfWhenHurt();

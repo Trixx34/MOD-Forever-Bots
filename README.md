@@ -70,8 +70,13 @@ Without `FOREVER_MODULE_SDK_SOURCE`, CMake fetches `Trixx34/forever-module-sdk` 
 Every class the module spawns has a rotation (`src/combat_rotation.cpp`): warrior, paladin, hunter, rogue, priest, shaman,
 mage, warlock and druid. Rows are rank 1 spell ids; the core casts the highest rank known. Ranged classes (hunter, priest,
 shaman, mage, warlock, druid) approach to 25 yards instead of 5. Damage-over-time spells are not recast while the effect
-runs on the same target (`DotDurationMs` in `bot_policy.cpp`). The spell ids and durations are from memory of the classic
-spell tables and are not yet checked on the sim.
+runs on the same target, and self buffs (Seal of Righteousness, Power Word: Shield) are not recast while up
+(`DotDurationMs` in `bot_policy.cpp`). A rogue counts its own combo points: each applied Sinister Strike on the target adds
+one, and Eviscerate fires at five. A ranged bot below 15% power walks to melee range.
+
+The spell ids and durations are from memory of the classic spell tables. The module logs once per spell id the core does
+not know ("is not in the core's spell table"), so a wrong id shows up in the sim log. Auto Shot (75) is the hunter's last
+row and its repeated casts are not yet checked on the sim.
 
 ## Milestones: M2 to M4
 
