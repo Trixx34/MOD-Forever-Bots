@@ -364,8 +364,25 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
             std::vector<forever_module::BotAction> actions = policy.Decide(view, nowMs());
             if (director)
             {
+                std::size_t const before = actions.size();
                 director->Decide(view, nowMs(), actions);
                 policy.SetRouteActive(director->RouteActive());
+
+                // The scenario's progress, in the module's log: each phase as it starts, and every teleport the director sends.
+                static ScenarioPhase lastPhase = ScenarioPhase::Done;
+                static bool phaseLogged = false;
+                if (!phaseLogged || director->Phase() != lastPhase)
+                {
+                    static char const* const names[] = { "waiting for the roster", "dressing", "grouping", "entering", "running", "done" };
+                    std::cerr << "forever-bots: scenario " << extras.Scenario->Name << ": phase " << names[int(director->Phase())] << " ("
+                              << view.bots.size() << " bots in view)\n";
+                    lastPhase = director->Phase();
+                    phaseLogged = true;
+                }
+                for (std::size_t i = before; i < actions.size(); ++i)
+                    if (actions[i].type == forever_module::ActionType::kTeleport)
+                        std::cerr << "forever-bots: scenario " << extras.Scenario->Name << ": teleport bot " << actions[i].bot_guid << " to map "
+                                  << actions[i].spell_id << " (" << actions[i].dest_x << ", " << actions[i].dest_y << ", " << actions[i].dest_z << ")\n";
                 if (auto const result = director->TakeResult())
                 {
                     std::string const line = FormatScenarioResult(*result);
