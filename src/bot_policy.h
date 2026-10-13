@@ -79,6 +79,8 @@ struct PolicyOptions
     // 2 Horde, 0 unknown).
     std::shared_ptr<GrindData const> Grind;
     std::function<std::uint8_t(std::uint64_t botGuid)> SideOf;
+    // A bot's race id (0 unknown), for the quests' race limits.
+    std::function<std::uint32_t(std::uint64_t botGuid)> RaceOf;
     // Chat commands: a bot accepts a party invite from a player (a human leader), so the player can bring bots into a group and command them.
     bool AcceptInvites = false;
     // Alts (a player's own characters playing as bots): never dressed by the module.

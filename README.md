@@ -156,6 +156,8 @@ offline), `.bots alt remove <name>` logs it out, `.bots alt list`. An alt is you
 trainer spells or talents, and it cannot be played while it is a bot. Alts are not remembered across a restart.
 `.bots <verb>` does the same as a dot command (`.bots autogear` dresses the group's bots); `goto here`, `pull` and `heal` are party chat only.
 
+**Whole-world quests.** A quest file made for the whole world (`tools/make_world_quests.py`, `doc/world-quests.md`) lets bots level by quests from 1 to 60: they take quests that suit their level, race and class from the nearest area that has some, and walk on to the next area when it is used up.
+
 **Grind spots.** With `GrindFile` set, an idle bot walks to a place that suits its level (nearest first, not back to the last two) instead of the hubs of its map. The file is made from the world database with `tools/make_grind_spots.py`; see `doc/grind-spots.md`.
 
 **Auto gear.** With `AutoGearing = 1` the core dresses each bot for its class and level (best usable item per slot, uncommon quality at

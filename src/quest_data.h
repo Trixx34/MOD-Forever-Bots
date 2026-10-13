@@ -9,6 +9,10 @@
 //                                      objective number <position> (0 = the quest's first objective, in the order of the log
 //                                      snapshot) needs <need> kills of, or items dropped by, these creature entries
 //   area <quest> <x> <y> <z>           a place to look for the quest's targets (repeat for several)
+//   req <quest> [minlevel <n>] [level <n>] [prev <quest>] [races <mask>] [classes <mask>]
+//                                      who may do the quest (optional; for the whole-world quest files): the least level to accept it, the quest's own
+//                                      level (a bot well above it skips the quest), the quest that must be handed in before it (tried later, not
+//                                      refused), and the races and classes that may take it as bit masks (bit n-1 for race or class id n; 0 = any)
 #pragma once
 
 #include <cstdint>
@@ -37,6 +41,11 @@ struct QuestDef
     QuestPoint Ender;
     std::vector<QuestObjectiveDef> Objectives;
     std::vector<QuestPoint> Areas;
+    std::uint32_t MinLevel = 0;               // 0 = no limit
+    std::uint32_t QuestLevel = 0;             // 0 = unknown
+    std::uint32_t PrevQuest = 0;              // 0 = none
+    std::uint32_t RaceMask = 0;               // 0 = any race
+    std::uint32_t ClassMask = 0;              // 0 = any class
 };
 
 struct QuestStartDef

@@ -194,6 +194,153 @@ void NoStartOnAnotherMapMeansNoQuests()
     CHECK(planner.Next(bot, memory, 1000).Kind == QuestStepKind::None);
 }
 
+
+// ---- whole-world files (req records, several starts) ----
+
+char const* kWorld =
+    "start Elwynn\n"
+    "anchor 0 -9000 -100 60\n"
+    "quest 100 giver -9000 -100 60 ender -9000 -100 60\n"
+    "req 100 level 5\n"
+    "quest 101 giver -9000 -100 60 ender -9000 -100 60\n"
+    "req 101 level 6 prev 100 minlevel 5\n"
+    "quest 102 giver -9000 -100 60 ender -9000 -100 60\n"
+    "req 102 level 7 classes 128\n"                     // mages only (class id 8: bit 7)
+    "start Westfall\n"
+    "anchor 0 -10000 1000 30\n"
+    "quest 200 giver -10000 1000 30 ender -10000 1000 30\n"
+    "req 200 level 12 minlevel 10\n"
+    "quest 201 giver -10000 1000 30 ender -10000 1000 30\n"
+    "req 201 level 14\n"
+    "start Durotar\n"
+    "anchor 1 300 -4000 20\n"
+    "quest 300 giver 300 -4000 20 ender 300 -4000 20\n"
+    "req 300 level 5 races 2\n";                        // orcs only (race id 2: bit 1)
+
+std::shared_ptr<QuestData const> World()
+{
+    std::istringstream in(kWorld);
+    std::vector<std::string> warnings;
+    auto data = std::make_shared<QuestData>(ParseQuestData(in, warnings));
+    CHECK(warnings.empty());
+    return data;
+}
+
+BotSnapshot WorldBot(std::uint32_t level, float x = -9000.0f, float y = -100.0f)
+{
+    BotSnapshot bot = Bot(x, y);
+    bot.level = level;
+    return bot;
+}
+
+void ReqRecordsAreParsed()
+{
+    auto const data = World();
+    QuestDef const& q = data->Starts[0].Quests[1];
+    CHECK(q.Id == 101 && q.QuestLevel == 6 && q.PrevQuest == 100 && q.MinLevel == 5);
+    CHECK(data->Starts[0].Quests[2].ClassMask == 128 && data->Starts[2].Quests[0].RaceMask == 2);
+    std::istringstream bad("start A\nquest 1 giver 0 0 0 ender 0 0 0\nreq 1 level\nreq 9 level 3\nreq 1 colour 4\n");
+    std::vector<std::string> warnings;
+    ParseQuestData(bad, warnings);
+    CHECK(warnings.size() == 3);
+}
+
+void LevelLimitsDecideWhichQuestsAreTaken()
+{
+    QuestPlanner planner(World());
+    QuestMemory memory;
+    // A level 5 bot: 100 (level 5) is fine, 101 needs its predecessor first, Westfall's quests are red (level 12+).
+    QuestStep step = planner.Next(WorldBot(5), memory, 1000);
+    CHECK(step.Quest == 100);
+    // A level 18 bot is far above Elwynn's quests (grey: 18 > 5 + 7) and takes Westfall's (level 12 and 14).
+    QuestMemory second;
+    step = planner.Next(WorldBot(18), second, 1000);
+    CHECK(step.Kind == QuestStepKind::WalkTo && step.Quest == 200); // it has to walk there
+}
+
+void ClassAndRaceLimitsApply()
+{
+    QuestPlanner planner(World());
+    QuestMemory memory;
+    BotSnapshot bot = WorldBot(7);
+    // A rogue (class 4) cannot take 102; a mage (class 8) can. 100 and 101 are first in the data, so block them for this check.
+    memory.Done = { 100, 101 };
+    CHECK(planner.Next(bot, memory, 1000, QuestBotInfo{ 4, 1 }).Quest != 102);
+    QuestMemory mage;
+    mage.Done = { 100, 101 };
+    CHECK(planner.Next(bot, mage, 1000, QuestBotInfo{ 8, 1 }).Quest == 102);
+    // Durotar's quest is for orcs on map 1.
+    BotSnapshot durotar = WorldBot(5, 300.0f, -4000.0f);
+    durotar.map_id = 1;
+    QuestMemory human;
+    CHECK(planner.Next(durotar, human, 1000, QuestBotInfo{ 1, 1 }).Kind == QuestStepKind::None);
+    QuestMemory orc;
+    CHECK(planner.Next(durotar, orc, 1000, QuestBotInfo{ 1, 2 }).Quest == 300);
+}
+
+void PrerequisiteQuestsComeAfterTheirPredecessors()
+{
+    QuestPlanner planner(World());
+    QuestMemory memory;
+    BotSnapshot bot = WorldBot(6);
+    memory.Done = { 102 };
+    // 100 is not done: 101 (prev 100) waits behind it even though both are open.
+    CHECK(planner.Next(bot, memory, 1000).Quest == 100);
+    // After a restart the memory is empty and 100 may be long done (the core refuses it): 101 is then the next one tried.
+    planner.NoteSent(memory, kQuestAccept, 100, 1000);
+    planner.NoteRefused(memory, 1000);
+    CHECK(planner.Next(bot, memory, 5000).Quest == 101);
+}
+
+void FinishedZoneSendsTheBotToTheNext()
+{
+    QuestPlanner planner(World());
+    QuestMemory memory;
+    BotSnapshot bot = WorldBot(11);
+    memory.Done = { 100, 101, 102 };
+    QuestStep step = planner.Next(bot, memory, 1000);
+    CHECK(step.Kind == QuestStepKind::WalkTo && step.Quest == 200); // Westfall: level 12 quest for an 11 (not red), minlevel 10 met
+    CHECK(step.Dest.X == -10000.0f);
+    bot.pos_x = -10000.0f;
+    bot.pos_y = 1000.0f;
+    CHECK(planner.Next(bot, memory, 2000).Kind == QuestStepKind::Accept);
+}
+
+void LogFullMeansNoNewQuest()
+{
+    QuestPlanner planner(World());
+    QuestMemory memory;
+    BotSnapshot bot = WorldBot(5);
+    for (std::uint32_t i = 0; i < kMaxAcceptedQuests; ++i)
+        LogQuest(bot, 9000 + i, 1); // quests the data does not know
+    CHECK(planner.Next(bot, memory, 1000).Kind == QuestStepKind::None);
+}
+
+void QuestsOfAnotherStartInTheLogAreStillWorked()
+{
+    QuestPlanner planner(World());
+    QuestMemory memory;
+    BotSnapshot bot = WorldBot(12, -9500.0f, 0.0f);
+    LogQuest(bot, 200, 2); // a Westfall quest, complete, while the bot stands in Elwynn
+    QuestStep step = planner.Next(bot, memory, 1000);
+    CHECK(step.Kind == QuestStepKind::WalkTo && step.Quest == 200 && step.Dest.X == -10000.0f);
+}
+
+void RefusalsBlockLongerEachTime()
+{
+    QuestPlanner planner(World());
+    QuestMemory memory;
+    planner.NoteSent(memory, kQuestAccept, 100, 0);
+    planner.NoteRefused(memory, 0);
+    CHECK(memory.BlockedUntilMs[100] == kBlockAfterRefusalMs);
+    planner.NoteSent(memory, kQuestAccept, 100, 100000);
+    planner.NoteRefused(memory, 100000);
+    CHECK(memory.BlockedUntilMs[100] == 100000 + 10 * kBlockAfterRefusalMs);
+    planner.NoteSent(memory, kQuestAccept, 100, 1000000);
+    planner.NoteRefused(memory, 1000000);
+    CHECK(memory.BlockedUntilMs[100] == 1000000 + kBlockAfterAbandonMs);
+}
+
 // ---- policy ----
 
 BotPolicy QuestPolicy()
@@ -310,6 +457,14 @@ int main()
     NoProgressForTenMinutesAbandons();
     RefusalBlocksTheQuestForAWhile();
     NoStartOnAnotherMapMeansNoQuests();
+    ReqRecordsAreParsed();
+    LevelLimitsDecideWhichQuestsAreTaken();
+    ClassAndRaceLimitsApply();
+    PrerequisiteQuestsComeAfterTheirPredecessors();
+    FinishedZoneSendsTheBotToTheNext();
+    LogFullMeansNoNewQuest();
+    QuestsOfAnotherStartInTheLogAreStillWorked();
+    RefusalsBlockLongerEachTime();
     PolicyWalksToTheGiverAndSendsTheAccept();
     PolicyHuntsOnlyTheQuestTargets();
     PolicyWalksToTheHuntingAreaWhenNoTargetIsNear();

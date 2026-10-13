@@ -896,6 +896,7 @@ int main(int argc, char** argv)
         std::cerr << "forever-bots: grind spots: " << grind->Spots.size() << " from " << settings.GrindFile << "\n";
         policyOptions.Grind = std::move(grind);
     }
+    policyOptions.RaceOf = [&races](std::uint64_t botGuid) { return races.Get(botGuid); };
     policyOptions.SideOf = [&races](std::uint64_t botGuid) { return SideOfRace(races.Get(botGuid)); };
     policyOptions.ClassOf = [&classes](std::uint64_t botGuid) { return classes.Get(botGuid); };
     policyOptions.AutoGearing = settings.AutoGearing;

@@ -106,6 +106,38 @@ QuestData ParseQuestData(std::istream& in, std::vector<std::string>& warnings)
             else
                 drop("area needs <quest> <x> <y> <z>, for a quest defined above");
         }
+        else if (keyword == "req")
+        {
+            std::uint32_t id = 0;
+            QuestDef* quest = nullptr;
+            if (!(line >> id) || !(quest = FindQuest(start, id)))
+            {
+                drop("req needs a quest defined above");
+                continue;
+            }
+            std::string key;
+            bool ok = true;
+            while (ok && (line >> key))
+            {
+                std::uint32_t value = 0;
+                if (!(line >> value))
+                    ok = false;
+                else if (key == "minlevel")
+                    quest->MinLevel = value;
+                else if (key == "level")
+                    quest->QuestLevel = value;
+                else if (key == "prev")
+                    quest->PrevQuest = value;
+                else if (key == "races")
+                    quest->RaceMask = value;
+                else if (key == "classes")
+                    quest->ClassMask = value;
+                else
+                    ok = false;
+            }
+            if (!ok)
+                drop("req takes 'minlevel|level|prev|races|classes <number>' pairs");
+        }
         else
             drop("unknown record");
     }

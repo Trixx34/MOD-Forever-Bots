@@ -1093,7 +1093,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         QuestStep questStep;
         bool routeBusy = false;
         if (_quests.Enabled() && !partyMember && !lowHealth && bot.in_combat == 0 && !state.ChatStay && state.ChatFollow == 0)
-            questStep = _quests.Next(bot, state.Quest, nowMs);
+            questStep = _quests.Next(bot, state.Quest, nowMs, QuestBotInfo{ classId, _options.RaceOf ? _options.RaceOf(bot.guid) : 0u });
         std::vector<std::uint32_t> const noEntries;
         std::vector<std::uint32_t> const& huntEntries = questStep.Kind == QuestStepKind::Hunt ? questStep.Entries : noEntries;
 
