@@ -93,13 +93,18 @@ bool IsLiveMob(NearbyUnit const& unit);
 // kPullRadius of the candidate, the candidate included. Units already attacking the bot are not chosen here; the policy
 // fights its threat target whatever the group size.
 NearbyUnit const* PullTarget(BotSnapshot const& bot, std::span<NearbyUnit const> units,
-                            std::function<bool(std::uint64_t)> const& avoided, bool defending)
+                            std::function<bool(std::uint64_t)> const& avoided, bool defending,
+                            std::vector<std::uint32_t> const& onlyEntries = {})
 {
     NearbyUnit const* best = nullptr;
     float bestDist = std::numeric_limits<float>::max();
     for (NearbyUnit const& candidate : units)
     {
         if (!IsLiveMob(candidate) || avoided(candidate.guid))
+            continue;
+        // A bot hunting for a quest pulls only the creatures the quest wants (unless it is already being attacked).
+        if (!defending && !onlyEntries.empty() &&
+            std::find(onlyEntries.begin(), onlyEntries.end(), forever_module::UnitRefEntry(candidate.guid)) == onlyEntries.end())
             continue;
         // Not worth pulling: well above the bot's level, or an elite. (A level of 0 is unknown and not judged.) A bot that is already
         // in combat is being attacked, and the snapshot does not say by what: it fights the closest creature, whatever its level, since
@@ -236,6 +241,13 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
     {
         state.Sitting = false;
         state.RestRetryAtMs = nowMs + kRetryMs;
+        return;
+    }
+
+    // A quest action refused (not eligible, bags full, no NPC in reach): the quest is left alone for a while.
+    if (bot.last_action_type == uint8_t(ActionType::kQuest) && bot.last_action_status == BotActionStatus::kRefused)
+    {
+        _quests.NoteRefused(state.Quest, nowMs);
         return;
     }
 
@@ -392,6 +404,14 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         if (partyMember && leaderSnap)
             followRef = atLeader ? 0 : leaderRef;
 
+        // Quests (M5): the planner's step for this bot. A party member follows its leader instead, and a hurt or fighting bot
+        // leaves quests alone until it is done.
+        QuestStep questStep;
+        if (_quests.Enabled() && !partyMember && !lowHealth && bot.in_combat == 0)
+            questStep = _quests.Next(bot, state.Quest, nowMs);
+        std::vector<std::uint32_t> const noEntries;
+        std::vector<std::uint32_t> const& huntEntries = questStep.Kind == QuestStepKind::Hunt ? questStep.Entries : noEntries;
+
         // The target is the threat target (even when it is out of view), otherwise the closest live hostile. A member with
         // no threat of its own fights its leader's target, when that is in view.
         NearbyUnit const* targetUnit = nullptr;
@@ -415,7 +435,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 if (unit.guid == targetRef)
                     targetUnit = &unit;
         }
-        else if (NearbyUnit const* hostile = PullTarget(bot, nearby, avoided, bot.in_combat != 0))
+        else if (NearbyUnit const* hostile = PullTarget(bot, nearby, avoided, bot.in_combat != 0, huntEntries))
         {
             targetUnit = hostile;
             targetRef = hostile->guid;
@@ -477,12 +497,41 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         {
             state.InFight = false;
             wanted = followRef ? Decision{ ActionType::kFollow, followRef } : Decision{ ActionType::kStop, 0 };
+            switch (questStep.Kind)
+            {
+                case QuestStepKind::WalkTo:
+                case QuestStepKind::Hunt:
+                    // Hunt with the target area equal to the bot's own place (no areas known): stand and wait for the creatures.
+                    if (questStep.Kind == QuestStepKind::WalkTo || questStep.Dest.X != bot.pos_x || questStep.Dest.Y != bot.pos_y)
+                        wanted = Decision{ ActionType::kMoveTo, 0, Point{ questStep.Dest.X, questStep.Dest.Y, questStep.Dest.Z } };
+                    else
+                        wanted = Decision{ ActionType::kStop, 0 };
+                    break;
+                case QuestStepKind::Accept:
+                case QuestStepKind::HandIn:
+                case QuestStepKind::Abandon:
+                {
+                    BotAction quest;
+                    quest.bot_guid = bot.guid;
+                    quest.type = ActionType::kQuest;
+                    std::uint32_t const operation = questStep.Kind == QuestStepKind::Accept ? kQuestAccept
+                                                    : questStep.Kind == QuestStepKind::HandIn ? kQuestHandIn : kQuestAbandon;
+                    quest.spell_id = QuestCode(operation, questStep.Quest);
+                    actions.push_back(quest);
+                    _quests.NoteSent(state.Quest, operation, questStep.Quest, nowMs);
+                    wanted = Decision{ ActionType::kStop, 0 };
+                    break;
+                }
+                case QuestStepKind::Wait:
+                case QuestStepKind::None:
+                    break;
+            }
         }
 
         bool enemyNear = false;
         for (NearbyUnit const& unit : nearby)
             enemyNear = enemyNear || IsLiveMob(unit);
-        bool idle = !hasTarget && !enemyNear && wanted.Type == ActionType::kStop;
+        bool idle = !hasTarget && !enemyNear && wanted.Type == ActionType::kStop && questStep.Kind == QuestStepKind::None;
 
         // Seeing nothing and doing nothing, for hubs (M7): the idle time starts when the bot first is idle, and any activity
         // resets it.
