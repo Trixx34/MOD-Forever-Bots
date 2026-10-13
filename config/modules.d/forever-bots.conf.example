@@ -46,3 +46,9 @@ Module.forever-bots.TelemetrySummarySec = 60
 
 # Travel (M6): an idle bot due a vendor visit (ServiceEverySec) walks to the nearest vendor on its own map and visits it.
 # The core finds the vendor (layout 6 core). Needs no position settings.
+
+# Hubs (M7): a bot that has seen nothing and done nothing for 30 s walks to the next hub of its map, waits there, and walks
+# on to the next one after a full interval. Keys Hub<map>_<n> = "x y z", n from 1, in order. Hubs of map 0 and map 1 only.
+# A bot with no hubs on its map does not wander. Needs the layout 7 core (map id in the snapshot).
+#   Module.forever-bots.Hub0_1 = 0 0 0
+#   Module.forever-bots.Hub1_1 = 0 0 0

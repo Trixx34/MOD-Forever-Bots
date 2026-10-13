@@ -18,6 +18,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <map>
 #include <optional>
 #include <unordered_map>
 #include <unordered_set>
@@ -48,6 +49,9 @@ struct PolicyOptions
     // leader is its first warrior, else its lowest-guid bot. PartySize 0 turns parties off.
     std::uint32_t PartySize = 0;
     std::uint32_t PartyCount = 1;
+    // Hubs (M7): the places an idle bot walks to when it has seen nothing for a while, per map, in order. The bot's map
+    // comes from its snapshot. A map with no hubs has no wandering.
+    std::map<std::uint32_t, std::vector<Point>> HubsByMap;
 };
 
 // Name of an action status, for logs.
@@ -96,6 +100,11 @@ private:
         std::uint64_t ComboTarget = 0;
         std::uint32_t LastTrainLevel = 0;                // the level at the last trainer check
         std::uint64_t PartyRetryAtMs = 0;                // a party action is not sent again before this
+        bool Idling = false;                             // seeing nothing and doing nothing since IdleSinceMs
+        std::uint64_t IdleSinceMs = 0;
+        bool Wandering = false;                          // walking to a hub
+        std::uint64_t WanderStartMs = 0;                 // when this walk began; dropped after kWanderTimeoutMs
+        std::size_t NextHub = 0;                         // index of the hub to walk to next, on the bot's map
         bool Traveling = false;                          // walking to the vendor for a visit
         std::uint64_t TravelStartMs = 0;                 // when this walk began; it is dropped after kTravelTimeoutMs
         std::unordered_map<std::uint64_t, std::uint64_t> InvitedAtMs; // member guid -> when this bot last invited it

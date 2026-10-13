@@ -865,8 +865,104 @@ void PartyMembersDoNotWalkAlone()
     CHECK(HasAction(actions, 12, ActionType::kMoveTo)); // the leader walks; the members follow it
 }
 
+// Hubs (M7). A bot on map 1 with two hubs on that map. Services are off, so the walk is the only move.
+BotPolicy HubPolicy()
+{
+    PolicyOptions options;
+    options.HubsByMap[1] = { Point{ 500.0f, 0.0f, 0.0f }, Point{ 900.0f, 0.0f, 0.0f } };
+    return BotPolicy(options);
+}
+
+WorldTickSnapshotView OnMap(std::uint32_t map)
+{
+    WorldTickSnapshotView view = PartyView({ 10 });
+    view.bots[0].map_id = map;
+    return view;
+}
+
+// The destination of the bot's walk in the actions, or NaN-free -1 when it does not walk.
+float WalkTo(std::vector<BotAction> const& actions, std::uint64_t bot)
+{
+    for (BotAction const& action : actions)
+        if (action.type == ActionType::kMoveTo && action.bot_guid == bot)
+            return action.dest_x;
+    return -1.0f;
+}
+
+void IdleBotWandersToAHubAfterAWhile()
+{
+    BotPolicy policy = HubPolicy();
+    WorldTickSnapshotView view = OnMap(1);
+    CHECK(WalkTo(policy.Decide(view, 0), 10) < 0.0f);     // idle starts now
+    CHECK(WalkTo(policy.Decide(view, 29000), 10) < 0.0f);
+    CHECK(WalkTo(policy.Decide(view, 30000), 10) == 500.0f);
+}
+
+void ArrivalMovesOnToTheNextHubAfterAnInterval()
+{
+    BotPolicy policy = HubPolicy();
+    WorldTickSnapshotView view = OnMap(1);
+    policy.Decide(view, 0);
+    CHECK(WalkTo(policy.Decide(view, 30000), 10) == 500.0f); // walking to hub 1
+    view.bots[0].pos_x = 495.0f;                              // five yards from it: arrived
+    CHECK(WalkTo(policy.Decide(view, 31000), 10) < 0.0f);     // waits at the hub
+    CHECK(WalkTo(policy.Decide(view, 60000), 10) < 0.0f);     // not a full interval yet
+    CHECK(WalkTo(policy.Decide(view, 61000), 10) == 900.0f);  // next walk, to hub 2
+}
+
+void NoHubsOnTheBotsMapMeansNoWalk()
+{
+    BotPolicy policy = HubPolicy();
+    CHECK(WalkTo(policy.Decide(OnMap(0), 0), 10) < 0.0f);
+    CHECK(WalkTo(policy.Decide(OnMap(0), 30000), 10) < 0.0f); // map 0 has no hubs here
+}
+
+void AnythingSeenStopsTheWalk()
+{
+    BotPolicy policy = HubPolicy();
+    WorldTickSnapshotView view = OnMap(1);
+    policy.Decide(view, 0);
+    CHECK(WalkTo(policy.Decide(view, 30000), 10) == 500.0f);
+    // A hostile creature comes into view: the bot fights it instead of walking on.
+    NearbyUnit const wolf = Hostile(7, 2.0f, 100);
+    AddNearby(view, 0, wolf);
+    auto const actions = policy.Decide(view, 31000);
+    CHECK(WalkTo(actions, 10) < 0.0f);
+    CHECK(HasAction(actions, 10, ActionType::kAttackTarget, wolf.guid));
+}
+
+void HurtBotRestsInsteadOfWalking()
+{
+    WorldTickSnapshotView view = OnMap(1);
+    view.bots[0].health = 500; // below the rest threshold
+    BotPolicy policy = HubPolicy();
+    policy.Decide(view, 0);
+    CHECK(WalkTo(policy.Decide(view, 30000), 10) < 0.0f);
+}
+
+void PartyMembersDoNotWanderAlone()
+{
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    for (BotSnapshot& bot : view.bots)
+        bot.map_id = 1;
+    PolicyOptions options;
+    options.HubsByMap[1] = { Point{ 500.0f, 0.0f, 0.0f } };
+    options.PartySize = 5;
+    options.PartyCount = 1;
+    options.ClassOf = WarriorLeads;
+    BotPolicy policy(options);
+    policy.Decide(view, 0);
+    CHECK(WalkTo(policy.Decide(view, 30000), 10) < 0.0f); // a member: it follows its leader
+}
+
 int main()
 {
+    IdleBotWandersToAHubAfterAWhile();
+    ArrivalMovesOnToTheNextHubAfterAnInterval();
+    NoHubsOnTheBotsMapMeansNoWalk();
+    AnythingSeenStopsTheWalk();
+    HurtBotRestsInsteadOfWalking();
+    PartyMembersDoNotWanderAlone();
     IdleBotWalksToItsVendor();
     VendorVisitWhenInReach();
     TravelIsDroppedAfterTheTimeout();

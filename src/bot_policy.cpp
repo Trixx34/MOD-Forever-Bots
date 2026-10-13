@@ -48,6 +48,9 @@ constexpr std::uint32_t kPlayerType = 2;     // unit reference type of a player 
 constexpr std::uint64_t kInviteRetryMs = 15000; // a member is invited again this long after the last invite
 constexpr std::uint64_t kPartyRetryMs = 2000;   // a party action refused, or just sent, is not repeated before this
 constexpr float kFollowLeaderYards = 8.0f;      // a member this close to its leader stays where it is
+constexpr std::uint64_t kWanderIdleMs = 30000;   // idle for this long, seeing nothing, before walking to a hub
+constexpr std::uint64_t kWanderTimeoutMs = 180000; // a walk to a hub longer than this is dropped
+constexpr float kHubReachYards = 10.0f;          // a bot this close to its hub has arrived
 constexpr float kVendorReachYards = 4.0f;       // a bot this close to its vendor can use it (the core allows 5)
 constexpr std::uint64_t kTravelTimeoutMs = 180000; // a walk to the vendor longer than this is dropped for now
 
@@ -399,6 +402,19 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             enemyNear = enemyNear || IsLiveMob(unit);
         bool idle = !hasTarget && !enemyNear && wanted.Type == ActionType::kStop;
 
+        // Seeing nothing and doing nothing, for hubs (M7): the idle time starts when the bot first is idle, and any activity
+        // resets it.
+        if (!idle)
+        {
+            state.Idling = false;
+            state.Wandering = false;
+        }
+        else if (!state.Idling)
+        {
+            state.Idling = true;
+            state.IdleSinceMs = nowMs;
+        }
+
         // Services and travel (M6). An idle bot due a vendor visit walks to the nearest vendor on its map, unless it is a
         // party member (it follows its leader). The visit is sent once the bot is in reach. A walk longer than
         // kTravelTimeoutMs is dropped and the visit waits for its next interval. A walking bot is not idle, so it neither
@@ -435,6 +451,40 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 vendor.spell_id = kServiceSell | kServiceRepair | kServiceEquip;
                 actions.push_back(vendor);
                 state.NextServiceMs = nowMs + _options.ServiceEveryMs;
+            }
+        }
+
+        // Hubs (M7): a bot that has been idle for kWanderIdleMs walks to the next hub of its map, and waits there until the
+        // next walk. A hurt bot rests instead, and a party member follows its leader. Anything that comes near stops the walk.
+        bool const healthy = bot.max_health == 0 || std::uint64_t(bot.health) * 100 >= std::uint64_t(bot.max_health) * kRestBelowPct;
+        auto const hubs = _options.HubsByMap.find(bot.map_id);
+        if (idle && healthy && !partyMember && hubs != _options.HubsByMap.end() && !hubs->second.empty())
+        {
+            std::vector<Point> const& list = hubs->second;
+            if (state.Wandering)
+            {
+                Point const& hub = list[state.NextHub % list.size()];
+                bool const arrived = DistanceTo(bot, hub) <= kHubReachYards;
+                bool const timedOut = nowMs - state.WanderStartMs > kWanderTimeoutMs;
+                if (arrived || timedOut)
+                {
+                    // Next time, the next hub; the bot waits a full interval before it walks again.
+                    state.Wandering = false;
+                    state.NextHub = (state.NextHub + 1) % list.size();
+                    state.IdleSinceMs = nowMs;
+                }
+                else
+                {
+                    wanted = Decision{ ActionType::kMoveTo, 0, hub };
+                    idle = false;
+                }
+            }
+            else if (nowMs - state.IdleSinceMs >= kWanderIdleMs)
+            {
+                state.Wandering = true;
+                state.WanderStartMs = nowMs;
+                wanted = Decision{ ActionType::kMoveTo, 0, list[state.NextHub % list.size()] };
+                idle = false;
             }
         }
 

@@ -5,7 +5,9 @@
 #include <algorithm>
 #include <charconv>
 #include <limits>
+#include <sstream>
 #include <system_error>
+#include <tuple>
 
 namespace
 {
@@ -43,6 +45,46 @@ void ReadKey(std::unordered_map<std::string, std::string> const& config, char co
         value = parsed;
     else
         warnings.push_back(std::string("Module.forever-bots.") + key + ": " + reason + "; using " + std::to_string(value) + ".");
+}
+
+// Reads Hub<map>_<n> = "x y z" for every map, in order n. A key or value that does not fit is dropped with a warning.
+void ReadHubs(std::unordered_map<std::string, std::string> const& config,
+              std::map<std::uint32_t, std::vector<std::array<float, 3>>>& hubs, std::vector<std::string>& warnings)
+{
+    std::vector<std::tuple<std::uint32_t, std::uint32_t, std::array<float, 3>>> found; // map, n, spot
+    for (auto const& [key, value] : config)
+    {
+        if (key.rfind("Hub", 0) != 0)
+            continue;
+
+        std::string const body = key.substr(3);
+        auto const sep = body.find('_');
+        std::uint32_t mapId = 0;
+        std::uint32_t n = 0;
+        bool const keyOk = sep != std::string::npos && sep > 0 && sep + 1 < body.size() &&
+                           std::from_chars(body.data(), body.data() + sep, mapId).ec == std::errc{} &&
+                           std::from_chars(body.data() + sep + 1, body.data() + body.size(), n).ec == std::errc{} && n > 0;
+        if (!keyOk)
+        {
+            warnings.push_back("Module.forever-bots." + key + ": the key is not Hub<map>_<n>; ignored.");
+            continue;
+        }
+
+        std::istringstream in(value);
+        std::array<float, 3> spot{};
+        std::string trailing;
+        if (!(in >> spot[0] >> spot[1] >> spot[2]) || (in >> trailing))
+            warnings.push_back("Module.forever-bots." + key + ": '" + value + "' is not three numbers; ignored.");
+        else
+            found.emplace_back(mapId, n, spot);
+    }
+
+    std::sort(found.begin(), found.end(), [](auto const& a, auto const& b)
+    {
+        return std::get<0>(a) != std::get<0>(b) ? std::get<0>(a) < std::get<0>(b) : std::get<1>(a) < std::get<1>(b);
+    });
+    for (auto const& [mapId, n, spot] : found)
+        hubs[mapId].push_back(spot);
 }
 
 // Reads a race or class id. The word "random" means pick (0); otherwise a valid id.
@@ -109,5 +151,6 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadKey(config, "TrainEverySec", 60, 86400, settings.TrainEverySec, warnings);
     ReadKey(config, "PartySize", 0, 5, settings.PartySize, warnings);
     ReadKey(config, "PartyCount", 1, 100, settings.PartyCount, warnings);
+    ReadHubs(config, settings.Hubs, warnings);
     return settings;
 }
