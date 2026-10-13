@@ -88,3 +88,115 @@ Module.forever-bots.TelemetrySummarySec = 60
 # ScenarioRoute3 = -177.4 -574.5 19.3
 # ScenarioGear1 = 1234,5678                     # optional: items granted to a class instead of auto gear (needs Bot.Actions.Grant)
 # ScenarioResultFile = scenario-results.log
+
+# ---- InfluxDB statistics ----------------------------------------------------------------------------------------------
+# Writes bot counts, deaths, fights, stuck episodes, level-ups and quests done to InfluxDB v2 (see README, "InfluxDB statistics").
+# World figures (players online, tick diff, uptime) come from the MOD-Influx-logging module, not from here.
+
+#
+#    Module.forever-bots.Influx.Enabled
+#        Description: Turns on the InfluxDB bot statistics (needs the influx settings below). Off by default.
+#        Default:     0
+#        Allowed:     0 (off), 1 (on)
+#
+
+Module.forever-bots.Influx.Enabled = 0
+
+#
+#    Module.forever-bots.Influx.Url
+#        Description: Where InfluxDB v2 listens. Plain http only (local InfluxDB, a reverse proxy or Telegraf); https:// is refused.
+#        Default:     "http://127.0.0.1:8086"
+#        Allowed:     http://host or http://host:port
+#
+
+Module.forever-bots.Influx.Url = "http://127.0.0.1:8086"
+
+#
+#    Module.forever-bots.Influx.Org
+#        Description: The InfluxDB organization (name or id). Required when Enabled = 1.
+#        Default:     ""
+#        Allowed:     Any non-empty text
+#
+
+Module.forever-bots.Influx.Org = ""
+
+#
+#    Module.forever-bots.Influx.Bucket
+#        Description: The bucket to write to. It must exist already.
+#        Default:     "forever"
+#        Allowed:     Any non-empty text
+#
+
+Module.forever-bots.Influx.Bucket = "forever"
+
+#
+#    Module.forever-bots.Influx.Token
+#        Description: An API token with write access to the bucket. Required when Enabled = 1. Keep this file readable by the worldserver account only.
+#        Default:     ""
+#        Allowed:     Any non-empty text
+#
+
+Module.forever-bots.Influx.Token = ""
+
+#
+#    Module.forever-bots.Influx.SampleIntervalSec
+#        Description: Seconds between samples of the bot gauges (bots, bots_by_class, bots_by_level) and the event counters (bot_events).
+#        Default:     10
+#        Allowed:     1 to 3600
+#
+
+Module.forever-bots.Influx.SampleIntervalSec = 10
+
+#
+#    Module.forever-bots.Influx.FlushIntervalMs
+#        Description: The longest a point waits before a batch is sent. A batch also goes out as soon as BatchSize points are queued.
+#        Default:     5000
+#        Allowed:     100 to 60000
+#
+
+Module.forever-bots.Influx.FlushIntervalMs = 5000
+
+#
+#    Module.forever-bots.Influx.BatchSize
+#        Description: The most points sent in one request.
+#        Default:     500
+#        Allowed:     1 to 5000
+#
+
+Module.forever-bots.Influx.BatchSize = 500
+
+#
+#    Module.forever-bots.Influx.MaxQueue
+#        Description: The most points held while InfluxDB is slow or down; past this the oldest are dropped. Never lower than BatchSize.
+#        Default:     10000
+#        Allowed:     BatchSize to 1000000
+#
+
+Module.forever-bots.Influx.MaxQueue = 10000
+
+#
+#    Module.forever-bots.Influx.RequestTimeoutMs
+#        Description: How long one request may take, connect to answer. A failed request is tried 3 times, then the batch is dropped.
+#        Default:     3000
+#        Allowed:     100 to 60000
+#
+
+Module.forever-bots.Influx.RequestTimeoutMs = 3000
+
+#
+#    Module.forever-bots.Influx.MeasurementPrefix
+#        Description: Put in front of every measurement name ("bots" becomes "forever_bots").
+#        Default:     "forever_"
+#        Allowed:     Any text, including empty
+#
+
+Module.forever-bots.Influx.MeasurementPrefix = "forever_"
+
+#
+#    Module.forever-bots.Influx.GlobalTags
+#        Description: Tags added to every point, for telling servers or realms apart in one bucket.
+#        Default:     ""
+#        Allowed:     Comma-separated key=value pairs, for example "realm=sim1,host=alpha"
+#
+
+Module.forever-bots.Influx.GlobalTags = ""

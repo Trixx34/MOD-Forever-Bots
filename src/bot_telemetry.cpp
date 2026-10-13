@@ -217,5 +217,8 @@ void BotTelemetry::Write(char const* kind, BotSnapshot const& bot, Record const&
          << Percent(bot.power, bot.max_power) << ',' << (record.Target != 0 ? 1 : 0) << ',' << record.Fights << ','
          << record.TargetsGone << ',' << record.Deaths << ',' << record.CastsApplied << ',' << record.Refusals << ','
          << record.StuckEpisodes << ',' << record.LongestFightMs << ',' << record.HealthLost << ',' << Field(detail);
-    _sink(line.str());
+    if (_sink)
+        _sink(line.str());
+    if (_events)
+        _events(kind, bot.guid);
 }

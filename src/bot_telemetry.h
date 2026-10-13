@@ -29,6 +29,11 @@ public:
 
     BotTelemetry(Sink sink, Options options) : _sink(std::move(sink)), _options(options) {}
 
+    // Called for every line written, with its kind ("death", "fight_start", "stuck", "level", ...) and the bot, so other
+    // code (the Influx statistics) counts the same events without watching the snapshots a second time. Set before Observe().
+    using EventSink = std::function<void(std::string const& kind, std::uint64_t botGuid)>;
+    void SetEventSink(EventSink events) { _events = std::move(events); }
+
     // The CSV header line, written once when a file is new.
     static char const* Header();
 
@@ -75,6 +80,7 @@ private:
                std::string const& detail);
 
     Sink _sink;
+    EventSink _events;
     Options _options;
     std::unordered_map<std::uint64_t, Record> _bots; // bot guid -> record
 };

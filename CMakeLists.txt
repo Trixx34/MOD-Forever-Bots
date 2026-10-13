@@ -17,6 +17,19 @@ else()
     FetchContent_MakeAvailable(forever_module_sdk)
 endif()
 
+# The InfluxDB writer comes from MOD-Influx-logging (library target influx_logging). Use a local checkout with
+# INFLUX_LOGGING_SOURCE, or leave it empty to fetch it from GitHub.
+set(INFLUX_LOGGING_SOURCE "" CACHE PATH "Path to a MOD-Influx-logging checkout (optional)")
+if(INFLUX_LOGGING_SOURCE)
+    add_subdirectory("${INFLUX_LOGGING_SOURCE}" "${CMAKE_BINARY_DIR}/influx-logging")
+else()
+    include(FetchContent)
+    FetchContent_Declare(influx_logging
+        GIT_REPOSITORY https://github.com/Trixx34/MOD-Influx-logging
+        GIT_TAG main)
+    FetchContent_MakeAvailable(influx_logging)
+endif()
+
 find_package(Threads REQUIRED)
 
 add_library(forever_bots_roster STATIC src/bot_roster.cpp)
@@ -39,8 +52,12 @@ add_library(forever_bots_telemetry STATIC src/bot_telemetry.cpp)
 target_include_directories(forever_bots_telemetry PUBLIC src)
 target_link_libraries(forever_bots_telemetry PUBLIC forever_module_sdk)
 
+add_library(forever_bots_influx STATIC src/bot_influx.cpp)
+target_include_directories(forever_bots_influx PUBLIC src)
+target_link_libraries(forever_bots_influx PUBLIC forever_module_sdk influx_logging)
+
 add_executable(forever-bots src/main.cpp)
-target_link_libraries(forever-bots PRIVATE forever_bots_roster forever_bots_policy forever_bots_settings forever_bots_store forever_bots_telemetry forever_bots_files forever_module_sdk Threads::Threads)
+target_link_libraries(forever-bots PRIVATE forever_bots_roster forever_bots_policy forever_bots_settings forever_bots_store forever_bots_telemetry forever_bots_influx forever_bots_files forever_module_sdk Threads::Threads)
 
 enable_testing()
 add_executable(roster_test tests/roster_test.cpp)
@@ -86,3 +103,7 @@ add_test(NAME ramp COMMAND ramp_test)
 add_executable(rotating_file_test tests/rotating_file_test.cpp)
 target_link_libraries(rotating_file_test PRIVATE forever_bots_files)
 add_test(NAME rotating_file COMMAND rotating_file_test)
+
+add_executable(influx_stats_test tests/influx_stats_test.cpp)
+target_link_libraries(influx_stats_test PRIVATE forever_bots_influx forever_bots_settings forever_bots_telemetry)
+add_test(NAME influx_stats COMMAND influx_stats_test)

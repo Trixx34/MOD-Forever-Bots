@@ -75,6 +75,11 @@ struct BotSettings
     bool AutoGearing = false;
     std::uint32_t AutoGearEveryLevels = 5;
     ScenarioSettings Scenario;
+    // InfluxDB statistics (doc: README, "InfluxDB statistics"). The Module.forever-bots.Influx.<Key> entries with the prefix removed,
+    // for influx_stats::ParseSettings (Enabled, Url, Org, Bucket, Token, FlushIntervalMs, BatchSize, MaxQueue, RequestTimeoutMs,
+    // MeasurementPrefix, GlobalTags), and the module's own InfluxSampleSec (config key Influx.SampleIntervalSec, 1..3600).
+    std::unordered_map<std::string, std::string> Influx;
+    std::uint32_t InfluxSampleSec = 10;
 };
 
 // The most bots any configuration may ask for; also the Tier 2 bot bound requested at handshake.

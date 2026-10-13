@@ -279,6 +279,18 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadBool(config, "AutoGearing", settings.AutoGearing, warnings);
     ReadKey(config, "AutoGearEveryLevels", 1, 60, settings.AutoGearEveryLevels, warnings);
     ReadScenario(config, settings.Scenario, warnings);
+    for (auto const& [key, value] : config)
+        if (key.rfind("Influx.", 0) == 0 && key != "Influx.SampleIntervalSec")
+            settings.Influx[key.substr(7)] = value;
+    if (auto const it = config.find("Influx.SampleIntervalSec"); it != config.end())
+    {
+        std::uint32_t parsed = settings.InfluxSampleSec;
+        std::string reason;
+        if (ParseBounded(it->second, 1, 3600, parsed, reason))
+            settings.InfluxSampleSec = parsed;
+        else
+            warnings.push_back("Module.forever-bots.Influx.SampleIntervalSec: " + reason + "; using " + std::to_string(settings.InfluxSampleSec) + ".");
+    }
     if (auto const it = config.find("QuestFile"); it != config.end())
         settings.QuestFile = it->second;
     return settings;

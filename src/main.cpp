@@ -7,6 +7,7 @@
 // Tier 2 region and the ClassTable (locked), so the two loops share no other state.
 
 #include "bot_pick.h"
+#include "bot_influx.h"
 #include "bot_policy.h"
 #include "bot_ramp.h"
 #include "bot_roster.h"
@@ -15,6 +16,10 @@
 #include "bot_telemetry.h"
 #include "rotating_file.h"
 #include "scenario.h"
+
+#include "http_transport.h"
+#include "influx_settings.h"
+#include "influx_writer.h"
 
 #include "forever_module/module_client.h"
 #include "forever_module/tier2_session.h"
@@ -270,9 +275,46 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
     std::uint64_t actionsTotal = 0;
     std::size_t lastBotCount = 0;
 
-    // The telemetry file is appended to, so a restart adds to the same record. It rotates at TelemetryMaxMB.
+    // InfluxDB statistics (Module.forever-bots.Influx.*): off unless Influx.Enabled = 1 with a valid org, bucket and token. The
+    // writer queues and sends on its own thread, so the pump never waits on the network.
+    std::unique_ptr<influx_stats::Writer> influxWriter;
+    std::unique_ptr<BotInfluxStats> influxStats;
+    {
+        std::vector<std::string> warnings;
+        influx_stats::Settings influx = influx_stats::ParseSettings(settings.Influx, warnings);
+        for (std::string const& warning : warnings)
+            std::cerr << "forever-bots: config: " << warning << "\n";
+        std::string why;
+        if (influx.Enabled && !(why = influx_stats::ValidateForWriting(influx)).empty())
+        {
+            std::cerr << "forever-bots: Influx statistics stay off: " << why << "\n";
+            influx.Enabled = false;
+        }
+        if (influx.Enabled)
+        {
+            influxWriter = std::make_unique<influx_stats::Writer>(influx, influx_stats::MakeHttpTransport(influx));
+            influxWriter->OnError = [](std::string const& error) { std::cerr << "forever-bots: Influx: gave up on a batch: " << error << "\n"; };
+            influxWriter->Start();
+            BotInfluxStats::Options statsOptions;
+            statsOptions.SampleEveryMs = std::uint64_t(settings.InfluxSampleSec) * 1000;
+            statsOptions.ClassOf = options.ClassOf;
+            statsOptions.NowNs = []
+            {
+                return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+            };
+            influxStats = std::make_unique<BotInfluxStats>(
+                [writer = influxWriter.get()](influx_stats::Point point) { writer->Enqueue(std::move(point)); }, statsOptions);
+            std::cerr << "forever-bots: Influx statistics to " << influx.Host << ":" << influx.Port << " bucket " << influx.Bucket
+                      << " every " << settings.InfluxSampleSec << " s\n";
+        }
+    }
+
+    // The telemetry file is appended to, so a restart adds to the same record. It rotates at TelemetryMaxMB. The telemetry
+    // object also runs, with no file, when the Influx statistics want its events.
     std::unique_ptr<RotatingFile> telemetryFile;
     std::unique_ptr<BotTelemetry> telemetry;
+    BotTelemetry::Options telemetryOptions;
+    telemetryOptions.SummaryEveryMs = std::uint64_t(settings.TelemetrySummarySec) * 1000;
     if (!telemetryPath.empty())
     {
         telemetryFile = std::make_unique<RotatingFile>(telemetryPath,
@@ -282,8 +324,6 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
         {
             if (telemetryFile->CurrentBytes() == 0)
                 telemetryFile->WriteLine(BotTelemetry::Header());
-            BotTelemetry::Options telemetryOptions;
-            telemetryOptions.SummaryEveryMs = std::uint64_t(settings.TelemetrySummarySec) * 1000;
             telemetry = std::make_unique<BotTelemetry>(
                 [file = telemetryFile.get()](std::string const& line) { file->WriteLine(line); }, telemetryOptions);
             std::cerr << "forever-bots: telemetry to " << telemetryPath << " (summary every " << settings.TelemetrySummarySec
@@ -294,6 +334,10 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
             std::cerr << "forever-bots: cannot open telemetry file " << telemetryPath << "; telemetry is off\n";
         }
     }
+    if (!telemetry && influxStats)
+        telemetry = std::make_unique<BotTelemetry>(BotTelemetry::Sink(), telemetryOptions);
+    if (telemetry && influxStats)
+        telemetry->SetEventSink([stats = influxStats.get()](std::string const& kind, std::uint64_t guid) { stats->OnEvent(kind, guid); });
 
     while (running)
     {
@@ -340,6 +384,8 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
 
             if (telemetry)
                 telemetry->Observe(view, nowMs());
+            if (influxStats)
+                influxStats->Observe(view, nowMs());
 
             // One publish per snapshot tick: the core applies the newest action set it sees for each tick.
             auto const started = std::chrono::steady_clock::now();

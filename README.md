@@ -26,6 +26,24 @@ found bots could not see neutral creatures, now fixed), experience and levelling
 - The core with bot support (`BotMgr`), the Tier 2 snapshot at layout 7 and the loot action (branch `m7-quest-share-core` or later).
   The core keeps a byte-identical copy of the SDK's `tier2_layout.h`; a mismatch is refused at region attach.
 
+## InfluxDB statistics
+
+With `Influx.Enabled = 1` the module writes its own bot figures to InfluxDB v2, using the writer library from
+[MOD-Influx-logging](https://github.com/Trixx34/MOD-Influx-logging) (batched, on its own thread, so the pump never waits on the network;
+a down InfluxDB only fills a bounded queue). The world figures come from that repository's module. Measurements, prefix `forever_`:
+
+| Measurement | Tags | Fields |
+|---|---|---|
+| `forever_bots` | | `controlled`, `alive`, `dead`, `in_combat`, `moving`, `in_group` |
+| `forever_bots_by_class` | `class` | `online` (alive bots of that class) |
+| `forever_bots_by_level` | `band` (`0-9`, ..., `110+`) | `online` |
+| `forever_bot_events` | | `deaths`, `fights`, `stuck_episodes`, `level_ups`, `quests_done` (counts since the module started; use `derivative()`) |
+
+The event counts reuse the telemetry's death, fight, stuck and level events, so a stuck episode means what the telemetry file says it
+means. `quests_done` counts quests that were complete and then left the bot's quest log (the snapshot holds 8 quests per bot).
+There is no auction house figure: the bots do not use the auction house yet. Build with `-DINFLUX_LOGGING_SOURCE=/path/to/MOD-Influx-logging`
+for a local checkout; otherwise CMake fetches it from GitHub.
+
 ## Stored state
 
 The bots the module controls are rows in the core's module store (doc 15): `bot/<guid>`, holding the race and class. On start the
