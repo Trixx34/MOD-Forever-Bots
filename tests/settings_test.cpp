@@ -166,6 +166,17 @@ void TelemetrySettings()
 
 } // namespace
 
+void WipeRecoverySettings()
+{
+    std::vector<std::string> warnings;
+    BotSettings const d = ParseBotSettings({}, warnings);
+    CHECK(!d.Scenario.WipeRecovery && d.Scenario.WipeRecoverySec == 300 && d.Scenario.MinAlive == 0 && !d.Scenario.HasPortal);
+    BotSettings const s = ParseBotSettings({ { "Scenario", "x" }, { "ScenarioRoster", "1:1" }, { "ScenarioWipeRecovery", "1" }, { "ScenarioWipeRecoverySec", "120" }, { "ScenarioMinAlive", "2" },
+                                             { "ScenarioLeaderDeadAbandonSec", "90" }, { "ScenarioPortal", "0 -11.0 -390.0 60.0" } }, warnings);
+    CHECK(s.Scenario.WipeRecovery && s.Scenario.WipeRecoverySec == 120 && s.Scenario.MinAlive == 2 && s.Scenario.LeaderDeadAbandonSec == 90);
+    CHECK(s.Scenario.HasPortal);
+}
+
 int main()
 {
     DefaultsWhenEmpty();
@@ -182,6 +193,7 @@ int main()
     TestSpellIsOptional();
     PartySettings();
     HubSettings();
+    WipeRecoverySettings();
 
     if (failures == 0)
         std::printf("settings_test: all checks passed\n");

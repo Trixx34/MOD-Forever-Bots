@@ -47,7 +47,7 @@ void BotTelemetry::Observe(WorldTickSnapshotView const& view, std::uint64_t nowM
         ReadResult(record, bot);
 
         // Death and revival. A death ends the fight in progress.
-        if (bot.health == 0 && record.Alive)
+        if (bot.life_state != 0 && record.Alive)
         {
             record.Alive = false;
             record.Deaths++;
@@ -74,12 +74,27 @@ void BotTelemetry::Observe(WorldTickSnapshotView const& view, std::uint64_t nowM
                 where << " nearest_hostile=" << forever_module::UnitRefEntry(nearest->guid) << " level=" << nearest->level
                       << " dist=" << std::lround(std::sqrt(nearestSq)) << (nearest->elite ? " elite" : "");
             where << (bot.in_combat ? " in_combat" : "");
+            where << " life=" << (bot.life_state == 2 ? "ghost" : "corpse");
             Write("death", bot, record, nowMs, where.str());
         }
-        else if (bot.health != 0 && !record.Alive)
+        else if (bot.life_state == 0 && !record.Alive)
         {
             record.Alive = true;
-            Write("alive", bot, record, nowMs, "");
+            // Where the body was, when the core reported it: a revival by a resurrect or by a reclaim both end here.
+            std::ostringstream revived;
+            if (record.CorpseValid)
+                revived << "corpse_map=" << record.CorpseMap << " x=" << std::lround(record.CorpseX) << " y=" << std::lround(record.CorpseY)
+                        << " z=" << std::lround(record.CorpseZ);
+            record.CorpseValid = false;
+            Write("alive", bot, record, nowMs, revived.str());
+        }
+        if (bot.life_state != 0 && bot.corpse_valid != 0)
+        {
+            record.CorpseValid = true;
+            record.CorpseMap = bot.corpse_map;
+            record.CorpseX = bot.corpse_x;
+            record.CorpseY = bot.corpse_y;
+            record.CorpseZ = bot.corpse_z;
         }
 
         if (bot.level != 0 && bot.level != record.Level)
@@ -140,7 +155,7 @@ void BotTelemetry::Seed(Record& record, BotSnapshot const& bot, std::uint64_t no
 {
     record.Seeded = true;
     record.Level = bot.level;
-    record.Alive = bot.health != 0;
+    record.Alive = bot.life_state == 0;
     record.NextSummaryMs = nowMs + _options.SummaryEveryMs;
     record.LastSequence = bot.last_action_sequence;
     record.LastHealth = bot.health;

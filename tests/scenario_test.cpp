@@ -129,9 +129,9 @@ void DressesThenGroupsThenEnters()
     CHECK(director.Phase() == ScenarioPhase::Running && director.RouteActive());
 }
 
-ScenarioDirector RunningDirector(std::uint64_t& t, std::uint64_t& tick, std::vector<BotSnapshot>& bots)
+ScenarioDirector RunningDirector(std::uint64_t& t, std::uint64_t& tick, std::vector<BotSnapshot>& bots, ScenarioPlan plan = Plan())
 {
-    ScenarioDirector director(Plan());
+    ScenarioDirector director(plan);
     std::vector<BotAction> actions;
     bots = { Bot(1, 36, 0, 0, 2, 3), Bot(2, 36, 0, 0, 1, 3), Bot(3, 36, 0, 0, 1, 3) };
     t = 1000;
@@ -167,10 +167,14 @@ void WipeEndsTheRunAndCountsDeaths()
     ScenarioDirector director = RunningDirector(t, tick, bots);
     std::vector<BotAction> actions;
     bots[1].health = 0;
+    bots[1].life_state = 1;
     director.Decide(View(++tick, bots), t += 1000, actions);
     CHECK(director.Phase() == ScenarioPhase::Running);
     for (BotSnapshot& bot : bots)
+    {
         bot.health = 0;
+        bot.life_state = 1;
+    }
     director.Decide(View(++tick, bots), t += 1000, actions);
     auto const result = director.TakeResult();
     CHECK(result && result->Outcome == "wipe" && result->Deaths == 3 && result->Alive == 0);
@@ -445,11 +449,204 @@ void CountsBossesSeenDead()
     CHECK(fresh.size() == 1 && fresh[0] == "Rhahk'Zor");
     CHECK(director.TakeNewBossKills().empty());
 
-    bots[0].health = bots[1].health = bots[2].health = 0; // a wipe ends it
+    bots[0].health = bots[1].health = bots[2].health = 0;
+    bots[0].life_state = bots[1].life_state = bots[2].life_state = 1; // a wipe ends it
     director.Decide(View(++tick, bots), t += 1000, actions);
     auto const result = director.TakeResult();
     CHECK(result && result->BossesTotal == 2 && result->BossesKilled.size() == 1);
     CHECK(FormatScenarioResult(*result).find("bosses=1/2 killed=Rhahk'Zor") != std::string::npos);
+}
+
+void Down(BotSnapshot& bot, std::uint8_t life = 1)
+{
+    bot.life_state = life;
+    bot.health = life == 2 ? 1 : 0; // a ghost has health 1
+}
+
+void Up(BotSnapshot& bot)
+{
+    bot.life_state = 0;
+    bot.health = 1000;
+}
+
+void GhostCountsAsNotAlive()
+{
+    std::uint64_t t, tick;
+    std::vector<BotSnapshot> bots;
+    ScenarioDirector director = RunningDirector(t, tick, bots);
+    std::vector<BotAction> actions;
+    for (BotSnapshot& bot : bots)
+        Down(bot, 2);
+    director.Decide(View(++tick, bots), t += 1000, actions);
+    auto const result = director.TakeResult();
+    CHECK(result && result->Outcome == "wipe" && result->Alive == 0 && result->Ghosts == 3);
+}
+
+void SingleDeathKeepsTheRunGoing()
+{
+    std::uint64_t t, tick;
+    std::vector<BotSnapshot> bots;
+    ScenarioDirector director = RunningDirector(t, tick, bots);
+    std::vector<BotAction> actions;
+    Down(bots[1]);
+    director.Decide(View(++tick, bots), t += 1000, actions);
+    CHECK(director.Phase() == ScenarioPhase::Running);
+}
+
+void DeadLeaderDoesNotFreezeFurthest()
+{
+    std::uint64_t t, tick;
+    std::vector<BotSnapshot> bots;
+    ScenarioDirector director = RunningDirector(t, tick, bots);
+    std::vector<BotAction> actions;
+    Down(bots[0]);
+    bots[1].pos_y = 100.0f; // a living member reaches the first point
+    director.Decide(View(++tick, bots), t += 1000, actions);
+    bots[1].pos_y = 200.0f; // and the last
+    director.Decide(View(++tick, bots), t += 1000, actions);
+    auto const result = director.TakeResult();
+    CHECK(result && result->Outcome == "complete");
+}
+
+void DeathEventsCountARepeatDeathTwice()
+{
+    std::uint64_t t, tick;
+    std::vector<BotSnapshot> bots;
+    ScenarioDirector director = RunningDirector(t, tick, bots);
+    std::vector<BotAction> actions;
+    Down(bots[1]);
+    director.Decide(View(++tick, bots), t += 1000, actions);
+    Up(bots[1]);
+    director.Decide(View(++tick, bots), t += 1000, actions);
+    Down(bots[1], 2);
+    director.Decide(View(++tick, bots), t += 1000, actions);
+    Up(bots[1]);
+    director.Decide(View(++tick, bots), t += 1000, actions);
+    bots[0].pos_y = 200.0f;
+    director.Decide(View(++tick, bots), t += 1000, actions);
+    auto const result = director.TakeResult();
+    CHECK(result && result->DeathEvents == 2 && result->Revived == 2 && result->Deaths == 1); // Deaths: bots that died at least once
+}
+
+void RevivedBotIsCountedOnceInDeaths()
+{
+    std::uint64_t t, tick;
+    std::vector<BotSnapshot> bots;
+    ScenarioDirector director = RunningDirector(t, tick, bots);
+    std::vector<BotAction> actions;
+    Down(bots[2]);
+    director.Decide(View(++tick, bots), t += 1000, actions);
+    Up(bots[2]);
+    bots[0].pos_y = 200.0f;
+    director.Decide(View(++tick, bots), t += 1000, actions);
+    auto const result = director.TakeResult();
+    CHECK(result && result->Deaths == 1 && result->Alive == 3);
+}
+
+ScenarioPlan RecoveryPlan()
+{
+    ScenarioPlan plan = Plan();
+    plan.WipeRecovery = true;
+    plan.WipeRecoveryMs = 60000;
+    return plan;
+}
+
+void WipeRecoveredByAReclaimingGhost()
+{
+    std::uint64_t t, tick;
+    std::vector<BotSnapshot> bots;
+    ScenarioDirector director = RunningDirector(t, tick, bots, RecoveryPlan());
+    std::vector<BotAction> actions;
+    for (BotSnapshot& bot : bots)
+        Down(bot, 2);
+    director.Decide(View(++tick, bots), t += 1000, actions);
+    CHECK(director.Phase() == ScenarioPhase::Running); // not over yet
+    director.Decide(View(++tick, bots), t += 30000, actions);
+    CHECK(director.Phase() == ScenarioPhase::Running);
+    Up(bots[1]);
+    director.Decide(View(++tick, bots), t += 1000, actions);
+    Up(bots[0]);
+    bots[0].pos_y = 200.0f;
+    director.Decide(View(++tick, bots), t += 1000, actions);
+    auto const result = director.TakeResult();
+    CHECK(result && result->Outcome == "complete" && result->Wipes == 1);
+}
+
+void WipeRecoveryTimesOutToWipe()
+{
+    std::uint64_t t, tick;
+    std::vector<BotSnapshot> bots;
+    ScenarioDirector director = RunningDirector(t, tick, bots, RecoveryPlan());
+    std::vector<BotAction> actions;
+    for (BotSnapshot& bot : bots)
+        Down(bot, 2);
+    director.Decide(View(++tick, bots), t += 1000, actions);
+    director.Decide(View(++tick, bots), t += 61000, actions);
+    auto const result = director.TakeResult();
+    CHECK(result && result->Outcome == "wipe" && result->Wipes == 0);
+}
+
+void UnderstrengthEndsTheRun()
+{
+    std::uint64_t t, tick;
+    std::vector<BotSnapshot> bots;
+    ScenarioPlan plan = Plan();
+    plan.MinAlive = 2;
+    plan.DurationMs = 10000000;
+    ScenarioDirector director = RunningDirector(t, tick, bots, plan);
+    std::vector<BotAction> actions;
+    Down(bots[1]);
+    Down(bots[2], 2);
+    director.Decide(View(++tick, bots), t += 1000, actions);
+    CHECK(director.Phase() == ScenarioPhase::Running);
+    director.Decide(View(++tick, bots), t += kUnderstrengthGraceMs - 1000, actions);
+    CHECK(director.Phase() == ScenarioPhase::Running);
+    director.Decide(View(++tick, bots), t += 2000, actions);
+    auto const result = director.TakeResult();
+    CHECK(result && result->Outcome == "understrength");
+}
+
+void DeadLeaderAbandonsAfterTheCap()
+{
+    std::uint64_t t, tick;
+    std::vector<BotSnapshot> bots;
+    ScenarioPlan plan = Plan();
+    plan.LeaderDeadAbandonMs = 120000;
+    plan.DurationMs = 10000000;
+    ScenarioDirector director = RunningDirector(t, tick, bots, plan);
+    std::vector<BotAction> actions;
+    Down(bots[0], 2);
+    director.Decide(View(++tick, bots), t += 1000, actions);
+    director.Decide(View(++tick, bots), t += 100000, actions);
+    CHECK(director.Phase() == ScenarioPhase::Running);
+    director.Decide(View(++tick, bots), t += 30000, actions);
+    auto const result = director.TakeResult();
+    CHECK(result && result->Outcome == "abandoned_dead_leader");
+}
+
+void EnteringSkipsGhostsAndCorpses()
+{
+    ScenarioDirector director(Plan());
+    std::vector<BotAction> actions;
+    std::vector<BotSnapshot> bots = { Bot(1, 36, 0, 0, 2, 3), Bot(2, 0, 0, 0, 1, 3), Bot(3, 0, 0, 0, 1, 3) };
+    Down(bots[1], 2);
+    std::uint64_t t = 1000, tick = 1;
+    for (int i = 0; i < 20; ++i)
+        director.Decide(View(++tick, bots), t += 3000, actions);
+    for (BotAction const& action : actions)
+        CHECK(!(action.type == ActionType::kTeleport && action.bot_guid == 2));
+}
+
+void FormatShowsEventsRevivedWipes()
+{
+    ScenarioResult result;
+    result.DeathEvents = 4;
+    result.Revived = 2;
+    result.Wipes = 1;
+    result.Ghosts = 1;
+    std::string const text = FormatScenarioResult(result);
+    CHECK(text.find("events=4") != std::string::npos && text.find("revived=2") != std::string::npos);
+    CHECK(text.find("wipes=1") != std::string::npos && text.find("ghosts=1") != std::string::npos);
 }
 
 int main()
@@ -459,6 +656,17 @@ int main()
     DressesThenGroupsThenEnters();
     CompletesWhenTheLeaderReachesTheLastPoint();
     WipeEndsTheRunAndCountsDeaths();
+    GhostCountsAsNotAlive();
+    SingleDeathKeepsTheRunGoing();
+    DeadLeaderDoesNotFreezeFurthest();
+    DeathEventsCountARepeatDeathTwice();
+    RevivedBotIsCountedOnceInDeaths();
+    WipeRecoveredByAReclaimingGhost();
+    WipeRecoveryTimesOutToWipe();
+    UnderstrengthEndsTheRun();
+    DeadLeaderAbandonsAfterTheCap();
+    EnteringSkipsGhostsAndCorpses();
+    FormatShowsEventsRevivedWipes();
     TimeoutEndsTheRun();
     EnteringTimesOut();
     LeaderWalksTheRouteWhileTheRouteIsActive();

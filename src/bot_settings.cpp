@@ -172,6 +172,17 @@ void ReadScenario(std::unordered_map<std::string, std::string> const& config, Sc
     }
     if (auto const it = config.find("ScenarioResultFile"); it != config.end())
         scenario.ResultFile = it->second;
+    // Dead-bot recovery. The portal is the instance door on the outside map; without it a ghost released outside cannot reach a corpse inside.
+    ReadBool(config, "ScenarioWipeRecovery", scenario.WipeRecovery, warnings);
+    ReadKey(config, "ScenarioWipeRecoverySec", 10, 3600, scenario.WipeRecoverySec, warnings);
+    ReadKey(config, "ScenarioMinAlive", 0, 5, scenario.MinAlive, warnings);
+    ReadKey(config, "ScenarioLeaderDeadAbandonSec", 0, 3600, scenario.LeaderDeadAbandonSec, warnings);
+    if (auto const it = config.find("ScenarioPortal"); it != config.end())
+    {
+        scenario.HasPortal = ParseNumbers(it->second, scenario.Portal.data(), 4);
+        if (!scenario.HasPortal)
+            warnings.push_back("Module.forever-bots.ScenarioPortal: '" + it->second + "' is not four numbers (map x y z); ignored.");
+    }
 
     std::vector<std::pair<std::uint32_t, std::array<float, 3>>> route;
     for (auto const& [key, value] : config)

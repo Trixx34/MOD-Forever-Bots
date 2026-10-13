@@ -46,6 +46,9 @@ void ScenarioDirector::Finish(std::string outcome, std::uint64_t nowMs)
     for (auto const& [guid, dead] : _everDead)
         if (dead)
             ++result.Deaths;
+    result.DeathEvents = _deathEvents;
+    result.Revived = _revived;
+    result.Wipes = _wipes;
     _result = result;
     _phase = ScenarioPhase::Done;
 }
@@ -82,15 +85,32 @@ void ScenarioDirector::Decide(forever_module::WorldTickSnapshotView const& view,
     };
 
     std::vector<BotSnapshot> const& bots = view.bots;
+    // A bot is up only with life_state 0: a released ghost has health 1, so health says nothing about it.
     for (BotSnapshot const& bot : bots)
-        if (bot.health == 0)
+    {
+        bool const down = bot.life_state != 0;
+        bool& wasDown = _wasDown[bot.guid];
+        if (down)
             _everDead[bot.guid] = true;
+        if (down && !wasDown)
+            ++_deathEvents;
+        else if (!down && wasDown)
+            ++_revived;
+        wasDown = down;
+    }
     auto const aliveCount = [&bots]
     {
         std::uint32_t alive = 0;
         for (BotSnapshot const& bot : bots)
-            alive += bot.health != 0;
+            alive += bot.life_state == 0;
         return alive;
+    };
+    auto const ghostCount = [&bots]
+    {
+        std::uint32_t ghosts = 0;
+        for (BotSnapshot const& bot : bots)
+            ghosts += bot.life_state == 2;
+        return ghosts;
     };
 
     switch (_phase)
@@ -220,7 +240,7 @@ void ScenarioDirector::Decide(forever_module::WorldTickSnapshotView const& view,
                 if (nowMs - _leaderArrivedMs >= kMembersDelayMs && (_lastEnterMs == 0 || nowMs - _lastEnterMs >= kEnterRetryMs))
                 {
                     for (BotSnapshot const& bot : bots)
-                        if (bot.guid != leader->guid && bot.map_id != _plan.EntryMap && bot.health != 0)
+                        if (bot.guid != leader->guid && bot.map_id != _plan.EntryMap && bot.life_state == 0)
                             teleport(bot);
                     _lastEnterMs = nowMs;
                 }
@@ -235,10 +255,14 @@ void ScenarioDirector::Decide(forever_module::WorldTickSnapshotView const& view,
             BotSnapshot const* leader = LeaderOf(bots);
             if (!leader && !bots.empty())
                 leader = &bots.front();
-            if (leader && leader->health != 0)
+            // Route progress: the leader's while it is up; with the leader down, the furthest point any living member reaches, so the
+            // progress neither freezes nor is lost when the leader comes back. It never decreases.
+            for (BotSnapshot const& bot : bots)
             {
+                if (bot.life_state != 0 || (leader && leader->life_state == 0 && &bot != leader))
+                    continue;
                 for (std::size_t i = 0; i < _plan.Route.size(); ++i)
-                    if (Distance2d(*leader, _plan.Route[i]) <= kRoutePointReachYards)
+                    if (Distance2d(bot, _plan.Route[i]) <= kRoutePointReachYards)
                         _furthest = std::max<std::uint32_t>(_furthest, std::uint32_t(i + 1));
             }
             // A boss counts as killed once any bot sees its corpse (a creature of that entry with no health).
@@ -255,10 +279,37 @@ void ScenarioDirector::Decide(forever_module::WorldTickSnapshotView const& view,
                                 _bossKills.push_back(name);
                     }
             }
+            std::uint32_t const alive = aliveCount();
+            if (alive == 0)
+            {
+                if (!_allDown)
+                {
+                    _allDown = true;
+                    _allDownSinceMs = nowMs;
+                }
+            }
+            else if (_allDown)
+            {
+                _allDown = false; // somebody came back: the wipe is cancelled
+                ++_wipes;
+            }
+            bool const leaderDown = leader && leader->life_state != 0;
+            if (leaderDown && !_leaderDown)
+                _leaderDownSinceMs = nowMs;
+            _leaderDown = leaderDown;
+            bool const few = _plan.MinAlive != 0 && alive != 0 && alive < _plan.MinAlive;
+            if (few && !_fewAlive)
+                _fewAliveSinceMs = nowMs;
+            _fewAlive = few;
+
             if (!_plan.Route.empty() && _furthest >= _plan.Route.size())
                 Finish("complete", nowMs);
-            else if (aliveCount() == 0)
+            else if (_allDown && (!_plan.WipeRecovery || nowMs - _allDownSinceMs >= _plan.WipeRecoveryMs))
                 Finish("wipe", nowMs);
+            else if (_plan.LeaderDeadAbandonMs != 0 && _leaderDown && nowMs - _leaderDownSinceMs >= _plan.LeaderDeadAbandonMs)
+                Finish("abandoned_dead_leader", nowMs);
+            else if (_fewAlive && nowMs - _fewAliveSinceMs >= kUnderstrengthGraceMs)
+                Finish("understrength", nowMs);
             else if (nowMs - _runStartMs >= _plan.DurationMs)
                 Finish("timeout", nowMs);
             break;
@@ -269,14 +320,20 @@ void ScenarioDirector::Decide(forever_module::WorldTickSnapshotView const& view,
     }
 
     if (_result)
+    {
         _result->Alive = aliveCount();
+        _result->Ghosts = ghostCount();
+        _result->DeathEvents = _deathEvents;
+        _result->Revived = _revived;
+    }
 }
 
 std::string FormatScenarioResult(ScenarioResult const& result)
 {
     std::ostringstream out;
     out << "scenario " << result.Name << ": outcome=" << result.Outcome << " furthest=" << result.Furthest << "/" << result.RouteSize
-        << " deaths=" << result.Deaths << " alive=" << result.Alive << "/" << result.RosterSize << " run=" << result.RunMs / 1000 << "s"
+        << " deaths=" << result.Deaths << " alive=" << result.Alive << "/" << result.RosterSize << " events=" << result.DeathEvents
+        << " revived=" << result.Revived << " wipes=" << result.Wipes << " ghosts=" << result.Ghosts << " run=" << result.RunMs / 1000 << "s"
         << " party=" << (result.PartyFormed ? "yes" : "no");
     if (result.BossesTotal != 0)
     {

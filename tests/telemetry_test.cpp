@@ -91,6 +91,7 @@ BotSnapshot Bot(std::uint32_t health, float x = 0.0f, std::uint64_t threat = 0, 
     BotSnapshot bot;
     bot.guid = kBot;
     bot.health = health;
+    bot.life_state = health == 0 ? 1 : 0;
     bot.max_health = 1000;
     bot.level = level;
     bot.pos_x = x;
@@ -239,11 +240,25 @@ void HeaderHasSixteenFields()
 
 } // namespace
 
+void RevivalIsLoggedAfterAGhost()
+{
+    Recorder rec(Quiet());
+    rec.telemetry.Observe(View(Bot(1000)), 0);
+    BotSnapshot ghost = Bot(1);
+    ghost.life_state = 2;
+    rec.telemetry.Observe(View(ghost), 1000);
+    CHECK(rec.Count("death") == 1);
+    CHECK(rec.Last("death").find("life=ghost") != std::string::npos);
+    rec.telemetry.Observe(View(Bot(1000)), 5000);
+    CHECK(rec.Count("alive") == 1);
+}
+
 int main()
 {
     HeaderHasSixteenFields();
     FightLifecycle();
     DeathEndsTheFight();
+    RevivalIsLoggedAfterAGhost();
     StuckFightIsReportedOnce();
     CountsCastsAndRefusals();
     LevelChangeIsRecorded();

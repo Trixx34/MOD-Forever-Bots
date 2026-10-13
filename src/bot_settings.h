@@ -19,6 +19,15 @@
 //   ScenarioGear<classId> = "item,item,..."  (optional: items granted instead of auto gear for that class)
 //   ScenarioBosses = "644:Rhahk'Zor,643:Sneed,..."  (creature entry[:name] of each boss; the result counts the ones seen dead)
 //   ScenarioResultFile = "scenario-results.log"
+// Dead-bot recovery (a dead bot releases its spirit, walks back to its corpse and reclaims it; a living priest, paladin or shaman may
+// resurrect it first):
+//   ScenarioWipeRecovery = 0          1: when every bot is down, the run waits for one to come back (ghosts walk back by themselves) instead of
+//                                     ending at once; 0 (default): all down ends the run as "wipe"
+//   ScenarioWipeRecoverySec = 300     how long an all-down state may last with ScenarioWipeRecovery = 1 (10..3600)
+//   ScenarioPortal = "0 -11.0 -385.0 62.0"  (map x y z: the instance door on the outside map, where a ghost walks to before it enters; the
+//                                     inside map is ScenarioEntry's. Without it a ghost released outside cannot go back to a corpse inside)
+//   ScenarioMinAlive = 0              the run ends as "understrength" when fewer bots than this are alive for a while (0 = off, default)
+//   ScenarioLeaderDeadAbandonSec = 0  the run ends as "abandoned_dead_leader" when the party leader stays down this long (0 = off, default)
 struct ScenarioSettings
 {
     std::string Name;                                    // empty: no scenario
@@ -33,6 +42,12 @@ struct ScenarioSettings
     std::map<std::uint32_t, std::vector<std::uint32_t>> Gear;
     std::vector<std::pair<std::uint32_t, std::string>> Bosses; // creature entry, name
     std::string ResultFile = "scenario-results.log";
+    bool WipeRecovery = false;                           // all down is not the end while a ghost may still come back
+    std::uint32_t WipeRecoverySec = 300;
+    std::uint32_t MinAlive = 0;                          // 0 = the understrength stop is off
+    std::uint32_t LeaderDeadAbandonSec = 0;              // 0 = off
+    bool HasPortal = false;
+    std::array<float, 4> Portal{};                       // map, x, y, z: the instance door, outside
 };
 
 struct BotSettings

@@ -74,6 +74,9 @@ char const* ActionTypeName(std::uint8_t type)
         case forever_module::ActionType::kTeleport: return "teleport";
         case forever_module::ActionType::kGrant: return "grant";
         case forever_module::ActionType::kAutoGear: return "autogear";
+        case forever_module::ActionType::kReleaseSpirit: return "release";
+        case forever_module::ActionType::kResurrect: return "resurrect";
+        case forever_module::ActionType::kReclaimCorpse: return "reclaim";
     }
     return "action";
 }
@@ -638,6 +641,17 @@ int main(int argc, char** argv)
         plan.Gear = settings.Scenario.Gear;
         plan.Bosses = settings.Scenario.Bosses;
         plan.ClassOf = policyOptions.ClassOf;
+        plan.WipeRecovery = settings.Scenario.WipeRecovery;
+        plan.WipeRecoveryMs = std::uint64_t(settings.Scenario.WipeRecoverySec) * 1000;
+        plan.MinAlive = settings.Scenario.MinAlive;
+        plan.LeaderDeadAbandonMs = std::uint64_t(settings.Scenario.LeaderDeadAbandonSec) * 1000;
+        if (settings.Scenario.HasPortal)
+        {
+            policyOptions.HasPortal = true;
+            policyOptions.PortalMap = static_cast<std::uint32_t>(settings.Scenario.Portal[0]);
+            policyOptions.PortalPoint = { settings.Scenario.Portal[1], settings.Scenario.Portal[2], settings.Scenario.Portal[3] };
+            policyOptions.PortalInsideMap = plan.EntryMap;
+        }
         extras.Scenario = std::move(plan);
         extras.ScenarioResultFile = settings.Scenario.ResultFile;
     }

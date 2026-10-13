@@ -107,6 +107,7 @@ WorldTickSnapshotView Hurt(std::uint32_t health, std::vector<NearbyUnit> nearby,
 {
     WorldTickSnapshotView view = View(1, threat, std::move(nearby));
     view.bots[0].health = health;
+    view.bots[0].life_state = health == 0 ? 1 : 0;
     return view;
 }
 
@@ -137,10 +138,11 @@ void ThirtyPercentIsNotLow()
     CHECK(actions.size() == 1 && actions[0].type == ActionType::kAttackTarget);
 }
 
-void DeadBotGetsNoOrders()
+void LoneCorpseReleasesAndDoesNotFight()
 {
     BotPolicy policy;
-    CHECK(policy.Decide(Hurt(0, { Unit(8, 2, 5.0f, true) })).empty());
+    auto const actions = policy.Decide(Hurt(0, { Unit(8, 2, 5.0f, true) }), 1000);
+    CHECK(actions.size() == 1 && actions[0].type == ActionType::kReleaseSpirit);
 }
 
 void OnlyChangesArePublished()
@@ -1321,6 +1323,260 @@ void LineOfSightRefusalClosesTheDistance()
     auto const actions = policy.Decide(view, 1000);
     CHECK(HasAction(actions, 10, ActionType::kFollow, MakeUnitRef(8, 1, 7))); // a priest would stand at 15 yards; now it walks closer
 }
+// ---- dead bots: release, corpse run, reclaim, resurrect ----
+
+std::uint32_t AllWarriors(std::uint64_t) { return 1; }
+
+// A five-bot party (12 leads) whose events are collected. classOf defaults to WarriorLeads (priests follow the warrior).
+PolicyOptions DeadOptions(std::vector<std::string>* events, std::function<std::uint32_t(std::uint64_t)> classOf = WarriorLeads)
+{
+    PolicyOptions options;
+    options.PartySize = 5;
+    options.PartyCount = 1;
+    options.ClassOf = classOf;
+    options.HasPortal = true;
+    options.PortalMap = 0;
+    options.PortalPoint = { 500.0f, 0.0f, 0.0f };
+    options.PortalInsideMap = 36;
+    if (events)
+        options.OnEvent = [events](std::string const& text) { events->push_back(text); };
+    return options;
+}
+
+void Corpse(BotSnapshot& bot, float x)
+{
+    bot.life_state = 1;
+    bot.health = 0;
+    bot.pos_x = x;
+    bot.corpse_valid = 1;
+    bot.corpse_map = bot.map_id;
+    bot.corpse_x = x;
+}
+
+void Ghost(BotSnapshot& bot, float x, std::uint32_t corpseMap, float corpseX)
+{
+    bot.life_state = 2;
+    bot.health = 1;
+    bot.pos_x = x;
+    bot.corpse_valid = 1;
+    bot.corpse_map = corpseMap;
+    bot.corpse_x = corpseX;
+}
+
+bool Logged(std::vector<std::string> const& events, char const* prefix)
+{
+    for (std::string const& text : events)
+        if (text.rfind(prefix, 0) == 0)
+            return true;
+    return false;
+}
+
+void CorpseWaitsForARezzerThenReleases()
+{
+    BotPolicy policy(DeadOptions(nullptr));
+    auto const build = [] { WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 }); Corpse(v.bots[3], 10.0f); return v; };
+    CHECK(!HasAction(policy.Decide(build(), 1000), 13, ActionType::kReleaseSpirit));
+    CHECK(!HasAction(policy.Decide(build(), 11000), 13, ActionType::kReleaseSpirit));
+    CHECK(HasAction(policy.Decide(build(), 21500), 13, ActionType::kReleaseSpirit));
+}
+
+void CorpseReleasesAtOnceWithoutARezzer()
+{
+    std::vector<std::string> events;
+    BotPolicy policy(DeadOptions(&events, AllWarriors));
+    WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 });
+    Corpse(v.bots[3], 10.0f);
+    CHECK(HasAction(policy.Decide(v, 1000), 13, ActionType::kReleaseSpirit));
+    CHECK(Logged(events, "died:") && Logged(events, "release:"));
+}
+
+void CorpseReleasesWhenTheWholePartyIsDown()
+{
+    BotPolicy policy(DeadOptions(nullptr));
+    WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 });
+    for (std::size_t i = 0; i < v.bots.size(); ++i)
+        Corpse(v.bots[i], float(i));
+    auto const actions = policy.Decide(v, 1000);
+    for (std::uint64_t guid = 10; guid <= 14; ++guid)
+        CHECK(HasAction(actions, guid, ActionType::kReleaseSpirit));
+}
+
+void ReleaseIsHeldInCombatUpToTheCap()
+{
+    std::vector<std::string> events;
+    BotPolicy policy(DeadOptions(&events, AllWarriors));
+    auto const build = [] { WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 }); Corpse(v.bots[3], 10.0f); v.bots[1].in_combat = 1; return v; };
+    CHECK(!HasAction(policy.Decide(build(), 1000), 13, ActionType::kReleaseSpirit));
+    CHECK(!HasAction(policy.Decide(build(), 30000), 13, ActionType::kReleaseSpirit));
+    CHECK(Logged(events, "release_held:"));
+    CHECK(HasAction(policy.Decide(build(), 62000), 13, ActionType::kReleaseSpirit));
+}
+
+void GhostWalksToItsCorpseAndIgnoresCombat()
+{
+    BotPolicy policy(DeadOptions(nullptr));
+    WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 });
+    Ghost(v.bots[3], 200.0f, 0, 0.0f);
+    v.bots[3].in_combat = 1;
+    AddNearby(v, 3, Unit(8, 2, 5.0f, true));
+    auto const actions = policy.Decide(v, 1000);
+    CHECK(HasAction(actions, 13, ActionType::kMoveTo));
+    CHECK(!HasAction(actions, 13, ActionType::kAttackTarget));
+}
+
+void GhostOnTheOutsideMapWalksToThePortal()
+{
+    std::vector<std::string> events;
+    BotPolicy policy(DeadOptions(&events));
+    WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 });
+    Ghost(v.bots[3], 0.0f, 36, 50.0f);
+    auto const actions = policy.Decide(v, 1000);
+    bool towardPortal = false;
+    for (BotAction const& action : actions)
+        towardPortal = towardPortal || (action.type == ActionType::kMoveTo && action.bot_guid == 13 && action.dest_x == 500.0f);
+    CHECK(towardPortal);
+}
+
+void GhostWithoutAPortalGivesUp()
+{
+    std::vector<std::string> events;
+    PolicyOptions options = DeadOptions(&events);
+    options.HasPortal = false;
+    BotPolicy policy(options);
+    WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 });
+    Ghost(v.bots[3], 0.0f, 36, 50.0f);
+    policy.Decide(v, 1000);
+    CHECK(Logged(events, "corpse_run_failed:"));
+}
+
+void GhostReclaimsInRadiusAndRetries()
+{
+    BotPolicy policy(DeadOptions(nullptr));
+    auto const build = [](std::uint32_t wait) { WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 }); Ghost(v.bots[3], 0.0f, 0, 10.0f); v.bots[3].reclaim_wait_ms = wait; return v; };
+    CHECK(!HasAction(policy.Decide(build(5000), 1000), 13, ActionType::kReclaimCorpse)); // still waiting
+    CHECK(HasAction(policy.Decide(build(0), 2000), 13, ActionType::kReclaimCorpse));
+    CHECK(!HasAction(policy.Decide(build(0), 3000), 13, ActionType::kReclaimCorpse));    // retried after 3 s, not before
+    CHECK(HasAction(policy.Decide(build(0), 5500), 13, ActionType::kReclaimCorpse));
+}
+
+void GhostCorpseRunTimesOut()
+{
+    std::vector<std::string> events;
+    BotPolicy policy(DeadOptions(&events));
+    auto const build = [] { WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 }); Ghost(v.bots[3], 5000.0f, 0, 0.0f); return v; };
+    policy.Decide(build(), 1000);
+    policy.Decide(build(), 250000);
+    CHECK(Logged(events, "corpse_run_failed:"));
+}
+
+void DeadBotAcceptsAResurrectOffer()
+{
+    BotPolicy policy(DeadOptions(nullptr));
+    WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 });
+    Corpse(v.bots[3], 10.0f);
+    v.bots[3].resurrect_from = PlayerOf(10);
+    CHECK(HasAction(policy.Decide(v, 1000), 13, ActionType::kResurrect, PlayerOf(10)));
+    WorldTickSnapshotView none = PartyView({ 10, 11, 12, 13, 14 });
+    Corpse(none.bots[3], 10.0f);
+    BotPolicy other(DeadOptions(nullptr));
+    CHECK(!HasAction(other.Decide(none, 1000), 13, ActionType::kResurrect));
+}
+
+WorldTickSnapshotView CorpseNextToPriest(float x = 10.0f)
+{
+    WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 });
+    Corpse(v.bots[3], x);
+    for (std::size_t i : { 0, 1, 2, 4 })
+    {
+        v.bots[i].max_power = 1000;
+        v.bots[i].power = 1000;
+    }
+    return v;
+}
+
+void PriestResurrectsTheDeadMember()
+{
+    BotPolicy policy(DeadOptions(nullptr));
+    auto const actions = policy.Decide(CorpseNextToPriest(), 1000);
+    CHECK(CastsSpell(actions, 10, 2006, PlayerOf(13)));
+    CHECK(!CastsSpell(actions, 11, 2006)); // only the closest rezzer casts
+    CHECK(!CastsSpell(actions, 14, 2006));
+}
+
+void NoResurrectInCombat()
+{
+    BotPolicy policy(DeadOptions(nullptr));
+    WorldTickSnapshotView v = CorpseNextToPriest();
+    v.bots[2].in_combat = 1;
+    CHECK(!CastsSpell(policy.Decide(v, 1000), 10, 2006));
+}
+
+void NoResurrectBelowTheManaReserve()
+{
+    BotPolicy policy(DeadOptions(nullptr));
+    WorldTickSnapshotView v = CorpseNextToPriest();
+    for (std::size_t i : { 0, 1, 4 })
+        v.bots[i].power = 300;
+    CHECK(!CastsSpell(policy.Decide(v, 1000), 10, 2006));
+}
+
+void ResurrectRetriesAfterARefusal()
+{
+    BotPolicy policy(DeadOptions(nullptr));
+    CHECK(CastsSpell(policy.Decide(CorpseNextToPriest(), 1000), 10, 2006));
+    WorldTickSnapshotView refused = CorpseNextToPriest();
+    refused.bots[0].last_action_type = std::uint8_t(ActionType::kCastSpell);
+    refused.bots[0].last_action_spell = 2006;
+    refused.bots[0].last_action_status = forever_module::BotActionStatus::kRefused;
+    refused.bots[0].last_action_sequence = 1;
+    CHECK(!CastsSpell(policy.Decide(refused, 2000), 10, 2006));
+    // 5 s after the refusal the next healer in line (or the same) tries again.
+    auto const later = policy.Decide(CorpseNextToPriest(), 8000);
+    CHECK(CastsSpell(later, 10, 2006) || CastsSpell(later, 11, 2006));
+}
+
+void OnlyTheRightClassesAtTheRightLevelsResurrect()
+{
+    auto const spellOf = [](std::uint32_t classId, std::uint32_t level)
+    {
+        BotPolicy policy(DeadOptions(nullptr, [classId](std::uint64_t guid) { return guid == 12 ? 1u : classId; }));
+        WorldTickSnapshotView v = CorpseNextToPriest();
+        for (BotSnapshot& bot : v.bots)
+            bot.level = level;
+        auto const actions = policy.Decide(v, 1000);
+        for (std::uint32_t spell : { 2006u, 7328u, 2008u, 20484u })
+            if (CastsSpell(actions, 10, spell))
+                return spell;
+        return 0u;
+    };
+    CHECK(spellOf(5, 10) == 2006 && spellOf(5, 9) == 0);
+    CHECK(spellOf(2, 12) == 7328 && spellOf(2, 11) == 0);
+    CHECK(spellOf(7, 12) == 2008 && spellOf(7, 11) == 0);
+    CHECK(spellOf(11, 60) == 0); // druid
+}
+
+void HealBeatsResurrect()
+{
+    BotPolicy policy(DeadOptions(nullptr));
+    WorldTickSnapshotView v = CorpseNextToPriest();
+    v.bots[4].health = 300; // a hurt member
+    auto const actions = policy.Decide(v, 1000);
+    CHECK(CastsSpell(actions, 10, 2050) && !CastsSpell(actions, 10, 2006));
+}
+
+void PartyWaitIsLoggedForARezAndForAGhost()
+{
+    std::vector<std::string> events;
+    BotPolicy policy(DeadOptions(&events));
+    policy.Decide(CorpseNextToPriest(), 1000);
+    CHECK(Logged(events, "party_wait:"));
+    events.clear();
+    BotPolicy second(DeadOptions(&events));
+    WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 });
+    Ghost(v.bots[3], 0.0f, 0, 100.0f);
+    second.Decide(v, 1000);
+    CHECK(Logged(events, "party_wait:"));
+}
 
 int main()
 {
@@ -1408,7 +1664,24 @@ int main()
     RetreatsBelowThirtyPercent();
     RetreatWithNoPlayerStops();
     ThirtyPercentIsNotLow();
-    DeadBotGetsNoOrders();
+    LoneCorpseReleasesAndDoesNotFight();
+    CorpseWaitsForARezzerThenReleases();
+    CorpseReleasesAtOnceWithoutARezzer();
+    CorpseReleasesWhenTheWholePartyIsDown();
+    ReleaseIsHeldInCombatUpToTheCap();
+    GhostWalksToItsCorpseAndIgnoresCombat();
+    GhostOnTheOutsideMapWalksToThePortal();
+    GhostWithoutAPortalGivesUp();
+    GhostReclaimsInRadiusAndRetries();
+    GhostCorpseRunTimesOut();
+    DeadBotAcceptsAResurrectOffer();
+    PriestResurrectsTheDeadMember();
+    NoResurrectInCombat();
+    NoResurrectBelowTheManaReserve();
+    ResurrectRetriesAfterARefusal();
+    OnlyTheRightClassesAtTheRightLevelsResurrect();
+    HealBeatsResurrect();
+    PartyWaitIsLoggedForARezAndForAGhost();
     OnlyChangesArePublished();
 
     if (failures == 0)

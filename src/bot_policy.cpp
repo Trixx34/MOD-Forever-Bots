@@ -75,6 +75,20 @@ constexpr std::uint32_t kHealBelowPct = 60;
 constexpr float kHealRangeYards = 30.0f;
 constexpr std::uint64_t kCloserAfterLosMs = 5000;   // after a line-of-sight refusal the bot closes to melee range for this long
 constexpr std::uint64_t kTravelTimeoutMs = 180000; // a walk to the vendor longer than this is dropped for now
+// Death and recovery. Spell ids and levels checked against the fork's SpellLevels.db2: Resurrection 2006 level 10,
+// Redemption 7328 level 12, Ancestral Spirit 2008 level 12, Rebirth 20484 level 20.
+constexpr std::uint32_t kResurrection = 2006;
+constexpr std::uint32_t kRedemption = 7328;
+constexpr std::uint32_t kAncestralSpirit = 2008;
+constexpr float kRezRangeYards = 30.0f;              // a rezzer resurrects a corpse within this range
+constexpr std::uint32_t kRezManaPct = 35;            // and starts the 10 s cast with at least this much mana
+constexpr std::uint64_t kRezCastMs = 11000;          // after a resurrect cast started, the same target is left alone this long
+constexpr std::uint64_t kRezRetryMs = 5000;          // after a refusal, this long
+constexpr std::uint32_t kRezRefusalsLogged = 3;      // refusals in a row before rez_refused is logged
+constexpr std::uint64_t kReleaseRetryMs = 3000;      // a release not yet seen to work is not sent again before this
+constexpr std::uint64_t kAcceptRetryMs = 2000;
+constexpr std::uint64_t kReclaimRetryMs = 3000;
+constexpr float kReclaimYards = 35.0f;               // the core allows 39 yards; the ghost reclaims from this close
 
 // Spells with a cast time (or a channel), which cannot be started while moving. The core's refusals add to the bot's own list, so a
 // spell missing here is learned after its first refusal.
@@ -102,6 +116,24 @@ std::uint32_t HealSpellFor(std::uint32_t classId, std::uint32_t level)
         case 11: return 5185;                     // druid: Healing Touch
         default: return 0;
     }
+}
+
+// The spell a class resurrects a dead ally with, 0 for a class that cannot or whose level is too low. A druid's Rebirth (20484, level 20)
+// needs a reagent the bots are not given, so a druid is not a rezzer. A level of 0 is unknown and not judged.
+std::uint32_t ResurrectSpellFor(std::uint32_t classId, std::uint32_t level)
+{
+    switch (classId)
+    {
+        case 5: return level == 0 || level >= 10 ? kResurrection : 0;    // priest
+        case 2: return level == 0 || level >= 12 ? kRedemption : 0;      // paladin
+        case 7: return level == 0 || level >= 12 ? kAncestralSpirit : 0; // shaman
+        default: return 0;
+    }
+}
+
+bool IsResurrectSpell(std::uint32_t spell)
+{
+    return spell == kResurrection || spell == kRedemption || spell == kAncestralSpirit;
 }
 
 // Duration of the damage-over-time effect a spell leaves on its target, or 0 for spells the policy does not track. Rank 1
@@ -313,6 +345,21 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
         return;
     }
 
+    // The death actions: a refusal is logged, and the action waits before it is sent again.
+    if (bot.last_action_type == uint8_t(ActionType::kReleaseSpirit) || bot.last_action_type == uint8_t(ActionType::kResurrect) ||
+        bot.last_action_type == uint8_t(ActionType::kReclaimCorpse))
+    {
+        bool const ok = bot.last_action_status == BotActionStatus::kApplied;
+        char const* const what = bot.last_action_type == uint8_t(ActionType::kReleaseSpirit) ? "release"
+                                 : bot.last_action_type == uint8_t(ActionType::kResurrect) ? "resurrect_accept" : "reclaim";
+        if (!ok && _options.OnEvent)
+            _options.OnEvent(std::string("death_action_refused: bot=") + std::to_string(bot.guid) + " action=" + what +
+                             " status=" + ActionStatusName(bot.last_action_status));
+        if (ok && bot.last_action_type == uint8_t(ActionType::kReclaimCorpse))
+            state.Reclaimed = true;
+        return;
+    }
+
     // A melee attack refused or with no valid target: that unit is avoided for kAvoidMs, so the bot picks another.
     if (bot.last_action_type == uint8_t(ActionType::kAttackTarget) &&
         (bot.last_action_status == BotActionStatus::kRefused || bot.last_action_status == BotActionStatus::kInvalidTarget))
@@ -326,6 +373,25 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
         return;
 
     std::uint32_t const spell = bot.last_action_spell;
+    if (IsResurrectSpell(spell))
+    {
+        // A resurrect: the dead member is left alone while the cast runs, or after a refusal for a while; a run of refusals is logged.
+        auto const cast = state.CastTarget.find(spell);
+        std::uint64_t const target = cast != state.CastTarget.end() ? cast->second : 0;
+        if (bot.last_action_status == BotActionStatus::kApplied)
+        {
+            state.RezRetryAtMs[target] = nowMs + kRezCastMs;
+            state.RezRefusals[target] = 0;
+        }
+        else
+        {
+            state.RezRetryAtMs[target] = nowMs + kRezRetryMs;
+            if (++state.RezRefusals[target] == kRezRefusalsLogged && _options.OnEvent)
+                _options.OnEvent("rez_refused: rezzer=" + std::to_string(bot.guid) + " spell=" + std::to_string(spell) + " target=" +
+                                 std::to_string(target) + " status=" + ActionStatusName(bot.last_action_status));
+        }
+        return;
+    }
     if (bot.last_action_status == BotActionStatus::kInvalidTarget)
     {
         // The cast had no valid target: that unit is avoided too, so the next cast goes to another one.
@@ -437,12 +503,66 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             continue;
         BotSnapshot const& leader = view.bots[at->second];
         BotState& leaderState = _bots[leader.guid];
-        if (leader.health != 0 && leader.threat_target_guid != 0 && !leaderState.InFight)
+        if (leader.life_state == 0 && leader.threat_target_guid != 0 && !leaderState.InFight)
         {
             leaderState.InFight = true;
             leaderState.FightStartMs = nowMs;
         }
     }
+
+    // The party of a leader: the leader and its members that are online.
+    auto const forParty = [&](std::uint64_t leaderGuid, auto&& fn)
+    {
+        if (auto const at = indexOf.find(leaderGuid); at != indexOf.end())
+            fn(view.bots[at->second]);
+        auto const members = membersOf.find(leaderGuid);
+        if (members == membersOf.end())
+            return;
+        for (std::uint64_t member : members->second)
+            if (auto const at = indexOf.find(member); at != indexOf.end())
+                fn(view.bots[at->second]);
+    };
+    auto const isRezzer = [&](BotSnapshot const& member)
+    {
+        return member.life_state == 0 && ResurrectSpellFor(ClassFor(_options, member.guid), member.level) != 0;
+    };
+    auto const partyFighting = [&](std::uint64_t leaderGuid)
+    {
+        bool fighting = false;
+        forParty(leaderGuid, [&](BotSnapshot const& member) { fighting = fighting || (member.life_state == 0 && member.in_combat != 0); });
+        return fighting;
+    };
+    // Whether the party waits for a dead member: 0 no, 1 for a resurrect, 2 for a ghost on its way back. Never in a fight, never
+    // for a ghost whose run failed, and every wait is capped.
+    auto const deadWait = [&](std::uint64_t leaderGuid) -> std::uint8_t
+    {
+        if (partyFighting(leaderGuid))
+            return 0;
+        bool rezzer = false;
+        forParty(leaderGuid, [&](BotSnapshot const& member) { rezzer = rezzer || isRezzer(member); });
+        std::uint8_t kind = 0;
+        forParty(leaderGuid, [&](BotSnapshot const& member)
+        {
+            if (member.life_state == 0)
+                return;
+            static BotState const unseen; // a member the policy has not met yet counts as just down
+            auto const known = _bots.find(member.guid);
+            BotState const& theirs = known == _bots.end() ? unseen : known->second;
+            if (member.life_state == 1)
+            {
+                if (rezzer && (theirs.Life != 1 || nowMs - theirs.DeathMs < _options.WaitForRezMs))
+                    kind = std::max<std::uint8_t>(kind, 1);
+            }
+            else if (!theirs.RunFailed)
+            {
+                bool const within = theirs.Inside ? nowMs - theirs.InsideSinceMs < _options.WaitForGhostMs
+                                    : !theirs.RunStarted || nowMs - theirs.RunStartMs < _options.CorpseRunTimeoutMs;
+                if (within)
+                    kind = 2;
+            }
+        });
+        return kind;
+    };
 
     for (std::size_t i = 0; i < view.bots.size(); ++i)
     {
@@ -453,11 +573,227 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         for (auto it = state.AvoidUntilMs.begin(); it != state.AvoidUntilMs.end();)
             it = nowMs >= it->second ? state.AvoidUntilMs.erase(it) : std::next(it);
 
-        // A dead bot gets no orders; its last decision stays in place until it is alive again.
-        if (bot.health == 0)
-            continue;
-
         std::span<NearbyUnit const> nearby = view.NearbyOf(i);
+        auto const ledBy = leaderOf.find(bot.guid);
+        std::uint64_t const deadParty = ledBy == leaderOf.end() ? 0 : ledBy->second;
+
+        // A dead bot (a corpse, or a ghost: it has health 1, so only life_state tells) gets its own orders and nothing else. State
+        // changes are logged once.
+        if (bot.life_state != 0)
+        {
+            std::uint8_t const was = state.Life;
+            auto const event = [&](std::string const& text)
+            {
+                if (_options.OnEvent)
+                    _options.OnEvent(text);
+            };
+            auto const emit = [&](Decision const& wantedDead)
+            {
+                if (state.Last && state.Last->Type == wantedDead.Type && state.Last->Target == wantedDead.Target &&
+                    state.Last->Dest.X == wantedDead.Dest.X && state.Last->Dest.Y == wantedDead.Dest.Y && state.Last->Dest.Z == wantedDead.Dest.Z)
+                    return;
+                BotAction action;
+                action.bot_guid = bot.guid;
+                action.type = wantedDead.Type;
+                action.dest_x = wantedDead.Dest.X;
+                action.dest_y = wantedDead.Dest.Y;
+                action.dest_z = wantedDead.Dest.Z;
+                actions.push_back(action);
+                state.Last = wantedDead;
+            };
+            if (was == 0)
+            {
+                // Just died: the living state is dropped, and how it happened is logged (the killer is the threat target, else the
+                // closest live hostile).
+                state.DeathMs = nowMs;
+                state.ReleaseSent = false;
+                state.ReleaseHeldLogged = false;
+                state.AcceptRetryMs = 0;
+                state.AcceptedFrom = 0;
+                state.ReclaimRetryMs = 0;
+                state.Reclaimed = false;
+                state.RunStarted = false;
+                state.Inside = false;
+                state.RunFailed = false;
+                state.RunStartDist = 0.0f;
+                state.RunProgress = 0;
+                state.InFight = false;
+                state.Sitting = false;
+                state.Approaching = false;
+                state.Traveling = false;
+                state.Wandering = false;
+                state.Idling = false;
+                NearbyUnit const* killer = nullptr;
+                for (NearbyUnit const& unit : nearby)
+                    if (unit.guid == bot.threat_target_guid)
+                        killer = &unit;
+                if (!killer)
+                    killer = Closest(bot, nearby, IsLiveMob);
+                event("died: bot=" + std::to_string(bot.guid) + " life=" + std::to_string(bot.life_state) + " map=" + std::to_string(bot.map_id) +
+                      " last_decision=" + (state.Last ? std::to_string(int(state.Last->Type)) : std::string("none")) +
+                      " killer_entry=" + (killer ? std::to_string(forever_module::UnitRefEntry(killer->guid)) : std::string("none")) +
+                      " in_combat=" + std::to_string(bot.in_combat));
+            }
+            if (bot.life_state == 2 && was != 2)
+            {
+                state.RunStarted = false;
+                state.Inside = false;
+                state.Last.reset();
+                event("ghost: bot=" + std::to_string(bot.guid) + " map=" + std::to_string(bot.map_id) + " corpse_map=" + std::to_string(bot.corpse_map) +
+                      " corpse_valid=" + std::to_string(bot.corpse_valid) + " reclaim_wait_ms=" + std::to_string(bot.reclaim_wait_ms));
+            }
+            state.Life = bot.life_state;
+
+            // A resurrect offer is accepted at any time, whatever the bot was doing.
+            if (bot.resurrect_from != 0)
+            {
+                if (nowMs >= state.AcceptRetryMs)
+                {
+                    BotAction accept;
+                    accept.bot_guid = bot.guid;
+                    accept.type = ActionType::kResurrect;
+                    accept.target_guid = bot.resurrect_from;
+                    accept.spell_id = 0;
+                    actions.push_back(accept);
+                    state.AcceptRetryMs = nowMs + kAcceptRetryMs;
+                    if (state.AcceptedFrom != bot.resurrect_from)
+                    {
+                        state.AcceptedFrom = bot.resurrect_from;
+                        event("resurrect_accept: bot=" + std::to_string(bot.guid) + " from=" + std::to_string(bot.resurrect_from) +
+                              " life=" + std::to_string(bot.life_state) + " reason=offer_pending");
+                    }
+                }
+                continue;
+            }
+
+            if (bot.life_state == 1)
+            {
+                if (state.ReleaseSent && nowMs < state.ReleaseSentMs + kReleaseRetryMs)
+                    continue;
+                std::uint64_t const waited = nowMs - state.DeathMs;
+                bool anyAlive = false;
+                bool rezzer = false;
+                bool fighting = bot.in_combat != 0;
+                if (deadParty != 0)
+                    forParty(deadParty, [&](BotSnapshot const& member)
+                    {
+                        if (member.guid == bot.guid || member.life_state != 0)
+                            return;
+                        anyAlive = true;
+                        rezzer = rezzer || isRezzer(member);
+                        fighting = fighting || member.in_combat != 0;
+                    });
+                char const* reason = nullptr;
+                if (!anyAlive)
+                    reason = "release_all_down";
+                else if (!rezzer)
+                    reason = "release_no_rezzer";
+                else if (waited >= _options.ReleaseDelayMs)
+                    reason = "release_timeout";
+                if (!reason)
+                    continue; // waiting for a resurrect
+                if (fighting && waited < _options.ReleaseCombatHoldMs)
+                {
+                    // The core refuses a release in combat, and the party is still fighting: held back, capped.
+                    if (!state.ReleaseHeldLogged)
+                    {
+                        state.ReleaseHeldLogged = true;
+                        event("release_held: bot=" + std::to_string(bot.guid) + " reason=combat would_release=" + reason);
+                    }
+                    continue;
+                }
+                BotAction release;
+                release.bot_guid = bot.guid;
+                release.type = ActionType::kReleaseSpirit;
+                actions.push_back(release);
+                state.ReleaseSent = true;
+                state.ReleaseSentMs = nowMs;
+                event(std::string("release: bot=") + std::to_string(bot.guid) + " reason=" + reason + " waited_ms=" + std::to_string(waited) +
+                      " rezzer_up=" + (rezzer ? "yes" : "no") + " alive_members=" + (anyAlive ? "yes" : "no"));
+                continue;
+            }
+
+            // A ghost: back to the corpse. A corpse on another map (an instance, a ghost is released outside) is reached through the portal.
+            if (state.RunFailed)
+                continue;
+            auto const fail = [&](char const* why)
+            {
+                state.RunFailed = true;
+                emit(Decision{ ActionType::kStop, 0 });
+                event(std::string("corpse_run_failed: bot=") + std::to_string(bot.guid) + " reason=" + why + " map=" + std::to_string(bot.map_id) +
+                      " corpse_map=" + std::to_string(bot.corpse_map) + " run_ms=" + std::to_string(state.RunStarted ? nowMs - state.RunStartMs : 0));
+            };
+            if (!bot.corpse_valid)
+            {
+                fail("no_corpse");
+                continue;
+            }
+            if (!state.RunStarted)
+            {
+                state.RunStarted = true;
+                state.RunStartMs = nowMs;
+                event("corpse_run_start: bot=" + std::to_string(bot.guid) + " map=" + std::to_string(bot.map_id) + " corpse_map=" +
+                      std::to_string(bot.corpse_map) + " dist=" + (bot.map_id == bot.corpse_map ? std::to_string(int(DistanceTo(bot, Point{ bot.corpse_x, bot.corpse_y, bot.corpse_z }))) : std::string("other_map")));
+            }
+            if (nowMs - state.RunStartMs > _options.CorpseRunTimeoutMs)
+            {
+                fail("timeout");
+                continue;
+            }
+            Point const corpse{ bot.corpse_x, bot.corpse_y, bot.corpse_z };
+            if (bot.map_id == bot.corpse_map)
+            {
+                float const dist = DistanceTo(bot, corpse);
+                if (!state.Inside)
+                {
+                    state.Inside = true;
+                    state.InsideSinceMs = nowMs;
+                    state.RunStartDist = std::max(dist, 1.0f);
+                    event("corpse_map_reached: bot=" + std::to_string(bot.guid) + " map=" + std::to_string(bot.map_id) + " dist=" + std::to_string(int(dist)));
+                }
+                std::uint32_t const done = dist >= state.RunStartDist ? 0u : std::uint32_t((1.0f - dist / state.RunStartDist) * 100.0f);
+                for (std::uint32_t mark : { 25u, 50u, 75u })
+                    if (done >= mark && state.RunProgress < mark)
+                    {
+                        state.RunProgress = mark;
+                        event("corpse_run_progress: bot=" + std::to_string(bot.guid) + " pct=" + std::to_string(mark) + " dist=" + std::to_string(int(dist)));
+                    }
+                if (dist <= kReclaimYards)
+                {
+                    emit(Decision{ ActionType::kStop, 0 });
+                    if (bot.reclaim_wait_ms == 0 && nowMs >= state.ReclaimRetryMs)
+                    {
+                        BotAction reclaim;
+                        reclaim.bot_guid = bot.guid;
+                        reclaim.type = ActionType::kReclaimCorpse;
+                        actions.push_back(reclaim);
+                        state.ReclaimRetryMs = nowMs + kReclaimRetryMs;
+                        event("reclaim: bot=" + std::to_string(bot.guid) + " dist=" + std::to_string(int(dist)) + " run_ms=" + std::to_string(nowMs - state.RunStartMs));
+                    }
+                }
+                else
+                    emit(Decision{ ActionType::kMoveTo, 0, corpse });
+            }
+            else if (_options.HasPortal && bot.map_id == _options.PortalMap && bot.corpse_map == _options.PortalInsideMap)
+                emit(Decision{ ActionType::kMoveTo, 0, _options.PortalPoint });
+            else
+                fail("no_route_to_corpse_map");
+            continue;
+        }
+
+        // Alive again after being down: the movement orders are sent afresh, and how it happened is logged.
+        if (state.Life != 0)
+        {
+            if (_options.OnEvent)
+                _options.OnEvent("revived: bot=" + std::to_string(bot.guid) + " how=" + (state.AcceptedFrom != 0 ? "resurrect" : state.Reclaimed ? "reclaim" : "unknown") +
+                                 " down_ms=" + std::to_string(nowMs - state.DeathMs) + " health_pct=" +
+                                 std::to_string(bot.max_health ? std::uint64_t(bot.health) * 100 / bot.max_health : 0));
+            state.Life = 0;
+            state.Last.reset();
+            state.Sitting = false;
+            state.NextCastMs = 0;
+        }
+
         NearbyUnit const* player = Closest(bot, nearby, IsPlayer);
         bool const lowHealth = bot.max_health > 0 && std::uint64_t(bot.health) * 100 < std::uint64_t(bot.max_health) * kDisengagePct;
 
@@ -483,6 +819,19 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         std::uint64_t followRef = player ? player->guid : 0;
         if (partyMember && leaderSnap)
             followRef = atLeader ? 0 : leaderRef;
+
+        // The party leader waits for a dead member (a corpse that a rezzer can still resurrect, a ghost on its way back), capped.
+        std::uint8_t const deadWaitKind = partyLeader != 0 ? deadWait(partyLeader) : std::uint8_t(0);
+        if (partyLeaderBot && deadWaitKind != state.DeadWaitKind)
+        {
+            if (_options.OnEvent)
+                _options.OnEvent(std::string("party_wait: leader=") + std::to_string(bot.guid) + " for=" +
+                                 (deadWaitKind == 1 ? "rez" : deadWaitKind == 2 ? "ghost" : "none") + " waited_ms=" +
+                                 std::to_string(state.DeadWaitKind != 0 ? nowMs - state.DeadWaitSinceMs : 0));
+            if (state.DeadWaitKind == 0)
+                state.DeadWaitSinceMs = nowMs;
+            state.DeadWaitKind = deadWaitKind;
+        }
 
         // Auto gear: out of combat, once when the bot first appears (if AutoGearing) and after it has gained some levels, or when asked.
         if (bot.in_combat == 0 && nowMs >= state.GearRetryMs)
@@ -524,7 +873,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 std::string not_ready_reason;
                 auto const checkReady = [&](BotSnapshot const& member)
                 {
-                    if (member.health == 0)
+                    if (member.life_state != 0)
                         return;
                     if (member.max_health > 0 && std::uint64_t(member.health) * 100 < std::uint64_t(member.max_health) * kPartyReadyHealthPct)
                     {
@@ -547,6 +896,11 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 for (std::uint64_t member : membersOf[bot.guid])
                     if (auto const at = indexOf.find(member); at != indexOf.end())
                         checkReady(view.bots[at->second]);
+                if (ready && deadWaitKind != 0)
+                {
+                    ready = false;
+                    not_ready_reason = deadWaitKind == 1 ? "dead_member_rez" : "dead_member_ghost";
+                }
                 if (ready)
                 {
                     if (state.HoldSinceMs != 0 && _options.OnEvent)
@@ -675,10 +1029,11 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 for (std::uint64_t member : membersOf[bot.guid])
                 {
                     auto const at = indexOf.find(member);
-                    if (at == indexOf.end() || view.bots[at->second].health == 0)
+                    if (at == indexOf.end() || view.bots[at->second].life_state != 0)
                         continue;
                     together = together && Distance2d(bot, view.bots[at->second]) <= kRouteWaitYards;
                 }
+                together = together && deadWaitKind == 0;
                 bool const strong = bot.max_health == 0 ||
                                     std::uint64_t(bot.health) * 100 >= std::uint64_t(bot.max_health) * kRouteMinHealthPct;
                 Point const* waypoint = &_options.Route[state.RouteIndex];
@@ -923,6 +1278,9 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             }
         }
 
+        if (IsResurrectSpell(bot.casting_spell) && bot.cast_remaining_ms != 0 && state.Last)
+            wanted = *state.Last; // a resurrect cast is not broken by a new movement order
+
         if (!state.Last || state.Last->Type != wanted.Type || state.Last->Target != wanted.Target ||
             state.Last->Dest.X != wanted.Dest.X || state.Last->Dest.Y != wanted.Dest.Y || state.Last->Dest.Z != wanted.Dest.Z)
         {
@@ -948,7 +1306,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 std::uint64_t hurtPct = kHealBelowPct;
                 auto const consider = [&](BotSnapshot const& member)
                 {
-                    if (member.health == 0 || member.max_health == 0 || Distance2d(bot, member) > kHealRangeYards)
+                    if (member.life_state != 0 || member.max_health == 0 || Distance2d(bot, member) > kHealRangeYards)
                         return;
                     std::uint64_t const pct = std::uint64_t(member.health) * 100 / member.max_health;
                     if (pct < hurtPct)
@@ -986,6 +1344,76 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                             _options.OnEvent("heal: healer=" + std::to_string(bot.guid) + " spell=" + std::to_string(healSpell) +
                                              " target=" + std::to_string(hurt->guid) + " target_hp_pct=" + std::to_string(hurtPct));
                         state.NextCastMs = nowMs + kGlobalCooldownMs;
+                    }
+                    continue;
+                }
+            }
+
+            // Resurrect (after the heals): a priest, paladin or shaman out of combat with the party quiet resurrects the dead member in range
+            // that it is closest to (healers first, then the tank), once the 10 s cast is affordable. A refusal retries after a few seconds.
+            std::uint32_t const rezSpell = ResurrectSpellFor(classId, bot.level);
+            bool const manaOk = bot.power_type != 0 || bot.max_power == 0 ||
+                                std::uint64_t(bot.power) * 100 >= std::uint64_t(bot.max_power) * kRezManaPct;
+            if (rezSpell != 0 && bot.in_combat == 0 && !hasTarget && manaOk && !partyFighting(partyLeader))
+            {
+                BotSnapshot const* pick = nullptr;
+                int pickRank = 99;
+                float pickDist = 0.0f;
+                forParty(partyLeader, [&](BotSnapshot const& dead)
+                {
+                    if (dead.life_state == 0 || dead.map_id != bot.map_id || dead.resurrect_from != 0)
+                        return;
+                    float const dist = Distance2d(bot, dead);
+                    if (dist > kRezRangeYards)
+                        return;
+                    auto const retry = state.RezRetryAtMs.find(PlayerRef(dead.guid));
+                    if (retry != state.RezRetryAtMs.end() && nowMs < retry->second)
+                        return;
+                    // Only the closest eligible rezzer casts on a target (a tie: the lowest guid).
+                    bool otherCloser = false;
+                    forParty(partyLeader, [&](BotSnapshot const& other)
+                    {
+                        if (other.guid == bot.guid || !isRezzer(other) || other.in_combat != 0 || other.map_id != bot.map_id)
+                            return;
+                        float const otherDist = Distance2d(other, dead);
+                        if (otherDist <= kRezRangeYards && (otherDist < dist || (otherDist == dist && other.guid < bot.guid)))
+                            otherCloser = true;
+                    });
+                    if (otherCloser)
+                        return;
+                    std::uint32_t const deadClass = ClassFor(_options, dead.guid);
+                    int const rank = HealSpellFor(deadClass, 99) != 0 ? 0 : deadClass == kWarriorClass ? 1 : 2;
+                    if (!pick || rank < pickRank || (rank == pickRank && dist < pickDist))
+                    {
+                        pick = &dead;
+                        pickRank = rank;
+                        pickDist = dist;
+                    }
+                });
+                if (pick)
+                {
+                    if (bot.moving != 0)
+                    {
+                        BotAction stop;
+                        stop.bot_guid = bot.guid;
+                        stop.type = ActionType::kStop;
+                        actions.push_back(stop);
+                        state.Last = Decision{ ActionType::kStop, 0 };
+                        state.Approaching = false;
+                    }
+                    else
+                    {
+                        BotAction rez;
+                        rez.bot_guid = bot.guid;
+                        rez.type = ActionType::kCastSpell;
+                        rez.spell_id = rezSpell;
+                        rez.target_guid = PlayerRef(pick->guid);
+                        actions.push_back(rez);
+                        state.CastTarget[rezSpell] = rez.target_guid;
+                        state.NextCastMs = nowMs + kGlobalCooldownMs;
+                        if (_options.OnEvent)
+                            _options.OnEvent("rez_cast: rezzer=" + std::to_string(bot.guid) + " spell=" + std::to_string(rezSpell) + " target=" +
+                                             std::to_string(pick->guid) + " dist=" + std::to_string(int(pickDist)) + " life=" + std::to_string(pick->life_state));
                     }
                     continue;
                 }

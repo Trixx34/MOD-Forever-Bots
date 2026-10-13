@@ -40,6 +40,9 @@ private:
     {
         bool Seeded = false;
         bool Alive = true;
+        bool CorpseValid = false;              // the corpse position last reported while the bot was down
+        std::uint32_t CorpseMap = 0;
+        float CorpseX = 0.0f, CorpseY = 0.0f, CorpseZ = 0.0f;
         std::uint32_t Level = 0;
         std::uint32_t LastSequence = 0;
         std::uint64_t NextSummaryMs = 0;

@@ -13,6 +13,11 @@
 // are within 30 yards (sitting to recover meanwhile; never longer than two minutes); members do not pull and join a fight 2.5 s after
 // the tank; a healer class (priest, paladin, shaman, druid) heals the party member below 60% health; a cast refused for line of sight
 // makes the bot close to melee range for five seconds.
+// Dead bots (life_state, not health: a released ghost has health 1). A corpse waits kReleaseDelay for a living priest, paladin or shaman to
+// resurrect it, and releases its spirit at once when none is up, when the delay is over, or when the whole party is down; it never releases
+// while the party is fighting (capped). A ghost walks back to its corpse (through the instance door when the corpse is inside, see
+// PolicyOptions::Portal), reclaims it within reach, and accepts a resurrect offer at any time. A rezzer out of combat resurrects the
+// nearest dead member in range after healing the hurt, and the party leader waits for a corpse or a ghost on its way (capped).
 // Parties (M8): with PartySize set, bots are cut into parties. The leader invites its members and a member accepts the
 // invite, leaves any other party, follows its leader when it is more than 8 yards away, and fights the leader's target
 // when it has none of its own. Party actions are sent only out of combat.
@@ -68,6 +73,17 @@ struct PolicyOptions
     // Receives one line per notable decision (a heal cast, a pull held back or released), for the run logs. Unset = silent.
     std::function<void(std::string const&)> OnEvent;
     std::uint32_t AutoGearEveryLevels = 5;
+    // Dead-bot recovery. Portal: the instance door on the outside map (PortalMap) that leads to PortalInsideMap; a ghost released outside walks
+    // there when its corpse is inside. Without it such a ghost gives up (corpse_run_failed).
+    bool HasPortal = false;
+    std::uint32_t PortalMap = 0;
+    Point PortalPoint;
+    std::uint32_t PortalInsideMap = 0;
+    std::uint64_t ReleaseDelayMs = 20000;       // a corpse with a rezzer up waits this long before it releases
+    std::uint64_t ReleaseCombatHoldMs = 60000;  // and a release is held back while the party fights, but never longer than this after death
+    std::uint64_t CorpseRunTimeoutMs = 240000;  // a ghost that has not reached its corpse by then gives up
+    std::uint64_t WaitForRezMs = 90000;         // the party waits this long for a corpse to be resurrected
+    std::uint64_t WaitForGhostMs = 180000;      // and this long after the ghost entered the corpse's map
 };
 
 // Name of an action status, for logs.
@@ -145,6 +161,27 @@ private:
         std::size_t RouteIndex = 0;                      // the leader's next route waypoint
         QuestMemory Quest;                               // the quest planner's memory of this bot
         std::unordered_map<std::uint64_t, std::uint64_t> InvitedAtMs; // member guid -> when this bot last invited it
+        // Death and recovery.
+        std::uint8_t Life = 0;                           // life_state at the last tick (0 alive, 1 corpse, 2 ghost)
+        std::uint64_t DeathMs = 0;
+        bool ReleaseSent = false;
+        std::uint64_t ReleaseSentMs = 0;                 // a release is not sent again before kReleaseRetryMs
+        bool RunStarted = false;
+        bool Inside = false;                             // the ghost is on its corpse's map (InsideSinceMs)
+        std::uint8_t DeadWaitKind = 0;                   // the leader waits for a dead member: 0 no, 1 for a rez, 2 for a ghost
+        std::uint64_t DeadWaitSinceMs = 0;
+        bool ReleaseHeldLogged = false;
+        std::uint64_t AcceptRetryMs = 0;
+        std::uint64_t AcceptedFrom = 0;                  // the resurrecter of the last accept sent (0 = none)
+        std::uint64_t ReclaimRetryMs = 0;
+        bool Reclaimed = false;                          // a reclaim was sent in this death
+        std::uint64_t RunStartMs = 0;                    // the corpse run began (0 = not yet)
+        std::uint64_t InsideSinceMs = 0;                 // the ghost is on the corpse's map since
+        bool RunFailed = false;
+        float RunStartDist = 0.0f;                       // distance to the corpse at the start (same map), for progress lines
+        std::uint32_t RunProgress = 0;                   // 25, 50 or 75: the last progress line written
+        std::unordered_map<std::uint64_t, std::uint64_t> RezRetryAtMs; // dead member -> no resurrect cast on it before this
+        std::unordered_map<std::uint64_t, std::uint32_t> RezRefusals;  // dead member -> refusals in a row
     };
 
     void ReadResult(BotState& state, forever_module::BotSnapshot const& bot, std::uint64_t nowMs);
