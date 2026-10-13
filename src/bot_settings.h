@@ -87,6 +87,8 @@ struct BotSettings
     std::string QuestFile;
     // Grind spots (config key GrindFile, see grind_data.h): the places idle bots walk to for their level. Empty turns it off (hubs are used).
     std::string GrindFile;
+    // Rotations (config key RotationFile, see combat_rotation.h): fight rows and upkeep buffs per class from a file. Empty = the built-in rotations.
+    std::string RotationFile;
     // Auto gear (config key AutoGearing, 0 or 1): the core dresses every bot for its level when it first appears and after it gains
     // AutoGearEveryLevels levels. Off by default; when it is off, the .autogear command in a party does it for that party's bots.
     bool AutoGearing = false;

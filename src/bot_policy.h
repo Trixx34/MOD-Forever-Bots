@@ -25,6 +25,7 @@
 
 #include "forever_module/tier2_session.h"
 #include "chat_commands.h"
+#include "combat_rotation.h"
 #include "grind_data.h"
 #include "quest_planner.h"
 
@@ -79,6 +80,9 @@ struct PolicyOptions
     // 2 Horde, 0 unknown).
     std::shared_ptr<GrindData const> Grind;
     std::function<std::uint8_t(std::uint64_t botGuid)> SideOf;
+    // Rotations from a file (data/rotations.txt, tools/make_rotations.py): the fight rows and the upkeep buffs of the classes it lists. A class it does
+    // not list keeps the built-in rows.
+    std::shared_ptr<rotation::RotationData const> Rotations;
     // Chat commands: a bot accepts a party invite from a player (a human leader), so the player can bring bots into a group and command them.
     bool AcceptInvites = false;
     // Alts (a player's own characters playing as bots): never dressed by the module.
@@ -154,6 +158,7 @@ private:
         std::uint32_t LastSequence = 0;                  // last action result seen
         std::unordered_map<std::uint32_t, std::uint64_t> RetryAtMs; // spell -> time it may be cast again
         std::unordered_map<std::uint32_t, std::uint64_t> CastTarget; // spell -> target of the last cast sent for it
+        std::map<std::pair<std::uint32_t, std::uint64_t>, std::uint64_t> BuffUntilMs; // (spell, recipient reference; 0 = the bot itself) -> when the buff runs out
         std::unordered_map<std::uint32_t, Dot> Dots;     // spell -> effect on a target, while it lasts
         std::optional<std::uint64_t> LastTestCastTick;
         bool Sitting = false;                            // sat down to rest; stands before it moves or fights
@@ -235,6 +240,11 @@ private:
         std::unordered_map<std::uint64_t, std::uint64_t> RezRetryAtMs; // dead member -> no resurrect cast on it before this
         std::unordered_map<std::uint64_t, std::uint32_t> RezRefusals;  // dead member -> refusals in a row
     };
+
+    // The rows of a class's rotation: from the rotation file when it lists the class, else the built-in ones.
+    std::span<rotation::Row const> RowsFor(std::uint32_t classId) const;
+    // How long a spell's effect lasts, for the dot and buff upkeep: from the rotation file, else the built-in table (0 = not tracked).
+    std::uint64_t DurationMsOf(std::uint32_t classId, std::uint32_t spell) const;
 
     void ReadResult(BotState& state, forever_module::BotSnapshot const& bot, std::uint64_t nowMs);
 

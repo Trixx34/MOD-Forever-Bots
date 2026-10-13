@@ -71,6 +71,10 @@ Module.forever-bots.TelemetrySummarySec = 60
 # player in a party can type .autogear to dress the bots that player leads.
 # AutoGearing = 0
 #
+# Rotations from a file: fight rows and upkeep buffs for all classes up to level 60, with the real spell ids from the core's ability dump
+# (tools/make_rotations.py, doc/rotations.md). Without it the built-in rank 1 rotations are used.
+# RotationFile = "data/rotations.txt"
+#
 # Grind spots (leveling): idle bots walk to the spots that suit their level instead of their map's hubs. The file is made from the world database
 # (tools/make_grind_spots.py, doc/grind-spots.md).
 # GrindFile = "data/grind_spots.txt"
