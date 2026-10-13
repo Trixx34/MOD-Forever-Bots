@@ -129,8 +129,19 @@ void RangedClassesApproachToRange()
     CHECK(rotation::ApproachYards(2) == 5.0f);   // paladin
 }
 
+void LearnLevelsFollowTheTrainerData()
+{
+    CHECK(rotation::LearnLevel(772) == 4);     // Rend
+    CHECK(rotation::LearnLevel(1766) == 12);   // Kick
+    CHECK(rotation::LearnLevel(5308) == 24);   // Execute
+    CHECK(rotation::LearnLevel(1752) == 0);    // Sinister Strike: a level 1 spell
+    CHECK(rotation::LearnLevel(7386) == 0);    // Sunder Armor: no trainer row, not gated
+    CHECK(rotation::LearnLevel(999999) == 0);  // unknown
+}
+
 int main()
 {
+    LearnLevelsFollowTheTrainerData();
     EveryClassHasRows();
     RangedClassesApproachToRange();
     Conditions();

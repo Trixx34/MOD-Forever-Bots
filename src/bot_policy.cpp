@@ -687,6 +687,9 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
 
         for (rotation::Row const& row : rotation::RowsForClass(classId))
         {
+            // Not learned yet: below the level a trainer teaches it. (A level of 0 is unknown and not judged.)
+            if (bot.level != 0 && rotation::LearnLevel(row.Spell) > bot.level)
+                continue;
             auto const retry = state.RetryAtMs.find(row.Spell);
             if (retry != state.RetryAtMs.end() && nowMs < retry->second)
                 continue;
