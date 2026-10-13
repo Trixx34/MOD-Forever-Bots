@@ -32,10 +32,11 @@ struct BotSettings
     std::uint32_t TelemetryKeep = 5;
     // Seconds between summary lines per bot (config key TelemetrySummarySec, 1..3600).
     std::uint32_t TelemetrySummarySec = 60;
-    // Seconds between vendor visits (sell grey, repair, equip) and between trainer checks, for an idle bot. A level-up
-    // triggers a trainer check at once. Config keys ServiceEverySec and TrainEverySec (60..86400).
+    // Seconds between vendor visits (sell grey, repair, equip), for an idle bot (config key ServiceEverySec, 60..86400). The
+    // trainer check (config key TrainEverySec, 60..86400, also at once after a level-up) is off by default (0): bots learn
+    // their spells on level-up, so they do not need a trainer.
     std::uint32_t ServiceEverySec = 600;
-    std::uint32_t TrainEverySec = 600;
+    std::uint32_t TrainEverySec = 0;
     // Parties (M8): PartySize bots per party (config key PartySize, 0 = no parties, at most 5) and PartyCount parties,
     // cut from the lowest-guid bots (config key PartyCount, 1..100).
     std::uint32_t PartySize = 0;

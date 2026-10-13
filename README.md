@@ -87,8 +87,9 @@ row and its repeated casts are not yet checked on the sim.
   for an idle bot, when an NPC with the vendor or repair flag is in interaction range.
 - M4 trainers: `kTrain` learns the trainer's spells the bot can take now, lowest level first, through the core's teach
   checks. Runs on a timer and at once after a level-up, when a trainer is in interaction range.
-- Services are opt-in in the policy (zero interval is off). The module turns them on from `ServiceEverySec` and
-  `TrainEverySec`. A refused service is logged at most once per bot every ten minutes.
+- Services are opt-in in the policy (zero interval is off). The module turns the vendor visit on from `ServiceEverySec`
+  (default 600). The trainer check is off by default (`TrainEverySec` 0), since bots learn their spells on level-up; set
+  `TrainEverySec` to turn it on. A refused service is logged at most once per bot every ten minutes.
 - M8 parties: `kGroup` invites, accepts and leaves (spell_id 1, 2, 3; layout 5). With `PartySize` set, the first
   `PartyCount` parties of `PartySize` bots (lowest guids first) form: the leader (its first warrior, else its lowest-guid
   bot) invites each member not in the party, members accept, leave a foreign party, follow the leader when more than 8
