@@ -24,6 +24,7 @@ constexpr std::uint64_t kCooldownRetryMs = 2000;
 constexpr std::uint64_t kBusyRetryMs = 300;  // a cast refused because the bot was casting or moving: tried again very soon
 constexpr std::uint64_t kNotKnownRetryMs = 60000; // the spell may be learned later
 constexpr float kPullRadius = 10.0f;         // yards: hostiles this close to a candidate are pulled with it
+constexpr std::size_t kMaxDungeonPull = 6;  // a dungeon pack is larger; the party fights up to this many together
 constexpr std::size_t kMaxPull = 3;          // a group larger than this is not pulled (over-pull control)
 constexpr std::uint32_t kRend = 772;         // warrior rank 1; the bleed lasts 21 seconds
 constexpr std::uint64_t kRendDurationMs = 21000;
@@ -113,7 +114,7 @@ bool IsLiveMob(NearbyUnit const& unit);
 // fights its threat target whatever the group size.
 NearbyUnit const* PullTarget(BotSnapshot const& bot, std::span<NearbyUnit const> units,
                             std::function<bool(std::uint64_t)> const& avoided, bool defending,
-                            std::vector<std::uint32_t> const& onlyEntries = {})
+                            std::vector<std::uint32_t> const& onlyEntries = {}, bool dungeon = false)
 {
     NearbyUnit const* best = nullptr;
     float bestDist = std::numeric_limits<float>::max();
@@ -128,7 +129,9 @@ NearbyUnit const* PullTarget(BotSnapshot const& bot, std::span<NearbyUnit const>
         // Not worth pulling: well above the bot's level, or an elite. (A level of 0 is unknown and not judged.) A bot that is already
         // in combat is being attacked, and the snapshot does not say by what: it fights the closest creature, whatever its level, since
         // standing still until it dies is worse. The same goes for the pack-size rule below.
-        if (!defending && bot.level != 0 && ((candidate.level != 0 && candidate.level > bot.level + kMaxLevelAbove) || candidate.elite))
+        // In a dungeon (the route is active) elites, bosses and higher levels are the content: the party fights what it meets.
+        if (!defending && !dungeon && bot.level != 0 &&
+            ((candidate.level != 0 && candidate.level > bot.level + kMaxLevelAbove) || candidate.elite))
             continue;
         float const dist = rotation::DistanceYards(bot, candidate);
         if (dist >= bestDist)
@@ -138,7 +141,7 @@ NearbyUnit const* PullTarget(BotSnapshot const& bot, std::span<NearbyUnit const>
         for (NearbyUnit const& other : units)
             if (IsLiveMob(other) && DistanceBetween(candidate, other) <= kPullRadius)
                 ++group;
-        if (!defending && group > kMaxPull)
+        if (!defending && group > (dungeon ? kMaxDungeonPull : kMaxPull))
             continue;
 
         bestDist = dist;
@@ -489,7 +492,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 if (unit.guid == targetRef)
                     targetUnit = &unit;
         }
-        else if (NearbyUnit const* hostile = PullTarget(bot, nearby, avoided, bot.in_combat != 0, huntEntries))
+        else if (NearbyUnit const* hostile = PullTarget(bot, nearby, avoided, bot.in_combat != 0, huntEntries, _routeActive))
         {
             targetUnit = hostile;
             targetRef = hostile->guid;

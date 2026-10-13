@@ -252,6 +252,37 @@ void LeaderMovesOnAfterTheFirstPoint()
     CHECK(toSecond);
 }
 
+// ---- dungeon pulls ----
+
+void TheRoutePartyPullsElitesButGrindingBotsDoNot()
+{
+    auto const eliteView = []
+    {
+        WorldTickSnapshotView view;
+        view.tick_number = 1;
+        view.max_nearby_units = 1;
+        BotSnapshot bot = Bot(12, 36, 0, 0, 2, 2);
+        bot.level = 18;
+        bot.nearby_count = 1;
+        view.bots = { bot };
+        view.nearby.resize(1);
+        view.nearby[0].guid = forever_module::MakeUnitRef(8, 644, 1);
+        view.nearby[0].pos_x = 15.0f;
+        view.nearby[0].health = 100;
+        view.nearby[0].max_health = 100;
+        view.nearby[0].is_hostile = true;
+        view.nearby[0].level = 21; // three levels above, and elite
+        view.nearby[0].elite = 1;
+        return view;
+    };
+    BotPolicy grinding = RoutePolicy();
+    CHECK(Count(grinding.Decide(eliteView(), 1000), ActionType::kAttackTarget) == 0); // not worth it for a lone bot
+    BotPolicy dungeon = RoutePolicy();
+    dungeon.SetRouteActive(true);
+    auto const actions = dungeon.Decide(eliteView(), 1000);
+    CHECK(Count(actions, ActionType::kAttackTarget) + Count(actions, ActionType::kFollow) >= 1);
+}
+
 // ---- auto gear (policy) ----
 
 void AutoGearingDressesEachBotOnceAndAgainAfterLevels()
@@ -396,6 +427,7 @@ int main()
     LeaderWalksTheRouteWhileTheRouteIsActive();
     LeaderWaitsForAMemberWhoFellBehind();
     LeaderMovesOnAfterTheFirstPoint();
+    TheRoutePartyPullsElitesButGrindingBotsDoNot();
     AutoGearingDressesEachBotOnceAndAgainAfterLevels();
     WithoutAutoGearingOnlyTheCommandDressesABot();
     NoCastWhileAnotherCastRuns();
