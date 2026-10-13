@@ -1007,8 +1007,24 @@ void UnreachableTargetIsGivenUp()
     CHECK(!HasAction(policy.Decide(view, 32000), 10, ActionType::kFollow, far.guid)); // avoided: not picked again
 }
 
+// A target given up again is avoided for longer: the second time, twice kAvoidMs.
+void RepeatedlyAvoidedTargetIsLeftLonger()
+{
+    BotPolicy policy;
+    NearbyUnit const trainer = Hostile(7, 30.0f, 100);
+    WorldTickSnapshotView view = PartyView({ 10 });
+    AddNearby(view, 0, trainer);
+    policy.Decide(view, 0);                                      // walking to it
+    CHECK(HasAction(policy.Decide(view, 31000), 10, ActionType::kStop)); // given up: avoided for 30 s
+    CHECK(HasAction(policy.Decide(view, 61000), 10, ActionType::kFollow, trainer.guid)); // free again: walks back
+    CHECK(HasAction(policy.Decide(view, 92000), 10, ActionType::kStop));  // given up the second time: avoided for 60 s
+    CHECK(!HasAction(policy.Decide(view, 122000), 10, ActionType::kFollow, trainer.guid)); // still avoided
+    CHECK(HasAction(policy.Decide(view, 153000), 10, ActionType::kFollow, trainer.guid)); // free after 60 s
+}
+
 int main()
 {
+    RepeatedlyAvoidedTargetIsLeftLonger();
     UnreachableTargetIsGivenUp();
     RefusedAttackPicksAnotherTarget();
     InvalidCastTargetIsNotCastAtAgain();
