@@ -50,6 +50,8 @@ constexpr std::uint64_t kPartyRetryMs = 2000;   // a party action refused, or ju
 constexpr float kFollowLeaderYards = 8.0f;      // a member this close to its leader stays where it is
 constexpr std::uint64_t kApproachTimeoutMs = 30000; // walking to a target this long without reaching it: avoid the target
 constexpr std::uint32_t kMaxLevelAbove = 2;      // a bot does not pull a creature more than this many levels above it
+constexpr float kLootRangeYards = 25.0f;         // the core loots a corpse within 30 yards; the bot asks within 25
+constexpr std::uint64_t kLootWindowMs = 120000;  // a corpse is looted within this long after the fight, or forgotten
 constexpr std::uint64_t kAvoidMs = 30000;        // a target that refused an attack or a cast is skipped for this long
 constexpr std::uint32_t kMaxAvoidDoublings = 2;  // each repeat avoid doubles the time: 30 s, 60 s, then 120 s at most
 constexpr std::uint64_t kWanderIdleMs = 30000;   // idle for this long, seeing nothing, before walking to a hub
@@ -417,6 +419,13 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             targetRef = hostile->guid;
         }
         bool const hasTarget = targetRef != 0 && !lowHealth;
+        // The target of this fight is looted once it is dead: remember it, and forget the ones too old to still be on the ground.
+        if (hasTarget && forever_module::UnitRefType(targetRef) == 8)
+            state.FoughtAtMs[targetRef] = nowMs;
+        for (auto it = state.FoughtAtMs.begin(); it != state.FoughtAtMs.end();)
+            it = nowMs - it->second > kLootWindowMs ? state.FoughtAtMs.erase(it) : std::next(it);
+        for (auto it = state.LootedUntilMs.begin(); it != state.LootedUntilMs.end();)
+            it = nowMs >= it->second ? state.LootedUntilMs.erase(it) : std::next(it);
         float const distance = targetUnit ? rotation::DistanceYards(bot, *targetUnit) : bot.target_distance;
 
         Decision wanted;
@@ -630,6 +639,28 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     actions.push_back(party);
                     state.PartyRetryAtMs = nowMs + kPartyRetryMs;
                 }
+            }
+        }
+
+        // Loot (M7): a creature the bot fought, now dead and close, once the bot is out of combat. One loot per corpse; the core
+        // decides whether the bot may take anything from it.
+        if (bot.in_combat == 0 && !lowHealth)
+        {
+            for (NearbyUnit const& unit : nearby)
+            {
+                if (unit.health != 0 || forever_module::UnitRefType(unit.guid) != 8 || state.LootedUntilMs.count(unit.guid))
+                    continue;
+                if (!state.FoughtAtMs.count(unit.guid) || rotation::DistanceYards(bot, unit) > kLootRangeYards)
+                    continue;
+
+                BotAction loot;
+                loot.bot_guid = bot.guid;
+                loot.type = ActionType::kLoot;
+                loot.target_guid = unit.guid;
+                actions.push_back(loot);
+                state.LootedUntilMs[unit.guid] = nowMs + kLootWindowMs;
+                state.FoughtAtMs.erase(unit.guid);
+                break; // one corpse per tick
             }
         }
 

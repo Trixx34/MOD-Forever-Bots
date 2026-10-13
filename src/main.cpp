@@ -65,6 +65,7 @@ char const* ActionTypeName(std::uint8_t type)
         case forever_module::ActionType::kVendor: return "vendor";
         case forever_module::ActionType::kTrain: return "train";
         case forever_module::ActionType::kGroup: return "group";
+        case forever_module::ActionType::kLoot: return "loot";
     }
     return "action";
 }

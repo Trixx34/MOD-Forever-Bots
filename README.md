@@ -103,6 +103,9 @@ row and its repeated casts are not yet checked on the sim.
   of its map (`Hub<map>_<n>` settings, in order), waits there for a full interval, then walks to the next. A hurt bot
   rests rather than walks; a party member follows its leader; anything seen stops the walk. A walk longer than 3 minutes
   is dropped. Hubs come from the sim's quest-giver clusters (see the config example).
+- Loot (M7): a creature the bot fought, once it is dead, within 25 yards and the bot is out of combat, is looted once (`kLoot`)
+  within two minutes of the fight. The core opens the corpse through the bot's own loot handlers, so loot rights, group rules and
+  bag space are the core's. The item-looted event fires, so auto-vendor-trash sells a bot's grey drops too.
 - Refused targets: a unit whose melee attack is refused, or that a cast reports with no valid target, is avoided for 30 s.
   The bot picks the next closest hostile (or, if it is a party member, its leader's target when that is not avoided).
 
