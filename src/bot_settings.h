@@ -88,6 +88,11 @@ struct BotSettings
     // Auto gear (config key AutoGearing, 0 or 1): the core dresses every bot for its level when it first appears and after it gains
     // AutoGearEveryLevels levels. Off by default; when it is off, the .autogear command in a party does it for that party's bots.
     bool AutoGearing = false;
+    // Chat commands (config keys ChatCommands and ChatOrders, 0 or 1, both off by default; see chat_commands.h). ChatCommands turns on the basic
+    // verbs (follow, stay, goto here, release, status) typed by a group leader in party or raid chat or whispered to a bot; ChatOrders adds
+    // stop, pull, heal, passive and aggressive. Only the bots of the speaker's own group obey.
+    bool ChatCommands = false;
+    bool ChatOrders = false;
     std::uint32_t AutoGearEveryLevels = 5;
     ScenarioSettings Scenario;
 };

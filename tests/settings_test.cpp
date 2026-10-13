@@ -31,6 +31,15 @@ void ReadsValidValues()
     CHECK(warnings.empty());
 }
 
+void ChatSettings()
+{
+    std::vector<std::string> warnings;
+    BotSettings const off = ParseBotSettings({}, warnings);
+    CHECK(!off.ChatCommands && !off.ChatOrders); // both off by default
+    BotSettings const on = ParseBotSettings({ { "ChatCommands", "1" }, { "ChatOrders", "1" } }, warnings);
+    CHECK(on.ChatCommands && on.ChatOrders && warnings.empty());
+}
+
 void MaxBotsIsCapped()
 {
     std::vector<std::string> warnings;
@@ -179,6 +188,7 @@ void WipeRecoverySettings()
 
 int main()
 {
+    ChatSettings();
     DefaultsWhenEmpty();
     TelemetrySettings();
     ReadsValidValues();

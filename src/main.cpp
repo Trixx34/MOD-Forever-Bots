@@ -202,6 +202,14 @@ struct CommandQueue
 {
     std::mutex Lock;
     std::vector<std::uint64_t> AutoGear; // player guids that typed .autogear
+    // Chat commands parsed on the Run() thread, applied on the pump thread; and the lines to send back to the speakers.
+    struct ChatItem
+    {
+        BotPolicy::ChatContext Context;
+        ChatCommand Command;
+    };
+    std::vector<ChatItem> Chat;
+    std::vector<std::pair<std::uint64_t, std::string>> Replies; // speaker character guid, text
 };
 
 // What the pump needs beyond the policy: the scenario (if one is configured) and the command queue.
@@ -362,6 +370,22 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
                             policy.RequestAutoGear(bot.guid);
                 }
             }
+            // Chat commands: applied before this tick's decisions; the lines for the speaker go back through the Run() thread.
+            if (extras.Commands)
+            {
+                std::vector<CommandQueue::ChatItem> chat;
+                {
+                    std::lock_guard<std::mutex> lock(extras.Commands->Lock);
+                    chat.swap(extras.Commands->Chat);
+                }
+                for (CommandQueue::ChatItem const& item : chat)
+                {
+                    std::vector<std::string> const lines = policy.ApplyChat(view, item.Context, item.Command, nowMs());
+                    std::lock_guard<std::mutex> lock(extras.Commands->Lock);
+                    for (std::string const& line : lines)
+                        extras.Commands->Replies.emplace_back(item.Context.Issuer, line);
+                }
+            }
             if (director)
                 policy.SetRouteActive(director->RouteActive());
             std::vector<forever_module::BotAction> actions = policy.Decide(view, nowMs());
@@ -446,7 +470,7 @@ int main(int argc, char** argv)
     manifest.requested_max_bots = kMaxBotsCeiling;
     manifest.requested_max_nearby_units = kRequestedNearbyUnits;
     manifest.requested_max_actions = kRequestedActions;
-    manifest.tier1_hooks = { "CommandScript" };
+    manifest.tier1_hooks = { "CommandScript", "PlayerScript.OnChat" };
 
     forever_module::ModuleClient client(std::move(manifest));
     if (!client.Connect(argv[1]) || !client.Handshake())
@@ -515,11 +539,59 @@ int main(int argc, char** argv)
 
     // .autogear: a player in a party types it (as a chat command) and the bots that player leads are dressed for their level.
     auto commands = std::make_shared<CommandQueue>();
-    client.OnRequest("CommandScript", [commands](forever_module::EventRequest const& request) -> forever_module::EventReply
+    client.OnRequest("CommandScript", [commands, &settings](forever_module::EventRequest const& request) -> forever_module::EventReply
     {
         forever_module::EventReply reply;
         std::string text = request.command().command_text();
         std::transform(text.begin(), text.end(), text.begin(), [](unsigned char c) { return char(std::tolower(c)); });
+        // .bots <verb>: the chat commands (chat_commands.h) as a dot command, for the bots of the player's group. goto here, pull and heal need
+        // the speaker's position or target, which a dot command does not carry: those are for party chat.
+        if (text == "bots" || text.rfind("bots ", 0) == 0)
+        {
+            std::string const rest = text.size() > 5 ? text.substr(5) : std::string();
+            auto const set = [&reply](bool ok, std::string const& message)
+            {
+                reply.mutable_command()->set_success(ok);
+                reply.mutable_command()->set_result_text(message);
+            };
+            if (rest == "autogear")
+            {
+                {
+                    std::lock_guard<std::mutex> lock(commands->Lock);
+                    commands->AutoGear.push_back(request.command().issuer_guid());
+                }
+                set(true, "Your party's bots are being dressed for their level.");
+                return reply;
+            }
+            if (!settings.ChatCommands)
+            {
+                set(false, "Bot commands are off (ChatCommands = 0 in the module's config).");
+                return reply;
+            }
+            auto const parsed = ParseChatCommand(rest, settings.ChatOrders);
+            if (!parsed)
+            {
+                set(false, "Usage: .bots [all|tank|healer|dps|<class>] follow [off] | stay [off] | release | status | autogear" +
+                               std::string(settings.ChatOrders ? " | stop | passive | aggressive" : "") +
+                               ". goto here, pull and heal: say them in party chat.");
+                return reply;
+            }
+            if (parsed->Verb == ChatVerb::GotoHere || parsed->Verb == ChatVerb::Pull || parsed->Verb == ChatVerb::Heal)
+            {
+                set(false, std::string(ChatVerbName(parsed->Verb)) + " needs your position or target: say it in party chat.");
+                return reply;
+            }
+            CommandQueue::ChatItem item;
+            item.Command = *parsed;
+            item.Context.Issuer = request.command().issuer_guid() & forever_module::kUnitRefCounterMask;
+            {
+                std::lock_guard<std::mutex> lock(commands->Lock);
+                if (commands->Chat.size() < 64)
+                    commands->Chat.push_back(std::move(item));
+            }
+            set(true, "Sent to your group's bots.");
+            return reply;
+        }
         if (text != "autogear")
         {
             reply.mutable_command()->set_success(false); // not ours: no text, so the core tries the next module
@@ -532,6 +604,38 @@ int main(int argc, char** argv)
         reply.mutable_command()->set_success(true);
         reply.mutable_command()->set_result_text("Your party's bots are being dressed for their level.");
         return reply;
+    });
+
+    // Chat commands (chat_commands.h): a group leader's party or raid line, or a whisper to a bot. Parsed here, applied on the pump thread.
+    client.OnNotify("PlayerScript.OnChat", [commands, &settings](forever_module::EventNotify const& notify)
+    {
+        if (!settings.ChatCommands || notify.event_payload_case() != forever_module::EventNotify::kPlayerChat)
+            return;
+        forever_module::PlayerChatEvent const& chat = notify.player_chat();
+        auto const parsed = ParseChatCommand(chat.text(), settings.ChatOrders);
+        if (!parsed)
+            return; // ordinary chat
+        CommandQueue::ChatItem item;
+        item.Command = *parsed;
+        item.Context.Issuer = chat.player_guid();
+        item.Context.Recipient = chat.channel() == 3 ? chat.recipient_guid() : 0;
+        item.Context.MapId = chat.map_id();
+        item.Context.Pos = Point{ chat.pos_x(), chat.pos_y(), chat.pos_z() };
+        item.Context.TargetRef = chat.target_ref();
+        std::lock_guard<std::mutex> lock(commands->Lock);
+        if (commands->Chat.size() < 64)
+            commands->Chat.push_back(std::move(item));
+    });
+    // The lines the pump thread has for speakers are sent from this thread (client calls belong to it).
+    client.AddTimer(std::chrono::milliseconds(500), [commands, &client]
+    {
+        std::vector<std::pair<std::uint64_t, std::string>> replies;
+        {
+            std::lock_guard<std::mutex> lock(commands->Lock);
+            replies.swap(commands->Replies);
+        }
+        for (auto const& [player, text] : replies)
+            client.SendPlayerMessage(player, text);
     });
 
     // Bots from last run are rows in the module store (bot/<guid>). Each row's value is "race class", read before the

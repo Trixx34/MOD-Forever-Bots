@@ -141,6 +141,13 @@ or hand-in blocks that quest for a minute. Party members follow their leader and
 
 ## Auto gear and scenarios
 
+**Chat commands.** With `ChatCommands = 1` the leader of a group commands its bots by typing in party or raid chat, or by whispering one bot:
+`[selector] verb`. Selectors: `all` (default), `tank`, `healer`, `dps`, a class name, or a comma list. Verbs: `follow [off]`, `stay [off]`, `goto here`,
+`release` (a dead bot releases its spirit now), `status` (one line per bot, sent back to you). `ChatOrders = 1` adds `stop`, `pull` (the tank
+attacks your selected target), `heal` (a healer heals your selected friend), `passive`, `aggressive`. Only the bots of the speaker's own group obey;
+other chat is ignored. The core forwards only a group leader's lines in a group with a bot, and whispers to a bot (hook `PlayerScript.OnChat`).
+`.bots <verb>` does the same as a dot command (`.bots autogear` dresses the group's bots); `goto here`, `pull` and `heal` are party chat only.
+
 **Auto gear.** With `AutoGearing = 1` the core dresses each bot for its class and level (best usable item per slot, uncommon quality at
 most) when it first appears and after every `AutoGearEveryLevels` levels. With it off, a player who leads a party can type `.autogear`
 (a chat command the module claims) and the bots that player leads are dressed. It gears bots only, not the player's own characters.

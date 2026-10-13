@@ -24,6 +24,7 @@
 #pragma once
 
 #include "forever_module/tier2_session.h"
+#include "chat_commands.h"
 #include "quest_planner.h"
 
 #include <cstdint>
@@ -102,6 +103,22 @@ public:
     // Dress this bot for its level at the next tick (the .autogear command).
     void RequestAutoGear(std::uint64_t botGuid) { _bots[botGuid].GearRequested = true; }
 
+    // Who said a chat command and where, for ApplyChat. Issuer is the speaker's character guid counter (the group leader), Recipient the
+    // whispered bot's guid counter (0 for party or raid chat). Pos and MapId are the speaker's; TargetRef is its selected unit (0 = none).
+    struct ChatContext
+    {
+        std::uint64_t Issuer = 0;
+        std::uint64_t Recipient = 0;
+        std::uint32_t MapId = 0;
+        Point Pos;
+        std::uint64_t TargetRef = 0;
+    };
+
+    // Applies a chat command (chat_commands.h) to the bots of the speaker's group that its selector names (a whisper: that one bot, when the
+    // speaker leads its group). Returns the lines for the speaker: a status line per bot, or why nothing happened. Silent on success.
+    std::vector<std::string> ApplyChat(forever_module::WorldTickSnapshotView const& view, ChatContext const& chat, ChatCommand const& command,
+                                       std::uint64_t nowMs);
+
     std::vector<forever_module::BotAction> Decide(forever_module::WorldTickSnapshotView const& view, std::uint64_t nowMs = 0);
 
 private:
@@ -153,6 +170,21 @@ private:
         bool Traveling = false;                          // walking to the vendor for a visit
         std::uint64_t TravelStartMs = 0;                 // when this walk began; it is dropped after kTravelTimeoutMs
         std::unordered_set<std::uint32_t> CastTimeSpells; // spells the core refused because the bot was moving: they need it standing
+        // Chat orders (chat_commands.h).
+        bool ChatStay = false;                           // hold the position
+        std::uint64_t ChatFollow = 0;                    // follow this player reference (0 = no order)
+        bool Passive = false;                            // fight only what attacks the bot
+        bool GotoActive = false;                         // walking to GotoPoint
+        Point GotoPoint;
+        std::uint64_t GotoUntilMs = 0;
+        std::uint64_t ForcedTarget = 0;                  // the creature a pull order points at
+        std::uint64_t ForcedUntilMs = 0;
+        std::uint64_t ForcedHeal = 0;                    // the friend a heal order points at (once)
+        bool ReleaseNow = false;                         // a release order: no waiting for a resurrect
+        std::uint32_t SeenHealthPct = 100;               // for the status line, from the last snapshot
+        std::uint32_t SeenPowerPct = 100;
+        std::uint8_t SeenLife = 0;
+        bool SeenInCombat = false;
         std::uint64_t CloserUntilMs = 0;                 // closing to melee range after a line-of-sight refusal, until this time
         std::uint64_t HoldSinceMs = 0;                   // the party leader waits for the party to be ready since this time (0 = not waiting)
         std::uint32_t GearedAtLevel = 0;                 // the level at the last auto gear (0 = not yet)

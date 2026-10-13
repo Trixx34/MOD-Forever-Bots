@@ -73,6 +73,8 @@ constexpr std::uint64_t kTankHeadStartMs = 2500;    // the others join a fight t
 // Healing: a healer class heals the party member with the lowest health below this share, within this range.
 constexpr std::uint32_t kHealBelowPct = 60;
 constexpr float kHealRangeYards = 30.0f;
+constexpr std::uint64_t kGotoTimeoutMs = 90000;     // a goto order is dropped after this long
+constexpr std::uint64_t kPullOrderMs = 30000;      // a pull order is dropped after this long, or when the target is gone
 constexpr std::uint64_t kCloserAfterLosMs = 5000;   // after a line-of-sight refusal the bot closes to melee range for this long
 constexpr std::uint64_t kTravelTimeoutMs = 180000; // a walk to the vendor longer than this is dropped for now
 // Death and recovery. Spell ids and levels checked against the fork's SpellLevels.db2: Resurrection 2006 level 10,
@@ -452,6 +454,134 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
     }
 }
 
+std::vector<std::string> BotPolicy::ApplyChat(WorldTickSnapshotView const& view, ChatContext const& chat, ChatCommand const& command,
+                                               std::uint64_t nowMs)
+{
+    std::vector<std::string> lines;
+    std::uint64_t const issuerRef = PlayerRef(chat.Issuer);
+    std::uint32_t matched = 0, refused = 0, index = 0;
+    char const* refusal = "";
+    for (BotSnapshot const& bot : view.bots)
+    {
+        // Only the bots of the speaker's own group obey, and a whisper reaches only the bot it names.
+        if (bot.group_leader_guid != issuerRef || (chat.Recipient != 0 && bot.guid != chat.Recipient))
+            continue;
+        std::uint32_t const classId = ClassFor(_options, bot.guid);
+        if (!command.Selector.Matches(classId))
+            continue;
+        ++matched;
+        BotState& state = _bots[bot.guid];
+        auto const refuse = [&](char const* why)
+        {
+            ++refused;
+            refusal = why;
+        };
+        switch (command.Verb)
+        {
+            case ChatVerb::Follow:
+                state.ChatStay = false;
+                state.ChatFollow = issuerRef;
+                state.GotoActive = false;
+                state.Last.reset();
+                break;
+            case ChatVerb::FollowOff:
+                state.ChatFollow = 0;
+                state.Last.reset();
+                break;
+            case ChatVerb::Stay:
+                state.ChatStay = true;
+                state.ChatFollow = 0;
+                state.GotoActive = false;
+                state.Last.reset();
+                break;
+            case ChatVerb::StayOff:
+                state.ChatStay = false;
+                state.Last.reset();
+                break;
+            case ChatVerb::Stop:
+                state.ChatStay = false;
+                state.ChatFollow = 0;
+                state.GotoActive = false;
+                state.ForcedTarget = 0;
+                state.ForcedHeal = 0;
+                state.Last.reset();
+                break;
+            case ChatVerb::GotoHere:
+            {
+                if (bot.map_id != chat.MapId)
+                {
+                    refuse("on another map");
+                    break;
+                }
+                float dx = 0.0f, dy = 0.0f;
+                ChatSpreadOffset(index, dx, dy);
+                state.GotoPoint = Point{ chat.Pos.X + dx, chat.Pos.Y + dy, chat.Pos.Z };
+                state.GotoActive = true;
+                state.GotoUntilMs = nowMs + kGotoTimeoutMs;
+                state.ChatFollow = 0;
+                state.ChatStay = true; // holds the spot once there
+                state.Last.reset();
+                break;
+            }
+            case ChatVerb::Release:
+                if (bot.life_state != 1)
+                    refuse("not dead (or already released)");
+                else
+                    state.ReleaseNow = true;
+                break;
+            case ChatVerb::Status:
+            {
+                std::string line = "Bot " + std::to_string(bot.guid) + " (class " + std::to_string(classId) + "): ";
+                line += state.SeenLife == 1 ? "dead" : state.SeenLife == 2 ? "ghost" : state.SeenInCombat ? "fighting" : "idle";
+                line += ", hp " + std::to_string(state.SeenHealthPct) + "%";
+                if (bot.max_power > 0)
+                    line += ", power " + std::to_string(state.SeenPowerPct) + "%";
+                if (state.ChatStay) line += ", stay";
+                if (state.ChatFollow != 0) line += ", following you";
+                if (state.Passive) line += ", passive";
+                if (state.GotoActive) line += ", walking to you";
+                lines.push_back(std::move(line));
+                break;
+            }
+            case ChatVerb::Pull:
+                if (classId != kWarriorClass)
+                    refuse("not a tank");
+                else if (chat.TargetRef == 0 || forever_module::UnitRefType(chat.TargetRef) != 8)
+                    refuse("select a creature first");
+                else
+                {
+                    state.ForcedTarget = chat.TargetRef;
+                    state.ForcedUntilMs = nowMs + kPullOrderMs;
+                    state.ChatStay = false;
+                    state.AvoidUntilMs.erase(chat.TargetRef);
+                }
+                break;
+            case ChatVerb::Heal:
+                if (HealSpellFor(classId, bot.level) == 0)
+                    refuse("not a healer");
+                else if (chat.TargetRef == 0 || forever_module::UnitRefType(chat.TargetRef) != kPlayerType)
+                    refuse("select a friend first");
+                else
+                    state.ForcedHeal = chat.TargetRef;
+                break;
+            case ChatVerb::Passive:
+                state.Passive = true;
+                break;
+            case ChatVerb::Aggressive:
+                state.Passive = false;
+                break;
+            case ChatVerb::None:
+                break;
+        }
+        ++index;
+    }
+    if (matched == 0)
+        lines.push_back("No bot of your group matched.");
+    else if (refused != 0)
+        lines.push_back(std::string(ChatVerbName(command.Verb)) + ": " + std::to_string(refused) + " of " + std::to_string(matched) + " bot(s) refused (" + refusal + ").");
+    return lines;
+}
+
 std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std::uint64_t nowMs)
 {
     std::vector<BotAction> actions;
@@ -570,6 +700,10 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         present.insert(bot.guid);
         BotState& state = _bots[bot.guid];
         ReadResult(state, bot, nowMs);
+        state.SeenHealthPct = bot.max_health ? std::uint32_t(std::uint64_t(bot.health) * 100 / bot.max_health) : 100;
+        state.SeenPowerPct = bot.max_power ? std::uint32_t(std::uint64_t(bot.power) * 100 / bot.max_power) : 100;
+        state.SeenLife = bot.life_state;
+        state.SeenInCombat = bot.in_combat != 0;
         for (auto it = state.AvoidUntilMs.begin(); it != state.AvoidUntilMs.end();)
             it = nowMs >= it->second ? state.AvoidUntilMs.erase(it) : std::next(it);
 
@@ -606,6 +740,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 // Just died: the living state is dropped, and how it happened is logged (the killer is the threat target, else the
                 // closest live hostile).
                 state.DeathMs = nowMs;
+                state.ReleaseNow = false;
                 state.ReleaseSent = false;
                 state.ReleaseHeldLogged = false;
                 state.AcceptRetryMs = 0;
@@ -690,6 +825,8 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     reason = "release_no_rezzer";
                 else if (waited >= _options.ReleaseDelayMs)
                     reason = "release_timeout";
+                if (!reason && state.ReleaseNow)
+                    reason = "release_ordered";
                 if (!reason)
                     continue; // waiting for a resurrect
                 if (fighting && waited < _options.ReleaseCombatHoldMs)
@@ -789,6 +926,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                                  " down_ms=" + std::to_string(nowMs - state.DeathMs) + " health_pct=" +
                                  std::to_string(bot.max_health ? std::uint64_t(bot.health) * 100 / bot.max_health : 0));
             state.Life = 0;
+            state.ReleaseNow = false;
             state.Last.reset();
             state.Sitting = false;
             state.NextCastMs = 0;
@@ -819,6 +957,10 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         std::uint64_t followRef = player ? player->guid : 0;
         if (partyMember && leaderSnap)
             followRef = atLeader ? 0 : leaderRef;
+        if (state.ChatFollow != 0)
+            followRef = state.ChatFollow; // told to follow the speaker
+        if (state.ChatStay)
+            followRef = 0;                // told to hold the position
 
         // The party leader waits for a dead member (a corpse that a rezzer can still resurrect, a ghost on its way back), capped.
         std::uint8_t const deadWaitKind = partyLeader != 0 ? deadWait(partyLeader) : std::uint8_t(0);
@@ -854,7 +996,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         // leaves quests alone until it is done.
         QuestStep questStep;
         bool routeBusy = false;
-        if (_quests.Enabled() && !partyMember && !lowHealth && bot.in_combat == 0)
+        if (_quests.Enabled() && !partyMember && !lowHealth && bot.in_combat == 0 && !state.ChatStay && state.ChatFollow == 0)
             questStep = _quests.Next(bot, state.Quest, nowMs);
         std::vector<std::uint32_t> const noEntries;
         std::vector<std::uint32_t> const& huntEntries = questStep.Kind == QuestStepKind::Hunt ? questStep.Entries : noEntries;
@@ -935,7 +1077,16 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         std::uint64_t targetRef = bot.threat_target_guid;
         if (targetRef != 0 && avoided(targetRef))
             targetRef = 0; // it refused us: the bot does not fight it for now
-        if (targetRef == 0 && partyMember && leaderSnap && leaderSnap->threat_target_guid != 0 && !tankHeadStart &&
+        // Chat orders: a passive or staying bot starts no fight of its own; a pull order points the bot at the speaker's target.
+        bool const noSelfPull = (state.Passive || state.ChatStay) && bot.in_combat == 0;
+        if (state.ForcedTarget != 0)
+        {
+            if (nowMs >= state.ForcedUntilMs || !FindLiveMob(nearby, state.ForcedTarget))
+                state.ForcedTarget = 0;
+            else if (targetRef == 0 && !avoided(state.ForcedTarget))
+                targetRef = state.ForcedTarget;
+        }
+        if (targetRef == 0 && partyMember && leaderSnap && leaderSnap->threat_target_guid != 0 && !tankHeadStart && !noSelfPull &&
             !avoided(leaderSnap->threat_target_guid))
         {
             if (NearbyUnit const* assist = FindLiveMob(nearby, leaderSnap->threat_target_guid))
@@ -947,7 +1098,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 if (unit.guid == targetRef)
                     targetUnit = &unit;
         }
-        else if (NearbyUnit const* hostile = dungeonHold ? nullptr
+        else if (NearbyUnit const* hostile = (dungeonHold || noSelfPull) ? nullptr
                      : PullTarget(bot, nearby, avoided, bot.in_combat != 0, huntEntries, _routeActive))
         {
             targetUnit = hostile;
@@ -1023,7 +1174,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             wanted = followRef ? Decision{ ActionType::kFollow, followRef } : Decision{ ActionType::kStop, 0 };
             // Dungeon route (doc 19): the leader of a party walks the route while it is healthy and its members are close. Otherwise
             // it stands (and so rests), and the party catches up.
-            if (_routeActive && partyLeaderBot && !_options.Route.empty() && state.RouteIndex < _options.Route.size())
+            if (_routeActive && partyLeaderBot && !state.ChatStay && !_options.Route.empty() && state.RouteIndex < _options.Route.size())
             {
                 bool together = true;
                 for (std::uint64_t member : membersOf[bot.guid])
@@ -1080,6 +1231,18 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 case QuestStepKind::None:
                     break;
             }
+
+            // A goto order: walk to the point, then hold there (the order also set stay).
+            if (state.GotoActive)
+            {
+                if (nowMs >= state.GotoUntilMs || DistanceTo(bot, state.GotoPoint) <= 3.0f)
+                    state.GotoActive = false;
+                else
+                {
+                    wanted = Decision{ ActionType::kMoveTo, 0, state.GotoPoint };
+                    routeBusy = true;
+                }
+            }
         }
 
         bool enemyNear = false;
@@ -1104,7 +1267,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         // party member (it follows its leader). The visit is sent once the bot is in reach. A walk longer than
         // kTravelTimeoutMs is dropped and the visit waits for its next interval. A walking bot is not idle, so it neither
         // sits nor trains on the way.
-        if (idle && _options.ServiceEveryMs != 0 && nowMs >= state.NextServiceMs)
+        if (idle && _options.ServiceEveryMs != 0 && nowMs >= state.NextServiceMs && !state.ChatStay)
         {
             // The nearest vendor on the bot's map, found by the core (layout 6); the nearest repairman instead when the gear is worn
             // (layout 9). None on the map, or a party member: no walk.
@@ -1146,7 +1309,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         // next walk. A hurt bot rests instead, and a party member follows its leader. Anything that comes near stops the walk.
         bool const healthy = bot.max_health == 0 || std::uint64_t(bot.health) * 100 >= std::uint64_t(bot.max_health) * kRestBelowPct;
         auto const hubs = _options.HubsByMap.find(bot.map_id);
-        if (idle && healthy && !partyMember && hubs != _options.HubsByMap.end() && !hubs->second.empty())
+        if (idle && healthy && !partyMember && !state.ChatStay && state.ChatFollow == 0 && hubs != _options.HubsByMap.end() && !hubs->second.empty())
         {
             std::vector<Point> const& list = hubs->second;
             if (state.Wandering)
@@ -1293,6 +1456,35 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             action.dest_z = wanted.Dest.Z;
             actions.push_back(action);
             state.Last = wanted;
+        }
+
+        // A heal order: the healer casts its heal on the speaker's selected friend, once.
+        if (state.ForcedHeal != 0 && nowMs >= state.NextCastMs && !(bot.casting_spell != 0 && bot.cast_remaining_ms != 0))
+        {
+            std::uint32_t const orderedSpell = HealSpellFor(classId, bot.level);
+            if (orderedSpell != 0 && bot.moving != 0 && (KnownCastTimeSpell(orderedSpell) || state.CastTimeSpells.count(orderedSpell)))
+            {
+                BotAction stop;
+                stop.bot_guid = bot.guid;
+                stop.type = ActionType::kStop;
+                actions.push_back(stop);
+                state.Last = Decision{ ActionType::kStop, 0 };
+                state.Approaching = false;
+                continue;
+            }
+            if (orderedSpell != 0)
+            {
+                BotAction heal;
+                heal.bot_guid = bot.guid;
+                heal.type = ActionType::kCastSpell;
+                heal.spell_id = orderedSpell;
+                heal.target_guid = state.ForcedHeal;
+                actions.push_back(heal);
+                state.CastTarget[orderedSpell] = heal.target_guid;
+                state.NextCastMs = nowMs + kGlobalCooldownMs;
+            }
+            state.ForcedHeal = 0;
+            continue;
         }
 
         // Healing: a healer class in a party heals the party member (itself included) with the least health, below kHealBelowPct, in range.

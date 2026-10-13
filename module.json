@@ -3,6 +3,6 @@
   "version": "0.1.0",
   "protocol_version": "5",
   "tier1": {
-    "hooks": ["CommandScript"]
+    "hooks": ["CommandScript", "PlayerScript.OnChat"]
   }
 }

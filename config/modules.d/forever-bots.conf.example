@@ -70,6 +70,13 @@ Module.forever-bots.TelemetrySummarySec = 60
 # (best usable item per slot, uncommon quality at most; Bot.AutoGear.MaxQuality in the core's config). Off by default. With it off, a
 # player in a party can type .autogear to dress the bots that player leads.
 # AutoGearing = 0
+#
+# Chat commands (party chat, raid chat, or a whisper to one bot; or the .bots dot command). Both are off by default. Only the leader of a group
+# can command the bots in it. ChatCommands: follow [off], stay [off], goto here, release, status. ChatOrders adds: stop, pull, heal, passive,
+# aggressive. A selector may come first: all, tank, healer, dps, a class name (rogue, rogues), or a comma list: "healer follow", "rogue,mage stay".
+#   .bots follow | .bots healer stay | .bots status | .bots autogear     (goto here, pull and heal are party chat only: they use your position / target)
+# ChatCommands = 0
+# ChatOrders = 0
 # AutoGearEveryLevels = 5
 
 # A scenario (doc 19 of the core): a repeatable test. A fixed roster is spawned at the staging place, dressed, put in one party,
