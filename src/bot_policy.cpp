@@ -50,6 +50,7 @@ constexpr std::uint64_t kPartyRetryMs = 2000;   // a party action refused, or ju
 constexpr float kFollowLeaderYards = 8.0f;      // a member this close to its leader stays where it is
 constexpr std::uint64_t kApproachTimeoutMs = 30000; // walking to a target this long without reaching it: avoid the target
 constexpr std::uint64_t kAvoidMs = 30000;        // a target that refused an attack or a cast is skipped for this long
+constexpr std::uint32_t kMaxAvoidDoublings = 6;  // each repeat avoid doubles the time, up to 2^6 (about half an hour)
 constexpr std::uint64_t kWanderIdleMs = 30000;   // idle for this long, seeing nothing, before walking to a hub
 constexpr std::uint64_t kWanderTimeoutMs = 180000; // a walk to a hub longer than this is dropped
 constexpr float kHubReachYards = 10.0f;          // a bot this close to its hub has arrived
@@ -145,6 +146,16 @@ bool IsPlayer(NearbyUnit const& unit)
     return forever_module::UnitRefType(unit.guid) == 2 && unit.health > 0 && !unit.is_hostile;
 }
 
+// Avoids a unit for kAvoidMs, doubled for each earlier time it was avoided, so a unit that keeps coming back (a trainer the
+// bot cannot attack) is left alone for longer each time.
+void AvoidUnit(std::unordered_map<std::uint64_t, std::uint64_t>& avoidUntil, std::unordered_map<std::uint64_t, std::uint32_t>& count,
+               std::uint64_t ref, std::uint64_t nowMs)
+{
+    std::uint32_t const times = ++count[ref];
+    std::uint32_t const doublings = std::min<std::uint32_t>(times - 1, kMaxAvoidDoublings);
+    avoidUntil[ref] = nowMs + (kAvoidMs << doublings);
+}
+
 // The live creature in `units` with this reference, or nullptr.
 NearbyUnit const* FindLiveMob(std::span<NearbyUnit const> units, std::uint64_t guid)
 {
@@ -231,7 +242,7 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
         (bot.last_action_status == BotActionStatus::kRefused || bot.last_action_status == BotActionStatus::kInvalidTarget))
     {
         if (state.Last && state.Last->Type == ActionType::kAttackTarget && state.Last->Target != 0)
-            state.AvoidUntilMs[state.Last->Target] = nowMs + kAvoidMs;
+            AvoidUnit(state.AvoidUntilMs, state.AvoidCount, state.Last->Target, nowMs);
         return;
     }
 
@@ -244,7 +255,7 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
         // The cast had no valid target: that unit is avoided too, so the next cast goes to another one.
         auto const cast = state.CastTarget.find(spell);
         if (cast != state.CastTarget.end() && cast->second != 0)
-            state.AvoidUntilMs[cast->second] = nowMs + kAvoidMs;
+            AvoidUnit(state.AvoidUntilMs, state.AvoidCount, cast->second, nowMs);
     }
     if (bot.last_action_status == BotActionStatus::kApplied)
     {
@@ -437,7 +448,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 else if (nowMs - state.ApproachSinceMs > kApproachTimeoutMs)
                 {
                     state.Approaching = false;
-                    state.AvoidUntilMs[targetRef] = nowMs + kAvoidMs;
+                    AvoidUnit(state.AvoidUntilMs, state.AvoidCount, targetRef, nowMs);
                     wanted = Decision{ ActionType::kStop, 0 };
                 }
                 else

@@ -101,6 +101,7 @@ private:
         std::uint32_t LastTrainLevel = 0;                // the level at the last trainer check
         std::uint64_t PartyRetryAtMs = 0;                // a party action is not sent again before this
         std::unordered_map<std::uint64_t, std::uint64_t> AvoidUntilMs; // unit -> until when the bot picks another target
+        std::unordered_map<std::uint64_t, std::uint32_t> AvoidCount;   // unit -> how many times it has been avoided
         bool Approaching = false;                        // walking to its target, not yet in range
         std::uint64_t ApproachTarget = 0;
         std::uint64_t ApproachSinceMs = 0;               // when it started walking to ApproachTarget
