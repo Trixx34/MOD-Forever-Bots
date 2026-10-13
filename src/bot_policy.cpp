@@ -21,6 +21,7 @@ constexpr float kDisengagePct = 30.0f;       // below this health the bot stops 
 constexpr std::uint64_t kGlobalCooldownMs = 1500;
 constexpr std::uint64_t kRetryMs = 1000;     // out of range, invalid target, refused, not enough power
 constexpr std::uint64_t kCooldownRetryMs = 2000;
+constexpr std::uint64_t kBusyRetryMs = 300;  // a cast refused because the bot was casting or moving: tried again very soon
 constexpr std::uint64_t kNotKnownRetryMs = 60000; // the spell may be learned later
 constexpr float kPullRadius = 10.0f;         // yards: hostiles this close to a candidate are pulled with it
 constexpr std::size_t kMaxPull = 3;          // a group larger than this is not pulled (over-pull control)
@@ -63,6 +64,21 @@ constexpr float kRoutePointReachYards = 6.0f;    // the leader has arrived at a 
 constexpr float kRouteWaitYards = 30.0f;         // the leader waits for a member farther behind than this
 constexpr std::uint32_t kRouteMinHealthPct = 80; // and for its own health to be at least this
 constexpr std::uint64_t kTravelTimeoutMs = 180000; // a walk to the vendor longer than this is dropped for now
+
+// Spells with a cast time (or a channel), which cannot be started while moving. The core's refusals add to the bot's own list, so a
+// spell missing here is learned after its first refusal.
+bool KnownCastTimeSpell(std::uint32_t spell)
+{
+    switch (spell)
+    {
+        case 686: case 585: case 133: case 116: case 5176: case 5185: case 403: case 331: case 2050: case 2054: case 2060: case 635:
+        case 8092: case 348: case 707: case 172: case 1120: case 689: case 5676: case 5143: case 8004: case 421: case 1064: case 14914:
+        case 15407: case 2948: case 5019: case 8921: case 19750: case 2006: case 7328: case 2008:
+            return true;
+        default:
+            return false;
+    }
+}
 
 // Duration of the damage-over-time effect a spell leaves on its target, or 0 for spells the policy does not track. Rank 1
 // durations: while the effect runs, the policy does not recast the spell on the same target.
@@ -228,6 +244,8 @@ char const* ActionStatusName(BotActionStatus status)
         case BotActionStatus::kNoLineOfSight: return "no line of sight";
         case BotActionStatus::kInvalidTarget: return "invalid target";
         case BotActionStatus::kNotOnline: return "not online";
+        case BotActionStatus::kBusy: return "busy casting";
+        case BotActionStatus::kMoving: return "moving";
     }
     return "unknown";
 }
@@ -317,6 +335,13 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
             break;
         case BotActionStatus::kOnCooldown:
             state.RetryAtMs[spell] = nowMs + kCooldownRetryMs;
+            break;
+        case BotActionStatus::kBusy:
+            state.RetryAtMs[spell] = nowMs + kBusyRetryMs; // another cast is in progress: soon, not after the long retry
+            break;
+        case BotActionStatus::kMoving:
+            state.CastTimeSpells.insert(spell);            // remembered: the bot stops before this spell from now on
+            state.RetryAtMs[spell] = nowMs + kBusyRetryMs;
             break;
         case BotActionStatus::kOutOfRange:
         case BotActionStatus::kNoLineOfSight:
@@ -823,6 +848,9 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         // Class rotation: the first row that is off cooldown, in range and allowed by its rule. One cast per global cooldown.
         if (nowMs < state.NextCastMs)
             continue;
+        // A cast or channel in progress finishes first: no cast can start meanwhile.
+        if (bot.casting_spell != 0 && bot.cast_remaining_ms != 0)
+            continue;
         rotation::Facts facts = rotation::FactsFor(bot, nearby, targetUnit, state.InFight ? nowMs - state.FightStartMs : 0);
         if (state.ComboTarget != targetRef)
         {
@@ -856,6 +884,19 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             bool const sameTarget = dot != state.Dots.end() && dot->second.Target == (row.OnTarget ? targetRef : 0);
             if (sameTarget && nowMs < dot->second.UntilMs)
                 continue;
+
+            // A spell with a cast time cannot start while the bot moves: stop first (the cast follows on the next tick). The stop is
+            // remembered as the bot's last movement order, so a later follow or walk is sent again.
+            if (bot.moving != 0 && (KnownCastTimeSpell(row.Spell) || state.CastTimeSpells.count(row.Spell)))
+            {
+                BotAction stop;
+                stop.bot_guid = bot.guid;
+                stop.type = ActionType::kStop;
+                actions.push_back(stop);
+                state.Last = Decision{ ActionType::kStop, 0 };
+                state.Approaching = false;
+                break;
+            }
 
             BotAction cast;
             cast.bot_guid = bot.guid;
