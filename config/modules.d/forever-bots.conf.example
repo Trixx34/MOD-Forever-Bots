@@ -64,4 +64,6 @@ Module.forever-bots.TelemetrySummarySec = 60
 # Quests (M5). The starter quest data file (see data/starter_quests.txt and src/quest_data.h). A bot near one of its starts accepts
 # the quests of that start in order, hunts their targets, and hands them in; a bot with no start nearby grinds as before. Empty
 # turns quests off.
-# QuestFile = data/starter_quests.txt
+# The path is read from the module's working directory, which is the worldserver's, not the module's folder: use an absolute path,
+# or a path relative to where the worldserver runs.
+# QuestFile = /path/to/starter_quests.txt
