@@ -1,8 +1,8 @@
 # Starter quests for the bots (M5). Format: see src/quest_data.h. Built from the sim world database (quest_template, quest_objectives,
 # creature_queststarter/questender, creature spawns): positions are the NPCs' spawn points, hunting areas are real spawn points of
 # the quest's target creatures within about 250 yards of the quest giver. Quests are done in the order given.
-# A start covers every race that begins at its anchor. More starts (Dwarf, Night Elf, Undead, Tauren) need the targets' spawn points,
-# which the first export did not ask for; they are added the same way.
+# A start covers every race that begins at its anchor. Not yet: Tauren (the first quests' targets spawn out of reach, or are collect
+# quests), and the collect quests of every start; they need the drop list joined with the spawns.
 
 # Northshire Valley (Human)
 start Human
@@ -47,3 +47,68 @@ area 788 -721.3 -4183.7 30.2
 area 788 -717.0 -4150.8 30.1
 area 788 -682.7 -4287.0 40.6
 area 788 -486.3 -4144.7 54.7
+
+# Coldridge Valley (Dwarf, Gnome)
+start Dwarf
+anchor 0 -6216.5 339.0 383.5
+# 183 The Boar Hunter: Talin Keeneye, 12 Small Crag Boars
+quest 183 giver -6222.5 689.0 385.0 ender -6222.5 689.0 385.0
+hunt 183 0 12 708
+area 183 -6228.3 701.3 385.6
+area 183 -6249.4 684.0 386.3
+area 183 -6215.3 718.7 386.8
+area 183 -6257.0 678.1 386.4
+area 183 -6180.3 688.4 386.3
+# 182 The Troll Cave: Grelin Whitebeard, 14 Frostmane Troll Whelps
+quest 182 giver -6363.0 567.1 385.9 ender -6363.0 567.1 385.9
+hunt 182 0 14 706
+area 182 -6447.9 531.1 385.4
+area 182 -6451.9 502.2 386.1
+area 182 -6482.2 534.5 387.5
+area 182 -6467.4 482.3 387.1
+area 182 -6500.6 517.9 390.3
+
+# Shadowglen (Night Elf)
+start NightElf
+anchor 1 10328.9 826.1 1326.5
+# 456 The Balance of Nature: Conservator Ilthalaine, 7 Young Nightsabers and 4 Young Thistle Boars
+quest 456 giver 10328.9 826.1 1326.5 ender 10328.9 826.1 1326.5
+hunt 456 0 7 2031
+hunt 456 1 4 1984
+area 456 10314.7 868.2 1333.1
+area 456 10318.4 807.4 1328.0
+area 456 10285.2 839.4 1334.2
+area 456 10360.4 805.2 1322.9
+area 456 10271.9 816.9 1341.4
+area 456 10290.1 785.1 1336.2
+# 457 The Balance of Nature: 7 Mangy Nightsabers and 7 Thistle Boars (farther out)
+quest 457 giver 10328.9 826.1 1326.5 ender 10328.9 826.1 1326.5
+hunt 457 0 7 2032
+hunt 457 1 7 1985
+area 457 10500.4 753.7 1314.0
+area 457 10505.0 696.2 1319.2
+area 457 10555.1 769.5 1312.7
+area 457 10582.2 784.1 1310.5
+area 457 10529.5 946.6 1315.7
+
+# Deathknell (Undead)
+start Undead
+anchor 0 1843.3 1639.9 97.8
+# 363 Rude Awakening: Undertaker Mordo -> Shadow Priest Sarvis, no objective
+quest 363 giver 1679.0 1667.9 135.9 ender 1843.3 1639.9 97.8
+# 364 The Mindless Ones: 8 Mindless Zombies and 8 Wretched Zombies
+quest 364 giver 1843.3 1639.9 97.8 ender 1843.3 1639.9 97.8
+hunt 364 0 8 1501
+hunt 364 1 8 1502
+area 364 1911.2 1644.3 89.0
+area 364 1919.3 1626.9 85.8
+area 364 1914.2 1604.8 84.7
+area 364 1923.3 1588.0 83.7
+area 364 1930.1 1606.7 83.1
+# 3901 Rattling the Rattlecages: 12 Rattlecage Skeletons
+quest 3901 giver 1843.3 1639.9 97.8 ender 1843.3 1639.9 97.8
+hunt 3901 0 12 1890
+area 3901 1939.1 1543.0 90.1
+area 3901 1984.8 1591.6 82.7
+area 3901 1979.5 1572.1 79.1
+area 3901 1976.8 1550.0 86.0

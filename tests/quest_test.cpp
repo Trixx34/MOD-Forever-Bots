@@ -297,10 +297,28 @@ void PolicyDefendsAgainstAnyAttackerWhileHunting()
     CHECK(Has(actions, ActionType::kAttackTarget) || Has(actions, ActionType::kFollow));
 }
 
+void ShippedFileParsesWithoutWarnings()
+{
+    std::vector<std::string> warnings;
+    QuestData const data = LoadQuestData(QUEST_DATA_FILE, warnings);
+    for (std::string const& warning : warnings)
+        std::printf("warning: %s\n", warning.c_str());
+    CHECK(warnings.empty());
+    CHECK(data.Starts.size() == 5);
+    for (QuestStartDef const& start : data.Starts)
+    {
+        CHECK(start.HasAnchor && !start.Quests.empty());
+        for (QuestDef const& quest : start.Quests)
+            if (!quest.Objectives.empty())
+                CHECK(!quest.Areas.empty()); // a quest with targets has somewhere to look for them
+    }
+}
+
 } // namespace
 
 int main()
 {
+    ShippedFileParsesWithoutWarnings();
     ParserReadsTheFormat();
     ParserDropsBadLines();
     FarBotWalksToTheGiverThenAccepts();

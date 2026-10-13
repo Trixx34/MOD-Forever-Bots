@@ -53,6 +53,7 @@ add_test(NAME policy COMMAND policy_test)
 
 add_executable(quest_test tests/quest_test.cpp)
 target_link_libraries(quest_test PRIVATE forever_bots_policy)
+target_compile_definitions(quest_test PRIVATE QUEST_DATA_FILE="${CMAKE_SOURCE_DIR}/data/starter_quests.txt")
 add_test(NAME quest COMMAND quest_test)
 
 add_executable(settings_test tests/settings_test.cpp)
