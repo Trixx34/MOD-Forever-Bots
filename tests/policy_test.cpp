@@ -1207,8 +1207,133 @@ void BotInCombatIgnoresThePackLimit()
     CHECK(fights);
 }
 
+// Dungeon party control (doc 19): a five-bot party with the route active. Bot 12 is the warrior leader, the others priests.
+bool CastsSpell(std::vector<BotAction> const& actions, std::uint64_t bot, std::uint32_t spell, std::uint64_t target = 0)
+{
+    for (BotAction const& action : actions)
+        if (action.type == ActionType::kCastSpell && action.bot_guid == bot && action.spell_id == spell &&
+            (target == 0 || action.target_guid == target))
+            return true;
+    return false;
+}
+
+BotPolicy DungeonPolicy()
+{
+    BotPolicy policy = PartyPolicy(5);
+    policy.SetRouteActive(true);
+    return policy;
+}
+
+void HealerHealsTheHurtMember()
+{
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    view.bots[3].health = 300; // bot 13
+    auto const actions = DungeonPolicy().Decide(view, 0);
+    CHECK(CastsSpell(actions, 10, 2050, PlayerOf(13)));
+}
+
+void HealerHealsItselfWithoutATarget()
+{
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    view.bots[0].health = 300;
+    auto const actions = DungeonPolicy().Decide(view, 0);
+    CHECK(CastsSpell(actions, 10, 2050, 0));
+}
+
+void NoHealWhileEveryoneIsHealthy()
+{
+    auto const actions = DungeonPolicy().Decide(PartyView({ 10, 11, 12, 13, 14 }), 0);
+    CHECK(!CastsSpell(actions, 10, 2050));
+    CHECK(!CastsSpell(actions, 11, 2050));
+}
+
+void LeaderDoesNotPullWhileAMemberIsHurt()
+{
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    view.bots[0].health = 500; // 50%: the party is not ready
+    AddNearby(view, 2, Unit(8, 7, 20.0f, true));
+    auto const actions = DungeonPolicy().Decide(view, 0);
+    CHECK(!HasAction(actions, 12, ActionType::kFollow, MakeUnitRef(8, 1, 7)));
+    CHECK(!HasAction(actions, 12, ActionType::kAttackTarget));
+}
+
+void LeaderPullsWhenThePartyIsReady()
+{
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    AddNearby(view, 2, Unit(8, 7, 20.0f, true));
+    auto const actions = DungeonPolicy().Decide(view, 0);
+    CHECK(HasAction(actions, 12, ActionType::kFollow, MakeUnitRef(8, 1, 7)));
+}
+
+void LeaderPullsAfterWaitingTooLong()
+{
+    BotPolicy policy = DungeonPolicy();
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    view.bots[0].health = 500;
+    AddNearby(view, 2, Unit(8, 7, 20.0f, true));
+    policy.Decide(view, 1000);
+    auto const actions = policy.Decide(view, 1000 + 130000);
+    CHECK(HasAction(actions, 12, ActionType::kFollow, MakeUnitRef(8, 1, 7)));
+}
+
+void MembersDoNotPullInADungeon()
+{
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    AddNearby(view, 0, Unit(8, 7, 20.0f, true));
+    auto const actions = DungeonPolicy().Decide(view, 0);
+    CHECK(!HasAction(actions, 10, ActionType::kFollow, MakeUnitRef(8, 1, 7)));
+    CHECK(!CastsSpell(actions, 10, 585));
+}
+
+void MembersAttackedInADungeonDefendThemselves()
+{
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    view.bots[0].in_combat = 1;
+    AddNearby(view, 0, Unit(8, 7, 20.0f, true));
+    auto const actions = DungeonPolicy().Decide(view, 0);
+    CHECK(HasAction(actions, 10, ActionType::kFollow, MakeUnitRef(8, 1, 7)) || HasAction(actions, 10, ActionType::kAttackTarget));
+}
+
+void MembersWaitForTheTankToHoldTheTarget()
+{
+    BotPolicy policy = DungeonPolicy();
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    view.bots[2].threat_target_guid = MakeUnitRef(8, 1, 7);
+    AddNearby(view, 2, Unit(8, 7, 20.0f, true));
+    AddNearby(view, 0, Unit(8, 7, 20.0f, true));
+    auto first = policy.Decide(view, 1000);                 // the tank starts the fight
+    CHECK(!HasAction(first, 10, ActionType::kFollow, MakeUnitRef(8, 1, 7)));
+    auto later = policy.Decide(view, 1000 + 3000);           // a few seconds on, the others join
+    CHECK(HasAction(later, 10, ActionType::kFollow, MakeUnitRef(8, 1, 7)) || HasAction(later, 10, ActionType::kAttackTarget));
+}
+
+void LineOfSightRefusalClosesTheDistance()
+{
+    BotPolicy policy = DungeonPolicy();
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    view.bots[0].in_combat = 1;
+    view.bots[0].threat_target_guid = MakeUnitRef(8, 1, 7);
+    AddNearby(view, 0, Unit(8, 7, 15.0f, true));
+    view.bots[0].last_action_type = std::uint8_t(ActionType::kCastSpell);
+    view.bots[0].last_action_spell = 585;
+    view.bots[0].last_action_status = BotActionStatus::kNoLineOfSight;
+    view.bots[0].last_action_sequence = 5;
+    auto const actions = policy.Decide(view, 1000);
+    CHECK(HasAction(actions, 10, ActionType::kFollow, MakeUnitRef(8, 1, 7))); // a priest would stand at 15 yards; now it walks closer
+}
+
 int main()
 {
+    HealerHealsTheHurtMember();
+    HealerHealsItselfWithoutATarget();
+    NoHealWhileEveryoneIsHealthy();
+    LeaderDoesNotPullWhileAMemberIsHurt();
+    LeaderPullsWhenThePartyIsReady();
+    LeaderPullsAfterWaitingTooLong();
+    MembersDoNotPullInADungeon();
+    MembersAttackedInADungeonDefendThemselves();
+    MembersWaitForTheTankToHoldTheTarget();
+    LineOfSightRefusalClosesTheDistance();
     BotFightsBackAgainstAStrongAttacker();
     BotInCombatIgnoresThePackLimit();
     BotLootsTheCreatureItKilled();
