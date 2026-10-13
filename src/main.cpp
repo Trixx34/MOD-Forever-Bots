@@ -611,6 +611,7 @@ int main(int argc, char** argv)
     }
     policyOptions.ClassOf = [&classes](std::uint64_t botGuid) { return classes.Get(botGuid); };
     policyOptions.AutoGearing = settings.AutoGearing;
+    policyOptions.OnEvent = [](std::string const& line) { std::cerr << "forever-bots: event " << line << "\n"; };
     policyOptions.AutoGearEveryLevels = settings.AutoGearEveryLevels;
     PumpExtras extras;
     extras.Commands = commands;

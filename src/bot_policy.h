@@ -26,6 +26,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -64,6 +65,8 @@ struct PolicyOptions
     std::vector<Point> Route;
     // Auto gear (AutoGearing setting): every bot is dressed for its level when it first appears, and again after AutoGearEveryLevels levels.
     bool AutoGearing = false;
+    // Receives one line per notable decision (a heal cast, a pull held back or released), for the run logs. Unset = silent.
+    std::function<void(std::string const&)> OnEvent;
     std::uint32_t AutoGearEveryLevels = 5;
 };
 
