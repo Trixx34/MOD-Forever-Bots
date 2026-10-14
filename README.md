@@ -125,8 +125,11 @@ Without `FOREVER_MODULE_SDK_SOURCE`, CMake fetches `Trixx34/forever-module-sdk` 
 
 - No quest, levelling or dungeon logic yet (M5, M7 levelling, M9). Bots fight what they meet and wander between hubs.
 - The rotations follow the vanilla kits; Forever's changed abilities (for example Holy Strike, Demonic Brand) are not used yet.
-- A hunter has no pet handling, and Auto Shot's repeated casts are unchecked. Rend's bleed is estimated (21 s per accepted cast)
-  because the snapshot has no auras. A fleeing target is not detected.
+- A hunter's pet is handled by spell casts only (Call Pet 883, Revive Pet 982, Mend Pet 136, its state guessed from accepted and
+  refused casts): the snapshot has no pet and the core has no pet command action, so the pet's health and presence are not seen and
+  the pet is not sent to attack the bot's target (it acts on its own AI). See doc/rotations.md, Limits, for the core/SDK change
+  needed. Auto Shot is tracked and not re-cast while active. Rend's bleed is estimated (21 s per accepted cast) because the
+  snapshot has no auras. A fleeing target is not detected.
 - Hub positions come from the sim's quest-giver clusters and may sit in rock; a bot that cannot reach one gives up after 3 minutes.
 - Classes 6 and 10 are not spawned.
 

@@ -1580,8 +1580,198 @@ void PartyWaitIsLoggedForARezAndForAGhost()
     CHECK(Logged(events, "party_wait:"));
 }
 
+// A cast result as the next snapshot reports it: spell, status, with a new sequence number.
+void Result(WorldTickSnapshotView& view, std::uint32_t spell, BotActionStatus status, std::uint32_t sequence)
+{
+    view.bots[0].last_action_sequence = sequence;
+    view.bots[0].last_action_type = uint8_t(ActionType::kCastSpell);
+    view.bots[0].last_action_spell = spell;
+    view.bots[0].last_action_status = status;
+}
+
+WorldTickSnapshotView HunterView(std::uint64_t tick, std::uint32_t level, std::vector<NearbyUnit> nearby, std::uint64_t threat = 0)
+{
+    // A far creature too strong to pull keeps the bot from being idle (after 10 s of nothing in view it explores on foot, and is then not standing).
+    NearbyUnit strong = Hostile(99, 35.0f, 100);
+    strong.level = 60;
+    nearby.push_back(strong);
+    WorldTickSnapshotView view = View(tick, threat, std::move(nearby));
+    view.bots[0].level = level;
+    return view;
+}
+
+void AutoShotIsNotReissuedWhileActive()
+{
+    // Level 1: only Auto Shot is learned. It is cast once; once accepted it is not cast again at the next global cooldown.
+    BotPolicy policy = ClassPolicy(3);
+    NearbyUnit const mob = Hostile(2, 20.0f, 100);
+    CHECK(HasCast(policy.Decide(HunterView(1, 1, { mob }), 1000), 75));
+
+    WorldTickSnapshotView accepted = HunterView(2, 1, { mob }, MakeUnitRef(8, 1, 2));
+    Result(accepted, 75, BotActionStatus::kApplied, 1);
+    CHECK(!HasCast(policy.Decide(accepted, 2600), 75));
+    for (std::uint64_t i = 0; i < 5; ++i)
+        CHECK(!HasCast(policy.Decide(HunterView(3 + i, 1, { mob }, MakeUnitRef(8, 1, 2)), 4200 + 1600 * i), 75));
+
+    // A new target: Auto Shot is cast on it.
+    NearbyUnit const other = Hostile(3, 20.0f, 100);
+    CHECK(HasCast(policy.Decide(HunterView(10, 1, { other }, MakeUnitRef(8, 1, 3)), 20000), 75));
+}
+
+void AutoShotIsReissuedAfterTheFightAndWhenRefused()
+{
+    BotPolicy policy = ClassPolicy(3);
+    NearbyUnit const mob = Hostile(2, 20.0f, 100);
+    policy.Decide(HunterView(1, 1, { mob }), 1000);
+    WorldTickSnapshotView accepted = HunterView(2, 1, { mob }, MakeUnitRef(8, 1, 2));
+    Result(accepted, 75, BotActionStatus::kApplied, 1);
+    policy.Decide(accepted, 2600);
+    // The fight ends (nothing to fight), then a new fight with the same creature reference: shot again.
+    policy.Decide(HunterView(3, 1, {}), 5000);
+    CHECK(HasCast(policy.Decide(HunterView(4, 1, { mob }, MakeUnitRef(8, 1, 2)), 8000), 75));
+
+    // A refused Auto Shot is not marked active: it is retried.
+    BotPolicy refused = ClassPolicy(3);
+    refused.Decide(HunterView(1, 1, { mob }), 1000);
+    WorldTickSnapshotView no = HunterView(2, 1, { mob }, MakeUnitRef(8, 1, 2));
+    Result(no, 75, BotActionStatus::kRefused, 1);
+    refused.Decide(no, 2600);
+    CHECK(HasCast(refused.Decide(HunterView(3, 1, { mob }, MakeUnitRef(8, 1, 2)), 4000), 75));
+}
+
+void AutoShotIsReissuedAfterMoving()
+{
+    BotPolicy policy = ClassPolicy(3);
+    NearbyUnit const mob = Hostile(2, 20.0f, 100);
+    policy.Decide(HunterView(1, 1, { mob }), 1000);
+    WorldTickSnapshotView accepted = HunterView(2, 1, { mob }, MakeUnitRef(8, 1, 2));
+    Result(accepted, 75, BotActionStatus::kApplied, 1);
+    policy.Decide(accepted, 2600);
+    WorldTickSnapshotView moving = HunterView(3, 1, { mob }, MakeUnitRef(8, 1, 2));
+    moving.bots[0].moving = 1; // moving stops Auto Shot
+    policy.Decide(moving, 4200);
+    CHECK(HasCast(policy.Decide(HunterView(4, 1, { mob }, MakeUnitRef(8, 1, 2)), 5800), 75));
+}
+
+void HunterCallsItsPet()
+{
+    BotPolicy policy = ClassPolicy(3);
+    // Below level 10 there is no pet spell.
+    CHECK(!HasCast(policy.Decide(HunterView(1, 9, {}), 1000), 883));
+    // From level 10: Call Pet when nothing is to be fought, on the bot (the pet is the spell's own target).
+    auto actions = policy.Decide(HunterView(2, 10, {}), 2000);
+    CHECK(HasCast(actions, 883));
+    CHECK(CastTargetOf(actions, 883) == 0);
+    // Accepted: not called again.
+    WorldTickSnapshotView accepted = HunterView(3, 10, {});
+    Result(accepted, 883, BotActionStatus::kApplied, 1);
+    CHECK(policy.Decide(accepted, 8000).empty());
+    CHECK(policy.Decide(HunterView(4, 10, {}), 20000).empty());
+    // Not with a creature to fight.
+    CHECK(!HasCast(ClassPolicy(3).Decide(HunterView(1, 10, { Hostile(2, 20.0f, 100) }), 1000), 883));
+}
+
+void HunterRevivesADeadPetThenBacksOff()
+{
+    BotPolicy policy = ClassPolicy(3);
+    policy.Decide(HunterView(1, 20, {}), 1000);
+    WorldTickSnapshotView refused = HunterView(2, 20, {});
+    Result(refused, 883, BotActionStatus::kRefused, 1); // Call Pet refused: the pet is dead
+    auto actions = policy.Decide(refused, 7000);
+    CHECK(HasCast(actions, 982) && !HasCast(actions, 883));
+
+    // Revive Pet refused too: nothing for 30 s, then Call Pet again.
+    WorldTickSnapshotView no = HunterView(3, 20, {});
+    Result(no, 982, BotActionStatus::kRefused, 2);
+    CHECK(!HasCast(policy.Decide(no, 20000), 982));
+    CHECK(policy.Decide(HunterView(4, 20, {}), 30000).empty());
+    CHECK(HasCast(policy.Decide(HunterView(5, 20, {}), 51000), 883));
+
+    // A Revive Pet that is accepted ends it.
+    BotPolicy ok = ClassPolicy(3);
+    ok.Decide(HunterView(1, 20, {}), 1000);
+    WorldTickSnapshotView dead = HunterView(2, 20, {});
+    Result(dead, 883, BotActionStatus::kRefused, 1);
+    ok.Decide(dead, 7000);
+    WorldTickSnapshotView revived = HunterView(3, 20, {});
+    Result(revived, 982, BotActionStatus::kApplied, 2);
+    CHECK(ok.Decide(revived, 20000).empty());
+    CHECK(ok.Decide(HunterView(4, 20, {}), 40000).empty());
+}
+
+void HunterChecksItsPetAfterAFight()
+{
+    BotPolicy policy = ClassPolicy(3);
+    NearbyUnit const mob = Hostile(2, 20.0f, 100);
+    // Pet out (Call Pet accepted), then a fight.
+    policy.Decide(HunterView(1, 20, {}), 1000);
+    WorldTickSnapshotView out = HunterView(2, 20, {});
+    Result(out, 883, BotActionStatus::kApplied, 1);
+    policy.Decide(out, 7000);
+    policy.Decide(HunterView(3, 20, { mob }, MakeUnitRef(8, 1, 2)), 9000);
+    // After the fight Mend Pet checks and heals it.
+    auto actions = policy.Decide(HunterView(4, 20, {}), 15000);
+    CHECK(HasCast(actions, 136));
+    CHECK(CastTargetOf(actions, 136) == 0);
+    // Accepted: the pet is there, no more casts.
+    WorldTickSnapshotView mended = HunterView(5, 20, {});
+    Result(mended, 136, BotActionStatus::kApplied, 2);
+    CHECK(policy.Decide(mended, 22000).empty());
+    CHECK(policy.Decide(HunterView(6, 20, {}), 30000).empty());
+
+    // Mend Pet refused (no pet to heal): Call Pet follows.
+    BotPolicy gone = ClassPolicy(3);
+    gone.Decide(HunterView(1, 20, {}), 1000);
+    gone.Decide(out, 7000);
+    gone.Decide(HunterView(3, 20, { mob }, MakeUnitRef(8, 1, 2)), 9000);
+    gone.Decide(HunterView(4, 20, {}), 15000);
+    WorldTickSnapshotView no = HunterView(5, 20, {});
+    Result(no, 136, BotActionStatus::kRefused, 2);
+    CHECK(HasCast(gone.Decide(no, 22000), 883));
+
+    // Below level 12 there is no Mend Pet: Call Pet is the check.
+    BotPolicy low = ClassPolicy(3);
+    low.Decide(HunterView(1, 10, {}), 1000);
+    WorldTickSnapshotView lowOut = HunterView(2, 10, {});
+    Result(lowOut, 883, BotActionStatus::kApplied, 1);
+    low.Decide(lowOut, 7000);
+    low.Decide(HunterView(3, 10, { mob }, MakeUnitRef(8, 1, 2)), 9000);
+    CHECK(HasCast(low.Decide(HunterView(4, 10, {}), 15000), 883));
+}
+
+void HunterMendsItsPetInALongFight()
+{
+    BotPolicy policy = ClassPolicy(3);
+    NearbyUnit const mob = Hostile(2, 20.0f, 100);
+    policy.Decide(HunterView(1, 20, {}), 1000);
+    WorldTickSnapshotView out = HunterView(2, 20, {});
+    Result(out, 883, BotActionStatus::kApplied, 1);
+    policy.Decide(out, 7000);
+    // The fight starts at 10 s: no Mend Pet early, one after 15 s, not again within 30 s.
+    policy.Decide(HunterView(3, 20, { mob }, MakeUnitRef(8, 1, 2)), 10000);
+    CHECK(!HasCast(policy.Decide(HunterView(4, 20, { mob }, MakeUnitRef(8, 1, 2)), 14000), 136));
+    CHECK(HasCast(policy.Decide(HunterView(5, 20, { mob }, MakeUnitRef(8, 1, 2)), 26000), 136));
+    CHECK(!HasCast(policy.Decide(HunterView(6, 20, { mob }, MakeUnitRef(8, 1, 2)), 30000), 136));
+    // Not without mana.
+    BotPolicy dry = ClassPolicy(3);
+    dry.Decide(HunterView(1, 20, {}), 1000);
+    dry.Decide(out, 7000);
+    dry.Decide(HunterView(3, 20, { mob }, MakeUnitRef(8, 1, 2)), 10000);
+    WorldTickSnapshotView low = HunterView(5, 20, { mob }, MakeUnitRef(8, 1, 2));
+    low.bots[0].power = 10;
+    low.bots[0].max_power = 100;
+    CHECK(!HasCast(dry.Decide(low, 26000), 136));
+}
+
 int main()
 {
+    AutoShotIsNotReissuedWhileActive();
+    AutoShotIsReissuedAfterTheFightAndWhenRefused();
+    AutoShotIsReissuedAfterMoving();
+    HunterCallsItsPet();
+    HunterRevivesADeadPetThenBacksOff();
+    HunterChecksItsPetAfterAFight();
+    HunterMendsItsPetInALongFight();
     HealerHealsTheHurtMember();
     HealerHealsItselfWithoutATarget();
     NoHealWhileEveryoneIsHealthy();
