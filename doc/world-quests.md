@@ -60,16 +60,12 @@ differs, and start with `SHOW COLUMNS FROM` for the tables you are unsure of). A
     JOIN creature cr ON cr.id = lt.Entry
     WHERE o.Type = 1;
 
-Items that creatures drop only through a loot **reference** table are missed by the plain join. Add this to both the `targets.tsv` second part and `drops.tsv` if the skip
-breakdown (`--explain`, below) shows many "item without a creature dropper":
-
-    SELECT o.ObjectID, lt.Entry
-    FROM quest_objectives o
-    JOIN reference_loot_template rl ON rl.Item = o.ObjectID
-    JOIN creature_loot_template lt ON lt.Reference = rl.Entry
-    WHERE o.Type = 1
-
-(and the same joined to `creature cr ON cr.id = lt.Entry` for `targets.tsv`).
+Items that creatures drop only through a loot **reference** table are missed by the plain join. The query depends on how the fork stores references. On the sim world
+`creature_loot_template` has **no `Reference` column**: a reference is a row with `ItemType = 1` whose `Item` is the reference entry, and `reference_loot_template`
+rows with `ItemType = 0` hold the actual items. So the path is: `reference_loot_template` (`ItemType = 0`, `Item` = the quest item) -> its `Entry` ->
+`creature_loot_template` (`ItemType = 1`, `Item` = that entry) -> `creature`. A direct join of the three tables can run for many minutes; use temporary tables for
+the reference entries first. Nested references (a reference row that is itself `ItemType = 1`) are not followed. On the sim this added 465 rows to `drops.tsv` and 863
+to `targets.tsv`, but the recovered quests mostly failed the next check (their droppers do not spawn on the giver's map), so the kept count did not change.
 
 `drops.tsv` (which creatures drop a quest item):
 
