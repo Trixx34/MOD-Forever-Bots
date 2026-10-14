@@ -1,0 +1,25 @@
+# Dungeon routes for the dungeon run (M9). Format: src/dungeon_data.h, doc/dungeons.md.
+#
+# WARNING: the Ragefire Chasm block is a hand-written SAMPLE. Its entry and portal are the vanilla values; the boss entries are the vanilla creature
+# ids; the boss positions and the "go" waypoints are APPROXIMATE (from memory, not read from any world database, not walked on a sim). The route
+# must be regenerated from the real spawns with tools/make_dungeon.py (doc/dungeons.md) and its waypoints checked on the sim before a run means anything.
+dungeon rfc
+name Ragefire Chasm
+levels 13 18
+roster 2:1,5:5,8:8,2:9,5:4          # Orc warrior (tank), Undead priest (healer), Troll mage, Orc warlock, Undead rogue (dps)
+staging 1 1629 -4373 31             # Orgrimmar, Valley of Strength
+portal 1 1811 -4410 -18             # the Cleft of Shadow door, map 1
+entry 389 3.81 -14.82 -17.84        # inside Ragefire Chasm
+duration 1800
+wipe_recovery 300
+min_alive 2
+leader_dead_abandon 600
+go -35 -20 -22
+go -150 -30 -22
+boss 11517 -247 145 -21 Oggleflint
+go -150 90 -24
+boss 11520 -60 200 -26 Taragaman the Hungerer
+go -200 -140 -22
+boss 11518 -240 -200 -28 Jergosh the Invoker
+boss 11519 -380 -330 -28 Bazzalan
+end

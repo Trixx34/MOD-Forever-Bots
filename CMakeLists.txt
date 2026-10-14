@@ -22,7 +22,7 @@ find_package(Threads REQUIRED)
 add_library(forever_bots_roster STATIC src/bot_roster.cpp)
 target_include_directories(forever_bots_roster PUBLIC src)
 
-add_library(forever_bots_settings STATIC src/bot_settings.cpp src/bot_ramp.cpp src/bot_pick.cpp)
+add_library(forever_bots_settings STATIC src/bot_settings.cpp src/bot_ramp.cpp src/bot_pick.cpp src/dungeon_data.cpp)
 target_include_directories(forever_bots_settings PUBLIC src)
 
 add_library(forever_bots_store STATIC src/bot_store.cpp)
@@ -74,6 +74,10 @@ add_test(NAME rotation_data COMMAND rotation_data_test)
 add_executable(scenario_test tests/scenario_test.cpp)
 target_link_libraries(scenario_test PRIVATE forever_bots_policy forever_bots_settings)
 add_test(NAME scenario COMMAND scenario_test)
+
+add_executable(dungeon_test tests/dungeon_test.cpp)
+target_link_libraries(dungeon_test PRIVATE forever_bots_policy forever_bots_settings)
+add_test(NAME dungeon COMMAND dungeon_test)
 
 add_executable(settings_test tests/settings_test.cpp)
 target_link_libraries(settings_test PRIVATE forever_bots_settings)

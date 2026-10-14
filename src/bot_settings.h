@@ -28,6 +28,8 @@
 //                                     inside map is ScenarioEntry's. Without it a ghost released outside cannot go back to a corpse inside)
 //   ScenarioMinAlive = 0              the run ends as "understrength" when fewer bots than this are alive for a while (0 = off, default)
 //   ScenarioLeaderDeadAbandonSec = 0  the run ends as "abandoned_dead_leader" when the party leader stays down this long (0 = off, default)
+//   ScenarioRequireBosses = 0         1: the run is complete when every boss of ScenarioBosses has been seen dead (not when the last waypoint is reached)
+// A dungeon file (doc/dungeons.md) fills most of these keys: DungeonFile = "data/dungeons.txt" and Dungeon = "rfc" (see dungeon_data.h).
 struct ScenarioSettings
 {
     std::string Name;                                    // empty: no scenario
@@ -46,6 +48,7 @@ struct ScenarioSettings
     std::uint32_t WipeRecoverySec = 300;
     std::uint32_t MinAlive = 0;                          // 0 = the understrength stop is off
     std::uint32_t LeaderDeadAbandonSec = 0;              // 0 = off
+    bool RequireBosses = false;
     bool HasPortal = false;
     std::array<float, 4> Portal{};                       // map, x, y, z: the instance door, outside
 };
