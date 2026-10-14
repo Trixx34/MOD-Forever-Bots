@@ -647,7 +647,10 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
             break;
         case BotActionStatus::kRefused:
             state.RetryAtMs[spell] = nowMs + kRetryMs;
-            state.NextCastMs = std::max(state.NextCastMs, nowMs + kHeldCastMs); // a silent refusal (result 32) is the global cooldown too
+            // A silent refusal (result 32) is the global cooldown too. A refused pet cast is the answer to "is there a pet": no hold, the
+            // follow-up (Revive Pet after Call Pet) goes at once.
+            if (spell != kCallPet && spell != kRevivePet && spell != kMendPet)
+                state.NextCastMs = std::max(state.NextCastMs, nowMs + kHeldCastMs);
             break;
         case BotActionStatus::kOutOfRange:
         case BotActionStatus::kNoLineOfSight:
