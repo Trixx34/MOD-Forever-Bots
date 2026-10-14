@@ -61,7 +61,7 @@ constexpr Row kShamanRows[] = {
 
 constexpr Row kMageRows[] = {
     { 122, { Cond::EnemiesAtLeast, 2 }, false, 0.0f, 0.0f },   // Frost Nova when surrounded
-    { 2136, { Cond::TargetHpBelow, 25 }, true, 0.0f, 30.0f },  // Fire Blast to finish a target
+    { 2136, { Cond::TargetHpBelow, 25 }, true, 0.0f, 20.0f },  // Fire Blast to finish a target (20 yards)
     { 133, { Cond::Always, 0 }, true, 0.0f, 30.0f },           // Fireball
 };
 
@@ -178,6 +178,14 @@ float ApproachYards(std::uint32_t classId)
         case kDruidClass: return 25.0f;
         default: return 5.0f;
     }
+}
+
+float DistanceYards3d(BotSnapshot const& bot, NearbyUnit const& unit)
+{
+    float const dx = unit.pos_x - bot.pos_x;
+    float const dy = unit.pos_y - bot.pos_y;
+    float const dz = unit.pos_z - bot.pos_z;
+    return std::sqrt(dx * dx + dy * dy + dz * dz);
 }
 
 float DistanceYards(BotSnapshot const& bot, NearbyUnit const& unit)

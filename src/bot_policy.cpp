@@ -21,6 +21,13 @@ constexpr float kDisengagePct = 30.0f;       // below this health the bot stops 
 constexpr std::uint64_t kGlobalCooldownMs = 1500;
 constexpr std::uint64_t kRetryMs = 1000;     // out of range, invalid target, refused, not enough power
 constexpr std::uint64_t kCooldownRetryMs = 2000;
+constexpr float kRangeSlackYards = 2.0f;        // a ranged row is used this far inside its range: the snapshot is a tick old and the units move
+constexpr std::uint64_t kPowerRetryMs = 2000;    // a cast refused for lack of mana, rage or energy: power comes back slowly
+constexpr std::uint64_t kHeldCastMs = 500;       // after a cooldown or generic refusal no other spell is tried for this long (often the global cooldown)
+constexpr std::uint64_t kCloserAfterRangeMs = 5000; // after an out-of-range refusal the bot stands closer for this long
+constexpr float kCasterCloserYards = 15.0f;      // the closer stand-off of a ranged bot after an out-of-range refusal
+constexpr float kMeleeCloserYards = 3.0f;        // and of a melee bot
+constexpr std::uint32_t kLosRefusalsAvoid = 3;   // this many line-of-sight refusals in a row and the target is avoided
 constexpr std::uint64_t kBusyRetryMs = 300;  // a cast refused because the bot was casting or moving: tried again very soon
 constexpr std::uint64_t kNotKnownRetryMs = 60000; // the spell may be learned later
 constexpr float kPullRadius = 10.0f;         // yards: hostiles this close to a candidate are pulled with it
@@ -107,6 +114,13 @@ constexpr std::uint64_t kReleaseRetryMs = 3000;      // a release not yet seen t
 constexpr std::uint64_t kAcceptRetryMs = 2000;
 constexpr std::uint64_t kReclaimRetryMs = 3000;
 constexpr float kReclaimYards = 35.0f;               // the core allows 39 yards; the ghost reclaims from this close
+
+// A cast or channel is in progress. cast_remaining_ms is no test: it is 0 while a spell is in flight (a Fireball after the cast, state
+// "delayed"), which the core still counts as casting and refuses every other cast for ("bot is casting spell N").
+bool IsCasting(BotSnapshot const& bot)
+{
+    return bot.casting_spell != 0;
+}
 
 // Spells with a cast time (or a channel), which cannot be started while moving. The core's refusals add to the bot's own list, so a
 // spell missing here is learned after its first refusal.
@@ -505,7 +519,19 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
             AvoidUnit(state.AvoidUntilMs, state.AvoidCount, cast->second, nowMs);
     }
     if (bot.last_action_status == BotActionStatus::kNoLineOfSight)
+    {
         state.CloserUntilMs = nowMs + kCloserAfterLosMs; // walls between them: close in rather than cast through them
+        auto const cast = state.CastTarget.find(spell);
+        if (++state.LosRefusals >= kLosRefusalsAvoid && cast != state.CastTarget.end() && cast->second != 0)
+        {
+            AvoidUnit(state.AvoidUntilMs, state.AvoidCount, cast->second, nowMs); // still no sight after closing in: another target
+            state.LosRefusals = 0;
+        }
+    }
+    else if (bot.last_action_status != BotActionStatus::kBusy && bot.last_action_status != BotActionStatus::kMoving)
+        state.LosRefusals = 0;
+    if (bot.last_action_status == BotActionStatus::kOutOfRange)
+        state.RangeCloserUntilMs = nowMs + kCloserAfterRangeMs; // the snapshot's distance was short of the core's: stand closer for a while
     if (bot.last_action_status == BotActionStatus::kApplied)
     {
         // The target of the cast as sent: 0 for a spell on the bot itself (a self buff such as a seal).
@@ -538,6 +564,7 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
             break;
         case BotActionStatus::kOnCooldown:
             state.RetryAtMs[spell] = nowMs + kCooldownRetryMs;
+            state.NextCastMs = std::max(state.NextCastMs, nowMs + kHeldCastMs); // usually the global cooldown: no other spell meanwhile
             break;
         case BotActionStatus::kBusy:
             state.RetryAtMs[spell] = nowMs + kBusyRetryMs; // another cast is in progress: soon, not after the long retry
@@ -547,11 +574,16 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
             state.CastTimeSpells.insert(spell);            // remembered: the bot stops before this spell from now on
             state.RetryAtMs[spell] = nowMs + kBusyRetryMs;
             break;
+        case BotActionStatus::kNotEnoughPower:
+            state.RetryAtMs[spell] = nowMs + kPowerRetryMs;
+            break;
+        case BotActionStatus::kRefused:
+            state.RetryAtMs[spell] = nowMs + kRetryMs;
+            state.NextCastMs = std::max(state.NextCastMs, nowMs + kHeldCastMs); // a silent refusal (result 32) is the global cooldown too
+            break;
         case BotActionStatus::kOutOfRange:
         case BotActionStatus::kNoLineOfSight:
-        case BotActionStatus::kNotEnoughPower:
         case BotActionStatus::kInvalidTarget:
-        case BotActionStatus::kRefused:
             state.RetryAtMs[spell] = nowMs + kRetryMs;
             break;
         case BotActionStatus::kApplied:
@@ -1381,6 +1413,8 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             float approach = outOfPower ? kMeleeApproachYards : rotation::ApproachYards(classId);
             if (nowMs < state.CloserUntilMs)
                 approach = std::min(approach, kMeleeApproachYards + 1.0f);
+            if (nowMs < state.RangeCloserUntilMs)
+                approach = std::min(approach, approach > kMeleeApproachYards + 0.5f ? kCasterCloserYards : kMeleeCloserYards);
             if (distance <= approach)
             {
                 // A ranged bot that has walked into casting range stops there: the core's follow keeps running it into the target,
@@ -1801,8 +1835,22 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             {
                 if (unit.health != 0 || forever_module::UnitRefType(unit.guid) != 8 || state.LootedUntilMs.count(unit.guid))
                     continue;
-                if (!state.FoughtAtMs.count(unit.guid) || rotation::DistanceYards(bot, unit) > kLootRangeYards)
+                if (!state.FoughtAtMs.count(unit.guid) || rotation::DistanceYards3d(bot, unit) > kLootRangeYards)
                     continue;
+                // A groupmate already took this corpse (the core loots all of it for the group): nothing is left for this bot.
+                std::uint64_t const lootGroup = bot.group_leader_guid != 0 ? bot.group_leader_guid : bot.guid;
+                if (auto const claim = _lootClaims.find(unit.guid); claim != _lootClaims.end() && nowMs < claim->second.UntilMs)
+                {
+                    if (claim->second.Group == lootGroup)
+                    {
+                        state.FoughtAtMs.erase(unit.guid);
+                        continue;
+                    }
+                }
+                else if (_lootClaims.size() > 512)
+                    for (auto it = _lootClaims.begin(); it != _lootClaims.end();)
+                        it = nowMs >= it->second.UntilMs ? _lootClaims.erase(it) : std::next(it);
+                _lootClaims[unit.guid] = LootClaim{ lootGroup, nowMs + kLootWindowMs };
 
                 BotAction loot;
                 loot.bot_guid = bot.guid;
@@ -1833,7 +1881,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         }
 
         // A heal order: the healer casts its heal on the speaker's selected friend, once.
-        if (state.ForcedHeal != 0 && nowMs >= state.NextCastMs && !(bot.casting_spell != 0 && bot.cast_remaining_ms != 0))
+        if (state.ForcedHeal != 0 && nowMs >= state.NextCastMs && !(IsCasting(bot)))
         {
             std::uint32_t const orderedSpell = HealSpellFor(classId, bot.level);
             if (orderedSpell != 0 && bot.moving != 0 && (KnownCastTimeSpell(orderedSpell) || state.CastTimeSpells.count(orderedSpell)))
@@ -1862,7 +1910,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         }
 
         // Healing: a healer class in a party heals the party member (itself included) with the least health, below kHealBelowPct, in range.
-        if (partyLeader != 0 && nowMs >= state.NextCastMs && !(bot.casting_spell != 0 && bot.cast_remaining_ms != 0))
+        if (partyLeader != 0 && nowMs >= state.NextCastMs && !(IsCasting(bot)))
         {
             std::uint32_t const healSpell = state.Role_ == BotState::Role::Dps ? 0u : HealSpellFor(classId, bot.level);
             auto const retry = healSpell != 0 ? state.RetryAtMs.find(healSpell) : state.RetryAtMs.end();
@@ -1988,7 +2036,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
 
         // Upkeep buffs (rotation file rows 'buff'): out of combat, standing, with nothing to fight. Each is cast on the bot, or on every member of its group
         // (party), when its last cast has run out; a refused cast is tried again after the usual retry.
-        if (!hasTarget && bot.in_combat == 0 && bot.moving == 0 && nowMs >= state.NextCastMs && !(bot.casting_spell != 0 && bot.cast_remaining_ms != 0) &&
+        if (!hasTarget && bot.in_combat == 0 && bot.moving == 0 && nowMs >= state.NextCastMs && !(IsCasting(bot)) &&
             !state.Sitting)
         {
             bool cast = false;
@@ -2050,11 +2098,13 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             continue;
         }
 
+        float const castDistance = targetUnit ? rotation::DistanceYards3d(bot, *targetUnit) : distance;
+
         // Class rotation: the first row that is off cooldown, in range and allowed by its rule. One cast per global cooldown.
         if (nowMs < state.NextCastMs)
             continue;
         // A cast or channel in progress finishes first: no cast can start meanwhile.
-        if (bot.casting_spell != 0 && bot.cast_remaining_ms != 0)
+        if (IsCasting(bot))
             continue;
         rotation::Facts facts = rotation::FactsFor(bot, nearby, targetUnit, state.InFight ? nowMs - state.FightStartMs : 0);
         if (state.ComboTarget != targetRef)
@@ -2084,7 +2134,9 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 continue;
             if (cooling.count(row.Spell))
                 continue;
-            if (row.OnTarget && (distance < row.MinRange || (row.MaxRange > 0.0f && distance > row.MaxRange)))
+            if (row.OnTarget && castDistance < row.MinRange)
+                continue;
+            if (row.OnTarget && row.MaxRange > 0.0f && castDistance > (row.MaxRange > kRangeSlackYards * 2.0f ? row.MaxRange - kRangeSlackYards : row.MaxRange))
                 continue;
             if (!rotation::Allowed(row.When, facts))
                 continue;

@@ -520,6 +520,79 @@ void MageCastsFromRange()
     CHECK(approached);
 }
 
+// A snapshot of the bot (class 8, a mage) with the result of its last cast set.
+WorldTickSnapshotView CastResultView(std::uint64_t tick, std::vector<NearbyUnit> nearby, std::uint64_t sequence, std::uint32_t spell,
+                                     BotActionStatus status)
+{
+    WorldTickSnapshotView view = View(tick, 0, std::move(nearby));
+    view.bots[0].last_action_sequence = sequence;
+    view.bots[0].last_action_type = uint8_t(ActionType::kCastSpell);
+    view.bots[0].last_action_spell = spell;
+    view.bots[0].last_action_status = status;
+    return view;
+}
+
+void NoCastWhileASpellIsInFlight()
+{
+    // result "bot is casting spell N": a Fireball that has left the caster is still a cast to the core, and cast_remaining_ms is 0 for it.
+    BotPolicy policy = ClassPolicy(8);
+    WorldTickSnapshotView view = View(1, 0, { Hostile(2, 12.0f, 100) });
+    view.bots[0].casting_spell = 133;
+    view.bots[0].cast_remaining_ms = 0;
+    CHECK(!HasCast(policy.Decide(view, 1000), 133));
+    view.bots[0].casting_spell = 0; // landed
+    CHECK(HasCast(policy.Decide(view, 1100), 133));
+}
+
+void RangedRowsKeepASlackInsideTheirRange()
+{
+    // result 118 (out of range): the snapshot is old and the target moves, so a row is used two yards inside its range.
+    CHECK(HasCast(ClassPolicy(8).Decide(View(1, 0, { Hostile(2, 27.0f, 100) }), 1000), 133));
+    CHECK(!HasCast(ClassPolicy(8).Decide(View(1, 0, { Hostile(2, 29.0f, 100) }), 1000), 133));
+
+    // The height counts: 20 yards along the ground and 20 up is 28.3 away.
+    NearbyUnit ledge = Hostile(2, 20.0f, 100);
+    ledge.pos_z = 20.0f;
+    CHECK(!HasCast(ClassPolicy(8).Decide(View(1, 0, { ledge }), 1000), 133));
+
+    // Fire Blast reaches 20 yards, not 30.
+    CHECK(!HasCast(ClassPolicy(8).Decide(View(1, 0, { Hostile(2, 19.0f, 20) }), 1000), 2136));
+    CHECK(HasCast(ClassPolicy(8).Decide(View(1, 0, { Hostile(2, 15.0f, 20) }), 1000), 2136));
+}
+
+void OutOfRangeRefusalMakesTheCasterStandCloser()
+{
+    BotPolicy policy = ClassPolicy(8);
+    CHECK(HasCast(policy.Decide(View(1, 0, { Hostile(2, 20.0f, 100) }), 1000), 133));
+    auto const refused = policy.Decide(CastResultView(2, { Hostile(2, 20.0f, 100) }, 1, 133, BotActionStatus::kOutOfRange), 2600);
+    bool closer = false;
+    for (BotAction const& action : refused)
+        closer = closer || (action.type == ActionType::kFollow && action.target_guid == MakeUnitRef(8, 1, 2));
+    CHECK(closer); // a mage stands at 25 yards; after the refusal it walks in to 15
+}
+
+void CooldownRefusalHoldsEverySpellForAMoment()
+{
+    // result 91 / 32: usually the global cooldown. The next row is not tried at once and fails the same way.
+    BotPolicy policy = ClassPolicy(8);
+    CHECK(HasCast(policy.Decide(View(1, 0, { Hostile(2, 10.0f, 20) }), 1000), 2136));
+    auto const held = policy.Decide(CastResultView(2, { Hostile(2, 10.0f, 20) }, 1, 2136, BotActionStatus::kOnCooldown), 2600);
+    CHECK(!HasCast(held, 133));
+    CHECK(HasCast(policy.Decide(View(3, 0, { Hostile(2, 10.0f, 20) }), 3200), 133));
+}
+
+void RepeatedLineOfSightRefusalsAvoidTheTarget()
+{
+    // result 71: closing in is tried first; three refusals in a row and the target is dropped for a while.
+    BotPolicy policy = ClassPolicy(8);
+    CHECK(HasCast(policy.Decide(View(1, 0, { Hostile(2, 10.0f, 100) }), 1000), 133));
+    std::uint64_t now = 4000;
+    for (std::uint64_t n = 1; n <= 3; ++n, now += 3000)
+        policy.Decide(CastResultView(1 + n, { Hostile(2, 10.0f, 100) }, n, 133, BotActionStatus::kNoLineOfSight), now);
+    for (BotAction const& action : policy.Decide(View(9, 0, { Hostile(2, 10.0f, 100) }), now))
+        CHECK(action.type != ActionType::kCastSpell && action.target_guid != MakeUnitRef(8, 1, 2));
+}
+
 void WarlockDotIsNotRecastWhileRunning()
 {
     BotPolicy policy = ClassPolicy(9);
@@ -1139,6 +1212,33 @@ void BotLootsTheCreatureItKilled()
     CHECK(!HasAction(policy.Decide(after, 2000), 10, ActionType::kLoot)); // once per corpse
 }
 
+void GroupmateDoesNotLootACorpseAlreadyTaken()
+{
+    // Two members of one group fought the same creature: the core loots the whole corpse for the group, so only one sends the loot.
+    BotPolicy policy;
+    NearbyUnit const alive = Hostile(7, 2.0f, 100);
+    WorldTickSnapshotView fight = PartyView({ 10, 11 });
+    for (std::size_t i = 0; i < 2; ++i)
+    {
+        fight.bots[i].group_leader_guid = 10;
+        AddNearby(fight, i, alive);
+    }
+    policy.Decide(fight, 0);
+
+    NearbyUnit const dead = Hostile(7, 2.0f, 0);
+    WorldTickSnapshotView after = PartyView({ 10, 11 });
+    for (std::size_t i = 0; i < 2; ++i)
+    {
+        after.bots[i].group_leader_guid = 10;
+        AddNearby(after, i, dead);
+    }
+    auto const actions = policy.Decide(after, 1000);
+    int loots = 0;
+    for (BotAction const& action : actions)
+        loots += action.type == ActionType::kLoot ? 1 : 0;
+    CHECK(loots == 1);
+}
+
 void NoLootWhileInCombat()
 {
     BotPolicy policy;
@@ -1723,6 +1823,7 @@ int main()
     BotFightsBackAgainstAStrongAttacker();
     BotInCombatIgnoresThePackLimit();
     BotLootsTheCreatureItKilled();
+    GroupmateDoesNotLootACorpseAlreadyTaken();
     NoLootWhileInCombat();
     NoLootForACorpseItDidNotFight();
     NoLootForADistantCorpse();
@@ -1762,6 +1863,11 @@ int main()
     HostilePlayerDoesNotBlockRest();
     RangedBotWithoutPowerWalksIn();
     MageCastsFromRange();
+    NoCastWhileASpellIsInFlight();
+    RangedRowsKeepASlackInsideTheirRange();
+    OutOfRangeRefusalMakesTheCasterStandCloser();
+    CooldownRefusalHoldsEverySpellForAMoment();
+    RepeatedLineOfSightRefusalsAvoidTheTarget();
     WarlockDotIsNotRecastWhileRunning();
     PriestShieldsItselfWhenHurt();
     RogueKicksACastingTarget();

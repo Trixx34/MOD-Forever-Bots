@@ -69,8 +69,9 @@ Each tick the policy (`src/bot_policy.cpp`) reads the bot's snapshot and sends a
 - **Approach and attack.** Melee classes close to 5 yards, ranged classes (hunter, priest, shaman, mage, warlock, druid) to 25. A ranged
   bot below 15% power walks in to melee. Below 30% health a bot disengages.
 - **Rotation** (`src/combat_rotation.cpp`). Every spawned class has rank 1 rows; the core casts the highest rank known. A row is skipped
-  until the bot reaches the level a trainer teaches it (`LearnLevel`, from the Forever trainer data). One cast per global cooldown; a
-  refused cast is retried after a while. Damage-over-time spells and self buffs are not recast while their effect runs; a rogue counts its
+  until the bot reaches the level a trainer teaches it (`LearnLevel`, from the Forever trainer data). One cast per global cooldown, and none while the bot has any spell in progress (a Fireball in flight counts); a
+  ranged row is used two yards inside its range, measured in three dimensions; a refused cast is retried after a while, an out-of-range
+  one makes the bot stand closer for 5 s, and three line-of-sight refusals in a row drop the target. Damage-over-time spells and self buffs are not recast while their effect runs; a rogue counts its
   own combo points.
 - **Rest.** An idle bot below 90% health sits and stays sat until healed, and stands before it moves or fights. An idle mana user below 40% mana
   sits too, until 90% (at most 2 minutes at a time, then not again for 5), and does not walk off while it drinks.

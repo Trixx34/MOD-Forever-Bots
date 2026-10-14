@@ -65,7 +65,7 @@ class 8
 row "Counterspell" target_casting target range 0 30
 row "Frost Nova" enemies 2 self
 row "Evocation" self_power_below 15 self
-row "Fire Blast" target_hp_below 25 target range 0 30
+row "Fire Blast" target_hp_below 25 target range 0 20
 row "Fireball" opener 3 target range 0 30
 row "Frostbolt" always target range 0 30
 buff "Frost Armor" duration 1800 self
