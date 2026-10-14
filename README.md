@@ -134,7 +134,7 @@ Without `FOREVER_MODULE_SDK_SOURCE`, CMake fetches `Trixx34/forever-module-sdk` 
 ## Known gaps
 
 - No quest, levelling or dungeon logic yet (M5, M7 levelling, M9). Bots fight what they meet and wander between hubs.
-- The rotations follow the vanilla kits; Forever's changed abilities (for example Holy Strike, Demonic Brand) are not used yet.
+- The rotation spec uses the Forever abilities that could be verified in the client data (Holy Strike, Divine Storm, Chaos Bolt and others; `doc/rotations.md`). Abilities that need special handling or whose effect could not be verified (Demonic Brand, rogue finishers, forms, channels) are not used yet.
 - A hunter has no pet handling, and Auto Shot's repeated casts are unchecked. Rend's bleed is estimated (21 s per accepted cast)
   because the snapshot has no auras. A fleeing target is not detected.
 - Hub positions come from the sim's quest-giver clusters and may sit in rock; a bot that cannot reach one gives up after 3 minutes.
