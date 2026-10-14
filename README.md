@@ -136,7 +136,7 @@ With `QuestFile` set (see `data/starter_quests.txt`), a bot that is near the anc
 in order: it walks to the giver and accepts the quest (core action `kQuest`), hunts the quest's targets (it pulls only those creatures,
 walking between the quest's hunting areas when none is near, and still fights back when attacked), walks to the ender and hands the
 quest in (the core picks the reward). A quest with no progress for 10 minutes is abandoned and left alone for an hour; a refused accept
-or hand-in blocks that quest for a minute. Party members follow their leader and do no quests. The data format is documented in
+or hand-in blocks that quest for a minute (ten minutes, then an hour, on repeats). A refused hand-in is read as full bags (the snapshot has no bag count): the bot sends no hand-in until it has walked to a vendor and sold its grey items, at most once every 2 minutes. Party members follow their leader and do no quests. The data format is documented in
 `src/quest_data.h`; `tests/quest_test.cpp` covers it.
 
 ## Auto gear and scenarios

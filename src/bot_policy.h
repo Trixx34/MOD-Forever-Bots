@@ -166,6 +166,8 @@ private:
         bool Sitting = false;                            // sat down to rest; stands before it moves or fights
         std::uint64_t RestRetryAtMs = 0;                 // a refused sit is not tried again before this
         std::uint64_t NextServiceMs = 0;                 // next vendor visit (sell grey, repair, equip)
+        bool SellFirst = false;                          // a quest hand-in was refused (bags full): sell at a vendor before handing in again
+        std::uint64_t LastSellMs = 0;                    // when the last sell-first visit was sent (0 = never)
         std::uint64_t NextTrainMs = 0;                   // next trainer check
         std::uint32_t ComboPoints = 0;                   // combo points on ComboTarget, from the bot's own Sinister Strikes
         std::uint64_t ComboTarget = 0;

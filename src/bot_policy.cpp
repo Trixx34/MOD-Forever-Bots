@@ -32,6 +32,8 @@ constexpr std::uint64_t kRendDurationMs = 21000;
 constexpr std::uint32_t kServiceSell = 1;
 constexpr std::uint32_t kServiceRepair = 2;
 constexpr std::uint32_t kServiceEquip = 4;
+// A refused hand-in is read as full bags (the snapshot has no bag count): the bot sells before it hands in again, but not more often than this.
+constexpr std::uint64_t kSellFirstGapMs = 120000;
 // Combo points: the rogue's Sinister Strike spell and the spend, and the points a finisher needs.
 constexpr std::uint32_t kSinisterStrike = 1752;
 constexpr std::uint32_t kEviscerate = 2098;
@@ -362,6 +364,11 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
     // A quest action refused (not eligible, bags full, no NPC in reach): the quest is left alone for a while.
     if (bot.last_action_type == uint8_t(ActionType::kQuest) && bot.last_action_status == BotActionStatus::kRefused)
     {
+        // A refused hand-in is most often full bags (the reward does not fit): sell grey items before the next try. The escalating block
+        // in NoteRefused keeps the hand-in from being hammered meanwhile, and the visit is rate limited.
+        if (state.Quest.PendingHandIn != 0 && state.Quest.PendingHandIn == state.Quest.LastActionQuest &&
+            (state.LastSellMs == 0 || nowMs - state.LastSellMs >= kSellFirstGapMs))
+            state.SellFirst = true;
         _quests.NoteRefused(state.Quest, nowMs);
         return;
     }
@@ -1405,6 +1412,12 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 case QuestStepKind::HandIn:
                 case QuestStepKind::Abandon:
                 {
+                    // Bags are presumed full after a refused hand-in: no hand-in until the bot has been to a vendor (below).
+                    if (state.SellFirst && questStep.Kind == QuestStepKind::HandIn)
+                    {
+                        wanted = Decision{ ActionType::kStop, 0 };
+                        break;
+                    }
                     BotAction quest;
                     quest.bot_guid = bot.guid;
                     quest.type = ActionType::kQuest;
@@ -1456,7 +1469,9 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         // party member (it follows its leader). The visit is sent once the bot is in reach. A walk longer than
         // kTravelTimeoutMs is dropped and the visit waits for its next interval. A walking bot is not idle, so it neither
         // sits nor trains on the way.
-        if (idle && _options.ServiceEveryMs != 0 && nowMs >= state.NextServiceMs && !state.ChatStay)
+        // A bot that must sell first (bags full) goes whatever its quest work, unless it is fighting.
+        bool const sellNow = state.SellFirst && !hasTarget && !enemyNear && !routeBusy && !state.ChatStay;
+        if (sellNow || (idle && _options.ServiceEveryMs != 0 && nowMs >= state.NextServiceMs && !state.ChatStay))
         {
             // The nearest vendor on the bot's map, found by the core (layout 6); the nearest repairman instead when the gear is worn
             // (layout 9). None on the map, or a party member: no walk.
@@ -1480,6 +1495,8 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 {
                     state.Traveling = false;
                     state.NextServiceMs = nowMs + _options.ServiceEveryMs;
+                    state.SellFirst = false; // no walk to a vendor works; the hand-in block applies
+                    state.LastSellMs = nowMs;
                 }
             }
             else
@@ -1491,6 +1508,9 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 vendor.spell_id = kServiceSell | kServiceRepair | kServiceEquip;
                 actions.push_back(vendor);
                 state.NextServiceMs = nowMs + _options.ServiceEveryMs;
+                if (state.SellFirst)
+                    state.LastSellMs = nowMs;
+                state.SellFirst = false;
             }
         }
 

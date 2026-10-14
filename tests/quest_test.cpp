@@ -461,6 +461,84 @@ void PolicyDefendsAgainstAnyAttackerWhileHunting()
     CHECK(Has(actions, ActionType::kAttackTarget) || Has(actions, ActionType::kFollow));
 }
 
+// A hand-in the core refuses (the reward does not fit: bags full) sends the bot to a vendor to sell, with no hand-in meanwhile; afterwards the
+// hand-in is tried again once its block has run out. QuestActions counts the hand-ins (the bot may accept another quest meanwhile).
+int QuestActions(std::vector<BotAction> const& actions)
+{
+    int n = 0;
+    for (BotAction const& action : actions)
+        n += action.type == ActionType::kQuest && (action.spell_id >> 24) == kQuestHandIn;
+    return n;
+}
+
+void RefusedHandInSendsTheBotToSellFirst()
+{
+    BotPolicy policy = QuestPolicy();
+    BotSnapshot bot = Bot(-8902.6f, -162.6f); // at the ender
+    bot.vendor_valid = 1;
+    bot.vendor_x = -8800.0f;
+    bot.vendor_y = -160.0f;
+    LogQuest(bot, 783, 2);
+    auto actions = policy.Decide(OneBotView(bot, {}), 1000);
+    CHECK(QuestActions(actions) == 1);
+    for (BotAction const& action : actions)
+        if (action.type == ActionType::kQuest)
+            CHECK(action.spell_id == QuestCode(kQuestHandIn, 783));
+
+    bot.last_action_type = uint8_t(ActionType::kQuest);
+    bot.last_action_status = forever_module::BotActionStatus::kRefused;
+    bot.last_action_sequence = 1;
+    actions = policy.Decide(OneBotView(bot, {}), 5000);
+    CHECK(QuestActions(actions) == 0); // not hammered
+    bool walking = false;
+    for (BotAction const& action : actions)
+        if (action.type == ActionType::kMoveTo)
+        {
+            walking = true;
+            CHECK(action.dest_x == -8800.0f); // to the vendor
+        }
+    CHECK(walking);
+
+    bot.pos_x = -8801.0f; // at the vendor
+    bot.pos_y = -160.0f;
+    actions = policy.Decide(OneBotView(bot, {}), 9000);
+    bool sold = false;
+    for (BotAction const& action : actions)
+        if (action.type == ActionType::kVendor)
+        {
+            sold = true;
+            CHECK((action.spell_id & 1) != 0);
+        }
+    CHECK(sold);
+    CHECK(QuestActions(actions) == 0);
+
+    // The hand-in is blocked for a minute after the refusal; after that it is sent again.
+    bot.pos_x = -8902.6f;
+    bot.pos_y = -162.6f;
+    CHECK(QuestActions(policy.Decide(OneBotView(bot, {}), 20000)) == 0);
+    CHECK(QuestActions(policy.Decide(OneBotView(bot, {}), 70000)) == 1);
+}
+
+// A second refusal soon after the sale does not send the bot back to the vendor.
+void RepeatedRefusalsDoNotLoopThroughTheVendor()
+{
+    BotPolicy policy = QuestPolicy();
+    BotSnapshot bot = Bot(-8902.6f, -162.6f);
+    bot.vendor_valid = 1;
+    bot.vendor_x = -8902.0f; // vendor in reach
+    bot.vendor_y = -162.6f;
+    LogQuest(bot, 783, 2);
+    policy.Decide(OneBotView(bot, {}), 1000);
+    bot.last_action_type = uint8_t(ActionType::kQuest);
+    bot.last_action_status = forever_module::BotActionStatus::kRefused;
+    bot.last_action_sequence = 1;
+    policy.Decide(OneBotView(bot, {}), 5000);  // sells
+    policy.Decide(OneBotView(bot, {}), 70000); // hand-in sent again
+    bot.last_action_sequence = 2;
+    auto actions = policy.Decide(OneBotView(bot, {}), 75000); // refused again, 70 s after the sale
+    CHECK(!Has(actions, ActionType::kVendor) && QuestActions(actions) == 0);
+}
+
 } // namespace
 
 int main()
@@ -487,6 +565,8 @@ int main()
     PolicyHuntsOnlyTheQuestTargets();
     PolicyWalksToTheHuntingAreaWhenNoTargetIsNear();
     PolicyDefendsAgainstAnyAttackerWhileHunting();
+    RefusedHandInSendsTheBotToSellFirst();
+    RepeatedRefusalsDoNotLoopThroughTheVendor();
     if (failures == 0)
         std::printf("quest_test: all passed\n");
     return failures == 0 ? 0 : 1;
