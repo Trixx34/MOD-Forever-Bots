@@ -6,7 +6,7 @@ from 1 to 60 and, in a party of five, clear a dungeon.
 
 ## Status
 
-Built and unit-tested (9 test suites). Run on a dedicated sim worldserver with 300, 500 and 1000 bots: spawn and login, the ramp,
+Built and unit-tested (16 test suites). Run on a dedicated sim worldserver with 300, 500 and 1000 bots: spawn and login, the ramp,
 the safety valves, telemetry and the pump all work. What is **not yet verified** on the sim: sustained combat and kills (the last run
 found bots could not see neutral creatures, now fixed), experience and levelling, vendor and hub walks, parties and looting.
 
@@ -18,7 +18,8 @@ found bots could not see neutral creatures, now fixed), experience and levelling
 | M6 travel to a vendor | built, not verified |
 | M7 hubs, looting, safe pulls | built, not verified |
 | M8 parties | built, not verified |
-| M5 quests 1 to 10, levelling 1 to 60, M9 dungeon | not started |
+| M9 dungeons: data file of routes, `Dungeon` config, boss-clear rule | first slice built (unit-tested), not run on the sim; see `doc/dungeons.md` |
+| M5 quests 1 to 10, levelling 1 to 60 | partly built (quest, whole-world quest and grind-spot data), not verified |
 
 ## Needs
 
@@ -128,12 +129,13 @@ Without `FOREVER_MODULE_SDK_SOURCE`, CMake fetches `Trixx34/forever-module-sdk` 
 - `src/bot_settings.{h,cpp}`: the module's config. `src/bot_pick.{h,cpp}`: valid race/class combinations and the seeded pick.
 - `src/bot_ramp.{h,cpp}`: the ramp schedule. `src/bot_store.{h,cpp}`: the store row keys.
 - `src/bot_telemetry.{h,cpp}`, `src/rotating_file.{h,cpp}`: the telemetry CSV and its rotating file.
+- `src/dungeon_data.{h,cpp}`: the dungeon file (routes, bosses, entry) and its merge into the scenario config. `data/dungeons.txt`, `tools/make_dungeon.py`, `doc/dungeons.md`.
 - `src/main.cpp`: handshake, config, control requests, revocations, the ramp timer and the Tier 2 pump thread.
 - `tests/*_test.cpp`: unit tests for each library.
 
 ## Known gaps
 
-- No quest, levelling or dungeon logic yet (M5, M7 levelling, M9). Bots fight what they meet and wander between hubs.
+- Quests and levelling are built from data files but not verified on the sim. Dungeons (M9) are a first slice: a data-driven route and a boss-clear rule on top of the scenario director; the sample Ragefire Chasm route is approximate, no run has been done on the sim, there is no crowd control, boss mechanics or walk to the portal (`doc/dungeons.md`).
 - The rotation spec uses the Forever abilities that could be verified in the client data (Holy Strike, Divine Storm, Chaos Bolt and others; `doc/rotations.md`). Abilities that need special handling or whose effect could not be verified (Demonic Brand, rogue finishers, forms, channels) are not used yet.
 - A hunter's pet is handled by spell casts only (Call Pet 883, Revive Pet 982, Mend Pet 136, its state guessed from accepted and
   refused casts): the snapshot has no pet and the core has no pet command action, so the pet's health and presence are not seen and
@@ -185,3 +187,5 @@ or the class's `ScenarioGear<class>` list), waits for the party to form, telepor
 lets the leader walk the route (it waits for members more than 30 yards behind and while its health is under 80%). One result line is
 written when it ends: `scenario <name>: outcome=<complete|wipe|timeout|enter_failed> furthest=3/7 deaths=2 alive=3/5 run=412s`.
 `tests/scenario_test.cpp` covers the director, the route and the settings.
+
+**Dungeon runs (M9).** `DungeonFile = data/dungeons.txt` and `Dungeon = rfc` run a dungeon as a scenario: the file gives the roster (tank first, healer, three dps), the door and the entry, the boss list and the route, and `ScenarioRequireBosses` makes the run complete when every boss has been seen dead (`bosses_missing` if the leader reaches the end without). Keys you set yourself win over the file. The tank leads and pulls pack by pack, the healer heals, rest and corpse runs are the existing party and scenario logic. First slice, unit-tested only; the Ragefire Chasm route in the sample file is approximate. See `doc/dungeons.md`.

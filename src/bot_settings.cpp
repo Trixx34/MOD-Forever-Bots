@@ -174,6 +174,7 @@ void ReadScenario(std::unordered_map<std::string, std::string> const& config, Sc
         scenario.ResultFile = it->second;
     // Dead-bot recovery. The portal is the instance door on the outside map; without it a ghost released outside cannot reach a corpse inside.
     ReadBool(config, "ScenarioWipeRecovery", scenario.WipeRecovery, warnings);
+    ReadBool(config, "ScenarioRequireBosses", scenario.RequireBosses, warnings);
     ReadKey(config, "ScenarioWipeRecoverySec", 10, 3600, scenario.WipeRecoverySec, warnings);
     ReadKey(config, "ScenarioMinAlive", 0, 5, scenario.MinAlive, warnings);
     ReadKey(config, "ScenarioLeaderDeadAbandonSec", 0, 3600, scenario.LeaderDeadAbandonSec, warnings);

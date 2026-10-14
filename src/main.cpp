@@ -15,6 +15,7 @@
 #include "bot_live.h"
 #include "bot_telemetry.h"
 #include "rotating_file.h"
+#include "dungeon_data.h"
 #include "scenario.h"
 
 #include "forever_module/module_client.h"
@@ -525,7 +526,8 @@ int main(int argc, char** argv)
                         std::unordered_map<std::string, std::string> const& config)
     {
         std::vector<std::string> warnings;
-        BotSettings const parsed = ParseBotSettings(config, warnings);
+        // A dungeon file fills the scenario keys the config leaves out (dungeon_data.h).
+        BotSettings const parsed = ParseBotSettings(MergeDungeonFile(config, warnings), warnings);
         for (std::string const& warning : warnings)
             std::cerr << "forever-bots: config: " << warning << "\n";
 
@@ -947,6 +949,7 @@ int main(int argc, char** argv)
         plan.ClassOf = policyOptions.ClassOf;
         plan.WipeRecovery = settings.Scenario.WipeRecovery;
         plan.WipeRecoveryMs = std::uint64_t(settings.Scenario.WipeRecoverySec) * 1000;
+        plan.RequireBosses = settings.Scenario.RequireBosses;
         plan.MinAlive = settings.Scenario.MinAlive;
         plan.LeaderDeadAbandonMs = std::uint64_t(settings.Scenario.LeaderDeadAbandonSec) * 1000;
         if (settings.Scenario.HasPortal)

@@ -114,3 +114,8 @@ Module.forever-bots.TelemetrySummarySec = 60
 # LiveEveryMs (250..10000). Use an absolute path the dashboard may read (for example in the server's log folder). Empty = off.
 #   Module.forever-bots.LiveFile = /var/log/forever/sim/bots-live.json
 #   Module.forever-bots.LiveEveryMs = 1000
+
+# A dungeon run (doc/dungeons.md): the scenario keys above come from a dungeon file; keys you set here win over the file.
+# DungeonFile = data/dungeons.txt
+# Dungeon = rfc
+# ScenarioRequireBosses = 1                      # complete when every boss of ScenarioBosses is seen dead (the dungeon file turns it on when it lists bosses)
