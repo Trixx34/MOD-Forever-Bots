@@ -1,7 +1,11 @@
 // Unit tests for BotPolicy, on hand-built snapshots. No core needed.
 #include "bot_policy.h"
 
+#include "combat_rotation.h"
+
 #include <cstdio>
+#include <memory>
+#include <sstream>
 #include <string>
 
 using forever_module::ActionType;
@@ -596,6 +600,33 @@ void EviscerateAtFivePoints()
         auto actions = policy.Decide(landed, 1000 + 1600 * i);
         if (i < 5)
             CHECK(HasCast(actions, 1752) && !HasCast(actions, 2098));
+        else
+            CHECK(HasCast(actions, 2098));
+    }
+}
+
+void SaberSlashCountsAsAComboPoint()
+{
+    // Saber Slash (Forever) gives one combo point like Sinister Strike: a Saber Slash and four Sinister Strikes make five on one target.
+    PolicyOptions options;
+    options.ClassId = 4;
+    std::istringstream file("class 4\nrow 2098 combo 5 target range 0 5\nrow 424785 duration 12 always target range 0 5\nrow 1752 always target range 0 5\n");
+    std::vector<std::string> warnings;
+    options.Rotations = std::make_shared<rotation::RotationData>(rotation::ParseRotationData(file, warnings));
+    CHECK(warnings.empty());
+    BotPolicy policy(options);
+    CHECK(HasCast(policy.Decide(View(1, 0, { Hostile(2, 3.0f, 100) }), 1000), 424785));
+    std::uint32_t const spells[] = { 424785, 1752, 1752, 1752, 1752 };
+    for (std::uint32_t i = 1; i <= 5; ++i)
+    {
+        WorldTickSnapshotView landed = View(1 + i, 0, { Hostile(2, 3.0f, 100) });
+        landed.bots[0].last_action_sequence = i;
+        landed.bots[0].last_action_type = uint8_t(ActionType::kCastSpell);
+        landed.bots[0].last_action_spell = spells[i - 1];
+        landed.bots[0].last_action_status = BotActionStatus::kApplied;
+        auto actions = policy.Decide(landed, 1000 + 1600 * i);
+        if (i < 5)
+            CHECK(!HasCast(actions, 2098));
         else
             CHECK(HasCast(actions, 2098));
     }
@@ -1631,6 +1662,7 @@ int main()
     NoPartyActionsInCombat();
     SealIsNotRecastWhileUp();
     EviscerateAtFivePoints();
+    SaberSlashCountsAsAComboPoint();
     HostilePlayerDoesNotBlockRest();
     RangedBotWithoutPowerWalksIn();
     MageCastsFromRange();

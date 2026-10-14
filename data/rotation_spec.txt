@@ -4,24 +4,33 @@
 # self_hp_below N, self_power_below N, self_power_above N, enemies N, target_casting, opener N, target_strong N, combo N.
 # Left out on purpose: stances and forms, pets, totems that need placing, crowd control and anything that needs a target's target, the aura of a
 # creature or a position behind a target. The party heals are done by the policy itself (heal block), not here.
+# Rows marked "Forever" are abilities of this fork's client data (the Classic beta's Spell/SkillLineAbility/SpellEffect tables: class skill line, cost,
+# cooldown, range and effects were read from them) that the vanilla kits lack. They are spells by name like the others: a name that the core's ability
+# dump does not show for the class is dropped with a warning, so a bot never gets a guessed id. See doc/rotations.md for what was not added and why.
 
 class 1
 row "Execute" target_hp_below 20 target range 0 5
 row "Bloodrage" self_power_below 20 self
 row "Charge" opener 8 target range 8 25
 row "Thunder Clap" enemies 2 self
+row "Shockwave" enemies 2 self                      # Forever: frontal stun, 20 s cooldown
 row "Demoralizing Shout" enemies 3 self duration 30
 row "Sunder Armor" target_strong 2 target range 0 5
 row "Rend" duration 21 always target range 0 5
+row "Spearing Strike" self_power_above 30 target range 0 5   # Forever: 20 s cooldown, instant weapon strike
 row "Cleave" enemies 2 target range 0 5
 row "Heroic Strike" self_power_above 40 target range 0 5
 buff "Battle Shout" duration 120 self
 
 class 2
+row "Rebuke" target_casting target range 0 5          # Forever: melee interrupt, 15 s cooldown
 row "Hammer of Justice" target_casting target range 0 10
 row "Holy Light" self_hp_below 50 self
 row "Consecration" enemies 3 self
 row "Seal of Righteousness" duration 30 always self
+row "Holy Strike" always target range 0 5            # Forever: 10 s cooldown, 9 mana, weapon strike
+row "Divine Storm" always self                      # Forever: 10 s cooldown, hits the enemies around the paladin
+row "Hammer of the Righteous" always target range 0 5   # Forever: 6 s cooldown melee
 row "Judgement" always target range 0 10
 buff "Devotion Aura" duration 3600 self
 buff "Blessing of Might" duration 300 party
@@ -29,6 +38,8 @@ buff "Blessing of Might" duration 300 party
 class 3
 row "Hunter's Mark" duration 120 always target range 0 35
 row "Serpent Sting" duration 15 always target range 0 35
+row "Black Arrow" duration 30 always target range 0 35   # Forever: 30 s damage over time
+row "Chimera Shot" always target range 0 35         # Forever: instant, 6 s cooldown
 row "Multi-Shot" enemies 2 target range 0 35
 row "Arcane Shot" always target range 0 35
 row "Raptor Strike" always target range 0 5
@@ -41,11 +52,14 @@ row "Kick" target_casting target range 0 5
 row "Evasion" self_hp_below 40 self
 row "Slice and Dice" combo 2 duration 20 self
 row "Eviscerate" combo 5 target range 0 5
+row "Saber Slash" duration 12 always target range 0 5   # Forever: 12 s bleed and one combo point (the policy counts it like Sinister Strike)
 row "Sinister Strike" always target range 0 5
 
 class 5
 row "Power Word: Shield" self_hp_below 50 duration 30 self
 row "Shadow Word: Pain" duration 18 always target range 0 30
+row "Void Plague" duration 18 always target range 0 30   # Forever: 18 s damage over time
+row "Vampiric Touch" duration 15 always target range 0 30 # Forever: 15 s damage over time
 row "Mind Blast" always target range 0 30
 row "Smite" always target range 0 30
 buff "Power Word: Fortitude" duration 1800 party
@@ -57,8 +71,11 @@ row "Earth Shock" target_casting target range 0 20
 row "Healing Wave" self_hp_below 40 self
 row "Searing Totem" duration 55 always self
 row "Flame Shock" duration 12 always target range 0 20
+row "Lava Burst" always target range 0 30          # Forever: 10 s cooldown
 row "Lightning Bolt" always target range 0 30
 buff "Lightning Shield" duration 600 self
+buff "Water Shield" duration 600 self               # Forever
+supersede "Lightning Shield" by "Water Shield"
 buff "Rockbiter Weapon" duration 300 self
 
 class 8
@@ -67,6 +84,8 @@ row "Frost Nova" enemies 2 self
 row "Evocation" self_power_below 15 self
 row "Fire Blast" target_hp_below 25 target range 0 30
 row "Fireball" opener 3 target range 0 30
+row "Icy Veins" target_strong 2 self               # Forever: 3 minute cooldown haste
+row "Ice Lance" self_power_above 60 target range 0 30   # Forever: instant
 row "Frostbolt" always target range 0 30
 buff "Frost Armor" duration 1800 self
 buff "Ice Armor" duration 1800 self
@@ -80,16 +99,22 @@ row "Life Tap" self_power_below 25 self
 row "Corruption" duration 18 always target range 0 30
 row "Curse of Agony" duration 24 always target range 0 30
 row "Immolate" duration 15 always target range 0 30
+row "Wrack" duration 6 always target range 0 30      # Forever: instant damage over time
+row "Chaos Bolt" always target range 0 30           # Forever: 12 s cooldown
 row "Shadow Bolt" always target range 0 30
 buff "Demon Skin" duration 1800 self
 buff "Demon Armor" duration 1800 self
+buff "Fel Armor" duration 1800 self                 # Forever
 buff "Summon Imp" duration 3600 self
 supersede "Demon Skin" by "Demon Armor"
+supersede "Demon Armor" by "Fel Armor"
 
 class 11
 row "Healing Touch" self_hp_below 40 self
 row "Rejuvenation" self_hp_below 70 duration 12 self
 row "Moonfire" duration 12 always target range 0 30
+row "Starsurge" always target range 0 30            # Forever: instant, 6 s cooldown
+row "Sunfire" duration 12 always target range 0 30  # Forever: instant damage over time
 row "Wrath" always target range 0 30
 buff "Mark of the Wild" duration 1800 party
 buff "Thorns" duration 600 party

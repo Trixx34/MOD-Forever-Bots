@@ -106,3 +106,9 @@ add_test(NAME rotating_file COMMAND rotating_file_test)
 add_executable(live_test tests/live_test.cpp)
 target_link_libraries(live_test PRIVATE forever_bots_live)
 add_test(NAME live COMMAND live_test)
+
+# The spec of rotations made into a rotation file by tools/make_rotations.py (needs python3).
+find_package(Python3 COMPONENTS Interpreter)
+if(Python3_Interpreter_FOUND)
+  add_test(NAME make_rotations COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/make_rotations_test.py ${CMAKE_CURRENT_SOURCE_DIR})
+endif()

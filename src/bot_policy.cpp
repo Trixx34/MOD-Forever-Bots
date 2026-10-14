@@ -36,6 +36,14 @@ constexpr std::uint32_t kServiceEquip = 4;
 constexpr std::uint32_t kSinisterStrike = 1752;
 constexpr std::uint32_t kEviscerate = 2098;
 constexpr std::uint32_t kMaxComboPoints = 5;
+// Saber Slash (Forever): like Sinister Strike it gives one combo point (SpellEffect 30 energize, power type 4, 1 point, in the client data).
+constexpr std::uint32_t kSaberSlash = 424785;
+
+// Combo points a rogue spell adds on its target when it lands, 0 for any other spell.
+std::uint32_t ComboPointsGained(std::uint32_t spell)
+{
+    return spell == kSinisterStrike || spell == kSaberSlash ? 1 : 0;
+}
 // A ranged bot below this share of its power walks to melee range and fights there, since its spells are spent.
 constexpr std::uint32_t kOutOfPowerPct = 15;
 constexpr float kMeleeApproachYards = 5.0f;
@@ -458,10 +466,10 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
                 state.BuffUntilMs[{ spell, cast->second }] = nowMs + duration;
             }
 
-            if (spell == kSinisterStrike)
+            if (std::uint32_t const gained = ComboPointsGained(spell); gained != 0)
             {
-                // A Sinister Strike on a new target starts the count again.
-                state.ComboPoints = (state.ComboTarget == cast->second) ? std::min(state.ComboPoints + 1, kMaxComboPoints) : 1;
+                // A builder on a new target starts the count again.
+                state.ComboPoints = (state.ComboTarget == cast->second) ? std::min(state.ComboPoints + gained, kMaxComboPoints) : gained;
                 state.ComboTarget = cast->second;
             }
         }
