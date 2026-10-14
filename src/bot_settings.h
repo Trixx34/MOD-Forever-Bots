@@ -69,6 +69,10 @@ struct BotSettings
     std::string TelemetryFile = "forever-bots-telemetry.csv";
     std::uint32_t TelemetryMaxMB = 64;
     std::uint32_t TelemetryKeep = 5;
+    // The live picture (positions of the bots and what is near them) for the dashboard's map: a JSON file rewritten every
+    // LiveEveryMs (config keys LiveFile, LiveEveryMs 250..10000). Empty LiveFile (default) turns it off.
+    std::string LiveFile;
+    std::uint32_t LiveEveryMs = 1000;
     // Seconds between summary lines per bot (config key TelemetrySummarySec, 1..3600).
     std::uint32_t TelemetrySummarySec = 60;
     // Seconds between vendor visits (sell grey, repair, equip), for an idle bot (config key ServiceEverySec, 60..86400). The

@@ -12,6 +12,7 @@
 #include "bot_roster.h"
 #include "bot_settings.h"
 #include "bot_store.h"
+#include "bot_live.h"
 #include "bot_telemetry.h"
 #include "rotating_file.h"
 #include "scenario.h"
@@ -329,6 +330,11 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
         }
     }
 
+    // The live picture for the dashboard's map (LiveFile): rewritten in place, so nothing piles up.
+    BotLive live(BotLive::Options{ settings.LiveFile, settings.LiveEveryMs, 400 });
+    if (live.Enabled())
+        std::cerr << "forever-bots: live picture to " << settings.LiveFile << " every " << settings.LiveEveryMs << " ms\n";
+
     while (running)
     {
         forever_module::WorldTickSnapshotView const& view = session.ReadLatestSnapshot();
@@ -374,6 +380,9 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
 
             if (telemetry)
                 telemetry->Observe(view, nowMs());
+            if (live.Enabled())
+                live.Maybe(view, nowMs(), std::uint64_t(std::chrono::duration_cast<std::chrono::milliseconds>(
+                                              std::chrono::system_clock::now().time_since_epoch()).count()));
 
             // One publish per snapshot tick: the core applies the newest action set it sees for each tick.
             auto const started = std::chrono::steady_clock::now();

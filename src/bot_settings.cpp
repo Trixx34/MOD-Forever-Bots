@@ -276,6 +276,9 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
 
     if (auto const it = config.find("TelemetryFile"); it != config.end())
         settings.TelemetryFile = it->second;
+    if (auto const it = config.find("LiveFile"); it != config.end())
+        settings.LiveFile = it->second;
+    ReadKey(config, "LiveEveryMs", 250, 10000, settings.LiveEveryMs, warnings);
     ReadKey(config, "TelemetryMaxMB", 1, 10240, settings.TelemetryMaxMB, warnings);
     ReadKey(config, "TelemetryKeep", 0, 50, settings.TelemetryKeep, warnings);
     ReadKey(config, "TelemetrySummarySec", 1, 3600, settings.TelemetrySummarySec, warnings);
