@@ -165,6 +165,9 @@ void TelemetrySettings()
     BotSettings const defaults = ParseBotSettings({}, warnings);
     CHECK(defaults.TelemetryFile == "forever-bots-telemetry.csv");
     CHECK(defaults.TelemetrySummarySec == 60);
+    CHECK(defaults.LiveFile.empty() && defaults.LiveEveryMs == 1000);
+    CHECK(ParseBotSettings({ { "LiveFile", "/tmp/x.json" }, { "LiveEveryMs", "500" } }, warnings).LiveEveryMs == 500);
+    CHECK(ParseBotSettings({ { "LiveEveryMs", "5" } }, warnings).LiveEveryMs == 1000);
 
     BotSettings const off = ParseBotSettings({ { "TelemetryFile", "" } }, warnings);
     CHECK(off.TelemetryFile.empty()); // empty turns telemetry off

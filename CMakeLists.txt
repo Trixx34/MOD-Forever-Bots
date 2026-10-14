@@ -39,8 +39,12 @@ add_library(forever_bots_telemetry STATIC src/bot_telemetry.cpp)
 target_include_directories(forever_bots_telemetry PUBLIC src)
 target_link_libraries(forever_bots_telemetry PUBLIC forever_module_sdk)
 
+add_library(forever_bots_live STATIC src/bot_live.cpp)
+target_include_directories(forever_bots_live PUBLIC src)
+target_link_libraries(forever_bots_live PUBLIC forever_module_sdk)
+
 add_executable(forever-bots src/main.cpp)
-target_link_libraries(forever-bots PRIVATE forever_bots_roster forever_bots_policy forever_bots_settings forever_bots_store forever_bots_telemetry forever_bots_files forever_module_sdk Threads::Threads)
+target_link_libraries(forever-bots PRIVATE forever_bots_live forever_bots_roster forever_bots_policy forever_bots_settings forever_bots_store forever_bots_telemetry forever_bots_files forever_module_sdk Threads::Threads)
 
 enable_testing()
 add_executable(roster_test tests/roster_test.cpp)
@@ -98,3 +102,7 @@ add_test(NAME ramp COMMAND ramp_test)
 add_executable(rotating_file_test tests/rotating_file_test.cpp)
 target_link_libraries(rotating_file_test PRIVATE forever_bots_files)
 add_test(NAME rotating_file COMMAND rotating_file_test)
+
+add_executable(live_test tests/live_test.cpp)
+target_link_libraries(live_test PRIVATE forever_bots_live)
+add_test(NAME live COMMAND live_test)
