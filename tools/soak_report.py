@@ -127,6 +127,8 @@ def main():
 
     if args.server_log and os.path.exists(args.server_log):
         reasons = Counter()
+        cast_results = Counter()
+        cast_spells = Counter()
         gear_failed = 0
         gear_lines = 0
         summary = re.compile(r"^.*Modules:\s+(\d+) x type (\d+) status (\d+): (.*)$")
@@ -136,6 +138,10 @@ def main():
                 m = summary.match(line.rstrip("\n"))
                 if m:
                     reasons[re.sub(r"\d+", "N", m.group(4))] += int(m.group(1))
+                    cast = re.match(r"cast of spell (\d+) returned result (\d+)", m.group(4))
+                    if cast:
+                        cast_results[cast.group(2)] += int(m.group(1))
+                        cast_spells[(cast.group(1), cast.group(2))] += int(m.group(1))
                 g = gear.search(line)
                 if g:
                     gear_lines += 1
@@ -146,6 +152,13 @@ def main():
             print("\nTop refusal reasons (sum of the once-a-minute summaries):")
             for text, n in reasons.most_common(12):
                 print(f"- {n} x {text}")
+        if cast_results:
+            print("\nCast refusals by result code (SpellCastResult values):")
+            for code, n in cast_results.most_common(10):
+                print(f"- result {code}: {n}")
+            print("\nCast refusals by spell and result (top 15):")
+            for (spell, code), n in cast_spells.most_common(15):
+                print(f"- spell {spell} result {code}: {n}")
 
 
 if __name__ == "__main__":

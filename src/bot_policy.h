@@ -170,6 +170,16 @@ private:
         std::uint32_t ComboPoints = 0;                   // combo points on ComboTarget, from the bot's own Sinister Strikes
         std::uint64_t ComboTarget = 0;
         std::uint32_t LastTrainLevel = 0;                // the level at the last trainer check
+        std::uint32_t AcceptRefusals = 0;                // resurrect answers refused in a row
+        std::uint64_t AcceptIgnoreUntilMs = 0;           // a resurrect offer is not answered before this (it kept being refused)
+        std::uint64_t StallTarget = 0;                   // fight watchdog: the target being watched
+        std::uint32_t StallTargetHealth = 0;
+        std::uint32_t StallBotHealth = 0;
+        std::uint64_t StallLastMs = 0;                   // when the watchdog last looked (a long gap starts it again)
+        std::uint64_t StallSinceMs = 0;                  // since when neither the target's nor the bot's health has gone down
+        std::uint32_t HubFailures = 0;                   // hub walks in a row that ended without arriving
+        std::uint32_t ExploreStep = 0;                   // random walks made, for the direction of the next
+        Point ExploreTarget;
         std::uint64_t InviteAcceptAtMs = 0;              // a player's invite is not answered again before this
         std::uint64_t PartyRetryAtMs = 0;                // a party action is not sent again before this
         std::unordered_map<std::uint64_t, std::uint64_t> AvoidUntilMs; // unit -> until when the bot picks another target

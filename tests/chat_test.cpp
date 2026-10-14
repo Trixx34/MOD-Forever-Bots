@@ -477,6 +477,133 @@ void FocusTargetIsAttackedFirst()
     CHECK(Has(actions, 10, ActionType::kFollow, far.guid) || Has(actions, 10, ActionType::kAttackTarget, far.guid));
 }
 
+
+// ---- soak fixes: resurrect answers, fight watchdog, exploring on foot ----
+
+void RefusedResurrectAnswersDoNotHoldTheBotForever()
+{
+    PolicyOptions options;
+    options.ClassOf = ClassOf;
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = Group();
+    view.bots[2].health = 1;
+    view.bots[2].life_state = 1;
+    view.bots[2].resurrect_from = MakeUnitRef(2, 0, 999); // an offer the core keeps refusing
+    int sent = 0;
+    std::uint64_t now = 1000;
+    std::uint32_t sequence = 0;
+    for (int step = 0; step < 40; ++step)
+    {
+        auto const actions = policy.Decide(view, now);
+        for (BotAction const& action : actions)
+            if (action.bot_guid == 12 && action.type == ActionType::kResurrect)
+            {
+                ++sent;
+                view.bots[2].last_action_type = std::uint8_t(ActionType::kResurrect);
+                view.bots[2].last_action_status = forever_module::BotActionStatus::kInvalidTarget;
+                view.bots[2].last_action_sequence = ++sequence;
+            }
+        now += 2500;
+    }
+    CHECK(sent >= 3 && sent <= 9); // three answers, a minute's pause, three more ... not one every two seconds
+    // After the first run of refusals the bot is free to release its spirit (it has nobody to resurrect it).
+    view.bots[2].resurrect_from = 0;
+    bool released = false;
+    for (BotAction const& action : policy.Decide(view, now + 10000))
+        released = released || (action.bot_guid == 12 && action.type == ActionType::kReleaseSpirit);
+    CHECK(released);
+}
+
+void StalledFightIsGivenUp()
+{
+    PolicyOptions options;
+    options.ClassOf = ClassOf;
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = Group();
+    NearbyUnit mob;
+    mob.guid = MakeUnitRef(8, 7, 3);
+    mob.pos_x = 3.0f;
+    mob.health = 100;
+    mob.is_hostile = true;
+    view.nearby[0] = mob;
+    view.bots[0].nearby_count = 1;
+    view.bots[0].threat_target_guid = mob.guid;
+    view.bots[0].in_combat = 1;
+    std::vector<std::string> events;
+    PolicyOptions watched = options;
+    watched.OnEvent = [&events](std::string const& line) { events.push_back(line); };
+    BotPolicy watcher(watched);
+    for (std::uint64_t now = 1000; now < 1000 + 100000; now += 5000)
+        watcher.Decide(view, now);
+    bool stalled = false;
+    for (std::string const& line : events)
+        stalled = stalled || line.find("fight_stalled") != std::string::npos;
+    CHECK(stalled);
+    // The mob's health goes down now and then: no stall.
+    events.clear();
+    BotPolicy moving(watched);
+    for (std::uint64_t now = 1000; now < 1000 + 100000; now += 5000)
+    {
+        view.nearby[0].health = std::uint32_t(100 - (now - 1000) / 2000);
+        moving.Decide(view, now);
+    }
+    for (std::string const& line : events)
+        CHECK(line.find("fight_stalled") == std::string::npos);
+}
+
+void BotWithNowhereToGoExploresOnFoot()
+{
+    PolicyOptions options; // no hubs, no grind spots
+    options.ClassOf = ClassOf;
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = Group();
+    policy.Decide(view, 1000);
+    float firstX = 0.0f, firstY = 0.0f;
+    bool walked = false;
+    for (BotAction const& action : policy.Decide(view, 1000 + 12000))
+        if (action.bot_guid == 10 && action.type == ActionType::kMoveTo)
+        {
+            walked = true;
+            firstX = action.dest_x;
+            firstY = action.dest_y;
+            CHECK(firstX * firstX + firstY * firstY >= 45.0f * 45.0f && firstX * firstX + firstY * firstY <= 110.0f * 110.0f);
+        }
+    CHECK(walked);
+    // Arrived (the bot stands at the target): after a pause it walks again, in another direction.
+    view.bots[0].pos_x = firstX;
+    view.bots[0].pos_y = firstY;
+    policy.Decide(view, 20000);
+    bool second = false;
+    for (BotAction const& action : policy.Decide(view, 20000 + 12000))
+        if (action.bot_guid == 10 && action.type == ActionType::kMoveTo)
+            second = second || (action.dest_x != firstX || action.dest_y != firstY);
+    CHECK(second);
+}
+
+void UnreachableHubsAreGivenUpForExploring()
+{
+    PolicyOptions options;
+    options.ClassOf = ClassOf;
+    options.HubsByMap[0] = { Point{ 90000.0f, 0.0f, 0.0f } }; // never reached
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = Group();
+    std::uint64_t now = 1000;
+    bool hubWalks = false, exploredAfter = false;
+    for (int step = 0; step < 200; ++step)
+    {
+        for (BotAction const& action : policy.Decide(view, now))
+            if (action.bot_guid == 10 && action.type == ActionType::kMoveTo)
+            {
+                if (action.dest_x == 90000.0f)
+                    hubWalks = true;
+                else if (hubWalks)
+                    exploredAfter = true;
+            }
+        now += 5000;
+    }
+    CHECK(hubWalks && exploredAfter);
+}
+
 } // namespace
 
 int main()
@@ -506,6 +633,10 @@ int main()
     RoleTankLetsAnyClassPull();
     DefensiveBotsWaitForTheGroupToFight();
     FocusTargetIsAttackedFirst();
+    RefusedResurrectAnswersDoNotHoldTheBotForever();
+    StalledFightIsGivenUp();
+    BotWithNowhereToGoExploresOnFoot();
+    UnreachableHubsAreGivenUpForExploring();
     if (failures == 0)
         std::printf("chat_test: all checks passed\n");
     return failures == 0 ? 0 : 1;

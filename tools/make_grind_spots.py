@@ -8,7 +8,7 @@ for spawns that only one faction should grind (for example a faction's own start
 
 The spawns are cut into square cells (--cell yards, default 120). A cell with at least --min-count spawns becomes one spot at the average position of
 its spawns, with the bot levels that suit it: from the 10th percentile of the creature levels to the 90th percentile plus 2 (a bot does not pull
-more than two levels above itself). Neighbouring cells with the same band are not merged: the bot picks by distance and weight.
+more than two levels above itself). A cell whose creatures span more than --band levels is split by level into several spots at the same place. Neighbouring cells with the same band are not merged: the bot picks by distance and weight.
 
 Usage: make_grind_spots.py spawns.tsv > data/grind_spots.txt
 """
@@ -31,6 +31,7 @@ def main():
     parser.add_argument("--cell", type=float, default=120.0)
     parser.add_argument("--min-count", type=int, default=6)
     parser.add_argument("--max-level", type=int, default=60)
+    parser.add_argument("--band", type=int, default=8, help="most levels a spot may span (cells with a wider spread are split by level)")
     args = parser.parse_args()
 
     cells = defaultdict(list)
@@ -54,16 +55,28 @@ def main():
             cells[key].append((x, y, z, level))
 
     spots = []
-    for (map_id, side, _cx, _cy), spawns in cells.items():
-        if len(spawns) < args.min_count:
-            continue
-        levels = sorted(s[3] for s in spawns)
-        low = max(1, percentile(levels, 0.10))
-        high = min(args.max_level, percentile(levels, 0.90) + 2)
-        x = sum(s[0] for s in spawns) / len(spawns)
-        y = sum(s[1] for s in spawns) / len(spawns)
-        z = sum(s[2] for s in spawns) / len(spawns)
-        spots.append((map_id, low, x, y, z, high, side, len(spawns)))
+    for (map_id, side, _cx, _cy), cell_spawns in cells.items():
+        # A cell holding creatures of very different levels (a city with critters and guards, a hill with two zones on it) is split into groups whose levels
+        # lie within --band of the group's lowest, so one spot never claims a band of fifty levels.
+        ordered = sorted(cell_spawns, key=lambda s: s[3])
+        groups, current = [], []
+        for spawn in ordered:
+            if current and spawn[3] - current[0][3] > args.band:
+                groups.append(current)
+                current = []
+            current.append(spawn)
+        if current:
+            groups.append(current)
+        for spawns in groups:
+            if len(spawns) < args.min_count:
+                continue
+            levels = [s[3] for s in spawns]
+            low = max(1, percentile(levels, 0.10))
+            high = min(args.max_level, percentile(levels, 0.90) + 2)
+            x = sum(s[0] for s in spawns) / len(spawns)
+            y = sum(s[1] for s in spawns) / len(spawns)
+            z = sum(s[2] for s in spawns) / len(spawns)
+            spots.append((map_id, low, x, y, z, high, side, len(spawns)))
 
     spots.sort()
     print("# Grind spots (leveling). Made by tools/make_grind_spots.py from a creature spawn export. Format: src/grind_data.h")

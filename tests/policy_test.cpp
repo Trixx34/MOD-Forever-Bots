@@ -877,8 +877,8 @@ void TravelIsDroppedAfterTheTimeout()
     SetVendor(view, 100.0f);
     CHECK(HasAction(policy.Decide(view, 0), 10, ActionType::kMoveTo));
     auto const stuck = policy.Decide(view, 200000); // still far away after the timeout
-    CHECK(!HasAction(stuck, 10, ActionType::kMoveTo));
-    CHECK(HasAction(stuck, 10, ActionType::kStop));  // the walk is over
+    for (BotAction const& action : stuck)                // the walk to the vendor is over (the bot may take a short walk of its own)
+        CHECK(!(action.bot_guid == 10 && action.type == ActionType::kMoveTo && action.dest_x == 100.0f));
     CHECK(!HasAction(stuck, 10, ActionType::kVendor));
 }
 
@@ -959,7 +959,9 @@ void NoHubsOnTheBotsMapMeansNoWalk()
 {
     BotPolicy policy = HubPolicy();
     CHECK(WalkTo(policy.Decide(OnMap(0), 0), 10) < 0.0f);
-    CHECK(WalkTo(policy.Decide(OnMap(0), 30000), 10) < 0.0f); // map 0 has no hubs here
+    // Map 0 has no hubs here: the bot takes a short walk on foot after a quiet spell instead (it never walks to the hubs of map 1).
+    float const x = WalkTo(policy.Decide(OnMap(0), 30000), 10);
+    CHECK(x > -120.0f && x < 120.0f);
 }
 
 void AnythingSeenStopsTheWalk()

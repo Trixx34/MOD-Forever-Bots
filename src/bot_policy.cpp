@@ -75,6 +75,13 @@ constexpr std::uint32_t kHealBelowPct = 60;
 constexpr float kHealRangeYards = 30.0f;
 constexpr float kBuffRangeYards = 30.0f;            // a party buff reaches members this close
 constexpr std::size_t kGrindMemory = 2;           // grind spots remembered as just visited
+constexpr std::uint32_t kAcceptRefusalsMax = 3;       // resurrect answers refused this often in a row: the offer is left alone for a while
+constexpr std::uint64_t kAcceptIgnoreMs = 60000;
+constexpr std::uint64_t kFightStallMs = 90000;       // a fight in which neither side's health went down this long is given up
+constexpr std::uint32_t kHubFailuresMax = 2;         // hub walks in a row that failed before the bot explores on foot instead
+constexpr std::uint64_t kExploreIdleMs = 10000;      // an idle bot with nowhere to go takes a short walk after this long
+constexpr std::uint64_t kExploreTimeoutMs = 60000;
+constexpr float kExploreReachYards = 6.0f;
 constexpr std::uint64_t kAcceptInviteRetryMs = 3000; // an invite from a player is answered again after this long if it is still pending
 constexpr std::uint64_t kGotoTimeoutMs = 90000;     // a goto order is dropped after this long
 constexpr std::uint64_t kPullOrderMs = 30000;      // a pull order is dropped after this long, or when the target is gone
@@ -373,7 +380,23 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
         bool const ok = bot.last_action_status == BotActionStatus::kApplied;
         char const* const what = bot.last_action_type == uint8_t(ActionType::kReleaseSpirit) ? "release"
                                  : bot.last_action_type == uint8_t(ActionType::kResurrect) ? "resurrect_accept" : "reclaim";
-        if (!ok && _options.OnEvent)
+        bool logIt = !ok;
+        if (bot.last_action_type == uint8_t(ActionType::kResurrect))
+        {
+            // An answer to a resurrect offer that is refused again and again must not hold the bot: after a few it is left alone for a minute.
+            if (ok)
+                state.AcceptRefusals = 0;
+            else
+            {
+                logIt = state.AcceptRefusals == 0; // one line per run of refusals
+                if (++state.AcceptRefusals >= kAcceptRefusalsMax)
+                {
+                    state.AcceptIgnoreUntilMs = nowMs + kAcceptIgnoreMs;
+                    state.AcceptRefusals = 0;
+                }
+            }
+        }
+        if (logIt && _options.OnEvent)
             _options.OnEvent(std::string("death_action_refused: bot=") + std::to_string(bot.guid) + " action=" + what +
                              " status=" + ActionStatusName(bot.last_action_status));
         if (ok && bot.last_action_type == uint8_t(ActionType::kReclaimCorpse))
@@ -878,7 +901,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             state.Life = bot.life_state;
 
             // A resurrect offer is accepted at any time, whatever the bot was doing.
-            if (bot.resurrect_from != 0)
+            if (bot.resurrect_from != 0 && nowMs >= state.AcceptIgnoreUntilMs)
             {
                 if (nowMs >= state.AcceptRetryMs)
                 {
@@ -1254,6 +1277,32 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             it = nowMs >= it->second ? state.LootedUntilMs.erase(it) : std::next(it);
         float const distance = targetUnit ? rotation::DistanceYards(bot, *targetUnit) : bot.target_distance;
 
+        // Fight watchdog: a target whose health, and the bot's own, have not gone down for kFightStallMs is unreachable, evading or out of line of sight
+        // (the 8-hour soak had a fight of two hours). The target is avoided like one that refused an attack, and the bot picks another.
+        if (hasTarget && targetUnit)
+        {
+            if (state.StallTarget != targetRef || nowMs - state.StallLastMs > 10000)
+            {
+                state.StallTarget = targetRef;
+                state.StallSinceMs = nowMs;
+            }
+            else if (targetUnit->health < state.StallTargetHealth || bot.health < state.StallBotHealth)
+                state.StallSinceMs = nowMs;
+            state.StallLastMs = nowMs;
+            state.StallTargetHealth = targetUnit->health;
+            state.StallBotHealth = bot.health;
+            if (nowMs - state.StallSinceMs > kFightStallMs)
+            {
+                AvoidUnit(state.AvoidUntilMs, state.AvoidCount, targetRef, nowMs);
+                if (_options.OnEvent)
+                    _options.OnEvent("fight_stalled: bot=" + std::to_string(bot.guid) + " target_entry=" + std::to_string(forever_module::UnitRefEntry(targetRef)) +
+                                     " target_hp=" + std::to_string(targetUnit->health) + " distance=" + std::to_string(int(distance)));
+                state.StallTarget = 0;
+            }
+        }
+        else if (!hasTarget)
+            state.StallTarget = 0;
+
         Decision wanted;
         if (lowHealth)
         {
@@ -1492,7 +1541,8 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     state.IdleSinceMs = nowMs; // nothing on this map for this level: look again later
             }
         }
-        else if (idle && healthy && !partyMember && !state.ChatStay && state.ChatFollow == 0 && hubs != _options.HubsByMap.end() && !hubs->second.empty())
+        else if (idle && healthy && !partyMember && !state.ChatStay && state.ChatFollow == 0 && hubs != _options.HubsByMap.end() && !hubs->second.empty() &&
+                 state.HubFailures < kHubFailuresMax)
         {
             std::vector<Point> const& list = hubs->second;
             if (state.Wandering)
@@ -1502,8 +1552,10 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 bool const timedOut = nowMs - state.WanderStartMs > kWanderTimeoutMs;
                 if (arrived || timedOut)
                 {
-                    // Next time, the next hub; the bot waits a full interval before it walks again.
+                    // Next time, the next hub; the bot waits a full interval before it walks again. Walks that end without arriving (a hub in
+                    // another zone, past what the pathing allows) are counted: after kHubFailuresMax in a row the bot explores on foot instead.
                     state.Wandering = false;
+                    state.HubFailures = arrived ? 0 : state.HubFailures + 1;
                     state.NextHub = (state.NextHub + 1) % list.size();
                     state.IdleSinceMs = nowMs;
                 }
@@ -1518,6 +1570,41 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 state.Wandering = true;
                 state.WanderStartMs = nowMs;
                 wanted = Decision{ ActionType::kMoveTo, 0, list[state.NextHub % list.size()] };
+                idle = false;
+            }
+        }
+
+        // Exploring on foot: a bot with no grind spot and no hub it can reach (a map with neither, or hubs it never got to) would stand where it
+        // began and never meet a creature, as 45 bots did for eight hours in the soak. After a short quiet it takes a walk of 50 to 100 yards in a
+        // turning direction, and after a few walks tries its hubs again.
+        else if (idle && healthy && !grindMode && !partyMember && !state.ChatStay && state.ChatFollow == 0)
+        {
+            if (state.Wandering)
+            {
+                bool const arrived = DistanceTo(bot, state.ExploreTarget) <= kExploreReachYards;
+                bool const timedOut = nowMs - state.WanderStartMs > kExploreTimeoutMs;
+                if (arrived || timedOut)
+                {
+                    state.Wandering = false;
+                    state.IdleSinceMs = nowMs; // the next walk starts after kExploreIdleMs
+                    if (state.ExploreStep % 8 == 0)
+                        state.HubFailures = 0; // try the hubs again now and then
+                }
+                else
+                {
+                    wanted = Decision{ ActionType::kMoveTo, 0, state.ExploreTarget };
+                    idle = false;
+                }
+            }
+            else if (nowMs - state.IdleSinceMs >= kExploreIdleMs)
+            {
+                float const angle = float(bot.guid % 97) * 0.7f + float(state.ExploreStep) * 2.399963f;
+                float const radius = 50.0f + 25.0f * float(state.ExploreStep % 3);
+                ++state.ExploreStep;
+                state.ExploreTarget = Point{ bot.pos_x + std::cos(angle) * radius, bot.pos_y + std::sin(angle) * radius, bot.pos_z };
+                state.Wandering = true;
+                state.WanderStartMs = nowMs;
+                wanted = Decision{ ActionType::kMoveTo, 0, state.ExploreTarget };
                 idle = false;
             }
         }
