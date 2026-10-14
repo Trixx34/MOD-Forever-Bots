@@ -163,6 +163,16 @@ private:
         std::map<std::pair<std::uint32_t, std::uint64_t>, std::uint64_t> BuffUntilMs; // (spell, recipient reference; 0 = the bot itself) -> when the buff runs out
         std::unordered_map<std::uint32_t, Dot> Dots;     // spell -> effect on a target, while it lasts
         std::optional<std::uint64_t> LastTestCastTick;
+        std::uint64_t AutoShotTarget = 0;                // the unit Auto Shot was accepted on and is believed to be shooting (0 = not active)
+        // Hunter pet. The snapshot has no pet, so this is only what the accepted and refused pet casts imply.
+        bool PetMissing = true;                          // the pet is not believed to be out: Call Pet (or Revive Pet when PetDead) is due
+        bool PetDead = false;                            // Call Pet was refused: the pet is believed dead, Revive Pet is due
+        bool PetProbe = false;                           // a fight ended: Mend Pet (from level 12) or a Call Pet checks the pet is still there
+        bool PetFought = false;                          // the bot fought since the last pet check
+        std::uint32_t PetFailures = 0;                   // pet casts refused in a row, for the backoff
+        std::uint64_t PetRetryAtMs = 0;                  // no pet cast out of combat before this
+        std::uint64_t PetProbeAtMs = 0;                  // below level 12 (no Mend Pet) a Call Pet probe is not sent before this
+        std::uint64_t PetMendAtMs = 0;                   // no Mend Pet in a fight before this
         bool Sitting = false;                            // sat down to rest; stands before it moves or fights
         std::uint64_t RestRetryAtMs = 0;                 // a refused sit is not tried again before this
         std::uint64_t NextServiceMs = 0;                 // next vendor visit (sell grey, repair, equip)

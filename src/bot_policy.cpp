@@ -42,6 +42,17 @@ constexpr std::uint32_t kServiceEquip = 4;
 // Combo points: the rogue's Sinister Strike spell and the spend, and the points a finisher needs.
 constexpr std::uint32_t kSinisterStrike = 1752;
 constexpr std::uint32_t kEviscerate = 2098;
+constexpr std::uint32_t kAutoShot = 75;
+constexpr std::uint32_t kCallPet = 883;
+constexpr std::uint32_t kRevivePet = 982;
+constexpr std::uint32_t kMendPet = 136;
+constexpr std::uint32_t kHunterClass = 3;
+constexpr std::uint64_t kPetBackoffMs = 30000;       // first wait after a refused revive; doubles per failure
+constexpr std::uint64_t kPetBackoffMaxMs = 300000;
+constexpr std::uint64_t kPetProbeMs = 120000;        // below level 12 a Call Pet check after a fight is sent at most this often
+constexpr std::uint64_t kPetMendEveryMs = 30000;     // Mend Pet in a fight at most this often
+constexpr std::uint64_t kPetMendAfterMs = 15000;     // and only once the fight has lasted this long
+constexpr std::uint32_t kPetMendManaPct = 50;        // and with at least this much mana
 constexpr std::uint32_t kMaxComboPoints = 5;
 // Saber Slash (Forever): like Sinister Strike it gives one combo point (SpellEffect 30 energize, power type 4, 1 point, in the client data).
 constexpr std::uint32_t kSaberSlash = 424785;
@@ -519,6 +530,55 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
         }
         return;
     }
+    if (spell == kCallPet || spell == kRevivePet || spell == kMendPet)
+    {
+        // The snapshot has no pet, so the results of the pet casts are the only evidence of its state.
+        switch (bot.last_action_status)
+        {
+            case BotActionStatus::kApplied:
+                state.PetMissing = false;
+                state.PetDead = false;
+                state.PetProbe = false;
+                state.PetFailures = 0;
+                state.PetRetryAtMs = 0;
+                if (spell == kMendPet)
+                    state.AutoShotTarget = 0; // the channel stops Auto Shot: it is cast again afterwards
+                break;
+            case BotActionStatus::kRefused:
+            case BotActionStatus::kInvalidTarget:
+            case BotActionStatus::kNoLineOfSight:
+                if (spell == kCallPet)
+                {
+                    // Call Pet is refused for a dead pet (or for no pet at all, which Revive Pet's refusal then shows).
+                    state.PetDead = true;
+                    state.PetMissing = true;
+                }
+                else if (spell == kRevivePet)
+                {
+                    state.PetDead = false; // maybe it was alive after all, or there is no pet: Call Pet is tried again after the backoff
+                    state.PetMissing = true;
+                    ++state.PetFailures;
+                    std::uint64_t wait = kPetBackoffMs;
+                    for (std::uint32_t i = 1; i < state.PetFailures && wait < kPetBackoffMaxMs; ++i)
+                        wait *= 2;
+                    state.PetRetryAtMs = nowMs + std::min(wait, kPetBackoffMaxMs);
+                }
+                else
+                {
+                    state.PetMissing = true; // Mend Pet has no pet to heal
+                    state.PetProbe = false;
+                }
+                break;
+            default:
+                break; // busy, moving, cooldown, no power, out of range, not known: the usual retry below, the pet state is unchanged
+        }
+    }
+    if (spell == kAutoShot && bot.last_action_status == BotActionStatus::kApplied)
+    {
+        auto const shot = state.CastTarget.find(spell);
+        if (shot != state.CastTarget.end())
+            state.AutoShotTarget = shot->second;
+    }
     if (bot.last_action_status == BotActionStatus::kInvalidTarget)
     {
         // The cast had no valid target: that unit is avoided too, so the next cast goes to another one.
@@ -975,6 +1035,11 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 state.RunStartDist = 0.0f;
                 state.RunProgress = 0;
                 state.InFight = false;
+                state.AutoShotTarget = 0;
+                state.PetMissing = true; // the pet is dismissed with its dead owner: Call Pet after the resurrection
+                state.PetDead = false;
+                state.PetProbe = false;
+                state.PetFought = false;
                 state.Sitting = false;
                 state.Approaching = false;
                 state.Traveling = false;
@@ -2042,6 +2107,53 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             }
         }
 
+        // Hunter pet (out of combat, standing, nothing to fight). Only spell casts are available: there is no pet in the snapshot and no pet command
+        // action. A pet that is not believed to be out is called (a refusal means it is dead: Revive Pet); after a fight Mend Pet (level 12) heals it
+        // and, refused, shows it is gone; a failed revive backs off. Sending it to attack is not possible (doc/rotations.md, Limits).
+        if (classId == kHunterClass && !hasTarget && bot.in_combat == 0 && bot.moving == 0 && wanted.Type == ActionType::kStop && nowMs >= state.NextCastMs &&
+            !(bot.casting_spell != 0 && bot.cast_remaining_ms != 0) && !state.Sitting && nowMs >= state.PetRetryAtMs)
+        {
+            if (state.PetFought)
+            {
+                state.PetFought = false;
+                state.PetProbe = true;
+            }
+            std::uint32_t petSpell = 0;
+            if (state.PetMissing)
+                petSpell = state.PetDead ? kRevivePet : kCallPet;
+            else if (state.PetProbe)
+            {
+                if (bot.level == 0 || bot.level >= rotation::LearnLevel(kMendPet))
+                    petSpell = kMendPet;
+                else if (nowMs >= state.PetProbeAtMs)
+                    petSpell = kCallPet;
+                else
+                    state.PetProbe = false;
+            }
+            if (petSpell != 0)
+            {
+                auto const retry = state.RetryAtMs.find(petSpell);
+                bool const learned = bot.level == 0 || bot.level >= rotation::LearnLevel(petSpell);
+                if (learned && (retry == state.RetryAtMs.end() || nowMs >= retry->second))
+                {
+                    BotAction pet;
+                    pet.bot_guid = bot.guid;
+                    pet.type = ActionType::kCastSpell;
+                    pet.spell_id = petSpell;
+                    pet.target_guid = 0; // the pet is the spell's own target
+                    actions.push_back(pet);
+                    state.CastTarget[petSpell] = 0;
+                    state.NextCastMs = nowMs + kGlobalCooldownMs;
+                    if (petSpell == kCallPet && !state.PetMissing)
+                    {
+                        state.PetProbeAtMs = nowMs + kPetProbeMs;
+                        state.PetProbe = false;
+                    }
+                    continue;
+                }
+            }
+        }
+
         // Upkeep buffs (rotation file rows 'buff'): out of combat, standing, with nothing to fight. Each is cast on the bot, or on every member of its group
         // (party), when its last cast has run out; a refused cast is tried again after the usual retry.
         if (!hasTarget && bot.in_combat == 0 && bot.moving == 0 && nowMs >= state.NextCastMs && !(IsCasting(bot)) &&
@@ -2086,7 +2198,10 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         }
 
         if (!hasTarget)
+        {
+            state.AutoShotTarget = 0; // the fight is over: Auto Shot stopped with it
             continue;
+        }
 
         if (_options.TestSpell != 0)
         {
@@ -2121,6 +2236,10 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             state.ComboPoints = 0;
         }
         facts.ComboPoints = int32_t(state.ComboPoints);
+        state.PetFought = true;
+        // Auto Shot runs until the target changes or the bot moves; casting it again would not help (and may toggle it off).
+        if (state.AutoShotTarget != 0 && (state.AutoShotTarget != targetRef || bot.moving != 0))
+            state.AutoShotTarget = 0;
 
         // Spells the core reports as cooling down right now.
         std::unordered_set<std::uint32_t> cooling;
@@ -2128,10 +2247,33 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             if (cooldown.spell_id != 0 && cooldown.remaining_ms != 0)
                 cooling.insert(cooldown.spell_id);
 
+        // Hunter: Mend Pet now and then in a long fight, when the pet is believed to be out.
+        if (classId == kHunterClass && !state.PetMissing && bot.moving == 0 && nowMs >= state.PetMendAtMs && facts.FightMs >= kPetMendAfterMs &&
+            facts.SelfPowerPct >= std::int32_t(kPetMendManaPct) && facts.SelfHpPct >= 50 &&
+            (bot.level == 0 || bot.level >= rotation::LearnLevel(kMendPet)) && !cooling.count(kMendPet))
+        {
+            auto const retry = state.RetryAtMs.find(kMendPet);
+            if (retry == state.RetryAtMs.end() || nowMs >= retry->second)
+            {
+                BotAction mend;
+                mend.bot_guid = bot.guid;
+                mend.type = ActionType::kCastSpell;
+                mend.spell_id = kMendPet;
+                mend.target_guid = 0;
+                actions.push_back(mend);
+                state.CastTarget[kMendPet] = 0;
+                state.NextCastMs = nowMs + kGlobalCooldownMs;
+                state.PetMendAtMs = nowMs + kPetMendEveryMs;
+                continue;
+            }
+        }
+
         for (rotation::Row const& row : RowsFor(classId))
         {
             if (row.Buff)
                 continue; // upkeep spells are cast out of combat, below
+            if (row.Spell == kAutoShot && state.AutoShotTarget == targetRef)
+                continue; // already shooting this target
             if (row.MaxLevel != 0 && bot.level > row.MaxLevel)
                 continue; // a better spell has replaced it
             // Not learned yet: below the level a trainer teaches it (the rotation file's level, else the built-in table). (A level of 0 is unknown.)

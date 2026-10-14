@@ -148,6 +148,9 @@ std::uint32_t LearnLevel(std::uint32_t spell)
         case 172: return 4;    // Corruption
         case 8921: return 4;   // Moonfire
         case 3044: return 6;   // Arcane Shot
+        case 883: return 10;   // Call Pet
+        case 982: return 10;   // Revive Pet
+        case 136: return 12;   // Mend Pet
         case 2136: return 6;   // Fire Blast
         case 6343: return 6;   // Thunder Clap
         case 853: return 8;    // Hammer of Justice
