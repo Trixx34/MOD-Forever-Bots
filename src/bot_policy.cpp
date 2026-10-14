@@ -77,7 +77,13 @@ constexpr float kBuffRangeYards = 30.0f;            // a party buff reaches memb
 constexpr std::size_t kGrindMemory = 2;           // grind spots remembered as just visited
 constexpr std::uint32_t kAcceptRefusalsMax = 3;       // resurrect answers refused this often in a row: the offer is left alone for a while
 constexpr std::uint64_t kAcceptIgnoreMs = 60000;
-constexpr std::uint64_t kFightStallMs = 90000;       // a fight in which neither side's health went down this long is given up
+constexpr std::uint64_t kFightStallMs = 45000;       // a fight in which neither side's health went down this long is given up (the telemetry calls 60 s "stuck")
+constexpr std::uint64_t kStallAvoidMs = 300000;      // a target the fight stalled against is left alone 5 minutes, 10, 20, then 40 at most
+constexpr std::uint32_t kMaxStallDoublings = 3;
+constexpr std::uint32_t kRestManaBelowPct = 40;      // an idle mana user below this sits down to drink in the open
+constexpr std::uint32_t kRestManaUntilPct = 90;      // and stays sat until it has this much
+constexpr std::uint64_t kManaRestMaxMs = 120000;     // but never longer than this at a time
+constexpr std::uint64_t kManaRestBlockMs = 300000;   // and not again for this long after a rest that did not refill the mana
 constexpr std::uint32_t kHubFailuresMax = 2;         // hub walks in a row that failed before the bot explores on foot instead
 constexpr std::uint64_t kExploreIdleMs = 10000;      // an idle bot with nowhere to go takes a short walk after this long
 constexpr std::uint64_t kExploreTimeoutMs = 60000;
@@ -176,6 +182,41 @@ float DistanceBetween(NearbyUnit const& a, NearbyUnit const& b)
 
 bool IsLiveMob(NearbyUnit const& unit);
 
+// The level difference at which a creature gives no experience at all (the classic "grey" rule: GetZeroDifference). Whether this fork
+// changes it is not known; the vanilla table is used.
+std::uint32_t ZeroExpDifference(std::uint32_t level)
+{
+    if (level < 8)
+        return 5;
+    if (level < 10)
+        return 6;
+    if (level < 12)
+        return 7;
+    if (level < 16)
+        return 8;
+    if (level < 20)
+        return 9;
+    if (level < 30)
+        return 11;
+    if (level < 40)
+        return 12;
+    if (level < 45)
+        return 13;
+    if (level < 50)
+        return 14;
+    if (level < 55)
+        return 15;
+    if (level < 60)
+        return 16;
+    return 17;
+}
+
+// A creature far enough below the bot that killing it gives no experience: not worth pulling. (A level of 0 is unknown and not judged.)
+bool IsGrey(BotSnapshot const& bot, NearbyUnit const& unit)
+{
+    return bot.level != 0 && unit.level != 0 && unit.level < bot.level && bot.level - unit.level >= ZeroExpDifference(bot.level);
+}
+
 // The closest live hostile that is not part of a group larger than kMaxPull, or nullptr. A group is the hostiles within
 // kPullRadius of the candidate, the candidate included. Units already attacking the bot are not chosen here; the policy
 // fights its threat target whatever the group size.
@@ -192,6 +233,10 @@ NearbyUnit const* PullTarget(BotSnapshot const& bot, std::span<NearbyUnit const>
         // A bot hunting for a quest pulls only the creatures the quest wants (unless it is already being attacked).
         if (!defending && !onlyEntries.empty() &&
             std::find(onlyEntries.begin(), onlyEntries.end(), forever_module::UnitRefEntry(candidate.guid)) == onlyEntries.end())
+            continue;
+        // Nothing to gain from a grey creature (no experience): left alone, so the bot goes looking for something that levels it. Not when
+        // hunting for a quest (the quest wants it), nor in a dungeon, nor when the bot is already being attacked.
+        if (!defending && !dungeon && onlyEntries.empty() && IsGrey(bot, candidate))
             continue;
         // Not worth pulling: well above the bot's level, or an elite. (A level of 0 is unknown and not judged.) A bot that is already
         // in combat is being attacked, and the snapshot does not say by what: it fights the closest creature, whatever its level, since
@@ -257,6 +302,16 @@ void AvoidUnit(std::unordered_map<std::uint64_t, std::uint64_t>& avoidUntil, std
     std::uint32_t const times = ++count[ref];
     std::uint32_t const doublings = std::min<std::uint32_t>(times - 1, kMaxAvoidDoublings);
     avoidUntil[ref] = nowMs + (kAvoidMs << doublings);
+}
+
+// A stalled fight (nothing lost on either side): the target is left alone much longer than a refused one, more each time, because it is
+// out of reach or bugged, and the bot has nothing to gain by coming back to it every two minutes (a mage did that for an hour and a half).
+void AvoidStalledUnit(std::unordered_map<std::uint64_t, std::uint64_t>& avoidUntil, std::unordered_map<std::uint64_t, std::uint32_t>& count,
+                      std::uint64_t ref, std::uint64_t nowMs)
+{
+    std::uint32_t const times = ++count[ref];
+    std::uint32_t const doublings = std::min<std::uint32_t>(times - 1, kMaxStallDoublings);
+    avoidUntil[ref] = nowMs + (kStallAvoidMs << doublings);
 }
 
 // The live creature in `units` with this reference, or nullptr.
@@ -362,7 +417,13 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
     // A quest action refused (not eligible, bags full, no NPC in reach): the quest is left alone for a while.
     if (bot.last_action_type == uint8_t(ActionType::kQuest) && bot.last_action_status == BotActionStatus::kRefused)
     {
-        _quests.NoteRefused(state.Quest, nowMs);
+        if (_quests.NoteRefused(state.Quest, nowMs))
+        {
+            // A hand-in the core refused: the reward did not fit in the bags. A bot with quest work is never idle, so the vendor visit that
+            // empties the bags (sell, equip) is not left to the idle bot's turn.
+            state.ServiceUrgent = true;
+            state.NextServiceMs = 0;
+        }
         return;
     }
 
@@ -1293,7 +1354,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             state.StallBotHealth = bot.health;
             if (nowMs - state.StallSinceMs > kFightStallMs)
             {
-                AvoidUnit(state.AvoidUntilMs, state.AvoidCount, targetRef, nowMs);
+                AvoidStalledUnit(state.AvoidUntilMs, state.StallCount, targetRef, nowMs);
                 if (_options.OnEvent)
                     _options.OnEvent("fight_stalled: bot=" + std::to_string(bot.guid) + " target_entry=" + std::to_string(forever_module::UnitRefEntry(targetRef)) +
                                      " target_hp=" + std::to_string(targetUnit->health) + " distance=" + std::to_string(int(distance)));
@@ -1436,7 +1497,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
 
         bool enemyNear = false;
         for (NearbyUnit const& unit : nearby)
-            enemyNear = enemyNear || IsLiveMob(unit);
+            enemyNear = enemyNear || (IsLiveMob(unit) && (huntEntries.empty() ? !IsGrey(bot, unit) : true));
         bool idle = !hasTarget && !enemyNear && wanted.Type == ActionType::kStop && questStep.Kind == QuestStepKind::None && !routeBusy;
 
         // Seeing nothing and doing nothing, for hubs (M7): the idle time starts when the bot first is idle, and any activity
@@ -1456,7 +1517,8 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         // party member (it follows its leader). The visit is sent once the bot is in reach. A walk longer than
         // kTravelTimeoutMs is dropped and the visit waits for its next interval. A walking bot is not idle, so it neither
         // sits nor trains on the way.
-        if (idle && _options.ServiceEveryMs != 0 && nowMs >= state.NextServiceMs && !state.ChatStay)
+        bool const urgentService = state.ServiceUrgent && !hasTarget && bot.in_combat == 0 && !lowHealth && !state.InFight;
+        if ((idle || urgentService) && _options.ServiceEveryMs != 0 && nowMs >= state.NextServiceMs && !state.ChatStay)
         {
             // The nearest vendor on the bot's map, found by the core (layout 6); the nearest repairman instead when the gear is worn
             // (layout 9). None on the map, or a party member: no walk.
@@ -1479,12 +1541,18 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 else
                 {
                     state.Traveling = false;
+                    state.ServiceUrgent = false;
                     state.NextServiceMs = nowMs + _options.ServiceEveryMs;
                 }
             }
             else
             {
                 state.Traveling = false;
+                if (state.ServiceUrgent)
+                {
+                    state.ServiceUrgent = false;
+                    _quests.NoteServiced(state.Quest); // the bags are emptier: the refused hand-ins are tried again
+                }
                 BotAction vendor;
                 vendor.bot_guid = bot.guid;
                 vendor.type = ActionType::kVendor;
@@ -1496,7 +1564,32 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
 
         // Hubs (M7): a bot that has been idle for kWanderIdleMs walks to the next hub of its map, and waits there until the
         // next walk. A hurt bot rests instead, and a party member follows its leader. Anything that comes near stops the walk.
-        bool const healthy = bot.max_health == 0 || std::uint64_t(bot.health) * 100 >= std::uint64_t(bot.max_health) * kRestBelowPct;
+        // Mana (the soak's hunter spent most of its time at a third of its mana, because only health made a bot sit): an idle mana user
+        // below kRestManaBelowPct sits and drinks until kRestManaUntilPct, at most kManaRestMaxMs at a time (and not again for a while
+        // when that was not enough: mana that does not come back is not waited for). Anything else the bot does ends the rest.
+        bool const manaUser = bot.power_type == 0 && bot.max_power > 0;
+        bool manaResting = false;
+        if (idle && manaUser)
+        {
+            if (state.ManaRestSinceMs == 0 && nowMs >= state.ManaRestBlockedUntilMs &&
+                std::uint64_t(bot.power) * 100 < std::uint64_t(bot.max_power) * kRestManaBelowPct)
+                state.ManaRestSinceMs = nowMs;
+            if (state.ManaRestSinceMs != 0)
+            {
+                if (std::uint64_t(bot.power) * 100 >= std::uint64_t(bot.max_power) * kRestManaUntilPct)
+                    state.ManaRestSinceMs = 0;
+                else if (nowMs - state.ManaRestSinceMs > kManaRestMaxMs)
+                {
+                    state.ManaRestSinceMs = 0;
+                    state.ManaRestBlockedUntilMs = nowMs + kManaRestBlockMs;
+                }
+                else
+                    manaResting = true;
+            }
+        }
+        else
+            state.ManaRestSinceMs = 0;
+        bool const healthy = !manaResting && (bot.max_health == 0 || std::uint64_t(bot.health) * 100 >= std::uint64_t(bot.max_health) * kRestBelowPct);
         auto const hubs = _options.HubsByMap.find(bot.map_id);
         bool const grindMode = _options.Grind && !_options.Grind->Spots.empty() && bot.level != 0;
         if (idle && healthy && grindMode && !partyMember && !state.ChatStay && state.ChatFollow == 0)
@@ -1618,10 +1711,9 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         bool const stillHurt = bot.max_health > 0 && bot.health < bot.max_health;
         // Waiting for the party (dungeon): sits to recover health, and mana for a mana user, even with creatures in view.
         bool const holdIdle = dungeonHold && !hasTarget && wanted.Type == ActionType::kStop && !routeBusy;
-        bool const manaUser = bot.power_type == 0 && bot.max_power > 0;
         bool const manaLow = holdIdle && manaUser &&
                              std::uint64_t(bot.power) * 100 < std::uint64_t(bot.max_power) * (state.Sitting ? kPartyReadySitHealthPct : kPartyReadyPowerPct);
-        bool const sitWanted = (idle || holdIdle) && (state.Sitting ? (stillHurt || manaLow) : (hurtEnough || manaLow)) &&
+        bool const sitWanted = (idle || holdIdle) && (state.Sitting ? (stillHurt || manaLow || manaResting) : (hurtEnough || manaLow || manaResting)) &&
                                nowMs >= state.RestRetryAtMs;
         if (sitWanted != state.Sitting)
         {

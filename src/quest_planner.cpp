@@ -256,14 +256,29 @@ void QuestPlanner::NoteSent(QuestMemory& memory, std::uint32_t operation, std::u
     }
 }
 
-void QuestPlanner::NoteRefused(QuestMemory& memory, std::uint64_t nowMs) const
+bool QuestPlanner::NoteRefused(QuestMemory& memory, std::uint64_t nowMs) const
 {
     if (memory.LastActionQuest == 0)
-        return;
-    // The block grows with every refusal of the same quest: a minute, ten minutes, then an hour (done long ago, a prerequisite missing, not for this bot).
+        return false;
+    bool const handIn = memory.PendingHandIn == memory.LastActionQuest;
+    // The block grows with every refusal of the same quest: a minute, ten minutes, then an hour (done long ago, a prerequisite missing, not for
+    // this bot). A refused hand-in is most often a full bag, which the bot fixes at a vendor and which says nothing against the quest, so a
+    // hand-in is blocked a minute for its first two refusals.
     std::uint32_t const times = ++memory.Refusals[memory.LastActionQuest];
-    std::uint64_t const block = times == 1 ? kBlockAfterRefusalMs : times == 2 ? 10 * kBlockAfterRefusalMs : kBlockAfterAbandonMs;
+    std::uint32_t const step = handIn && times > 1 ? times - 1 : times; // a hand-in's second refusal counts as the first
+    std::uint64_t const block = step == 1 ? kBlockAfterRefusalMs : step == 2 ? 10 * kBlockAfterRefusalMs : kBlockAfterAbandonMs;
     memory.BlockedUntilMs[memory.LastActionQuest] = nowMs + block;
-    if (memory.PendingHandIn == memory.LastActionQuest)
+    if (handIn)
+    {
         memory.PendingHandIn = 0;
+        memory.RefusedHandIns.insert(memory.LastActionQuest);
+    }
+    return handIn;
+}
+
+void QuestPlanner::NoteServiced(QuestMemory& memory) const
+{
+    for (std::uint32_t quest : memory.RefusedHandIns)
+        memory.BlockedUntilMs.erase(quest);
+    memory.RefusedHandIns.clear();
 }

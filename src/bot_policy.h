@@ -177,6 +177,10 @@ private:
         std::uint32_t StallBotHealth = 0;
         std::uint64_t StallLastMs = 0;                   // when the watchdog last looked (a long gap starts it again)
         std::uint64_t StallSinceMs = 0;                  // since when neither the target's nor the bot's health has gone down
+        std::unordered_map<std::uint64_t, std::uint32_t> StallCount;   // unit -> how many fights against it stalled (the avoid time grows)
+        std::uint64_t ManaRestSinceMs = 0;               // when the current rest for mana began (0 = not resting for mana)
+        std::uint64_t ManaRestBlockedUntilMs = 0;        // a rest that ran its full time without refilling the mana is not started again before this
+        bool ServiceUrgent = false;                      // a quest hand-in was refused (bags full): go to a vendor now, even with quest work to do
         std::uint32_t HubFailures = 0;                   // hub walks in a row that ended without arriving
         std::uint32_t ExploreStep = 0;                   // random walks made, for the direction of the next
         Point ExploreTarget;

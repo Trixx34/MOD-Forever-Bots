@@ -60,6 +60,7 @@ struct QuestMemory
     std::map<std::uint32_t, ProgressInfo> Progress;         // quest -> its objective total and since when it has been that
     std::uint32_t LastActionQuest = 0;                  // the quest of the last accept, hand-in or abandon sent
     std::map<std::uint32_t, std::uint32_t> Refusals;    // quest -> how many accepts or hand-ins the core refused (the block grows with it)
+    std::set<std::uint32_t> RefusedHandIns;             // quests whose hand-in was refused since the last vendor visit
 };
 
 // Who the bot is, for the quests' race and class limits. 0 = unknown (no limit applied).
@@ -99,8 +100,12 @@ public:
     // The policy sent an accept, hand-in or abandon for `quest` (operation as in QuestCode).
     void NoteSent(QuestMemory& memory, std::uint32_t operation, std::uint32_t quest, std::uint64_t nowMs) const;
 
-    // The result of the last quest action the core reported: a refusal blocks the quest for a while.
-    void NoteRefused(QuestMemory& memory, std::uint64_t nowMs) const;
+    // The result of the last quest action the core reported: a refusal blocks the quest for a while. Returns true when the refused action
+    // was a hand-in: the reward did not fit (bags full), which a visit to a vendor fixes.
+    bool NoteRefused(QuestMemory& memory, std::uint64_t nowMs) const;
+
+    // The bot has been to a vendor (its bags are emptier): the quests blocked by refusals are tried again.
+    void NoteServiced(QuestMemory& memory) const;
 
 private:
     int FindStart(forever_module::BotSnapshot const& bot) const;

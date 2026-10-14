@@ -1580,6 +1580,134 @@ void PartyWaitIsLoggedForARezAndForAGhost()
     CHECK(Logged(events, "party_wait:"));
 }
 
+// ---- soak diagnosis: stalled fights, grey creatures, mana ----
+
+// A target that cannot be hurt (out of reach): the fight is given up after the watchdog time, and the target is left alone for minutes, not
+// seconds, more each time (the soak's mage went back to the same two creatures for an hour and a half).
+void StalledTargetIsLeftAloneForMinutes()
+{
+    NearbyUnit const mob = Hostile(7, 3.0f, 100);
+    BotPolicy policy;
+    auto const view = [&mob]
+    {
+        WorldTickSnapshotView v = PartyView({ 10 });
+        AddNearby(v, 0, mob);
+        v.bots[0].threat_target_guid = mob.guid;
+        v.bots[0].in_combat = 1;
+        return v;
+    };
+    std::uint64_t now = 0;
+    bool given = false;
+    for (; now < 70000 && !given; now += 5000)
+        for (BotAction const& action : policy.Decide(view(), now))
+            given = given || (action.type == ActionType::kStop && action.bot_guid == 10);
+    CHECK(given);                                    // given up well before a minute
+    CHECK(now <= 60000);
+    // Still avoided four minutes later, free again after five.
+    CHECK(!HasAction(policy.Decide(view(), now + 240000), 10, ActionType::kAttackTarget, mob.guid));
+    CHECK(HasAction(policy.Decide(view(), now + 310000), 10, ActionType::kAttackTarget, mob.guid));
+    // Stalls again: this time it is left alone for ten minutes.
+    std::uint64_t later = now + 310000;
+    bool second = false;
+    for (std::uint64_t t = later; t < later + 60000 && !second; t += 5000)
+    {
+        for (BotAction const& action : policy.Decide(view(), t))
+            second = second || (action.type == ActionType::kStop && action.bot_guid == 10);
+        later = t;
+    }
+    CHECK(second);
+    CHECK(!HasAction(policy.Decide(view(), later + 540000), 10, ActionType::kAttackTarget, mob.guid));
+    CHECK(HasAction(policy.Decide(view(), later + 610000), 10, ActionType::kAttackTarget, mob.guid));
+}
+
+// A creature far enough below the bot gives no experience: it is not pulled, and its presence does not keep the bot from walking on.
+void GreyCreatureIsNotPulled()
+{
+    NearbyUnit grey = Hostile(7, 3.0f, 100);
+    grey.level = 3; // seven below a level-10 bot: grey (zero experience from 7 below at level 10)
+    NearbyUnit green = Hostile(8, 6.0f, 100);
+    green.level = 4; // six below: still gives a little
+    WorldTickSnapshotView view = PartyView({ 10 });
+    view.bots[0].level = 10;
+    AddNearby(view, 0, grey);
+    BotPolicy policy;
+    auto actions = policy.Decide(view, 0);
+    CHECK(!HasAction(actions, 10, ActionType::kAttackTarget, grey.guid) && !HasAction(actions, 10, ActionType::kFollow, grey.guid));
+
+    WorldTickSnapshotView withGreen = PartyView({ 10 });
+    withGreen.bots[0].level = 10;
+    AddNearby(withGreen, 0, grey);
+    AddNearby(withGreen, 0, green);
+    BotPolicy other;
+    actions = other.Decide(withGreen, 0);
+    CHECK(HasAction(actions, 10, ActionType::kAttackTarget, green.guid) || HasAction(actions, 10, ActionType::kFollow, green.guid));
+
+    // The grey creature attacks the bot: it is fought whatever its level.
+    WorldTickSnapshotView attacked = PartyView({ 10 });
+    attacked.bots[0].level = 10;
+    attacked.bots[0].in_combat = 1;
+    AddNearby(attacked, 0, grey);
+    BotPolicy defender;
+    actions = defender.Decide(attacked, 0);
+    CHECK(HasAction(actions, 10, ActionType::kAttackTarget, grey.guid) || HasAction(actions, 10, ActionType::kFollow, grey.guid));
+}
+
+void GreyCreatureDoesNotKeepTheBotFromExploring()
+{
+    NearbyUnit grey = Hostile(7, 30.0f, 100);
+    grey.level = 1;
+    WorldTickSnapshotView view = PartyView({ 10 });
+    view.bots[0].level = 20;
+    AddNearby(view, 0, grey);
+    BotPolicy policy; // no hubs, no grind spots: the bot explores on foot after a quiet spell
+    policy.Decide(view, 0);
+    bool walks = false;
+    for (BotAction const& action : policy.Decide(view, 11000))
+        walks = walks || (action.type == ActionType::kMoveTo && action.bot_guid == 10);
+    CHECK(walks);
+}
+
+// An idle mana user low on mana sits to drink, stands when it has enough, and does not wait for mana that never comes.
+WorldTickSnapshotView ManaView(std::uint32_t powerPct)
+{
+    WorldTickSnapshotView view = PartyView({ 10 });
+    view.bots[0].power_type = 0;
+    view.bots[0].max_power = 100;
+    view.bots[0].power = powerPct;
+    return view;
+}
+
+void IdleCasterDrinksWhenLowOnMana()
+{
+    BotPolicy policy;
+    std::uint32_t spell = 99;
+    CHECK(RestAt(policy.Decide(ManaView(20), 1000), spell) >= 0 && spell == 1); // sits
+    CHECK(RestAt(policy.Decide(ManaView(60), 5000), spell) < 0);               // keeps sitting: no new action
+    // No walk while it drinks, even after a long quiet spell.
+    for (BotAction const& action : policy.Decide(ManaView(70), 40000))
+        CHECK(action.type != ActionType::kMoveTo);
+    CHECK(RestAt(policy.Decide(ManaView(95), 45000), spell) >= 0 && spell == 0); // enough: stands
+}
+
+void ManaRestIsCappedAndNotRepeatedAtOnce()
+{
+    BotPolicy policy;
+    std::uint32_t spell = 99;
+    CHECK(RestAt(policy.Decide(ManaView(10), 1000), spell) >= 0 && spell == 1);
+    CHECK(RestAt(policy.Decide(ManaView(10), 100000), spell) < 0);              // still drinking
+    CHECK(RestAt(policy.Decide(ManaView(10), 125000), spell) >= 0 && spell == 0); // 2 minutes: stands, the mana is not coming back
+    CHECK(RestAt(policy.Decide(ManaView(10), 130000), spell) < 0);              // and does not sit again at once
+}
+
+void FighterWithoutManaDoesNotDrink()
+{
+    BotPolicy policy;
+    WorldTickSnapshotView view = ManaView(0);
+    view.bots[0].power_type = 1; // rage
+    std::uint32_t spell = 99;
+    CHECK(RestAt(policy.Decide(view, 1000), spell) < 0);
+}
+
 int main()
 {
     HealerHealsTheHurtMember();
@@ -1685,6 +1813,12 @@ int main()
     HealBeatsResurrect();
     PartyWaitIsLoggedForARezAndForAGhost();
     OnlyChangesArePublished();
+    StalledTargetIsLeftAloneForMinutes();
+    GreyCreatureIsNotPulled();
+    GreyCreatureDoesNotKeepTheBotFromExploring();
+    IdleCasterDrinksWhenLowOnMana();
+    ManaRestIsCappedAndNotRepeatedAtOnce();
+    FighterWithoutManaDoesNotDrink();
 
     if (failures == 0)
         std::printf("policy_test: all checks passed\n");

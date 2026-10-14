@@ -64,14 +64,18 @@ Each tick the policy (`src/bot_policy.cpp`) reads the bot's snapshot and sends a
   trainer). It skips a creature more than two levels above it and elites, and does not pull a group of more than three within 10 yards;
   but a bot that is in combat with no target of its own is being attacked, and fights back against the closest creature whatever its level.
 - **Refused targets.** A unit whose attack is refused, that a cast reports with no valid target, or that the bot walks toward for 30 s
-  without reaching, is avoided for 30 s, doubling on each repeat up to 2 minutes.
+  without reaching, is avoided for 30 s, doubling on each repeat up to 2 minutes. A fight in which neither side's health goes down for 45 s
+  (a target out of reach) is given up, and that target is avoided for 5 minutes, then 10, 20 and 40.
 - **Approach and attack.** Melee classes close to 5 yards, ranged classes (hunter, priest, shaman, mage, warlock, druid) to 25. A ranged
   bot below 15% power walks in to melee. Below 30% health a bot disengages.
 - **Rotation** (`src/combat_rotation.cpp`). Every spawned class has rank 1 rows; the core casts the highest rank known. A row is skipped
   until the bot reaches the level a trainer teaches it (`LearnLevel`, from the Forever trainer data). One cast per global cooldown; a
   refused cast is retried after a while. Damage-over-time spells and self buffs are not recast while their effect runs; a rogue counts its
   own combo points.
-- **Rest.** An idle bot below 90% health sits and stays sat until healed, and stands before it moves or fights.
+- **Rest.** An idle bot below 90% health sits and stays sat until healed, and stands before it moves or fights. An idle mana user below 40% mana
+  sits too, until 90% (at most 2 minutes at a time, then not again for 5), and does not walk off while it drinks.
+- **Grey creatures.** A creature far enough below the bot to give no experience (the classic zero-experience difference: 5 levels up to level 7,
+  more above) is not pulled and does not keep an idle bot from walking on; one that attacks the bot, or that a quest wants, is still fought.
 - **Vendor and travel.** An idle bot due a visit walks to the nearest vendor on its map (found by the core, since a bot sees only 40
   yards) and visits within 4 yards: sell grey items, repair, equip the best gear. A walk over 3 minutes is dropped until the next interval.
 - **Hubs.** A bot idle for 30 s with nothing in view walks to the next hub of its map and waits a full interval there before walking on.
@@ -99,6 +103,11 @@ Kinds: `summary`, `fight_start`, `fight_end` (detail: reason, target, duration, 
 - A fight starts when the bot's own attack target is set. `fight_end` reason `target_gone` means the target was not in view when the
   threat dropped (usually a kill, also a leash or a target that left); `no_threat` means it was still alive and in view.
 - `stuck` is a fight with no change in health, position or target for 60 seconds.
+- `time_ms` is the machine's monotonic clock: it starts again after a reboot, and the counters in each line start again when the module
+  restarts. `tools/soak_report.py` splits the file into runs where the clock steps back or no line was written for 5 minutes, leaves the
+  gaps out of the hours, and adds the counters of each stretch.
+- Quest hand-ins: a hand-in the core refuses (bags full) sends the bot to the nearest vendor at once, even in the middle of quest work, and
+  the hand-in is tried again after the visit.
 - If the summary lines stop, the module has stopped.
 
 ## Build
