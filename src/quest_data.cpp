@@ -1,5 +1,6 @@
 #include "quest_data.h"
 
+#include <charconv>
 #include <cstdlib>
 #include <fstream>
 #include <sstream>
@@ -119,10 +120,26 @@ QuestData ParseQuestData(std::istream& in, std::vector<std::string>& warnings)
             bool ok = true;
             while (ok && (line >> key))
             {
-                std::uint32_t value = 0;
-                if (!(line >> value))
+                // A race or class mask may be wider than 32 bits (all bits set, -1 as unsigned 64): it is cut to the 32 bits the bot has race and
+                // class ids for, and a value too large to read at all means any race or class. Other values must fit in 32 bits.
+                std::string token;
+                if (!(line >> token))
+                {
                     ok = false;
-                else if (key == "minlevel")
+                    break;
+                }
+                std::uint64_t wide = 0;
+                auto const parsed = std::from_chars(token.data(), token.data() + token.size(), wide);
+                bool const isMask = key == "races" || key == "classes";
+                if (parsed.ec == std::errc::result_out_of_range && isMask)
+                    wide = 0;
+                else if (parsed.ec != std::errc{} || parsed.ptr != token.data() + token.size() || (!isMask && wide > 0xFFFFFFFFull))
+                {
+                    ok = false;
+                    break;
+                }
+                std::uint32_t const value = std::uint32_t(wide & 0xFFFFFFFFull);
+                if (key == "minlevel")
                     quest->MinLevel = value;
                 else if (key == "level")
                     quest->QuestLevel = value;

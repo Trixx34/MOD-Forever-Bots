@@ -33,6 +33,11 @@ def rows(path):
 
 
 def num(text, default=0):
+    # Exact integers first: a mask such as AllowableRaces = -1 stored as unsigned 64 bits (18446744073709551615) must not go through float.
+    try:
+        return int(text)
+    except ValueError:
+        pass
     try:
         return int(float(text))
     except ValueError:
@@ -40,8 +45,11 @@ def num(text, default=0):
 
 
 def mask_or_any(value):
-    # AllowableRaces / AllowableClasses: 0 or negative (or all bits set) mean any.
-    return 0 if value <= 0 else value
+    # AllowableRaces / AllowableClasses: 0 or negative mean any; so does a value with every bit set (-1 stored unsigned). A wider mask is cut to 32 bits
+    # (the module has race and class ids up to 32); a mask with no bit in those 32 means any.
+    if value <= 0 or value >= (1 << 63):
+        return 0
+    return (value & 0xFFFFFFFF) or 0
 
 
 def main():

@@ -341,6 +341,23 @@ void RefusalsBlockLongerEachTime()
     CHECK(memory.BlockedUntilMs[100] == 1000000 + kBlockAfterAbandonMs);
 }
 
+
+void WideMasksAreCutOrTreatedAsAny()
+{
+    std::istringstream in(
+        "start A\nanchor 0 0 0 0\n"
+        "quest 1 giver 0 0 0 ender 0 0 0\nreq 1 level 55 races 18446744073709551616 classes 2\n"   // too large to read: any race, the class limit stays
+        "quest 2 giver 0 0 0 ender 0 0 0\nreq 2 level 5 races 18446744073709551615\n"              // all 64 bits set: cut to 32 bits
+        "quest 3 giver 0 0 0 ender 0 0 0\nreq 3 level 5 races 77\n"
+        "quest 4 giver 0 0 0 ender 0 0 0\nreq 4 level 99999999999\n");                           // not a mask: too wide, the record is dropped
+    std::vector<std::string> warnings;
+    QuestData const data = ParseQuestData(in, warnings);
+    CHECK(data.Starts[0].Quests[0].QuestLevel == 55 && data.Starts[0].Quests[0].RaceMask == 0 && data.Starts[0].Quests[0].ClassMask == 2);
+    CHECK(data.Starts[0].Quests[1].RaceMask == 0xFFFFFFFFu);
+    CHECK(data.Starts[0].Quests[2].RaceMask == 77);
+    CHECK(warnings.size() == 1);
+}
+
 // ---- policy ----
 
 BotPolicy QuestPolicy()
@@ -465,6 +482,7 @@ int main()
     LogFullMeansNoNewQuest();
     QuestsOfAnotherStartInTheLogAreStillWorked();
     RefusalsBlockLongerEachTime();
+    WideMasksAreCutOrTreatedAsAny();
     PolicyWalksToTheGiverAndSendsTheAccept();
     PolicyHuntsOnlyTheQuestTargets();
     PolicyWalksToTheHuntingAreaWhenNoTargetIsNear();
