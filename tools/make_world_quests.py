@@ -52,6 +52,7 @@ def main():
     parser.add_argument("--areas", type=int, default=3, help="hunting areas per quest")
     parser.add_argument("--min-level", type=int, default=1)
     parser.add_argument("--max-level", type=int, default=60)
+    parser.add_argument("--explain", help="write one line per skipped quest (quest, level, reason, detail) to this file, and print a breakdown of the reasons")
     args = parser.parse_args()
     maps = {int(m) for m in args.maps.split(",") if m}
     d = args.directory.rstrip("/\\")
@@ -86,24 +87,30 @@ def main():
 
     built = {}
     skipped = defaultdict(int)
+    explained = []   # (quest, level, reason, detail)
+
+    def skip(qid, reason, detail=""):
+        skipped[reason] += 1
+        explained.append((qid, quests[qid]["level"], reason, detail))
     for qid, info in quests.items():
         if info["group"] > 1:
-            skipped["group"] += 1
+            skip(qid, "group", f"suggestedGroup={info['group']}")
             continue
         if not (args.min_level <= info["level"] <= args.max_level):
-            skipped["level"] += 1
+            skip(qid, "level")
             continue
         giver = next(((m, x, y, z) for m, x, y, z in npcs[qid]["start"] if m in maps), None)
         if not giver:
-            skipped["no giver"] += 1
+            starts_elsewhere = [m for m, *_ in npcs[qid]["start"]]
+            skip(qid, "no giver", "no creature giver spawn" if not starts_elsewhere else f"giver only on maps {sorted(set(starts_elsewhere))}")
             continue
         ender = next(((m, x, y, z) for m, x, y, z in npcs[qid]["end"] if m == giver[0]), None)
         if not ender:
-            skipped["no ender on the giver's map"] += 1
+            skip(qid, "no ender on the giver's map", f"enders on maps {sorted({m for m, *_ in npcs[qid]['end']})}")
             continue
         objs = sorted(objectives.get(qid, []))
         if any(kind not in (0, 1) for _, kind, _, _ in objs):
-            skipped["unsupported objective"] += 1
+            skip(qid, "unsupported objective", "types " + ",".join(sorted({str(kind) for _, kind, _, _ in objs if kind not in (0, 1)})))
             continue
         hunts = []
         areas = []
@@ -115,11 +122,17 @@ def main():
             spawns = [(x, y, z) for c in creatures for (m, x, y, z) in targets[qid].get(c, []) if m == giver[0]]
             if not creatures or not spawns:
                 usable = False
+                if kind == 1 and not creatures:
+                    why = f"item {ident}: no creature drops it (gameobject, vendor, reference or other loot)"
+                elif not spawns:
+                    why = f"{'creature' if kind == 0 else 'item ' + str(ident)}: {len(creatures)} creature(s), none spawned on map {giver[0]}"
+                else:
+                    why = "unknown"
                 break
             hunts.append((position, amount, sorted(creatures)))
             areas.extend(spawns)
         if not usable:
-            skipped["no known creature spawns"] += 1
+            skip(qid, "no known creature spawns", why)
             continue
         # Hunting areas: spawns spread out, nearest to the giver first.
         areas.sort(key=lambda a: (a[0] - giver[1]) ** 2 + (a[1] - giver[2]) ** 2)
@@ -170,6 +183,17 @@ def main():
                 out.append(f"hunt {qid} {position} {amount} {','.join(str(c) for c in creatures)}")
             for ax, ay, az in q["areas"]:
                 out.append(f"area {qid} {ax:.1f} {ay:.1f} {az:.1f}")
+    if args.explain:
+        with open(args.explain, "w", encoding="utf-8") as handle:
+            handle.write("quest\tlevel\treason\tdetail\n")
+            for row in sorted(explained):
+                handle.write("\t".join(str(v) for v in row) + "\n")
+        breakdown = defaultdict(int)
+        for _q, _l, reason, detail in explained:
+            key = reason if reason != "no known creature spawns" else reason + ": " + ("item without a creature dropper" if "no creature drops it" in detail else "no spawn on the giver's map")
+            breakdown[key] += 1
+        for key, n in sorted(breakdown.items(), key=lambda kv: -kv[1]):
+            print(f"  {n:5d}  {key}", file=sys.stderr)
     print("\n".join(out))
     print(f"{len(built)} quests in {len(cells)} starts; skipped: " + ", ".join(f"{n} {why}" for why, n in sorted(skipped.items())), file=sys.stderr)
 

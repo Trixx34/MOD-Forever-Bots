@@ -60,6 +60,17 @@ differs, and start with `SHOW COLUMNS FROM` for the tables you are unsure of). A
     JOIN creature cr ON cr.id = lt.Entry
     WHERE o.Type = 1;
 
+Items that creatures drop only through a loot **reference** table are missed by the plain join. Add this to both the `targets.tsv` second part and `drops.tsv` if the skip
+breakdown (`--explain`, below) shows many "item without a creature dropper":
+
+    SELECT o.ObjectID, lt.Entry
+    FROM quest_objectives o
+    JOIN reference_loot_template rl ON rl.Item = o.ObjectID
+    JOIN creature_loot_template lt ON lt.Reference = rl.Entry
+    WHERE o.Type = 1
+
+(and the same joined to `creature cr ON cr.id = lt.Entry` for `targets.tsv`).
+
 `drops.tsv` (which creatures drop a quest item):
 
     SELECT o.ObjectID, lt.Entry FROM quest_objectives o JOIN creature_loot_template lt ON lt.Item = o.ObjectID WHERE o.Type = 1;
@@ -68,7 +79,7 @@ Then:
 
     python3 -I tools/make_world_quests.py exports/ > data/world_quests.txt
 
-The tool prints how many quests it kept and why it skipped the others. Options: `--cell 500` (yards per start), `--maps 0,1`, `--areas 3` (hunting
+The tool prints how many quests it kept and why it skipped the others. `--explain skipped.tsv` also writes one line per skipped quest (quest, level, reason, detail) and prints a breakdown of the reasons; use it to see where a high skip count comes from. Options: `--cell 500` (yards per start), `--maps 0,1`, `--areas 3` (hunting
 areas per quest), `--min-level`, `--max-level`. Set `QuestFile = "data/world_quests.txt"` in the module's config (instead of the starter file; the two
 formats are the same, so both can also be joined by hand).
 
