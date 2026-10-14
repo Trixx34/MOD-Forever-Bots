@@ -222,6 +222,8 @@ private:
         std::uint32_t SeenPowerPct = 100;
         std::uint8_t SeenLife = 0;
         bool SeenInCombat = false;
+        std::uint64_t RangeCloserUntilMs = 0;            // standing closer to the target after an out-of-range refusal, until this time
+        std::uint32_t LosRefusals = 0;                   // line-of-sight refusals in a row
         std::uint64_t CloserUntilMs = 0;                 // closing to melee range after a line-of-sight refusal, until this time
         std::uint64_t HoldSinceMs = 0;                   // the party leader waits for the party to be ready since this time (0 = not waiting)
         std::uint32_t GearedAtLevel = 0;                 // the level at the last auto gear (0 = not yet)
@@ -261,6 +263,14 @@ private:
     void ReadResult(BotState& state, forever_module::BotSnapshot const& bot, std::uint64_t nowMs);
 
     std::unordered_map<std::uint64_t, BotState> _bots; // bot guid -> state
+    // Corpses a bot has sent a loot for -> the looter's group (its leader's reference, else its own guid) and when the claim ends. The
+    // core loots a whole corpse for a group at once, so a second member's loot is refused ("no right to loot": already looted).
+    struct LootClaim
+    {
+        std::uint64_t Group = 0;
+        std::uint64_t UntilMs = 0;
+    };
+    std::unordered_map<std::uint64_t, LootClaim> _lootClaims;
     PolicyOptions _options;
     QuestPlanner _quests;
     bool _routeActive = false;
