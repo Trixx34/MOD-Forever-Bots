@@ -293,6 +293,8 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadBool(config, "ChatControl", settings.ChatControl, warnings);
     ReadKey(config, "AutoGearEveryLevels", 1, 60, settings.AutoGearEveryLevels, warnings);
     ReadScenario(config, settings.Scenario, warnings);
+    if (auto const it = config.find("RotationFile"); it != config.end())
+        settings.RotationFile = it->second;
     if (auto const it = config.find("GrindFile"); it != config.end())
         settings.GrindFile = it->second;
     if (auto const it = config.find("QuestFile"); it != config.end())

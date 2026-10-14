@@ -887,6 +887,15 @@ int main(int argc, char** argv)
         std::cerr << "forever-bots: quests: " << quests->Starts.size() << " start(s) from " << settings.QuestFile << "\n";
         policyOptions.Quests = std::move(quests);
     }
+    if (!settings.RotationFile.empty())
+    {
+        std::vector<std::string> rotationWarnings;
+        auto rotations = std::make_shared<rotation::RotationData>(rotation::LoadRotationData(settings.RotationFile, rotationWarnings));
+        for (std::string const& warning : rotationWarnings)
+            std::cerr << "forever-bots: " << warning << "\n";
+        std::cerr << "forever-bots: rotations for " << rotations->ByClass.size() << " class(es) from " << settings.RotationFile << "\n";
+        policyOptions.Rotations = std::move(rotations);
+    }
     if (!settings.GrindFile.empty())
     {
         std::vector<std::string> grindWarnings;

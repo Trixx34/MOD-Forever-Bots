@@ -158,6 +158,8 @@ trainer spells or talents, and it cannot be played while it is a bot. Alts are n
 
 **Whole-world quests.** A quest file made for the whole world (`tools/make_world_quests.py`, `doc/world-quests.md`) lets bots level by quests from 1 to 60: they take quests that suit their level, race and class from the nearest area that has some, and walk on to the next area when it is used up.
 
+**Rotations.** With `RotationFile` set, the classes use rows from a file (levels 1 to 60, damage-over-time lengths, and upkeep buffs such as Power Word: Fortitude, armor spells and Battle Shout cast out of combat, on the bot or its whole group). The file is made from a spec of spell names and the core's ability dump by `tools/make_rotations.py`; see `doc/rotations.md`.
+
 **Grind spots.** With `GrindFile` set, an idle bot walks to a place that suits its level (nearest first, not back to the last two) instead of the hubs of its map. The file is made from the world database with `tools/make_grind_spots.py`; see `doc/grind-spots.md`.
 
 **Auto gear.** With `AutoGearing = 1` the core dresses each bot for its class and level (best usable item per slot, uncommon quality at

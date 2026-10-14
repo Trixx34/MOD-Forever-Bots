@@ -73,6 +73,7 @@ constexpr std::uint64_t kTankHeadStartMs = 2500;    // the others join a fight t
 // Healing: a healer class heals the party member with the lowest health below this share, within this range.
 constexpr std::uint32_t kHealBelowPct = 60;
 constexpr float kHealRangeYards = 30.0f;
+constexpr float kBuffRangeYards = 30.0f;            // a party buff reaches members this close
 constexpr std::size_t kGrindMemory = 2;           // grind spots remembered as just visited
 constexpr std::uint64_t kAcceptInviteRetryMs = 3000; // an invite from a player is answered again after this long if it is still pending
 constexpr std::uint64_t kGotoTimeoutMs = 90000;     // a goto order is dropped after this long
@@ -313,6 +314,22 @@ char const* ActionStatusName(BotActionStatus status)
 }
 
 // Reads the result of the bot's last action, once per sequence number, and sets when the spell may be tried again.
+std::span<rotation::Row const> BotPolicy::RowsFor(std::uint32_t classId) const
+{
+    if (_options.Rotations)
+        if (auto const at = _options.Rotations->ByClass.find(classId); at != _options.Rotations->ByClass.end())
+            return at->second;
+    return rotation::RowsForClass(classId);
+}
+
+std::uint64_t BotPolicy::DurationMsOf(std::uint32_t classId, std::uint32_t spell) const
+{
+    for (rotation::Row const& row : RowsFor(classId))
+        if (row.Spell == spell && row.DurationSec != 0)
+            return std::uint64_t(row.DurationSec) * 1000;
+    return DotDurationMs(spell);
+}
+
 void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_t nowMs)
 {
     if (bot.last_action_sequence == 0 || bot.last_action_sequence == state.LastSequence)
@@ -411,8 +428,12 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
         auto const cast = state.CastTarget.find(spell);
         if (cast != state.CastTarget.end())
         {
-            if (DotDurationMs(spell) != 0)
-                state.Dots[spell] = Dot{ cast->second, nowMs + DotDurationMs(spell) };
+            std::uint64_t const duration = DurationMsOf(ClassFor(_options, bot.guid), spell);
+            if (duration != 0)
+            {
+                state.Dots[spell] = Dot{ cast->second, nowMs + duration };
+                state.BuffUntilMs[{ spell, cast->second }] = nowMs + duration;
+            }
 
             if (spell == kSinisterStrike)
             {
@@ -1786,6 +1807,49 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             }
         }
 
+        // Upkeep buffs (rotation file rows 'buff'): out of combat, standing, with nothing to fight. Each is cast on the bot, or on every member of its group
+        // (party), when its last cast has run out; a refused cast is tried again after the usual retry.
+        if (!hasTarget && bot.in_combat == 0 && bot.moving == 0 && nowMs >= state.NextCastMs && !(bot.casting_spell != 0 && bot.cast_remaining_ms != 0) &&
+            !state.Sitting)
+        {
+            bool cast = false;
+            for (rotation::Row const& row : RowsFor(classId))
+            {
+                if (!row.Buff || (bot.level != 0 && (row.MinLevel > bot.level || (row.MaxLevel != 0 && bot.level > row.MaxLevel))))
+                    continue;
+                auto const retry = state.RetryAtMs.find(row.Spell);
+                if (retry != state.RetryAtMs.end() && nowMs < retry->second)
+                    continue;
+                // The recipients: the bot itself (reference 0), and for a party buff the members of its group that are alive and close.
+                std::vector<std::uint64_t> recipients{ 0 };
+                if (row.Party)
+                    for (BotSnapshot const& other : view.bots)
+                        if (other.guid != bot.guid && other.life_state == 0 && other.group_leader_guid != 0 && other.group_leader_guid == bot.group_leader_guid &&
+                            Distance2d(bot, other) <= kBuffRangeYards)
+                            recipients.push_back(PlayerRef(other.guid));
+                for (std::uint64_t recipient : recipients)
+                {
+                    auto const until = state.BuffUntilMs.find({ row.Spell, recipient });
+                    if (until != state.BuffUntilMs.end() && nowMs < until->second)
+                        continue;
+                    BotAction buff;
+                    buff.bot_guid = bot.guid;
+                    buff.type = ActionType::kCastSpell;
+                    buff.spell_id = row.Spell;
+                    buff.target_guid = recipient;
+                    actions.push_back(buff);
+                    state.CastTarget[row.Spell] = recipient;
+                    state.NextCastMs = nowMs + kGlobalCooldownMs;
+                    cast = true;
+                    break;
+                }
+                if (cast)
+                    break;
+            }
+            if (cast)
+                continue;
+        }
+
         if (!hasTarget)
             continue;
 
@@ -1827,10 +1891,14 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             if (cooldown.spell_id != 0 && cooldown.remaining_ms != 0)
                 cooling.insert(cooldown.spell_id);
 
-        for (rotation::Row const& row : rotation::RowsForClass(classId))
+        for (rotation::Row const& row : RowsFor(classId))
         {
-            // Not learned yet: below the level a trainer teaches it. (A level of 0 is unknown and not judged.)
-            if (bot.level != 0 && rotation::LearnLevel(row.Spell) > bot.level)
+            if (row.Buff)
+                continue; // upkeep spells are cast out of combat, below
+            if (row.MaxLevel != 0 && bot.level > row.MaxLevel)
+                continue; // a better spell has replaced it
+            // Not learned yet: below the level a trainer teaches it (the rotation file's level, else the built-in table). (A level of 0 is unknown.)
+            if (bot.level != 0 && (row.MinLevel != 0 ? row.MinLevel : rotation::LearnLevel(row.Spell)) > bot.level)
                 continue;
             auto const retry = state.RetryAtMs.find(row.Spell);
             if (retry != state.RetryAtMs.end() && nowMs < retry->second)

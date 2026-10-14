@@ -2,7 +2,10 @@
 #include "combat_rotation.h"
 
 #include <algorithm>
+#include <charconv>
 #include <cmath>
+#include <fstream>
+#include <sstream>
 
 using forever_module::BotSnapshot;
 using forever_module::NearbyUnit;
@@ -207,6 +210,123 @@ Facts FactsFor(BotSnapshot const& bot, std::span<NearbyUnit const> nearby, Nearb
         facts.EnemiesOnBot = 1;
 
     return facts;
+}
+
+} // namespace rotation
+
+namespace rotation {
+
+namespace {
+
+bool Whole(std::string const& text, std::uint32_t& out)
+{
+    auto const r = std::from_chars(text.data(), text.data() + text.size(), out);
+    return r.ec == std::errc{} && r.ptr == text.data() + text.size();
+}
+
+bool Decimal(std::string const& text, float& out)
+{
+    auto const r = std::from_chars(text.data(), text.data() + text.size(), out);
+    return r.ec == std::errc{} && r.ptr == text.data() + text.size();
+}
+
+} // namespace
+
+RotationData ParseRotationData(std::istream& in, std::vector<std::string>& warnings)
+{
+    RotationData data;
+    std::uint32_t classId = 0;
+    std::string line;
+    std::size_t number = 0;
+    while (std::getline(in, line))
+    {
+        ++number;
+        if (auto const hash = line.find('#'); hash != std::string::npos)
+            line.erase(hash);
+        std::istringstream words(line);
+        std::vector<std::string> t;
+        for (std::string token; words >> token;)
+            t.push_back(token);
+        if (t.empty())
+            continue;
+        auto const drop = [&](char const* why) { warnings.push_back("rotation file line " + std::to_string(number) + ": " + why + "; ignored"); };
+
+        if (t[0] == "class")
+        {
+            if (t.size() == 2 && Whole(t[1], classId) && classId > 0 && classId < 32)
+                data.ByClass[classId];
+            else
+            {
+                classId = 0;
+                drop("class needs a class id");
+            }
+            continue;
+        }
+        if (classId == 0)
+        {
+            drop("a record before the first 'class'");
+            continue;
+        }
+        bool const buff = t[0] == "buff";
+        if (!buff && t[0] != "row")
+        {
+            drop("unknown record");
+            continue;
+        }
+
+        Row row{ 0, Rule{ Cond::Always, 0 }, true, 0.0f, 0.0f };
+        row.Buff = buff;
+        std::size_t i = 1;
+        bool ok = t.size() >= 3 && Whole(t[i++], row.Spell) && row.Spell != 0;
+        bool targetGiven = false;
+        while (ok && i < t.size())
+        {
+            std::string const& key = t[i++];
+            std::uint32_t n = 0;
+            auto const arg = [&](std::uint32_t& out) { return i < t.size() && Whole(t[i++], out); };
+            if (key == "level") ok = arg(row.MinLevel);
+            else if (key == "maxlevel") ok = arg(row.MaxLevel);
+            else if (key == "duration") ok = arg(row.DurationSec);
+            else if (key == "self") { row.OnTarget = false; targetGiven = true; }
+            else if (key == "target") { row.OnTarget = true; targetGiven = true; }
+            else if (key == "party") { row.Party = true; row.OnTarget = false; targetGiven = true; }
+            else if (key == "range") ok = i + 1 < t.size() && Decimal(t[i++], row.MinRange) && Decimal(t[i++], row.MaxRange);
+            else if (key == "always") row.When = Rule{ Cond::Always, 0 };
+            else if (key == "target_casting") row.When = Rule{ Cond::TargetCasting, 0 };
+            else if (key == "target_hp_above") { ok = arg(n); row.When = Rule{ Cond::TargetHpAbove, std::int32_t(n) }; }
+            else if (key == "target_hp_below") { ok = arg(n); row.When = Rule{ Cond::TargetHpBelow, std::int32_t(n) }; }
+            else if (key == "self_hp_below") { ok = arg(n); row.When = Rule{ Cond::SelfHpBelow, std::int32_t(n) }; }
+            else if (key == "self_power_below") { ok = arg(n); row.When = Rule{ Cond::SelfPowerBelow, std::int32_t(n) }; }
+            else if (key == "self_power_above") { ok = arg(n); row.When = Rule{ Cond::SelfPowerAbove, std::int32_t(n) }; }
+            else if (key == "enemies") { ok = arg(n); row.When = Rule{ Cond::EnemiesAtLeast, std::int32_t(n) }; }
+            else if (key == "opener") { ok = arg(n); row.When = Rule{ Cond::Opener, std::int32_t(n) }; }
+            else if (key == "target_strong") { ok = arg(n); row.When = Rule{ Cond::TargetStrong, std::int32_t(n) }; }
+            else if (key == "combo") { ok = arg(n); row.When = Rule{ Cond::ComboPointsAtLeast, std::int32_t(n) }; }
+            else ok = false;
+        }
+        if (ok && buff && (!targetGiven || row.OnTarget || row.DurationSec == 0))
+            ok = false; // a buff needs 'self' or 'party' and a duration
+        if (!ok)
+        {
+            drop(buff ? "buff needs '<spell> duration <sec> self|party'" : "row needs '<spell> [level n] [duration s] <condition> self|target [range min max]'");
+            continue;
+        }
+        if (!buff && !targetGiven)
+            row.OnTarget = true;
+        data.ByClass[classId].push_back(row);
+    }
+    return data;
+}
+
+RotationData LoadRotationData(std::string const& path, std::vector<std::string>& warnings)
+{
+    std::ifstream in(path);
+    if (!in)
+    {
+        warnings.push_back("rotation file '" + path + "' cannot be read; the built-in rotations are used");
+        return {};
+    }
+    return ParseRotationData(in, warnings);
 }
 
 } // namespace rotation

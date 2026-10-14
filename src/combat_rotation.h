@@ -8,7 +8,11 @@
 #include "forever_module/tier2_session.h"
 
 #include <cstdint>
+#include <iosfwd>
+#include <map>
 #include <span>
+#include <string>
+#include <vector>
 
 namespace rotation {
 
@@ -60,7 +64,27 @@ struct Row
     bool OnTarget;
     float MinRange;
     float MaxRange;
+    // From a rotation file (RotationData); the built-in rows leave these at their defaults.
+    std::uint32_t MinLevel = 0;     // the bot's level that learns the spell (0 = the built-in LearnLevel table decides)
+    std::uint32_t MaxLevel = 0;     // not used above this level, when a better spell replaces it (0 = no limit)
+    std::uint32_t DurationSec = 0;  // how long the effect lasts: a damage-over-time effect or a buff is not recast while it runs
+    bool Buff = false;              // an upkeep spell cast out of combat, not part of the fight rotation
+    bool Party = false;             // a buff: cast on every member of the bot's group (itself included), not only on the bot
 };
+
+// Rotations read from a file (data/rotations.txt, made by tools/make_rotations.py), per class id. A class missing from the file keeps the built-in rows.
+//   class <id>
+//   row <spell> [level <n>] [maxlevel <n>] [duration <sec>] <condition> self|target [range <min> <max>]       a fight spell, in priority order
+//   buff <spell> [level <n>] [maxlevel <n>] duration <sec> self|party                                        an upkeep spell, cast out of combat when it has run out
+// Conditions: always | target_hp_above N | target_hp_below N | self_hp_below N | self_power_below N | self_power_above N | enemies N |
+// target_casting | opener N | target_strong N | combo N.
+struct RotationData
+{
+    std::map<std::uint32_t, std::vector<Row>> ByClass;
+};
+
+RotationData ParseRotationData(std::istream& in, std::vector<std::string>& warnings);
+RotationData LoadRotationData(std::string const& path, std::vector<std::string>& warnings);
 
 // Rows in priority order, for a class id (1 = warrior). Empty for a class id without rows.
 std::span<Row const> RowsForClass(std::uint32_t classId);

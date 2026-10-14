@@ -63,6 +63,10 @@ add_executable(grind_test tests/grind_test.cpp)
 target_link_libraries(grind_test PRIVATE forever_bots_policy)
 add_test(NAME grind COMMAND grind_test)
 
+add_executable(rotation_data_test tests/rotation_data_test.cpp)
+target_link_libraries(rotation_data_test PRIVATE forever_bots_policy)
+add_test(NAME rotation_data COMMAND rotation_data_test)
+
 add_executable(scenario_test tests/scenario_test.cpp)
 target_link_libraries(scenario_test PRIVATE forever_bots_policy forever_bots_settings)
 add_test(NAME scenario COMMAND scenario_test)
