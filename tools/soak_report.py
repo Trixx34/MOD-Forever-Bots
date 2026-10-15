@@ -138,7 +138,7 @@ def main():
                 m = summary.match(line.rstrip("\n"))
                 if m:
                     reasons[re.sub(r"\d+", "N", m.group(4))] += int(m.group(1))
-                    cast = re.match(r"cast of spell (\d+) returned result (\d+)", m.group(4))
+                    cast = re.search(r"cast of spell (\d+).*?result\D*(\d+)", m.group(4), re.I)
                     if cast:
                         cast_results[cast.group(2)] += int(m.group(1))
                         cast_spells[(cast.group(1), cast.group(2))] += int(m.group(1))

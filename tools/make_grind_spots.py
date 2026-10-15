@@ -67,6 +67,14 @@ def main():
             current.append(spawn)
         if current:
             groups.append(current)
+        # A group too small to be a spot joins its neighbour when the two still fit in one band; otherwise it is dropped below.
+        merged = []
+        for group in groups:
+            if merged and (len(group) < args.min_count or len(merged[-1]) < args.min_count) and group[-1][3] - merged[-1][0][3] <= args.band * 2:
+                merged[-1] = merged[-1] + group
+            else:
+                merged.append(group)
+        groups = merged
         for spawns in groups:
             if len(spawns) < args.min_count:
                 continue

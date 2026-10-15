@@ -392,6 +392,7 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
                 if (++state.AcceptRefusals >= kAcceptRefusalsMax)
                 {
                     state.AcceptIgnoreUntilMs = nowMs + kAcceptIgnoreMs;
+                    state.AcceptIgnoreFrom = bot.resurrect_from; // a different resurrector is still answered
                     state.AcceptRefusals = 0;
                 }
             }
@@ -901,7 +902,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             state.Life = bot.life_state;
 
             // A resurrect offer is accepted at any time, whatever the bot was doing.
-            if (bot.resurrect_from != 0 && nowMs >= state.AcceptIgnoreUntilMs)
+            if (bot.resurrect_from != 0 && !(nowMs < state.AcceptIgnoreUntilMs && bot.resurrect_from == state.AcceptIgnoreFrom))
             {
                 if (nowMs >= state.AcceptRetryMs)
                 {
@@ -1267,7 +1268,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             targetUnit = hostile;
             targetRef = hostile->guid;
         }
-        bool const hasTarget = targetRef != 0 && !lowHealth;
+        bool hasTarget = targetRef != 0 && !lowHealth;
         // The target of this fight is looted once it is dead: remember it, and forget the ones too old to still be on the ground.
         if (hasTarget && forever_module::UnitRefType(targetRef) == 8)
             state.FoughtAtMs[targetRef] = nowMs;
@@ -1279,7 +1280,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
 
         // Fight watchdog: a target whose health, and the bot's own, have not gone down for kFightStallMs is unreachable, evading or out of line of sight
         // (the 8-hour soak had a fight of two hours). The target is avoided like one that refused an attack, and the bot picks another.
-        if (hasTarget && targetUnit)
+        if (hasTarget && targetUnit && targetUnit->is_hostile && bot.in_combat != 0)
         {
             if (state.StallTarget != targetRef || nowMs - state.StallLastMs > 10000)
             {
@@ -1298,9 +1299,13 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     _options.OnEvent("fight_stalled: bot=" + std::to_string(bot.guid) + " target_entry=" + std::to_string(forever_module::UnitRefEntry(targetRef)) +
                                      " target_hp=" + std::to_string(targetUnit->health) + " distance=" + std::to_string(int(distance)));
                 state.StallTarget = 0;
+                // Given up for good this tick too: the bot must not keep attacking it until the next one.
+                targetRef = 0;
+                targetUnit = nullptr;
+                hasTarget = false;
             }
         }
-        else if (!hasTarget)
+        else
             state.StallTarget = 0;
 
         Decision wanted;
@@ -1598,7 +1603,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             }
             else if (nowMs - state.IdleSinceMs >= kExploreIdleMs)
             {
-                float const angle = float(bot.guid % 97) * 0.7f + float(state.ExploreStep) * 2.399963f;
+                float const angle = float((bot.guid * 2654435761ull) % 628) * 0.01f + float(state.ExploreStep) * 2.399963f;
                 float const radius = 50.0f + 25.0f * float(state.ExploreStep % 3);
                 ++state.ExploreStep;
                 state.ExploreTarget = Point{ bot.pos_x + std::cos(angle) * radius, bot.pos_y + std::sin(angle) * radius, bot.pos_z };

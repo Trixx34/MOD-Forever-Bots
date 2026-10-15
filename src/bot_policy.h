@@ -171,6 +171,7 @@ private:
         std::uint64_t ComboTarget = 0;
         std::uint32_t LastTrainLevel = 0;                // the level at the last trainer check
         std::uint32_t AcceptRefusals = 0;                // resurrect answers refused in a row
+        std::uint64_t AcceptIgnoreFrom = 0;              // the resurrector whose offer is ignored until then
         std::uint64_t AcceptIgnoreUntilMs = 0;           // a resurrect offer is not answered before this (it kept being refused)
         std::uint64_t StallTarget = 0;                   // fight watchdog: the target being watched
         std::uint32_t StallTargetHealth = 0;
