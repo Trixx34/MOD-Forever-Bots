@@ -207,6 +207,57 @@ void UnpullableCreaturesDoNotKeepTheBotFromWalking()
     CHECK(WalksTo(policy.Decide(view, 1000 + 31000), 900.0f));
 }
 
+// Bots standing together (a start zone) used to follow the nearest of each other forever, in circles. Another bot is not a player to follow: the
+// bot walks to a grind spot. A real player (not one of the controlled bots) is still followed.
+void BotsDoNotFollowEachOther()
+{
+    std::vector<std::string> warnings;
+    PolicyOptions options;
+    options.Grind = std::make_shared<GrindData>(Parse("spot 0 900 0 0 1 5 0\n", warnings));
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = OneBot(1, 0);
+    view.max_nearby_units = 2;
+    view.nearby.assign(2, forever_module::NearbyUnit{});
+    BotSnapshot second = view.bots[0];
+    second.guid = 8;
+    second.pos_x = 3.0f;
+    view.bots.push_back(second);
+    view.bots[0].nearby_count = 1;
+    view.bots[1].nearby_count = 1;
+    view.nearby.resize(4);
+    view.nearby[0].guid = forever_module::MakeUnitRef(2, 0, 8);      // bot 7 sees bot 8
+    view.nearby[0].pos_x = 3.0f;
+    view.nearby[0].health = view.nearby[0].max_health = 1000;
+    view.nearby[2].guid = forever_module::MakeUnitRef(2, 0, 7);      // bot 8 sees bot 7
+    view.nearby[2].health = view.nearby[2].max_health = 1000;
+    policy.Decide(view, 1000);
+    bool followed = false;
+    bool walked = false;
+    for (std::uint64_t now = 2000; now <= 40000; now += 1000)
+        for (BotAction const& action : policy.Decide(view, now))
+        {
+            followed = followed || action.type == ActionType::kFollow;
+            walked = walked || (action.type == ActionType::kMoveTo && action.dest_x == 900.0f);
+        }
+    CHECK(!followed);
+    CHECK(walked);
+
+    // A real player (not controlled by the module) in view is followed.
+    WorldTickSnapshotView withPlayer = OneBot(1, 0);
+    withPlayer.max_nearby_units = 2;
+    withPlayer.nearby.assign(2, forever_module::NearbyUnit{});
+    withPlayer.bots[0].nearby_count = 1;
+    withPlayer.nearby[0].guid = forever_module::MakeUnitRef(2, 0, 999);
+    withPlayer.nearby[0].pos_x = 20.0f;
+    withPlayer.nearby[0].health = withPlayer.nearby[0].max_health = 1000;
+    BotPolicy other(options);
+    bool followsPlayer = false;
+    for (std::uint64_t now = 1000; now <= 5000; now += 1000)
+        for (BotAction const& action : other.Decide(withPlayer, now))
+            followsPlayer = followsPlayer || action.type == ActionType::kFollow;
+    CHECK(followsPlayer);
+}
+
 } // namespace
 
 int main()
@@ -221,6 +272,7 @@ int main()
     HubsAreTheFallbackWithoutGrindData();
     NextWalkMovesOnToAnotherSpot();
     UnpullableCreaturesDoNotKeepTheBotFromWalking();
+    BotsDoNotFollowEachOther();
     if (failures == 0)
         std::printf("grind_test: all checks passed\n");
     return failures == 0 ? 0 : 1;
