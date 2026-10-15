@@ -60,6 +60,8 @@ struct QuestMemory
     std::map<std::uint32_t, ProgressInfo> Progress;         // quest -> its objective total and since when it has been that
     std::uint32_t LastActionQuest = 0;                  // the quest of the last accept, hand-in or abandon sent
     std::map<std::uint32_t, std::uint32_t> Refusals;    // quest -> how many accepts or hand-ins the core refused (the block grows with it)
+    std::map<std::size_t, std::uint64_t> NoRouteUntilMs; // start index -> not walked to before this (the core found no route to its giver)
+    bool WalkingToStart = false;                        // the step from the last Next is the walk to a start's giver
     std::set<std::uint32_t> RefusedHandIns;             // quests whose hand-in was refused since the last vendor visit
 };
 
@@ -76,6 +78,8 @@ constexpr std::uint64_t kQuestActionGapMs = 3000;       // wait this long after 
 constexpr std::uint64_t kBlockAfterRefusalMs = 60000;
 constexpr std::uint64_t kStuckMs = 600000;              // no progress for 10 minutes: abandon
 constexpr std::uint64_t kBlockAfterAbandonMs = 3600000;
+constexpr float kWorldStartRadiusYards = 2000.0f;      // a world start (its quests carry levels) is walked to from up to this far (see kStartRadiusYards)
+constexpr std::uint64_t kNoRouteBlockMs = 1800000;     // a start whose giver the core found no route to is left alone for this long
 constexpr std::uint32_t kGreyQuestMargin = 7;          // a bot this many levels above a quest's level skips it (little experience)
 constexpr std::uint32_t kRedQuestMargin = 4;           // a quest this many levels above the bot is left for later
 constexpr std::uint32_t kMaxAcceptedQuests = 5;        // no new quest while the log holds this many
@@ -106,6 +110,10 @@ public:
 
     // The bot has been to a vendor (its bags are emptier): the quests blocked by refusals are tried again.
     void NoteServiced(QuestMemory& memory) const;
+
+    // The core found no route for the move to the step's destination (kNoRoute). When that was the walk to a start's giver, the start is left
+    // alone for kNoRouteBlockMs and the planner looks for the next start.
+    void NoteNoRoute(QuestMemory& memory, std::uint64_t nowMs) const;
 
 private:
     int FindStart(forever_module::BotSnapshot const& bot) const;

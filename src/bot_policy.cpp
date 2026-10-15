@@ -406,6 +406,7 @@ char const* ActionStatusName(BotActionStatus status)
         case BotActionStatus::kNotOnline: return "not online";
         case BotActionStatus::kBusy: return "busy casting";
         case BotActionStatus::kMoving: return "moving";
+        case BotActionStatus::kNoRoute: return "no route";
     }
     return "unknown";
 }
@@ -447,6 +448,15 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
         state.GearedAtLevel = 0;
         state.GearRetryMs = nowMs + 60000;
         return;
+    }
+
+    // A move the core found no route for: the bot walks to the nearest reachable point and stops there. A quest start whose giver that is
+    // is left alone for a while (the planner picks the next start). Each result is read once, by its sequence.
+    if (bot.last_action_type == uint8_t(ActionType::kMoveTo) && bot.last_action_status == BotActionStatus::kNoRoute &&
+        bot.last_action_sequence != state.NoRouteSequence)
+    {
+        state.NoRouteSequence = bot.last_action_sequence;
+        _quests.NoteNoRoute(state.Quest, nowMs);
     }
 
     // A quest action refused (not eligible, bags full, no NPC in reach): the quest is left alone for a while.
