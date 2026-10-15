@@ -111,6 +111,7 @@ constexpr std::uint32_t kRestManaUntilPct = 90;      // and stays sat until it h
 constexpr std::uint64_t kManaRestMaxMs = 120000;     // but never longer than this at a time
 constexpr std::uint64_t kManaRestBlockMs = 300000;   // and not again for this long after a rest that did not refill the mana
 constexpr std::uint32_t kHubFailuresMax = 2;         // hub walks in a row that failed before the bot explores on foot instead
+constexpr std::uint64_t kStuckCheckMs = 300000;       // every 5 minutes a bot that has not moved reports why it is not doing anything
 constexpr std::uint64_t kGrindRetryMs = 60000;        // a bot that found no grind spot explores on foot this long before it looks again
 constexpr std::uint64_t kExploreIdleMs = 10000;      // an idle bot with nowhere to go takes a short walk after this long
 constexpr std::uint64_t kExploreTimeoutMs = 60000;
@@ -1826,6 +1827,30 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 wanted = Decision{ ActionType::kMoveTo, 0, state.ExploreTarget };
                 idle = false;
             }
+        }
+
+        // A bot that stood on the same spot for a whole check interval, not fighting, says why in one event line (stuck_idle). The 73 Undead bots
+        // of the soak did this for eight hours and nothing in the logs said what held them; this line shows which condition did.
+        if (_options.OnEvent && nowMs - state.DiagAtMs >= kStuckCheckMs)
+        {
+            float const moved = std::hypot(bot.pos_x - state.DiagX, bot.pos_y - state.DiagY);
+            if (state.DiagAtMs != 0 && moved < 5.0f && bot.in_combat == 0 && !state.Sitting)
+            {
+                std::size_t hostiles = 0;
+                for (NearbyUnit const& unit : nearby)
+                    if (IsLiveMob(unit))
+                        ++hostiles;
+                _options.OnEvent("stuck_idle: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id) +
+                                 " idle=" + std::to_string(idle) + " hasTarget=" + std::to_string(hasTarget) + " enemyNear=" + std::to_string(enemyNear) +
+                                 " wanted=" + std::to_string(int(wanted.Type)) + " quest=" + std::to_string(int(questStep.Kind)) + " route=" + std::to_string(routeBusy) +
+                                 " healthy=" + std::to_string(healthy) + " mana=" + std::to_string(manaResting) + " grind=" + std::to_string(grindMode) +
+                                 " wandering=" + std::to_string(state.Wandering) + " traveling=" + std::to_string(state.Traveling) + " party=" + std::to_string(partyMember) +
+                                 " stay=" + std::to_string(state.ChatStay) + " liveHostiles=" + std::to_string(hostiles) + " nearby=" + std::to_string(nearby.size()) +
+                                 " idleForS=" + std::to_string(state.Idling ? (nowMs - state.IdleSinceMs) / 1000 : 0));
+            }
+            state.DiagAtMs = nowMs;
+            state.DiagX = bot.pos_x;
+            state.DiagY = bot.pos_y;
         }
 
         // Rest: sit down while idle and hurt, and stand before anything moves or fights. The stand goes out before the

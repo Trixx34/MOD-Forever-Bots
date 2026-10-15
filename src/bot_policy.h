@@ -193,6 +193,8 @@ private:
         std::uint64_t ManaRestSinceMs = 0;               // when the current rest for mana began (0 = not resting for mana)
         std::uint64_t ManaRestBlockedUntilMs = 0;        // a rest that ran its full time without refilling the mana is not started again before this
         bool ServiceUrgent = false;                      // a quest hand-in was refused (bags full): go to a vendor now, even with quest work to do
+        float DiagX = 0.0f, DiagY = 0.0f;                // where the bot was at the last stuck check
+        std::uint64_t DiagAtMs = 0;                      // when the stuck check last ran
         std::uint64_t GrindRetryAtMs = 0;                // no grind spot on this map for this level: explore on foot until this time, then look again
         std::uint32_t HubFailures = 0;                   // hub walks in a row that ended without arriving
         std::uint32_t ExploreStep = 0;                   // random walks made, for the direction of the next
