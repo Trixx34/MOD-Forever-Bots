@@ -111,9 +111,16 @@ add_executable(live_test tests/live_test.cpp)
 target_link_libraries(live_test PRIVATE forever_bots_live)
 add_test(NAME live COMMAND live_test)
 
+# The pump at the 1500-bot ceiling: Decide stays bounded in time and in the actions it publishes.
+add_executable(scale_test tests/scale_test.cpp)
+target_link_libraries(scale_test PRIVATE forever_bots_policy forever_bots_settings)
+add_test(NAME scale COMMAND scale_test)
+
 find_package(Python3 COMPONENTS Interpreter)
 if(Python3_Interpreter_FOUND)
     add_test(NAME soak_report COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/soak_report_test.py)
+    # The replay of a telemetry run, one section per open finding of the sim handoff.
+    add_test(NAME snapshot_replay COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/snapshot_replay_test.py)
     # The spec of rotations made into a rotation file by tools/make_rotations.py.
     add_test(NAME make_rotations COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/make_rotations_test.py ${CMAKE_CURRENT_SOURCE_DIR})
 endif()

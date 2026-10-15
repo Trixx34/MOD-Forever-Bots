@@ -303,6 +303,21 @@ private:
         std::uint64_t UntilMs = 0;
     };
     std::unordered_map<std::uint64_t, LootClaim> _lootClaims;
+    // A buff cast on a party member: (spell, recipient reference) -> who cast it and until when it runs. Several healers must
+    // not refresh the same buff on the same member; the caster's own BuffUntilMs cannot see another bot's cast.
+    struct BuffClaim
+    {
+        std::uint64_t Group = 0;
+        std::uint64_t UntilMs = 0;
+    };
+    std::map<std::pair<std::uint32_t, std::uint64_t>, BuffClaim> _buffClaims;
+    // Who is healing which member and until when: two healers of a party must not cast on the same member.
+    struct HealClaim
+    {
+        std::uint64_t Group = 0;
+        std::uint64_t UntilMs = 0;
+    };
+    std::unordered_map<std::uint64_t, HealClaim> _healClaims; // member bot guid -> claim
     PolicyOptions _options;
     QuestPlanner _quests;
     bool _routeActive = false;

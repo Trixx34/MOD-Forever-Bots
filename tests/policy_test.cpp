@@ -118,8 +118,19 @@ WorldTickSnapshotView Hurt(std::uint32_t health, std::vector<NearbyUnit> nearby,
 void RetreatsBelowThirtyPercent()
 {
     BotPolicy policy;
-    // 250 of 1000 is below 30%: a hostile is near and it is fighting, but it follows the player instead.
+    // 250 of 1000 is below 30%: a hostile five yards away is what it runs from now, and it keeps running until it is clear
+    // of it. Standing still was the whole reply before, and the creature killed the bot where it stood.
     auto actions = policy.Decide(Hurt(250, { Unit(8, 2, 5.0f, true), Unit(2, 7, 12.0f, false) }, MakeUnitRef(8, 1, 9)));
+    CHECK(actions.size() == 1);
+    if (actions.size() == 1)
+        CHECK(actions[0].type == ActionType::kMoveTo);
+}
+
+void RetreatFollowsAPlayerWhenNothingNearToFlee()
+{
+    BotPolicy policy;
+    // Nothing close by that can still kill it: it follows the player again, as before.
+    auto actions = policy.Decide(Hurt(250, { Unit(2, 7, 12.0f, false) }));
     CHECK(actions.size() == 1);
     if (actions.size() == 1)
     {
@@ -128,11 +139,14 @@ void RetreatsBelowThirtyPercent()
     }
 }
 
-void RetreatWithNoPlayerStops()
+void RetreatWithNoPlayerStillFlees()
 {
     BotPolicy policy;
+    // 100 of 1000 is below 30%: no player to follow, but a hostile five yards away, so it runs.
     auto actions = policy.Decide(Hurt(100, { Unit(8, 2, 5.0f, true) }));
-    CHECK(actions.size() == 1 && actions[0].type == ActionType::kStop);
+    CHECK(actions.size() == 1);
+    if (actions.size() == 1)
+        CHECK(actions[0].type == ActionType::kMoveTo);
 }
 
 void ThirtyPercentIsNotLow()
@@ -2181,6 +2195,155 @@ void BotDoesNotMountInCombat()
         CHECK(action.type != ActionType::kMount);
 }
 
+// A hostile ten yards away that the bot is not fighting: below 30% health it runs, it does not stand and rest.
+void LowHealthFleesFromAHostileItIsNotFighting()
+{
+    WorldTickSnapshotView view = Hurt(250, { Unit(8, 2, 10.0f, true) });
+    BotPolicy policy;
+    auto actions = policy.Decide(view, 0);
+    CHECK(actions.size() == 1);
+    if (actions.size() == 1)
+        CHECK(actions[0].type == ActionType::kMoveTo);
+}
+
+// ---- weakest target, interrupt sharing, heal sharing, party buffs ----
+
+// A pull is the weakest creature that may be pulled, not the closest: finishing it before the next is more experience per hour.
+void WeakestTargetIsPulledFirst()
+{
+    BotPolicy policy;
+    WorldTickSnapshotView view = PartyView({ 10 });
+    AddNearby(view, 0, Hostile(7, 20.0f, 20)); // hurt, far away
+    AddNearby(view, 0, Hostile(8, 3.0f, 100)); // healthy, close
+    auto const actions = policy.Decide(view, 0);
+    CHECK(HasAction(actions, 10, ActionType::kFollow, MakeUnitRef(8, 1, 7)));
+}
+
+// Two that may equally well be pulled: the closest one.
+void ClosestBreaksTheTieBetweenEqualTargets()
+{
+    BotPolicy policy;
+    WorldTickSnapshotView view = PartyView({ 10 });
+    AddNearby(view, 0, Hostile(7, 12.0f, 100));
+    AddNearby(view, 0, Hostile(8, 3.0f, 100));
+    auto const actions = policy.Decide(view, 0);
+    CHECK(HasAction(actions, 10, ActionType::kFollow, MakeUnitRef(8, 1, 8)));
+}
+
+// Two rogues of one party, a target that is casting: one interrupts it and the other keeps building combo points.
+void OnlyOneRogueInterruptsACastingTarget()
+{
+    PolicyOptions options;
+    options.PartySize = 5;
+    options.PartyCount = 1;
+    options.ClassOf = [](std::uint64_t) { return 4; }; // every bot a rogue
+    BotPolicy policy(options);
+
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    NearbyUnit caster = Hostile(7, 3.0f, 100);
+    caster.casting = 1;
+    AddNearby(view, 0, caster);
+    view.bots[0].casting_spell = 1766; // bot 10 already has Kick on it
+    auto const actions = policy.Decide(view, 0);
+    CHECK(!HasCast(actions, 1766)); // a second Kick lands on nothing
+}
+
+// One rogue with no party: it interrupts as before.
+void RogueWithoutAPartyStillInterrupts()
+{
+    NearbyUnit caster = Hostile(2, 3.0f, 100);
+    caster.casting = 1;
+    auto const actions = ClassPolicy(4).Decide(View(1, 0, { caster }), 1000);
+    CHECK(HasCast(actions, 1766));
+}
+
+// Two priests of one party, one member hurt: one heals it and the others look elsewhere while that heal is in flight.
+void TwoHealersDoNotHealTheSameMember()
+{
+    PolicyOptions options;
+    options.PartySize = 5;
+    options.PartyCount = 1;
+    options.ClassOf = [](std::uint64_t) { return 5; }; // every bot a priest
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    view.bots[3].health = 300; // bot 13 is hurt
+    auto const actions = policy.Decide(view, 0);
+    int heals = 0;
+    std::uint64_t healed = 0;
+    for (BotAction const& action : actions)
+        if (action.type == ActionType::kCastSpell && action.spell_id == 2050)
+        {
+            ++heals;
+            healed = action.target_guid;
+        }
+    CHECK(heals == 1);
+    CHECK(healed == PlayerOf(13));
+}
+
+// The leader (the tank) is kept alive first while it holds a target, even when someone else is on less health.
+void TankIsHealedBeforeTheLowestMember()
+{
+    PolicyOptions options;
+    options.PartySize = 5;
+    options.PartyCount = 1;
+    options.ClassOf = WarriorLeads; // bot 12 is the warrior and leads
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    view.bots[2].health = 600; // the leader: 60%, holding a target
+    view.bots[3].health = 300; // a member on 30%
+    view.bots[2].threat_target_guid = Hostile(7, 3.0f, 100).guid; // the tank is fighting
+    AddNearby(view, 2, Hostile(7, 3.0f, 100));
+    auto const actions = policy.Decide(view, 0);
+    CHECK(CastsSpell(actions, 10, 2050, PlayerOf(12))); // the tank, not the member
+}
+
+// Two druids of one party with one party buff: each member gets it once, however many druids know it.
+void TwoDruidsDoNotBothCastThePartyBuff()
+{
+    std::istringstream file("class 11\nbuff 1126 duration 1800 party\n");
+    std::vector<std::string> drop;
+    PolicyOptions options;
+    options.Rotations = std::make_shared<rotation::RotationData>(rotation::ParseRotationData(file, drop));
+    CHECK(drop.empty());
+    options.PartySize = 5;
+    options.PartyCount = 1;
+    options.ClassOf = [](std::uint64_t) { return 11; };
+    BotPolicy policy(options);
+
+    auto const group = [] { return MakeUnitRef(2, 0, 10); }; // the core formed the group, the leader is bot 10
+    auto const partied = [&group]
+    {
+        WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+        for (BotSnapshot& bot : view.bots)
+            bot.group_leader_guid = group();
+        return view;
+    };
+
+    std::size_t onMember11 = 0, total = 0;
+    for (std::uint64_t now = 0; now < 12000; now += 3000)
+        for (BotAction const& action : policy.Decide(partied(), now))
+            if (action.type == ActionType::kCastSpell && action.spell_id == 1126)
+            {
+                ++total;
+                onMember11 += action.target_guid == PlayerOf(11) ? 1 : 0;
+            }
+    CHECK(total == 5);      // one cast per member
+    CHECK(onMember11 == 1); // and not one per druid
+}
+
+// A hub walk that timed out is not worth a full idle interval: an unreachable hub (in rock, or in another zone) must not
+// cost the bot 30 seconds of standing every time it goes round the list.
+void HubTimeoutTriesTheNextHubSoonerThanAnArrival()
+{
+    BotPolicy policy = HubPolicy();
+    WorldTickSnapshotView view = OnMap(1);
+    policy.Decide(view, 0);                                   // the idle time starts
+    CHECK(WalkTo(policy.Decide(view, 30000), 10) == 500.0f);  // walking to hub 1
+    policy.Decide(view, 31000);                               // unchanged
+    CHECK(WalkTo(policy.Decide(view, 210001), 10) < 0.0f);    // dropped after the timeout
+    CHECK(WalkTo(policy.Decide(view, 215001), 10) == 900.0f); // the next hub, after a short pause
+}
+
 int main()
 {
     AutoShotIsNotReissuedWhileActive();
@@ -2279,7 +2442,8 @@ int main()
     StopsWhenNothingNearby();
     DeadUnitsAreNotAttacked();
     RetreatsBelowThirtyPercent();
-    RetreatWithNoPlayerStops();
+    RetreatFollowsAPlayerWhenNothingNearToFlee();
+    RetreatWithNoPlayerStillFlees();
     ThirtyPercentIsNotLow();
     LoneCorpseReleasesAndDoesNotFight();
     CorpseWaitsForARezzerThenReleases();
@@ -2316,6 +2480,15 @@ int main()
     BotDoesNotMountForAShortWalk();
     BotDismountsWhenClose();
     BotDoesNotMountInCombat();
+    LowHealthFleesFromAHostileItIsNotFighting();
+    WeakestTargetIsPulledFirst();
+    ClosestBreaksTheTieBetweenEqualTargets();
+    OnlyOneRogueInterruptsACastingTarget();
+    RogueWithoutAPartyStillInterrupts();
+    TwoHealersDoNotHealTheSameMember();
+    TankIsHealedBeforeTheLowestMember();
+    TwoDruidsDoNotBothCastThePartyBuff();
+    HubTimeoutTriesTheNextHubSoonerThanAnArrival();
 
     if (failures == 0)
         std::printf("policy_test: all checks passed\n");

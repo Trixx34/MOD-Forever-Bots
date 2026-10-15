@@ -113,6 +113,28 @@ Kinds: `summary`, `fight_start`, `fight_end` (detail: reason, target, duration, 
   the hand-in is tried again after the visit.
 - If the summary lines stop, the module has stopped.
 
+Two tools read a telemetry file (both are Python 3, run with `-I`, and both read the rotated files beside it):
+
+- `tools/soak_report.py --telemetry <csv> [--stderr <file>] [--server-log <file>] [--hours 5]`: one report over the whole file
+  or the last hours, with the runs split up.
+- `tools/snapshot_replay.py --telemetry <csv> [--stderr <file>]`: one section per open question — the bots still on level 1 and
+  their last quest step, deaths per level, stuck episodes beside fights, the longest fight with the rows around it, applied casts
+  against refusals with the reason from the stderr, and fights that ended with the target gone by level. It is a diagnosis aid, not
+  a summary tool: run it on the runs of one soak, not on a mixed chain.
+
+## Tests
+
+`tests/*_test.cpp` are the unit tests; `tests/*_test.py` are the Python ones, run with `-I`. Beyond the per-library suites:
+
+- `policy_test.cpp` covers the whole decision path: pulls, over-pull control, the class rotations, kiting, fleeing,
+  mounting for long travel, parties, heals, resurrections, loot, hubs, quests, death recovery, and the coordination
+  the policy does across bots (one interrupt per party, one heal per member, one party buff per member).
+- `scale_test.cpp` runs `Decide` at the 1500-bot ceiling with 300 parties and a full nearby list, and checks that the
+  tick stays bounded in time and that the actions published stay within the two per bot the core granted. Timing is
+  printed; the ceiling is wide (override it with `FOREVER_BOTS_TICK_MS`) so a loaded machine does not fail a build.
+- `tools/snapshot_replay.py` replays a telemetry run and answers the open questions of a soak; `soak_report.py`
+  summarises a whole file.
+
 ## Build
 
     cmake -S . -B build -DFOREVER_MODULE_SDK_SOURCE=/path/to/forever-module-sdk

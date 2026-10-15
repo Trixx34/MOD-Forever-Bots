@@ -86,6 +86,9 @@ constexpr std::uint64_t kAvoidMs = 30000;        // a target that refused an att
 constexpr std::uint32_t kMaxAvoidDoublings = 2;  // each repeat avoid doubles the time: 30 s, 60 s, then 120 s at most
 constexpr std::uint64_t kWanderIdleMs = 30000;   // idle for this long, seeing nothing, before walking to a hub
 constexpr std::uint64_t kWanderTimeoutMs = 180000; // a walk to a hub longer than this is dropped
+// After a hub walk that timed out (a hub in rock, or past what the pathing allows), the next hub is tried this much sooner than a
+// full idle interval: going round the list must not cost the bot 30 s of standing for every unreachable hub.
+constexpr std::uint64_t kHubRetryIdleMs = 5000;
 constexpr float kHubReachYards = 10.0f;          // a bot this close to its hub has arrived
 constexpr float kVendorReachYards = 4.0f;       // a bot this close to its vendor can use it (the core allows 5)
 constexpr std::uint32_t kRepairBelowPct = 50;    // worn gear below this durability sends the bot to a repairman, not just any vendor
@@ -100,6 +103,10 @@ constexpr std::uint64_t kPullHoldMaxMs = 120000;    // the party never waits lon
 constexpr std::uint64_t kTankHeadStartMs = 2500;    // the others join a fight this long after the tank started it, so the tank has the threat
 // Healing: a healer class heals the party member with the lowest health below this share, within this range.
 constexpr std::uint32_t kHealBelowPct = 60;
+// The tank (the party leader) is kept alive first while it holds a target, even a little below this.
+constexpr std::uint32_t kTankHealBelowPct = 90;
+// How long a heal claim on a member lasts: one global cooldown and the cast, so a second healer looks elsewhere meanwhile.
+constexpr std::uint64_t kHealClaimMs = 2500;
 constexpr float kHealRangeYards = 30.0f;
 constexpr float kBuffRangeYards = 30.0f;            // a party buff reaches members this close
 constexpr std::size_t kGrindMemory = 2;           // grind spots remembered as just visited
@@ -199,6 +206,13 @@ bool IsResurrectSpell(std::uint32_t spell)
     return spell == kResurrection || spell == kRedemption || spell == kAncestralSpirit;
 }
 
+// The spells that stop a cast in progress (rotation rows with Cond::TargetCasting). When several party members know one, only
+// one may use it on the same cast: a second kick lands on nothing and both casts are wasted.
+bool IsInterruptSpell(std::uint32_t spell)
+{
+    return spell == 853 || spell == 1766 || spell == 8042; // Hammer of Justice, Kick, Earth Shock
+}
+
 // Duration of the damage-over-time effect a spell leaves on its target, or 0 for spells the policy does not track. Rank 1
 // durations: while the effect runs, the policy does not recast the spell on the same target.
 std::uint64_t DotDurationMs(std::uint32_t spell)
@@ -262,15 +276,23 @@ bool IsGrey(BotSnapshot const& bot, NearbyUnit const& unit)
     return bot.level != 0 && unit.level != 0 && unit.level < bot.level && bot.level - unit.level >= ZeroExpDifference(bot.level);
 }
 
-// The closest live hostile that is not part of a group larger than kMaxPull, or nullptr. A group is the hostiles within
-// kPullRadius of the candidate, the candidate included. Units already attacking the bot are not chosen here; the policy
-// fights its threat target whatever the group size.
+// A unit's share of its health (0..1), or 1 when its maximum is unknown. A pull prefers the weakest, so a kill comes sooner.
+float HealthShare(NearbyUnit const& unit)
+{
+    return unit.max_health ? float(unit.health) / float(unit.max_health) : 1.0f;
+}
+
+// The live hostile this bot should pull, or nullptr. A group is the hostiles within kPullRadius of the candidate, the candidate
+// included. Units already attacking the bot are not chosen here; the policy fights its threat target whatever the group size.
+// The weakest target wins and the closest breaks the tie: finishing one creature before the next is more experience per hour
+// than walking to whichever one happens to stand nearest first.
 NearbyUnit const* PullTarget(BotSnapshot const& bot, std::span<NearbyUnit const> units,
                             std::function<bool(std::uint64_t)> const& avoided, bool defending,
                             std::vector<std::uint32_t> const& onlyEntries = {}, bool dungeon = false)
 {
     NearbyUnit const* best = nullptr;
-    float bestDist = std::numeric_limits<float>::max();
+    float bestHealth = 0.0f;
+    float bestDist = 0.0f;
     for (NearbyUnit const& candidate : units)
     {
         if (!IsLiveMob(candidate) || avoided(candidate.guid))
@@ -290,8 +312,9 @@ NearbyUnit const* PullTarget(BotSnapshot const& bot, std::span<NearbyUnit const>
         if (!defending && !dungeon && bot.level != 0 &&
             ((candidate.level != 0 && candidate.level > bot.level + kMaxLevelAbove) || candidate.elite))
             continue;
+        float const health = HealthShare(candidate);
         float const dist = rotation::DistanceYards(bot, candidate);
-        if (dist >= bestDist)
+        if (best && !(health < bestHealth || (health == bestHealth && dist < bestDist)))
             continue;
 
         std::size_t group = 0;
@@ -301,8 +324,9 @@ NearbyUnit const* PullTarget(BotSnapshot const& bot, std::span<NearbyUnit const>
         if (!defending && group > (dungeon ? kMaxDungeonPull : kMaxPull))
             continue;
 
-        bestDist = dist;
         best = &candidate;
+        bestHealth = health;
+        bestDist = dist;
     }
     return best;
 }
@@ -984,6 +1008,23 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         forParty(leaderGuid, [&](BotSnapshot const& member) { fighting = fighting || (member.life_state == 0 && member.in_combat != 0); });
         return fighting;
     };
+    // Whether another member of this bot's party is already stopping a cast. The snapshot says who casts what, and a member with
+    // casting_spell set is mid-cast (cast_remaining_ms is 0 for a spell in flight, which the core still counts as casting).
+    // Only the party is looked at, so the cost does not grow with the bot count.
+    auto const interruptTaken = [&](BotSnapshot const& bot, std::uint64_t leaderGuid) -> bool
+    {
+        if (leaderGuid == 0)
+            return false; // not in a party of this module's: nobody to coordinate with
+        bool taken = false;
+        forParty(leaderGuid, [&](BotSnapshot const& member)
+        {
+            if (member.guid == bot.guid || member.life_state != 0 || member.casting_spell == 0)
+                return;
+            if (IsInterruptSpell(member.casting_spell))
+                taken = true;
+        });
+        return taken;
+    };
     // Whether the party waits for a dead member: 0 no, 1 for a resurrect, 2 for a ghost on its way back. Never in a fight, never
     // for a ghost whose run failed, and every wait is capped.
     auto const deadWait = [&](std::uint64_t leaderGuid) -> std::uint8_t
@@ -1565,16 +1606,23 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         Decision wanted;
         if (lowHealth)
         {
-            // Below kDisengagePct health: get clear of the threat target before doing anything else.
-            if (targetUnit && bot.in_combat != 0 && distance < kFleeYards)
+            // Below kDisengagePct health: get clear of whatever is close enough to still kill it. In combat that is the threat
+            // target; out of combat the closest live hostile is the one to run from, since nothing says yet that it is the target.
+            // Standing still to rest used to be the whole reply, and a hostile five yards away killed the bot.
+            NearbyUnit const* threat = targetUnit;
+            if (!threat)
+                threat = Closest(bot, nearby, IsLiveMob);
+            float const away = threat ? (threat == targetUnit ? distance : rotation::DistanceYards(bot, *threat))
+                                      : std::numeric_limits<float>::max();
+            if (threat && away < kFleeYards)
             {
-                float const dx = bot.pos_x - targetUnit->pos_x;
-                float const dy = bot.pos_y - targetUnit->pos_y;
+                float const dx = bot.pos_x - threat->pos_x;
+                float const dy = bot.pos_y - threat->pos_y;
                 float const dist = std::sqrt(dx * dx + dy * dy);
                 if (dist > 0.0f)
                 {
-                    Point flee{ targetUnit->pos_x + dx / dist * kFleeYards,
-                                targetUnit->pos_y + dy / dist * kFleeYards,
+                    Point flee{ threat->pos_x + dx / dist * kFleeYards,
+                                threat->pos_y + dy / dist * kFleeYards,
                                 bot.pos_z };
                     wanted = Decision{ ActionType::kMoveTo, 0, flee };
                 }
@@ -1943,12 +1991,13 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 bool const timedOut = nowMs - state.WanderStartMs > kWanderTimeoutMs;
                 if (arrived || timedOut)
                 {
-                    // Next time, the next hub; the bot waits a full interval before it walks again. Walks that end without arriving (a hub in
-                    // another zone, past what the pathing allows) are counted: after kHubFailuresMax in a row the bot explores on foot instead.
+                    // Next time, the next hub. An arrival waits a full idle interval, as before. A timeout does not: a hub in rock or in
+                    // another zone must not cost the bot 30 s of standing every time it goes round the list, so it walks on after a short
+                    // pause. Walks that end without arriving are counted: after kHubFailuresMax in a row the bot explores on foot instead.
                     state.Wandering = false;
                     state.HubFailures = arrived ? 0 : state.HubFailures + 1;
                     state.NextHub = (state.NextHub + 1) % list.size();
-                    state.IdleSinceMs = nowMs;
+                    state.IdleSinceMs = arrived ? nowMs : nowMs - (kWanderIdleMs - kHubRetryIdleMs);
                 }
                 else
                 {
@@ -2238,13 +2287,32 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             auto const retry = healSpell != 0 ? state.RetryAtMs.find(healSpell) : state.RetryAtMs.end();
             if (healSpell != 0 && (retry == state.RetryAtMs.end() || nowMs >= retry->second))
             {
+                std::uint64_t const healGroup = partyLeader != 0 ? partyLeader : bot.guid;
+                if (_healClaims.size() > 64)
+                    for (auto it = _healClaims.begin(); it != _healClaims.end();)
+                        it = nowMs >= it->second.UntilMs ? _healClaims.erase(it) : std::next(it);
                 BotSnapshot const* hurt = nullptr;
                 std::uint64_t hurtPct = kHealBelowPct;
+                BotSnapshot const* leaderHurt = nullptr;   // the tank with a target: healed first, whatever its share
+                std::uint64_t leaderHurtPct = kTankHealBelowPct;
                 auto const consider = [&](BotSnapshot const& member)
                 {
                     if (member.life_state != 0 || member.max_health == 0 || Distance2d(bot, member) > kHealRangeYards)
                         return;
+                    // Another healer of this party already has this member: leave it, someone else needs the heal more.
+                    if (auto const claim = _healClaims.find(member.guid); claim != _healClaims.end() &&
+                        nowMs < claim->second.UntilMs && claim->second.Group == healGroup)
+                        return;
                     std::uint64_t const pct = std::uint64_t(member.health) * 100 / member.max_health;
+                    if (member.guid == partyLeader && member.threat_target_guid != 0)
+                    {
+                        if (pct < leaderHurtPct)
+                        {
+                            leaderHurtPct = pct;
+                            leaderHurt = &member;
+                        }
+                        return;
+                    }
                     if (pct < hurtPct)
                     {
                         hurtPct = pct;
@@ -2256,6 +2324,11 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 for (BotSnapshot const& other : view.bots)
                     if (other.guid != bot.guid && leaderOf.count(other.guid) && leaderOf[other.guid] == lead->second)
                         consider(other);
+                if (leaderHurt) // the tank is kept alive first while it holds a target
+                {
+                    hurt = leaderHurt;
+                    hurtPct = leaderHurtPct;
+                }
                 if (hurt)
                 {
                     if (bot.moving != 0 && (KnownCastTimeSpell(healSpell) || state.CastTimeSpells.count(healSpell)))
@@ -2276,9 +2349,11 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                         heal.target_guid = hurt->guid == bot.guid ? 0 : PlayerRef(hurt->guid);
                         actions.push_back(heal);
                         state.CastTarget[healSpell] = heal.target_guid;
+                        _healClaims[hurt->guid] = HealClaim{ healGroup, nowMs + kHealClaimMs };
                         if (_options.OnEvent)
                             _options.OnEvent("heal: healer=" + std::to_string(bot.guid) + " spell=" + std::to_string(healSpell) +
-                                             " target=" + std::to_string(hurt->guid) + " target_hp_pct=" + std::to_string(hurtPct));
+                                             " target=" + std::to_string(hurt->guid) + " target_hp_pct=" + std::to_string(hurtPct) +
+                                             (hurt->guid == partyLeader ? " tank" : ""));
                         state.NextCastMs = nowMs + kGlobalCooldownMs;
                     }
                     continue;
@@ -2409,6 +2484,11 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             !state.Sitting)
         {
             bool cast = false;
+            // Claims that have run out are dropped; the map is bounded so a long run cannot grow it.
+            if (_buffClaims.size() > 256)
+                for (auto it = _buffClaims.begin(); it != _buffClaims.end();)
+                    it = nowMs >= it->second.UntilMs ? _buffClaims.erase(it) : std::next(it);
+            std::uint64_t const buffGroup = bot.group_leader_guid != 0 ? bot.group_leader_guid : bot.guid;
             for (rotation::Row const& row : RowsFor(classId))
             {
                 if (!row.Buff || (bot.level != 0 && (row.MinLevel > bot.level || (row.MaxLevel != 0 && bot.level > row.MaxLevel))))
@@ -2428,6 +2508,10 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     auto const until = state.BuffUntilMs.find({ row.Spell, recipient });
                     if (until != state.BuffUntilMs.end() && nowMs < until->second)
                         continue;
+                    // A party member refreshed this buff moments ago: someone else has it, leave it to them.
+                    auto const claimed = _buffClaims.find({ row.Spell, recipient });
+                    if (claimed != _buffClaims.end() && nowMs < claimed->second.UntilMs && claimed->second.Group == buffGroup)
+                        continue;
                     BotAction buff;
                     buff.bot_guid = bot.guid;
                     buff.type = ActionType::kCastSpell;
@@ -2436,6 +2520,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     actions.push_back(buff);
                     state.CastTarget[row.Spell] = recipient;
                     state.NextCastMs = nowMs + kGlobalCooldownMs;
+                    _buffClaims[{ row.Spell, recipient }] = BuffClaim{ buffGroup, nowMs + std::uint64_t(row.DurationSec) * 1000 };
                     cast = true;
                     break;
                 }
@@ -2538,6 +2623,9 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             if (row.OnTarget && row.MaxRange > 0.0f && castDistance > (row.MaxRange > kRangeSlackYards * 2.0f ? row.MaxRange - kRangeSlackYards : row.MaxRange))
                 continue;
             if (!rotation::Allowed(row.When, facts))
+                continue;
+            // Only one member of the party stops a cast: when a party member is already casting an interrupt, this bot uses its next row.
+            if (row.When.Condition == rotation::Cond::TargetCasting && interruptTaken(bot, partyLeader))
                 continue;
             // The effect is still up (on the target, or on the bot for a self buff): recasting only refreshes it.
             auto const dot = state.Dots.find(row.Spell);
