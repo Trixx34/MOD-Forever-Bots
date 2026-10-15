@@ -6,7 +6,8 @@
 // cooldown; with no target, pull the closest hostile unless it is part of a group of more than three (over-pull control),
 // else follow the closest player or stand still. A threat target is always fought. Decisions are sent when they change.
 // A refused cast is retried after a while, and its spell is not used again before then. A spell the snapshot reports as on
-// cooldown is skipped. Rend's bleed is tracked per target, since the snapshot has no auras, so it is not recast while active.
+// cooldown is skipped. Rend's bleed is tracked per target from accepted casts (layout 13 puts the bot's own auras in the
+// snapshot, so a self buff is read as fact; a target's DOTs are only a coarse mask, so the estimate stays).
 // Rest (M2): an idle bot below 90% health sits down, and stays sat until its health is full. It stands before it moves,
 // follows or fights. A sit refused in combat is retried after a second.
 // Dungeon party control (route active): the leader (tank) pulls only when every living member has 80% health, mana users 60% mana, and all
@@ -171,6 +172,8 @@ private:
         std::unordered_map<std::uint32_t, Dot> Dots;     // spell -> effect on a target, while it lasts
         std::optional<std::uint64_t> LastTestCastTick;
         std::uint64_t AutoShotTarget = 0;                // the unit Auto Shot was accepted on and is believed to be shooting (0 = not active)
+        std::uint64_t SeenThreatTarget = 0;              // the threat target of the last tick, to see it go away
+        std::uint32_t LostTargetReason = 0;              // last_target_lost_reason already acted on (layout 13)
         // Hunter pet. The snapshot has no pet, so this is only what the accepted and refused pet casts imply.
         bool PetMissing = true;                          // the pet is not believed to be out: Call Pet (or Revive Pet when PetDead) is due
         bool PetDead = false;                            // Call Pet was refused: the pet is believed dead, Revive Pet is due
@@ -180,6 +183,7 @@ private:
         std::uint64_t PetRetryAtMs = 0;                  // no pet cast out of combat before this
         std::uint64_t PetProbeAtMs = 0;                  // below level 12 (no Mend Pet) a Call Pet probe is not sent before this
         std::uint64_t PetMendAtMs = 0;                   // no Mend Pet in a fight before this
+        bool PetCommanded = false;                       // the pet has been sent at this fight's target (layout 13)
         bool Sitting = false;                            // sat down to rest; stands before it moves or fights
         std::uint64_t RestRetryAtMs = 0;                 // a refused sit is not tried again before this
         bool Mounted = false;                            // the bot is mounted: travel is faster, combat dismounts it

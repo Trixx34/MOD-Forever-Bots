@@ -153,6 +153,27 @@ void FightLifecycle()
         CHECK(Split(line).size() == fields);
 }
 
+// Layout 13: the core says why the target went away, so a target_gone can be split into kill, leash, despawn and stolen
+// player. The reason is on the fight_end line.
+void LostTargetReasonIsOnTheFightEndLine()
+{
+    auto const observe = [](std::uint32_t reason)
+    {
+        Recorder rec(Quiet());
+        rec.telemetry.Observe(View(Bot(1000)), 0);
+        rec.telemetry.Observe(View(Bot(1000, 0, kEnemy), { Enemy(3.0f) }), 1000);
+        BotSnapshot gone = Bot(900);
+        gone.last_target_lost_reason = reason;
+        rec.telemetry.Observe(View(gone), 5000);
+        return rec.Last("fight_end");
+    };
+    CHECK(observe(1).find("lost killed") != std::string::npos);
+    CHECK(observe(2).find("lost leashed") != std::string::npos);
+    CHECK(observe(3).find("lost despawned") != std::string::npos);
+    CHECK(observe(4).find("lost other_player") != std::string::npos);
+    CHECK(observe(0).find("lost none") != std::string::npos); // a core that reports no reason still has the field
+}
+
 void DeathEndsTheFight()
 {
     Recorder rec(Quiet());
@@ -257,6 +278,7 @@ int main()
 {
     HeaderHasSixteenFields();
     FightLifecycle();
+    LostTargetReasonIsOnTheFightEndLine();
     DeathEndsTheFight();
     RevivalIsLoggedAfterAGhost();
     StuckFightIsReportedOnce();

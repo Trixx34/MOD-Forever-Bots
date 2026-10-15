@@ -54,7 +54,13 @@ constexpr std::uint64_t kPetBackoffMaxMs = 300000;
 constexpr std::uint64_t kPetProbeMs = 120000;        // below level 12 a Call Pet check after a fight is sent at most this often
 constexpr std::uint64_t kPetMendEveryMs = 30000;     // Mend Pet in a fight at most this often
 constexpr std::uint64_t kPetMendAfterMs = 15000;     // and only once the fight has lasted this long
-constexpr std::uint32_t kPetMendManaPct = 50;        // and with at least this much mana
+constexpr std::uint32_t kPetMendManaPct = 50;         // and with at least this much mana
+constexpr std::uint32_t kPetMendHealthPct = 85;        // layout 13: a pet below this health is healed
+// Layout 13: ActionType::kPetCommand spell_id (the pet is in the snapshot now, so it can be commanded, not just called).
+constexpr std::uint32_t kPetAttack = 1;               // attack target_guid
+constexpr std::uint32_t kPetFollow = 2;
+constexpr std::uint32_t kPetStay = 3;                 // hold position
+constexpr std::uint32_t kPetStance = 4;               // passive, defensive or aggressive, in dest_x
 constexpr std::uint32_t kMaxComboPoints = 5;
 // Saber Slash (Forever): like Sinister Strike it gives one combo point (SpellEffect 30 energize, power type 4, 1 point, in the client data).
 constexpr std::uint32_t kSaberSlash = 424785;
@@ -211,6 +217,31 @@ bool IsResurrectSpell(std::uint32_t spell)
 bool IsInterruptSpell(std::uint32_t spell)
 {
     return spell == 853 || spell == 1766 || spell == 8042; // Hammer of Justice, Kick, Earth Shock
+}
+
+// Layout 13: whether the bot carries this aura right now. The aura list replaces the module's own buff timers, so a buff
+// another player cast over the bot, or one it lost to a death, is the fact it is. An aura with no duration reports a large
+// remaining_ms and runs for ever; a reported aura with 0 left is one that just expired.
+bool AuraRunning(BotSnapshot const& bot, std::uint32_t spell)
+{
+    for (std::uint32_t i = 0; i < bot.aura_count && i < forever_module::kMaxAuras; ++i)
+        if (bot.auras[i].spell_id == spell)
+            return bot.auras[i].remaining_ms != 0;
+    return false;
+}
+
+// Layout 13: the bot's pet, from the snapshot, instead of what refused casts imply. pet_state is 0 none, 1 alive, 2 dead.
+// A core that does not report pets leaves it 0, and the inference from refused casts below is the fallback.
+enum class PetKnown : std::uint8_t { kNone, kOut, kDead };
+
+PetKnown PetOf(BotSnapshot const& bot)
+{
+    switch (bot.pet_state)
+    {
+        case 1: return PetKnown::kOut;
+        case 2: return PetKnown::kDead;
+        default: return PetKnown::kNone;
+    }
 }
 
 // Duration of the damage-over-time effect a spell leaves on its target, or 0 for spells the policy does not track. Rank 1
@@ -1072,6 +1103,21 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         state.SeenPowerPct = bot.max_power ? std::uint32_t(std::uint64_t(bot.power) * 100 / bot.max_power) : 100;
         state.SeenLife = bot.life_state;
         state.SeenInCombat = bot.in_combat != 0;
+
+        // Layout 13: the core says why the bot lost its last target (0 none, 1 killed, 2 leashed, 3 despawned, 4 another player).
+        // A creature that leashed or despawned is not worth pulling again at once, so it is avoided like a refused one;
+        // a kill is not, which keeps the bot working the corpses it just made.
+        if (state.SeenThreatTarget != bot.threat_target_guid)
+        {
+            if (state.SeenThreatTarget != 0 && bot.threat_target_guid == 0 && bot.last_target_lost_reason != 0 &&
+                bot.last_target_lost_reason != state.LostTargetReason)
+            {
+                state.LostTargetReason = bot.last_target_lost_reason;
+                if (bot.last_target_lost_reason >= 2)
+                    state.AvoidUntilMs[state.SeenThreatTarget] = nowMs + kAvoidMs;
+            }
+            state.SeenThreatTarget = bot.threat_target_guid;
+        }
         for (auto it = state.AvoidUntilMs.begin(); it != state.AvoidUntilMs.end();)
             it = nowMs >= it->second ? state.AvoidUntilMs.erase(it) : std::next(it);
 
@@ -1126,6 +1172,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 state.PetDead = false;
                 state.PetProbe = false;
                 state.PetFought = false;
+                state.PetCommanded = false;
                 state.Sitting = false;
                 state.Approaching = false;
                 state.Traveling = false;
@@ -1640,6 +1687,18 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             {
                 state.InFight = true;
                 state.FightStartMs = nowMs;
+                // Layout 13: the pet is in the snapshot, so it can be sent at this fight's target. Once per fight, so a
+                // long one does not repeat the order. A core that reports no pet never gets this action.
+                if (PetOf(bot) == PetKnown::kOut)
+                {
+                    BotAction petGo;
+                    petGo.bot_guid = bot.guid;
+                    petGo.type = ActionType::kPetCommand;
+                    petGo.spell_id = kPetAttack;
+                    petGo.target_guid = targetRef;
+                    actions.push_back(petGo);
+                    state.PetCommanded = true;
+                }
             }
             // A ranged bot that has run out of power closes to melee range: its spells are spent.
             bool const outOfPower = bot.max_power > 0 && std::uint64_t(bot.power) * 100 < std::uint64_t(bot.max_power) * kOutOfPowerPct;
@@ -1705,6 +1764,17 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         }
         else
         {
+            // Layout 13: the fight just ended, so the pet has nothing to hunt. Call it back once; a core that reports no pet
+            // never sent it out, so there is nothing to recall.
+            if (state.InFight && state.PetCommanded)
+            {
+                BotAction back;
+                back.bot_guid = bot.guid;
+                back.type = ActionType::kPetCommand;
+                back.spell_id = kPetStay;
+                actions.push_back(back);
+                state.PetCommanded = false;
+            }
             state.InFight = false;
             wanted = followRef ? Decision{ ActionType::kFollow, followRef } : Decision{ ActionType::kStop, 0 };
             // Dungeon route (doc 19): the leader of a party walks the route while it is healthy and its members are close. Otherwise
@@ -1897,6 +1967,9 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 vendor.bot_guid = bot.guid;
                 vendor.type = ActionType::kVendor;
                 vendor.spell_id = kServiceSell | kServiceRepair | kServiceEquip;
+                // Layout 13: the NPC's guid, not just its position. An older core leaves it 0 and the core resolves the
+                // nearest vendor of the map instead.
+                vendor.target_guid = needRepair ? bot.repair_guid : bot.vendor_guid;
                 actions.push_back(vendor);
                 state.NextServiceMs = nowMs + _options.ServiceEveryMs;
             }
@@ -2431,9 +2504,9 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             }
         }
 
-        // Hunter pet (out of combat, standing, nothing to fight). Only spell casts are available: there is no pet in the snapshot and no pet command
-        // action. A pet that is not believed to be out is called (a refusal means it is dead: Revive Pet); after a fight Mend Pet (level 12) heals it
-        // and, refused, shows it is gone; a failed revive backs off. Sending it to attack is not possible (doc/rotations.md, Limits).
+        // Hunter pet (out of combat, standing, nothing to fight). Layout 13 puts the pet in the snapshot (pet_state 0 none,
+        // 1 alive, 2 dead, with pet_health and pet_max_health), so its state is fact rather than what refused casts imply;
+        // the inference below is the fallback for a core that does not report pets.
         if (classId == kHunterClass && !hasTarget && bot.in_combat == 0 && bot.moving == 0 && wanted.Type == ActionType::kStop && nowMs >= state.NextCastMs &&
             !(bot.casting_spell != 0 && bot.cast_remaining_ms != 0) && !state.Sitting && nowMs >= state.PetRetryAtMs)
         {
@@ -2442,12 +2515,20 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 state.PetFought = false;
                 state.PetProbe = true;
             }
+            PetKnown const known = PetOf(bot);
+            bool const mendable = bot.level == 0 || bot.level >= rotation::LearnLevel(kMendPet);
+            bool const petHurt = bot.pet_max_health != 0 &&
+                                 std::uint64_t(bot.pet_health) * 100 < std::uint64_t(bot.pet_max_health) * kPetMendHealthPct;
             std::uint32_t petSpell = 0;
-            if (state.PetMissing)
-                petSpell = state.PetDead ? kRevivePet : kCallPet;
+            if (known == PetKnown::kDead)
+                petSpell = kRevivePet;                                    // fact: it is dead
+            else if (known == PetKnown::kNone && state.PetMissing)
+                petSpell = state.PetDead ? kRevivePet : kCallPet;          // inferred: no pet in the snapshot
+            else if (known == PetKnown::kOut && petHurt && mendable)
+                petSpell = kMendPet;                                      // fact: it is out and hurt
             else if (state.PetProbe)
             {
-                if (bot.level == 0 || bot.level >= rotation::LearnLevel(kMendPet))
+                if (mendable)
                     petSpell = kMendPet;
                 else if (nowMs >= state.PetProbeAtMs)
                     petSpell = kCallPet;
@@ -2505,9 +2586,20 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                             recipients.push_back(PlayerRef(other.guid));
                 for (std::uint64_t recipient : recipients)
                 {
-                    auto const until = state.BuffUntilMs.find({ row.Spell, recipient });
-                    if (until != state.BuffUntilMs.end() && nowMs < until->second)
-                        continue;
+                    // The bot's own buff is read from the snapshot's auras (layout 13): a buff another player cast over it,
+                    // or one it lost to a death, is now seen as the fact it is. A party member's buff is not in this bot's
+                    // snapshot, so its timer and the party claim carry it.
+                    if (recipient == 0)
+                    {
+                        if (AuraRunning(bot, row.Spell))
+                            continue;
+                    }
+                    else
+                    {
+                        auto const mine = state.BuffUntilMs.find({ row.Spell, recipient });
+                        if (mine != state.BuffUntilMs.end() && nowMs < mine->second)
+                            continue;
+                    }
                     // A party member refreshed this buff moments ago: someone else has it, leave it to them.
                     auto const claimed = _buffClaims.find({ row.Spell, recipient });
                     if (claimed != _buffClaims.end() && nowMs < claimed->second.UntilMs && claimed->second.Group == buffGroup)

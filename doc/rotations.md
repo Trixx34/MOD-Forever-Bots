@@ -31,6 +31,30 @@ copied from another branch, and a wrong id fails silently.
    cannot find: fix the spec's spelling or drop the row. `supersede "Frost Armor" by "Ice Armor"` retires the old buff when the new one is learned.
 3. Set `RotationFile = "data/rotations.txt"` in the module's config.
 
+## Layout 13 (protocol 7): what the SDK now provides
+
+`forever-module-sdk` at `cab5043` added the asks from `core-sdk-requests-2026-10-15.md`. Built against it, the module reads:
+
+- `BotSnapshot::aura_count` / `auras[16]` (`AuraEntry{spell_id, remaining_ms, stacks}`) — the bot's own buffs and DOTs. `AuraRunning` in
+  `bot_policy.cpp` replaces the module's own buff timer for self buffs, so a buff another player cast over the bot, or one lost
+  to a death, is now the fact it is. A target's DOTs are still only `NearbyUnit::aura_mask`, so `state.Dots` stays.
+- `pet_guid` / `pet_health` / `pet_max_health` / `pet_state` (0 none, 1 alive, 2 dead) — `PetOf` reads the pet as fact; the old
+  inference from refused Call/Revive/Mend Pet casts is the fallback for a core that does not report pets.
+- `ActionType::kPetCommand` (`spell_id` 1 attack `target_guid`, 2 follow, 3 stay, 4 stance in `dest_x`) — the pet is sent at the
+  target when a fight starts and called back when it ends, once per fight.
+- `casting_target` — who a member is casting on (not used by the policy yet: heal claims stay on the module's own one-cooldown
+  claim, which works without it).
+- `vendor_guid` / `repair_guid` / `auctioneer_guid` — the vendor action now carries the NPC's guid.
+- `copper` / `bag_free_slots` — for buy and hand-in pre-checks (not used yet).
+- `last_target_lost_reason` (0 none, 1 killed, 2 leashed, 3 despawned, 4 other player) — telemetry writes it on the `fight_end`
+  line, and the policy avoids a creature that leashed or despawned for the usual avoid window.
+- Tier 1: `BuyItem(vendorGuid, itemEntry, count)` and `AuctionHouse(op, auctioneerGuid, ...)`, with `PlayerScript.OnAuctionResult`.
+  Tier 2: `Craft(botGuid, spellId)` and `Gather(botGuid, targetGuid)`.
+
+**The deployment gate:** a core still on layout 12 / protocol 6 refuses the module at handshake, and a module built against layout
+12 refuses to attach to a layout 13 region. The core has to move first; the SDK summary's §10 still lists the layout 12 contract
+and the core-side handlers for `kPetCommand`, buy, auction house, craft and gather are not confirmed written yet.
+
 ## Limits
 
 - Stances (warrior), forms (druid), and totems that need placing are not handled; Searing Totem is cast as a self spell at the fight's start.
@@ -42,8 +66,8 @@ copied from another branch, and a wrong id fails silently.
   3. The core confirming that a `kCastSpell` with `target_guid` 0 reaches the pet for Mend Pet and Revive Pet.
 - A warlock's pet is not handled either (same missing snapshot field and action).
 - The rows named in policy code (Sinister Strike and Eviscerate for combo points, the heal ids) stay tied to their ids: if the dump gives other ids for them, the combo count is wrong.
-- Buff timers are the module's own: the snapshot has no auras. A buff another player cast over it, or a death, is not noticed until the timer runs out (a death does reset the bot's
-  state; a ghost is not buffed).
+- Buff timers are the module's own for party members: the snapshot has no auras. A buff another player cast over it, or a death, is not noticed until the timer runs out (a death does reset the bot's
+  state; a ghost is not buffed). The bot's own buffs are read from `auras[]` since layout 13.
 - Warlock's Life Tap has no health check yet.
 
 ## Forever's own abilities

@@ -2344,6 +2344,137 @@ void HubTimeoutTriesTheNextHubSoonerThanAnArrival()
     CHECK(WalkTo(policy.Decide(view, 215001), 10) == 900.0f); // the next hub, after a short pause
 }
 
+// ---- layout 13: auras, pet, lost-target reason, vendor guid ----
+
+// The core says a creature leashed or despawned. It is not worth pulling again at once, so it is avoided like a refused one.
+void LeashedTargetIsNotPulledAgain()
+{
+    NearbyUnit const mob = Hostile(7, 3.0f, 100);
+    BotPolicy policy;
+    WorldTickSnapshotView fighting = PartyView({ 10 });
+    AddNearby(fighting, 0, mob);
+    fighting.bots[0].threat_target_guid = mob.guid;
+    fighting.bots[0].in_combat = 1;
+    CHECK(HasAction(policy.Decide(fighting, 0), 10, ActionType::kAttackTarget, mob.guid));
+
+    // The creature is gone and the core says it leashed: not pulled again for the avoid window.
+    WorldTickSnapshotView lost = PartyView({ 10 });
+    AddNearby(lost, 0, mob); // still in view, but the bot's threat dropped
+    lost.bots[0].in_combat = 0;
+    lost.bots[0].last_target_lost_reason = 2; // leashed
+    auto const after = policy.Decide(lost, 1000);
+    CHECK(!HasAction(after, 10, ActionType::kAttackTarget, mob.guid));
+    CHECK(!HasAction(after, 10, ActionType::kFollow, mob.guid));
+    // A kill is different: the bot goes straight on to the next creature.
+    BotPolicy killer;
+    WorldTickSnapshotView killed = PartyView({ 10 });
+    killed.bots[0].last_target_lost_reason = 1; // killed
+    AddNearby(killed, 0, Hostile(8, 5.0f, 100));
+    auto const next = killer.Decide(killed, 1000);
+    CHECK(HasAction(next, 10, ActionType::kFollow, MakeUnitRef(8, 1, 8)) ||
+          HasAction(next, 10, ActionType::kAttackTarget, MakeUnitRef(8, 1, 8)));
+}
+
+// The pet is in the snapshot now, so it can be sent at the target and called back.
+void PetIsSentAtTheTargetAndCalledBack()
+{
+    BotPolicy policy = ClassPolicy(3);
+    NearbyUnit const mob = Hostile(2, 20.0f, 100);
+    WorldTickSnapshotView fight = HunterView(1, 20, { mob }, MakeUnitRef(8, 1, 2));
+    fight.bots[0].pet_state = 1; // out
+    auto const first = policy.Decide(fight, 1000);
+    CHECK(HasAction(first, kBot, ActionType::kPetCommand, mob.guid)); // sent at this fight's target, once
+
+    WorldTickSnapshotView over = HunterView(2, 20, {}, 0);
+    over.bots[0].pet_state = 1;
+    auto const after = policy.Decide(over, 5000);
+    CHECK(HasAction(after, kBot, ActionType::kPetCommand)); // called back
+    CHECK(!HasAction(policy.Decide(over, 6000), kBot, ActionType::kPetCommand)); // once, not every tick
+}
+
+// A pet the snapshot reports as dead is revived directly: no Call Pet first, and no 30-second backoff.
+void DeadPetIsRevivedFromTheSnapshot()
+{
+    BotPolicy policy = ClassPolicy(3);
+    WorldTickSnapshotView view = HunterView(1, 20, {});
+    view.bots[0].pet_state = 2; // dead
+    auto const actions = policy.Decide(view, 1000);
+    CHECK(HasCast(actions, 982) && !HasCast(actions, 883)); // Revive Pet, not Call Pet
+}
+
+// A pet that is out and healthy is not touched: no probe, no Mend Pet.
+void HealthyPetOutIsLeftAlone()
+{
+    BotPolicy policy = ClassPolicy(3);
+    WorldTickSnapshotView view = HunterView(1, 20, {});
+    view.bots[0].pet_state = 1;
+    view.bots[0].pet_health = 500;
+    view.bots[0].pet_max_health = 500;
+    auto const actions = policy.Decide(view, 1000);
+    CHECK(!HasCast(actions, 136) && !HasCast(actions, 883) && !HasCast(actions, 982));
+}
+
+// A pet out and below the health threshold is healed, from fact rather than from a probe.
+void HurtPetIsMendedFromTheSnapshot()
+{
+    BotPolicy policy = ClassPolicy(3);
+    WorldTickSnapshotView view = HunterView(1, 20, {});
+    view.bots[0].pet_state = 1;
+    view.bots[0].pet_health = 100;
+    view.bots[0].pet_max_health = 1000;
+    auto const actions = policy.Decide(view, 1000);
+    CHECK(HasCast(actions, 136)); // Mend Pet
+}
+
+// A buff the bot already carries is read from the snapshot's auras, not from the module's own timer.
+void SelfBuffIsReadFromTheAura()
+{
+    std::istringstream file("class 5\nbuff 17 duration 1800 self\n");
+    std::vector<std::string> drop;
+    PolicyOptions options;
+    options.Rotations = std::make_shared<rotation::RotationData>(rotation::ParseRotationData(file, drop));
+    CHECK(drop.empty());
+    options.ClassId = 5;
+    options.WanderWhenIdle = false;
+
+    WorldTickSnapshotView view = View(1, 0, {});
+    view.bots[0].level = 30;
+    view.bots[0].aura_count = 1;
+    view.bots[0].auras[0].spell_id = 17;      // Power Word: Shield, running
+    view.bots[0].auras[0].remaining_ms = 15000;
+    auto const actions = BotPolicy(options).Decide(view, 1000);
+    CHECK(!HasCast(actions, 17)); // it is up: not cast
+
+    WorldTickSnapshotView gone = View(1, 0, {});
+    gone.bots[0].level = 30;
+    gone.bots[0].aura_count = 1;
+    gone.bots[0].auras[0].spell_id = 17;
+    gone.bots[0].auras[0].remaining_ms = 0; // just expired
+    CHECK(HasCast(BotPolicy(options).Decide(gone, 1000), 17)); // cast again
+
+    WorldTickSnapshotView none = View(1, 0, {});
+    none.bots[0].level = 30;
+    CHECK(HasCast(BotPolicy(options).Decide(none, 1000), 17)); // a core that reports no auras: the timer still works
+}
+
+// The vendor action carries the NPC's guid now, so buy and repair can be aimed at it.
+void VendorCarriesItsGuid()
+{
+    WorldTickSnapshotView view = PartyView({ 10 });
+    SetVendor(view, 100.0f);
+    view.bots[0].pos_x = 98.0f; // within reach of the vendor
+    view.bots[0].vendor_guid = MakeUnitRef(8, 1234, 77);
+    auto const actions = VendorPolicy().Decide(view, 0);
+    bool aimed = false;
+    for (BotAction const& action : actions)
+        if (action.type == ActionType::kVendor && action.bot_guid == 10)
+        {
+            aimed = true;
+            CHECK(action.target_guid == MakeUnitRef(8, 1234, 77));
+        }
+    CHECK(aimed);
+}
+
 int main()
 {
     AutoShotIsNotReissuedWhileActive();
@@ -2480,6 +2611,13 @@ int main()
     BotDoesNotMountForAShortWalk();
     BotDismountsWhenClose();
     BotDoesNotMountInCombat();
+    LeashedTargetIsNotPulledAgain();
+    PetIsSentAtTheTargetAndCalledBack();
+    DeadPetIsRevivedFromTheSnapshot();
+    HealthyPetOutIsLeftAlone();
+    HurtPetIsMendedFromTheSnapshot();
+    SelfBuffIsReadFromTheAura();
+    VendorCarriesItsGuid();
     LowHealthFleesFromAHostileItIsNotFighting();
     WeakestTargetIsPulledFirst();
     ClosestBreaksTheTieBetweenEqualTargets();

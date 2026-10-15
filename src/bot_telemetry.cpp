@@ -176,6 +176,20 @@ void BotTelemetry::ReadResult(Record& record, BotSnapshot const& bot)
         record.Refusals++;
 }
 
+// Layout 13: why the bot lost its target (0 none, 1 killed, 2 leashed, 3 despawned, 4 another player). A kill and a leash
+// both end a fight with the target out of view; only one of them means the creature is worth pulling again.
+char const* LostReasonName(std::uint32_t reason)
+{
+    switch (reason)
+    {
+        case 1: return "killed";
+        case 2: return "leashed";
+        case 3: return "despawned";
+        case 4: return "other_player";
+        default: return "none";
+    }
+}
+
 // Closes the fight in progress. targetPresent says whether the target was still in view and alive, which tells a
 // target that was killed or fled apart from one that dropped the threat.
 void BotTelemetry::EndFight(Record& record, BotSnapshot const& bot, std::uint64_t nowMs, char const* reason, bool targetPresent)
@@ -191,7 +205,8 @@ void BotTelemetry::EndFight(Record& record, BotSnapshot const& bot, std::uint64_
         record.TargetsGone++;
 
     std::ostringstream detail;
-    detail << "reason " << reason << " target " << record.Target << " duration_ms " << duration << " health_lost " << lost;
+    detail << "reason " << reason << " target " << record.Target << " duration_ms " << duration << " health_lost " << lost
+           << " lost " << LostReasonName(bot.last_target_lost_reason);
     record.Target = 0;
     record.Stuck = false;
     Write("fight_end", bot, record, nowMs, detail.str());

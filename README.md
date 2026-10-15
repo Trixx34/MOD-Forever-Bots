@@ -159,6 +159,7 @@ Without `FOREVER_MODULE_SDK_SOURCE`, CMake fetches `Trixx34/forever-module-sdk` 
 ## Known gaps
 
 - Quests and levelling are built from data files but not verified on the sim. Dungeons (M9) are a first slice: a data-driven route and a boss-clear rule on top of the scenario director; the sample Ragefire Chasm route is approximate, no run has been done on the sim, there is no crowd control, boss mechanics or walk to the portal (`doc/dungeons.md`).
+- Layout 13 (protocol 7) is what the module is built against: the bot's auras, the pet, `casting_target`, vendor/repair/auctioneer guids, money and free bag slots, and `last_target_lost_reason`. A core that still runs layout 12 refuses the module at attach, so the core has to move first. What the module does with them is in `src/bot_policy.cpp` (`AuraRunning`, `PetOf`, the `kPetCommand` actions, the avoid of a leashed creature); a target's DOTs are still a coarse `aura_mask`, whose bit assignment the core has not published, so a DOT on a target is still estimated.
 - The rotation spec uses the Forever abilities that could be verified in the client data (Holy Strike, Divine Storm, Chaos Bolt and others; `doc/rotations.md`). Abilities that need special handling or whose effect could not be verified (Demonic Brand, rogue finishers, forms, channels) are not used yet.
 - A hunter's pet is handled by spell casts only (Call Pet 883, Revive Pet 982, Mend Pet 136, its state guessed from accepted and
   refused casts): the snapshot has no pet and the core has no pet command action, so the pet's health and presence are not seen and
@@ -167,6 +168,7 @@ Without `FOREVER_MODULE_SDK_SOURCE`, CMake fetches `Trixx34/forever-module-sdk` 
   snapshot has no auras. A fleeing target is not detected.
 - Hub positions come from the sim's quest-giver clusters and may sit in rock; a bot that cannot reach one gives up after 3 minutes.
 - Classes 6 and 10 are not spawned.
+- **Not yet built on layout 13:** vendor buying (`client.BuyItem`, needs an item list to buy from and the Tier 1 action sent from the `Run()` thread), the auction house (`client.AuctionHouse` plus `PlayerScript.OnAuctionResult`), and crafting and gathering (`client.Craft`, `client.Gather`, which need recipe and node data). The SDK has all of it; the module does not use it yet.
 
 ## Quests (M5)
 
