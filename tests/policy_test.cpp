@@ -2023,6 +2023,121 @@ void HunterMendsItsPetInALongFight()
     CHECK(!HasCast(dry.Decide(low, 26000), 136));
 }
 
+// ---- new behaviour: kiting, fleeing, mounting ----
+
+// A ranged bot with a melee target inside kiting distance backs off instead of attacking.
+void RangedBotKitesACloseTarget()
+{
+    BotPolicy policy = ClassPolicy(8);
+    WorldTickSnapshotView view = View(1, MakeUnitRef(8, 1, 2), { Hostile(2, 5.0f, 100) });
+    view.bots[0].in_combat = 1;
+    auto actions = policy.Decide(view, 1000);
+    bool kited = false;
+    for (BotAction const& action : actions)
+        kited = kited || (action.type == ActionType::kMoveTo && action.target_guid == 0);
+    CHECK(kited);
+    for (BotAction const& action : actions)
+        CHECK(action.type != ActionType::kAttackTarget);
+}
+
+// A ranged bot at or beyond kiting distance attacks normally.
+void RangedBotAttacksWhenBackAtRange()
+{
+    BotPolicy policy = ClassPolicy(8);
+    WorldTickSnapshotView view = View(1, MakeUnitRef(8, 1, 2), { Hostile(2, 12.0f, 100) });
+    view.bots[0].in_combat = 1;
+    auto actions = policy.Decide(view, 1000);
+    bool attacked = false;
+    for (BotAction const& action : actions)
+        attacked = attacked || (action.type == ActionType::kAttackTarget && action.target_guid == MakeUnitRef(8, 1, 2));
+    CHECK(attacked);
+}
+
+// Below 30% health, in combat, threat close: flee away from the threat target.
+void HurtBotFleesFromThreat()
+{
+    WorldTickSnapshotView view = Hurt(250, { Unit(8, 2, 10.0f, true) }, MakeUnitRef(8, 1, 9));
+    view.bots[0].in_combat = 1;
+    BotPolicy policy;
+    auto actions = policy.Decide(view, 1000);
+    bool fled = false;
+    for (BotAction const& action : actions)
+        fled = fled || (action.type == ActionType::kMoveTo && action.target_guid == 0);
+    CHECK(fled);
+}
+
+// Below 30% health, but the threat is farther than kFleeYards: stop, do not flee.
+void HurtBotDoesNotFleeWhenThreatIsFar()
+{
+    WorldTickSnapshotView view = Hurt(250, { Unit(8, 2, 20.0f, true) }, MakeUnitRef(8, 1, 9));
+    view.bots[0].in_combat = 1;
+    BotPolicy policy;
+    auto actions = policy.Decide(view, 1000);
+    for (BotAction const& action : actions)
+        CHECK(action.type != ActionType::kMoveTo);
+}
+
+// Vendor 200 yards away: above the mount threshold, the bot mounts before walking.
+void BotMountsForALongWalk()
+{
+    WorldTickSnapshotView view = PartyView({ 10 });
+    SetVendor(view, 200.0f);
+    BotPolicy policy = VendorPolicy();
+    auto actions = policy.Decide(view, 0);
+    bool mounted = false;
+    for (BotAction const& action : actions)
+        if (action.type == ActionType::kMount && action.spell_id == 1)
+            mounted = true;
+    CHECK(mounted);
+}
+
+// Vendor 50 yards away: below the mount threshold, the bot walks without mounting.
+void BotDoesNotMountForAShortWalk()
+{
+    WorldTickSnapshotView view = PartyView({ 10 });
+    SetVendor(view, 50.0f);
+    BotPolicy policy = VendorPolicy();
+    auto actions = policy.Decide(view, 0);
+    for (BotAction const& action : actions)
+        CHECK(action.type != ActionType::kMount);
+    bool walks = false;
+    for (BotAction const& action : actions)
+        walks = walks || (action.type == ActionType::kMoveTo && action.dest_x == 50.0f);
+    CHECK(walks);
+}
+
+// Already mounted with the vendor close: dismount.
+void BotDismountsWhenClose()
+{
+    WorldTickSnapshotView view = PartyView({ 10 });
+    SetVendor(view, 10.0f);
+    view.bots[0].last_action_sequence = 1;
+    view.bots[0].last_action_type = uint8_t(ActionType::kMount);
+    view.bots[0].last_action_spell = 1;
+    view.bots[0].last_action_status = BotActionStatus::kApplied;
+    BotPolicy policy = VendorPolicy();
+    auto actions = policy.Decide(view, 1000);
+    bool dismounted = false;
+    for (BotAction const& action : actions)
+        if (action.type == ActionType::kMount && action.spell_id == 0)
+            dismounted = true;
+    CHECK(dismounted);
+}
+
+// In combat with a target: do not mount even if a vendor is far away.
+void BotDoesNotMountInCombat()
+{
+    WorldTickSnapshotView view = PartyView({ 10 });
+    SetVendor(view, 200.0f);
+    view.bots[0].in_combat = 1;
+    view.bots[0].threat_target_guid = MakeUnitRef(8, 1, 2);
+    AddNearby(view, 0, Hostile(2, 5.0f, 100));
+    BotPolicy policy = VendorPolicy();
+    auto actions = policy.Decide(view, 0);
+    for (BotAction const& action : actions)
+        CHECK(action.type != ActionType::kMount);
+}
+
 int main()
 {
     AutoShotIsNotReissuedWhileActive();
@@ -2148,6 +2263,14 @@ int main()
     IdleCasterDrinksWhenLowOnMana();
     ManaRestIsCappedAndNotRepeatedAtOnce();
     FighterWithoutManaDoesNotDrink();
+    RangedBotKitesACloseTarget();
+    RangedBotAttacksWhenBackAtRange();
+    HurtBotFleesFromThreat();
+    HurtBotDoesNotFleeWhenThreatIsFar();
+    BotMountsForALongWalk();
+    BotDoesNotMountForAShortWalk();
+    BotDismountsWhenClose();
+    BotDoesNotMountInCombat();
 
     if (failures == 0)
         std::printf("policy_test: all checks passed\n");

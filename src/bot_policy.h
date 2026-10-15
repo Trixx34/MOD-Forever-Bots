@@ -178,6 +178,8 @@ private:
         std::uint64_t PetMendAtMs = 0;                   // no Mend Pet in a fight before this
         bool Sitting = false;                            // sat down to rest; stands before it moves or fights
         std::uint64_t RestRetryAtMs = 0;                 // a refused sit is not tried again before this
+        bool Mounted = false;                            // the bot is mounted: travel is faster, combat dismounts it
+        std::uint64_t MountRetryMs = 0;                  // no mount or dismount request before this
         std::uint64_t NextServiceMs = 0;                 // next vendor visit (sell grey, repair, equip)
         std::uint64_t NextTrainMs = 0;                   // next trainer check
         std::uint32_t ComboPoints = 0;                   // combo points on ComboTarget, from the bot's own Sinister Strikes

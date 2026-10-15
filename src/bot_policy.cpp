@@ -18,6 +18,8 @@ using forever_module::WorldTickSnapshotView;
 namespace {
 
 constexpr float kDisengagePct = 30.0f;       // below this health the bot stops fighting
+constexpr float kRangedKiteYards = 12.0f;    // a ranged bot keeps a melee target this far away
+constexpr float kFleeYards = 15.0f;          // below 30% health: flees while a threat is this close
 constexpr std::uint64_t kGlobalCooldownMs = 1500;
 constexpr std::uint64_t kRetryMs = 1000;     // out of range, invalid target, refused, not enough power
 constexpr std::uint64_t kCooldownRetryMs = 2000;
@@ -121,6 +123,8 @@ constexpr std::uint64_t kGotoTimeoutMs = 90000;     // a goto order is dropped a
 constexpr std::uint64_t kPullOrderMs = 30000;      // a pull order is dropped after this long, or when the target is gone
 constexpr std::uint64_t kCloserAfterLosMs = 5000;   // after a line-of-sight refusal the bot closes to melee range for this long
 constexpr std::uint64_t kTravelTimeoutMs = 180000; // a walk to the vendor longer than this is dropped for now
+constexpr float kMountMinDistanceYards = 100.0f;   // a walk this long: mount up before it
+constexpr float kMountDismountDistanceYards = 15.0f; // arrived or close: dismount
 // A quest walk that keeps the bot within kQuestWalkStuckYards for kQuestWalkStuckMs has no route to its giver (seen on the sim: 11
 // level 1 bots idle for hours, 110 to 8000 yards from the giver). Such a bot is sent to the giver once; the core refuses the teleport
 // unless Bot.Actions.Teleport is on, and a refused one is tried again after another kQuestWalkStuckMs.
@@ -481,6 +485,19 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
     if (bot.last_action_type == uint8_t(ActionType::kGroup) && bot.last_action_status == BotActionStatus::kRefused)
     {
         state.PartyRetryAtMs = nowMs + kPartyRetryMs;
+        return;
+    }
+
+    // Mount / dismount: record whether the request succeeded so the policy does not keep repeating it.
+    if (bot.last_action_type == uint8_t(ActionType::kMount))
+    {
+        if (bot.last_action_status == BotActionStatus::kApplied)
+            state.Mounted = (bot.last_action_spell == 1);
+        else
+        {
+            state.Mounted = false;
+            state.MountRetryMs = nowMs + 15000;
+        }
         return;
     }
 
@@ -1533,7 +1550,26 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         Decision wanted;
         if (lowHealth)
         {
-            wanted = followRef ? Decision{ ActionType::kFollow, followRef } : Decision{ ActionType::kStop, 0 };
+            // Below kDisengagePct health: get clear of the threat target before doing anything else.
+            if (targetUnit && bot.in_combat != 0 && distance < kFleeYards)
+            {
+                float const dx = bot.pos_x - targetUnit->pos_x;
+                float const dy = bot.pos_y - targetUnit->pos_y;
+                float const dist = std::sqrt(dx * dx + dy * dy);
+                if (dist > 0.0f)
+                {
+                    Point flee{ targetUnit->pos_x + dx / dist * kFleeYards,
+                                targetUnit->pos_y + dy / dist * kFleeYards,
+                                bot.pos_z };
+                    wanted = Decision{ ActionType::kMoveTo, 0, flee };
+                }
+                else
+                    wanted = Decision{ ActionType::kStop, 0 };
+            }
+            else
+            {
+                wanted = followRef ? Decision{ ActionType::kFollow, followRef } : Decision{ ActionType::kStop, 0 };
+            }
         }
         else if (targetRef != 0)
         {
@@ -1561,7 +1597,25 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     actions.push_back(stop);
                 }
                 state.Approaching = false;
-                wanted = Decision{ ActionType::kAttackTarget, targetRef };
+                // Kite: a ranged bot backs off when a melee target gets inside kiting distance, then resumes attacking
+                // once it is back at range.
+                if (approach > kMeleeApproachYards + 0.5f && targetUnit && distance < kRangedKiteYards)
+                {
+                    float const dx = bot.pos_x - targetUnit->pos_x;
+                    float const dy = bot.pos_y - targetUnit->pos_y;
+                    float const dist = std::sqrt(dx * dx + dy * dy);
+                    if (dist > 0.0f)
+                    {
+                        Point kite{ targetUnit->pos_x + dx / dist * kRangedKiteYards,
+                                    targetUnit->pos_y + dy / dist * kRangedKiteYards,
+                                    bot.pos_z };
+                        wanted = Decision{ ActionType::kMoveTo, 0, kite };
+                    }
+                    else
+                        wanted = Decision{ ActionType::kAttackTarget, targetRef };
+                }
+                else
+                    wanted = Decision{ ActionType::kAttackTarget, targetRef };
             }
             else
             {
@@ -2065,6 +2119,39 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
 
         if (IsResurrectSpell(bot.casting_spell) && bot.cast_remaining_ms != 0 && state.Last)
             wanted = *state.Last; // a resurrect cast is not broken by a new movement order
+
+        // Mount for long travel, dismount when the walk is short, combat starts, or the bot arrives.
+        if (bot.in_combat == 0 && bot.life_state == 0 && bot.casting_spell == 0 && nowMs >= state.MountRetryMs)
+        {
+            if (wanted.Type == ActionType::kMoveTo && !state.Mounted)
+            {
+                float const destDist = DistanceTo(bot, wanted.Dest);
+                if (destDist > kMountMinDistanceYards)
+                {
+                    BotAction mount;
+                    mount.bot_guid = bot.guid;
+                    mount.type = ActionType::kMount;
+                    mount.spell_id = 1; // the core interprets 1 as mount up
+                    actions.push_back(mount);
+                    state.Mounted = true;
+                    state.MountRetryMs = nowMs + 5000;
+                    wanted.Type = ActionType::kStop; // stop moving while the mount cast completes
+                    wanted.Target = 0;
+                }
+            }
+            else if (state.Mounted &&
+                     (wanted.Type != ActionType::kMoveTo ||
+                      DistanceTo(bot, wanted.Dest) <= kMountDismountDistanceYards))
+            {
+                BotAction dismount;
+                dismount.bot_guid = bot.guid;
+                dismount.type = ActionType::kMount;
+                dismount.spell_id = 0; // 0 = dismount
+                actions.push_back(dismount);
+                state.Mounted = false;
+                state.MountRetryMs = nowMs + 5000;
+            }
+        }
 
         if (!state.Last || state.Last->Type != wanted.Type || state.Last->Target != wanted.Target ||
             state.Last->Dest.X != wanted.Dest.X || state.Last->Dest.Y != wanted.Dest.Y || state.Last->Dest.Z != wanted.Dest.Z)
