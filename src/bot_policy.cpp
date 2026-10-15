@@ -121,6 +121,11 @@ constexpr std::uint64_t kGotoTimeoutMs = 90000;     // a goto order is dropped a
 constexpr std::uint64_t kPullOrderMs = 30000;      // a pull order is dropped after this long, or when the target is gone
 constexpr std::uint64_t kCloserAfterLosMs = 5000;   // after a line-of-sight refusal the bot closes to melee range for this long
 constexpr std::uint64_t kTravelTimeoutMs = 180000; // a walk to the vendor longer than this is dropped for now
+// A quest walk that keeps the bot within kQuestWalkStuckYards for kQuestWalkStuckMs has no route to its giver (seen on the sim: 11
+// level 1 bots idle for hours, 110 to 8000 yards from the giver). Such a bot is sent to the giver once; the core refuses the teleport
+// unless Bot.Actions.Teleport is on, and a refused one is tried again after another kQuestWalkStuckMs.
+constexpr std::uint64_t kQuestWalkStuckMs = 120000;
+constexpr float kQuestWalkStuckYards = 5.0f;
 // Death and recovery. Spell ids and levels checked against the fork's SpellLevels.db2: Resurrection 2006 level 10,
 // Redemption 7328 level 12, Ancestral Spirit 2008 level 12, Rebirth 20484 level 20.
 constexpr std::uint32_t kResurrection = 2006;
@@ -1601,12 +1606,38 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 }
             }
 
+            if (questStep.Kind != QuestStepKind::WalkTo)
+                state.WalkStillSinceMs = 0; // the stall timer only runs during a quest walk
+
             switch (questStep.Kind)
             {
                 case QuestStepKind::WalkTo:
+                {
+                    // Stuck on a quest walk: the bot is sent to the giver in one teleport (not in combat, not in a party).
+                    Point const here{ bot.pos_x, bot.pos_y, bot.pos_z };
+                    if (state.WalkStillSinceMs == 0 || bot.in_combat != 0 || DistanceTo(bot, state.WalkAnchor) > kQuestWalkStuckYards)
+                    {
+                        state.WalkAnchor = here;
+                        state.WalkStillSinceMs = nowMs;
+                    }
+                    bool const stuck = nowMs - state.WalkStillSinceMs >= kQuestWalkStuckMs;
+                    if (stuck && bot.in_combat == 0 && !partyMember)
+                    {
+                        wanted = Decision{ ActionType::kTeleport, 0, Point{ questStep.Dest.X, questStep.Dest.Y, questStep.Dest.Z }, bot.map_id };
+                        state.WalkStillSinceMs = nowMs;
+                        _options.OnEvent("quest_walk_forced: bot=" + std::to_string(bot.guid) + " map=" + std::to_string(bot.map_id) +
+                                         " quest=" + std::to_string(questStep.Quest) + " from=" + std::to_string(int(here.X)) + "," +
+                                         std::to_string(int(here.Y)) + "," + std::to_string(int(here.Z)) + " to=" +
+                                         std::to_string(int(questStep.Dest.X)) + "," + std::to_string(int(questStep.Dest.Y)) + "," +
+                                         std::to_string(int(questStep.Dest.Z)));
+                    }
+                    else
+                        wanted = Decision{ ActionType::kMoveTo, 0, Point{ questStep.Dest.X, questStep.Dest.Y, questStep.Dest.Z } };
+                    break;
+                }
                 case QuestStepKind::Hunt:
                     // Hunt with the target area equal to the bot's own place (no areas known): stand and wait for the creatures.
-                    if (questStep.Kind == QuestStepKind::WalkTo || questStep.Dest.X != bot.pos_x || questStep.Dest.Y != bot.pos_y)
+                    if (questStep.Dest.X != bot.pos_x || questStep.Dest.Y != bot.pos_y)
                         wanted = Decision{ ActionType::kMoveTo, 0, Point{ questStep.Dest.X, questStep.Dest.Y, questStep.Dest.Z } };
                     else
                         wanted = Decision{ ActionType::kStop, 0 };
@@ -2027,6 +2058,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             action.bot_guid = bot.guid;
             action.type = wanted.Type;
             action.target_guid = wanted.Target;
+            action.spell_id = wanted.Map;
             action.dest_x = wanted.Dest.X;
             action.dest_y = wanted.Dest.Y;
             action.dest_z = wanted.Dest.Z;

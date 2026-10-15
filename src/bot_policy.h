@@ -144,6 +144,7 @@ private:
         forever_module::ActionType Type = forever_module::ActionType::kStop;
         std::uint64_t Target = 0;
         Point Dest;                                      // kMoveTo destination
+        std::uint32_t Map = 0;                           // kTeleport map (spell_id of the action)
     };
 
     // A damage-over-time effect the policy believes is on a target, from an accepted cast.
@@ -217,6 +218,8 @@ private:
         Point GrindTarget;                               // the grind spot being walked to
         std::vector<std::size_t> GrindVisited;           // the last spots visited (indexes), so the bot moves on instead of going back and forth
         std::size_t NextHub = 0;                         // index of the hub to walk to next, on the bot's map
+        Point WalkAnchor;                                // where the bot stood when its quest walk was last seen moving
+        std::uint64_t WalkStillSinceMs = 0;              // when it was at WalkAnchor; 0 when no quest walk is watched
         bool Traveling = false;                          // walking to the vendor for a visit
         std::uint64_t TravelStartMs = 0;                 // when this walk began; it is dropped after kTravelTimeoutMs
         std::unordered_set<std::uint32_t> CastTimeSpells; // spells the core refused because the bot was moving: they need it standing
