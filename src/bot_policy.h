@@ -197,6 +197,7 @@ private:
         float DiagX = 0.0f, DiagY = 0.0f;                // where the bot was at the last stuck check
         std::uint64_t DiagAtMs = 0;                      // when the stuck check last ran
         std::uint64_t QuestDiagAtMs = 0;                 // when the quest line was last written (quest_state event)
+        std::uint32_t NoRouteSequence = 0;               // the last kNoRoute result read (last_action_sequence)
         std::uint64_t GrindRetryAtMs = 0;                // no grind spot on this map for this level: explore on foot until this time, then look again
         std::uint32_t HubFailures = 0;                   // hub walks in a row that ended without arriving
         std::uint32_t ExploreStep = 0;                   // random walks made, for the direction of the next

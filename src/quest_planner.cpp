@@ -112,6 +112,7 @@ QuestStep QuestPlanner::Next(BotSnapshot const& bot, QuestMemory& memory, std::u
     QuestStep none;
     if (!Enabled())
         return none;
+    memory.WalkingToStart = false;
 
     // A hand-in that was sent and whose quest is out of the log is done.
     if (memory.PendingHandIn != 0 && !InLog(bot, memory.PendingHandIn))
@@ -214,12 +215,18 @@ QuestStep QuestPlanner::Next(BotSnapshot const& bot, QuestMemory& memory, std::u
         if (!start.HasAnchor || start.Map != bot.map_id || (memory.StartIndex >= 0 && i == std::size_t(memory.StartIndex)))
             continue;
         float const dist = Distance2d(bot, start.Anchor);
-        // A start made for the whole world (its quests carry levels) may be walked to from anywhere on the map; a starter-zone start only from nearby.
+        // A start made for the whole world (its quests carry levels) may be walked to from across its map, up to kWorldStartRadiusYards: a
+        // farther giver is on another continent with no route (seen on the sim). A starter-zone start only from nearby.
         bool world = false;
         for (QuestDef const& quest : start.Quests)
             world = world || quest.QuestLevel != 0;
-        if (world || dist <= kStartRadiusYards)
-            byDistance.emplace_back(dist, i);
+        if (!(world ? dist <= kWorldStartRadiusYards : dist <= kStartRadiusYards))
+            continue;
+        // A start whose giver the core found no route to is left alone for a while.
+        auto const blocked = memory.NoRouteUntilMs.find(i);
+        if (blocked != memory.NoRouteUntilMs.end() && blocked->second > nowMs)
+            continue;
+        byDistance.emplace_back(dist, i);
     }
     std::sort(byDistance.begin(), byDistance.end());
     for (auto const& entry : byDistance)
@@ -237,7 +244,9 @@ QuestStep QuestPlanner::Next(BotSnapshot const& bot, QuestMemory& memory, std::u
             if (QuestDef const* quest = pick(start, prevDone))
             {
                 memory.StartIndex = int(index);
-                return WalkOrAct(bot, memory, quest->Giver, QuestStepKind::Accept, quest->Id, nowMs);
+                QuestStep const step = WalkOrAct(bot, memory, quest->Giver, QuestStepKind::Accept, quest->Id, nowMs);
+                memory.WalkingToStart = step.Kind == QuestStepKind::WalkTo;
+                return step;
             }
         }
     return none;
@@ -254,6 +263,15 @@ void QuestPlanner::NoteSent(QuestMemory& memory, std::uint32_t operation, std::u
         memory.BlockedUntilMs[quest] = nowMs + kBlockAfterAbandonMs;
         memory.Progress.erase(quest);
     }
+}
+
+void QuestPlanner::NoteNoRoute(QuestMemory& memory, std::uint64_t nowMs) const
+{
+    if (!memory.WalkingToStart || memory.StartIndex < 0)
+        return;
+    memory.NoRouteUntilMs[std::size_t(memory.StartIndex)] = nowMs + kNoRouteBlockMs;
+    memory.StartIndex = -2; // looked up again: the nearest start that is not blocked
+    memory.WalkingToStart = false;
 }
 
 bool QuestPlanner::NoteRefused(QuestMemory& memory, std::uint64_t nowMs) const

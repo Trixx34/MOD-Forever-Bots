@@ -541,8 +541,47 @@ void HandInRefusalsBlockLessThanOtherRefusals()
 
 } // namespace
 
+// ---- no route and far world starts ----
+
+void WorldStartFarAwayIsNotWalkedTo()
+{
+    // A world start (its quests carry levels) is walked to only up to kWorldStartRadiusYards; this one is about 15000 yards away.
+    std::istringstream in("start Far\nanchor 0 5000 5000 0\nquest 500 giver 5000 5000 0 ender 5000 5000 0\nreq 500 level 5\n");
+    std::vector<std::string> warnings;
+    auto data = std::make_shared<QuestData>(ParseQuestData(in, warnings));
+    QuestPlanner planner(data);
+    QuestMemory memory;
+    CHECK(planner.Next(WorldBot(5), memory, 1000).Kind == QuestStepKind::None);
+}
+
+void NoRouteToAStartGiverBlocksThatStart()
+{
+    QuestPlanner planner(World());
+    QuestMemory memory;
+    BotSnapshot const bot = WorldBot(5, -9300.0f, -100.0f); // 300 yards from the giver: a walk, not an accept
+    QuestStep step = planner.Next(bot, memory, 1000);
+    CHECK(step.Kind == QuestStepKind::WalkTo && step.Quest == 100);
+    planner.NoteNoRoute(memory, 2000);
+    CHECK(planner.Next(bot, memory, 3000).Kind == QuestStepKind::None); // the only start in reach is blocked
+    step = planner.Next(bot, memory, 2000 + kNoRouteBlockMs + 1);
+    CHECK(step.Kind == QuestStepKind::WalkTo && step.Quest == 100); // unblocked when the block runs out
+}
+
+void NoRouteAtTheGiverIsIgnored()
+{
+    QuestPlanner planner(Data());
+    QuestMemory memory;
+    CHECK(planner.Next(Bot(-8900.0f, -160.0f), memory, 1000).Kind == QuestStepKind::WalkTo);
+    CHECK(planner.Next(Bot(-8933.0f, -136.0f), memory, 2000).Kind == QuestStepKind::Accept); // not a walk now
+    planner.NoteNoRoute(memory, 2500);
+    CHECK(memory.StartIndex == 0); // the start is kept: the planner was not walking to it
+}
+
 int main()
 {
+    WorldStartFarAwayIsNotWalkedTo();
+    NoRouteToAStartGiverBlocksThatStart();
+    NoRouteAtTheGiverIsIgnored();
     RefusedHandInSendsTheBotToAVendor();
     HandInRefusalsBlockLessThanOtherRefusals();
     ParserReadsTheFormat();
