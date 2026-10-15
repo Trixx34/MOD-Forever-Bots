@@ -244,7 +244,8 @@ QuestStep QuestPlanner::Next(BotSnapshot const& bot, QuestMemory& memory, std::u
             if (QuestDef const* quest = pick(start, prevDone))
             {
                 memory.StartIndex = int(index);
-                QuestStep const step = WalkOrAct(bot, memory, quest->Giver, QuestStepKind::Accept, quest->Id, nowMs);
+                QuestStep step = WalkOrAct(bot, memory, quest->Giver, QuestStepKind::Accept, quest->Id, nowMs);
+                step.StartGiver = true;
                 memory.WalkingToStart = step.Kind == QuestStepKind::WalkTo;
                 return step;
             }
