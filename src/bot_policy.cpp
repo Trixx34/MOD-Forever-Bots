@@ -1486,6 +1486,10 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             it = nowMs >= it->second ? state.LootedUntilMs.erase(it) : std::next(it);
         float const distance = targetUnit ? rotation::DistanceYards(bot, *targetUnit) : bot.target_distance;
 
+        // A fight ends a quest walk's stall timer: the quest block below only runs out of combat, so the timer is reset here.
+        if (bot.in_combat != 0)
+            state.WalkStillSinceMs = 0;
+
         // Fight watchdog: a target whose health, and the bot's own, have not gone down for kFightStallMs is unreachable, evading or out of line of sight
         // (the 8-hour soak had a fight of two hours). The target is avoided like one that refused an attack, and the bot picks another.
         if (hasTarget && targetUnit && targetUnit->is_hostile && bot.in_combat != 0)
@@ -1613,15 +1617,16 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             {
                 case QuestStepKind::WalkTo:
                 {
-                    // Stuck on a quest walk: the bot is sent to the giver in one teleport (not in combat, not in a party).
+                    // Stuck on the walk to a quest start's giver: the bot is sent there in one teleport. The planner only offers starts on
+                    // the bot's own map, so the giver's position is on that map too.
                     Point const here{ bot.pos_x, bot.pos_y, bot.pos_z };
-                    if (state.WalkStillSinceMs == 0 || bot.in_combat != 0 || DistanceTo(bot, state.WalkAnchor) > kQuestWalkStuckYards)
+                    if (state.WalkStillSinceMs == 0 || DistanceTo(bot, state.WalkAnchor) > kQuestWalkStuckYards)
                     {
                         state.WalkAnchor = here;
                         state.WalkStillSinceMs = nowMs;
                     }
                     bool const stuck = nowMs - state.WalkStillSinceMs >= kQuestWalkStuckMs;
-                    if (stuck && bot.in_combat == 0 && !partyMember)
+                    if (stuck && questStep.StartGiver)
                     {
                         wanted = Decision{ ActionType::kTeleport, 0, Point{ questStep.Dest.X, questStep.Dest.Y, questStep.Dest.Z }, bot.map_id };
                         state.WalkStillSinceMs = nowMs;
@@ -2058,7 +2063,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             action.bot_guid = bot.guid;
             action.type = wanted.Type;
             action.target_guid = wanted.Target;
-            action.spell_id = wanted.Map;
+            action.spell_id = wanted.Type == ActionType::kTeleport ? wanted.Map : 0;
             action.dest_x = wanted.Dest.X;
             action.dest_y = wanted.Dest.Y;
             action.dest_z = wanted.Dest.Z;

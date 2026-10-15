@@ -41,6 +41,7 @@ struct QuestStep
     std::uint32_t Quest = 0;
     QuestPoint Dest;
     std::vector<std::uint32_t> Entries;
+    bool StartGiver = false; // the walk is to the giver of a quest start on the bot's map (not a turn-in or a hunt)
 };
 
 // What the planner remembers about one bot.
