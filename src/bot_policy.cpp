@@ -1324,8 +1324,23 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         // leaves quests alone until it is done.
         QuestStep questStep;
         bool routeBusy = false;
-        if (_quests.Enabled() && !partyMember && !lowHealth && bot.in_combat == 0 && !state.ChatStay && state.ChatFollow == 0)
+        bool const questsAllowed = _quests.Enabled() && !partyMember && !lowHealth && bot.in_combat == 0 && !state.ChatStay && state.ChatFollow == 0;
+        if (questsAllowed)
             questStep = _quests.Next(bot, state.Quest, nowMs, QuestBotInfo{ classId, _options.RaceOf ? _options.RaceOf(bot.guid) : 0u });
+        // Every five minutes, what the quest planner is doing for this bot and what keeps it from doing more (the events are the only record,
+        // since a planner that takes no quest logs nothing otherwise).
+        if (_options.OnEvent && nowMs - state.QuestDiagAtMs >= 300000)
+        {
+            state.QuestDiagAtMs = nowMs;
+            static constexpr char const* kinds[] = { "none", "walk_to", "accept", "hand_in", "hunt", "abandon", "wait" };
+            _options.OnEvent("quest_state: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id) +
+                             " allowed=" + std::to_string(questsAllowed) + " enabled=" + std::to_string(_quests.Enabled()) +
+                             " party=" + std::to_string(partyMember) + " low_health=" + std::to_string(lowHealth) + " in_combat=" + std::to_string(bot.in_combat) +
+                             " chat_stay=" + std::to_string(state.ChatStay) + " chat_follow=" + std::to_string(state.ChatFollow != 0) +
+                             " step=" + kinds[int(questStep.Kind)] + " quest=" + std::to_string(questStep.Quest) +
+                             " log=" + std::to_string(bot.quest_count) + " start_index=" + std::to_string(state.Quest.StartIndex) +
+                             " memory_done=" + std::to_string(state.Quest.Done.size()) + " memory_log=" + std::to_string(state.Quest.Progress.size()));
+        }
         std::vector<std::uint32_t> const noEntries;
         std::vector<std::uint32_t> const& huntEntries = questStep.Kind == QuestStepKind::Hunt ? questStep.Entries : noEntries;
 
