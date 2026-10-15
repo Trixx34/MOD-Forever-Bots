@@ -100,6 +100,10 @@ float ApproachYards(std::uint32_t classId);
 // Distance in yards on the ground between the bot and a unit in the snapshot.
 float DistanceYards(forever_module::BotSnapshot const& bot, forever_module::NearbyUnit const& unit);
 
+// The same in three dimensions: what the core's spell range and loot distance checks measure (up to the units' reaches). A
+// target on a ledge above the bot is farther than its ground distance says.
+float DistanceYards3d(forever_module::BotSnapshot const& bot, forever_module::NearbyUnit const& unit);
+
 // Facts for the rules: health and power percentages, the target's state and level, hostiles close to the bot.
 // target may be null (the target is not in the snapshot's view).
 rotation::Facts FactsFor(forever_module::BotSnapshot const& bot, std::span<forever_module::NearbyUnit const> nearby,

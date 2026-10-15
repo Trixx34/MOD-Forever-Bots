@@ -76,6 +76,8 @@ struct PolicyOptions
     // Receives one line per notable decision (a heal cast, a pull held back or released), for the run logs. Unset = silent.
     std::function<void(std::string const&)> OnEvent;
     std::uint32_t AutoGearEveryLevels = 5;
+    // An idle bot walks to a grind spot, a hub, or takes an exploring walk. false keeps it where it is (for tests that need a bot to stand still).
+    bool WanderWhenIdle = true;
     // Grind spots (leveling): the places an idle bot walks to for its level, instead of its map's hubs. SideOf gives a bot's faction (1 Alliance,
     // 2 Horde, 0 unknown).
     std::shared_ptr<GrindData const> Grind;
@@ -163,6 +165,16 @@ private:
         std::map<std::pair<std::uint32_t, std::uint64_t>, std::uint64_t> BuffUntilMs; // (spell, recipient reference; 0 = the bot itself) -> when the buff runs out
         std::unordered_map<std::uint32_t, Dot> Dots;     // spell -> effect on a target, while it lasts
         std::optional<std::uint64_t> LastTestCastTick;
+        std::uint64_t AutoShotTarget = 0;                // the unit Auto Shot was accepted on and is believed to be shooting (0 = not active)
+        // Hunter pet. The snapshot has no pet, so this is only what the accepted and refused pet casts imply.
+        bool PetMissing = true;                          // the pet is not believed to be out: Call Pet (or Revive Pet when PetDead) is due
+        bool PetDead = false;                            // Call Pet was refused: the pet is believed dead, Revive Pet is due
+        bool PetProbe = false;                           // a fight ended: Mend Pet (from level 12) or a Call Pet checks the pet is still there
+        bool PetFought = false;                          // the bot fought since the last pet check
+        std::uint32_t PetFailures = 0;                   // pet casts refused in a row, for the backoff
+        std::uint64_t PetRetryAtMs = 0;                  // no pet cast out of combat before this
+        std::uint64_t PetProbeAtMs = 0;                  // below level 12 (no Mend Pet) a Call Pet probe is not sent before this
+        std::uint64_t PetMendAtMs = 0;                   // no Mend Pet in a fight before this
         bool Sitting = false;                            // sat down to rest; stands before it moves or fights
         std::uint64_t RestRetryAtMs = 0;                 // a refused sit is not tried again before this
         std::uint64_t NextServiceMs = 0;                 // next vendor visit (sell grey, repair, equip)
@@ -178,6 +190,13 @@ private:
         std::uint32_t StallBotHealth = 0;
         std::uint64_t StallLastMs = 0;                   // when the watchdog last looked (a long gap starts it again)
         std::uint64_t StallSinceMs = 0;                  // since when neither the target's nor the bot's health has gone down
+        std::unordered_map<std::uint64_t, std::uint32_t> StallCount;   // unit -> how many fights against it stalled (the avoid time grows)
+        std::uint64_t ManaRestSinceMs = 0;               // when the current rest for mana began (0 = not resting for mana)
+        std::uint64_t ManaRestBlockedUntilMs = 0;        // a rest that ran its full time without refilling the mana is not started again before this
+        bool ServiceUrgent = false;                      // a quest hand-in was refused (bags full): go to a vendor now, even with quest work to do
+        float DiagX = 0.0f, DiagY = 0.0f;                // where the bot was at the last stuck check
+        std::uint64_t DiagAtMs = 0;                      // when the stuck check last ran
+        std::uint64_t GrindRetryAtMs = 0;                // no grind spot on this map for this level: explore on foot until this time, then look again
         std::uint32_t HubFailures = 0;                   // hub walks in a row that ended without arriving
         std::uint32_t ExploreStep = 0;                   // random walks made, for the direction of the next
         Point ExploreTarget;
@@ -223,6 +242,8 @@ private:
         std::uint32_t SeenPowerPct = 100;
         std::uint8_t SeenLife = 0;
         bool SeenInCombat = false;
+        std::uint64_t RangeCloserUntilMs = 0;            // standing closer to the target after an out-of-range refusal, until this time
+        std::uint32_t LosRefusals = 0;                   // line-of-sight refusals in a row
         std::uint64_t CloserUntilMs = 0;                 // closing to melee range after a line-of-sight refusal, until this time
         std::uint64_t HoldSinceMs = 0;                   // the party leader waits for the party to be ready since this time (0 = not waiting)
         std::uint32_t GearedAtLevel = 0;                 // the level at the last auto gear (0 = not yet)
@@ -262,6 +283,14 @@ private:
     void ReadResult(BotState& state, forever_module::BotSnapshot const& bot, std::uint64_t nowMs);
 
     std::unordered_map<std::uint64_t, BotState> _bots; // bot guid -> state
+    // Corpses a bot has sent a loot for -> the looter's group (its leader's reference, else its own guid) and when the claim ends. The
+    // core loots a whole corpse for a group at once, so a second member's loot is refused ("no right to loot": already looted).
+    struct LootClaim
+    {
+        std::uint64_t Group = 0;
+        std::uint64_t UntilMs = 0;
+    };
+    std::unordered_map<std::uint64_t, LootClaim> _lootClaims;
     PolicyOptions _options;
     QuestPlanner _quests;
     bool _routeActive = false;

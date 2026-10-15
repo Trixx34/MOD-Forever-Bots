@@ -46,6 +46,10 @@ struct ScenarioPlan
     std::uint32_t MinAlive = 0;
     // The run ends as "abandoned_dead_leader" when the party leader has been down this long (0 = off).
     std::uint64_t LeaderDeadAbandonMs = 0;
+    // A dungeon clear (doc/dungeons.md): with RequireBosses on (and bosses listed) the run is "complete" when every boss has been seen dead,
+    // not when the leader touches the last waypoint; a leader at the last waypoint with bosses still alive gets kBossGraceMs more, then the
+    // run ends as "bosses_missing".
+    bool RequireBosses = false;
 };
 
 enum class ScenarioPhase
@@ -61,7 +65,7 @@ enum class ScenarioPhase
 struct ScenarioResult
 {
     std::string Name;
-    std::string Outcome;            // complete, wipe, timeout, enter_failed, understrength, abandoned_dead_leader
+    std::string Outcome;            // complete, wipe, timeout, enter_failed, understrength, abandoned_dead_leader, bosses_missing
     std::uint64_t RunMs = 0;        // time spent in Running
     std::uint32_t Furthest = 0;     // route points the leader reached (0..RouteSize)
     std::uint32_t RouteSize = 0;
@@ -84,6 +88,7 @@ constexpr std::uint64_t kMembersDelayMs = 3000;
 constexpr std::uint64_t kEnterRetryMs = 10000;
 constexpr std::uint64_t kEnterTimeoutMs = 90000;
 constexpr std::uint64_t kUnderstrengthGraceMs = 180000; // fewer than MinAlive alive this long: the run is given up
+constexpr std::uint64_t kBossGraceMs = 120000;          // RequireBosses: time allowed after the last waypoint for the remaining bosses to die
 constexpr float kRoutePointReachYards = 15.0f; // the leader counts as having reached a waypoint this close to it
 
 class ScenarioDirector
@@ -115,6 +120,7 @@ private:
     std::uint64_t _lastEnterMs = 0;
     std::uint64_t _leaderArrivedMs = 0;
     std::uint64_t _runStartMs = 0;
+    std::uint64_t _routeDoneMs = 0;        // when the leader first touched the last waypoint (RequireBosses grace)
     std::map<std::uint64_t, bool> _everDead;
     std::map<std::uint64_t, bool> _wasDown;            // bot -> down at the last tick (a bot never seen counts as up)
     std::uint32_t _deathEvents = 0;

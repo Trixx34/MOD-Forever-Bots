@@ -461,10 +461,90 @@ void PolicyDefendsAgainstAnyAttackerWhileHunting()
     CHECK(Has(actions, ActionType::kAttackTarget) || Has(actions, ActionType::kFollow));
 }
 
+// A hand-in the core refuses (the reward does not fit: bags full) sends the bot to a vendor at once, even though it has quest work and so is never
+// idle, and the hand-in is tried again after the visit instead of waiting out the block.
+void RefusedHandInSendsTheBotToAVendor()
+{
+    PolicyOptions options;
+    options.Quests = Data();
+    options.ServiceEveryMs = 600000;
+    BotPolicy policy(options);
+    auto const botAt = [](float x)
+    {
+        BotSnapshot bot = Bot(x, -162.6f);
+        LogQuest(bot, 783, 2); // complete
+        bot.vendor_valid = 1;
+        bot.vendor_x = -8800.0f;
+        bot.vendor_y = -162.6f;
+        bot.vendor_z = 82.0f;
+        return bot;
+    };
+    auto const kind = [](std::vector<BotAction> const& actions, ActionType type)
+    {
+        for (BotAction const& action : actions)
+            if (action.type == type)
+                return &action;
+        return static_cast<BotAction const*>(nullptr);
+    };
+
+    auto first = policy.Decide(OneBotView(botAt(-8902.6f), {}), 1000);
+    BotAction const* handIn = kind(first, ActionType::kQuest);
+    CHECK(handIn && handIn->spell_id == QuestCode(kQuestHandIn, 783));
+    CHECK(!kind(first, ActionType::kVendor));
+
+    BotSnapshot refused = botAt(-8902.6f);
+    refused.last_action_sequence = 1;
+    refused.last_action_type = std::uint8_t(ActionType::kQuest);
+    refused.last_action_status = forever_module::BotActionStatus::kRefused;
+    auto walk = policy.Decide(OneBotView(refused, {}), 5000);
+    BotAction const* move = kind(walk, ActionType::kMoveTo);
+    CHECK(move && move->dest_x == -8800.0f); // to the vendor, not back to the quest NPC
+    for (BotAction const& action : walk)
+        CHECK(!(action.type == ActionType::kQuest && action.spell_id == QuestCode(kQuestHandIn, 783))); // blocked for now
+
+    BotSnapshot atVendor = botAt(-8800.0f);
+    atVendor.last_action_sequence = 1;
+    atVendor.last_action_type = std::uint8_t(ActionType::kQuest);
+    atVendor.last_action_status = forever_module::BotActionStatus::kRefused;
+    CHECK(kind(policy.Decide(OneBotView(atVendor, {}), 9000), ActionType::kVendor));
+
+    BotSnapshot back = botAt(-8902.6f);
+    back.last_action_sequence = 1;
+    back.last_action_type = std::uint8_t(ActionType::kQuest);
+    back.last_action_status = forever_module::BotActionStatus::kRefused;
+    auto const afterwards = policy.Decide(OneBotView(back, {}), 10000);
+    bool again = false;
+    for (BotAction const& action : afterwards)
+        again = again || (action.type == ActionType::kQuest && action.spell_id == QuestCode(kQuestHandIn, 783));
+    CHECK(again); // not blocked for a minute any more
+}
+
+void HandInRefusalsBlockLessThanOtherRefusals()
+{
+    QuestPlanner planner(Data());
+    QuestMemory memory;
+    planner.NoteSent(memory, kQuestHandIn, 783, 0);
+    CHECK(planner.NoteRefused(memory, 0));
+    CHECK(memory.BlockedUntilMs[783] == kBlockAfterRefusalMs);
+    planner.NoteSent(memory, kQuestHandIn, 783, 100000);
+    CHECK(planner.NoteRefused(memory, 100000));
+    CHECK(memory.BlockedUntilMs[783] == 100000 + kBlockAfterRefusalMs); // the second is still a minute
+    planner.NoteSent(memory, kQuestHandIn, 783, 200000);
+    planner.NoteRefused(memory, 200000);
+    CHECK(memory.BlockedUntilMs[783] == 200000 + 10 * kBlockAfterRefusalMs);
+    planner.NoteServiced(memory);
+    CHECK(memory.BlockedUntilMs.count(783) == 0);
+    // An accept refusal is not a hand-in refusal.
+    planner.NoteSent(memory, kQuestAccept, 7, 300000);
+    CHECK(!planner.NoteRefused(memory, 300000));
+}
+
 } // namespace
 
 int main()
 {
+    RefusedHandInSendsTheBotToAVendor();
+    HandInRefusalsBlockLessThanOtherRefusals();
     ParserReadsTheFormat();
     ParserDropsBadLines();
     FarBotWalksToTheGiverThenAccepts();

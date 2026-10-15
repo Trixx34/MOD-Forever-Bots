@@ -128,7 +128,9 @@ void IdleBotWalksToAGrindSpotForItsLevel()
     CHECK(WalksTo(policy.Decide(view, 1000 + 31000), 900.0f)); // a quiet spell: to the spot for level 7
 }
 
-void NoSpotForTheMapMeansNoWalk()
+// A map the spot file does not cover: the bot used to stand at its start for the whole run (the new races' island). It now takes short walks
+// on foot, and looks for spots again after a minute.
+void NoSpotForTheMapMeansExploringOnFoot()
 {
     std::vector<std::string> warnings;
     PolicyOptions options;
@@ -136,8 +138,17 @@ void NoSpotForTheMapMeansNoWalk()
     BotPolicy policy(options);
     WorldTickSnapshotView view = OneBot(3, 0);
     policy.Decide(view, 1000);
-    for (BotAction const& action : policy.Decide(view, 1000 + 31000))
-        CHECK(action.type != ActionType::kMoveTo);
+    bool walked = false;
+    std::uint64_t now = 1000 + 31000;
+    for (int i = 0; i < 40 && !walked; ++i, now += 3000)    // the lookup fails once, then the exploring starts after a short quiet
+        for (BotAction const& action : policy.Decide(view, now))
+            if (action.type == ActionType::kMoveTo)
+            {
+                walked = true;
+                float const dx = action.dest_x - view.bots[0].pos_x, dy = action.dest_y - view.bots[0].pos_y;
+                CHECK(dx * dx + dy * dy >= 49.0f * 49.0f && dx * dx + dy * dy <= 101.0f * 101.0f);   // 50 to 100 yards
+            }
+    CHECK(walked);
 }
 
 void HubsAreTheFallbackWithoutGrindData()
@@ -164,6 +175,89 @@ void NextWalkMovesOnToAnotherSpot()
     CHECK(WalksTo(policy.Decide(view, 40000 + 31000), 400.0f));      // then the other one, not back to the same
 }
 
+// A start zone whose creatures the bot will not pull (an elite, a level far above it, a pack of four) used to count as "an enemy near": the bot
+// was never idle, so it never walked to a grind spot and stood there for hours.
+void UnpullableCreaturesDoNotKeepTheBotFromWalking()
+{
+    std::vector<std::string> warnings;
+    PolicyOptions options;
+    options.Grind = std::make_shared<GrindData>(Parse("spot 0 900 0 0 1 5 0\n", warnings));
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = OneBot(1, 0);
+    view.max_nearby_units = 8;
+    view.nearby.assign(8, forever_module::NearbyUnit{});
+    view.bots[0].nearby_count = 5;
+    for (int i = 0; i < 4; ++i)                                   // a pack of four, close together
+    {
+        forever_module::NearbyUnit& unit = view.nearby[i];
+        unit.guid = forever_module::MakeUnitRef(8, 100, i + 1);
+        unit.pos_x = 30.0f + float(i);
+        unit.health = unit.max_health = 50;
+        unit.is_hostile = true;
+        unit.level = 1;
+    }
+    forever_module::NearbyUnit& elite = view.nearby[4];                           // and an elite on its own
+    elite.guid = forever_module::MakeUnitRef(8, 200, 1);
+    elite.pos_x = -40.0f;
+    elite.health = elite.max_health = 500;
+    elite.is_hostile = true;
+    elite.level = 2;
+    elite.elite = 1;
+    policy.Decide(view, 1000);
+    CHECK(WalksTo(policy.Decide(view, 1000 + 31000), 900.0f));
+}
+
+// Bots standing together (a start zone) used to follow the nearest of each other forever, in circles. Another bot is not a player to follow: the
+// bot walks to a grind spot. A real player (not one of the controlled bots) is still followed.
+void BotsDoNotFollowEachOther()
+{
+    std::vector<std::string> warnings;
+    PolicyOptions options;
+    options.Grind = std::make_shared<GrindData>(Parse("spot 0 900 0 0 1 5 0\n", warnings));
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = OneBot(1, 0);
+    view.max_nearby_units = 2;
+    view.nearby.assign(2, forever_module::NearbyUnit{});
+    BotSnapshot second = view.bots[0];
+    second.guid = 8;
+    second.pos_x = 3.0f;
+    view.bots.push_back(second);
+    view.bots[0].nearby_count = 1;
+    view.bots[1].nearby_count = 1;
+    view.nearby.resize(4);
+    view.nearby[0].guid = forever_module::MakeUnitRef(2, 0, 8);      // bot 7 sees bot 8
+    view.nearby[0].pos_x = 3.0f;
+    view.nearby[0].health = view.nearby[0].max_health = 1000;
+    view.nearby[2].guid = forever_module::MakeUnitRef(2, 0, 7);      // bot 8 sees bot 7
+    view.nearby[2].health = view.nearby[2].max_health = 1000;
+    policy.Decide(view, 1000);
+    bool followed = false;
+    bool walked = false;
+    for (std::uint64_t now = 2000; now <= 40000; now += 1000)
+        for (BotAction const& action : policy.Decide(view, now))
+        {
+            followed = followed || action.type == ActionType::kFollow;
+            walked = walked || (action.type == ActionType::kMoveTo && action.dest_x == 900.0f);
+        }
+    CHECK(!followed);
+    CHECK(walked);
+
+    // A real player (not controlled by the module) in view is followed.
+    WorldTickSnapshotView withPlayer = OneBot(1, 0);
+    withPlayer.max_nearby_units = 2;
+    withPlayer.nearby.assign(2, forever_module::NearbyUnit{});
+    withPlayer.bots[0].nearby_count = 1;
+    withPlayer.nearby[0].guid = forever_module::MakeUnitRef(2, 0, 999);
+    withPlayer.nearby[0].pos_x = 20.0f;
+    withPlayer.nearby[0].health = withPlayer.nearby[0].max_health = 1000;
+    BotPolicy other(options);
+    bool followsPlayer = false;
+    for (std::uint64_t now = 1000; now <= 5000; now += 1000)
+        for (BotAction const& action : other.Decide(withPlayer, now))
+            followsPlayer = followsPlayer || action.type == ActionType::kFollow;
+    CHECK(followsPlayer);
+}
+
 } // namespace
 
 int main()
@@ -174,9 +268,11 @@ int main()
     RichSpotsCountAsCloser();
     SidesOfRaces();
     IdleBotWalksToAGrindSpotForItsLevel();
-    NoSpotForTheMapMeansNoWalk();
+    NoSpotForTheMapMeansExploringOnFoot();
     HubsAreTheFallbackWithoutGrindData();
     NextWalkMovesOnToAnotherSpot();
+    UnpullableCreaturesDoNotKeepTheBotFromWalking();
+    BotsDoNotFollowEachOther();
     if (failures == 0)
         std::printf("grind_test: all checks passed\n");
     return failures == 0 ? 0 : 1;

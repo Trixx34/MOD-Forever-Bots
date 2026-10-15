@@ -1,0 +1,83 @@
+# Rotations. Made by tools/make_rotations.py from the spec and the core's ability dump. Format: src/combat_rotation.h
+
+class 1
+row 5308 level 21 target_hp_below 20 target range 0 5   # Execute: ranks [5308, 20658, 20660, 20661, 20662]
+row 2687 level 6 self_power_below 20 self   # Bloodrage: ranks [2687]
+row 100 level 2 opener 8 target range 8 25   # Charge: ranks [100, 6178, 11578]
+row 6343 level 6 enemies 2 self   # Thunder Clap: ranks [6343, 8198, 8204, 8205, 11580, 11581]
+row 1160 level 11 enemies 3 self duration 30   # Demoralizing Shout: ranks [1160, 6190, 11554, 11555, 11556]
+row 7386 level 21 target_strong 2 target range 0 5   # Sunder Armor: ranks [7386, 7405, 8380, 11596, 11597]
+row 772 level 2 duration 21 always target range 0 5   # Rend: ranks [772, 6546, 6547, 6548, 11572, 11573, 11574]
+row 845 level 16 enemies 2 target range 0 5   # Cleave: ranks [845, 7369, 11608, 11609, 20569]
+row 78 level 1 self_power_above 40 target range 0 5   # Heroic Strike: ranks [78, 284, 285, 1608, 11564, 11565, 11566, 11567]
+buff 5242 level 11 duration 120 self   # Battle Shout: ranks [5242, 6192, 6673, 11549, 11550, 11551]
+
+class 2
+row 853 level 1 target_casting target range 0 10   # Hammer of Justice: ranks [853, 5588, 5589, 10308]
+row 635 level 1 self_hp_below 50 self   # Holy Light: ranks [635, 639, 647, 1026, 1042, 3472, 10328, 10329]
+row 20116 level 26 enemies 3 self   # Consecration: ranks [20116, 20922, 20923, 20924, 26573]
+row 20154 level 1 duration 30 always self   # Seal of Righteousness: ranks [20154, 20287, 20288, 20289, 20290, 20291, 20292, 20293, 21084]
+row 678 level 11 always target range 0 5   # Holy Strike: ranks [678, 679, 680, 1866, 2495, 5569, 10332, 10333]
+row 20271 level 1 always target range 0 10   # Judgement: ranks [20271]
+buff 465 level 1 duration 3600 self   # Devotion Aura: ranks [465, 643, 1032, 10290, 10291, 10292, 10293]
+buff 19740 level 1 duration 300 party   # Blessing of Might: ranks [19740, 19834, 19835, 19836, 19837, 19838]
+
+class 3
+row 1130 level 1 duration 120 always target range 0 35   # Hunter's Mark: ranks [1130, 14323, 14324, 14325]
+row 1978 level 1 duration 15 always target range 0 35   # Serpent Sting: ranks [1978, 13549, 13550, 13551, 13552, 13553, 13554, 13555]
+row 2643 level 16 enemies 2 target range 0 35   # Multi-Shot: ranks [2643]
+row 3044 level 1 always target range 0 35   # Arcane Shot: ranks [3044, 14281, 14282, 14283, 14284, 14285, 14286, 14287]
+row 2973 level 1 always target range 0 5   # Raptor Strike: ranks [2973, 14260, 14261, 14262, 14263, 14264, 14265, 14266]
+row 75 level 1 always target range 0 35   # Auto Shot: ranks [75]
+buff 13165 level 1 duration 3600 self   # Aspect of the Hawk: ranks [13165, 14318, 14319, 14320, 14321, 14322]
+
+class 4
+row 1766 level 11 target_casting target range 0 5   # Kick: ranks [1766, 1767, 1768, 1769]
+row 5277 level 1 self_hp_below 40 self   # Evasion: ranks [5277]
+row 5171 level 1 combo 2 duration 20 self   # Slice and Dice: ranks [5171, 6774]
+row 2098 level 1 combo 5 target range 0 5   # Eviscerate: ranks [2098, 6760, 6761, 6762, 8623, 8624, 11299, 11300]
+row 1752 level 1 always target range 0 5   # Sinister Strike: ranks [1752, 1757, 1758, 1759, 1760, 8621, 11293, 11294]
+
+class 5
+row 17 level 6 self_hp_below 50 duration 30 self   # Power Word: Shield: ranks [17, 592, 600, 3747, 6065, 6066, 10898, 10899, 10900, 10901]
+row 589 level 2 duration 18 always target range 0 30   # Shadow Word: Pain: ranks [589, 594, 970, 992, 2767, 10892, 10893, 10894]
+row 8092 level 6 always target range 0 30   # Mind Blast: ranks [8092, 8102, 8103, 8104, 8105, 8106, 10945, 10946, 10947]
+row 585 level 1 always target range 0 30   # Smite: ranks [585, 591, 598, 984, 1004, 6060, 10933, 10934]
+buff 1243 level 1 duration 1800 party   # Power Word: Fortitude: ranks [1243, 1244, 1245, 2791, 10937, 10938]
+buff 588 level 11 duration 600 self   # Inner Fire: ranks [588, 602, 1006, 7128, 10951, 10952]
+
+class 7
+row 8042 level 1 target_casting target range 0 20   # Earth Shock: ranks [8042, 8044, 8045, 8046, 10412, 10413, 10414]
+row 331 level 1 self_hp_below 40 self   # Healing Wave: ranks [331, 332, 547, 913, 939, 959, 8005, 10395, 10396]
+row 8050 level 6 duration 12 always target range 0 20   # Flame Shock: ranks [8050, 8052, 8053, 10447, 10448]
+row 403 level 1 always target range 0 30   # Lightning Bolt: ranks [403, 529, 548, 915, 943, 6041, 10391, 10392, 15207, 15208]
+buff 324 level 6 duration 600 self   # Lightning Shield: ranks [324, 325, 905, 945, 8134, 10431, 10432]
+buff 8017 level 1 duration 300 self   # Rockbiter Weapon: ranks [8017, 8018, 8019, 10399, 16314, 16315, 16316]
+
+class 8
+row 2139 level 21 target_casting target range 0 30   # Counterspell: ranks [2139]
+row 122 level 6 enemies 2 self   # Frost Nova: ranks [122, 865, 6131, 10230]
+row 12051 level 16 self_power_below 15 self   # Evocation: ranks [12051]
+row 2136 level 6 target_hp_below 25 target range 0 20   # Fire Blast: ranks [2136, 2137, 2138, 8412, 8413, 10197, 10199]
+row 133 level 1 opener 3 target range 0 30   # Fireball: ranks [133, 143, 145, 3140, 8400, 8401, 8402, 10148, 10149, 10150, 10151]
+row 116 level 2 always target range 0 30   # Frostbolt: ranks [116, 205, 837, 7322, 8406, 8407, 8408, 10179, 10180, 10181]
+buff 168 level 1 duration 1800 self maxlevel 25   # Frost Armor: ranks [168, 7300, 7301]
+buff 7302 level 26 duration 1800 self maxlevel 30   # Ice Armor: ranks [7302, 7320, 10219, 10220]
+buff 6117 level 31 duration 1800 self   # Mage Armor: ranks [6117, 22782, 22783]
+buff 1459 level 1 duration 1800 party   # Arcane Intellect: ranks [1459, 1460, 1461, 10156, 10157]
+
+class 9
+row 1454 level 6 self_power_below 25 self   # Life Tap: ranks [1454, 1455, 1456, 11687, 11688, 11689]
+row 172 level 2 duration 18 always target range 0 30   # Corruption: ranks [172, 6222, 6223, 7648, 11671, 11672]
+row 348 level 1 duration 15 always target range 0 30   # Immolate: ranks [348, 707, 1094, 2941, 11665, 11667, 11668]
+row 686 level 1 always target range 0 30   # Shadow Bolt: ranks [686, 695, 705, 1088, 1106, 7641, 11659, 11660, 11661]
+buff 687 level 1 duration 1800 self maxlevel 15   # Demon Skin: ranks [687, 696]
+buff 706 level 16 duration 1800 self   # Demon Armor: ranks [706, 1086, 11733, 11734, 11735]
+
+class 11
+row 5185 level 1 self_hp_below 40 self   # Healing Touch: ranks [5185, 5186, 5187, 5188, 5189, 6778, 8903, 9758, 9888, 9889]
+row 774 level 1 self_hp_below 70 duration 12 self   # Rejuvenation: ranks [774, 1058, 1430, 2090, 2091, 3627, 8910, 9839, 9840, 9841]
+row 8921 level 1 duration 12 always target range 0 30   # Moonfire: ranks [8921, 8924, 8925, 8926, 8927, 8928, 8929, 9833, 9834, 9835]
+row 5176 level 1 always target range 0 30   # Wrath: ranks [5176, 5177, 5178, 5179, 5180, 6780, 8905, 9912]
+buff 1126 level 1 duration 1800 party   # Mark of the Wild: ranks [1126, 5232, 5234, 6756, 8907, 9884, 9885]
+buff 467 level 1 duration 600 party   # Thorns: ranks [467, 782, 1075, 8914, 9756, 9910]

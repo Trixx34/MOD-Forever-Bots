@@ -302,9 +302,22 @@ void ScenarioDirector::Decide(forever_module::WorldTickSnapshotView const& view,
                 _fewAliveSinceMs = nowMs;
             _fewAlive = few;
 
-            if (!_plan.Route.empty() && _furthest >= _plan.Route.size())
+            bool const routeDone = !_plan.Route.empty() && _furthest >= _plan.Route.size();
+            if (routeDone && _routeDoneMs == 0)
+                _routeDoneMs = nowMs;
+            if (_plan.RequireBosses && !_plan.Bosses.empty())
+            {
+                // A dungeon clear: every boss dead is the goal; the last waypoint only starts a grace period for the ones still standing.
+                if (_bossKills.size() >= _plan.Bosses.size())
+                    Finish("complete", nowMs);
+                else if (routeDone && nowMs - _routeDoneMs >= kBossGraceMs)
+                    Finish("bosses_missing", nowMs);
+            }
+            else if (routeDone)
                 Finish("complete", nowMs);
-            else if (_allDown && (!_plan.WipeRecovery || nowMs - _allDownSinceMs >= _plan.WipeRecoveryMs))
+            if (_result)
+                break;
+            if (_allDown && (!_plan.WipeRecovery || nowMs - _allDownSinceMs >= _plan.WipeRecoveryMs))
                 Finish("wipe", nowMs);
             else if (_plan.LeaderDeadAbandonMs != 0 && _leaderDown && nowMs - _leaderDownSinceMs >= _plan.LeaderDeadAbandonMs)
                 Finish("abandoned_dead_leader", nowMs);

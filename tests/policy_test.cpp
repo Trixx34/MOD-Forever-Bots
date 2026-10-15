@@ -1,7 +1,11 @@
 // Unit tests for BotPolicy, on hand-built snapshots. No core needed.
 #include "bot_policy.h"
 
+#include "combat_rotation.h"
+
 #include <cstdio>
+#include <memory>
+#include <sstream>
 #include <string>
 
 using forever_module::ActionType;
@@ -492,6 +496,7 @@ BotPolicy ClassPolicy(std::uint32_t classId)
 {
     PolicyOptions options;
     options.ClassId = classId;
+    options.WanderWhenIdle = false;       // these tests look at casts and rests: the bot stays where it is
     return BotPolicy(options);
 }
 
@@ -518,6 +523,79 @@ void MageCastsFromRange()
     for (BotAction const& action : far)
         approached = approached || (action.type == ActionType::kFollow && action.target_guid == MakeUnitRef(8, 1, 2));
     CHECK(approached);
+}
+
+// A snapshot of the bot (class 8, a mage) with the result of its last cast set.
+WorldTickSnapshotView CastResultView(std::uint64_t tick, std::vector<NearbyUnit> nearby, std::uint64_t sequence, std::uint32_t spell,
+                                     BotActionStatus status)
+{
+    WorldTickSnapshotView view = View(tick, 0, std::move(nearby));
+    view.bots[0].last_action_sequence = sequence;
+    view.bots[0].last_action_type = uint8_t(ActionType::kCastSpell);
+    view.bots[0].last_action_spell = spell;
+    view.bots[0].last_action_status = status;
+    return view;
+}
+
+void NoCastWhileASpellIsInFlight()
+{
+    // result "bot is casting spell N": a Fireball that has left the caster is still a cast to the core, and cast_remaining_ms is 0 for it.
+    BotPolicy policy = ClassPolicy(8);
+    WorldTickSnapshotView view = View(1, 0, { Hostile(2, 12.0f, 100) });
+    view.bots[0].casting_spell = 133;
+    view.bots[0].cast_remaining_ms = 0;
+    CHECK(!HasCast(policy.Decide(view, 1000), 133));
+    view.bots[0].casting_spell = 0; // landed
+    CHECK(HasCast(policy.Decide(view, 1100), 133));
+}
+
+void RangedRowsKeepASlackInsideTheirRange()
+{
+    // result 118 (out of range): the snapshot is old and the target moves, so a row is used two yards inside its range.
+    CHECK(HasCast(ClassPolicy(8).Decide(View(1, 0, { Hostile(2, 27.0f, 100) }), 1000), 133));
+    CHECK(!HasCast(ClassPolicy(8).Decide(View(1, 0, { Hostile(2, 29.0f, 100) }), 1000), 133));
+
+    // The height counts: 20 yards along the ground and 20 up is 28.3 away.
+    NearbyUnit ledge = Hostile(2, 20.0f, 100);
+    ledge.pos_z = 20.0f;
+    CHECK(!HasCast(ClassPolicy(8).Decide(View(1, 0, { ledge }), 1000), 133));
+
+    // Fire Blast reaches 20 yards, not 30.
+    CHECK(!HasCast(ClassPolicy(8).Decide(View(1, 0, { Hostile(2, 19.0f, 20) }), 1000), 2136));
+    CHECK(HasCast(ClassPolicy(8).Decide(View(1, 0, { Hostile(2, 15.0f, 20) }), 1000), 2136));
+}
+
+void OutOfRangeRefusalMakesTheCasterStandCloser()
+{
+    BotPolicy policy = ClassPolicy(8);
+    CHECK(HasCast(policy.Decide(View(1, 0, { Hostile(2, 20.0f, 100) }), 1000), 133));
+    auto const refused = policy.Decide(CastResultView(2, { Hostile(2, 20.0f, 100) }, 1, 133, BotActionStatus::kOutOfRange), 2600);
+    bool closer = false;
+    for (BotAction const& action : refused)
+        closer = closer || (action.type == ActionType::kFollow && action.target_guid == MakeUnitRef(8, 1, 2));
+    CHECK(closer); // a mage stands at 25 yards; after the refusal it walks in to 15
+}
+
+void CooldownRefusalHoldsEverySpellForAMoment()
+{
+    // result 91 / 32: usually the global cooldown. The next row is not tried at once and fails the same way.
+    BotPolicy policy = ClassPolicy(8);
+    CHECK(HasCast(policy.Decide(View(1, 0, { Hostile(2, 10.0f, 20) }), 1000), 2136));
+    auto const held = policy.Decide(CastResultView(2, { Hostile(2, 10.0f, 20) }, 1, 2136, BotActionStatus::kOnCooldown), 2600);
+    CHECK(!HasCast(held, 133));
+    CHECK(HasCast(policy.Decide(View(3, 0, { Hostile(2, 10.0f, 20) }), 3200), 133));
+}
+
+void RepeatedLineOfSightRefusalsAvoidTheTarget()
+{
+    // result 71: closing in is tried first; three refusals in a row and the target is dropped for a while.
+    BotPolicy policy = ClassPolicy(8);
+    CHECK(HasCast(policy.Decide(View(1, 0, { Hostile(2, 10.0f, 100) }), 1000), 133));
+    std::uint64_t now = 4000;
+    for (std::uint64_t n = 1; n <= 3; ++n, now += 3000)
+        policy.Decide(CastResultView(1 + n, { Hostile(2, 10.0f, 100) }, n, 133, BotActionStatus::kNoLineOfSight), now);
+    for (BotAction const& action : policy.Decide(View(9, 0, { Hostile(2, 10.0f, 100) }), now))
+        CHECK(action.type != ActionType::kCastSpell && action.target_guid != MakeUnitRef(8, 1, 2));
 }
 
 void WarlockDotIsNotRecastWhileRunning()
@@ -596,6 +674,33 @@ void EviscerateAtFivePoints()
         auto actions = policy.Decide(landed, 1000 + 1600 * i);
         if (i < 5)
             CHECK(HasCast(actions, 1752) && !HasCast(actions, 2098));
+        else
+            CHECK(HasCast(actions, 2098));
+    }
+}
+
+void SaberSlashCountsAsAComboPoint()
+{
+    // Saber Slash (Forever) gives one combo point like Sinister Strike: a Saber Slash and four Sinister Strikes make five on one target.
+    PolicyOptions options;
+    options.ClassId = 4;
+    std::istringstream file("class 4\nrow 2098 combo 5 target range 0 5\nrow 424785 duration 12 always target range 0 5\nrow 1752 always target range 0 5\n");
+    std::vector<std::string> warnings;
+    options.Rotations = std::make_shared<rotation::RotationData>(rotation::ParseRotationData(file, warnings));
+    CHECK(warnings.empty());
+    BotPolicy policy(options);
+    CHECK(HasCast(policy.Decide(View(1, 0, { Hostile(2, 3.0f, 100) }), 1000), 424785));
+    std::uint32_t const spells[] = { 424785, 1752, 1752, 1752, 1752 };
+    for (std::uint32_t i = 1; i <= 5; ++i)
+    {
+        WorldTickSnapshotView landed = View(1 + i, 0, { Hostile(2, 3.0f, 100) });
+        landed.bots[0].last_action_sequence = i;
+        landed.bots[0].last_action_type = uint8_t(ActionType::kCastSpell);
+        landed.bots[0].last_action_spell = spells[i - 1];
+        landed.bots[0].last_action_status = BotActionStatus::kApplied;
+        auto actions = policy.Decide(landed, 1000 + 1600 * i);
+        if (i < 5)
+            CHECK(!HasCast(actions, 2098));
         else
             CHECK(HasCast(actions, 2098));
     }
@@ -1139,6 +1244,33 @@ void BotLootsTheCreatureItKilled()
     CHECK(!HasAction(policy.Decide(after, 2000), 10, ActionType::kLoot)); // once per corpse
 }
 
+void GroupmateDoesNotLootACorpseAlreadyTaken()
+{
+    // Two members of one group fought the same creature: the core loots the whole corpse for the group, so only one sends the loot.
+    BotPolicy policy;
+    NearbyUnit const alive = Hostile(7, 2.0f, 100);
+    WorldTickSnapshotView fight = PartyView({ 10, 11 });
+    for (std::size_t i = 0; i < 2; ++i)
+    {
+        fight.bots[i].group_leader_guid = 10;
+        AddNearby(fight, i, alive);
+    }
+    policy.Decide(fight, 0);
+
+    NearbyUnit const dead = Hostile(7, 2.0f, 0);
+    WorldTickSnapshotView after = PartyView({ 10, 11 });
+    for (std::size_t i = 0; i < 2; ++i)
+    {
+        after.bots[i].group_leader_guid = 10;
+        AddNearby(after, i, dead);
+    }
+    auto const actions = policy.Decide(after, 1000);
+    int loots = 0;
+    for (BotAction const& action : actions)
+        loots += action.type == ActionType::kLoot ? 1 : 0;
+    CHECK(loots == 1);
+}
+
 void NoLootWhileInCombat()
 {
     BotPolicy policy;
@@ -1580,8 +1712,326 @@ void PartyWaitIsLoggedForARezAndForAGhost()
     CHECK(Logged(events, "party_wait:"));
 }
 
+// ---- soak diagnosis: stalled fights, grey creatures, mana ----
+
+// A target that cannot be hurt (out of reach): the fight is given up after the watchdog time, and the target is left alone for minutes, not
+// seconds, more each time (the soak's mage went back to the same two creatures for an hour and a half).
+void StalledTargetIsLeftAloneForMinutes()
+{
+    NearbyUnit const mob = Hostile(7, 3.0f, 100);
+    BotPolicy policy;
+    auto const view = [&mob]
+    {
+        WorldTickSnapshotView v = PartyView({ 10 });
+        AddNearby(v, 0, mob);
+        v.bots[0].threat_target_guid = mob.guid;
+        v.bots[0].in_combat = 1;
+        return v;
+    };
+    std::uint64_t now = 0;
+    bool given = false;
+    for (; now < 70000 && !given; now += 5000)
+        for (BotAction const& action : policy.Decide(view(), now))
+            given = given || (action.type == ActionType::kStop && action.bot_guid == 10);
+    CHECK(given);                                    // given up well before a minute
+    CHECK(now <= 60000);
+    // Still avoided four minutes later, free again after five.
+    CHECK(!HasAction(policy.Decide(view(), now + 240000), 10, ActionType::kAttackTarget, mob.guid));
+    CHECK(HasAction(policy.Decide(view(), now + 310000), 10, ActionType::kAttackTarget, mob.guid));
+    // Stalls again: this time it is left alone for ten minutes.
+    std::uint64_t later = now + 310000;
+    bool second = false;
+    for (std::uint64_t t = later; t < later + 60000 && !second; t += 5000)
+    {
+        for (BotAction const& action : policy.Decide(view(), t))
+            second = second || (action.type == ActionType::kStop && action.bot_guid == 10);
+        later = t;
+    }
+    CHECK(second);
+    CHECK(!HasAction(policy.Decide(view(), later + 540000), 10, ActionType::kAttackTarget, mob.guid));
+    CHECK(HasAction(policy.Decide(view(), later + 610000), 10, ActionType::kAttackTarget, mob.guid));
+}
+
+// A creature far enough below the bot gives no experience: it is not pulled, and its presence does not keep the bot from walking on.
+void GreyCreatureIsNotPulled()
+{
+    NearbyUnit grey = Hostile(7, 3.0f, 100);
+    grey.level = 3; // seven below a level-10 bot: grey (zero experience from 7 below at level 10)
+    NearbyUnit green = Hostile(8, 6.0f, 100);
+    green.level = 4; // six below: still gives a little
+    WorldTickSnapshotView view = PartyView({ 10 });
+    view.bots[0].level = 10;
+    AddNearby(view, 0, grey);
+    BotPolicy policy;
+    auto actions = policy.Decide(view, 0);
+    CHECK(!HasAction(actions, 10, ActionType::kAttackTarget, grey.guid) && !HasAction(actions, 10, ActionType::kFollow, grey.guid));
+
+    WorldTickSnapshotView withGreen = PartyView({ 10 });
+    withGreen.bots[0].level = 10;
+    AddNearby(withGreen, 0, grey);
+    AddNearby(withGreen, 0, green);
+    BotPolicy other;
+    actions = other.Decide(withGreen, 0);
+    CHECK(HasAction(actions, 10, ActionType::kAttackTarget, green.guid) || HasAction(actions, 10, ActionType::kFollow, green.guid));
+
+    // The grey creature attacks the bot: it is fought whatever its level.
+    WorldTickSnapshotView attacked = PartyView({ 10 });
+    attacked.bots[0].level = 10;
+    attacked.bots[0].in_combat = 1;
+    AddNearby(attacked, 0, grey);
+    BotPolicy defender;
+    actions = defender.Decide(attacked, 0);
+    CHECK(HasAction(actions, 10, ActionType::kAttackTarget, grey.guid) || HasAction(actions, 10, ActionType::kFollow, grey.guid));
+}
+
+void GreyCreatureDoesNotKeepTheBotFromExploring()
+{
+    NearbyUnit grey = Hostile(7, 30.0f, 100);
+    grey.level = 1;
+    WorldTickSnapshotView view = PartyView({ 10 });
+    view.bots[0].level = 20;
+    AddNearby(view, 0, grey);
+    BotPolicy policy; // no hubs, no grind spots: the bot explores on foot after a quiet spell
+    policy.Decide(view, 0);
+    bool walks = false;
+    for (BotAction const& action : policy.Decide(view, 11000))
+        walks = walks || (action.type == ActionType::kMoveTo && action.bot_guid == 10);
+    CHECK(walks);
+}
+
+// An idle mana user low on mana sits to drink, stands when it has enough, and does not wait for mana that never comes.
+WorldTickSnapshotView ManaView(std::uint32_t powerPct)
+{
+    WorldTickSnapshotView view = PartyView({ 10 });
+    view.bots[0].power_type = 0;
+    view.bots[0].max_power = 100;
+    view.bots[0].power = powerPct;
+    return view;
+}
+
+void IdleCasterDrinksWhenLowOnMana()
+{
+    BotPolicy policy;
+    std::uint32_t spell = 99;
+    CHECK(RestAt(policy.Decide(ManaView(20), 1000), spell) >= 0 && spell == 1); // sits
+    CHECK(RestAt(policy.Decide(ManaView(60), 5000), spell) < 0);               // keeps sitting: no new action
+    // No walk while it drinks, even after a long quiet spell.
+    for (BotAction const& action : policy.Decide(ManaView(70), 40000))
+        CHECK(action.type != ActionType::kMoveTo);
+    CHECK(RestAt(policy.Decide(ManaView(95), 45000), spell) >= 0 && spell == 0); // enough: stands
+}
+
+void ManaRestIsCappedAndNotRepeatedAtOnce()
+{
+    BotPolicy policy;
+    std::uint32_t spell = 99;
+    CHECK(RestAt(policy.Decide(ManaView(10), 1000), spell) >= 0 && spell == 1);
+    CHECK(RestAt(policy.Decide(ManaView(10), 100000), spell) < 0);              // still drinking
+    CHECK(RestAt(policy.Decide(ManaView(10), 125000), spell) >= 0 && spell == 0); // 2 minutes: stands, the mana is not coming back
+    CHECK(RestAt(policy.Decide(ManaView(10), 130000), spell) < 0);              // and does not sit again at once
+}
+
+void FighterWithoutManaDoesNotDrink()
+{
+    BotPolicy policy;
+    WorldTickSnapshotView view = ManaView(0);
+    view.bots[0].power_type = 1; // rage
+    std::uint32_t spell = 99;
+    CHECK(RestAt(policy.Decide(view, 1000), spell) < 0);
+}
+
+// A cast result as the next snapshot reports it: spell, status, with a new sequence number.
+void Result(WorldTickSnapshotView& view, std::uint32_t spell, BotActionStatus status, std::uint32_t sequence)
+{
+    view.bots[0].last_action_sequence = sequence;
+    view.bots[0].last_action_type = uint8_t(ActionType::kCastSpell);
+    view.bots[0].last_action_spell = spell;
+    view.bots[0].last_action_status = status;
+}
+
+WorldTickSnapshotView HunterView(std::uint64_t tick, std::uint32_t level, std::vector<NearbyUnit> nearby, std::uint64_t threat = 0)
+{
+    // A far creature too strong to pull keeps the bot from being idle (after 10 s of nothing in view it explores on foot, and is then not standing).
+    NearbyUnit strong = Hostile(99, 35.0f, 100);
+    strong.level = 60;
+    nearby.push_back(strong);
+    WorldTickSnapshotView view = View(tick, threat, std::move(nearby));
+    view.bots[0].level = level;
+    return view;
+}
+
+void AutoShotIsNotReissuedWhileActive()
+{
+    // Level 1: only Auto Shot is learned. It is cast once; once accepted it is not cast again at the next global cooldown.
+    BotPolicy policy = ClassPolicy(3);
+    NearbyUnit const mob = Hostile(2, 20.0f, 100);
+    CHECK(HasCast(policy.Decide(HunterView(1, 1, { mob }), 1000), 75));
+
+    WorldTickSnapshotView accepted = HunterView(2, 1, { mob }, MakeUnitRef(8, 1, 2));
+    Result(accepted, 75, BotActionStatus::kApplied, 1);
+    CHECK(!HasCast(policy.Decide(accepted, 2600), 75));
+    for (std::uint64_t i = 0; i < 5; ++i)
+        CHECK(!HasCast(policy.Decide(HunterView(3 + i, 1, { mob }, MakeUnitRef(8, 1, 2)), 4200 + 1600 * i), 75));
+
+    // A new target: Auto Shot is cast on it.
+    NearbyUnit const other = Hostile(3, 20.0f, 100);
+    CHECK(HasCast(policy.Decide(HunterView(10, 1, { other }, MakeUnitRef(8, 1, 3)), 20000), 75));
+}
+
+void AutoShotIsReissuedAfterTheFightAndWhenRefused()
+{
+    BotPolicy policy = ClassPolicy(3);
+    NearbyUnit const mob = Hostile(2, 20.0f, 100);
+    policy.Decide(HunterView(1, 1, { mob }), 1000);
+    WorldTickSnapshotView accepted = HunterView(2, 1, { mob }, MakeUnitRef(8, 1, 2));
+    Result(accepted, 75, BotActionStatus::kApplied, 1);
+    policy.Decide(accepted, 2600);
+    // The fight ends (nothing to fight), then a new fight with the same creature reference: shot again.
+    policy.Decide(HunterView(3, 1, {}), 5000);
+    CHECK(HasCast(policy.Decide(HunterView(4, 1, { mob }, MakeUnitRef(8, 1, 2)), 8000), 75));
+
+    // A refused Auto Shot is not marked active: it is retried.
+    BotPolicy refused = ClassPolicy(3);
+    refused.Decide(HunterView(1, 1, { mob }), 1000);
+    WorldTickSnapshotView no = HunterView(2, 1, { mob }, MakeUnitRef(8, 1, 2));
+    Result(no, 75, BotActionStatus::kRefused, 1);
+    refused.Decide(no, 2600);
+    CHECK(HasCast(refused.Decide(HunterView(3, 1, { mob }, MakeUnitRef(8, 1, 2)), 4000), 75));
+}
+
+void AutoShotIsReissuedAfterMoving()
+{
+    BotPolicy policy = ClassPolicy(3);
+    NearbyUnit const mob = Hostile(2, 20.0f, 100);
+    policy.Decide(HunterView(1, 1, { mob }), 1000);
+    WorldTickSnapshotView accepted = HunterView(2, 1, { mob }, MakeUnitRef(8, 1, 2));
+    Result(accepted, 75, BotActionStatus::kApplied, 1);
+    policy.Decide(accepted, 2600);
+    WorldTickSnapshotView moving = HunterView(3, 1, { mob }, MakeUnitRef(8, 1, 2));
+    moving.bots[0].moving = 1; // moving stops Auto Shot
+    policy.Decide(moving, 4200);
+    CHECK(HasCast(policy.Decide(HunterView(4, 1, { mob }, MakeUnitRef(8, 1, 2)), 5800), 75));
+}
+
+void HunterCallsItsPet()
+{
+    BotPolicy policy = ClassPolicy(3);
+    // Below level 10 there is no pet spell.
+    CHECK(!HasCast(policy.Decide(HunterView(1, 9, {}), 1000), 883));
+    // From level 10: Call Pet when nothing is to be fought, on the bot (the pet is the spell's own target).
+    auto actions = policy.Decide(HunterView(2, 10, {}), 2000);
+    CHECK(HasCast(actions, 883));
+    CHECK(CastTargetOf(actions, 883) == 0);
+    // Accepted: not called again.
+    WorldTickSnapshotView accepted = HunterView(3, 10, {});
+    Result(accepted, 883, BotActionStatus::kApplied, 1);
+    CHECK(policy.Decide(accepted, 8000).empty());
+    CHECK(policy.Decide(HunterView(4, 10, {}), 20000).empty());
+    // Not with a creature to fight.
+    CHECK(!HasCast(ClassPolicy(3).Decide(HunterView(1, 10, { Hostile(2, 20.0f, 100) }), 1000), 883));
+}
+
+void HunterRevivesADeadPetThenBacksOff()
+{
+    BotPolicy policy = ClassPolicy(3);
+    policy.Decide(HunterView(1, 20, {}), 1000);
+    WorldTickSnapshotView refused = HunterView(2, 20, {});
+    Result(refused, 883, BotActionStatus::kRefused, 1); // Call Pet refused: the pet is dead
+    auto actions = policy.Decide(refused, 7000);
+    CHECK(HasCast(actions, 982) && !HasCast(actions, 883));
+
+    // Revive Pet refused too: nothing for 30 s, then Call Pet again.
+    WorldTickSnapshotView no = HunterView(3, 20, {});
+    Result(no, 982, BotActionStatus::kRefused, 2);
+    CHECK(!HasCast(policy.Decide(no, 20000), 982));
+    CHECK(policy.Decide(HunterView(4, 20, {}), 30000).empty());
+    CHECK(HasCast(policy.Decide(HunterView(5, 20, {}), 51000), 883));
+
+    // A Revive Pet that is accepted ends it.
+    BotPolicy ok = ClassPolicy(3);
+    ok.Decide(HunterView(1, 20, {}), 1000);
+    WorldTickSnapshotView dead = HunterView(2, 20, {});
+    Result(dead, 883, BotActionStatus::kRefused, 1);
+    ok.Decide(dead, 7000);
+    WorldTickSnapshotView revived = HunterView(3, 20, {});
+    Result(revived, 982, BotActionStatus::kApplied, 2);
+    CHECK(ok.Decide(revived, 20000).empty());
+    CHECK(ok.Decide(HunterView(4, 20, {}), 40000).empty());
+}
+
+void HunterChecksItsPetAfterAFight()
+{
+    BotPolicy policy = ClassPolicy(3);
+    NearbyUnit const mob = Hostile(2, 20.0f, 100);
+    // Pet out (Call Pet accepted), then a fight.
+    policy.Decide(HunterView(1, 20, {}), 1000);
+    WorldTickSnapshotView out = HunterView(2, 20, {});
+    Result(out, 883, BotActionStatus::kApplied, 1);
+    policy.Decide(out, 7000);
+    policy.Decide(HunterView(3, 20, { mob }, MakeUnitRef(8, 1, 2)), 9000);
+    // After the fight Mend Pet checks and heals it.
+    auto actions = policy.Decide(HunterView(4, 20, {}), 15000);
+    CHECK(HasCast(actions, 136));
+    CHECK(CastTargetOf(actions, 136) == 0);
+    // Accepted: the pet is there, no more casts.
+    WorldTickSnapshotView mended = HunterView(5, 20, {});
+    Result(mended, 136, BotActionStatus::kApplied, 2);
+    CHECK(policy.Decide(mended, 22000).empty());
+    CHECK(policy.Decide(HunterView(6, 20, {}), 30000).empty());
+
+    // Mend Pet refused (no pet to heal): Call Pet follows.
+    BotPolicy gone = ClassPolicy(3);
+    gone.Decide(HunterView(1, 20, {}), 1000);
+    gone.Decide(out, 7000);
+    gone.Decide(HunterView(3, 20, { mob }, MakeUnitRef(8, 1, 2)), 9000);
+    gone.Decide(HunterView(4, 20, {}), 15000);
+    WorldTickSnapshotView no = HunterView(5, 20, {});
+    Result(no, 136, BotActionStatus::kRefused, 2);
+    CHECK(HasCast(gone.Decide(no, 22000), 883));
+
+    // Below level 12 there is no Mend Pet: Call Pet is the check.
+    BotPolicy low = ClassPolicy(3);
+    low.Decide(HunterView(1, 10, {}), 1000);
+    WorldTickSnapshotView lowOut = HunterView(2, 10, {});
+    Result(lowOut, 883, BotActionStatus::kApplied, 1);
+    low.Decide(lowOut, 7000);
+    low.Decide(HunterView(3, 10, { mob }, MakeUnitRef(8, 1, 2)), 9000);
+    CHECK(HasCast(low.Decide(HunterView(4, 10, {}), 15000), 883));
+}
+
+void HunterMendsItsPetInALongFight()
+{
+    BotPolicy policy = ClassPolicy(3);
+    NearbyUnit const mob = Hostile(2, 20.0f, 100);
+    policy.Decide(HunterView(1, 20, {}), 1000);
+    WorldTickSnapshotView out = HunterView(2, 20, {});
+    Result(out, 883, BotActionStatus::kApplied, 1);
+    policy.Decide(out, 7000);
+    // The fight starts at 10 s: no Mend Pet early, one after 15 s, not again within 30 s.
+    policy.Decide(HunterView(3, 20, { mob }, MakeUnitRef(8, 1, 2)), 10000);
+    CHECK(!HasCast(policy.Decide(HunterView(4, 20, { mob }, MakeUnitRef(8, 1, 2)), 14000), 136));
+    CHECK(HasCast(policy.Decide(HunterView(5, 20, { mob }, MakeUnitRef(8, 1, 2)), 26000), 136));
+    CHECK(!HasCast(policy.Decide(HunterView(6, 20, { mob }, MakeUnitRef(8, 1, 2)), 30000), 136));
+    // Not without mana.
+    BotPolicy dry = ClassPolicy(3);
+    dry.Decide(HunterView(1, 20, {}), 1000);
+    dry.Decide(out, 7000);
+    dry.Decide(HunterView(3, 20, { mob }, MakeUnitRef(8, 1, 2)), 10000);
+    WorldTickSnapshotView low = HunterView(5, 20, { mob }, MakeUnitRef(8, 1, 2));
+    low.bots[0].power = 10;
+    low.bots[0].max_power = 100;
+    CHECK(!HasCast(dry.Decide(low, 26000), 136));
+}
+
 int main()
 {
+    AutoShotIsNotReissuedWhileActive();
+    AutoShotIsReissuedAfterTheFightAndWhenRefused();
+    AutoShotIsReissuedAfterMoving();
+    HunterCallsItsPet();
+    HunterRevivesADeadPetThenBacksOff();
+    HunterChecksItsPetAfterAFight();
+    HunterMendsItsPetInALongFight();
     HealerHealsTheHurtMember();
     HealerHealsItselfWithoutATarget();
     NoHealWhileEveryoneIsHealthy();
@@ -1595,6 +2045,7 @@ int main()
     BotFightsBackAgainstAStrongAttacker();
     BotInCombatIgnoresThePackLimit();
     BotLootsTheCreatureItKilled();
+    GroupmateDoesNotLootACorpseAlreadyTaken();
     NoLootWhileInCombat();
     NoLootForACorpseItDidNotFight();
     NoLootForADistantCorpse();
@@ -1631,9 +2082,15 @@ int main()
     NoPartyActionsInCombat();
     SealIsNotRecastWhileUp();
     EviscerateAtFivePoints();
+    SaberSlashCountsAsAComboPoint();
     HostilePlayerDoesNotBlockRest();
     RangedBotWithoutPowerWalksIn();
     MageCastsFromRange();
+    NoCastWhileASpellIsInFlight();
+    RangedRowsKeepASlackInsideTheirRange();
+    OutOfRangeRefusalMakesTheCasterStandCloser();
+    CooldownRefusalHoldsEverySpellForAMoment();
+    RepeatedLineOfSightRefusalsAvoidTheTarget();
     WarlockDotIsNotRecastWhileRunning();
     PriestShieldsItselfWhenHurt();
     RogueKicksACastingTarget();
@@ -1685,6 +2142,12 @@ int main()
     HealBeatsResurrect();
     PartyWaitIsLoggedForARezAndForAGhost();
     OnlyChangesArePublished();
+    StalledTargetIsLeftAloneForMinutes();
+    GreyCreatureIsNotPulled();
+    GreyCreatureDoesNotKeepTheBotFromExploring();
+    IdleCasterDrinksWhenLowOnMana();
+    ManaRestIsCappedAndNotRepeatedAtOnce();
+    FighterWithoutManaDoesNotDrink();
 
     if (failures == 0)
         std::printf("policy_test: all checks passed\n");

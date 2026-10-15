@@ -6,7 +6,7 @@ from 1 to 60 and, in a party of five, clear a dungeon.
 
 ## Status
 
-Built and unit-tested (9 test suites). Run on a dedicated sim worldserver with 300, 500 and 1000 bots: spawn and login, the ramp,
+Built and unit-tested (16 test suites). Run on a dedicated sim worldserver with 300, 500 and 1000 bots: spawn and login, the ramp,
 the safety valves, telemetry and the pump all work. What is **not yet verified** on the sim: sustained combat and kills (the last run
 found bots could not see neutral creatures, now fixed), experience and levelling, vendor and hub walks, parties and looting.
 
@@ -18,7 +18,8 @@ found bots could not see neutral creatures, now fixed), experience and levelling
 | M6 travel to a vendor | built, not verified |
 | M7 hubs, looting, safe pulls | built, not verified |
 | M8 parties | built, not verified |
-| M5 quests 1 to 10, levelling 1 to 60, M9 dungeon | not started |
+| M9 dungeons: data file of routes, `Dungeon` config, boss-clear rule | first slice built (unit-tested), not run on the sim; see `doc/dungeons.md` |
+| M5 quests 1 to 10, levelling 1 to 60 | partly built (quest, whole-world quest and grind-spot data), not verified |
 
 ## Needs
 
@@ -64,14 +65,19 @@ Each tick the policy (`src/bot_policy.cpp`) reads the bot's snapshot and sends a
   trainer). It skips a creature more than two levels above it and elites, and does not pull a group of more than three within 10 yards;
   but a bot that is in combat with no target of its own is being attacked, and fights back against the closest creature whatever its level.
 - **Refused targets.** A unit whose attack is refused, that a cast reports with no valid target, or that the bot walks toward for 30 s
-  without reaching, is avoided for 30 s, doubling on each repeat up to 2 minutes.
+  without reaching, is avoided for 30 s, doubling on each repeat up to 2 minutes. A fight in which neither side's health goes down for 45 s
+  (a target out of reach) is given up, and that target is avoided for 5 minutes, then 10, 20 and 40.
 - **Approach and attack.** Melee classes close to 5 yards, ranged classes (hunter, priest, shaman, mage, warlock, druid) to 25. A ranged
   bot below 15% power walks in to melee. Below 30% health a bot disengages.
 - **Rotation** (`src/combat_rotation.cpp`). Every spawned class has rank 1 rows; the core casts the highest rank known. A row is skipped
-  until the bot reaches the level a trainer teaches it (`LearnLevel`, from the Forever trainer data). One cast per global cooldown; a
-  refused cast is retried after a while. Damage-over-time spells and self buffs are not recast while their effect runs; a rogue counts its
+  until the bot reaches the level a trainer teaches it (`LearnLevel`, from the Forever trainer data). One cast per global cooldown, and none while the bot has any spell in progress (a Fireball in flight counts); a
+  ranged row is used two yards inside its range, measured in three dimensions; a refused cast is retried after a while, an out-of-range
+  one makes the bot stand closer for 5 s, and three line-of-sight refusals in a row drop the target. Damage-over-time spells and self buffs are not recast while their effect runs; a rogue counts its
   own combo points.
-- **Rest.** An idle bot below 90% health sits and stays sat until healed, and stands before it moves or fights.
+- **Rest.** An idle bot below 90% health sits and stays sat until healed, and stands before it moves or fights. An idle mana user below 40% mana
+  sits too, until 90% (at most 2 minutes at a time, then not again for 5), and does not walk off while it drinks.
+- **Grey creatures.** A creature far enough below the bot to give no experience (the classic zero-experience difference: 5 levels up to level 7,
+  more above) is not pulled and does not keep an idle bot from walking on; one that attacks the bot, or that a quest wants, is still fought.
 - **Vendor and travel.** An idle bot due a visit walks to the nearest vendor on its map (found by the core, since a bot sees only 40
   yards) and visits within 4 yards: sell grey items, repair, equip the best gear. A walk over 3 minutes is dropped until the next interval.
 - **Hubs.** A bot idle for 30 s with nothing in view walks to the next hub of its map and waits a full interval there before walking on.
@@ -99,6 +105,11 @@ Kinds: `summary`, `fight_start`, `fight_end` (detail: reason, target, duration, 
 - A fight starts when the bot's own attack target is set. `fight_end` reason `target_gone` means the target was not in view when the
   threat dropped (usually a kill, also a leash or a target that left); `no_threat` means it was still alive and in view.
 - `stuck` is a fight with no change in health, position or target for 60 seconds.
+- `time_ms` is the machine's monotonic clock: it starts again after a reboot, and the counters in each line start again when the module
+  restarts. `tools/soak_report.py` splits the file into runs where the clock steps back or no line was written for 5 minutes, leaves the
+  gaps out of the hours, and adds the counters of each stretch.
+- Quest hand-ins: a hand-in the core refuses (bags full) sends the bot to the nearest vendor at once, even in the middle of quest work, and
+  the hand-in is tried again after the visit.
 - If the summary lines stop, the module has stopped.
 
 ## Build
@@ -118,15 +129,19 @@ Without `FOREVER_MODULE_SDK_SOURCE`, CMake fetches `Trixx34/forever-module-sdk` 
 - `src/bot_settings.{h,cpp}`: the module's config. `src/bot_pick.{h,cpp}`: valid race/class combinations and the seeded pick.
 - `src/bot_ramp.{h,cpp}`: the ramp schedule. `src/bot_store.{h,cpp}`: the store row keys.
 - `src/bot_telemetry.{h,cpp}`, `src/rotating_file.{h,cpp}`: the telemetry CSV and its rotating file.
+- `src/dungeon_data.{h,cpp}`: the dungeon file (routes, bosses, entry) and its merge into the scenario config. `data/dungeons.txt`, `tools/make_dungeon.py`, `doc/dungeons.md`.
 - `src/main.cpp`: handshake, config, control requests, revocations, the ramp timer and the Tier 2 pump thread.
 - `tests/*_test.cpp`: unit tests for each library.
 
 ## Known gaps
 
-- No quest, levelling or dungeon logic yet (M5, M7 levelling, M9). Bots fight what they meet and wander between hubs.
-- The rotations follow the vanilla kits; Forever's changed abilities (for example Holy Strike, Demonic Brand) are not used yet.
-- A hunter has no pet handling, and Auto Shot's repeated casts are unchecked. Rend's bleed is estimated (21 s per accepted cast)
-  because the snapshot has no auras. A fleeing target is not detected.
+- Quests and levelling are built from data files but not verified on the sim. Dungeons (M9) are a first slice: a data-driven route and a boss-clear rule on top of the scenario director; the sample Ragefire Chasm route is approximate, no run has been done on the sim, there is no crowd control, boss mechanics or walk to the portal (`doc/dungeons.md`).
+- The rotation spec uses the Forever abilities that could be verified in the client data (Holy Strike, Divine Storm, Chaos Bolt and others; `doc/rotations.md`). Abilities that need special handling or whose effect could not be verified (Demonic Brand, rogue finishers, forms, channels) are not used yet.
+- A hunter's pet is handled by spell casts only (Call Pet 883, Revive Pet 982, Mend Pet 136, its state guessed from accepted and
+  refused casts): the snapshot has no pet and the core has no pet command action, so the pet's health and presence are not seen and
+  the pet is not sent to attack the bot's target (it acts on its own AI). See doc/rotations.md, Limits, for the core/SDK change
+  needed. Auto Shot is tracked and not re-cast while active. Rend's bleed is estimated (21 s per accepted cast) because the
+  snapshot has no auras. A fleeing target is not detected.
 - Hub positions come from the sim's quest-giver clusters and may sit in rock; a bot that cannot reach one gives up after 3 minutes.
 - Classes 6 and 10 are not spawned.
 
@@ -172,3 +187,5 @@ or the class's `ScenarioGear<class>` list), waits for the party to form, telepor
 lets the leader walk the route (it waits for members more than 30 yards behind and while its health is under 80%). One result line is
 written when it ends: `scenario <name>: outcome=<complete|wipe|timeout|enter_failed> furthest=3/7 deaths=2 alive=3/5 run=412s`.
 `tests/scenario_test.cpp` covers the director, the route and the settings.
+
+**Dungeon runs (M9).** `DungeonFile = data/dungeons.txt` and `Dungeon = rfc` run a dungeon as a scenario: the file gives the roster (tank first, healer, three dps), the door and the entry, the boss list and the route, and `ScenarioRequireBosses` makes the run complete when every boss has been seen dead (`bosses_missing` if the leader reaches the end without). Keys you set yourself win over the file. The tank leads and pulls pack by pack, the healer heals, rest and corpse runs are the existing party and scenario logic. First slice, unit-tested only; the Ragefire Chasm route in the sample file is approximate. See `doc/dungeons.md`.

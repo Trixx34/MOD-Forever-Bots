@@ -21,6 +21,13 @@ constexpr float kDisengagePct = 30.0f;       // below this health the bot stops 
 constexpr std::uint64_t kGlobalCooldownMs = 1500;
 constexpr std::uint64_t kRetryMs = 1000;     // out of range, invalid target, refused, not enough power
 constexpr std::uint64_t kCooldownRetryMs = 2000;
+constexpr float kRangeSlackYards = 2.0f;        // a ranged row is used this far inside its range: the snapshot is a tick old and the units move
+constexpr std::uint64_t kPowerRetryMs = 2000;    // a cast refused for lack of mana, rage or energy: power comes back slowly
+constexpr std::uint64_t kHeldCastMs = 500;       // after a cooldown or generic refusal no other spell is tried for this long (often the global cooldown)
+constexpr std::uint64_t kCloserAfterRangeMs = 5000; // after an out-of-range refusal the bot stands closer for this long
+constexpr float kCasterCloserYards = 15.0f;      // the closer stand-off of a ranged bot after an out-of-range refusal
+constexpr float kMeleeCloserYards = 3.0f;        // and of a melee bot
+constexpr std::uint32_t kLosRefusalsAvoid = 3;   // this many line-of-sight refusals in a row and the target is avoided
 constexpr std::uint64_t kBusyRetryMs = 300;  // a cast refused because the bot was casting or moving: tried again very soon
 constexpr std::uint64_t kNotKnownRetryMs = 60000; // the spell may be learned later
 constexpr float kPullRadius = 10.0f;         // yards: hostiles this close to a candidate are pulled with it
@@ -35,7 +42,26 @@ constexpr std::uint32_t kServiceEquip = 4;
 // Combo points: the rogue's Sinister Strike spell and the spend, and the points a finisher needs.
 constexpr std::uint32_t kSinisterStrike = 1752;
 constexpr std::uint32_t kEviscerate = 2098;
+constexpr std::uint32_t kAutoShot = 75;
+constexpr std::uint32_t kCallPet = 883;
+constexpr std::uint32_t kRevivePet = 982;
+constexpr std::uint32_t kMendPet = 136;
+constexpr std::uint32_t kHunterClass = 3;
+constexpr std::uint64_t kPetBackoffMs = 30000;       // first wait after a refused revive; doubles per failure
+constexpr std::uint64_t kPetBackoffMaxMs = 300000;
+constexpr std::uint64_t kPetProbeMs = 120000;        // below level 12 a Call Pet check after a fight is sent at most this often
+constexpr std::uint64_t kPetMendEveryMs = 30000;     // Mend Pet in a fight at most this often
+constexpr std::uint64_t kPetMendAfterMs = 15000;     // and only once the fight has lasted this long
+constexpr std::uint32_t kPetMendManaPct = 50;        // and with at least this much mana
 constexpr std::uint32_t kMaxComboPoints = 5;
+// Saber Slash (Forever): like Sinister Strike it gives one combo point (SpellEffect 30 energize, power type 4, 1 point, in the client data).
+constexpr std::uint32_t kSaberSlash = 424785;
+
+// Combo points a rogue spell adds on its target when it lands, 0 for any other spell.
+std::uint32_t ComboPointsGained(std::uint32_t spell)
+{
+    return spell == kSinisterStrike || spell == kSaberSlash ? 1 : 0;
+}
 // A ranged bot below this share of its power walks to melee range and fights there, since its spells are spent.
 constexpr std::uint32_t kOutOfPowerPct = 15;
 constexpr float kMeleeApproachYards = 5.0f;
@@ -77,8 +103,16 @@ constexpr float kBuffRangeYards = 30.0f;            // a party buff reaches memb
 constexpr std::size_t kGrindMemory = 2;           // grind spots remembered as just visited
 constexpr std::uint32_t kAcceptRefusalsMax = 3;       // resurrect answers refused this often in a row: the offer is left alone for a while
 constexpr std::uint64_t kAcceptIgnoreMs = 60000;
-constexpr std::uint64_t kFightStallMs = 90000;       // a fight in which neither side's health went down this long is given up
+constexpr std::uint64_t kFightStallMs = 45000;       // a fight in which neither side's health went down this long is given up (the telemetry calls 60 s "stuck")
+constexpr std::uint64_t kStallAvoidMs = 300000;      // a target the fight stalled against is left alone 5 minutes, 10, 20, then 40 at most
+constexpr std::uint32_t kMaxStallDoublings = 3;
+constexpr std::uint32_t kRestManaBelowPct = 40;      // an idle mana user below this sits down to drink in the open
+constexpr std::uint32_t kRestManaUntilPct = 90;      // and stays sat until it has this much
+constexpr std::uint64_t kManaRestMaxMs = 120000;     // but never longer than this at a time
+constexpr std::uint64_t kManaRestBlockMs = 300000;   // and not again for this long after a rest that did not refill the mana
 constexpr std::uint32_t kHubFailuresMax = 2;         // hub walks in a row that failed before the bot explores on foot instead
+constexpr std::uint64_t kStuckCheckMs = 300000;       // every 5 minutes a bot that has not moved reports why it is not doing anything
+constexpr std::uint64_t kGrindRetryMs = 60000;        // a bot that found no grind spot explores on foot this long before it looks again
 constexpr std::uint64_t kExploreIdleMs = 10000;      // an idle bot with nowhere to go takes a short walk after this long
 constexpr std::uint64_t kExploreTimeoutMs = 60000;
 constexpr float kExploreReachYards = 6.0f;
@@ -101,6 +135,13 @@ constexpr std::uint64_t kReleaseRetryMs = 3000;      // a release not yet seen t
 constexpr std::uint64_t kAcceptRetryMs = 2000;
 constexpr std::uint64_t kReclaimRetryMs = 3000;
 constexpr float kReclaimYards = 35.0f;               // the core allows 39 yards; the ghost reclaims from this close
+
+// A cast or channel is in progress. cast_remaining_ms is no test: it is 0 while a spell is in flight (a Fireball after the cast, state
+// "delayed"), which the core still counts as casting and refuses every other cast for ("bot is casting spell N").
+bool IsCasting(BotSnapshot const& bot)
+{
+    return bot.casting_spell != 0;
+}
 
 // Spells with a cast time (or a channel), which cannot be started while moving. The core's refusals add to the bot's own list, so a
 // spell missing here is learned after its first refusal.
@@ -176,6 +217,41 @@ float DistanceBetween(NearbyUnit const& a, NearbyUnit const& b)
 
 bool IsLiveMob(NearbyUnit const& unit);
 
+// The level difference at which a creature gives no experience at all (the classic "grey" rule: GetZeroDifference). Whether this fork
+// changes it is not known; the vanilla table is used.
+std::uint32_t ZeroExpDifference(std::uint32_t level)
+{
+    if (level < 8)
+        return 5;
+    if (level < 10)
+        return 6;
+    if (level < 12)
+        return 7;
+    if (level < 16)
+        return 8;
+    if (level < 20)
+        return 9;
+    if (level < 30)
+        return 11;
+    if (level < 40)
+        return 12;
+    if (level < 45)
+        return 13;
+    if (level < 50)
+        return 14;
+    if (level < 55)
+        return 15;
+    if (level < 60)
+        return 16;
+    return 17;
+}
+
+// A creature far enough below the bot that killing it gives no experience: not worth pulling. (A level of 0 is unknown and not judged.)
+bool IsGrey(BotSnapshot const& bot, NearbyUnit const& unit)
+{
+    return bot.level != 0 && unit.level != 0 && unit.level < bot.level && bot.level - unit.level >= ZeroExpDifference(bot.level);
+}
+
 // The closest live hostile that is not part of a group larger than kMaxPull, or nullptr. A group is the hostiles within
 // kPullRadius of the candidate, the candidate included. Units already attacking the bot are not chosen here; the policy
 // fights its threat target whatever the group size.
@@ -192,6 +268,10 @@ NearbyUnit const* PullTarget(BotSnapshot const& bot, std::span<NearbyUnit const>
         // A bot hunting for a quest pulls only the creatures the quest wants (unless it is already being attacked).
         if (!defending && !onlyEntries.empty() &&
             std::find(onlyEntries.begin(), onlyEntries.end(), forever_module::UnitRefEntry(candidate.guid)) == onlyEntries.end())
+            continue;
+        // Nothing to gain from a grey creature (no experience): left alone, so the bot goes looking for something that levels it. Not when
+        // hunting for a quest (the quest wants it), nor in a dungeon, nor when the bot is already being attacked.
+        if (!defending && !dungeon && onlyEntries.empty() && IsGrey(bot, candidate))
             continue;
         // Not worth pulling: well above the bot's level, or an elite. (A level of 0 is unknown and not judged.) A bot that is already
         // in combat is being attacked, and the snapshot does not say by what: it fights the closest creature, whatever its level, since
@@ -257,6 +337,16 @@ void AvoidUnit(std::unordered_map<std::uint64_t, std::uint64_t>& avoidUntil, std
     std::uint32_t const times = ++count[ref];
     std::uint32_t const doublings = std::min<std::uint32_t>(times - 1, kMaxAvoidDoublings);
     avoidUntil[ref] = nowMs + (kAvoidMs << doublings);
+}
+
+// A stalled fight (nothing lost on either side): the target is left alone much longer than a refused one, more each time, because it is
+// out of reach or bugged, and the bot has nothing to gain by coming back to it every two minutes (a mage did that for an hour and a half).
+void AvoidStalledUnit(std::unordered_map<std::uint64_t, std::uint64_t>& avoidUntil, std::unordered_map<std::uint64_t, std::uint32_t>& count,
+                      std::uint64_t ref, std::uint64_t nowMs)
+{
+    std::uint32_t const times = ++count[ref];
+    std::uint32_t const doublings = std::min<std::uint32_t>(times - 1, kMaxStallDoublings);
+    avoidUntil[ref] = nowMs + (kStallAvoidMs << doublings);
 }
 
 // The live creature in `units` with this reference, or nullptr.
@@ -362,7 +452,13 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
     // A quest action refused (not eligible, bags full, no NPC in reach): the quest is left alone for a while.
     if (bot.last_action_type == uint8_t(ActionType::kQuest) && bot.last_action_status == BotActionStatus::kRefused)
     {
-        _quests.NoteRefused(state.Quest, nowMs);
+        if (_quests.NoteRefused(state.Quest, nowMs))
+        {
+            // A hand-in the core refused: the reward did not fit in the bags. A bot with quest work is never idle, so the vendor visit that
+            // empties the bags (sell, equip) is not left to the idle bot's turn.
+            state.ServiceUrgent = true;
+            state.NextServiceMs = 0;
+        }
         return;
     }
 
@@ -437,6 +533,55 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
         }
         return;
     }
+    if (spell == kCallPet || spell == kRevivePet || spell == kMendPet)
+    {
+        // The snapshot has no pet, so the results of the pet casts are the only evidence of its state.
+        switch (bot.last_action_status)
+        {
+            case BotActionStatus::kApplied:
+                state.PetMissing = false;
+                state.PetDead = false;
+                state.PetProbe = false;
+                state.PetFailures = 0;
+                state.PetRetryAtMs = 0;
+                if (spell == kMendPet)
+                    state.AutoShotTarget = 0; // the channel stops Auto Shot: it is cast again afterwards
+                break;
+            case BotActionStatus::kRefused:
+            case BotActionStatus::kInvalidTarget:
+            case BotActionStatus::kNoLineOfSight:
+                if (spell == kCallPet)
+                {
+                    // Call Pet is refused for a dead pet (or for no pet at all, which Revive Pet's refusal then shows).
+                    state.PetDead = true;
+                    state.PetMissing = true;
+                }
+                else if (spell == kRevivePet)
+                {
+                    state.PetDead = false; // maybe it was alive after all, or there is no pet: Call Pet is tried again after the backoff
+                    state.PetMissing = true;
+                    ++state.PetFailures;
+                    std::uint64_t wait = kPetBackoffMs;
+                    for (std::uint32_t i = 1; i < state.PetFailures && wait < kPetBackoffMaxMs; ++i)
+                        wait *= 2;
+                    state.PetRetryAtMs = nowMs + std::min(wait, kPetBackoffMaxMs);
+                }
+                else
+                {
+                    state.PetMissing = true; // Mend Pet has no pet to heal
+                    state.PetProbe = false;
+                }
+                break;
+            default:
+                break; // busy, moving, cooldown, no power, out of range, not known: the usual retry below, the pet state is unchanged
+        }
+    }
+    if (spell == kAutoShot && bot.last_action_status == BotActionStatus::kApplied)
+    {
+        auto const shot = state.CastTarget.find(spell);
+        if (shot != state.CastTarget.end())
+            state.AutoShotTarget = shot->second;
+    }
     if (bot.last_action_status == BotActionStatus::kInvalidTarget)
     {
         // The cast had no valid target: that unit is avoided too, so the next cast goes to another one.
@@ -445,7 +590,19 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
             AvoidUnit(state.AvoidUntilMs, state.AvoidCount, cast->second, nowMs);
     }
     if (bot.last_action_status == BotActionStatus::kNoLineOfSight)
+    {
         state.CloserUntilMs = nowMs + kCloserAfterLosMs; // walls between them: close in rather than cast through them
+        auto const cast = state.CastTarget.find(spell);
+        if (++state.LosRefusals >= kLosRefusalsAvoid && cast != state.CastTarget.end() && cast->second != 0)
+        {
+            AvoidUnit(state.AvoidUntilMs, state.AvoidCount, cast->second, nowMs); // still no sight after closing in: another target
+            state.LosRefusals = 0;
+        }
+    }
+    else if (bot.last_action_status != BotActionStatus::kBusy && bot.last_action_status != BotActionStatus::kMoving)
+        state.LosRefusals = 0;
+    if (bot.last_action_status == BotActionStatus::kOutOfRange)
+        state.RangeCloserUntilMs = nowMs + kCloserAfterRangeMs; // the snapshot's distance was short of the core's: stand closer for a while
     if (bot.last_action_status == BotActionStatus::kApplied)
     {
         // The target of the cast as sent: 0 for a spell on the bot itself (a self buff such as a seal).
@@ -459,10 +616,10 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
                 state.BuffUntilMs[{ spell, cast->second }] = nowMs + duration;
             }
 
-            if (spell == kSinisterStrike)
+            if (std::uint32_t const gained = ComboPointsGained(spell); gained != 0)
             {
-                // A Sinister Strike on a new target starts the count again.
-                state.ComboPoints = (state.ComboTarget == cast->second) ? std::min(state.ComboPoints + 1, kMaxComboPoints) : 1;
+                // A builder on a new target starts the count again.
+                state.ComboPoints = (state.ComboTarget == cast->second) ? std::min(state.ComboPoints + gained, kMaxComboPoints) : gained;
                 state.ComboTarget = cast->second;
             }
         }
@@ -478,6 +635,7 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
             break;
         case BotActionStatus::kOnCooldown:
             state.RetryAtMs[spell] = nowMs + kCooldownRetryMs;
+            state.NextCastMs = std::max(state.NextCastMs, nowMs + kHeldCastMs); // usually the global cooldown: no other spell meanwhile
             break;
         case BotActionStatus::kBusy:
             state.RetryAtMs[spell] = nowMs + kBusyRetryMs; // another cast is in progress: soon, not after the long retry
@@ -487,11 +645,19 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
             state.CastTimeSpells.insert(spell);            // remembered: the bot stops before this spell from now on
             state.RetryAtMs[spell] = nowMs + kBusyRetryMs;
             break;
+        case BotActionStatus::kNotEnoughPower:
+            state.RetryAtMs[spell] = nowMs + kPowerRetryMs;
+            break;
+        case BotActionStatus::kRefused:
+            state.RetryAtMs[spell] = nowMs + kRetryMs;
+            // A silent refusal (result 32) is the global cooldown too. A refused pet cast is the answer to "is there a pet": no hold, the
+            // follow-up (Revive Pet after Call Pet) goes at once.
+            if (spell != kCallPet && spell != kRevivePet && spell != kMendPet)
+                state.NextCastMs = std::max(state.NextCastMs, nowMs + kHeldCastMs);
+            break;
         case BotActionStatus::kOutOfRange:
         case BotActionStatus::kNoLineOfSight:
-        case BotActionStatus::kNotEnoughPower:
         case BotActionStatus::kInvalidTarget:
-        case BotActionStatus::kRefused:
             state.RetryAtMs[spell] = nowMs + kRetryMs;
             break;
         case BotActionStatus::kApplied:
@@ -875,6 +1041,11 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 state.RunStartDist = 0.0f;
                 state.RunProgress = 0;
                 state.InFight = false;
+                state.AutoShotTarget = 0;
+                state.PetMissing = true; // the pet is dismissed with its dead owner: Call Pet after the resurrection
+                state.PetDead = false;
+                state.PetProbe = false;
+                state.PetFought = false;
                 state.Sitting = false;
                 state.Approaching = false;
                 state.Traveling = false;
@@ -1054,7 +1225,24 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             state.NextCastMs = 0;
         }
 
-        NearbyUnit const* player = Closest(bot, nearby, IsPlayer);
+        // The closest friendly player an idle bot follows. A player is someone else: another bot this module controls is not one. Bots standing
+        // together at a start zone each followed the nearest of the others, in circles, and never left (the Undead, Tauren and Night Elf bots of
+        // the soak, which stand on the same few spots by race).
+        NearbyUnit const* player = nullptr;
+        {
+            float bestPlayerDist = std::numeric_limits<float>::max();
+            for (NearbyUnit const& unit : nearby)
+            {
+                if (!IsPlayer(unit) || indexOf.count(unit.guid & forever_module::kUnitRefCounterMask) != 0)
+                    continue;
+                float const dist = rotation::DistanceYards(bot, unit);
+                if (dist < bestPlayerDist)
+                {
+                    bestPlayerDist = dist;
+                    player = &unit;
+                }
+            }
+        }
         bool const lowHealth = bot.max_health > 0 && std::uint64_t(bot.health) * 100 < std::uint64_t(bot.max_health) * kDisengagePct;
 
         // The bot's class: its own (from the class table) or the configured one. Ranged classes approach to range.
@@ -1294,7 +1482,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             state.StallBotHealth = bot.health;
             if (nowMs - state.StallSinceMs > kFightStallMs)
             {
-                AvoidUnit(state.AvoidUntilMs, state.AvoidCount, targetRef, nowMs);
+                AvoidStalledUnit(state.AvoidUntilMs, state.StallCount, targetRef, nowMs);
                 if (_options.OnEvent)
                     _options.OnEvent("fight_stalled: bot=" + std::to_string(bot.guid) + " target_entry=" + std::to_string(forever_module::UnitRefEntry(targetRef)) +
                                      " target_hp=" + std::to_string(targetUnit->health) + " distance=" + std::to_string(int(distance)));
@@ -1325,6 +1513,8 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             float approach = outOfPower ? kMeleeApproachYards : rotation::ApproachYards(classId);
             if (nowMs < state.CloserUntilMs)
                 approach = std::min(approach, kMeleeApproachYards + 1.0f);
+            if (nowMs < state.RangeCloserUntilMs)
+                approach = std::min(approach, approach > kMeleeApproachYards + 0.5f ? kCasterCloserYards : kMeleeCloserYards);
             if (distance <= approach)
             {
                 // A ranged bot that has walked into casting range stops there: the core's follow keeps running it into the target,
@@ -1439,9 +1629,18 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             }
         }
 
+        // An enemy near keeps the bot from idling, which keeps it from walking to grind spots. Only one the bot would actually pull counts: a bot
+        // whose start zone shows only elites, packs of four or more, or creatures well above its level used to stand there for the whole run
+        // (all 73 Undead and many Night Elf and Tauren bots of the 8-hour soak), neither fighting nor leaving. A bot that holds position by
+        // order (a party waiting in a dungeon, no self pull) still counts any live creature.
         bool enemyNear = false;
-        for (NearbyUnit const& unit : nearby)
-            enemyNear = enemyNear || IsLiveMob(unit);
+        if (dungeonHold || noSelfPull)
+        {
+            for (NearbyUnit const& unit : nearby)
+                enemyNear = enemyNear || (IsLiveMob(unit) && (huntEntries.empty() ? !IsGrey(bot, unit) : true));
+        }
+        else
+            enemyNear = PullTarget(bot, nearby, avoided, false, huntEntries, _routeActive) != nullptr;
         bool idle = !hasTarget && !enemyNear && wanted.Type == ActionType::kStop && questStep.Kind == QuestStepKind::None && !routeBusy;
 
         // Seeing nothing and doing nothing, for hubs (M7): the idle time starts when the bot first is idle, and any activity
@@ -1461,7 +1660,8 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         // party member (it follows its leader). The visit is sent once the bot is in reach. A walk longer than
         // kTravelTimeoutMs is dropped and the visit waits for its next interval. A walking bot is not idle, so it neither
         // sits nor trains on the way.
-        if (idle && _options.ServiceEveryMs != 0 && nowMs >= state.NextServiceMs && !state.ChatStay)
+        bool const urgentService = state.ServiceUrgent && !hasTarget && bot.in_combat == 0 && !lowHealth && !state.InFight;
+        if ((idle || urgentService) && _options.ServiceEveryMs != 0 && nowMs >= state.NextServiceMs && !state.ChatStay)
         {
             // The nearest vendor on the bot's map, found by the core (layout 6); the nearest repairman instead when the gear is worn
             // (layout 9). None on the map, or a party member: no walk.
@@ -1484,12 +1684,18 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 else
                 {
                     state.Traveling = false;
+                    state.ServiceUrgent = false;
                     state.NextServiceMs = nowMs + _options.ServiceEveryMs;
                 }
             }
             else
             {
                 state.Traveling = false;
+                if (state.ServiceUrgent)
+                {
+                    state.ServiceUrgent = false;
+                    _quests.NoteServiced(state.Quest); // the bags are emptier: the refused hand-ins are tried again
+                }
                 BotAction vendor;
                 vendor.bot_guid = bot.guid;
                 vendor.type = ActionType::kVendor;
@@ -1501,10 +1707,35 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
 
         // Hubs (M7): a bot that has been idle for kWanderIdleMs walks to the next hub of its map, and waits there until the
         // next walk. A hurt bot rests instead, and a party member follows its leader. Anything that comes near stops the walk.
-        bool const healthy = bot.max_health == 0 || std::uint64_t(bot.health) * 100 >= std::uint64_t(bot.max_health) * kRestBelowPct;
+        // Mana (the soak's hunter spent most of its time at a third of its mana, because only health made a bot sit): an idle mana user
+        // below kRestManaBelowPct sits and drinks until kRestManaUntilPct, at most kManaRestMaxMs at a time (and not again for a while
+        // when that was not enough: mana that does not come back is not waited for). Anything else the bot does ends the rest.
+        bool const manaUser = bot.power_type == 0 && bot.max_power > 0;
+        bool manaResting = false;
+        if (idle && manaUser)
+        {
+            if (state.ManaRestSinceMs == 0 && nowMs >= state.ManaRestBlockedUntilMs &&
+                std::uint64_t(bot.power) * 100 < std::uint64_t(bot.max_power) * kRestManaBelowPct)
+                state.ManaRestSinceMs = nowMs;
+            if (state.ManaRestSinceMs != 0)
+            {
+                if (std::uint64_t(bot.power) * 100 >= std::uint64_t(bot.max_power) * kRestManaUntilPct)
+                    state.ManaRestSinceMs = 0;
+                else if (nowMs - state.ManaRestSinceMs > kManaRestMaxMs)
+                {
+                    state.ManaRestSinceMs = 0;
+                    state.ManaRestBlockedUntilMs = nowMs + kManaRestBlockMs;
+                }
+                else
+                    manaResting = true;
+            }
+        }
+        else
+            state.ManaRestSinceMs = 0;
+        bool const healthy = !manaResting && (bot.max_health == 0 || std::uint64_t(bot.health) * 100 >= std::uint64_t(bot.max_health) * kRestBelowPct);
         auto const hubs = _options.HubsByMap.find(bot.map_id);
         bool const grindMode = _options.Grind && !_options.Grind->Spots.empty() && bot.level != 0;
-        if (idle && healthy && grindMode && !partyMember && !state.ChatStay && state.ChatFollow == 0)
+        if (idle && healthy && _options.WanderWhenIdle && grindMode && nowMs >= state.GrindRetryAtMs && !partyMember && !state.ChatStay && state.ChatFollow == 0)
         {
             // Leveling: after a quiet spell the bot walks to a grind spot that suits its level (nearest first, not the ones it just left), and
             // stays to fight what lives there until it sees nothing for a while again.
@@ -1543,10 +1774,16 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                                          " spot=" + std::to_string(spots.front()) + " levels=" + std::to_string(spot.MinLevel) + "-" + std::to_string(spot.MaxLevel));
                 }
                 else
-                    state.IdleSinceMs = nowMs; // nothing on this map for this level: look again later
+                {
+                    // Nothing on this map for this level (a start zone the spot file does not cover, such as the new races' island): the bot
+                    // explores on foot for a minute, as a bot without grind data does, and then looks again. Without this it stood at its
+                    // start for the whole run.
+                    state.IdleSinceMs = nowMs;
+                    state.GrindRetryAtMs = nowMs + kGrindRetryMs;
+                }
             }
         }
-        else if (idle && healthy && !partyMember && !state.ChatStay && state.ChatFollow == 0 && hubs != _options.HubsByMap.end() && !hubs->second.empty() &&
+        else if (idle && healthy && _options.WanderWhenIdle && !partyMember && !state.ChatStay && state.ChatFollow == 0 && hubs != _options.HubsByMap.end() && !hubs->second.empty() &&
                  state.HubFailures < kHubFailuresMax)
         {
             std::vector<Point> const& list = hubs->second;
@@ -1582,7 +1819,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         // Exploring on foot: a bot with no grind spot and no hub it can reach (a map with neither, or hubs it never got to) would stand where it
         // began and never meet a creature, as 45 bots did for eight hours in the soak. After a short quiet it takes a walk of 50 to 100 yards in a
         // turning direction, and after a few walks tries its hubs again.
-        else if (idle && healthy && !grindMode && !partyMember && !state.ChatStay && state.ChatFollow == 0)
+        else if (idle && healthy && _options.WanderWhenIdle && (!grindMode || nowMs < state.GrindRetryAtMs) && !partyMember && !state.ChatStay && state.ChatFollow == 0)
         {
             if (state.Wandering)
             {
@@ -1614,6 +1851,30 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             }
         }
 
+        // A bot that stood on the same spot for a whole check interval, not fighting, says why in one event line (stuck_idle). The 73 Undead bots
+        // of the soak did this for eight hours and nothing in the logs said what held them; this line shows which condition did.
+        if (_options.OnEvent && nowMs - state.DiagAtMs >= kStuckCheckMs)
+        {
+            float const moved = std::hypot(bot.pos_x - state.DiagX, bot.pos_y - state.DiagY);
+            if (state.DiagAtMs != 0 && moved < 5.0f && bot.in_combat == 0 && !state.Sitting)
+            {
+                std::size_t hostiles = 0;
+                for (NearbyUnit const& unit : nearby)
+                    if (IsLiveMob(unit))
+                        ++hostiles;
+                _options.OnEvent("stuck_idle: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id) +
+                                 " idle=" + std::to_string(idle) + " hasTarget=" + std::to_string(hasTarget) + " enemyNear=" + std::to_string(enemyNear) +
+                                 " wanted=" + std::to_string(int(wanted.Type)) + " quest=" + std::to_string(int(questStep.Kind)) + " route=" + std::to_string(routeBusy) +
+                                 " healthy=" + std::to_string(healthy) + " mana=" + std::to_string(manaResting) + " grind=" + std::to_string(grindMode) +
+                                 " wandering=" + std::to_string(state.Wandering) + " traveling=" + std::to_string(state.Traveling) + " party=" + std::to_string(partyMember) +
+                                 " stay=" + std::to_string(state.ChatStay) + " liveHostiles=" + std::to_string(hostiles) + " nearby=" + std::to_string(nearby.size()) +
+                                 " idleForS=" + std::to_string(state.Idling ? (nowMs - state.IdleSinceMs) / 1000 : 0));
+            }
+            state.DiagAtMs = nowMs;
+            state.DiagX = bot.pos_x;
+            state.DiagY = bot.pos_y;
+        }
+
         // Rest: sit down while idle and hurt, and stand before anything moves or fights. The stand goes out before the
         // movement below, in the same action set, so the bot never moves sitting.
         // Idle means no fight and no player to follow, with no live hostile anywhere near: a sitting bot is easy prey.
@@ -1623,10 +1884,9 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         bool const stillHurt = bot.max_health > 0 && bot.health < bot.max_health;
         // Waiting for the party (dungeon): sits to recover health, and mana for a mana user, even with creatures in view.
         bool const holdIdle = dungeonHold && !hasTarget && wanted.Type == ActionType::kStop && !routeBusy;
-        bool const manaUser = bot.power_type == 0 && bot.max_power > 0;
         bool const manaLow = holdIdle && manaUser &&
                              std::uint64_t(bot.power) * 100 < std::uint64_t(bot.max_power) * (state.Sitting ? kPartyReadySitHealthPct : kPartyReadyPowerPct);
-        bool const sitWanted = (idle || holdIdle) && (state.Sitting ? (stillHurt || manaLow) : (hurtEnough || manaLow)) &&
+        bool const sitWanted = (idle || holdIdle) && (state.Sitting ? (stillHurt || manaLow || manaResting) : (hurtEnough || manaLow || manaResting)) &&
                                nowMs >= state.RestRetryAtMs;
         if (sitWanted != state.Sitting)
         {
@@ -1714,8 +1974,22 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             {
                 if (unit.health != 0 || forever_module::UnitRefType(unit.guid) != 8 || state.LootedUntilMs.count(unit.guid))
                     continue;
-                if (!state.FoughtAtMs.count(unit.guid) || rotation::DistanceYards(bot, unit) > kLootRangeYards)
+                if (!state.FoughtAtMs.count(unit.guid) || rotation::DistanceYards3d(bot, unit) > kLootRangeYards)
                     continue;
+                // A groupmate already took this corpse (the core loots all of it for the group): nothing is left for this bot.
+                std::uint64_t const lootGroup = bot.group_leader_guid != 0 ? bot.group_leader_guid : bot.guid;
+                if (auto const claim = _lootClaims.find(unit.guid); claim != _lootClaims.end() && nowMs < claim->second.UntilMs)
+                {
+                    if (claim->second.Group == lootGroup)
+                    {
+                        state.FoughtAtMs.erase(unit.guid);
+                        continue;
+                    }
+                }
+                else if (_lootClaims.size() > 512)
+                    for (auto it = _lootClaims.begin(); it != _lootClaims.end();)
+                        it = nowMs >= it->second.UntilMs ? _lootClaims.erase(it) : std::next(it);
+                _lootClaims[unit.guid] = LootClaim{ lootGroup, nowMs + kLootWindowMs };
 
                 BotAction loot;
                 loot.bot_guid = bot.guid;
@@ -1746,7 +2020,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         }
 
         // A heal order: the healer casts its heal on the speaker's selected friend, once.
-        if (state.ForcedHeal != 0 && nowMs >= state.NextCastMs && !(bot.casting_spell != 0 && bot.cast_remaining_ms != 0))
+        if (state.ForcedHeal != 0 && nowMs >= state.NextCastMs && !(IsCasting(bot)))
         {
             std::uint32_t const orderedSpell = HealSpellFor(classId, bot.level);
             if (orderedSpell != 0 && bot.moving != 0 && (KnownCastTimeSpell(orderedSpell) || state.CastTimeSpells.count(orderedSpell)))
@@ -1775,7 +2049,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         }
 
         // Healing: a healer class in a party heals the party member (itself included) with the least health, below kHealBelowPct, in range.
-        if (partyLeader != 0 && nowMs >= state.NextCastMs && !(bot.casting_spell != 0 && bot.cast_remaining_ms != 0))
+        if (partyLeader != 0 && nowMs >= state.NextCastMs && !(IsCasting(bot)))
         {
             std::uint32_t const healSpell = state.Role_ == BotState::Role::Dps ? 0u : HealSpellFor(classId, bot.level);
             auto const retry = healSpell != 0 ? state.RetryAtMs.find(healSpell) : state.RetryAtMs.end();
@@ -1899,9 +2173,56 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             }
         }
 
+        // Hunter pet (out of combat, standing, nothing to fight). Only spell casts are available: there is no pet in the snapshot and no pet command
+        // action. A pet that is not believed to be out is called (a refusal means it is dead: Revive Pet); after a fight Mend Pet (level 12) heals it
+        // and, refused, shows it is gone; a failed revive backs off. Sending it to attack is not possible (doc/rotations.md, Limits).
+        if (classId == kHunterClass && !hasTarget && bot.in_combat == 0 && bot.moving == 0 && wanted.Type == ActionType::kStop && nowMs >= state.NextCastMs &&
+            !(bot.casting_spell != 0 && bot.cast_remaining_ms != 0) && !state.Sitting && nowMs >= state.PetRetryAtMs)
+        {
+            if (state.PetFought)
+            {
+                state.PetFought = false;
+                state.PetProbe = true;
+            }
+            std::uint32_t petSpell = 0;
+            if (state.PetMissing)
+                petSpell = state.PetDead ? kRevivePet : kCallPet;
+            else if (state.PetProbe)
+            {
+                if (bot.level == 0 || bot.level >= rotation::LearnLevel(kMendPet))
+                    petSpell = kMendPet;
+                else if (nowMs >= state.PetProbeAtMs)
+                    petSpell = kCallPet;
+                else
+                    state.PetProbe = false;
+            }
+            if (petSpell != 0)
+            {
+                auto const retry = state.RetryAtMs.find(petSpell);
+                bool const learned = bot.level == 0 || bot.level >= rotation::LearnLevel(petSpell);
+                if (learned && (retry == state.RetryAtMs.end() || nowMs >= retry->second))
+                {
+                    BotAction pet;
+                    pet.bot_guid = bot.guid;
+                    pet.type = ActionType::kCastSpell;
+                    pet.spell_id = petSpell;
+                    pet.target_guid = 0; // the pet is the spell's own target
+                    actions.push_back(pet);
+                    state.CastTarget[petSpell] = 0;
+                    state.NextCastMs = nowMs + kGlobalCooldownMs;
+                    if (petSpell == kCallPet && !state.PetMissing)
+                    {
+                        state.PetProbeAtMs = nowMs + kPetProbeMs;
+                        state.PetProbe = false;
+                    }
+                    continue;
+                }
+            }
+        }
+
         // Upkeep buffs (rotation file rows 'buff'): out of combat, standing, with nothing to fight. Each is cast on the bot, or on every member of its group
         // (party), when its last cast has run out; a refused cast is tried again after the usual retry.
-        if (!hasTarget && bot.in_combat == 0 && bot.moving == 0 && nowMs >= state.NextCastMs && !(bot.casting_spell != 0 && bot.cast_remaining_ms != 0) &&
+        if (!hasTarget && bot.in_combat == 0 && bot.moving == 0 && nowMs >= state.NextCastMs && !(IsCasting(bot)) &&
             !state.Sitting)
         {
             bool cast = false;
@@ -1943,7 +2264,10 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         }
 
         if (!hasTarget)
+        {
+            state.AutoShotTarget = 0; // the fight is over: Auto Shot stopped with it
             continue;
+        }
 
         if (_options.TestSpell != 0)
         {
@@ -1963,11 +2287,13 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             continue;
         }
 
+        float const castDistance = targetUnit ? rotation::DistanceYards3d(bot, *targetUnit) : distance;
+
         // Class rotation: the first row that is off cooldown, in range and allowed by its rule. One cast per global cooldown.
         if (nowMs < state.NextCastMs)
             continue;
         // A cast or channel in progress finishes first: no cast can start meanwhile.
-        if (bot.casting_spell != 0 && bot.cast_remaining_ms != 0)
+        if (IsCasting(bot))
             continue;
         rotation::Facts facts = rotation::FactsFor(bot, nearby, targetUnit, state.InFight ? nowMs - state.FightStartMs : 0);
         if (state.ComboTarget != targetRef)
@@ -1976,6 +2302,10 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             state.ComboPoints = 0;
         }
         facts.ComboPoints = int32_t(state.ComboPoints);
+        state.PetFought = true;
+        // Auto Shot runs until the target changes or the bot moves; casting it again would not help (and may toggle it off).
+        if (state.AutoShotTarget != 0 && (state.AutoShotTarget != targetRef || bot.moving != 0))
+            state.AutoShotTarget = 0;
 
         // Spells the core reports as cooling down right now.
         std::unordered_set<std::uint32_t> cooling;
@@ -1983,10 +2313,33 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             if (cooldown.spell_id != 0 && cooldown.remaining_ms != 0)
                 cooling.insert(cooldown.spell_id);
 
+        // Hunter: Mend Pet now and then in a long fight, when the pet is believed to be out.
+        if (classId == kHunterClass && !state.PetMissing && bot.moving == 0 && nowMs >= state.PetMendAtMs && facts.FightMs >= kPetMendAfterMs &&
+            facts.SelfPowerPct >= std::int32_t(kPetMendManaPct) && facts.SelfHpPct >= 50 &&
+            (bot.level == 0 || bot.level >= rotation::LearnLevel(kMendPet)) && !cooling.count(kMendPet))
+        {
+            auto const retry = state.RetryAtMs.find(kMendPet);
+            if (retry == state.RetryAtMs.end() || nowMs >= retry->second)
+            {
+                BotAction mend;
+                mend.bot_guid = bot.guid;
+                mend.type = ActionType::kCastSpell;
+                mend.spell_id = kMendPet;
+                mend.target_guid = 0;
+                actions.push_back(mend);
+                state.CastTarget[kMendPet] = 0;
+                state.NextCastMs = nowMs + kGlobalCooldownMs;
+                state.PetMendAtMs = nowMs + kPetMendEveryMs;
+                continue;
+            }
+        }
+
         for (rotation::Row const& row : RowsFor(classId))
         {
             if (row.Buff)
                 continue; // upkeep spells are cast out of combat, below
+            if (row.Spell == kAutoShot && state.AutoShotTarget == targetRef)
+                continue; // already shooting this target
             if (row.MaxLevel != 0 && bot.level > row.MaxLevel)
                 continue; // a better spell has replaced it
             // Not learned yet: below the level a trainer teaches it (the rotation file's level, else the built-in table). (A level of 0 is unknown.)
@@ -1997,7 +2350,9 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 continue;
             if (cooling.count(row.Spell))
                 continue;
-            if (row.OnTarget && (distance < row.MinRange || (row.MaxRange > 0.0f && distance > row.MaxRange)))
+            if (row.OnTarget && castDistance < row.MinRange)
+                continue;
+            if (row.OnTarget && row.MaxRange > 0.0f && castDistance > (row.MaxRange > kRangeSlackYards * 2.0f ? row.MaxRange - kRangeSlackYards : row.MaxRange))
                 continue;
             if (!rotation::Allowed(row.When, facts))
                 continue;

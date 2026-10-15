@@ -22,7 +22,7 @@ find_package(Threads REQUIRED)
 add_library(forever_bots_roster STATIC src/bot_roster.cpp)
 target_include_directories(forever_bots_roster PUBLIC src)
 
-add_library(forever_bots_settings STATIC src/bot_settings.cpp src/bot_ramp.cpp src/bot_pick.cpp)
+add_library(forever_bots_settings STATIC src/bot_settings.cpp src/bot_ramp.cpp src/bot_pick.cpp src/dungeon_data.cpp)
 target_include_directories(forever_bots_settings PUBLIC src)
 
 add_library(forever_bots_store STATIC src/bot_store.cpp)
@@ -75,6 +75,10 @@ add_executable(scenario_test tests/scenario_test.cpp)
 target_link_libraries(scenario_test PRIVATE forever_bots_policy forever_bots_settings)
 add_test(NAME scenario COMMAND scenario_test)
 
+add_executable(dungeon_test tests/dungeon_test.cpp)
+target_link_libraries(dungeon_test PRIVATE forever_bots_policy forever_bots_settings)
+add_test(NAME dungeon COMMAND dungeon_test)
+
 add_executable(settings_test tests/settings_test.cpp)
 target_link_libraries(settings_test PRIVATE forever_bots_settings)
 add_test(NAME settings COMMAND settings_test)
@@ -106,3 +110,10 @@ add_test(NAME rotating_file COMMAND rotating_file_test)
 add_executable(live_test tests/live_test.cpp)
 target_link_libraries(live_test PRIVATE forever_bots_live)
 add_test(NAME live COMMAND live_test)
+
+find_package(Python3 COMPONENTS Interpreter)
+if(Python3_Interpreter_FOUND)
+    add_test(NAME soak_report COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/soak_report_test.py)
+    # The spec of rotations made into a rotation file by tools/make_rotations.py.
+    add_test(NAME make_rotations COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/make_rotations_test.py ${CMAKE_CURRENT_SOURCE_DIR})
+endif()
