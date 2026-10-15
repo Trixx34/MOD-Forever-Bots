@@ -128,7 +128,9 @@ void IdleBotWalksToAGrindSpotForItsLevel()
     CHECK(WalksTo(policy.Decide(view, 1000 + 31000), 900.0f)); // a quiet spell: to the spot for level 7
 }
 
-void NoSpotForTheMapMeansNoWalk()
+// A map the spot file does not cover: the bot used to stand at its start for the whole run (the new races' island). It now takes short walks
+// on foot, and looks for spots again after a minute.
+void NoSpotForTheMapMeansExploringOnFoot()
 {
     std::vector<std::string> warnings;
     PolicyOptions options;
@@ -136,8 +138,17 @@ void NoSpotForTheMapMeansNoWalk()
     BotPolicy policy(options);
     WorldTickSnapshotView view = OneBot(3, 0);
     policy.Decide(view, 1000);
-    for (BotAction const& action : policy.Decide(view, 1000 + 31000))
-        CHECK(action.type != ActionType::kMoveTo);
+    bool walked = false;
+    std::uint64_t now = 1000 + 31000;
+    for (int i = 0; i < 40 && !walked; ++i, now += 3000)    // the lookup fails once, then the exploring starts after a short quiet
+        for (BotAction const& action : policy.Decide(view, now))
+            if (action.type == ActionType::kMoveTo)
+            {
+                walked = true;
+                float const dx = action.dest_x - view.bots[0].pos_x, dy = action.dest_y - view.bots[0].pos_y;
+                CHECK(dx * dx + dy * dy >= 49.0f * 49.0f && dx * dx + dy * dy <= 101.0f * 101.0f);   // 50 to 100 yards
+            }
+    CHECK(walked);
 }
 
 void HubsAreTheFallbackWithoutGrindData()
@@ -174,7 +185,7 @@ int main()
     RichSpotsCountAsCloser();
     SidesOfRaces();
     IdleBotWalksToAGrindSpotForItsLevel();
-    NoSpotForTheMapMeansNoWalk();
+    NoSpotForTheMapMeansExploringOnFoot();
     HubsAreTheFallbackWithoutGrindData();
     NextWalkMovesOnToAnotherSpot();
     if (failures == 0)

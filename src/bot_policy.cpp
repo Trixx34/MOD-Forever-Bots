@@ -111,6 +111,7 @@ constexpr std::uint32_t kRestManaUntilPct = 90;      // and stays sat until it h
 constexpr std::uint64_t kManaRestMaxMs = 120000;     // but never longer than this at a time
 constexpr std::uint64_t kManaRestBlockMs = 300000;   // and not again for this long after a rest that did not refill the mana
 constexpr std::uint32_t kHubFailuresMax = 2;         // hub walks in a row that failed before the bot explores on foot instead
+constexpr std::uint64_t kGrindRetryMs = 60000;        // a bot that found no grind spot explores on foot this long before it looks again
 constexpr std::uint64_t kExploreIdleMs = 10000;      // an idle bot with nowhere to go takes a short walk after this long
 constexpr std::uint64_t kExploreTimeoutMs = 60000;
 constexpr float kExploreReachYards = 6.0f;
@@ -1702,7 +1703,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         bool const healthy = !manaResting && (bot.max_health == 0 || std::uint64_t(bot.health) * 100 >= std::uint64_t(bot.max_health) * kRestBelowPct);
         auto const hubs = _options.HubsByMap.find(bot.map_id);
         bool const grindMode = _options.Grind && !_options.Grind->Spots.empty() && bot.level != 0;
-        if (idle && healthy && grindMode && !partyMember && !state.ChatStay && state.ChatFollow == 0)
+        if (idle && healthy && grindMode && nowMs >= state.GrindRetryAtMs && !partyMember && !state.ChatStay && state.ChatFollow == 0)
         {
             // Leveling: after a quiet spell the bot walks to a grind spot that suits its level (nearest first, not the ones it just left), and
             // stays to fight what lives there until it sees nothing for a while again.
@@ -1741,7 +1742,13 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                                          " spot=" + std::to_string(spots.front()) + " levels=" + std::to_string(spot.MinLevel) + "-" + std::to_string(spot.MaxLevel));
                 }
                 else
-                    state.IdleSinceMs = nowMs; // nothing on this map for this level: look again later
+                {
+                    // Nothing on this map for this level (a start zone the spot file does not cover, such as the new races' island): the bot
+                    // explores on foot for a minute, as a bot without grind data does, and then looks again. Without this it stood at its
+                    // start for the whole run.
+                    state.IdleSinceMs = nowMs;
+                    state.GrindRetryAtMs = nowMs + kGrindRetryMs;
+                }
             }
         }
         else if (idle && healthy && !partyMember && !state.ChatStay && state.ChatFollow == 0 && hubs != _options.HubsByMap.end() && !hubs->second.empty() &&
@@ -1780,7 +1787,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         // Exploring on foot: a bot with no grind spot and no hub it can reach (a map with neither, or hubs it never got to) would stand where it
         // began and never meet a creature, as 45 bots did for eight hours in the soak. After a short quiet it takes a walk of 50 to 100 yards in a
         // turning direction, and after a few walks tries its hubs again.
-        else if (idle && healthy && !grindMode && !partyMember && !state.ChatStay && state.ChatFollow == 0)
+        else if (idle && healthy && (!grindMode || nowMs < state.GrindRetryAtMs) && !partyMember && !state.ChatStay && state.ChatFollow == 0)
         {
             if (state.Wandering)
             {
