@@ -496,6 +496,7 @@ BotPolicy ClassPolicy(std::uint32_t classId)
 {
     PolicyOptions options;
     options.ClassId = classId;
+    options.WanderWhenIdle = false;       // these tests look at casts and rests: the bot stays where it is
     return BotPolicy(options);
 }
 

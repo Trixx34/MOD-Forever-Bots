@@ -175,6 +175,38 @@ void NextWalkMovesOnToAnotherSpot()
     CHECK(WalksTo(policy.Decide(view, 40000 + 31000), 400.0f));      // then the other one, not back to the same
 }
 
+// A start zone whose creatures the bot will not pull (an elite, a level far above it, a pack of four) used to count as "an enemy near": the bot
+// was never idle, so it never walked to a grind spot and stood there for hours.
+void UnpullableCreaturesDoNotKeepTheBotFromWalking()
+{
+    std::vector<std::string> warnings;
+    PolicyOptions options;
+    options.Grind = std::make_shared<GrindData>(Parse("spot 0 900 0 0 1 5 0\n", warnings));
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = OneBot(1, 0);
+    view.max_nearby_units = 8;
+    view.nearby.assign(8, forever_module::NearbyUnit{});
+    view.bots[0].nearby_count = 5;
+    for (int i = 0; i < 4; ++i)                                   // a pack of four, close together
+    {
+        forever_module::NearbyUnit& unit = view.nearby[i];
+        unit.guid = forever_module::MakeUnitRef(8, 100, i + 1);
+        unit.pos_x = 30.0f + float(i);
+        unit.health = unit.max_health = 50;
+        unit.is_hostile = true;
+        unit.level = 1;
+    }
+    forever_module::NearbyUnit& elite = view.nearby[4];                           // and an elite on its own
+    elite.guid = forever_module::MakeUnitRef(8, 200, 1);
+    elite.pos_x = -40.0f;
+    elite.health = elite.max_health = 500;
+    elite.is_hostile = true;
+    elite.level = 2;
+    elite.elite = 1;
+    policy.Decide(view, 1000);
+    CHECK(WalksTo(policy.Decide(view, 1000 + 31000), 900.0f));
+}
+
 } // namespace
 
 int main()
@@ -188,6 +220,7 @@ int main()
     NoSpotForTheMapMeansExploringOnFoot();
     HubsAreTheFallbackWithoutGrindData();
     NextWalkMovesOnToAnotherSpot();
+    UnpullableCreaturesDoNotKeepTheBotFromWalking();
     if (failures == 0)
         std::printf("grind_test: all checks passed\n");
     return failures == 0 ? 0 : 1;

@@ -1606,9 +1606,18 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             }
         }
 
+        // An enemy near keeps the bot from idling, which keeps it from walking to grind spots. Only one the bot would actually pull counts: a bot
+        // whose start zone shows only elites, packs of four or more, or creatures well above its level used to stand there for the whole run
+        // (all 73 Undead and many Night Elf and Tauren bots of the 8-hour soak), neither fighting nor leaving. A bot that holds position by
+        // order (a party waiting in a dungeon, no self pull) still counts any live creature.
         bool enemyNear = false;
-        for (NearbyUnit const& unit : nearby)
-            enemyNear = enemyNear || (IsLiveMob(unit) && (huntEntries.empty() ? !IsGrey(bot, unit) : true));
+        if (dungeonHold || noSelfPull)
+        {
+            for (NearbyUnit const& unit : nearby)
+                enemyNear = enemyNear || (IsLiveMob(unit) && (huntEntries.empty() ? !IsGrey(bot, unit) : true));
+        }
+        else
+            enemyNear = PullTarget(bot, nearby, avoided, false, huntEntries, _routeActive) != nullptr;
         bool idle = !hasTarget && !enemyNear && wanted.Type == ActionType::kStop && questStep.Kind == QuestStepKind::None && !routeBusy;
 
         // Seeing nothing and doing nothing, for hubs (M7): the idle time starts when the bot first is idle, and any activity
@@ -1703,7 +1712,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         bool const healthy = !manaResting && (bot.max_health == 0 || std::uint64_t(bot.health) * 100 >= std::uint64_t(bot.max_health) * kRestBelowPct);
         auto const hubs = _options.HubsByMap.find(bot.map_id);
         bool const grindMode = _options.Grind && !_options.Grind->Spots.empty() && bot.level != 0;
-        if (idle && healthy && grindMode && nowMs >= state.GrindRetryAtMs && !partyMember && !state.ChatStay && state.ChatFollow == 0)
+        if (idle && healthy && _options.WanderWhenIdle && grindMode && nowMs >= state.GrindRetryAtMs && !partyMember && !state.ChatStay && state.ChatFollow == 0)
         {
             // Leveling: after a quiet spell the bot walks to a grind spot that suits its level (nearest first, not the ones it just left), and
             // stays to fight what lives there until it sees nothing for a while again.
@@ -1751,7 +1760,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 }
             }
         }
-        else if (idle && healthy && !partyMember && !state.ChatStay && state.ChatFollow == 0 && hubs != _options.HubsByMap.end() && !hubs->second.empty() &&
+        else if (idle && healthy && _options.WanderWhenIdle && !partyMember && !state.ChatStay && state.ChatFollow == 0 && hubs != _options.HubsByMap.end() && !hubs->second.empty() &&
                  state.HubFailures < kHubFailuresMax)
         {
             std::vector<Point> const& list = hubs->second;
@@ -1787,7 +1796,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         // Exploring on foot: a bot with no grind spot and no hub it can reach (a map with neither, or hubs it never got to) would stand where it
         // began and never meet a creature, as 45 bots did for eight hours in the soak. After a short quiet it takes a walk of 50 to 100 yards in a
         // turning direction, and after a few walks tries its hubs again.
-        else if (idle && healthy && (!grindMode || nowMs < state.GrindRetryAtMs) && !partyMember && !state.ChatStay && state.ChatFollow == 0)
+        else if (idle && healthy && _options.WanderWhenIdle && (!grindMode || nowMs < state.GrindRetryAtMs) && !partyMember && !state.ChatStay && state.ChatFollow == 0)
         {
             if (state.Wandering)
             {

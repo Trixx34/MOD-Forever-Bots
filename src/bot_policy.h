@@ -76,6 +76,8 @@ struct PolicyOptions
     // Receives one line per notable decision (a heal cast, a pull held back or released), for the run logs. Unset = silent.
     std::function<void(std::string const&)> OnEvent;
     std::uint32_t AutoGearEveryLevels = 5;
+    // An idle bot walks to a grind spot, a hub, or takes an exploring walk. false keeps it where it is (for tests that need a bot to stand still).
+    bool WanderWhenIdle = true;
     // Grind spots (leveling): the places an idle bot walks to for its level, instead of its map's hubs. SideOf gives a bot's faction (1 Alliance,
     // 2 Horde, 0 unknown).
     std::shared_ptr<GrindData const> Grind;
