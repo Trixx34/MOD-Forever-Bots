@@ -126,8 +126,9 @@ constexpr std::uint64_t kTravelTimeoutMs = 180000; // a walk to the vendor longe
 constexpr float kMountMinDistanceYards = 100.0f;   // a walk this long: mount up before it
 constexpr float kMountDismountDistanceYards = 15.0f; // arrived or close: dismount
 // A quest walk that keeps the bot within kQuestWalkStuckYards for kQuestWalkStuckMs has no route to its giver (seen on the sim: 11
-// level 1 bots idle for hours, 110 to 8000 yards from the giver). Such a bot is sent to the giver once; the core refuses the teleport
-// unless Bot.Actions.Teleport is on, and a refused one is tried again after another kQuestWalkStuckMs.
+// level 1 bots idle for hours, 110 to 8000 yards from the giver). With QuestTeleport the bot is sent there once; a refusal, or a second
+// stuck period, drops the start (kNoRouteBlockMs) so the bot grinds. With QuestTeleport off the start is dropped at once: the core
+// refuses the teleport while Bot.Actions.Teleport is 0, and retrying it never ends the walk.
 constexpr std::uint64_t kQuestWalkStuckMs = 120000;
 constexpr float kQuestWalkStuckYards = 5.0f;
 // Death and recovery. Spell ids and levels checked against the fork's SpellLevels.db2: Resurrection 2006 level 10,
@@ -459,13 +460,19 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
         return;
     }
 
-    // A move the core found no route for: the bot walks to the nearest reachable point and stops there. A quest start whose giver that is
-    // is left alone for a while (the planner picks the next start). Each result is read once, by its sequence.
-    if (bot.last_action_type == uint8_t(ActionType::kMoveTo) && bot.last_action_status == BotActionStatus::kNoRoute &&
-        bot.last_action_sequence != state.NoRouteSequence)
+    // A move the core found no route for, or a quest-walk teleport the core refused: that start's giver is left alone for a while
+    // (the planner picks the next start). Each result is read once, by its sequence. A refused teleport must not be sent again.
+    bool const noRoute = bot.last_action_type == uint8_t(ActionType::kMoveTo) && bot.last_action_status == BotActionStatus::kNoRoute;
+    bool const teleportRefused = bot.last_action_type == uint8_t(ActionType::kTeleport) &&
+                                 bot.last_action_status != BotActionStatus::kApplied && bot.last_action_status != BotActionStatus::kNone;
+    if ((noRoute || teleportRefused) && bot.last_action_sequence != state.NoRouteSequence)
     {
         state.NoRouteSequence = bot.last_action_sequence;
+        state.QuestTeleportSent = false;
         _quests.NoteNoRoute(state.Quest, nowMs);
+        if (teleportRefused && _options.OnEvent)
+            _options.OnEvent("quest_walk_blocked: bot=" + std::to_string(bot.guid) + " reason=teleport_refused status=" +
+                             ActionStatusName(bot.last_action_status));
     }
 
     // A quest action refused (not eligible, bags full, no NPC in reach): the quest is left alone for a while.
@@ -1517,26 +1524,34 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         if (bot.in_combat != 0)
             state.WalkStillSinceMs = 0;
 
-        // Fight watchdog: a target whose health, and the bot's own, have not gone down for kFightStallMs is unreachable, evading or out of line of sight
-        // (the 8-hour soak had a fight of two hours). The target is avoided like one that refused an attack, and the bot picks another.
-        if (hasTarget && targetUnit && targetUnit->is_hostile && bot.in_combat != 0)
+        // Fight watchdog: a visible hostile whose health, and the bot's own, have not gone down for kFightStallMs is unreachable,
+        // evading or out of line of sight (the 8-hour soak had a fight of two hours). A threat the snapshot keeps set but that is not
+        // in view is the same: telemetry holds the fight open until the guid clears, and the nearby list is all the bot can fight.
+        // A gap between snapshots does not restart the timer; the stall continued while this tick was late.
+        bool const unseenThreat = hasTarget && targetUnit == nullptr;
+        bool const visibleStall = hasTarget && targetUnit && targetUnit->is_hostile && bot.in_combat != 0;
+        if (unseenThreat || visibleStall)
         {
-            if (state.StallTarget != targetRef || nowMs - state.StallLastMs > 10000)
+            if (state.StallTarget != targetRef)
             {
                 state.StallTarget = targetRef;
                 state.StallSinceMs = nowMs;
             }
-            else if (targetUnit->health < state.StallTargetHealth || bot.health < state.StallBotHealth)
+            else if (targetUnit && (targetUnit->health < state.StallTargetHealth || bot.health < state.StallBotHealth))
                 state.StallSinceMs = nowMs;
             state.StallLastMs = nowMs;
-            state.StallTargetHealth = targetUnit->health;
-            state.StallBotHealth = bot.health;
+            if (targetUnit)
+            {
+                state.StallTargetHealth = targetUnit->health;
+                state.StallBotHealth = bot.health;
+            }
             if (nowMs - state.StallSinceMs > kFightStallMs)
             {
                 AvoidStalledUnit(state.AvoidUntilMs, state.StallCount, targetRef, nowMs);
                 if (_options.OnEvent)
                     _options.OnEvent("fight_stalled: bot=" + std::to_string(bot.guid) + " target_entry=" + std::to_string(forever_module::UnitRefEntry(targetRef)) +
-                                     " target_hp=" + std::to_string(targetUnit->health) + " distance=" + std::to_string(int(distance)));
+                                     " target_hp=" + (targetUnit ? std::to_string(targetUnit->health) : std::string("unseen")) +
+                                     " distance=" + std::to_string(int(distance)));
                 state.StallTarget = 0;
                 // Given up for good this tick too: the bot must not keep attacking it until the next one.
                 targetRef = 0;
@@ -1675,30 +1690,49 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             }
 
             if (questStep.Kind != QuestStepKind::WalkTo)
+            {
                 state.WalkStillSinceMs = 0; // the stall timer only runs during a quest walk
+                state.QuestTeleportSent = false;
+            }
 
             switch (questStep.Kind)
             {
                 case QuestStepKind::WalkTo:
                 {
-                    // Stuck on the walk to a quest start's giver: the bot is sent there in one teleport. The planner only offers starts on
+                    // Stuck on the walk to a quest start's giver. One teleport if QuestTeleport is on; otherwise, or if that teleport was
+                    // already sent and the bot is still stuck, the start is dropped and the bot grinds. The planner only offers starts on
                     // the bot's own map, so the giver's position is on that map too.
                     Point const here{ bot.pos_x, bot.pos_y, bot.pos_z };
                     if (state.WalkStillSinceMs == 0 || DistanceTo(bot, state.WalkAnchor) > kQuestWalkStuckYards)
                     {
                         state.WalkAnchor = here;
                         state.WalkStillSinceMs = nowMs;
+                        state.QuestTeleportSent = false;
                     }
                     bool const stuck = nowMs - state.WalkStillSinceMs >= kQuestWalkStuckMs;
-                    if (stuck && questStep.StartGiver)
+                    if (stuck && questStep.StartGiver && _options.QuestTeleport && !state.QuestTeleportSent)
                     {
                         wanted = Decision{ ActionType::kTeleport, 0, Point{ questStep.Dest.X, questStep.Dest.Y, questStep.Dest.Z }, bot.map_id };
+                        state.QuestTeleportSent = true;
                         state.WalkStillSinceMs = nowMs;
-                        _options.OnEvent("quest_walk_forced: bot=" + std::to_string(bot.guid) + " map=" + std::to_string(bot.map_id) +
-                                         " quest=" + std::to_string(questStep.Quest) + " from=" + std::to_string(int(here.X)) + "," +
-                                         std::to_string(int(here.Y)) + "," + std::to_string(int(here.Z)) + " to=" +
-                                         std::to_string(int(questStep.Dest.X)) + "," + std::to_string(int(questStep.Dest.Y)) + "," +
-                                         std::to_string(int(questStep.Dest.Z)));
+                        if (_options.OnEvent)
+                            _options.OnEvent("quest_walk_forced: bot=" + std::to_string(bot.guid) + " map=" + std::to_string(bot.map_id) +
+                                             " quest=" + std::to_string(questStep.Quest) + " from=" + std::to_string(int(here.X)) + "," +
+                                             std::to_string(int(here.Y)) + "," + std::to_string(int(here.Z)) + " to=" +
+                                             std::to_string(int(questStep.Dest.X)) + "," + std::to_string(int(questStep.Dest.Y)) + "," +
+                                             std::to_string(int(questStep.Dest.Z)));
+                    }
+                    else if (stuck && questStep.StartGiver)
+                    {
+                        _quests.NoteNoRoute(state.Quest, nowMs);
+                        state.QuestTeleportSent = false;
+                        state.WalkStillSinceMs = 0;
+                        if (_options.OnEvent)
+                            _options.OnEvent("quest_walk_blocked: bot=" + std::to_string(bot.guid) + " map=" + std::to_string(bot.map_id) +
+                                             " quest=" + std::to_string(questStep.Quest) + " reason=" +
+                                             (_options.QuestTeleport ? "teleport_stuck" : "teleport_off"));
+                        questStep = {};
+                        wanted = Decision{ ActionType::kStop, 0 };
                     }
                     else
                         wanted = Decision{ ActionType::kMoveTo, 0, Point{ questStep.Dest.X, questStep.Dest.Y, questStep.Dest.Z } };

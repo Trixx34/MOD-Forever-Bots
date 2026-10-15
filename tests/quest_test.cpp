@@ -539,6 +539,60 @@ void HandInRefusalsBlockLessThanOtherRefusals()
     CHECK(!planner.NoteRefused(memory, 300000));
 }
 
+// The giver of quest 783. A stuck walk must not keep sending the bot there.
+bool WalksToGiver(std::vector<BotAction> const& actions)
+{
+    for (BotAction const& action : actions)
+        if ((action.type == ActionType::kMoveTo || action.type == ActionType::kTeleport) && action.dest_x < -8930.0f)
+            return true;
+    return false;
+}
+
+// Teleport is off (the sim default). A walk that does not move is dropped, not retried as a teleport the core will refuse.
+void StuckQuestWalkIsDroppedWhenTeleportIsOff()
+{
+    PolicyOptions options;
+    options.Quests = Data();
+    options.WanderWhenIdle = false;
+    BotPolicy policy(options);
+    BotSnapshot const bot = Bot(-8900.0f, -160.0f);
+    CHECK(WalksToGiver(policy.Decide(OneBotView(bot, {}), 0)));
+    auto const stuck = policy.Decide(OneBotView(bot, {}), 120000);
+    CHECK(!Has(stuck, ActionType::kTeleport));
+    CHECK(!WalksToGiver(stuck));
+    CHECK(!WalksToGiver(policy.Decide(OneBotView(bot, {}), 130000)));
+}
+
+// Teleport on: one attempt, then a refusal drops the start. A silent core does not get a second teleport.
+void StuckQuestWalkTeleportsOnceThenDropsTheStart()
+{
+    PolicyOptions options;
+    options.Quests = Data();
+    options.QuestTeleport = true;
+    options.WanderWhenIdle = false;
+    BotPolicy policy(options);
+    BotSnapshot bot = Bot(-8900.0f, -160.0f);
+    policy.Decide(OneBotView(bot, {}), 0);
+    auto const forced = policy.Decide(OneBotView(bot, {}), 120000);
+    CHECK(Has(forced, ActionType::kTeleport));
+
+    bot.last_action_sequence = 1;
+    bot.last_action_type = std::uint8_t(ActionType::kTeleport);
+    bot.last_action_status = forever_module::BotActionStatus::kRefused;
+    auto const blocked = policy.Decide(OneBotView(bot, {}), 121000);
+    CHECK(!Has(blocked, ActionType::kTeleport));
+    CHECK(!WalksToGiver(blocked));
+
+    PolicyOptions again = options;
+    BotPolicy silent(again);
+    BotSnapshot still = Bot(-8900.0f, -160.0f);
+    silent.Decide(OneBotView(still, {}), 0);
+    CHECK(Has(silent.Decide(OneBotView(still, {}), 120000), ActionType::kTeleport));
+    auto const second = silent.Decide(OneBotView(still, {}), 240000);
+    CHECK(!Has(second, ActionType::kTeleport));
+    CHECK(!WalksToGiver(second));
+}
+
 } // namespace
 
 // ---- no route and far world starts ----
@@ -579,6 +633,8 @@ void NoRouteAtTheGiverIsIgnored()
 
 int main()
 {
+    StuckQuestWalkIsDroppedWhenTeleportIsOff();
+    StuckQuestWalkTeleportsOnceThenDropsTheStart();
     WorldStartFarAwayIsNotWalkedTo();
     NoRouteToAStartGiverBlocksThatStart();
     NoRouteAtTheGiverIsIgnored();

@@ -1752,6 +1752,49 @@ void StalledTargetIsLeftAloneForMinutes()
     CHECK(HasAction(policy.Decide(view(), later + 610000), 10, ActionType::kAttackTarget, mob.guid));
 }
 
+// A late snapshot must not restart the stall timer. Steps of 15 s used to reset it (the gap was over 10 s), so a fight whose health never moved was never given up.
+void SparseSnapshotsStillEndAStalledFight()
+{
+    NearbyUnit const mob = Hostile(7, 3.0f, 100);
+    BotPolicy policy;
+    auto const view = [&mob]
+    {
+        WorldTickSnapshotView v = PartyView({ 10 });
+        AddNearby(v, 0, mob);
+        v.bots[0].threat_target_guid = mob.guid;
+        v.bots[0].in_combat = 1;
+        return v;
+    };
+    policy.Decide(view(), 0);
+    policy.Decide(view(), 15000);
+    policy.Decide(view(), 30000);
+    bool given = false;
+    for (BotAction const& action : policy.Decide(view(), 60000))
+        given = given || (action.type == ActionType::kStop && action.bot_guid == 10);
+    CHECK(given);
+    CHECK(!HasAction(policy.Decide(view(), 70000), 10, ActionType::kAttackTarget, mob.guid));
+}
+
+// A threat guid the snapshot keeps set, but that is not in the nearby list, used to hold the fight open for hours. It is given up like a stall.
+void UnseenThreatIsGivenUp()
+{
+    std::uint64_t const threat = MakeUnitRef(8, 1, 9);
+    BotPolicy policy;
+    auto const view = [&threat]
+    {
+        WorldTickSnapshotView v = PartyView({ 10 });
+        v.bots[0].threat_target_guid = threat;
+        v.bots[0].in_combat = 1;
+        v.bots[0].target_distance = 0;
+        return v;
+    };
+    CHECK(HasAction(policy.Decide(view(), 0), 10, ActionType::kAttackTarget, threat));
+    auto const given = policy.Decide(view(), 46000);
+    CHECK(!HasAction(given, 10, ActionType::kAttackTarget, threat));
+    CHECK(!HasAction(given, 10, ActionType::kFollow, threat));
+    CHECK(!HasAction(policy.Decide(view(), 50000), 10, ActionType::kAttackTarget, threat));
+}
+
 // A creature far enough below the bot gives no experience: it is not pulled, and its presence does not keep the bot from walking on.
 void GreyCreatureIsNotPulled()
 {
@@ -2258,6 +2301,8 @@ int main()
     PartyWaitIsLoggedForARezAndForAGhost();
     OnlyChangesArePublished();
     StalledTargetIsLeftAloneForMinutes();
+    SparseSnapshotsStillEndAStalledFight();
+    UnseenThreatIsGivenUp();
     GreyCreatureIsNotPulled();
     GreyCreatureDoesNotKeepTheBotFromExploring();
     IdleCasterDrinksWhenLowOnMana();

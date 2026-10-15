@@ -69,6 +69,10 @@ struct PolicyOptions
     std::map<std::uint32_t, std::vector<Point>> HubsByMap;
     // Quests (M5): the starter quest data. Unset or empty means the bots do no quests and grind as before.
     std::shared_ptr<QuestData const> Quests;
+    // A quest walk that has not moved for two minutes teleports to the giver when this is set. Off by default: the core refuses
+    // the teleport unless Bot.Actions.Teleport is on, and retrying it held level-1 bots in walk_to. With this off, that start is
+    // dropped the same way a no-route move is, and the bot grinds. A refused teleport drops the start either way.
+    bool QuestTeleport = false;
     // Dungeon route (doc 19): the waypoints the party leader walks, in order, while the route is active (SetRouteActive). Empty = none.
     std::vector<Point> Route;
     // Auto gear (AutoGearing setting): every bot is dressed for its level when it first appears, and again after AutoGearEveryLevels levels.
@@ -191,7 +195,7 @@ private:
         std::uint64_t StallTarget = 0;                   // fight watchdog: the target being watched
         std::uint32_t StallTargetHealth = 0;
         std::uint32_t StallBotHealth = 0;
-        std::uint64_t StallLastMs = 0;                   // when the watchdog last looked (a long gap starts it again)
+        std::uint64_t StallLastMs = 0;                   // when the watchdog last looked; a gap does not restart the timer
         std::uint64_t StallSinceMs = 0;                  // since when neither the target's nor the bot's health has gone down
         std::unordered_map<std::uint64_t, std::uint32_t> StallCount;   // unit -> how many fights against it stalled (the avoid time grows)
         std::uint64_t ManaRestSinceMs = 0;               // when the current rest for mana began (0 = not resting for mana)
@@ -223,6 +227,7 @@ private:
         std::size_t NextHub = 0;                         // index of the hub to walk to next, on the bot's map
         Point WalkAnchor;                                // where the bot stood when its quest walk was last seen moving
         std::uint64_t WalkStillSinceMs = 0;              // when it was at WalkAnchor; 0 when no quest walk is watched
+        bool QuestTeleportSent = false;                  // one teleport already sent for this stuck walk; a second stuck drops the start
         bool Traveling = false;                          // walking to the vendor for a visit
         std::uint64_t TravelStartMs = 0;                 // when this walk began; it is dropped after kTravelTimeoutMs
         std::unordered_set<std::uint32_t> CastTimeSpells; // spells the core refused because the bot was moving: they need it standing

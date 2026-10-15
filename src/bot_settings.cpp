@@ -292,6 +292,7 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadKey(config, "PartyCount", 1, 100, settings.PartyCount, warnings);
     ReadHubs(config, settings.Hubs, warnings);
     ReadBool(config, "AutoGearing", settings.AutoGearing, warnings);
+    ReadBool(config, "QuestTeleport", settings.QuestTeleport, warnings);
     ReadBool(config, "ChatCommands", settings.ChatCommands, warnings);
     ReadBool(config, "ChatOrders", settings.ChatOrders, warnings);
     ReadBool(config, "ChatControl", settings.ChatControl, warnings);

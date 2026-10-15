@@ -92,6 +92,9 @@ struct BotSettings
     std::map<std::uint32_t, std::vector<std::array<float, 3>>> Hubs;
     // Quests (M5): the starter quest data file (config key QuestFile, see quest_data.h). Empty turns quests off.
     std::string QuestFile;
+    // QuestTeleport (0 or 1, off by default): a quest walk that has not moved for two minutes teleports to the giver. Needs
+    // Bot.Actions.Teleport = 1 in the core. Off, that start is dropped and the bot grinds instead of retrying a refused teleport.
+    bool QuestTeleport = false;
     // Grind spots (config key GrindFile, see grind_data.h): the places idle bots walk to for their level. Empty turns it off (hubs are used).
     std::string GrindFile;
     // Rotations (config key RotationFile, see combat_rotation.h): fight rows and upkeep buffs per class from a file. Empty = the built-in rotations.

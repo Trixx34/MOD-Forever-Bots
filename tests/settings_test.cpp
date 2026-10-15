@@ -35,9 +35,9 @@ void ChatSettings()
 {
     std::vector<std::string> warnings;
     BotSettings const off = ParseBotSettings({}, warnings);
-    CHECK(!off.ChatCommands && !off.ChatOrders && !off.ChatControl); // all off by default
-    BotSettings const on = ParseBotSettings({ { "ChatCommands", "1" }, { "ChatOrders", "1" }, { "ChatControl", "1" } }, warnings);
-    CHECK(on.ChatCommands && on.ChatOrders && on.ChatControl && warnings.empty());
+    CHECK(!off.ChatCommands && !off.ChatOrders && !off.ChatControl && !off.QuestTeleport); // all off by default
+    BotSettings const on = ParseBotSettings({ { "ChatCommands", "1" }, { "ChatOrders", "1" }, { "ChatControl", "1" }, { "QuestTeleport", "1" } }, warnings);
+    CHECK(on.ChatCommands && on.ChatOrders && on.ChatControl && on.QuestTeleport && warnings.empty());
 }
 
 void MaxBotsIsCapped()

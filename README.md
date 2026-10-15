@@ -47,6 +47,7 @@ line to the module's stderr. A config reload updates the ramp, the random picks 
 | `RandomSeed` | 1 | Seed for the random picks |
 | `BotsInitial`, `BotsStep`, `BotsStepMinutes`, `BotsCap`, `BotsStopTime` | 300, 100, 15, 1500, 06:00 | The ramp: start count, bots added per step, minutes per step, the cap, and the local time it stops adding |
 | `ServiceEverySec` | 600 | Seconds between vendor visits for an idle bot (60 to 86400) |
+| `QuestTeleport` | 0 | A quest walk stuck for two minutes teleports to its giver (needs `Bot.Actions.Teleport = 1`); 0 drops the start and grinds instead |
 | `TrainEverySec` | 0 (off) | Seconds between trainer checks, also after a level-up (0, or 60 to 86400) |
 | `PartySize`, `PartyCount` | 0 (off), 1 | Bots per party (at most 5) and number of parties |
 | `Hub<map>_<n>` | none | Hub positions `"x y z"` per map, in order |

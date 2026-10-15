@@ -898,6 +898,7 @@ int main(int argc, char** argv)
         std::cerr << "forever-bots: quests: " << quests->Starts.size() << " start(s) from " << settings.QuestFile << "\n";
         policyOptions.Quests = std::move(quests);
     }
+    policyOptions.QuestTeleport = settings.QuestTeleport;
     if (!settings.RotationFile.empty())
     {
         std::vector<std::string> rotationWarnings;
