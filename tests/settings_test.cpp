@@ -43,9 +43,9 @@ void ChatSettings()
 void MaxBotsIsCapped()
 {
     std::vector<std::string> warnings;
-    CHECK(ParseBotSettings({ { "MaxBots", "1500" } }, warnings).MaxBots == 1500); // the ceiling itself
+    CHECK(ParseBotSettings({ { "MaxBots", "2500" } }, warnings).MaxBots == 2500); // the ceiling itself
     CHECK(warnings.empty());
-    BotSettings const s = ParseBotSettings({ { "MaxBots", "1501" } }, warnings);
+    BotSettings const s = ParseBotSettings({ { "MaxBots", "2501" } }, warnings);
     CHECK(s.MaxBots == 1); // above the ceiling: the default, with a warning
     CHECK(warnings.size() == 1);
 }
@@ -66,7 +66,7 @@ void RampSettings()
     std::vector<std::string> warnings;
     BotSettings const defaults = ParseBotSettings({}, warnings);
     CHECK(defaults.Ramp.Initial == 300 && defaults.Ramp.Step == 100 && defaults.Ramp.StepMinutes == 15);
-    CHECK(defaults.Ramp.Cap == 1500 && defaults.Ramp.StopSecOfDay == 6 * 3600);
+    CHECK(defaults.Ramp.Cap == 2500 && defaults.Ramp.StopSecOfDay == 6 * 3600);
 
     BotSettings const s = ParseBotSettings({ { "BotsInitial", "50" }, { "BotsStep", "25" }, { "BotsStepMinutes", "5" },
                                               { "BotsCap", "400" }, { "BotsStopTime", "05:30" } }, warnings);
@@ -76,7 +76,7 @@ void RampSettings()
 
     CHECK(ParseBotSettings({ { "BotsStopTime", "25:00" } }, warnings).Ramp.StopSecOfDay == 6 * 3600); // kept, warned
     CHECK(!warnings.empty());
-    CHECK(ParseBotSettings({ { "BotsCap", "1501" } }, warnings).Ramp.Cap == 1500);
+    CHECK(ParseBotSettings({ { "BotsCap", "2501" } }, warnings).Ramp.Cap == 2500);
 }
 
 void ServiceSettings()

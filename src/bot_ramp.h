@@ -14,7 +14,7 @@ struct RampPlan
     std::uint32_t Initial = 300;
     std::uint32_t Step = 100;
     std::uint32_t StepMinutes = 15;
-    std::uint32_t Cap = 1500;
+    std::uint32_t Cap = 2500;
     std::uint32_t StopSecOfDay = 6 * 3600; // 06:00 local time
 };
 

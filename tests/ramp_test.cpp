@@ -32,7 +32,7 @@ void RampStartsAtInitialAndStepsEveryFifteenMinutes()
 void RampNeverExceedsTheCap()
 {
     RampPlan plan;
-    CHECK(RampTarget(plan, 100 * kHour) == 1500);
+    CHECK(RampTarget(plan, 100 * kHour) == 2500);
 
     RampPlan capped;
     capped.Cap = 700;

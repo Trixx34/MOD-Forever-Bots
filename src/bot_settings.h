@@ -110,7 +110,7 @@ struct BotSettings
 };
 
 // The most bots any configuration may ask for; also the Tier 2 bot bound requested at handshake.
-constexpr std::uint32_t kMaxBotsCeiling = 1500;
+constexpr std::uint32_t kMaxBotsCeiling = 2500;
 
 // The number of bots the module may control: the configured MaxBots, capped at the Tier 2 bot grant the core returned at
 // handshake. Without a Tier 2 region the module cannot drive bots, so it asks for none.
