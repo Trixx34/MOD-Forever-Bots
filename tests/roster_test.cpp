@@ -92,6 +92,53 @@ void LoweringTheCapKeepsOwnedBots()
     CHECK(roster.MaxBots() == 2);
 }
 
+void AltsDoNotUseTheCap()
+{
+    // The cap is full of spawned bots, and an alt is still granted: it is owned, but it does not count against the cap.
+    BotRoster roster(1);
+    roster.NoteRequestSent(0);
+    roster.OnGranted(0, 101);
+    CHECK(!roster.CanRequest());
+    roster.OnAltGranted(202);
+    CHECK(roster.Owned().count(202) == 1);
+    CHECK(roster.SpawnedCount() == 1);
+    CHECK(!roster.CanRequest()); // the spawn cap is still full from the spawned bot
+}
+
+void AltsAreNotCountedForSpawns()
+{
+    BotRoster roster(2);
+    roster.OnAltGranted(301);
+    roster.OnAltGranted(302);
+    CHECK(roster.Owned().size() == 2);
+    CHECK(roster.SpawnedCount() == 0);
+    CHECK(roster.CanRequest()); // two alts leave both spawn slots free
+    roster.NoteRequestSent(0);
+    roster.OnGranted(0, 101);
+    roster.NoteRequestSent(0);
+    roster.OnGranted(0, 102);
+    CHECK(roster.SpawnedCount() == 2);
+    CHECK(!roster.CanRequest());
+}
+
+void RevokingAnAltFreesNothingForSpawns()
+{
+    BotRoster roster(1);
+    roster.OnAltGranted(401);
+    CHECK(roster.OnRevoked(401, "alt removed"));
+    CHECK(roster.Owned().empty());
+    CHECK(roster.SpawnedCount() == 0);
+    CHECK(roster.CanRequest());
+}
+
+void ZeroAltGrantKeepsNothing()
+{
+    BotRoster roster(1);
+    roster.OnAltGranted(0);
+    CHECK(roster.Owned().empty());
+    CHECK(roster.SpawnedCount() == 0);
+}
+
 } // namespace
 
 int main()
@@ -102,6 +149,10 @@ int main()
     ZeroGrantKeepsNothing();
     RaisingTheCapAllowsMoreBots();
     LoweringTheCapKeepsOwnedBots();
+    AltsDoNotUseTheCap();
+    AltsAreNotCountedForSpawns();
+    RevokingAnAltFreesNothingForSpawns();
+    ZeroAltGrantKeepsNothing();
 
     if (failures == 0)
         std::printf("roster_test: all checks passed\n");

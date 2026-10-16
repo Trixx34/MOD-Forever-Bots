@@ -166,7 +166,7 @@ void RampTick(RunContext& run)
 
     std::uint32_t const target = std::min(RampTarget(run.Settings.Ramp, elapsed), run.Roster.MaxBots());
     std::uint32_t spawned = 0;
-    while (spawned < kSpawnsPerRampTick && run.Roster.Owned().size() + run.Roster.PendingCount() < target &&
+    while (spawned < kSpawnsPerRampTick && run.Roster.SpawnedCount() + run.Roster.PendingCount() < target &&
            run.Roster.CanRequest())
     {
         RaceClass combo{};
@@ -626,25 +626,19 @@ int main(int argc, char** argv)
                 if (words.size() == 3 && words[1] == "add")
                 {
                     std::string const name = words[2];
-                    if (!run.Roster.CanRequest())
-                    {
-                        set(false, "The module cannot take another bot (its bot limit is reached).");
-                        return reply;
-                    }
+                    // An alt does not use up the bot cap, so it is not refused for it (BotRoster::OnAltGranted).
                     forever_module::SpawnParams params;
                     params.set_alt_name(name);
                     params.set_owner_guid(issuerCounter);
-                    run.Roster.NoteRequestSent(0);
                     run.Client.RequestControl(0, params, [&run, alts, tell, name](forever_module::ControlResponse const& response)
                     {
                         if (!response.granted())
                         {
-                            run.Roster.OnDenied(0);
                             tell("Cannot make " + name + " a bot: " + response.reason());
                             return;
                         }
                         std::uint64_t const guid = response.bot_guid();
-                        run.Roster.OnGranted(0, guid);
+                        run.Roster.OnAltGranted(guid);
                         if (response.class_id() != 0)
                             run.Classes.Set(guid, response.class_id());
                         if (response.race() != 0)

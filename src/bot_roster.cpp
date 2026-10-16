@@ -6,7 +6,20 @@ BotRoster::BotRoster(std::uint32_t maxBots) : _maxBots(maxBots)
 
 bool BotRoster::CanRequest() const
 {
-    return _owned.size() + _pending < _maxBots;
+    return SpawnedCount() + _pending < _maxBots;
+}
+
+std::uint32_t BotRoster::SpawnedCount() const
+{
+    return static_cast<std::uint32_t>(_owned.size() - _alts.size());
+}
+
+void BotRoster::OnAltGranted(std::uint64_t grantedGuid)
+{
+    if (grantedGuid == 0)
+        return;
+    _owned.insert(grantedGuid);
+    _alts.insert(grantedGuid);
 }
 
 void BotRoster::NoteRequestSent(std::uint64_t)
@@ -32,6 +45,7 @@ bool BotRoster::OnRevoked(std::uint64_t botGuid, std::string const& reason)
 {
     if (_owned.erase(botGuid) == 0)
         return false;
+    _alts.erase(botGuid);
     _lastRevokeReason = reason;
     return true;
 }
