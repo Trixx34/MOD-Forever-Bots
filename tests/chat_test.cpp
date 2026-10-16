@@ -116,6 +116,17 @@ BotPolicy Policy()
     return BotPolicy(options);
 }
 
+// The bot acts on the unit: it attacks it, follows it, or casts at it. A ranged bot that kites a melee target inside kiting distance
+// backs off with a kMoveTo and casts at it instead of walking in, so "it is fighting it" covers a cast as well as an attack.
+bool Engages(std::vector<BotAction> const& actions, std::uint64_t bot, std::uint64_t unit)
+{
+    for (BotAction const& action : actions)
+        if (action.bot_guid == bot && action.target_guid == unit &&
+            (action.type == ActionType::kAttackTarget || action.type == ActionType::kFollow || action.type == ActionType::kCastSpell))
+            return true;
+    return false;
+}
+
 bool Has(std::vector<BotAction> const& actions, std::uint64_t bot, ActionType type, std::uint64_t target = 0)
 {
     for (BotAction const& action : actions)
@@ -210,7 +221,8 @@ void GotoHereSendsTheBotsToTheSpeaker()
     BotPolicy policy = Policy();
     WorldTickSnapshotView view = Group();
     policy.ApplyChat(view, Ctx(), *ParseChatCommand("goto here", false), 1000);
-    auto const actions = policy.Decide(view, 1000);
+    policy.Decide(view, 1000);                                  // the bots mount first: the speaker is over 100 yards away
+    auto const actions = policy.Decide(view, 1001);             // and walk on the next tick
     int moves = 0;
     for (BotAction const& action : actions)
         if (action.type == ActionType::kMoveTo)
@@ -321,7 +333,7 @@ void PassiveBotsDoNotAssist()
     // Attacked: it defends itself.
     view.bots[2].in_combat = 1;
     actions = policy.Decide(view, 2000);
-    CHECK(Has(actions, 12, ActionType::kFollow, mob.guid) || Has(actions, 12, ActionType::kAttackTarget));
+    CHECK(Engages(actions, 12, mob.guid)); // it fights back: a mage kites the mob at 10 yards and casts at it
 }
 
 void AcceptsAPlayersInvite()
@@ -450,7 +462,7 @@ void DefensiveBotsWaitForTheGroupToFight()
     CHECK(!Has(actions, 12, ActionType::kFollow, mob.guid) && !Has(actions, 12, ActionType::kAttackTarget));
     view.bots[0].in_combat = 1; // somebody in the group is fighting
     actions = policy.Decide(view, 2000);
-    CHECK(Has(actions, 12, ActionType::kFollow, mob.guid) || Has(actions, 12, ActionType::kAttackTarget));
+    CHECK(Engages(actions, 12, mob.guid)); // it fights back: a mage kites the mob at 10 yards and casts at it
 }
 
 void FocusTargetIsAttackedFirst()

@@ -117,6 +117,14 @@ bool WalksTo(std::vector<BotAction> const& actions, float x)
     return false;
 }
 
+// A walk longer than the mount threshold spends its first tick mounting up: kMount, then kStop instead of the walk. The walk to the
+// spot follows on the next tick. BotMountsForALongWalk in policy_test covers the mount itself.
+bool WalksToAfterMount(BotPolicy& policy, WorldTickSnapshotView const& view, std::uint64_t nowMs, float x)
+{
+    policy.Decide(view, nowMs);
+    return WalksTo(policy.Decide(view, nowMs + 1), x);
+}
+
 void IdleBotWalksToAGrindSpotForItsLevel()
 {
     std::vector<std::string> warnings;
@@ -125,7 +133,7 @@ void IdleBotWalksToAGrindSpotForItsLevel()
     BotPolicy policy(options);
     WorldTickSnapshotView view = OneBot(7, 0);
     CHECK(!WalksTo(policy.Decide(view, 1000), 900.0f));      // idle for a moment only
-    CHECK(WalksTo(policy.Decide(view, 1000 + 31000), 900.0f)); // a quiet spell: to the spot for level 7
+    CHECK(WalksToAfterMount(policy, view, 1000 + 31000, 900.0f)); // a quiet spell: to the spot for level 7
 }
 
 // A map the spot file does not cover: the bot used to stand at its start for the whole run (the new races' island). It now takes short walks
@@ -158,7 +166,7 @@ void HubsAreTheFallbackWithoutGrindData()
     BotPolicy policy(options);
     WorldTickSnapshotView view = OneBot(3, 0);
     policy.Decide(view, 1000);
-    CHECK(WalksTo(policy.Decide(view, 1000 + 31000), 700.0f));
+    CHECK(WalksToAfterMount(policy, view, 1000 + 31000, 700.0f));
 }
 
 void NextWalkMovesOnToAnotherSpot()
@@ -172,7 +180,7 @@ void NextWalkMovesOnToAnotherSpot()
     CHECK(WalksTo(policy.Decide(view, 1000 + 31000), 100.0f));       // the nearest first
     view.bots[0].pos_x = 100.0f;                                     // arrived
     policy.Decide(view, 40000);
-    CHECK(WalksTo(policy.Decide(view, 40000 + 31000), 400.0f));      // then the other one, not back to the same
+    CHECK(WalksToAfterMount(policy, view, 40000 + 31000, 400.0f)); // then the other one, not back to the same
 }
 
 // A start zone whose creatures the bot will not pull (an elite, a level far above it, a pack of four) used to count as "an enemy near": the bot
@@ -204,7 +212,7 @@ void UnpullableCreaturesDoNotKeepTheBotFromWalking()
     elite.level = 2;
     elite.elite = 1;
     policy.Decide(view, 1000);
-    CHECK(WalksTo(policy.Decide(view, 1000 + 31000), 900.0f));
+    CHECK(WalksToAfterMount(policy, view, 1000 + 31000, 900.0f));
 }
 
 // Bots standing together (a start zone) used to follow the nearest of each other forever, in circles. Another bot is not a player to follow: the

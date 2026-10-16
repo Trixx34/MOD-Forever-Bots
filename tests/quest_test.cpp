@@ -380,6 +380,15 @@ WorldTickSnapshotView OneBotView(BotSnapshot bot, std::vector<NearbyUnit> const&
     return view;
 }
 
+// A walk longer than the mount threshold spends its first tick mounting up: kMount, then kStop instead of the walk. The walk to the
+// destination follows on the next tick. BotMountsForALongWalk in policy_test covers the mount itself.
+std::vector<BotAction> AfterMount(BotPolicy& policy, WorldTickSnapshotView const& view, std::uint64_t nowMs)
+{
+    policy.Decide(view, nowMs);
+    return policy.Decide(view, nowMs + 1);
+}
+
+
 NearbyUnit Mob(std::uint32_t entry, std::uint64_t counter, float x, float y)
 {
     NearbyUnit unit;
@@ -439,7 +448,9 @@ void PolicyWalksToTheHuntingAreaWhenNoTargetIsNear()
     BotPolicy policy = QuestPolicy();
     BotSnapshot bot = Bot(-8900.0f, -165.0f);
     LogQuest(bot, 7, 1, 3);
-    auto actions = policy.Decide(OneBotView(bot, { Mob(99, 1, -8890.0f, -165.0f) }), 1000);
+    // The hunting area is 103 yards away, over the mount threshold, so the first tick mounts and the walk follows on the next one.
+    WorldTickSnapshotView const view = OneBotView(bot, { Mob(99, 1, -8890.0f, -165.0f) });
+    auto const actions = AfterMount(policy, view, 1000);
     bool moved = false;
     for (BotAction const& action : actions)
         if (action.type == ActionType::kMoveTo)
@@ -496,7 +507,8 @@ void RefusedHandInSendsTheBotToAVendor()
     refused.last_action_sequence = 1;
     refused.last_action_type = std::uint8_t(ActionType::kQuest);
     refused.last_action_status = forever_module::BotActionStatus::kRefused;
-    auto walk = policy.Decide(OneBotView(refused, {}), 5000);
+    WorldTickSnapshotView const walking = OneBotView(refused, {});
+    auto const walk = AfterMount(policy, walking, 5000); // 103 yards to the vendor: mounts first, then walks
     BotAction const* move = kind(walk, ActionType::kMoveTo);
     CHECK(move && move->dest_x == -8800.0f); // to the vendor, not back to the quest NPC
     for (BotAction const& action : walk)

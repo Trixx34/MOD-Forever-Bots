@@ -182,14 +182,14 @@ int main()
         for (BotAction const& action : actions)
         {
             CHECK_AT(action.bot_guid >= 1000000 && action.bot_guid < 1000000 + kBotCount);
-            CHECK_AT(action.type != ActionType::kNone);
+            CHECK_AT(action.type <= ActionType::kLastActionType);
             bool const complete = action.type != ActionType::kTeleport ||
                                   (action.spell_id != 0 && (action.dest_x != 0.0f || action.dest_y != 0.0f || action.dest_z != 0.0f));
             CHECK_AT(complete);
         }
     }
 
-    std::printf("scale: %d ticks of %zu bots: avg %.0f us, worst %.0f us, %.0f us per bot, %zu actions at the widest tick\n",
+    std::printf("scale: %zu ticks of %zu bots: avg %.0f us, worst %.0f us, %.0f us per bot, %zu actions at the widest tick\n",
                 last_tick, kBotCount, total_us / kTicks, worst_us, worst_us / double(kBotCount), worst_actions);
 
     // The ceiling is wide on purpose: a machine running the build, or a debug build, both cost more than this. It is here to

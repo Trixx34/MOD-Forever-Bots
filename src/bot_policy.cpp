@@ -1610,7 +1610,10 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
 
         // A fight ends a quest walk's stall timer: the quest block below only runs out of combat, so the timer is reset here.
         if (bot.in_combat != 0)
+        {
             state.WalkStillSinceMs = 0;
+            state.WalkAnchored = false;
+        }
 
         // Fight watchdog: a visible hostile whose health, and the bot's own, have not gone down for kFightStallMs is unreachable,
         // evading or out of line of sight (the 8-hour soak had a fight of two hours). A threat the snapshot keeps set but that is not
@@ -1810,6 +1813,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             if (questStep.Kind != QuestStepKind::WalkTo)
             {
                 state.WalkStillSinceMs = 0; // the stall timer only runs during a quest walk
+                state.WalkAnchored = false;
                 state.QuestTeleportSent = false;
             }
 
@@ -1821,10 +1825,11 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     // already sent and the bot is still stuck, the start is dropped and the bot grinds. The planner only offers starts on
                     // the bot's own map, so the giver's position is on that map too.
                     Point const here{ bot.pos_x, bot.pos_y, bot.pos_z };
-                    if (state.WalkStillSinceMs == 0 || DistanceTo(bot, state.WalkAnchor) > kQuestWalkStuckYards)
+                    if (!state.WalkAnchored || DistanceTo(bot, state.WalkAnchor) > kQuestWalkStuckYards)
                     {
                         state.WalkAnchor = here;
                         state.WalkStillSinceMs = nowMs;
+                        state.WalkAnchored = true;
                         state.QuestTeleportSent = false;
                     }
                     bool const stuck = nowMs - state.WalkStillSinceMs >= kQuestWalkStuckMs;
@@ -1845,6 +1850,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                         _quests.NoteNoRoute(state.Quest, nowMs);
                         state.QuestTeleportSent = false;
                         state.WalkStillSinceMs = 0;
+                        state.WalkAnchored = false;
                         if (_options.OnEvent)
                             _options.OnEvent("quest_walk_blocked: bot=" + std::to_string(bot.guid) + " map=" + std::to_string(bot.map_id) +
                                              " quest=" + std::to_string(questStep.Quest) + " reason=" +
@@ -1935,8 +1941,10 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             bool const needRepair = bot.repair_valid != 0 && bot.durability_pct < kRepairBelowPct;
             Point const vendor = needRepair ? Point{ bot.repair_x, bot.repair_y, bot.repair_z }
                                             : Point{ bot.vendor_x, bot.vendor_y, bot.vendor_z };
-            bool const hasVendor = !partyMember && (needRepair || bot.vendor_valid != 0);
-            if (hasVendor && DistanceTo(bot, vendor) > kVendorReachYards)
+            bool const vendorExists = needRepair || bot.vendor_valid != 0;
+            bool const hasVendor = !partyMember && vendorExists;
+            bool const inReach = vendorExists && DistanceTo(bot, vendor) <= kVendorReachYards;
+            if (hasVendor && !inReach)
             {
                 if (!state.Traveling)
                 {
@@ -1955,8 +1963,13 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     state.NextServiceMs = nowMs + _options.ServiceEveryMs;
                 }
             }
-            else
+            else if (inReach || !vendorExists)
             {
+                // In reach of a vendor, or none on the map at all: the visit is tried where the bot stands and the core refuses it when
+                // no NPC is in range. What is left is a party member with a vendor it may not walk to, and it is sent nothing: it follows
+                // its leader, and an action it will have refused still spent a slot of the tick's action budget (kRequestedActions is 2 a
+                // bot, and PublishActions drops the whole tick when the list runs over) and pushed the next visit a whole ServiceEveryMs
+                // out. At the 1500-bot ceiling that is 1200 refused actions on one tick, over the budget the core granted.
                 state.Traveling = false;
                 if (state.ServiceUrgent)
                 {
@@ -2170,7 +2183,8 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         }
 
         bool const levelUp = bot.level != 0 && bot.level != state.LastTrainLevel;
-        if (idle && _options.TrainEveryMs != 0 && (levelUp || nowMs >= state.NextTrainMs))
+        // A sitting bot (resting, or drinking) is not available for a trainer check, exactly as a walking bot is not: it stands first.
+        if (idle && !state.Sitting && _options.TrainEveryMs != 0 && (levelUp || nowMs >= state.NextTrainMs))
         {
             BotAction train;
             train.bot_guid = bot.guid;
@@ -2612,7 +2626,13 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     actions.push_back(buff);
                     state.CastTarget[row.Spell] = recipient;
                     state.NextCastMs = nowMs + kGlobalCooldownMs;
-                    _buffClaims[{ row.Spell, recipient }] = BuffClaim{ buffGroup, nowMs + std::uint64_t(row.DurationSec) * 1000 };
+                    std::uint64_t const untilMs = nowMs + std::uint64_t(row.DurationSec) * 1000;
+                    _buffClaims[{ row.Spell, recipient }] = BuffClaim{ buffGroup, untilMs };
+                    // A buff this bot casts on itself is claimed under its own player reference as well. Without that, a party mate
+                    // deciding a moment later sees { spell, PlayerRef(this bot) } unclaimed and buffs it a second time: the self claim is
+                    // keyed 0, the members' by reference, and the snapshot that would show the buff does not exist yet.
+                    if (recipient == 0)
+                        _buffClaims[{ row.Spell, PlayerRef(bot.guid) }] = BuffClaim{ buffGroup, untilMs };
                     cast = true;
                     break;
                 }

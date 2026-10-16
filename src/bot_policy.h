@@ -230,7 +230,9 @@ private:
         std::vector<std::size_t> GrindVisited;           // the last spots visited (indexes), so the bot moves on instead of going back and forth
         std::size_t NextHub = 0;                         // index of the hub to walk to next, on the bot's map
         Point WalkAnchor;                                // where the bot stood when its quest walk was last seen moving
-        std::uint64_t WalkStillSinceMs = 0;              // when it was at WalkAnchor; 0 when no quest walk is watched
+        std::uint64_t WalkStillSinceMs = 0;              // when it was at WalkAnchor; only read while WalkAnchored is set
+        bool WalkAnchored = false;                       // a quest walk is being watched: WalkAnchor and WalkStillSinceMs are live.
+                                                        // A flag, not WalkStillSinceMs == 0, because 0 is a legal timestamp.
         bool QuestTeleportSent = false;                  // one teleport already sent for this stuck walk; a second stuck drops the start
         bool Traveling = false;                          // walking to the vendor for a visit
         std::uint64_t TravelStartMs = 0;                 // when this walk began; it is dropped after kTravelTimeoutMs

@@ -761,6 +761,15 @@ WorldTickSnapshotView PartyView(std::vector<std::uint64_t> const& guids)
     return view;
 }
 
+// A walk longer than the mount threshold spends its first tick mounting up: kMount, then kStop instead of the walk. The walk to the
+// destination follows on the next tick. The tests below are about where the bot walks, so they read the tick after the mount;
+// BotMountsForALongWalk and its neighbours cover the mount itself.
+std::vector<BotAction> AfterMount(BotPolicy& policy, WorldTickSnapshotView const& view, std::uint64_t nowMs)
+{
+    policy.Decide(view, nowMs);
+    return policy.Decide(view, nowMs + 1);
+}
+
 void AddNearby(WorldTickSnapshotView& view, std::size_t botIndex, NearbyUnit const& unit)
 {
     view.nearby[botIndex * view.max_nearby_units + view.bots[botIndex].nearby_count++] = unit;
@@ -896,7 +905,15 @@ void MemberFightsItsLeadersTarget()
     NearbyUnit const wolf = Hostile(7, 2.0f, 100);
     view.bots[2].threat_target_guid = wolf.guid; // the leader is fighting the wolf
     AddNearby(view, 1, wolf);                    // bot 11 sees it
-    CHECK(HasAction(PartyPolicy(5).Decide(view, 0), 11, ActionType::kAttackTarget, wolf.guid));
+    auto const actions = PartyPolicy(5).Decide(view, 0);
+    // Bot 11 is a priest, and the wolf is 2 yards away: a melee target inside kiting distance, so it backs off (kMoveTo) and casts at
+    // the wolf instead of walking into it. Either way it acts on the leader's target; a melee member attacks it outright.
+    bool engages = false;
+    for (BotAction const& action : actions)
+        if (action.bot_guid == 11 && action.target_guid == wolf.guid &&
+            (action.type == ActionType::kAttackTarget || action.type == ActionType::kCastSpell))
+            engages = true;
+    CHECK(engages);
 }
 
 void NoPartyActionsInCombat()
@@ -955,7 +972,8 @@ void WornGearSendsTheBotToTheRepairman()
     view.bots[0].repair_x = -200.0f;
     view.bots[0].repair_valid = 1;
     view.bots[0].durability_pct = 20;
-    auto const actions = VendorPolicy().Decide(view, 0);
+    BotPolicy policy = VendorPolicy();
+    auto const actions = AfterMount(policy, view, 0);
     bool found = false;
     for (BotAction const& action : actions)
         if (action.type == ActionType::kMoveTo && action.bot_guid == 10)
@@ -1059,7 +1077,7 @@ void IdleBotWandersToAHubAfterAWhile()
     WorldTickSnapshotView view = OnMap(1);
     CHECK(WalkTo(policy.Decide(view, 0), 10) < 0.0f);     // idle starts now
     CHECK(WalkTo(policy.Decide(view, 29000), 10) < 0.0f);
-    CHECK(WalkTo(policy.Decide(view, 30000), 10) == 500.0f);
+    CHECK(WalkTo(AfterMount(policy, view, 30000), 10) == 500.0f);
 }
 
 void ArrivalMovesOnToTheNextHubAfterAnInterval()
@@ -1067,10 +1085,11 @@ void ArrivalMovesOnToTheNextHubAfterAnInterval()
     BotPolicy policy = HubPolicy();
     WorldTickSnapshotView view = OnMap(1);
     policy.Decide(view, 0);
-    CHECK(WalkTo(policy.Decide(view, 30000), 10) == 500.0f); // walking to hub 1
+    CHECK(WalkTo(AfterMount(policy, view, 30000), 10) == 500.0f); // walking to hub 1
     view.bots[0].pos_x = 495.0f;                              // five yards from it: arrived
     CHECK(WalkTo(policy.Decide(view, 31000), 10) < 0.0f);     // waits at the hub
     CHECK(WalkTo(policy.Decide(view, 60000), 10) < 0.0f);     // not a full interval yet
+    // The bot is still mounted from the first walk, so this one starts walking at once: AfterMount would read a tick too late.
     CHECK(WalkTo(policy.Decide(view, 61000), 10) == 900.0f);  // next walk, to hub 2
 }
 
@@ -1088,7 +1107,7 @@ void AnythingSeenStopsTheWalk()
     BotPolicy policy = HubPolicy();
     WorldTickSnapshotView view = OnMap(1);
     policy.Decide(view, 0);
-    CHECK(WalkTo(policy.Decide(view, 30000), 10) == 500.0f);
+    CHECK(WalkTo(AfterMount(policy, view, 30000), 10) == 500.0f);
     // A hostile creature comes into view: the bot fights it instead of walking on.
     NearbyUnit const wolf = Hostile(7, 2.0f, 100);
     AddNearby(view, 0, wolf);
@@ -2219,7 +2238,8 @@ void WeakestTargetIsPulledFirst()
     CHECK(HasAction(actions, 10, ActionType::kFollow, MakeUnitRef(8, 1, 7)));
 }
 
-// Two that may equally well be pulled: the closest one.
+// Two that may equally well be pulled: the closest one. It is 3 yards away, so the bot is already in range and attacks rather than
+// walking up (a target still out of range is kFollow: see WeakestTargetIsPulledFirst).
 void ClosestBreaksTheTieBetweenEqualTargets()
 {
     BotPolicy policy;
@@ -2227,7 +2247,7 @@ void ClosestBreaksTheTieBetweenEqualTargets()
     AddNearby(view, 0, Hostile(7, 12.0f, 100));
     AddNearby(view, 0, Hostile(8, 3.0f, 100));
     auto const actions = policy.Decide(view, 0);
-    CHECK(HasAction(actions, 10, ActionType::kFollow, MakeUnitRef(8, 1, 8)));
+    CHECK(HasAction(actions, 10, ActionType::kAttackTarget, MakeUnitRef(8, 1, 8)));
 }
 
 // Two rogues of one party, a target that is casting: one interrupts it and the other keeps building combo points.
@@ -2338,10 +2358,10 @@ void HubTimeoutTriesTheNextHubSoonerThanAnArrival()
     BotPolicy policy = HubPolicy();
     WorldTickSnapshotView view = OnMap(1);
     policy.Decide(view, 0);                                   // the idle time starts
-    CHECK(WalkTo(policy.Decide(view, 30000), 10) == 500.0f);  // walking to hub 1
-    policy.Decide(view, 31000);                               // unchanged
+    CHECK(WalkTo(AfterMount(policy, view, 30000), 10) == 500.0f); // walking to hub 1
+    policy.Decide(view, 31000);                              // unchanged
     CHECK(WalkTo(policy.Decide(view, 210001), 10) < 0.0f);    // dropped after the timeout
-    CHECK(WalkTo(policy.Decide(view, 215001), 10) == 900.0f); // the next hub, after a short pause
+    CHECK(WalkTo(AfterMount(policy, view, 215001), 10) == 900.0f); // the next hub, after a short pause
 }
 
 // ---- layout 13: auras, pet, lost-target reason, vendor guid ----
