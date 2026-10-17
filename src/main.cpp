@@ -216,6 +216,15 @@ struct CommandQueue
     std::vector<std::pair<std::uint64_t, std::string>> Replies; // speaker character guid, text
 };
 
+// The words from index `from` on, joined with single spaces: a character name can have a last name ("Tinky Winky").
+static std::string JoinWords(std::vector<std::string> const& words, std::size_t from)
+{
+    std::string out;
+    for (std::size_t i = from; i < words.size(); ++i)
+        out += (out.empty() ? "" : " ") + words[i];
+    return out;
+}
+
 // The alts this module controls (characters of players' accounts playing as bots): name (lower case) to bot guid. Read by the pump thread
 // (IsAlt) and written on the Run() thread.
 struct AltRegistry
@@ -623,9 +632,9 @@ int main(int argc, char** argv)
                     set(true, names.empty() ? "No alts are playing as bots." : "Alts as bots: " + names);
                     return reply;
                 }
-                if (words.size() == 3 && words[1] == "add")
+                if (words.size() >= 3 && words[1] == "add")
                 {
-                    std::string const name = words[2];
+                    std::string const name = JoinWords(words, 2);
                     // An alt does not use up the bot cap, so it is not refused for it (BotRoster::OnAltGranted).
                     forever_module::SpawnParams params;
                     params.set_alt_name(name);
@@ -654,12 +663,13 @@ int main(int argc, char** argv)
                     set(true, "Asking the server to log " + name + " in as a bot.");
                     return reply;
                 }
-                if (words.size() == 3 && words[1] == "remove")
+                if (words.size() >= 3 && words[1] == "remove")
                 {
+                    std::string const name = JoinWords(words, 2);
                     std::uint64_t guid = 0;
                     {
                         std::lock_guard<std::mutex> lock(alts->Lock);
-                        auto const it = alts->ByName.find(LowerCopy(words[2]));
+                        auto const it = alts->ByName.find(LowerCopy(name));
                         if (it != alts->ByName.end())
                         {
                             guid = it->second;
@@ -669,12 +679,12 @@ int main(int argc, char** argv)
                     }
                     if (guid == 0)
                     {
-                        set(false, words[2] + " is not an alt playing as a bot.");
+                        set(false, name + " is not an alt playing as a bot.");
                         return reply;
                     }
                     run.Roster.OnRevoked(guid, "alt removed");
                     run.Client.ReleaseControl(guid); // the core logs an alt out when the module lets it go
-                    set(true, words[2] + " is being logged out.");
+                    set(true, name + " is being logged out.");
                     return reply;
                 }
                 set(false, "Usage: .bots alt add <name> | alt remove <name> | alt list");
