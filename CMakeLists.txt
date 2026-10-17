@@ -22,6 +22,9 @@ find_package(Threads REQUIRED)
 add_library(forever_bots_roster STATIC src/bot_roster.cpp)
 target_include_directories(forever_bots_roster PUBLIC src)
 
+add_library(forever_bots_trade STATIC src/trade_policy.cpp)
+target_include_directories(forever_bots_trade PUBLIC src)
+
 add_library(forever_bots_settings STATIC src/bot_settings.cpp src/bot_ramp.cpp src/bot_pick.cpp src/dungeon_data.cpp)
 target_include_directories(forever_bots_settings PUBLIC src)
 
@@ -44,12 +47,16 @@ target_include_directories(forever_bots_live PUBLIC src)
 target_link_libraries(forever_bots_live PUBLIC forever_module_sdk)
 
 add_executable(forever-bots src/main.cpp)
-target_link_libraries(forever-bots PRIVATE forever_bots_live forever_bots_roster forever_bots_policy forever_bots_settings forever_bots_store forever_bots_telemetry forever_bots_files forever_module_sdk Threads::Threads)
+target_link_libraries(forever-bots PRIVATE forever_bots_live forever_bots_trade forever_bots_roster forever_bots_policy forever_bots_settings forever_bots_store forever_bots_telemetry forever_bots_files forever_module_sdk Threads::Threads)
 
 enable_testing()
 add_executable(roster_test tests/roster_test.cpp)
 target_link_libraries(roster_test PRIVATE forever_bots_roster)
 add_test(NAME roster COMMAND roster_test)
+
+add_executable(trade_test tests/trade_test.cpp)
+target_link_libraries(trade_test PRIVATE forever_bots_trade)
+add_test(NAME trade COMMAND trade_test)
 
 add_executable(policy_test tests/policy_test.cpp)
 target_link_libraries(policy_test PRIVATE forever_bots_policy)

@@ -10,6 +10,7 @@
 #include "bot_policy.h"
 #include "bot_ramp.h"
 #include "bot_roster.h"
+#include "trade_policy.h"
 #include "bot_settings.h"
 #include "bot_store.h"
 #include "bot_live.h"
@@ -512,7 +513,7 @@ int main(int argc, char** argv)
     manifest.requested_max_bots = kMaxBotsCeiling;
     manifest.requested_max_nearby_units = kRequestedNearbyUnits;
     manifest.requested_max_actions = kRequestedActions;
-    manifest.tier1_hooks = { "CommandScript", "PlayerScript.OnChat" };
+    manifest.tier1_hooks = { "CommandScript", "PlayerScript.OnChat", "PlayerScript.OnBotTrade" };
 
     forever_module::ModuleClient client(std::move(manifest));
     if (!client.Connect(argv[1]) || !client.Handshake())
@@ -790,9 +791,82 @@ int main(int argc, char** argv)
         return reply;
     });
 
-    // Chat commands (chat_commands.h): a group leader's party or raid line, or a whisper to a bot. Parsed here, applied on the pump thread.
-    client.OnNotify("PlayerScript.OnChat", [commands, &settings](forever_module::EventNotify const& notify)
+    // Bot trade (trade_policy.h). Everything below runs on the client's thread (notify callbacks, timers and action replies), so the TradeBook
+    // needs no lock. The core only sends the events of bots this module controls, and only when Bot.Trade.Enabled is on there.
+    auto trades = std::make_shared<trade::TradeBook>();
+    auto runTrade = std::make_shared<std::function<void(std::vector<trade::Step> const&)>>();
+    *runTrade = [&client, trades, runTrade](std::vector<trade::Step> const& steps)
     {
+        using forever_module::ActionReply;
+        using forever_module::ModuleClient;
+        for (trade::Step const& step : steps)
+        {
+            switch (step.What)
+            {
+                case trade::Step::Kind::Begin:
+                    client.BotTrade(step.Bot, ModuleClient::BotTradeOp::kBegin);
+                    break;
+                case trade::Step::Kind::ListBags:
+                {
+                    std::uint64_t const bot = step.Bot;
+                    client.BotTrade(bot, ModuleClient::BotTradeOp::kListBags, 0, 0, 0, [trades, runTrade, bot](ActionReply const& reply)
+                    {
+                        std::vector<trade::BagItem> items;
+                        if (reply.success())
+                            for (auto const& item : reply.bag_items())
+                                items.push_back({ item.item_guid(), item.entry(), item.count(), item.name() });
+                        (*runTrade)(trades->OnBagList(bot, std::move(items), nowMs()));
+                    });
+                    break;
+                }
+                case trade::Step::Kind::Whisper:
+                    client.BotSpeak(step.Bot, ModuleClient::SpeakKind::kWhisper, step.Partner, step.Text);
+                    break;
+                case trade::Step::Kind::SetItem:
+                {
+                    std::uint64_t const bot = step.Bot;
+                    std::string const name = step.Text;
+                    client.BotTrade(bot, ModuleClient::BotTradeOp::kSetItem, step.Slot, step.ItemGuid, 0, [trades, runTrade, bot, name](ActionReply const& reply)
+                    {
+                        if (!reply.success())
+                            (*runTrade)(trades->OnItemRefused(bot, name));
+                    });
+                    break;
+                }
+                case trade::Step::Kind::Accept:
+                    client.BotTrade(step.Bot, ModuleClient::BotTradeOp::kAccept);
+                    break;
+                case trade::Step::Kind::Cancel:
+                    client.BotTrade(step.Bot, ModuleClient::BotTradeOp::kCancel);
+                    break;
+            }
+        }
+    };
+    client.OnNotify("PlayerScript.OnBotTrade", [trades, runTrade](forever_module::EventNotify const& notify)
+    {
+        if (notify.event_payload_case() != forever_module::EventNotify::kBotTrade)
+            return;
+        forever_module::BotTradeEvent const& event = notify.bot_trade();
+        if (event.status() > static_cast<std::uint32_t>(trade::Status::Completed))
+            return;
+        (*runTrade)(trades->OnEvent(event.bot_guid(), event.partner_guid(), static_cast<trade::Status>(event.status()), nowMs()));
+    });
+    // A trade nobody is working on is cancelled.
+    client.AddTimer(std::chrono::seconds(5), [trades, runTrade] { (*runTrade)(trades->OnIdle(nowMs())); });
+
+    // Chat commands (chat_commands.h): a group leader's party or raid line, or a whisper to a bot. Parsed here, applied on the pump thread.
+    client.OnNotify("PlayerScript.OnChat", [commands, &settings, trades, runTrade](forever_module::EventNotify const& notify)
+    {
+        if (notify.event_payload_case() == forever_module::EventNotify::kPlayerChat)
+        {
+            // A whisper to a bot that is trading with the speaker is about the trade (what it asks for), not a chat order.
+            forever_module::PlayerChatEvent const& whisper = notify.player_chat();
+            if (whisper.channel() == 3 && trades->PartnerOf(whisper.recipient_guid()) == whisper.player_guid())
+            {
+                (*runTrade)(trades->OnWhisper(whisper.player_guid(), whisper.recipient_guid(), whisper.text(), nowMs()));
+                return;
+            }
+        }
         if (!settings.ChatCommands || notify.event_payload_case() != forever_module::EventNotify::kPlayerChat)
             return;
         forever_module::PlayerChatEvent const& chat = notify.player_chat();
