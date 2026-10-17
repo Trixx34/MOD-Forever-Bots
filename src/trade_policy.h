@@ -39,7 +39,7 @@ enum class Status : std::uint32_t
 // One thing for main.cpp to do.
 struct Step
 {
-    enum class Kind { Begin, ListBags, Whisper, SetItem, Accept, Cancel };
+    enum class Kind { Begin, ListBags, Whisper, SetItem, Accept, Cancel, Regear };
     Kind What = Kind::Whisper;
     std::uint64_t Bot = 0;
     std::uint64_t Partner = 0;  // Whisper: the player to whisper to
@@ -83,7 +83,7 @@ public:
     explicit TradeBook(std::uint64_t idleMs = 120000) : _idleMs(idleMs) {}
 
     // A trade event for a bot. Requested opens the bot's side and asks for the bags; PartnerAccepted presses Accept; Cancelled and
-    // Completed end the trade (Completed also thanks the player).
+    // Completed end the trade (Completed thanks the player and asks for a gear pass: the bot may have been given something to wear).
     std::vector<Step> OnEvent(std::uint64_t bot, std::uint64_t partner, Status status, std::uint64_t nowMs);
 
     // The core's list-bags reply: whispers the items as pages.

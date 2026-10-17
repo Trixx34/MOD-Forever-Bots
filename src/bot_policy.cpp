@@ -135,6 +135,10 @@ constexpr std::uint64_t kAcceptInviteRetryMs = 3000; // an invite from a player 
 constexpr std::uint64_t kGotoTimeoutMs = 90000;     // a goto order is dropped after this long
 constexpr std::uint64_t kPullOrderMs = 30000;      // a pull order is dropped after this long, or when the target is gone
 constexpr std::uint64_t kCloserAfterLosMs = 5000;   // after a line-of-sight refusal the bot closes to melee range for this long
+// Gear a bot carries (traded, looted, a quest reward) is worn when it is better. The core compares item levels; asking is cheap, so every
+// bot asks this often, spread by guid so a few hundred bots do not all ask in one tick.
+constexpr std::uint64_t kBagGearEveryMs = 300000;
+constexpr std::uint64_t kBagGearSpreadMs = 60000;
 constexpr std::uint64_t kTravelTimeoutMs = 180000; // a walk to the vendor longer than this is dropped for now
 constexpr float kMountMinDistanceYards = 100.0f;   // a walk this long: mount up before it
 constexpr float kMountDismountDistanceYards = 15.0f; // arrived or close: dismount
@@ -1445,6 +1449,21 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 state.GearedAtLevel = bot.level != 0 ? bot.level : 1;
                 state.GearRequested = false;
                 state.GearRetryMs = nowMs + 10000;
+            }
+            else if (!alt && bot.life_state == 0 && (state.BagGearRequested || nowMs >= state.NextBagGearMs))
+            {
+                // Not tied to an auto gear pass, and it works with AutoGearing off: spell_id 2 is "only wear what is better in the bags".
+                // The first look at a bot only sets its schedule.
+                if (state.NextBagGearMs != 0 || state.BagGearRequested)
+                {
+                    BotAction gear;
+                    gear.bot_guid = bot.guid;
+                    gear.type = ActionType::kAutoGear;
+                    gear.spell_id = 2u;
+                    actions.push_back(gear);
+                }
+                state.BagGearRequested = false;
+                state.NextBagGearMs = nowMs + kBagGearEveryMs + (bot.guid % kBagGearSpreadMs / 1000) * 1000;
             }
         }
 

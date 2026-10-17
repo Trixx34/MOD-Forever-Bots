@@ -233,7 +233,8 @@ void CompleteThanksAndEnds()
 {
     TradeBook book = Opened();
     auto steps = book.OnEvent(kBot, kPlayer, Status::Completed, 2000);
-    CHECK(steps.size() == 1 && steps[0].What == Step::Kind::Whisper && steps[0].Partner == kPlayer);
+    CHECK(steps.size() == 2 && steps[0].What == Step::Kind::Whisper && steps[0].Partner == kPlayer);
+    CHECK(steps[1].What == Step::Kind::Regear && steps[1].Bot == kBot); // it may have been given something to wear
     CHECK(!book.Active(kBot));
     CHECK(book.OnWhisper(kPlayer, kBot, "2", 2100).empty());
 }

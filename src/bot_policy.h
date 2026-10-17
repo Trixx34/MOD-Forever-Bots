@@ -124,6 +124,8 @@ public:
 
     // Dress this bot for its level at the next tick (the .autogear command).
     void RequestAutoGear(std::uint64_t botGuid) { _bots[botGuid].GearRequested = true; }
+    // Asks for a bag-only gear pass at the next tick (a trade just finished): the core wears what the bot carries when it is better.
+    void RequestBagGear(std::uint64_t botGuid) { _bots[botGuid].BagGearRequested = true; }
 
     // Who said a chat command and where, for ApplyChat. Issuer is the speaker's character guid counter (the group leader), Recipient the
     // whispered bot's guid counter (0 for party or raid chat). Pos and MapId are the speaker's; TargetRef is its selected unit (0 = none).
@@ -266,6 +268,8 @@ private:
         std::uint64_t HoldSinceMs = 0;                   // the party leader waits for the party to be ready since this time (0 = not waiting)
         std::uint32_t GearedAtLevel = 0;                 // the level at the last auto gear (0 = not yet)
         bool GearRequested = false;                      // the .autogear command asked for it
+        bool BagGearRequested = false;                   // a bag-only pass is wanted now (a trade finished)
+        std::uint64_t NextBagGearMs = 0;                 // the next bag-only pass (0 = not scheduled yet)
         std::uint64_t GearRetryMs = 0;                   // no auto gear before this
         std::size_t RouteIndex = 0;                      // the leader's next route waypoint
         QuestMemory Quest;                               // the quest planner's memory of this bot

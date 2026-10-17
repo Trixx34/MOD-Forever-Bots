@@ -207,6 +207,7 @@ struct CommandQueue
 {
     std::mutex Lock;
     std::vector<std::uint64_t> AutoGear; // player guids that typed .autogear
+    std::vector<std::uint64_t> GearBots; // bot guids to check their bags for better gear now (a trade with them has finished)
     // Chat commands parsed on the Run() thread, applied on the pump thread; and the lines to send back to the speakers.
     struct ChatItem
     {
@@ -405,6 +406,13 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
                     std::lock_guard<std::mutex> lock(extras.Commands->Lock);
                     issuers.swap(extras.Commands->AutoGear);
                 }
+                std::vector<std::uint64_t> gearBots;
+                {
+                    std::lock_guard<std::mutex> lock(extras.Commands->Lock);
+                    gearBots.swap(extras.Commands->GearBots);
+                }
+                for (std::uint64_t bot : gearBots)
+                    policy.RequestBagGear(bot);
                 for (std::uint64_t issuer : issuers)
                 {
                     std::uint64_t const ref = forever_module::MakeUnitRef(2, 0, issuer & forever_module::kUnitRefCounterMask);
@@ -795,7 +803,7 @@ int main(int argc, char** argv)
     // needs no lock. The core only sends the events of bots this module controls, and only when Bot.Trade.Enabled is on there.
     auto trades = std::make_shared<trade::TradeBook>();
     auto runTrade = std::make_shared<std::function<void(std::vector<trade::Step> const&)>>();
-    *runTrade = [&client, trades, runTrade](std::vector<trade::Step> const& steps)
+    *runTrade = [&client, trades, runTrade, commands](std::vector<trade::Step> const& steps)
     {
         using forever_module::ActionReply;
         using forever_module::ModuleClient;
@@ -839,6 +847,13 @@ int main(int argc, char** argv)
                 case trade::Step::Kind::Cancel:
                     client.BotTrade(step.Bot, ModuleClient::BotTradeOp::kCancel);
                     break;
+                case trade::Step::Kind::Regear:
+                {
+                    // the pump thread asks the policy for a bag-only gear pass: the core wears what the bot carries when it is better
+                    std::lock_guard<std::mutex> lock(commands->Lock);
+                    commands->GearBots.push_back(step.Bot);
+                    break;
+                }
             }
         }
     };

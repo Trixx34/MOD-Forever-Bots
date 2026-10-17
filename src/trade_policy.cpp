@@ -258,6 +258,7 @@ std::vector<Step> TradeBook::OnEvent(std::uint64_t bot, std::uint64_t partner, S
             if (it != _sessions.end())
             {
                 steps.push_back(Whisper(bot, it->second.Partner, "Trade complete."));
+                steps.push_back(Plain(Step::Kind::Regear, bot));
                 _sessions.erase(it);
             }
             break;

@@ -315,6 +315,69 @@ void WithoutAutoGearingOnlyTheCommandDressesABot()
     CHECK(Count(policy.Decide(View(3, bots), 30000), ActionType::kAutoGear, 10) == 0); // once per request
 }
 
+// ---- gear from the bags (policy) ----
+
+std::size_t BagGear(std::vector<BotAction> const& actions, std::uint64_t guid)
+{
+    std::size_t n = 0;
+    for (BotAction const& a : actions)
+        n += a.type == ActionType::kAutoGear && a.bot_guid == guid && a.spell_id == 2;
+    return n;
+}
+
+void BotsWearBetterGearFromTheirBagsOnASchedule()
+{
+    BotPolicy policy; // AutoGearing is off: the bag pass does not depend on it
+    std::vector<BotSnapshot> bots = { Bot(10, 0, 0, 0) };
+    CHECK(BagGear(policy.Decide(View(1, bots), 1000), 10) == 0);       // the first look only sets the schedule
+    CHECK(BagGear(policy.Decide(View(2, bots), 200000), 10) == 0);     // not due yet
+    CHECK(BagGear(policy.Decide(View(3, bots), 400000), 10) == 1);     // 5 to 6 minutes after the first look
+    CHECK(BagGear(policy.Decide(View(4, bots), 405000), 10) == 0);     // once per period
+    CHECK(BagGear(policy.Decide(View(5, bots), 800000), 10) == 1);     // and again
+}
+
+void BagGearIsNotAskedForAltsTheDeadOrBotsInACombat()
+{
+    PolicyOptions options;
+    options.IsAlt = [](std::uint64_t guid) { return guid == 11; };
+    BotPolicy policy(options);
+    std::vector<BotSnapshot> bots = { Bot(10, 0, 0, 0), Bot(11, 0, 0, 0), Bot(12, 0, 0, 0) };
+    bots[2].in_combat = 1;
+    policy.Decide(View(1, bots), 1000);
+    auto const later = policy.Decide(View(2, bots), 400000);
+    CHECK(BagGear(later, 10) == 1);
+    CHECK(BagGear(later, 11) == 0); // an alt is the player's own character
+    CHECK(BagGear(later, 12) == 0); // fighting
+    bots[2].in_combat = 0;
+    bots[2].life_state = 1;         // dead
+    CHECK(BagGear(policy.Decide(View(3, bots), 500000), 12) == 0);
+    bots[2].life_state = 0;
+    CHECK(BagGear(policy.Decide(View(4, bots), 520000), 12) == 0); // the first look out of combat only sets its schedule
+    CHECK(BagGear(policy.Decide(View(5, bots), 900000), 12) == 1); // then it asks like the others
+}
+
+void ARequestAsksAtOnceAndOnlyOnce()
+{
+    BotPolicy policy;
+    std::vector<BotSnapshot> bots = { Bot(10, 0, 0, 0) };
+    policy.Decide(View(1, bots), 1000);
+    policy.RequestBagGear(10);
+    CHECK(BagGear(policy.Decide(View(2, bots), 2000), 10) == 1);
+    CHECK(BagGear(policy.Decide(View(3, bots), 30000), 10) == 0);
+}
+
+void AFullGearPassAndABagPassNeverShareATick()
+{
+    PolicyOptions options;
+    options.AutoGearing = true;
+    BotPolicy policy(options);
+    std::vector<BotSnapshot> bots = { Bot(10, 0, 0, 0) };
+    policy.RequestBagGear(10);
+    auto const actions = policy.Decide(View(1, bots), 1000);   // the full pass is due now (a new bot)
+    CHECK(Count(actions, ActionType::kAutoGear, 10) == 1);
+    CHECK(BagGear(actions, 10) == 0);
+}
+
 // ---- casts that cannot work (layout 10) ----
 
 WorldTickSnapshotView MageFacingAMob(BotSnapshot bot)
@@ -675,6 +738,10 @@ int main()
     TheRoutePartyPullsElitesButGrindingBotsDoNot();
     AutoGearingDressesEachBotOnceAndAgainAfterLevels();
     WithoutAutoGearingOnlyTheCommandDressesABot();
+    BotsWearBetterGearFromTheirBagsOnASchedule();
+    BagGearIsNotAskedForAltsTheDeadOrBotsInACombat();
+    ARequestAsksAtOnceAndOnlyOnce();
+    AFullGearPassAndABagPassNeverShareATick();
     NoCastWhileAnotherCastRuns();
     StopsBeforeASpellWithACastTimeWhileMoving();
     RefusedAsMovingIsLearnedAndRetriedSoon();
