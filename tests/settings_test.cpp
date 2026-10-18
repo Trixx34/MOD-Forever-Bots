@@ -74,6 +74,20 @@ void SayAndSupplySettings()
     CHECK(away.Presence.Enabled && away.Presence.OnlineMinMin == 90 && away.Presence.OnlineMaxMin == 90);
     CHECK(away.Presence.OfflineMinMin == 10 && away.Presence.OfflineMaxMin == 20 && away.Presence.MinOnline == 40 && away.Presence.MaxOnline == 800);
     CHECK(away.Presence.DayPercent[0] == 1 && away.Presence.DayPercent[23] == 24 && warnings.empty());
+    // Auction: off by default; the run time is one of the fork's three.
+    CHECK(!off.Auction.Enabled && off.Auction.SellPctGreen == 300 && off.Auction.RunMinutes == 1440 && off.Auction.EveryMs == 1800000);
+    BotSettings const house = ParseBotSettings({ { "Auction", "1" }, { "AuctionSellPctGreen", "250" }, { "AuctionSellPctBlue", "350" }, { "AuctionSellPctEpic", "450" },
+                                                 { "AuctionBuyoutPct", "130" }, { "AuctionRelistPct", "80" }, { "AuctionRunHours", "8" },
+                                                 { "AuctionMinVendorCopper", "500" }, { "AuctionBagFullPct", "70" }, { "AuctionPerVisit", "3" },
+                                                 { "AuctionListedMax", "6" }, { "AuctionEverySec", "600" }, { "AuctionBuyMaxPct", "25" },
+                                                 { "AuctionBrowsePerVisit", "2" }, { "AuctionCallsPerTick", "8" } }, warnings);
+    CHECK(house.Auction.Enabled && house.Auction.SellPctGreen == 250 && house.Auction.SellPctBlue == 350 && house.Auction.SellPctEpic == 450);
+    CHECK(house.Auction.BuyoutPct == 130 && house.Auction.RelistPct == 80 && house.Auction.RunMinutes == 480 && house.Auction.MinVendorCopper == 500);
+    CHECK(house.Auction.BagFullPct == 70 && house.Auction.PerVisit == 3 && house.Auction.ListedMax == 6 && house.Auction.EveryMs == 600000);
+    CHECK(house.Auction.BuyMaxPct == 25 && house.Auction.BrowsePerVisit == 2 && house.Auction.MaxCallsPerTick == 8 && warnings.empty());
+    BotSettings const badHours = ParseBotSettings({ { "AuctionRunHours", "12" } }, warnings);
+    CHECK(badHours.Auction.RunMinutes == 1440 && warnings.size() == 1);
+    warnings.clear();
     BotSettings const badCurve = ParseBotSettings({ { "PresenceDayPercent", "1,2,3" } }, warnings);
     CHECK(badCurve.Presence.DayPercent == presence::Settings().DayPercent && warnings.size() == 1);
     warnings.clear();

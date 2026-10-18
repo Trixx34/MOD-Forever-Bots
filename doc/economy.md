@@ -1,7 +1,33 @@
 # Bot economy and the Auction House: design
 
-Status: **a design, nothing is built.** It says what exists, what is missing, a first version small enough to test, and the decisions that are the
+Status: **the decision logic is built and unit-tested** (`src/auction_policy.*`, `tests/auction_test.cpp`, settings `Auction*`, off by default); **the module does not
+carry it out yet**, and the core lacks what is listed under "Checks". Bots receive the pay of their sales: the core takes a bot's delivered mail for it (`Bot.Mail.Collect`,
+`Bots/BotMail.cpp`, branch `feature/auction-core`). Nothing has run on a sim. It says what exists, what is missing, a first version small enough to test, and the decisions that are the
 owner's. The brief it replaces (`economy-design-prompt.md` in the old `.opencode/docs`) is not on the new servers.
+
+## Checks of the core (read from the code, 2026-10-19)
+
+- **Mail** (the owner's requirement: bots get the money). A sale, a buyout, an expired or cancelled listing and an outbid bid all arrive as mail; the core delivers the sale mail after
+  `MailDeliveryDelay` (3600 s by default). No code ever opened a mailbox for a bot, so the money and items would have stayed there. Built: `WorldSession::CollectMailAsBot` takes the money and
+  the items of every delivered mail without a mailbox (the same steps as `HandleMailTakeMoney` and `HandleMailTakeItem`), skips cash on delivery, and deletes the mail that is empty. `BotMgr` runs it for every
+  online bot that is not an alt every `Bot.Mail.CollectEverySec` (30) seconds and at login, so mail that arrives while a bot is away (presence) is taken when it comes back. Compiles; **not run**.
+- **Listing** (`kList`, `ModuleActions.cpp`): works for a bot (the item's owner is found among the online players, or `PlayerGuid`). The core's handler lists **one non-stackable item
+  at a time** (`UseCount` 1, `item->GetCount() == 1`); stackable goods go through `HandleAuctionSellCommodity`, which the module action does not call. So the first version lists pieces of equipment
+  only. The fork's auctions run **2, 8 or 24 hours** (`RunTime` 120, 480 or 1440; the action sends 120), not 12/24/48. The action also fixes the run time at 120: it must take the run time from the request.
+- **Browse** (`kBrowse`): by **item entry only**; it cannot ask for "upgrades for my slot". It answers with one `AuctionListingEvent` per listing, carrying the asking bot's guid and the request id, so
+  results can be matched to a bot. It needs one online player to take a locale from (a bot is one).
+- **Bid and buyout**: need an acting player; with `AuctionHouseForBot` the bot is that player.
+- **Bag contents**: `kListBags` gives only guid, entry, count and name. Quality, vendor price, whether the item is bound and whether the bot would wear it are not in it.
+
+### Still to build
+
+1. Core: let `kList` take the run time (and optionally stackable commodities); a browse mode that returns the cheapest listings of an equipment slot and level range (so the buy side can
+   work), or a core-side "best upgrade on the house for this bot" using the `AutoGear` score.
+2. Core/SDK: a bag description with what `auction::Candidate` needs: quality, vendor sell price, bound, quest item, stackable, and "needed" (equipped, a better piece than the worn one, a
+   supply or reagent). The same score `AutoGear` uses decides "needed" and "upgrade".
+3. Module: call the above from `main.cpp` (a visit timer on the client thread like presence, the call budget `AuctionCallsPerTick`), keep the `Standing` of each bot (listings made, attempts per item guid;
+   the first listing of an item that comes back by mail keeps its guid), sell to a vendor what `ForVendor` names, and write `auction_listed`, `auction_sold`, `auction_bought` events.
+4. Sim test as described at the end.
 
 ## What exists
 
@@ -31,15 +57,14 @@ Bots **sell** surplus on the house and **buy** upgrades and supplies they alread
 **Selling.**
 - *What:* any non-soulbound item of quality uncommon (green) or better that the bot will not use (`AutoGear` found it no better than what is worn, and it is not
   a quest item, a reagent the bot needs, or food/drink/ammunition/potion/bandage it uses) and that a vendor would pay at least `SellMinCopper` for.
-  Stacks of trade goods are listed whole.
+  The core lists single non-stackable items only, so in practice this is equipment; stacks of trade goods stay with the vendor for now.
 - *Price:* a multiple of the vendor sell price by quality: green x3, blue x4, epic x5 (knob `SellMultiplier<q>`), rounded; buyout equals the starting bid
   times 1.2. A multiple of the vendor price is a floor the market cannot go under: a player who undercuts it loses money to the vendor, so the house price
   stays near it.
-- *Duration:* 12 hours, relisted once at 90 percent of the price if it did not sell, then sold to a vendor.
+- *Duration:* 24 hours (the fork offers 2, 8 or 24), relisted once at 90 percent of the price if it did not sell, then sold to a vendor.
 - *When:* an idle bot with at least `SellBagFraction` (default 60 percent) of its bag slots used, standing near an auctioneer or due its service visit
   (`ServiceEverySec`), lists at most `SellPerVisit` (default 5) items per visit.
-- *Limit:* at most `ListedMax` (default 10) listings per bot at once. Gold from sales is collected from the mailbox by the core's own mail handling
-  (to be checked: bots do not open mail yet; if not, the core credits them, which is a core change).
+- *Limit:* at most `ListedMax` (default 10) listings per bot at once. The gold from sales is taken from the bot's mail by the core (`Bot.Mail.Collect`).
 
 **Buying.**
 - *Gear upgrade:* when `AutoGear` shows a slot a level behind (the bot's item in that slot is below its level band), the bot browses its auctioneer for
@@ -64,7 +89,7 @@ all bots: each call is a browse that walks the house's lists in the core.
 - None for browse / list / buyout / cancel (they exist). The bot-as-actor variant `AuctionHouseForBot` is the one to use.
 - A list of a bot's sellable items with their quality, vendor price and slot, which today needs a bag listing: `BotTrade` has `kListBags` (Tier 1) for trade; the same
   call can serve here, or the snapshot gains the single "best item to sell" (a layout field), which keeps the walk to the house to one decision.
-- Mail: whether a sold item's money reaches a bot (open question above).
+- Mail: done (see Checks).
 - Telemetry: `auction_listed`, `auction_sold`, `auction_bought` events.
 
 ## Test plan
@@ -81,4 +106,4 @@ all bots: each call is a browse that walks the house's lists in the core.
 - **What bots list:** tradeable items of green quality or better that the bot will not use.
 - **Prices:** vendor price multiples (green x3, blue x4, epic x5, buyout x1.2), tunable; still guesses until the sim shows what bots earn.
 
-Still open: whether any of this is wanted before bots level reliably (with no levelling there is nothing worth selling), and the mail question under "Core and SDK work needed".
+Still open: whether any of this is wanted before bots level reliably (with no levelling there is nothing worth selling). The mail question is answered: bots take their mail.

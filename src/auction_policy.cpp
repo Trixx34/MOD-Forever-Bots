@@ -1,0 +1,141 @@
+#include "auction_policy.h"
+
+#include <algorithm>
+
+namespace auction {
+
+std::uint32_t StartingBid(Settings const& settings, std::uint8_t quality, std::uint64_t vendorSellCopper, std::uint32_t attempt)
+{
+    std::uint32_t pct = 0;
+    switch (quality)
+    {
+        case kUncommon: pct = settings.SellPctGreen; break;
+        case kRare: pct = settings.SellPctBlue; break;
+        case kEpic:
+        case kLegendary: pct = settings.SellPctEpic; break;
+        default: return 0;
+    }
+    if (vendorSellCopper < settings.MinVendorCopper)
+        return 0;
+    if (attempt >= 2)
+        pct = std::uint32_t(std::uint64_t(pct) * settings.RelistPct / 100);   // the second listing is cheaper
+    std::uint64_t const bid = vendorSellCopper * pct / 100;
+    // Never below what a vendor pays: the floor of the market.
+    std::uint64_t const floor = vendorSellCopper + 1;
+    constexpr std::uint64_t kMaxBid = 4000000000ull;                           // the core takes 32-bit copper amounts
+    return std::uint32_t(std::min(std::max(bid, floor), kMaxBid));
+}
+
+std::uint32_t BuyoutOf(Settings const& settings, std::uint32_t bid)
+{
+    std::uint64_t const buyout = std::uint64_t(bid) * settings.BuyoutPct / 100;
+    constexpr std::uint64_t kMax = 4000000000ull;
+    return std::uint32_t(std::min(std::max<std::uint64_t>(buyout, bid), kMax));   // never below the bid
+}
+
+bool Listable(Settings const& settings, Candidate const& item)
+{
+    if (item.ItemGuid == 0 || item.Bound || item.QuestItem || item.Needed || item.Stackable || item.Count != 1)
+        return false;
+    return StartingBid(settings, item.Quality, item.VendorSellCopper, 1) != 0;
+}
+
+bool VisitDue(Settings const& settings, Bags const& bags, Standing const& standing, bool relistingDue, std::uint64_t nowMs)
+{
+    if (!settings.Enabled || bags.TotalSlots == 0)
+        return false;
+    if (standing.LastVisitMs != 0 && nowMs - standing.LastVisitMs < settings.EveryMs)
+        return false;
+    if (standing.ListedNow >= settings.ListedMax && !relistingDue)
+        return false;
+    if (relistingDue)
+        return true;
+    return std::uint64_t(bags.UsedSlots) * 100 >= std::uint64_t(bags.TotalSlots) * settings.BagFullPct;
+}
+
+std::vector<Listing> PlanListings(Settings const& settings, Bags const&, Standing const& standing, std::vector<Candidate> const& items)
+{
+    std::vector<Listing> plan;
+    if (!settings.Enabled || standing.ListedNow >= settings.ListedMax)
+        return plan;
+
+    struct Ranked
+    {
+        Candidate const* Item;
+        std::uint32_t Attempt;
+        std::uint32_t Bid;
+    };
+    std::vector<Ranked> ranked;
+    for (Candidate const& item : items)
+    {
+        if (!Listable(settings, item))
+            continue;
+        auto const seen = standing.Attempts.find(item.ItemGuid);
+        std::uint32_t const attempt = seen == standing.Attempts.end() ? 1 : seen->second + 1;
+        if (attempt > 2)
+            continue; // listed twice already: the vendor gets it
+        std::uint32_t const bid = StartingBid(settings, item.Quality, item.VendorSellCopper, attempt);
+        if (bid != 0)
+            ranked.push_back({ &item, attempt, bid });
+    }
+    // The dearest first: the fee is a share of the price, so a few valuable items are worth more than many cheap ones.
+    std::sort(ranked.begin(), ranked.end(), [](Ranked const& a, Ranked const& b)
+    {
+        return a.Bid != b.Bid ? a.Bid > b.Bid : a.Item->ItemGuid < b.Item->ItemGuid;
+    });
+    std::uint32_t const room = settings.ListedMax - standing.ListedNow;
+    std::uint32_t const take = std::min(room, settings.PerVisit);
+    for (Ranked const& entry : ranked)
+    {
+        if (plan.size() >= take)
+            break;
+        plan.push_back({ entry.Item->ItemGuid, entry.Item->Entry, entry.Bid, BuyoutOf(settings, entry.Bid), settings.RunMinutes, entry.Attempt });
+    }
+    return plan;
+}
+
+std::vector<std::uint64_t> ForVendor(Settings const& settings, Standing const& standing, std::vector<Candidate> const& items)
+{
+    std::vector<std::uint64_t> sell;
+    if (!settings.Enabled)
+        return sell;
+    for (Candidate const& item : items)
+    {
+        auto const seen = standing.Attempts.find(item.ItemGuid);
+        if (seen != standing.Attempts.end() && seen->second >= 2 && !item.Bound && !item.QuestItem && !item.Needed)
+            sell.push_back(item.ItemGuid);
+    }
+    return sell;
+}
+
+std::uint64_t BuyBudget(Settings const& settings, std::uint64_t copper, std::uint32_t level)
+{
+    std::uint64_t const reserve = std::uint64_t(level) * settings.ReserveCopperPerLevel;
+    std::uint64_t const spendable = copper > reserve ? copper - reserve : 0;
+    return spendable * settings.BuyMaxPct / 100;
+}
+
+std::optional<Offer> ChooseBuy(Settings const& settings, std::uint64_t budget, std::vector<Offer> const& offers, UpgradeScore const& score)
+{
+    if (!settings.Enabled || budget == 0 || !score)
+        return std::nullopt;
+    std::optional<Offer> best;
+    double bestValue = 0.0;
+    for (Offer const& offer : offers)
+    {
+        if (offer.OwnListing || offer.Buyout == 0 || offer.Buyout > budget)
+            continue;
+        double const gain = score(offer);
+        if (gain <= 0.0)
+            continue;
+        double const value = gain / double(offer.Buyout);
+        if (!best || value > bestValue || (value == bestValue && offer.Buyout < best->Buyout))
+        {
+            best = offer;
+            bestValue = value;
+        }
+    }
+    return best;
+}
+
+} // namespace auction

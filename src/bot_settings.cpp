@@ -352,6 +352,38 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
         else
             warnings.push_back("Module.forever-bots.PresenceDayPercent: expected 24 comma-separated numbers from 0 to 100; using the default curve.");
     }
+    ReadBool(config, "Auction", settings.Auction.Enabled, warnings);
+    ReadKey(config, "AuctionSellPctGreen", 100, 2000, settings.Auction.SellPctGreen, warnings);
+    ReadKey(config, "AuctionSellPctBlue", 100, 2000, settings.Auction.SellPctBlue, warnings);
+    ReadKey(config, "AuctionSellPctEpic", 100, 2000, settings.Auction.SellPctEpic, warnings);
+    ReadKey(config, "AuctionBuyoutPct", 100, 500, settings.Auction.BuyoutPct, warnings);
+    ReadKey(config, "AuctionRelistPct", 50, 100, settings.Auction.RelistPct, warnings);
+    {
+        // The fork's auctions run 2, 8 or 24 hours.
+        std::uint32_t hours = settings.Auction.RunMinutes / 60;
+        ReadKey(config, "AuctionRunHours", 2, 24, hours, warnings);
+        if (hours == 2 || hours == 8 || hours == 24)
+            settings.Auction.RunMinutes = hours * 60;
+        else
+            warnings.push_back("Module.forever-bots.AuctionRunHours: the fork's auctions run 2, 8 or 24 hours; using " +
+                               std::to_string(settings.Auction.RunMinutes / 60) + ".");
+    }
+    {
+        std::uint32_t minCopper = static_cast<std::uint32_t>(settings.Auction.MinVendorCopper);
+        ReadKey(config, "AuctionMinVendorCopper", 0, 1000000, minCopper, warnings);
+        settings.Auction.MinVendorCopper = minCopper;
+    }
+    ReadKey(config, "AuctionBagFullPct", 1, 100, settings.Auction.BagFullPct, warnings);
+    ReadKey(config, "AuctionPerVisit", 1, 20, settings.Auction.PerVisit, warnings);
+    ReadKey(config, "AuctionListedMax", 1, 50, settings.Auction.ListedMax, warnings);
+    {
+        std::uint32_t everySec = static_cast<std::uint32_t>(settings.Auction.EveryMs / 1000);
+        ReadKey(config, "AuctionEverySec", 60, 86400, everySec, warnings);
+        settings.Auction.EveryMs = std::uint64_t(everySec) * 1000;
+    }
+    ReadKey(config, "AuctionBuyMaxPct", 1, 100, settings.Auction.BuyMaxPct, warnings);
+    ReadKey(config, "AuctionBrowsePerVisit", 1, 20, settings.Auction.BrowsePerVisit, warnings);
+    ReadKey(config, "AuctionCallsPerTick", 1, 50, settings.Auction.MaxCallsPerTick, warnings);
     // A target below its "low" mark would send a bot shopping that then buys nothing: the target is raised to the mark.
     settings.Supplies.AmmoTarget = std::max(settings.Supplies.AmmoTarget, settings.Supplies.AmmoLow);
     settings.Supplies.FoodTarget = std::max(settings.Supplies.FoodTarget, settings.Supplies.FoodLow);

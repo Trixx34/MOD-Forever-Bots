@@ -2,6 +2,7 @@
 // prefix removed; see modules.d/forever-bots.conf.example). Pure logic, unit-tested in tests/settings_test.cpp.
 #pragma once
 
+#include "auction_policy.h"
 #include "bot_presence.h"
 #include "bot_ramp.h"
 #include "supply_policy.h"
@@ -125,6 +126,10 @@ struct BotSettings
     // PresenceMaxOnline, PresenceDayPercent; off by default): bots log off and on like players, see bot_presence.h. Needs Bot.Presence.LogoutOnRelease
     // in the core, or a released bot stays in the world.
     presence::Settings Presence;
+    // Auction House (doc/economy.md; config keys Auction, AuctionSellPctGreen, AuctionSellPctBlue, AuctionSellPctEpic, AuctionBuyoutPct, AuctionRelistPct,
+    // AuctionRunHours (2, 8 or 24), AuctionMinVendorCopper, AuctionBagFullPct, AuctionPerVisit, AuctionListedMax, AuctionEverySec, AuctionBuyMaxPct,
+    // AuctionBrowsePerVisit, AuctionCallsPerTick; off by default). The decisions are built (auction_policy.h); the module does not carry them out yet.
+    auction::Settings Auction;
     std::uint32_t AutoGearEveryLevels = 5;
     ScenarioSettings Scenario;
 };
