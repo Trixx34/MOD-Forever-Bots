@@ -82,9 +82,24 @@ by walking it with a GM character and copy the coordinates into `go` lines). The
 `--merge 25` folds packs closer than 25 yards to the previous waypoint. Straight lines between waypoints are not path-checked: the core moves bots
 along its own navigation mesh, so a waypoint in rock or on the wrong floor is a stuck leader (it then runs into the timeout).
 
-## The sample
+## The data file
 
-`data/dungeons.txt` holds Ragefire Chasm (`rfc`). The entry (map 389, 3.81 -14.82 -17.84), the door (map 1, 1811 -4410 -18) and the four boss entries
+`data/dungeons.txt` is made by `tools/make_dungeons_from_db.py` from the world database (`dump_to_sqlite.py` reads it from a `mysqldump` file, see
+`doc/world-quests.md`): Ragefire Chasm (`rfc`), Wailing Caverns (`wc`), Deadmines (`dm`), Shadowfang Keep (`sfk`), Stormwind Stockades (`stockade`),
+Blackfathom Deeps (`bfd`), Gnomeregan (`gnomer`), Razorfen Kraul (`rfk`) and Razorfen Downs (`rfd`). What is real: the entrance (where the party is teleported)
+and the exit (where a ghost walks to, `portal`) are the teleport targets of the database ("Classic: <name> - Entrance" and "- Exit"), the hostile spawns,
+and the bosses (found by name; a boss with no spawn on the map is left out and the tool says so: Mutanus, Baron Aquanis, Grubbis and Tuten'kash are summoned
+or event spawns, so those dungeons are cleared without them). What is a guess: **the order of every route** (the pack or boss nearest to where the party
+stands next, starting at the entrance, with a penalty for another floor), so a route may walk past a door into a dead end and back, and the levels (the usual
+vanilla ranges) and the roster (an orc warrior, undead priest, troll mage, orc warlock and undead rogue from Orgrimmar for all of them). Zul'Farrak is left out
+(most of its bosses are event spawns) and the Temple of Atal'Hakkar has no "Classic:" door in this database. None of it has run on the sim: start with `rfc`,
+whose route has 42 waypoints, and edit the `go` lines that lead the party wrong.
+
+The hand-written sample that was here before (Ragefire Chasm) had the entrance at 3.81 -14.82 -17.84; the database says 0.80 -8.23 -15.53, and the boss positions were off.
+
+### The old sample note
+
+`data/dungeons.txt` held Ragefire Chasm (`rfc`). The entry (map 389, 3.81 -14.82 -17.84), the door (map 1, 1811 -4410 -18) and the four boss entries
 (Oggleflint 11517, Taragaman the Hungerer 11520, Jergosh the Invoker 11518, Bazzalan 11519) are the vanilla values. **The waypoints and the boss
 positions are approximate and were not read from a database or walked.** Regenerate the route before trusting it.
 

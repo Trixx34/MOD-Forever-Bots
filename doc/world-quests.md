@@ -1,6 +1,24 @@
 # Whole-world quests: leveling 1 to 60 by quests
 
-Status: planner and data format built and unit-tested; the data file is made from the world database with `tools/make_world_quests.py` (not made yet).
+Status: planner and data format built and unit-tested. The data file `data/world_quests.txt` is made (1256 quests in 263 starts, levels 1 to 60, from the
+test world database) with `tools/make_world_quests.py`. **No bot has levelled by it on the sim yet.**
+
+## Making the data without a MySQL server
+
+The five exports can be made from a `mysqldump` file (a backup of the world database) with two tools, which need no database server and no packages:
+
+    python3 -I tools/dump_to_sqlite.py forever_test_world.sql.gz world.sqlite quest_template quest_template_addon quest_template_classic_level \
+        quest_objectives creature creature_queststarter creature_questender creature_loot_template reference_loot_template
+    python3 -I tools/export_world_quests.py world.sqlite exports/
+    python3 -I tools/make_world_quests.py exports/ --explain skipped.tsv > data/world_quests.txt
+
+This is how the committed file was made (about 15 seconds). `export_world_quests.py` runs the queries below for this world's tables, with two differences:
+this world has no `MinLevel` on the quest (it comes from content tuning in the hotfix database), so `minLevel` is written as 0 and the planner's own
+rule applies; and quest items dropped through a loot reference are found with the reference path described under the queries. Result on the test world:
+3636 quests have a classic level 1 to 60; 1256 are kept. The rest are skipped: 929 have no creature giver (they start from an item or an object), 849 want an item
+no creature drops (an object, a vendor, a pickpocket), 359 have no target on the giver's map, 212 have no ender on the giver's map, 31 are not kill or
+collect quests (the counts overlap, a quest is counted by its first reason). About 116 of the kept quests are for levels 1 to 9, 180 for 10 to 19, 170 for 20
+to 29, 210 for 30 to 39, 170 for 40 to 49, 230 for 50 to 59 and 170 for 60.
 
 ## What changed in the planner
 

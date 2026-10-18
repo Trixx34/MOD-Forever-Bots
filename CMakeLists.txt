@@ -142,4 +142,6 @@ if(Python3_Interpreter_FOUND)
     add_test(NAME snapshot_replay COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/snapshot_replay_test.py)
     # The spec of rotations made into a rotation file by tools/make_rotations.py.
     add_test(NAME make_rotations COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/make_rotations_test.py ${CMAKE_CURRENT_SOURCE_DIR})
+    # The world database tools: dump_to_sqlite.py and export_world_quests.py on a tiny made-up dump.
+    add_test(NAME world_data COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/world_data_test.py ${CMAKE_CURRENT_SOURCE_DIR})
 endif()
