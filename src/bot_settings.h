@@ -115,6 +115,9 @@ struct BotSettings
     std::uint32_t ChatSayMax = 3;
     // Supplies (layout 15, config keys Supplies, SupplyAmmoLow, SupplyAmmoTarget, SupplyFoodLow, SupplyFoodTarget, SupplyDrinkLow, SupplyDrinkTarget,
     // SupplyTripSec; off by default): bots buy ammunition, food and drink at vendors that sell what they can use, and eat and drink while resting.
+    // Layout 16, each off by default: SupplyPotions (health and mana potions, drunk in a fight below UseHealthPotionBelowPct and
+    // UseManaPotionBelowPct), SupplyBandages (used by a resting bot below UseBandageBelowPct that has no food), SupplyHealthPotionLow,
+    // SupplyManaPotionLow and SupplyBandageLow (the counts under which a bot goes shopping; the core's settings decide how many it buys).
     supply::Settings Supplies;
     std::uint32_t AutoGearEveryLevels = 5;
     ScenarioSettings Scenario;

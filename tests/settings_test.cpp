@@ -54,6 +54,14 @@ void SayAndSupplySettings()
     CHECK(on.ChatSay && on.ChatSayMax == 5 && on.Supplies.Enabled);
     CHECK(on.Supplies.AmmoLow == 50 && on.Supplies.AmmoTarget == 300 && on.Supplies.FoodLow == 2 && on.Supplies.FoodTarget == 15);
     CHECK(on.Supplies.DrinkLow == 4 && on.Supplies.DrinkTarget == 20 && on.Supplies.TripEveryMs == 300000);
+    CHECK(!off.Supplies.Potions && !off.Supplies.Bandages && !on.Supplies.Potions && !on.Supplies.Bandages); // layout 16: off by default
+    CHECK(off.Supplies.HealthPotionLow == 1 && off.Supplies.BandageLow == 3 && off.Supplies.UseHealthPotionBelowPct == 35);
+    BotSettings const goods = ParseBotSettings({ { "Supplies", "1" }, { "SupplyPotions", "1" }, { "SupplyBandages", "1" }, { "SupplyHealthPotionLow", "2" },
+                                                 { "SupplyManaPotionLow", "3" }, { "SupplyBandageLow", "5" }, { "UseHealthPotionBelowPct", "50" },
+                                                 { "UseManaPotionBelowPct", "20" }, { "UseBandageBelowPct", "70" } }, warnings);
+    CHECK(goods.Supplies.Potions && goods.Supplies.Bandages && goods.Supplies.HealthPotionLow == 2 && goods.Supplies.ManaPotionLow == 3);
+    CHECK(goods.Supplies.BandageLow == 5 && goods.Supplies.UseHealthPotionBelowPct == 50 && goods.Supplies.UseManaPotionBelowPct == 20);
+    CHECK(goods.Supplies.UseBandageBelowPct == 70 && warnings.empty());
     CHECK(warnings.empty());
 
     // A target below its low mark is raised to it; a value out of range falls back with a warning.

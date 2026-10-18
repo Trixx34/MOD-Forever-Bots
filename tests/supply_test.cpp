@@ -151,6 +151,119 @@ void RestingBotsEatAndDrinkByThresholds()
     CHECK(ConsumeNow(Settings{}, Hunter(500, 5, 5), 10, 10) == 0); // off
 }
 
+Settings WithGoods()
+{
+    Settings settings = On();
+    settings.Potions = true;
+    settings.Bandages = true;
+    return settings;
+}
+
+Facts Shopper()
+{
+    Facts facts = Hunter(500, 10, 0);   // ammunition and food are fine
+    facts.ManaUser = true;
+    facts.DrinkCount = 10;
+    facts.GoodsVendor = true;
+    return facts;
+}
+
+void PotionsAndBandagesAreOffUnlessAsked()
+{
+    Facts facts = Shopper();
+    CHECK(!Assess(On(), facts).Any());                       // the defaults ask for none
+    Needs needs = Assess(WithGoods(), facts);
+    CHECK(needs.HealthPotion && needs.ManaPotion && needs.Bandage && needs.Goods() && needs.Any());
+    Settings potionsOnly = On();
+    potionsOnly.Potions = true;
+    Needs onlyPotions = Assess(potionsOnly, facts);
+    CHECK(onlyPotions.HealthPotion && onlyPotions.ManaPotion && !onlyPotions.Bandage);
+}
+
+void GoodsFollowTheClassTheStockAndTheCounts()
+{
+    Facts facts = Shopper();
+    facts.ManaUser = false;                                   // a warrior needs no mana potion
+    Needs warrior = Assess(WithGoods(), facts);
+    CHECK(warrior.HealthPotion && !warrior.ManaPotion && warrior.Bandage);
+    facts.GoodsVendor = false;                                // nowhere to buy them
+    CHECK(!Assess(WithGoods(), facts).Any());
+    facts = Shopper();
+    facts.HealthPotions = 1;                                  // at the low mark of 1 is enough
+    facts.ManaPotions = 1;
+    facts.Bandages = 3;
+    CHECK(!Assess(WithGoods(), facts).Any());
+    facts.Bandages = 2;
+    CHECK(Assess(WithGoods(), facts).Bandage);
+    Facts poor = Shopper();
+    poor.Copper = 9;
+    CHECK(!Assess(WithGoods(), poor).Any());                  // the money floor applies to goods too
+}
+
+void GoodsComeAfterAmmunitionAndFood()
+{
+    Needs needs;
+    needs.Bandage = true;
+    CHECK(NextStop(needs) == Stop::Goods);
+    needs.Food = true;
+    CHECK(NextStop(needs) == Stop::Food);
+    needs.Ammo = true;
+    CHECK(NextStop(needs) == Stop::Ammo);
+    Needs potion;
+    potion.ManaPotion = true;
+    CHECK(NextStop(potion) == Stop::Goods);
+    Request request = RequestFor(WithGoods(), potion);
+    CHECK(request.ManaPotion && !request.HealthPotion && !request.Bandage && request.Ammo == 0);
+}
+
+void AGoodsTripIsJudgedByItsOwnCounts()
+{
+    Needs asked;
+    asked.HealthPotion = true;
+    Facts before = Shopper();
+    Facts after = before;
+    after.Bandages = 10;                                      // another kind does not count
+    CHECK(!Improved(asked, before, after));
+    after.HealthPotions = 3;
+    CHECK(Improved(asked, before, after));
+}
+
+void PotionsAreDrunkInAFightByThresholds()
+{
+    Settings settings = WithGoods();
+    Facts facts = Shopper();
+    facts.HealthPotions = 2;
+    facts.ManaPotions = 2;
+    CHECK(PotionNow(settings, facts, 34, 100) == 3);
+    CHECK(PotionNow(settings, facts, 35, 100) == 0);          // at the mark: not yet
+    CHECK(PotionNow(settings, facts, 80, 14) == 4);
+    CHECK(PotionNow(settings, facts, 20, 10) == 3);           // both low: health first
+    facts.HealthPotions = 0;
+    CHECK(PotionNow(settings, facts, 20, 100) == 0);          // none to drink
+    CHECK(PotionNow(settings, facts, 20, 10) == 4);
+    facts.ManaUser = false;
+    CHECK(PotionNow(settings, facts, 90, 5) == 0);            // no mana to restore
+    CHECK(PotionNow(On(), Shopper(), 10, 10) == 0);           // potions are off by default
+    CHECK(PotionNow(Settings{}, Shopper(), 10, 10) == 0);
+}
+
+void ABotWithNoFoodBandagesWhenHurt()
+{
+    Settings settings = WithGoods();
+    Facts facts = Shopper();
+    facts.Bandages = 4;
+    facts.FoodCount = 0;
+    CHECK(BandageNow(settings, facts, 59) == 5);
+    CHECK(BandageNow(settings, facts, 60) == 0);
+    facts.FoodCount = 3;                                      // food is the first choice
+    CHECK(BandageNow(settings, facts, 40) == 0);
+    facts.FoodCount = 0;
+    facts.Bandages = 0;
+    CHECK(BandageNow(settings, facts, 40) == 0);
+    facts.Bandages = 4;
+    CHECK(BandageNow(On(), facts, 40) == 0);                  // off by default
+}
+
 } // namespace
 
 int main()
@@ -164,6 +277,12 @@ int main()
     BackoffDoublesAndIsCapped();
     ATripIsJudgedByTheCounts();
     RestingBotsEatAndDrinkByThresholds();
+    PotionsAndBandagesAreOffUnlessAsked();
+    GoodsFollowTheClassTheStockAndTheCounts();
+    GoodsComeAfterAmmunitionAndFood();
+    AGoodsTripIsJudgedByItsOwnCounts();
+    PotionsAreDrunkInAFightByThresholds();
+    ABotWithNoFoodBandagesWhenHurt();
     if (failures == 0)
         std::printf("supply_test: all passed\n");
     return failures == 0 ? 0 : 1;

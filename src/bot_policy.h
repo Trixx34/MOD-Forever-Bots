@@ -252,6 +252,7 @@ private:
         supply::Facts SupplyBefore;                      // and what the bot carried before it
         bool SupplyTrip = false;                         // the walk in progress is a supply trip
         std::uint64_t NextConsumeMs = 0;                 // no eat or drink before this
+        std::uint64_t NextPotionMs = 0;                  // no potion before this (the game shares one cooldown between potions)
         std::uint64_t TravelStartMs = 0;                 // when this walk began; it is dropped after kTravelTimeoutMs
         std::unordered_set<std::uint32_t> CastTimeSpells; // spells the core refused because the bot was moving: they need it standing
         // Chat orders (chat_commands.h).

@@ -2739,9 +2739,129 @@ void AHunterWithoutAmmunitionFightsInMelee()
     CHECK(HasCast(unknown.Decide(old, 1000), 75));
 }
 
+
+// ---- Potions and bandages (layout 16) ----
+BotPolicy GoodsPolicy(std::uint32_t classId = 1)
+{
+    PolicyOptions options;
+    options.ClassId = classId;
+    options.WanderWhenIdle = false;
+    options.Supplies.Enabled = true;
+    options.Supplies.Potions = true;
+    options.Supplies.Bandages = true;
+    return BotPolicy(options);
+}
+
+// A warrior with food and money and nothing else, and a goods vendor 2 yards away.
+WorldTickSnapshotView GoodsView()
+{
+    WorldTickSnapshotView view = PartyView({ 10 });
+    BotSnapshot& bot = view.bots[0];
+    bot.level = 20;
+    bot.food_count = 10;
+    bot.copper = 500;
+    bot.bag_free_slots = 5;
+    bot.goods_vendor_valid = 1;
+    bot.goods_vendor_x = 2.0f;
+    bot.goods_vendor_guid = MakeUnitRef(8, 5100, 41);
+    return view;
+}
+
+void AWarriorWithoutPotionsOrBandagesBuysThemAtTheGoodsVendor()
+{
+    BotPolicy policy = GoodsPolicy();
+    std::optional<BotAction> buy = FindAction(policy.Decide(GoodsView(), 0), ActionType::kVendor);
+    CHECK(buy.has_value());
+    if (buy)
+    {
+        CHECK((buy->spell_id & 64) != 0 && (buy->spell_id & 128) == 0 && (buy->spell_id & 256) != 0); // no mana, so no mana potion
+        CHECK((buy->spell_id & (8 | 16 | 32)) == 0);
+        CHECK(buy->target_guid == MakeUnitRef(8, 5100, 41));
+    }
+    // Off unless asked for.
+    BotPolicy off = SupplyPolicy(1);
+    CHECK(!FindAction(off.Decide(GoodsView(), 0), ActionType::kVendor).has_value());
+}
+
+void AFarGoodsVendorIsWalkedTo()
+{
+    BotPolicy policy = GoodsPolicy();
+    WorldTickSnapshotView far = GoodsView();
+    far.bots[0].goods_vendor_x = 80.0f;
+    std::optional<BotAction> walk = FindAction(policy.Decide(far, 0), ActionType::kMoveTo);
+    CHECK(walk.has_value() && walk->dest_x == 80.0f);
+}
+
+void AHurtFightingBotDrinksAHealthPotionOnce()
+{
+    BotPolicy policy = GoodsPolicy();
+    WorldTickSnapshotView fight = GoodsView();
+    fight.bots[0].health = 300;      // 30%
+    fight.bots[0].health_potion_count = 2;
+    fight.bots[0].in_combat = 1;
+    std::optional<BotAction> drink = FindAction(policy.Decide(fight, 1000), ActionType::kConsume);
+    CHECK(drink.has_value() && drink->spell_id == 3);
+    // The game's shared cooldown: not asked for again at once.
+    CHECK(!FindAction(policy.Decide(fight, 20000), ActionType::kConsume).has_value());
+    std::optional<BotAction> again = FindAction(policy.Decide(fight, 130000), ActionType::kConsume);
+    CHECK(again.has_value() && again->spell_id == 3);
+    // Healthy enough, or no potion: nothing.
+    BotPolicy fine = GoodsPolicy();
+    WorldTickSnapshotView well = fight;
+    well.bots[0].health = 900;
+    CHECK(!FindAction(fine.Decide(well, 1000), ActionType::kConsume).has_value());
+    BotPolicy none = GoodsPolicy();
+    WorldTickSnapshotView empty = fight;
+    empty.bots[0].health_potion_count = 0;
+    CHECK(!FindAction(none.Decide(empty, 1000), ActionType::kConsume).has_value());
+    // Not outside a fight (a resting bot eats or bandages instead).
+    BotPolicy calm = GoodsPolicy();
+    WorldTickSnapshotView resting = fight;
+    resting.bots[0].in_combat = 0;
+    resting.bots[0].food_count = 0;
+    std::optional<BotAction> notPotion = FindAction(calm.Decide(resting, 1000), ActionType::kConsume);
+    CHECK(!notPotion.has_value() || notPotion->spell_id != 3);
+}
+
+void ARestingBotWithoutFoodBandagesItself()
+{
+    BotPolicy policy = GoodsPolicy();
+    WorldTickSnapshotView hurt = GoodsView();
+    hurt.bots[0].health = 400;
+    hurt.bots[0].food_count = 0;
+    hurt.bots[0].bandage_count = 4;
+    std::optional<BotAction> bandage = FindAction(policy.Decide(hurt, 1000), ActionType::kConsume);
+    CHECK(bandage.has_value() && bandage->spell_id == 5);
+    // "Recently Bandaged" lasts a minute: not again before then.
+    CHECK(!FindAction(policy.Decide(hurt, 40000), ActionType::kConsume).has_value());
+    std::optional<BotAction> again = FindAction(policy.Decide(hurt, 70000), ActionType::kConsume);
+    CHECK(again.has_value() && again->spell_id == 5);
+    // With food, the food is eaten.
+    BotPolicy eater = GoodsPolicy();
+    WorldTickSnapshotView fed = hurt;
+    fed.bots[0].food_count = 5;
+    std::optional<BotAction> eat = FindAction(eater.Decide(fed, 1000), ActionType::kConsume);
+    CHECK(eat.has_value() && eat->spell_id == 1);
+}
+
+void AManaUserDrinksAManaPotionInAFight()
+{
+    BotPolicy policy = GoodsPolicy(5);
+    WorldTickSnapshotView fight = ManaView(10);
+    fight.bots[0].in_combat = 1;
+    fight.bots[0].mana_potion_count = 1;
+    std::optional<BotAction> drink = FindAction(policy.Decide(fight, 1000), ActionType::kConsume);
+    CHECK(drink.has_value() && drink->spell_id == 4);
+}
+
 int main()
 {
     ShortOfAmmoWalksToTheAmmoVendor();
+    AWarriorWithoutPotionsOrBandagesBuysThemAtTheGoodsVendor();
+    AFarGoodsVendorIsWalkedTo();
+    AHurtFightingBotDrinksAHealthPotionOnce();
+    ARestingBotWithoutFoodBandagesItself();
+    AManaUserDrinksAManaPotionInAFight();
     NoSuppliesTripWhenTheFeatureIsOff();
     NoTripWithoutMoneyOrBagRoom();
     BuysAmmoAtTheVendor();

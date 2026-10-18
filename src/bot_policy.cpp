@@ -41,6 +41,9 @@ constexpr std::uint64_t kRendDurationMs = 21000;
 constexpr std::uint32_t kServiceSell = 1;
 constexpr std::uint32_t kServiceRepair = 2;
 constexpr std::uint32_t kServiceEquip = 4;
+constexpr std::uint32_t kServiceBuyHealthPotion = 64; // layout 16: the core's settings give the counts
+constexpr std::uint32_t kServiceBuyManaPotion = 128;
+constexpr std::uint32_t kServiceBuyBandage = 256;
 constexpr std::uint32_t kServiceBuyAmmo = 8;     // layout 15: buy ammunition (dest_x = the count to carry), food (dest_y), drink (dest_z)
 constexpr std::uint32_t kServiceBuyFood = 16;
 constexpr std::uint32_t kServiceBuyDrink = 32;
@@ -479,6 +482,10 @@ supply::Facts FactsOf(BotSnapshot const& bot)
     facts.FreeSlots = bot.bag_free_slots;
     facts.AmmoVendor = bot.ammo_vendor_valid != 0;
     facts.FoodVendor = bot.food_vendor_valid != 0;
+    facts.HealthPotions = bot.health_potion_count;
+    facts.ManaPotions = bot.mana_potion_count;
+    facts.Bandages = bot.bandage_count;
+    facts.GoodsVendor = bot.goods_vendor_valid != 0;
     return facts;
 }
 
@@ -2013,7 +2020,9 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             if (_options.OnEvent)
                 _options.OnEvent(std::string(improved ? "supply_trip_done" : "supply_trip_failed") + ": bot=" + std::to_string(bot.guid) +
                                  " ammo=" + std::to_string(supplyFacts.AmmoCount) + " food=" + std::to_string(supplyFacts.FoodCount) +
-                                 " drink=" + std::to_string(supplyFacts.DrinkCount) + " failures=" + std::to_string(state.SupplyFailures));
+                                 " drink=" + std::to_string(supplyFacts.DrinkCount) + " hpot=" + std::to_string(supplyFacts.HealthPotions) +
+                                 " mpot=" + std::to_string(supplyFacts.ManaPotions) + " bandage=" + std::to_string(supplyFacts.Bandages) +
+                                 " failures=" + std::to_string(state.SupplyFailures));
         }
         // A party member follows its leader, and a bot held by a chat order stays where it was told: neither goes shopping.
         supply::Needs const supplyNeeds = (partyMember || state.ChatStay || state.ChatFollow != 0) ? supply::Needs{}
@@ -2037,8 +2046,10 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             // Worn gear first: the repairman is the stop then, and the supplies wait for the next trip (a few minutes).
             bool const supplyStopNow = supplyDue && !needRepair;
             bool const ammoStop = supplyStopNow && supplyStop == supply::Stop::Ammo;
-            Point const vendor = supplyStopNow ? (ammoStop ? Point{ bot.ammo_vendor_x, bot.ammo_vendor_y, bot.ammo_vendor_z }
-                                                           : Point{ bot.food_vendor_x, bot.food_vendor_y, bot.food_vendor_z })
+            bool const goodsStop = supplyStopNow && supplyStop == supply::Stop::Goods;
+            Point const vendor = supplyStopNow ? (ammoStop    ? Point{ bot.ammo_vendor_x, bot.ammo_vendor_y, bot.ammo_vendor_z }
+                                                  : goodsStop ? Point{ bot.goods_vendor_x, bot.goods_vendor_y, bot.goods_vendor_z }
+                                                              : Point{ bot.food_vendor_x, bot.food_vendor_y, bot.food_vendor_z })
                                  : needRepair  ? Point{ bot.repair_x, bot.repair_y, bot.repair_z }
                                                : Point{ bot.vendor_x, bot.vendor_y, bot.vendor_z };
             bool const vendorExists = supplyStopNow || needRepair || bot.vendor_valid != 0;
@@ -2096,13 +2107,19 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 {
                     // Layout 15: buy what is short. The core picks the items from this vendor's stock and buys up to the counts given here.
                     supply::Request const request = supply::RequestFor(_options.Supplies, supplyNeeds);
-                    vendor.target_guid = ammoStop ? bot.ammo_vendor_guid : bot.food_vendor_guid;
+                    vendor.target_guid = ammoStop ? bot.ammo_vendor_guid : goodsStop ? bot.goods_vendor_guid : bot.food_vendor_guid;
                     if (request.Ammo != 0)
                         vendor.spell_id |= kServiceBuyAmmo;
                     if (request.Food != 0)
                         vendor.spell_id |= kServiceBuyFood;
                     if (request.Drink != 0)
                         vendor.spell_id |= kServiceBuyDrink;
+                    if (request.HealthPotion)
+                        vendor.spell_id |= kServiceBuyHealthPotion;
+                    if (request.ManaPotion)
+                        vendor.spell_id |= kServiceBuyManaPotion;
+                    if (request.Bandage)
+                        vendor.spell_id |= kServiceBuyBandage;
                     vendor.dest_x = float(request.Ammo);
                     vendor.dest_y = float(request.Food);
                     vendor.dest_z = float(request.Drink);
@@ -2113,7 +2130,9 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     if (_options.OnEvent)
                         _options.OnEvent("supply_trip: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " ammo=" +
                                          std::to_string(supplyFacts.AmmoCount) + " food=" + std::to_string(supplyFacts.FoodCount) + " drink=" +
-                                         std::to_string(supplyFacts.DrinkCount) + " copper=" + std::to_string(bot.copper));
+                                         std::to_string(supplyFacts.DrinkCount) + " hpot=" + std::to_string(supplyFacts.HealthPotions) + " mpot=" +
+                                         std::to_string(supplyFacts.ManaPotions) + " bandage=" + std::to_string(supplyFacts.Bandages) +
+                                         " copper=" + std::to_string(bot.copper));
                 }
                 actions.push_back(vendor);
                 if (!supplyStopNow || serviceDue)
@@ -2321,14 +2340,34 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         {
             std::uint32_t const healthPct = bot.max_health > 0 ? std::uint32_t(std::uint64_t(bot.health) * 100 / bot.max_health) : 100;
             std::uint32_t const manaPct = manaUser && bot.max_power > 0 ? std::uint32_t(std::uint64_t(bot.power) * 100 / bot.max_power) : 100;
-            if (std::uint32_t const what = supply::ConsumeNow(_options.Supplies, supplyFacts, healthPct, manaPct))
+            std::uint32_t what = supply::ConsumeNow(_options.Supplies, supplyFacts, healthPct, manaPct);
+            if (what == 0)
+                what = supply::BandageNow(_options.Supplies, supplyFacts, healthPct); // layout 16: no food to eat, so a bandage
+            if (what != 0)
             {
                 BotAction eat;
                 eat.bot_guid = bot.guid;
                 eat.type = ActionType::kConsume;
                 eat.spell_id = what;
                 actions.push_back(eat);
-                state.NextConsumeMs = nowMs + _options.Supplies.ConsumeEveryMs;
+                state.NextConsumeMs = nowMs + (what == 5 ? _options.Supplies.BandageEveryMs : _options.Supplies.ConsumeEveryMs);
+            }
+        }
+
+        // Potions (layout 16): a bot in a fight that is badly hurt, or a mana user nearly out of mana, drinks one. It costs no global cooldown and
+        // no standing still, so it goes alongside whatever the bot does; the game's shared potion cooldown is why it is not asked for sooner.
+        if (_options.Supplies.Enabled && _options.Supplies.Potions && bot.in_combat != 0 && nowMs >= state.NextPotionMs)
+        {
+            std::uint32_t const healthPct = bot.max_health > 0 ? std::uint32_t(std::uint64_t(bot.health) * 100 / bot.max_health) : 100;
+            std::uint32_t const manaPct = manaUser && bot.max_power > 0 ? std::uint32_t(std::uint64_t(bot.power) * 100 / bot.max_power) : 100;
+            if (std::uint32_t const which = supply::PotionNow(_options.Supplies, supplyFacts, healthPct, manaPct))
+            {
+                BotAction potion;
+                potion.bot_guid = bot.guid;
+                potion.type = ActionType::kConsume;
+                potion.spell_id = which;
+                actions.push_back(potion);
+                state.NextPotionMs = nowMs + _options.Supplies.PotionEveryMs;
             }
         }
 

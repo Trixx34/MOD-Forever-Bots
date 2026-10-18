@@ -1,4 +1,4 @@
-// Bot supplies (layout 15): when a bot is short of ammunition, food or drink, where it shops, what it asks the vendor for, and how a failed trip
+// Bot supplies (layout 15 and 16): when a bot is short of ammunition, food, drink, health or mana potions or bandages, where it shops, what it asks the vendor for, and how a failed trip
 // backs off. Pure logic with no SDK dependency, unit-tested in tests/supply_test.cpp. BotPolicy feeds it the snapshot facts and sends the
 // kVendor buy action and the kConsume action; the core chooses the items from the vendor's stock.
 #pragma once
@@ -23,6 +23,17 @@ struct Settings
     std::uint32_t EatBelowHealthPct = 70;      // a resting bot eats below this health ...
     std::uint32_t DrinkBelowManaPct = 40;      // ... and drinks below this mana
     std::uint64_t ConsumeEveryMs = 24000;      // food and drink work over about 20 to 30 seconds: not used again sooner
+    // Layout 16: potions and bandages, each off by default (config keys SupplyPotions, SupplyBandages).
+    bool Potions = false;                      // buy health potions (and mana potions for a mana user) and drink them in a fight
+    bool Bandages = false;                     // buy bandages and use them out of combat
+    std::uint32_t HealthPotionLow = 1;         // a bot with fewer health potions than this goes shopping (the core buys up to its own target)
+    std::uint32_t ManaPotionLow = 1;
+    std::uint32_t BandageLow = 3;
+    std::uint32_t UseHealthPotionBelowPct = 35; // in a fight, a bot below this health drinks a health potion ...
+    std::uint32_t UseManaPotionBelowPct = 15;   // ... and one below this mana (a mana user) a mana potion
+    std::uint64_t PotionEveryMs = 120000;       // the game shares a two-minute cooldown between potions: not asked for sooner
+    std::uint32_t UseBandageBelowPct = 60;      // a resting bot below this health, with no food to eat, bandages itself ...
+    std::uint64_t BandageEveryMs = 60000;       // ... and not again for the "Recently Bandaged" minute
 };
 
 // The facts of a bot's snapshot that matter here.
@@ -37,6 +48,10 @@ struct Facts
     std::uint32_t FreeSlots = 0;
     bool AmmoVendor = false;        // the snapshot names a vendor that sells ammunition the bot can use
     bool FoodVendor = false;        // ... and one that sells food or drink it can use
+    std::uint32_t HealthPotions = 0;   // layout 16
+    std::uint32_t ManaPotions = 0;
+    std::uint32_t Bandages = 0;
+    bool GoodsVendor = false;       // a reachable vendor that sells potions or bandages it can use
 };
 
 struct Needs
@@ -44,14 +59,18 @@ struct Needs
     bool Ammo = false;
     bool Food = false;
     bool Drink = false;
-    bool Any() const { return Ammo || Food || Drink; }
+    bool HealthPotion = false;
+    bool ManaPotion = false;
+    bool Bandage = false;
+    bool Goods() const { return HealthPotion || ManaPotion || Bandage; }
+    bool Any() const { return Ammo || Food || Drink || Goods(); }
 };
 
 // What the bot is short of and can do something about: a vendor that sells it exists, there is a free bag slot, and a little money.
 Needs Assess(Settings const& settings, Facts const& facts);
 
-// The vendor to walk to first: ammunition before food (a shooter without ammunition cannot fight at range).
-enum class Stop : std::uint8_t { None, Ammo, Food };
+// The vendor to walk to first: ammunition before food (a shooter without ammunition cannot fight at range), food before potions and bandages.
+enum class Stop : std::uint8_t { None, Ammo, Food, Goods };
 Stop NextStop(Needs const& needs);
 
 // What a visit asks for: the counts to bring the bot up to (0 = nothing of that kind). A vendor without the goods simply sells none.
@@ -60,6 +79,9 @@ struct Request
     std::uint32_t Ammo = 0;
     std::uint32_t Food = 0;
     std::uint32_t Drink = 0;
+    bool HealthPotion = false;   // layout 16: the core's settings decide how many
+    bool ManaPotion = false;
+    bool Bandage = false;
 };
 Request RequestFor(Settings const& settings, Needs const& needs);
 
@@ -71,5 +93,11 @@ bool Improved(Needs const& asked, Facts const& before, Facts const& after);
 
 // Whether a resting bot should eat (1) or drink (2) now, or 0. Drinking comes first for a mana user below the mana threshold.
 std::uint32_t ConsumeNow(Settings const& settings, Facts const& facts, std::uint32_t healthPct, std::uint32_t manaPct);
+
+// Layout 16: whether a bot in a fight should drink a health potion (3) or a mana potion (4) now, or 0. Health comes first.
+std::uint32_t PotionNow(Settings const& settings, Facts const& facts, std::uint32_t healthPct, std::uint32_t manaPct);
+
+// Whether a resting bot should bandage itself (5) now, or 0: it is hurt, carries a bandage and has no food to eat.
+std::uint32_t BandageNow(Settings const& settings, Facts const& facts, std::uint32_t healthPct);
 
 } // namespace supply

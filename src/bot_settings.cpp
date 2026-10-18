@@ -305,6 +305,14 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadKey(config, "SupplyFoodTarget", 1, 200, settings.Supplies.FoodTarget, warnings);
     ReadKey(config, "SupplyDrinkLow", 0, 100, settings.Supplies.DrinkLow, warnings);
     ReadKey(config, "SupplyDrinkTarget", 1, 200, settings.Supplies.DrinkTarget, warnings);
+    ReadBool(config, "SupplyPotions", settings.Supplies.Potions, warnings);
+    ReadBool(config, "SupplyBandages", settings.Supplies.Bandages, warnings);
+    ReadKey(config, "SupplyHealthPotionLow", 0, 20, settings.Supplies.HealthPotionLow, warnings);
+    ReadKey(config, "SupplyManaPotionLow", 0, 20, settings.Supplies.ManaPotionLow, warnings);
+    ReadKey(config, "SupplyBandageLow", 0, 50, settings.Supplies.BandageLow, warnings);
+    ReadKey(config, "UseHealthPotionBelowPct", 1, 90, settings.Supplies.UseHealthPotionBelowPct, warnings);
+    ReadKey(config, "UseManaPotionBelowPct", 1, 90, settings.Supplies.UseManaPotionBelowPct, warnings);
+    ReadKey(config, "UseBandageBelowPct", 1, 95, settings.Supplies.UseBandageBelowPct, warnings);
     {
         std::uint32_t tripSec = static_cast<std::uint32_t>(settings.Supplies.TripEveryMs / 1000);
         ReadKey(config, "SupplyTripSec", 30, 3600, tripSec, warnings);
