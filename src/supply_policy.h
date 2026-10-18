@@ -26,6 +26,7 @@ struct Settings
     // Layout 16: potions and bandages, each off by default (config keys SupplyPotions, SupplyBandages).
     bool Potions = false;                      // buy health potions (and mana potions for a mana user) and drink them in a fight
     bool Bandages = false;                     // buy bandages and use them out of combat
+    bool Reagents = false;                     // buy the reagent the core says a refused cast was missing (config key SupplyReagents)
     std::uint32_t HealthPotionLow = 1;         // a bot with fewer health potions than this goes shopping (the core buys up to its own target)
     std::uint32_t ManaPotionLow = 1;
     std::uint32_t BandageLow = 3;
@@ -52,6 +53,9 @@ struct Facts
     std::uint32_t ManaPotions = 0;
     std::uint32_t Bandages = 0;
     bool GoodsVendor = false;       // a reachable vendor that sells potions or bandages it can use
+    std::uint32_t ReagentEntry = 0;    // the reagent a cast was missing (0 = none); the core stops naming it once the bot carries enough
+    std::uint32_t ReagentCount = 0;
+    bool ReagentVendor = false;     // a reachable vendor that sells it
 };
 
 struct Needs
@@ -62,15 +66,16 @@ struct Needs
     bool HealthPotion = false;
     bool ManaPotion = false;
     bool Bandage = false;
+    bool Reagent = false;
     bool Goods() const { return HealthPotion || ManaPotion || Bandage; }
-    bool Any() const { return Ammo || Food || Drink || Goods(); }
+    bool Any() const { return Ammo || Food || Drink || Goods() || Reagent; }
 };
 
 // What the bot is short of and can do something about: a vendor that sells it exists, there is a free bag slot, and a little money.
 Needs Assess(Settings const& settings, Facts const& facts);
 
 // The vendor to walk to first: ammunition before food (a shooter without ammunition cannot fight at range), food before potions and bandages.
-enum class Stop : std::uint8_t { None, Ammo, Food, Goods };
+enum class Stop : std::uint8_t { None, Ammo, Food, Goods, Reagent };
 Stop NextStop(Needs const& needs);
 
 // What a visit asks for: the counts to bring the bot up to (0 = nothing of that kind). A vendor without the goods simply sells none.
@@ -82,6 +87,7 @@ struct Request
     bool HealthPotion = false;   // layout 16: the core's settings decide how many
     bool ManaPotion = false;
     bool Bandage = false;
+    bool Reagent = false;        // the item and the count are the core's
 };
 Request RequestFor(Settings const& settings, Needs const& needs);
 

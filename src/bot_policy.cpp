@@ -44,6 +44,7 @@ constexpr std::uint32_t kServiceEquip = 4;
 constexpr std::uint32_t kServiceBuyHealthPotion = 64; // layout 16: the core's settings give the counts
 constexpr std::uint32_t kServiceBuyManaPotion = 128;
 constexpr std::uint32_t kServiceBuyBandage = 256;
+constexpr std::uint32_t kServiceBuyReagent = 512;  // the item and the count are the core's
 constexpr std::uint32_t kServiceBuyAmmo = 8;     // layout 15: buy ammunition (dest_x = the count to carry), food (dest_y), drink (dest_z)
 constexpr std::uint32_t kServiceBuyFood = 16;
 constexpr std::uint32_t kServiceBuyDrink = 32;
@@ -486,6 +487,9 @@ supply::Facts FactsOf(BotSnapshot const& bot)
     facts.ManaPotions = bot.mana_potion_count;
     facts.Bandages = bot.bandage_count;
     facts.GoodsVendor = bot.goods_vendor_valid != 0;
+    facts.ReagentEntry = bot.reagent_entry;
+    facts.ReagentCount = bot.reagent_count;
+    facts.ReagentVendor = bot.reagent_vendor_valid != 0;
     return facts;
 }
 
@@ -2047,9 +2051,11 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             bool const supplyStopNow = supplyDue && !needRepair;
             bool const ammoStop = supplyStopNow && supplyStop == supply::Stop::Ammo;
             bool const goodsStop = supplyStopNow && supplyStop == supply::Stop::Goods;
-            Point const vendor = supplyStopNow ? (ammoStop    ? Point{ bot.ammo_vendor_x, bot.ammo_vendor_y, bot.ammo_vendor_z }
-                                                  : goodsStop ? Point{ bot.goods_vendor_x, bot.goods_vendor_y, bot.goods_vendor_z }
-                                                              : Point{ bot.food_vendor_x, bot.food_vendor_y, bot.food_vendor_z })
+            bool const reagentStop = supplyStopNow && supplyStop == supply::Stop::Reagent;
+            Point const vendor = supplyStopNow ? (ammoStop      ? Point{ bot.ammo_vendor_x, bot.ammo_vendor_y, bot.ammo_vendor_z }
+                                                  : goodsStop   ? Point{ bot.goods_vendor_x, bot.goods_vendor_y, bot.goods_vendor_z }
+                                                  : reagentStop ? Point{ bot.reagent_vendor_x, bot.reagent_vendor_y, bot.reagent_vendor_z }
+                                                                : Point{ bot.food_vendor_x, bot.food_vendor_y, bot.food_vendor_z })
                                  : needRepair  ? Point{ bot.repair_x, bot.repair_y, bot.repair_z }
                                                : Point{ bot.vendor_x, bot.vendor_y, bot.vendor_z };
             bool const vendorExists = supplyStopNow || needRepair || bot.vendor_valid != 0;
@@ -2107,7 +2113,8 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 {
                     // Layout 15: buy what is short. The core picks the items from this vendor's stock and buys up to the counts given here.
                     supply::Request const request = supply::RequestFor(_options.Supplies, supplyNeeds);
-                    vendor.target_guid = ammoStop ? bot.ammo_vendor_guid : goodsStop ? bot.goods_vendor_guid : bot.food_vendor_guid;
+                    vendor.target_guid = ammoStop ? bot.ammo_vendor_guid : goodsStop ? bot.goods_vendor_guid
+                                       : reagentStop ? bot.reagent_vendor_guid : bot.food_vendor_guid;
                     if (request.Ammo != 0)
                         vendor.spell_id |= kServiceBuyAmmo;
                     if (request.Food != 0)
@@ -2120,6 +2127,8 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                         vendor.spell_id |= kServiceBuyManaPotion;
                     if (request.Bandage)
                         vendor.spell_id |= kServiceBuyBandage;
+                    if (request.Reagent)
+                        vendor.spell_id |= kServiceBuyReagent;
                     vendor.dest_x = float(request.Ammo);
                     vendor.dest_y = float(request.Food);
                     vendor.dest_z = float(request.Drink);

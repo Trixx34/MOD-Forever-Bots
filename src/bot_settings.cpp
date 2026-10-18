@@ -307,6 +307,7 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadKey(config, "SupplyDrinkTarget", 1, 200, settings.Supplies.DrinkTarget, warnings);
     ReadBool(config, "SupplyPotions", settings.Supplies.Potions, warnings);
     ReadBool(config, "SupplyBandages", settings.Supplies.Bandages, warnings);
+    ReadBool(config, "SupplyReagents", settings.Supplies.Reagents, warnings);
     ReadKey(config, "SupplyHealthPotionLow", 0, 20, settings.Supplies.HealthPotionLow, warnings);
     ReadKey(config, "SupplyManaPotionLow", 0, 20, settings.Supplies.ManaPotionLow, warnings);
     ReadKey(config, "SupplyBandageLow", 0, 50, settings.Supplies.BandageLow, warnings);

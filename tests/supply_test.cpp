@@ -264,6 +264,46 @@ void ABotWithNoFoodBandagesWhenHurt()
     CHECK(BandageNow(On(), facts, 40) == 0);                  // off by default
 }
 
+void AReagentTripNeedsTheSettingAnItemAndAVendor()
+{
+    Facts facts = Shopper();
+    facts.ReagentEntry = 17026;
+    facts.ReagentCount = 0;
+    facts.ReagentVendor = true;
+    Settings reagents = On();
+    reagents.Reagents = true;
+    CHECK(Assess(reagents, facts).Reagent && Assess(reagents, facts).Any() && !Assess(reagents, facts).Goods());
+    CHECK(!Assess(On(), facts).Any());                       // off by default
+    Facts noVendor = facts;
+    noVendor.ReagentVendor = false;
+    CHECK(!Assess(reagents, noVendor).Any());
+    Facts none = facts;
+    none.ReagentEntry = 0;                                   // the core names nothing: nothing is missing
+    CHECK(!Assess(reagents, none).Any());
+
+    Needs needs = Assess(reagents, facts);
+    CHECK(NextStop(needs) == Stop::Reagent && RequestFor(reagents, needs).Reagent);
+    needs.Bandage = true;                                    // goods come first
+    CHECK(NextStop(needs) == Stop::Goods);
+}
+
+void AReagentTripIsJudgedByTheCountOrByTheCoreStoppingTheNote()
+{
+    Needs asked;
+    asked.Reagent = true;
+    Facts before = Shopper();
+    before.ReagentEntry = 17026;
+    before.ReagentCount = 1;
+    Facts after = before;
+    CHECK(!Improved(asked, before, after));
+    after.ReagentCount = 6;
+    CHECK(Improved(asked, before, after));
+    after = before;
+    after.ReagentEntry = 0;                                  // carries enough now
+    after.ReagentCount = 0;
+    CHECK(Improved(asked, before, after));
+}
+
 } // namespace
 
 int main()
@@ -283,6 +323,8 @@ int main()
     AGoodsTripIsJudgedByItsOwnCounts();
     PotionsAreDrunkInAFightByThresholds();
     ABotWithNoFoodBandagesWhenHurt();
+    AReagentTripNeedsTheSettingAnItemAndAVendor();
+    AReagentTripIsJudgedByTheCountOrByTheCoreStoppingTheNote();
     if (failures == 0)
         std::printf("supply_test: all passed\n");
     return failures == 0 ? 0 : 1;

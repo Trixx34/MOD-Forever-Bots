@@ -2844,6 +2844,32 @@ void ARestingBotWithoutFoodBandagesItself()
     CHECK(eat.has_value() && eat->spell_id == 1);
 }
 
+void ABotMissingAReagentBuysItAtTheReagentVendor()
+{
+    PolicyOptions options;
+    options.ClassId = 1;
+    options.WanderWhenIdle = false;
+    options.Supplies.Enabled = true;
+    options.Supplies.Reagents = true;
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = GoodsView();
+    view.bots[0].reagent_entry = 17026;
+    view.bots[0].reagent_count = 0;
+    view.bots[0].reagent_vendor_valid = 1;
+    view.bots[0].reagent_vendor_x = 2.0f;
+    view.bots[0].reagent_vendor_guid = MakeUnitRef(8, 5200, 7);
+    std::optional<BotAction> buy = FindAction(policy.Decide(view, 0), ActionType::kVendor);
+    CHECK(buy.has_value());
+    if (buy)
+    {
+        CHECK((buy->spell_id & 512) != 0 && (buy->spell_id & (8 | 16 | 32 | 64 | 128 | 256)) == 0);
+        CHECK(buy->target_guid == MakeUnitRef(8, 5200, 7));
+    }
+    BotPolicy off = GoodsPolicy();
+    CHECK(!FindAction(off.Decide(view, 0), ActionType::kVendor).has_value() ||
+          (FindAction(off.Decide(view, 0), ActionType::kVendor)->spell_id & 512) == 0);
+}
+
 void AManaUserDrinksAManaPotionInAFight()
 {
     BotPolicy policy = GoodsPolicy(5);
@@ -2862,6 +2888,7 @@ int main()
     AHurtFightingBotDrinksAHealthPotionOnce();
     ARestingBotWithoutFoodBandagesItself();
     AManaUserDrinksAManaPotionInAFight();
+    ABotMissingAReagentBuysItAtTheReagentVendor();
     NoSuppliesTripWhenTheFeatureIsOff();
     NoTripWithoutMoneyOrBagRoom();
     BuysAmmoAtTheVendor();

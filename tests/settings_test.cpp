@@ -62,6 +62,8 @@ void SayAndSupplySettings()
     CHECK(goods.Supplies.Potions && goods.Supplies.Bandages && goods.Supplies.HealthPotionLow == 2 && goods.Supplies.ManaPotionLow == 3);
     CHECK(goods.Supplies.BandageLow == 5 && goods.Supplies.UseHealthPotionBelowPct == 50 && goods.Supplies.UseManaPotionBelowPct == 20);
     CHECK(goods.Supplies.UseBandageBelowPct == 70 && warnings.empty());
+    BotSettings const reagents = ParseBotSettings({ { "Supplies", "1" }, { "SupplyReagents", "1" } }, warnings);
+    CHECK(reagents.Supplies.Reagents && !off.Supplies.Reagents && warnings.empty());
     CHECK(warnings.empty());
 
     // A target below its low mark is raised to it; a value out of range falls back with a warning.

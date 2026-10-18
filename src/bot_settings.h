@@ -118,6 +118,7 @@ struct BotSettings
     // Layout 16, each off by default: SupplyPotions (health and mana potions, drunk in a fight below UseHealthPotionBelowPct and
     // UseManaPotionBelowPct), SupplyBandages (used by a resting bot below UseBandageBelowPct that has no food), SupplyHealthPotionLow,
     // SupplyManaPotionLow and SupplyBandageLow (the counts under which a bot goes shopping; the core's settings decide how many it buys).
+    // SupplyReagents (off by default): a bot whose cast was refused for lack of a reagent goes to a vendor that sells it; the core names the item.
     supply::Settings Supplies;
     std::uint32_t AutoGearEveryLevels = 5;
     ScenarioSettings Scenario;
