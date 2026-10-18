@@ -2880,9 +2880,41 @@ void AManaUserDrinksAManaPotionInAFight()
     CHECK(drink.has_value() && drink->spell_id == 4);
 }
 
+
+// ---- Presence (bot_presence.h) ----
+void ABotIsSafeToLogOutOnlyWhenNothingIsGoingOn()
+{
+    BotPolicy policy = SupplyPolicy(1);
+    WorldTickSnapshotView view = GoodsView();
+    policy.Decide(view, 0);
+    CHECK(policy.SafeToLogOut(view.bots[0]));
+    BotSnapshot fighting = view.bots[0];
+    fighting.in_combat = 1;
+    CHECK(!policy.SafeToLogOut(fighting));
+    BotSnapshot dead = view.bots[0];
+    dead.life_state = 2;
+    CHECK(!policy.SafeToLogOut(dead));
+    BotSnapshot grouped = view.bots[0];
+    grouped.group_role = 1;
+    CHECK(!policy.SafeToLogOut(grouped));
+    BotSnapshot invited = view.bots[0];
+    invited.group_invite_from = MakeUnitRef(4, 77, 1);
+    CHECK(!policy.SafeToLogOut(invited));
+    // On the way to a vendor for supplies: not now.
+    WorldTickSnapshotView shopper = ShopperView(10);
+    BotPolicy walking = SupplyPolicy(3);
+    CHECK(FindAction(walking.Decide(shopper, 0), ActionType::kMoveTo).has_value());
+    CHECK(!walking.SafeToLogOut(shopper.bots[0]));
+    // A bot the policy never saw has nothing going on.
+    BotSnapshot stranger = view.bots[0];
+    stranger.guid = 999;
+    CHECK(policy.SafeToLogOut(stranger));
+}
+
 int main()
 {
     ShortOfAmmoWalksToTheAmmoVendor();
+    ABotIsSafeToLogOutOnlyWhenNothingIsGoingOn();
     AWarriorWithoutPotionsOrBandagesBuysThemAtTheGoodsVendor();
     AFarGoodsVendorIsWalkedTo();
     AHurtFightingBotDrinksAHealthPotionOnce();

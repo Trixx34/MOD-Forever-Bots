@@ -139,6 +139,30 @@ void ZeroAltGrantKeepsNothing()
     CHECK(roster.SpawnedCount() == 0);
 }
 
+void ABotAwayForAWhileStillUsesTheCapAndComesBack()
+{
+    BotRoster roster(2);
+    roster.OnGranted(0, 11);
+    roster.OnGranted(0, 12);
+    CHECK(!roster.CanRequest());
+    roster.NoteOffline(11);                        // released for presence
+    CHECK(roster.Owned().size() == 1 && roster.IsOffline(11) && roster.OfflineCount() == 1);
+    CHECK(roster.SpawnedCount() == 2 && !roster.CanRequest());   // no new bot takes its place
+    roster.NoteRequestSent(11);
+    roster.OnGranted(11, 11);                      // taken back by its guid
+    CHECK(!roster.IsOffline(11) && roster.OfflineCount() == 0 && roster.Owned().size() == 2 && roster.SpawnedCount() == 2);
+}
+
+void AnAltIsNeverMarkedAway()
+{
+    BotRoster roster(2);
+    roster.OnAltGranted(401);
+    roster.NoteOffline(401);
+    CHECK(roster.OfflineCount() == 0 && roster.Owned().count(401) == 1);
+    roster.NoteOffline(0);
+    CHECK(roster.OfflineCount() == 0);
+}
+
 } // namespace
 
 int main()
@@ -153,6 +177,8 @@ int main()
     AltsAreNotCountedForSpawns();
     RevokingAnAltFreesNothingForSpawns();
     ZeroAltGrantKeepsNothing();
+    ABotAwayForAWhileStillUsesTheCapAndComesBack();
+    AnAltIsNeverMarkedAway();
 
     if (failures == 0)
         std::printf("roster_test: all checks passed\n");

@@ -495,6 +495,17 @@ supply::Facts FactsOf(BotSnapshot const& bot)
 
 } // namespace
 
+bool BotPolicy::SafeToLogOut(BotSnapshot const& bot) const
+{
+    if (bot.in_combat != 0 || bot.life_state != 0 || bot.group_role != 0 || bot.group_invite_from != 0)
+        return false;
+    auto const found = _bots.find(bot.guid);
+    if (found == _bots.end())
+        return true;
+    BotState const& state = found->second;
+    return !state.ChatStay && state.ChatFollow == 0 && !state.Traveling && !state.SupplyTrip && state.SupplyCheckAtMs == 0 && !state.ServiceUrgent;
+}
+
 char const* ActionStatusName(BotActionStatus status)
 {
     switch (status)

@@ -18,7 +18,8 @@ public:
     // Alts are not counted (see OnAltGranted).
     bool CanRequest() const;
 
-    // Bots this module spawned: the owned bots minus the alts. This is what the cap and the spawn ramp count.
+    // Bots this module spawned: the owned bots minus the alts, plus those away for a while (presence). This is what the cap and the spawn ramp
+    // count.
     std::uint32_t SpawnedCount() const;
 
     // Core granted control of an alt (a player's own character logged in as a bot). Alts do not use up the cap, and no pending
@@ -37,6 +38,13 @@ public:
     // Core took a bot back (ControlRevoked). Returns false if the bot was not owned.
     bool OnRevoked(std::uint64_t botGuid, std::string const& reason);
 
+    // Presence (bot_presence.h): the module released an ordinary bot so that it logs off for a while. It still counts toward the cap, because it
+    // is one of the bots and comes back; a new bot is not spawned in its place. Taking it back (OnGranted) or losing it (Forget) ends that.
+    void NoteOffline(std::uint64_t botGuid);
+    void ForgetOffline(std::uint64_t botGuid) { _offline.erase(botGuid); }
+    bool IsOffline(std::uint64_t botGuid) const { return _offline.count(botGuid) != 0; }
+    std::uint32_t OfflineCount() const { return static_cast<std::uint32_t>(_offline.size()); }
+
     std::set<std::uint64_t> const& Owned() const { return _owned; }
     std::uint32_t PendingCount() const { return _pending; }
     std::uint32_t MaxBots() const { return _maxBots; }
@@ -47,5 +55,6 @@ private:
     std::uint32_t _pending = 0;      // requests sent and not yet answered
     std::set<std::uint64_t> _owned;  // every bot this module controls, alts included
     std::set<std::uint64_t> _alts;   // the subset of _owned that are alts
+    std::set<std::uint64_t> _offline; // ordinary bots away for a while (presence): not owned now, still counted
     std::string _lastRevokeReason;
 };

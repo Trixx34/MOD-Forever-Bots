@@ -64,6 +64,19 @@ void SayAndSupplySettings()
     CHECK(goods.Supplies.UseBandageBelowPct == 70 && warnings.empty());
     BotSettings const reagents = ParseBotSettings({ { "Supplies", "1" }, { "SupplyReagents", "1" } }, warnings);
     CHECK(reagents.Supplies.Reagents && !off.Supplies.Reagents && warnings.empty());
+
+    // Presence: off by default; a maximum below its minimum is raised; the day curve has 24 numbers.
+    CHECK(!off.Presence.Enabled && off.Presence.OnlineMinMin == 60 && off.Presence.OfflineMaxMin == 240 && off.Presence.DayPercent[20] == 100);
+    BotSettings const away = ParseBotSettings({ { "Presence", "1" }, { "PresenceOnlineMinMin", "90" }, { "PresenceOnlineMaxMin", "30" },
+                                                { "PresenceOfflineMinMin", "10" }, { "PresenceOfflineMaxMin", "20" }, { "PresenceMinOnline", "40" },
+                                                { "PresenceMaxOnline", "800" },
+                                                { "PresenceDayPercent", "1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24" } }, warnings);
+    CHECK(away.Presence.Enabled && away.Presence.OnlineMinMin == 90 && away.Presence.OnlineMaxMin == 90);
+    CHECK(away.Presence.OfflineMinMin == 10 && away.Presence.OfflineMaxMin == 20 && away.Presence.MinOnline == 40 && away.Presence.MaxOnline == 800);
+    CHECK(away.Presence.DayPercent[0] == 1 && away.Presence.DayPercent[23] == 24 && warnings.empty());
+    BotSettings const badCurve = ParseBotSettings({ { "PresenceDayPercent", "1,2,3" } }, warnings);
+    CHECK(badCurve.Presence.DayPercent == presence::Settings().DayPercent && warnings.size() == 1);
+    warnings.clear();
     CHECK(warnings.empty());
 
     // A target below its low mark is raised to it; a value out of range falls back with a warning.

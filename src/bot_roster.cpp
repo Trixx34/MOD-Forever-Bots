@@ -11,7 +11,15 @@ bool BotRoster::CanRequest() const
 
 std::uint32_t BotRoster::SpawnedCount() const
 {
-    return static_cast<std::uint32_t>(_owned.size() - _alts.size());
+    return static_cast<std::uint32_t>(_owned.size() - _alts.size() + _offline.size());
+}
+
+void BotRoster::NoteOffline(std::uint64_t botGuid)
+{
+    if (botGuid == 0 || _alts.count(botGuid) != 0)
+        return;
+    _owned.erase(botGuid);
+    _offline.insert(botGuid);
 }
 
 void BotRoster::OnAltGranted(std::uint64_t grantedGuid)
@@ -32,7 +40,10 @@ void BotRoster::OnGranted(std::uint64_t, std::uint64_t grantedGuid)
     if (_pending > 0)
         --_pending;
     if (grantedGuid != 0)
+    {
         _owned.insert(grantedGuid);
+        _offline.erase(grantedGuid);
+    }
 }
 
 void BotRoster::OnDenied(std::uint64_t)

@@ -12,6 +12,7 @@
 #include "bot_roster.h"
 #include "trade_policy.h"
 #include "bot_settings.h"
+#include "bot_presence.h"
 #include "bot_store.h"
 #include "bot_live.h"
 #include "bot_telemetry.h"
@@ -56,6 +57,12 @@ constexpr std::uint64_t kServiceNoticeMs = 600000; // a refused vendor or traine
 // the defaults. The core logs bots in at most Bot.Login.MaxPerSecond a second, so a ramp step of 100 bots takes about 50
 // seconds to spawn and about 10 seconds more to log in.
 constexpr std::chrono::milliseconds kRampInterval(5000);
+
+// Presence (bot_presence.h): the pump thread tells the Run() thread which ordinary bots are online and idle every kPresenceFeedMs; the Run()
+// thread decides every kPresenceInterval who logs off and who comes back.
+constexpr std::chrono::milliseconds kPresenceInterval(5000);
+constexpr std::uint64_t kPresenceFeedMs = 2000;
+constexpr std::uint64_t kPresenceStaleMs = 15000; // a feed older than this is not acted on (the pump stalled)
 constexpr std::uint32_t kSpawnsPerRampTick = 10;
 constexpr std::uint64_t kSpawnBackoffMs = 30000; // after a refused spawn, wait this long before the next
 
@@ -250,9 +257,18 @@ std::string LowerCopy(std::string text)
     return text;
 }
 
+struct PresenceFeed
+{
+    std::mutex Lock;
+    std::vector<presence::Online> Bots;
+    std::uint64_t AtMs = 0;
+};
+
 // What the pump needs beyond the policy: the scenario (if one is configured) and the command queue.
 struct PumpExtras
 {
+    std::shared_ptr<PresenceFeed> Presence;   // set when Presence is on
+    std::shared_ptr<AltRegistry> Alts;
     std::optional<ScenarioPlan> Scenario;
     std::string ScenarioResultFile;
     std::shared_ptr<CommandQueue> Commands;
@@ -307,6 +323,7 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
         director.emplace(*extras.Scenario);
     bool sawSnapshot = false;
     std::uint64_t lastTick = 0;
+    std::uint64_t presenceFedMs = 0;
     // Last action sequence seen per bot, so each result is reported once.
     std::unordered_map<std::uint64_t, std::uint32_t> seenSequence;
     std::unordered_map<std::uint64_t, std::uint64_t> serviceNoticeMs; // bot -> when a service refusal was last logged
@@ -447,6 +464,22 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
             if (director)
                 policy.SetRouteActive(director->RouteActive());
             std::vector<forever_module::BotAction> actions = policy.Decide(view, nowMs());
+            if (extras.Presence && nowMs() - presenceFedMs >= kPresenceFeedMs)
+            {
+                // Ordinary bots only: alts and party members are never logged off and are not in the list.
+                presenceFedMs = nowMs();
+                std::vector<presence::Online> list;
+                list.reserve(view.bots.size());
+                for (forever_module::BotSnapshot const& bot : view.bots)
+                {
+                    if ((extras.Alts && extras.Alts->Has(bot.guid)) || bot.group_role != 0)
+                        continue;
+                    list.push_back({ bot.guid, policy.SafeToLogOut(bot) });
+                }
+                std::lock_guard<std::mutex> lock(extras.Presence->Lock);
+                extras.Presence->Bots.swap(list);
+                extras.Presence->AtMs = presenceFedMs;
+            }
             if (director)
             {
                 std::size_t const before = actions.size();
@@ -1034,6 +1067,63 @@ int main(int argc, char** argv)
     policyOptions.AutoGearEveryLevels = settings.AutoGearEveryLevels;
     PumpExtras extras;
     extras.Commands = commands;
+    extras.Alts = alts;
+    if (settings.Presence.Enabled && !scenarioOn)
+    {
+        auto feed = std::make_shared<PresenceFeed>();
+        extras.Presence = feed;
+        auto scheduler = std::make_shared<presence::Scheduler>(settings.Presence, settings.RandomSeed ^ 0x9e3779b97f4a7c15ull);
+        client.AddTimer(kPresenceInterval, [&run, feed, scheduler, trades]
+        {
+            std::vector<presence::Online> list;
+            std::uint64_t fedAt = 0;
+            {
+                std::lock_guard<std::mutex> lock(feed->Lock);
+                list = feed->Bots;
+                fedAt = feed->AtMs;
+            }
+            std::uint64_t const now = nowMs();
+            if (fedAt == 0 || now - fedAt > kPresenceStaleMs)
+                return;
+            for (presence::Online& bot : list)
+                if (trades->Active(bot.Guid))
+                    bot.Idle = false; // a trade in progress is not cut short
+            scheduler->SetSettings(run.Settings.Presence);
+            presence::Decisions const decisions = scheduler->Tick(now, LocalSecondsOfDay(), list);
+            for (std::uint64_t guid : decisions.LogOff)
+            {
+                run.Roster.NoteOffline(guid);
+                run.Client.ReleaseControl(guid); // the core logs it out (Bot.Presence.LogoutOnRelease)
+            }
+            for (std::uint64_t guid : decisions.LogOn)
+            {
+                run.Roster.NoteRequestSent(guid);
+                run.Client.RequestControl(guid, {}, [&run, scheduler, guid](forever_module::ControlResponse const& reply)
+                {
+                    if (reply.granted())
+                    {
+                        run.Roster.OnGranted(guid, reply.bot_guid());
+                        return;
+                    }
+                    run.Roster.OnDenied(guid);
+                    if (reply.reason() == "character not found")
+                    {
+                        scheduler->Forget(guid);
+                        run.Roster.ForgetOffline(guid);
+                        run.Client.StoreDelete(bot_store::KeyFor(guid));
+                    }
+                    else
+                        scheduler->LogOnFailed(guid, nowMs());
+                    std::cerr << "forever-bots: presence: could not bring bot " << guid << " back: " << reply.reason() << "\n";
+                });
+            }
+            if (!decisions.LogOff.empty() || !decisions.LogOn.empty())
+                std::cerr << "forever-bots: presence: " << decisions.LogOff.size() << " log off, " << decisions.LogOn.size() << " back; "
+                          << run.Roster.OfflineCount() << " away, " << run.Roster.Owned().size() << " online\n";
+        });
+        std::cerr << "forever-bots: presence is on: sessions " << settings.Presence.OnlineMinMin << " to " << settings.Presence.OnlineMaxMin
+                  << " min, away " << settings.Presence.OfflineMinMin << " to " << settings.Presence.OfflineMaxMin << " min\n";
+    }
     if (scenarioOn)
     {
         // The scenario takes over the party, the route and the dressing: no vendor walks, no ramp, one party of the whole roster.

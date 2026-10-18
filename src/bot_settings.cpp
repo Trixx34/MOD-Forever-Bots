@@ -319,6 +319,39 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
         ReadKey(config, "SupplyTripSec", 30, 3600, tripSec, warnings);
         settings.Supplies.TripEveryMs = std::uint64_t(tripSec) * 1000;
     }
+    ReadBool(config, "Presence", settings.Presence.Enabled, warnings);
+    ReadKey(config, "PresenceOnlineMinMin", 1, 1440, settings.Presence.OnlineMinMin, warnings);
+    ReadKey(config, "PresenceOnlineMaxMin", 1, 1440, settings.Presence.OnlineMaxMin, warnings);
+    ReadKey(config, "PresenceOfflineMinMin", 1, 1440, settings.Presence.OfflineMinMin, warnings);
+    ReadKey(config, "PresenceOfflineMaxMin", 1, 1440, settings.Presence.OfflineMaxMin, warnings);
+    ReadKey(config, "PresenceMinOnline", 0, 100000, settings.Presence.MinOnline, warnings);
+    ReadKey(config, "PresenceMaxOnline", 0, 100000, settings.Presence.MaxOnline, warnings);
+    settings.Presence.OnlineMaxMin = std::max(settings.Presence.OnlineMaxMin, settings.Presence.OnlineMinMin);
+    settings.Presence.OfflineMaxMin = std::max(settings.Presence.OfflineMaxMin, settings.Presence.OfflineMinMin);
+    if (auto const it = config.find("PresenceDayPercent"); it != config.end())
+    {
+        // 24 comma-separated percents, midnight first.
+        std::array<std::uint32_t, 24> percent{};
+        std::size_t count = 0;
+        bool ok = true;
+        std::istringstream in(it->second);
+        std::string part;
+        while (std::getline(in, part, ','))
+        {
+            std::uint32_t value = 0;
+            std::string reason;
+            if (count >= 24 || !ParseBounded(part, 0, 100, value, reason))
+            {
+                ok = false;
+                break;
+            }
+            percent[count++] = value;
+        }
+        if (ok && count == 24)
+            settings.Presence.DayPercent = percent;
+        else
+            warnings.push_back("Module.forever-bots.PresenceDayPercent: expected 24 comma-separated numbers from 0 to 100; using the default curve.");
+    }
     // A target below its "low" mark would send a bot shopping that then buys nothing: the target is raised to the mark.
     settings.Supplies.AmmoTarget = std::max(settings.Supplies.AmmoTarget, settings.Supplies.AmmoLow);
     settings.Supplies.FoodTarget = std::max(settings.Supplies.FoodTarget, settings.Supplies.FoodLow);

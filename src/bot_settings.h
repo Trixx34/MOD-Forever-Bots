@@ -2,6 +2,7 @@
 // prefix removed; see modules.d/forever-bots.conf.example). Pure logic, unit-tested in tests/settings_test.cpp.
 #pragma once
 
+#include "bot_presence.h"
 #include "bot_ramp.h"
 #include "supply_policy.h"
 
@@ -120,6 +121,10 @@ struct BotSettings
     // SupplyManaPotionLow and SupplyBandageLow (the counts under which a bot goes shopping; the core's settings decide how many it buys).
     // SupplyReagents (off by default): a bot whose cast was refused for lack of a reagent goes to a vendor that sells it; the core names the item.
     supply::Settings Supplies;
+    // Presence (config keys Presence, PresenceOnlineMinMin, PresenceOnlineMaxMin, PresenceOfflineMinMin, PresenceOfflineMaxMin, PresenceMinOnline,
+    // PresenceMaxOnline, PresenceDayPercent; off by default): bots log off and on like players, see bot_presence.h. Needs Bot.Presence.LogoutOnRelease
+    // in the core, or a released bot stays in the world.
+    presence::Settings Presence;
     std::uint32_t AutoGearEveryLevels = 5;
     ScenarioSettings Scenario;
 };

@@ -25,7 +25,7 @@ target_include_directories(forever_bots_roster PUBLIC src)
 add_library(forever_bots_trade STATIC src/trade_policy.cpp)
 target_include_directories(forever_bots_trade PUBLIC src)
 
-add_library(forever_bots_settings STATIC src/bot_settings.cpp src/bot_ramp.cpp src/bot_pick.cpp src/dungeon_data.cpp)
+add_library(forever_bots_settings STATIC src/bot_settings.cpp src/bot_ramp.cpp src/bot_pick.cpp src/dungeon_data.cpp src/bot_presence.cpp)
 target_include_directories(forever_bots_settings PUBLIC src)
 
 add_library(forever_bots_store STATIC src/bot_store.cpp)
@@ -117,6 +117,10 @@ add_test(NAME pick COMMAND pick_test)
 add_executable(ramp_test tests/ramp_test.cpp)
 target_link_libraries(ramp_test PRIVATE forever_bots_settings)
 add_test(NAME ramp COMMAND ramp_test)
+
+add_executable(presence_test tests/presence_test.cpp)
+target_link_libraries(presence_test PRIVATE forever_bots_settings)
+add_test(NAME presence COMMAND presence_test)
 
 add_executable(rotating_file_test tests/rotating_file_test.cpp)
 target_link_libraries(rotating_file_test PRIVATE forever_bots_files)

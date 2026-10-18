@@ -147,6 +147,10 @@ public:
     // Applies a chat command (chat_commands.h) to the bots of the speaker's group that its selector names (a whisper: that one bot, when the
     // speaker leads its group). Returns the lines for the speaker: a status line per bot, or why nothing happened. Silent on success.
     // `acks`, when given, receives the lines the bots that took the order say out loud (chat_say.h), at most chat.SayMax of them.
+    // Presence (bot_presence.h): whether nothing a log off would cut short is going on for this bot: no fight, death, party or invite, chat order,
+    // vendor walk or supply trip, and no walk to hand in a quest.
+    bool SafeToLogOut(forever_module::BotSnapshot const& bot) const;
+
     std::vector<std::string> ApplyChat(forever_module::WorldTickSnapshotView const& view, ChatContext const& chat, ChatCommand const& command,
                                        std::uint64_t nowMs, std::vector<ChatAck>* acks = nullptr);
 
