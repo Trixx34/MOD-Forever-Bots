@@ -74,10 +74,11 @@ all bots: each call is a browse that walks the house's lists in the core.
    (browses are the cost to watch).
 3. Compare: the money total after 8 hours with and without the house.
 
-## Decisions for the owner
+## Decisions (answered by the owner, 2026-10-19)
 
-- Whether bot listings and the core's `AuctionHouseBot` seller are both wanted; the first makes a market that players can use, the second is simpler and does not
-  depend on the bots' play.
-- Whether players may buy from bots at all (it makes bot gold real); and whether bot-sold gear may be soulbound-free items only (as above) or anything.
-- The price multiples, which are guesses until the sim shows what bots earn.
-- Whether any of this is wanted before bots level reliably: with no levelling there is nothing worth selling.
+- **Sellers:** the bots only. The core's `AuctionHouseBot` stays off (`Sellers.Count = 0`).
+- **Players may buy** what bots list. Bot gold becomes real; no rule hides bot listings.
+- **What bots list:** tradeable items of green quality or better that the bot will not use.
+- **Prices:** vendor price multiples (green x3, blue x4, epic x5, buyout x1.2), tunable; still guesses until the sim shows what bots earn.
+
+Still open: whether any of this is wanted before bots level reliably (with no levelling there is nothing worth selling), and the mail question under "Core and SDK work needed".
