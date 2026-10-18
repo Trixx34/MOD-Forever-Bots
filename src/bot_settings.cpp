@@ -296,6 +296,24 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadBool(config, "ChatCommands", settings.ChatCommands, warnings);
     ReadBool(config, "ChatOrders", settings.ChatOrders, warnings);
     ReadBool(config, "ChatControl", settings.ChatControl, warnings);
+    ReadBool(config, "ChatSay", settings.ChatSay, warnings);
+    ReadKey(config, "ChatSayMax", 0, 50, settings.ChatSayMax, warnings);
+    ReadBool(config, "Supplies", settings.Supplies.Enabled, warnings);
+    ReadKey(config, "SupplyAmmoLow", 0, 1000, settings.Supplies.AmmoLow, warnings);
+    ReadKey(config, "SupplyAmmoTarget", 1, 2000, settings.Supplies.AmmoTarget, warnings);
+    ReadKey(config, "SupplyFoodLow", 0, 100, settings.Supplies.FoodLow, warnings);
+    ReadKey(config, "SupplyFoodTarget", 1, 200, settings.Supplies.FoodTarget, warnings);
+    ReadKey(config, "SupplyDrinkLow", 0, 100, settings.Supplies.DrinkLow, warnings);
+    ReadKey(config, "SupplyDrinkTarget", 1, 200, settings.Supplies.DrinkTarget, warnings);
+    {
+        std::uint32_t tripSec = static_cast<std::uint32_t>(settings.Supplies.TripEveryMs / 1000);
+        ReadKey(config, "SupplyTripSec", 30, 3600, tripSec, warnings);
+        settings.Supplies.TripEveryMs = std::uint64_t(tripSec) * 1000;
+    }
+    // A target below its "low" mark would send a bot shopping that then buys nothing: the target is raised to the mark.
+    settings.Supplies.AmmoTarget = std::max(settings.Supplies.AmmoTarget, settings.Supplies.AmmoLow);
+    settings.Supplies.FoodTarget = std::max(settings.Supplies.FoodTarget, settings.Supplies.FoodLow);
+    settings.Supplies.DrinkTarget = std::max(settings.Supplies.DrinkTarget, settings.Supplies.DrinkLow);
     ReadKey(config, "AutoGearEveryLevels", 1, 60, settings.AutoGearEveryLevels, warnings);
     ReadScenario(config, settings.Scenario, warnings);
     if (auto const it = config.find("RotationFile"); it != config.end())

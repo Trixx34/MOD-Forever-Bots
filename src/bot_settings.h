@@ -3,6 +3,7 @@
 #pragma once
 
 #include "bot_ramp.h"
+#include "supply_policy.h"
 
 #include <array>
 #include <cstdint>
@@ -108,6 +109,13 @@ struct BotSettings
     bool ChatCommands = false;
     bool ChatOrders = false;
     bool ChatControl = false;   // the control panel: role, stance, focus, distance
+    // Say-back (config keys ChatSay, 0 or 1, off by default; ChatSayMax 0..50, default 3): a bot that takes a chat order answers with a short /say line.
+    // ChatSayMax caps how many bots of a group speak for one order, so a big group does not drown the chat; a bot that was whispered always answers.
+    bool ChatSay = false;
+    std::uint32_t ChatSayMax = 3;
+    // Supplies (layout 15, config keys Supplies, SupplyAmmoLow, SupplyAmmoTarget, SupplyFoodLow, SupplyFoodTarget, SupplyDrinkLow, SupplyDrinkTarget,
+    // SupplyTripSec; off by default): bots buy ammunition, food and drink at vendors that sell what they can use, and eat and drink while resting.
+    supply::Settings Supplies;
     std::uint32_t AutoGearEveryLevels = 5;
     ScenarioSettings Scenario;
 };

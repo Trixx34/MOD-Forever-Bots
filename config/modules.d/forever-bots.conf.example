@@ -94,7 +94,19 @@ Module.forever-bots.TelemetrySummarySec = 60
 # ChatControl = 0    (the control panel: role tank|healer|dps|auto, stance aggressive|defensive|passive, focus [off], distance <yards>|default)
 #   With ChatCommands = 1 a bot also accepts a party invite from a player. Dot commands: .bots spawn <race id> <class id> [level] | list |
 #   alt add <name> | alt remove <name> | alt list (alts need Bot.Alt.Enabled = 1 in the core's worldserver.conf).
+# ChatSay = 0        (a bot that takes an order answers with a short /say line; ChatSayMax caps how many bots of a group speak for one order, a whispered bot always answers)
+# ChatSayMax = 3
 # AutoGearEveryLevels = 5
+#
+# Supplies (layout 15, off by default): a bot short of ammunition, food or drink walks to the nearest vendor that sells what it can use and buys,
+# and a resting bot eats or drinks what it carries. Needs Bot.Actions.Supplies in the core (on by default there). A hunter with no ammunition
+# fights in melee until it has bought some. A trip that bought nothing (no money, the vendor out of stock) is tried again later, after a longer wait each time.
+# Supplies = 0
+# SupplyAmmoLow = 100       (a bot with fewer pieces of ammunition than this goes shopping ...)
+# SupplyAmmoTarget = 400    (... and buys up to this many)
+# SupplyFoodLow = 3         SupplyFoodTarget = 10
+# SupplyDrinkLow = 3        SupplyDrinkTarget = 10     (drink: bots with mana only)
+# SupplyTripSec = 120       (a bot that needs supplies makes a trip at most this often, 30..3600)
 
 # A scenario (doc 19 of the core): a repeatable test. A fixed roster is spawned at the staging place, dressed, put in one party,
 # teleported to the entry, and walked along the route by its leader for the duration. One result line is written to stderr and to

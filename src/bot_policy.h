@@ -29,6 +29,8 @@
 #include "combat_rotation.h"
 #include "grind_data.h"
 #include "quest_planner.h"
+#include "chat_say.h"
+#include "supply_policy.h"
 
 #include <cstdint>
 #include <functional>
@@ -107,6 +109,8 @@ struct PolicyOptions
     std::uint64_t CorpseRunTimeoutMs = 240000;  // a ghost that has not reached its corpse by then gives up
     std::uint64_t WaitForRezMs = 90000;         // the party waits this long for a corpse to be resurrected
     std::uint64_t WaitForGhostMs = 180000;      // and this long after the ghost entered the corpse's map
+    // Supplies (layout 15): a bot short of ammunition, food or drink walks to a vendor that sells it and buys, and eats or drinks while resting.
+    supply::Settings Supplies;
 };
 
 // Name of an action status, for logs.
@@ -136,12 +140,15 @@ public:
         std::uint32_t MapId = 0;
         Point Pos;
         std::uint64_t TargetRef = 0;
+        bool Say = false;           // the bots that take the order answer out loud (ChatSay)
+        std::uint32_t SayMax = 0;   // at most this many bots answer one order (a whispered bot always does)
     };
 
     // Applies a chat command (chat_commands.h) to the bots of the speaker's group that its selector names (a whisper: that one bot, when the
     // speaker leads its group). Returns the lines for the speaker: a status line per bot, or why nothing happened. Silent on success.
+    // `acks`, when given, receives the lines the bots that took the order say out loud (chat_say.h), at most chat.SayMax of them.
     std::vector<std::string> ApplyChat(forever_module::WorldTickSnapshotView const& view, ChatContext const& chat, ChatCommand const& command,
-                                       std::uint64_t nowMs);
+                                       std::uint64_t nowMs, std::vector<ChatAck>* acks = nullptr);
 
     std::vector<forever_module::BotAction> Decide(forever_module::WorldTickSnapshotView const& view, std::uint64_t nowMs = 0);
 
@@ -237,6 +244,14 @@ private:
                                                         // A flag, not WalkStillSinceMs == 0, because 0 is a legal timestamp.
         bool QuestTeleportSent = false;                  // one teleport already sent for this stuck walk; a second stuck drops the start
         bool Traveling = false;                          // walking to the vendor for a visit
+        // Supplies (supply_policy.h).
+        std::uint64_t NextSupplyMs = 0;                  // no supply trip before this
+        std::uint32_t SupplyFailures = 0;                // trips in a row that bought nothing
+        std::uint64_t SupplyCheckAtMs = 0;               // when the last trip is judged (0 = none pending)
+        supply::Needs SupplyAsked;                       // what that trip asked for
+        supply::Facts SupplyBefore;                      // and what the bot carried before it
+        bool SupplyTrip = false;                         // the walk in progress is a supply trip
+        std::uint64_t NextConsumeMs = 0;                 // no eat or drink before this
         std::uint64_t TravelStartMs = 0;                 // when this walk began; it is dropped after kTravelTimeoutMs
         std::unordered_set<std::uint32_t> CastTimeSpells; // spells the core refused because the bot was moving: they need it standing
         // Chat orders (chat_commands.h).

@@ -5,6 +5,7 @@
 
 #include <cstdio>
 #include <memory>
+#include <optional>
 #include <sstream>
 #include <string>
 
@@ -2495,8 +2496,261 @@ void VendorCarriesItsGuid()
     CHECK(aimed);
 }
 
+// ---- Supplies (layout 15, supply_policy.h) ----
+// A bot short of ammunition, food or drink walks to a vendor that sells it, buys there, backs off when a trip bought nothing, and eats or drinks
+// while it rests.
+BotPolicy SupplyPolicy(std::uint32_t classId = 0)
+{
+    PolicyOptions options;
+    options.ClassId = classId;
+    options.WanderWhenIdle = false; // an idle bot would take an exploring walk; these tests look at trips, rests and eating
+    options.Supplies.Enabled = true;
+    return BotPolicy(options);
+}
+
+// A hunter at the origin with ammunition running low, 500 copper and room in the bags. The ammunition vendor stands at x = 100, an ordinary vendor on
+// the other side at x = -50.
+WorldTickSnapshotView ShopperView(std::uint32_t ammo, std::uint32_t food = 20)
+{
+    WorldTickSnapshotView view = PartyView({ 10 });
+    BotSnapshot& bot = view.bots[0];
+    bot.level = 10;
+    bot.ammo_entry = 2512;
+    bot.ammo_count = ammo;
+    bot.food_count = food;
+    bot.copper = 500;
+    bot.bag_free_slots = 5;
+    bot.ammo_vendor_x = 100.0f;
+    bot.ammo_vendor_valid = 1;
+    bot.ammo_vendor_guid = MakeUnitRef(8, 4553, 31);
+    bot.vendor_x = -50.0f;
+    bot.vendor_valid = 1;
+    return view;
+}
+
+// A copy of the first action of this type for bot 10 (a pointer into the vector that Decide returned would dangle once the call ends).
+std::optional<BotAction> FindAction(std::vector<BotAction> const& actions, ActionType type)
+{
+    for (BotAction const& action : actions)
+        if (action.type == type && action.bot_guid == 10)
+            return action;
+    return std::nullopt;
+}
+
+void ShortOfAmmoWalksToTheAmmoVendor()
+{
+    BotPolicy policy = SupplyPolicy(3);
+    auto const actions = policy.Decide(ShopperView(10), 0);
+    std::optional<BotAction> walk = FindAction(actions, ActionType::kMoveTo);
+    CHECK(walk.has_value() && walk->dest_x == 100.0f); // the vendor that sells ammunition, not the nearer ordinary one
+    CHECK(!FindAction(actions, ActionType::kVendor).has_value());
+}
+
+void NoSuppliesTripWhenTheFeatureIsOff()
+{
+    PolicyOptions options;
+    options.ClassId = 3;
+    options.WanderWhenIdle = false;
+    BotPolicy policy(options);
+    auto const actions = policy.Decide(ShopperView(0), 0);
+    CHECK(!FindAction(actions, ActionType::kMoveTo).has_value() || FindAction(actions, ActionType::kMoveTo)->dest_x != 100.0f);
+    CHECK(!FindAction(actions, ActionType::kVendor).has_value());
+}
+
+void NoTripWithoutMoneyOrBagRoom()
+{
+    WorldTickSnapshotView poor = ShopperView(0);
+    poor.bots[0].copper = 3;
+    CHECK(!FindAction(SupplyPolicy(3).Decide(poor, 0), ActionType::kMoveTo).has_value());
+    WorldTickSnapshotView full = ShopperView(0);
+    full.bots[0].bag_free_slots = 0;
+    CHECK(!FindAction(SupplyPolicy(3).Decide(full, 0), ActionType::kMoveTo).has_value());
+}
+
+void BuysAmmoAtTheVendor()
+{
+    BotPolicy policy = SupplyPolicy(3);
+    WorldTickSnapshotView view = ShopperView(10);
+    view.bots[0].pos_x = 98.0f; // two yards from the ammunition vendor
+    auto const actions = policy.Decide(view, 0);
+    std::optional<BotAction> buy = FindAction(actions, ActionType::kVendor);
+    CHECK(buy.has_value());
+    if (buy)
+    {
+        CHECK((buy->spell_id & 8) != 0 && (buy->spell_id & 16) == 0 && (buy->spell_id & 32) == 0);
+        CHECK(buy->dest_x == 400.0f && buy->dest_y == 0.0f && buy->dest_z == 0.0f);
+        CHECK(buy->target_guid == MakeUnitRef(8, 4553, 31));
+        CHECK((buy->spell_id & 7) == 7); // sells, repairs and equips on the same visit
+    }
+}
+
+void AManaUserWithoutFoodOrDrinkBuysBoth()
+{
+    BotPolicy policy = SupplyPolicy(5);
+    WorldTickSnapshotView view = PartyView({ 10 });
+    BotSnapshot& bot = view.bots[0];
+    bot.level = 12;
+    bot.power_type = 0;
+    bot.max_power = 100;
+    bot.power = 100;
+    bot.copper = 200;
+    bot.bag_free_slots = 3;
+    bot.food_vendor_x = 3.0f;
+    bot.food_vendor_valid = 1;
+    bot.food_vendor_guid = MakeUnitRef(8, 1465, 12);
+    bot.food_count = 0;
+    bot.drink_count = 0;
+    auto const actions = policy.Decide(view, 0);
+    std::optional<BotAction> buy = FindAction(actions, ActionType::kVendor);
+    CHECK(buy.has_value());
+    if (buy)
+    {
+        CHECK((buy->spell_id & 16) != 0 && (buy->spell_id & 32) != 0 && (buy->spell_id & 8) == 0);
+        CHECK(buy->dest_y == 10.0f && buy->dest_z == 10.0f);
+        CHECK(buy->target_guid == MakeUnitRef(8, 1465, 12));
+    }
+    // A class without mana is not asked to buy drink.
+    BotPolicy warrior = SupplyPolicy(1);
+    WorldTickSnapshotView plain = view;
+    plain.bots[0].max_power = 0;
+    std::optional<BotAction> foodOnly = FindAction(warrior.Decide(plain, 0), ActionType::kVendor);
+    CHECK(foodOnly.has_value() && foodOnly->dest_y == 10.0f && foodOnly->dest_z == 0.0f && (foodOnly->spell_id & 32) == 0);
+}
+
+void AFailedTripBacksOffAndASuccessfulOneDoesNot()
+{
+    BotPolicy failing = SupplyPolicy(3);
+    WorldTickSnapshotView atVendor = ShopperView(10);
+    atVendor.bots[0].pos_x = 98.0f;
+    CHECK(FindAction(failing.Decide(atVendor, 0), ActionType::kVendor).has_value());
+    // The counts did not change by the time the trip is judged: it bought nothing, so the next trip waits the first back-off (10 minutes).
+    failing.Decide(atVendor, 8000);
+    CHECK(!FindAction(failing.Decide(atVendor, 200000), ActionType::kVendor).has_value());
+    CHECK(!FindAction(failing.Decide(atVendor, 400000), ActionType::kVendor).has_value());
+    CHECK(FindAction(failing.Decide(atVendor, 700000), ActionType::kVendor).has_value());
+
+    // A trip that bought ammunition: still short (below the low mark), so it goes again after the ordinary trip interval, not the back-off.
+    BotPolicy working = SupplyPolicy(3);
+    CHECK(FindAction(working.Decide(atVendor, 0), ActionType::kVendor).has_value());
+    WorldTickSnapshotView bought = atVendor;
+    bought.bots[0].ammo_count = 60;
+    working.Decide(bought, 8000);
+    CHECK(!FindAction(working.Decide(bought, 100000), ActionType::kVendor).has_value());   // inside the two-minute trip interval
+    CHECK(FindAction(working.Decide(bought, 130000), ActionType::kVendor).has_value());
+}
+
+void WornGearGoesToTheRepairmanBeforeTheSupplyVendor()
+{
+    BotPolicy policy = SupplyPolicy(3);
+    WorldTickSnapshotView view = ShopperView(10);
+    view.bots[0].repair_x = -200.0f;
+    view.bots[0].repair_valid = 1;
+    view.bots[0].durability_pct = 20;
+    std::optional<BotAction> walk = FindAction(AfterMount(policy, view, 0), ActionType::kMoveTo);
+    CHECK(walk.has_value() && walk->dest_x == -200.0f);
+}
+
+void PartyMembersAndHeldBotsDoNotShop()
+{
+    PolicyOptions options;
+    options.ClassOf = WarriorLeads;
+    options.PartySize = 5;
+    options.PartyCount = 1;
+    options.Supplies.Enabled = true;
+    options.WanderWhenIdle = false;
+    BotPolicy party(options);
+    // Bots 11 and 12: the warrior 12 leads, and the priest 11 follows it. The priest is short of ammunition (as a test would have it) but is
+    // a party member, so it does not go shopping; a lone bot with the same facts does (ShortOfAmmoWalksToTheAmmoVendor).
+    WorldTickSnapshotView view = PartyView({ 11, 12 });
+    BotSnapshot const shopper = ShopperView(0).bots[0];
+    for (BotSnapshot& bot : view.bots)
+    {
+        std::uint64_t const guid = bot.guid;
+        bot = shopper;
+        bot.guid = guid;
+    }
+    for (BotAction const& action : party.Decide(view, 0))
+        if (action.bot_guid == 11)
+            CHECK(!(action.type == ActionType::kMoveTo && action.dest_x == 100.0f) && action.type != ActionType::kVendor);
+}
+
+void ARestingHurtBotEatsAndDrinks()
+{
+    BotPolicy policy = SupplyPolicy();
+    WorldTickSnapshotView hurt = PartyView({ 10 });
+    hurt.bots[0].health = 400;
+    hurt.bots[0].food_count = 5;
+    auto const first = policy.Decide(hurt, 1000);
+    CHECK(FindAction(first, ActionType::kRest).has_value());
+    std::optional<BotAction> eat = FindAction(first, ActionType::kConsume);
+    CHECK(eat.has_value() && eat->spell_id == 1);
+    // Not again until the last piece has done its work.
+    CHECK(!FindAction(policy.Decide(hurt, 10000), ActionType::kConsume).has_value());
+    std::optional<BotAction> again = FindAction(policy.Decide(hurt, 30000), ActionType::kConsume);
+    CHECK(again.has_value() && again->spell_id == 1);
+
+    // Low mana: drink, which comes before food.
+    BotPolicy drinker = SupplyPolicy(5);
+    WorldTickSnapshotView dry = ManaView(20);
+    dry.bots[0].health = 400;
+    dry.bots[0].food_count = 5;
+    dry.bots[0].drink_count = 5;
+    std::optional<BotAction> drink = FindAction(drinker.Decide(dry, 1000), ActionType::kConsume);
+    CHECK(drink.has_value() && drink->spell_id == 2);
+
+    // Nothing carried: nothing to use.
+    BotPolicy empty = SupplyPolicy();
+    WorldTickSnapshotView bare = PartyView({ 10 });
+    bare.bots[0].health = 400;
+    CHECK(!FindAction(empty.Decide(bare, 1000), ActionType::kConsume).has_value());
+    // A refused use is not repeated at once.
+    BotPolicy refused = SupplyPolicy();
+    CHECK(FindAction(refused.Decide(hurt, 1000), ActionType::kConsume).has_value());
+    WorldTickSnapshotView no = hurt;
+    no.bots[0].last_action_sequence = 5;
+    no.bots[0].last_action_type = uint8_t(ActionType::kConsume);
+    no.bots[0].last_action_status = BotActionStatus::kRefused;
+    refused.Decide(no, 2000);
+    CHECK(!FindAction(refused.Decide(hurt, 60000), ActionType::kConsume).has_value());
+    CHECK(FindAction(refused.Decide(hurt, 130000), ActionType::kConsume).has_value());
+}
+
+void AHunterWithoutAmmunitionFightsInMelee()
+{
+    NearbyUnit const mob = Hostile(2, 20.0f, 100);
+    PolicyOptions options;
+    options.ClassId = 3;
+    options.WanderWhenIdle = false;
+
+    BotPolicy armed(options);
+    WorldTickSnapshotView withAmmo = HunterView(1, 1, { mob });
+    withAmmo.bots[0].ammo_entry = 2512;
+    withAmmo.bots[0].ammo_count = 50;
+    CHECK(HasCast(armed.Decide(withAmmo, 1000), 75));
+
+    BotPolicy empty(options);
+    WorldTickSnapshotView without = HunterView(1, 1, { mob });
+    without.bots[0].ammo_entry = 2512;
+    without.bots[0].ammo_count = 0;
+    CHECK(!HasCast(empty.Decide(without, 1000), 75)); // the core would refuse it
+    // A core that does not report ammunition (ammo_entry 0) is not second-guessed.
+    BotPolicy unknown(options);
+    WorldTickSnapshotView old = HunterView(1, 1, { mob });
+    CHECK(HasCast(unknown.Decide(old, 1000), 75));
+}
+
 int main()
 {
+    ShortOfAmmoWalksToTheAmmoVendor();
+    NoSuppliesTripWhenTheFeatureIsOff();
+    NoTripWithoutMoneyOrBagRoom();
+    BuysAmmoAtTheVendor();
+    AManaUserWithoutFoodOrDrinkBuysBoth();
+    AFailedTripBacksOffAndASuccessfulOneDoesNot();
+    WornGearGoesToTheRepairmanBeforeTheSupplyVendor();
+    PartyMembersAndHeldBotsDoNotShop();
+    ARestingHurtBotEatsAndDrinks();
+    AHunterWithoutAmmunitionFightsInMelee();
     AutoShotIsNotReissuedWhileActive();
     AutoShotIsReissuedAfterTheFightAndWhenRefused();
     AutoShotIsReissuedAfterMoving();

@@ -47,6 +47,11 @@ line to the module's stderr. A config reload updates the ramp, the random picks 
 | `RandomSeed` | 1 | Seed for the random picks |
 | `BotsInitial`, `BotsStep`, `BotsStepMinutes`, `BotsCap`, `BotsStopTime` | 300, 100, 15, 1500, 06:00 | The ramp: start count, bots added per step, minutes per step, the cap, and the local time it stops adding |
 | `ServiceEverySec` | 600 | Seconds between vendor visits for an idle bot (60 to 86400) |
+| `ChatSay`, `ChatSayMax` | 0 (off), 3 | A bot that takes a chat order answers with a short /say line (0 to 50 bots speak for one order; a whispered bot always answers) |
+| `Supplies` | 0 (off) | Bots buy ammunition, food and drink at vendors that sell what they can use, and eat and drink while resting (needs `Bot.Actions.Supplies` in the core) |
+| `SupplyAmmoLow`, `SupplyAmmoTarget` | 100, 400 | A bot with fewer pieces of ammunition goes shopping, and buys up to the target |
+| `SupplyFoodLow`, `SupplyFoodTarget`, `SupplyDrinkLow`, `SupplyDrinkTarget` | 3, 10, 3, 10 | The same for food, and for drink (bots with mana) |
+| `SupplyTripSec` | 120 | A bot that needs supplies makes a trip at most this often (30 to 3600); a trip that bought nothing waits 10 minutes, doubling each time (an hour at most) |
 | `QuestTeleport` | 0 | A quest walk stuck for two minutes teleports to its giver (needs `Bot.Actions.Teleport = 1`); 0 drops the start and grinds instead |
 | `TrainEverySec` | 0 (off) | Seconds between trainer checks, also after a level-up (0, or 60 to 86400) |
 | `PartySize`, `PartyCount` | 0 (off), 1 | Bots per party (at most 5) and number of parties |
@@ -190,6 +195,15 @@ the core). `ChatControl = 1` adds the control panel: `role tank|healer|dps|auto`
 target is attacked first in a fight), `distance <yards>|default` (how far from you a following bot stops). Only the bots of the speaker's own group obey;
 other chat is ignored. The core forwards only a group leader's lines in a group with a bot, and whispers to a bot (hook `PlayerScript.OnChat`).
 A bot accepts a party invite from a player when `ChatCommands = 1`, so the player invites bots with the normal /invite and then commands them.
+With `ChatSay = 1` a bot that takes an order says a short line out loud (`On my way.`, `Holding here.`), at most `ChatSayMax` bots per order so a big group does not
+drown the chat; a bot you whisper always answers. Refused orders and `status` (which already whispers) get no line.
+
+**Supplies.** With `Supplies = 1` the core tells the module what each bot carries (ammunition for its ranged weapon, food, drink) and where the nearest vendor is
+that sells what the bot can use. A bot with fewer than `SupplyAmmoLow` pieces of ammunition (a hunter, or anyone with a bow, crossbow or gun), or fewer than
+`SupplyFoodLow` food or `SupplyDrinkLow` drink, and with some money and a free bag slot, walks to that vendor when it is idle and buys up to the target; the core chooses
+the items from the vendor's stock (ammunition of the right kind, the best food or drink the bot may use at its level). Worn gear (the repairman) comes first. A trip is
+judged a few seconds after the purchase: if the bot carries no more than before, the next trip waits 10 minutes, doubling per failure in a row. A resting bot below 70%
+health eats, one below 40% mana drinks (`kConsume`). A hunter that carries no ammunition does not shoot (the core would refuse it) and fights in melee until it has some.
 More dot commands (they need the module-command permission): `.bots spawn <race id> <class id> [level]`, `.bots list`, and alts: `.bots alt add <name>`
 logs a character of your own account in as a bot (the core needs `Bot.Alt.Enabled = 1`; you must be playing another character, the alt must be
 offline), `.bots alt remove <name>` logs it out, `.bots alt list`. An alt is your own character: it gets no auto gear, no equip service and no free

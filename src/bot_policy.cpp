@@ -41,6 +41,10 @@ constexpr std::uint64_t kRendDurationMs = 21000;
 constexpr std::uint32_t kServiceSell = 1;
 constexpr std::uint32_t kServiceRepair = 2;
 constexpr std::uint32_t kServiceEquip = 4;
+constexpr std::uint32_t kServiceBuyAmmo = 8;     // layout 15: buy ammunition (dest_x = the count to carry), food (dest_y), drink (dest_z)
+constexpr std::uint32_t kServiceBuyFood = 16;
+constexpr std::uint32_t kServiceBuyDrink = 32;
+constexpr std::uint64_t kSupplyJudgeAfterMs = 7000; // a supply trip is judged this long after the buy: the core counts the bags every 2 seconds
 // Combo points: the rogue's Sinister Strike spell and the spend, and the points a finisher needs.
 constexpr std::uint32_t kSinisterStrike = 1752;
 constexpr std::uint32_t kEviscerate = 2098;
@@ -456,6 +460,28 @@ std::uint32_t ClassFor(PolicyOptions const& options, std::uint64_t guid)
     return options.ClassId;
 }
 
+// A hunter whose ranged weapon uses ammunition and who carries none (layout 15: the core fills ammo_entry and ammo_count).
+bool NoAmmo(BotSnapshot const& bot, std::uint32_t classId)
+{
+    return classId == kHunterClass && bot.ammo_entry != 0 && bot.ammo_count == 0;
+}
+
+// The snapshot facts the supply logic reads (supply_policy.h).
+supply::Facts FactsOf(BotSnapshot const& bot)
+{
+    supply::Facts facts;
+    facts.AmmoEntry = bot.ammo_entry;
+    facts.AmmoCount = bot.ammo_count;
+    facts.FoodCount = bot.food_count;
+    facts.DrinkCount = bot.drink_count;
+    facts.ManaUser = bot.power_type == 0 && bot.max_power > 0;
+    facts.Copper = bot.copper;
+    facts.FreeSlots = bot.bag_free_slots;
+    facts.AmmoVendor = bot.ammo_vendor_valid != 0;
+    facts.FoodVendor = bot.food_vendor_valid != 0;
+    return facts;
+}
+
 } // namespace
 
 char const* ActionStatusName(BotActionStatus status)
@@ -508,6 +534,15 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
     {
         state.Sitting = false;
         state.RestRetryAtMs = nowMs + kRetryMs;
+        return;
+    }
+
+    // Eating or drinking refused: busy or moving is a short wait, anything else (nothing to eat, supplies off in the core) a long one.
+    if (bot.last_action_type == uint8_t(ActionType::kConsume) && bot.last_action_status != BotActionStatus::kApplied &&
+        bot.last_action_status != BotActionStatus::kNone)
+    {
+        bool const brief = bot.last_action_status == BotActionStatus::kBusy || bot.last_action_status == BotActionStatus::kMoving;
+        state.NextConsumeMs = nowMs + (brief ? 8000 : 120000);
         return;
     }
 
@@ -766,9 +801,10 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
 }
 
 std::vector<std::string> BotPolicy::ApplyChat(WorldTickSnapshotView const& view, ChatContext const& chat, ChatCommand const& command,
-                                               std::uint64_t nowMs)
+                                               std::uint64_t nowMs, std::vector<ChatAck>* acks)
 {
     std::vector<std::string> lines;
+    std::vector<std::uint64_t> accepted; // the bots that took the order, for the say-back
     std::uint64_t const issuerRef = PlayerRef(chat.Issuer);
     std::uint32_t matched = 0, refused = 0, index = 0;
     char const* refusal = "";
@@ -782,6 +818,7 @@ std::vector<std::string> BotPolicy::ApplyChat(WorldTickSnapshotView const& view,
             continue;
         ++matched;
         BotState& state = _bots[bot.guid];
+        std::uint32_t const refusedBefore = refused;
         auto const refuse = [&](char const* why)
         {
             ++refused;
@@ -952,7 +989,15 @@ std::vector<std::string> BotPolicy::ApplyChat(WorldTickSnapshotView const& view,
             case ChatVerb::None:
                 break;
         }
+        if (refused == refusedBefore)
+            accepted.push_back(bot.guid);
         ++index;
+    }
+    if (acks && chat.Say)
+    {
+        for (std::uint64_t const guid : PickSpeakers(accepted, command.Verb, chat.Recipient != 0, chat.SayMax))
+            if (std::string text = AckLine(command.Verb, guid); !text.empty())
+                acks->push_back({ guid, std::move(text) });
     }
     if (matched == 0)
         lines.push_back("No bot of your group matched.");
@@ -1724,7 +1769,8 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             }
             // A ranged bot that has run out of power closes to melee range: its spells are spent.
             bool const outOfPower = bot.max_power > 0 && std::uint64_t(bot.power) * 100 < std::uint64_t(bot.max_power) * kOutOfPowerPct;
-            float approach = outOfPower ? kMeleeApproachYards : rotation::ApproachYards(classId);
+            // A hunter with no ammunition cannot shoot (the core refuses every ranged attack): it closes to melee range as well.
+            float approach = outOfPower || NoAmmo(bot, classId) ? kMeleeApproachYards : rotation::ApproachYards(classId);
             if (nowMs < state.CloserUntilMs)
                 approach = std::min(approach, kMeleeApproachYards + 1.0f);
             if (nowMs < state.RangeCloserUntilMs)
@@ -1953,14 +1999,49 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         // kTravelTimeoutMs is dropped and the visit waits for its next interval. A walking bot is not idle, so it neither
         // sits nor trains on the way.
         bool const urgentService = state.ServiceUrgent && !hasTarget && bot.in_combat == 0 && !lowHealth && !state.InFight;
-        if ((idle || urgentService) && _options.ServiceEveryMs != 0 && nowMs >= state.NextServiceMs && !state.ChatStay)
+
+        // Supplies (layout 15, supply_policy.h). A trip made earlier is judged once the core has counted again: more pieces than before is a
+        // success; otherwise the vendor had nothing the bot could buy (or the bot never reached it) and the next trip waits longer.
+        supply::Facts const supplyFacts = FactsOf(bot);
+        if (state.SupplyCheckAtMs != 0 && nowMs >= state.SupplyCheckAtMs)
+        {
+            state.SupplyCheckAtMs = 0;
+            bool const improved = supply::Improved(state.SupplyAsked, state.SupplyBefore, supplyFacts);
+            state.SupplyFailures = improved ? 0 : state.SupplyFailures + 1;
+            if (!improved)
+                state.NextSupplyMs = nowMs + supply::BackoffMs(_options.Supplies, state.SupplyFailures);
+            if (_options.OnEvent)
+                _options.OnEvent(std::string(improved ? "supply_trip_done" : "supply_trip_failed") + ": bot=" + std::to_string(bot.guid) +
+                                 " ammo=" + std::to_string(supplyFacts.AmmoCount) + " food=" + std::to_string(supplyFacts.FoodCount) +
+                                 " drink=" + std::to_string(supplyFacts.DrinkCount) + " failures=" + std::to_string(state.SupplyFailures));
+        }
+        // A party member follows its leader, and a bot held by a chat order stays where it was told: neither goes shopping.
+        supply::Needs const supplyNeeds = (partyMember || state.ChatStay || state.ChatFollow != 0) ? supply::Needs{}
+                                                                                                    : supply::Assess(_options.Supplies, supplyFacts);
+        supply::Stop const supplyStop = supply::NextStop(supplyNeeds);
+        bool const supplyDue = supplyStop != supply::Stop::None && nowMs >= state.NextSupplyMs && state.SupplyCheckAtMs == 0;
+        bool const serviceDue = _options.ServiceEveryMs != 0 && nowMs >= state.NextServiceMs;
+        bool const shopping = (idle || urgentService) && !state.ChatStay && (serviceDue || supplyDue);
+        if (!shopping && state.Traveling)
+            state.Traveling = false; // a walk to a vendor cut short (a fight, an order) starts its timer again next time
+
+        // Services and travel (M6). An idle bot due a vendor visit walks to the nearest vendor on its map, unless it is a
+        // party member (it follows its leader). The visit is sent once the bot is in reach. A walk longer than
+        // kTravelTimeoutMs is dropped and the visit waits for its next interval. A walking bot is not idle, so it neither
+        // sits nor trains on the way. A bot short of ammunition, food or drink walks to a vendor that sells it instead (supplies).
+        if (shopping)
         {
             // The nearest vendor on the bot's map, found by the core (layout 6); the nearest repairman instead when the gear is worn
             // (layout 9). None on the map, or a party member: no walk.
             bool const needRepair = bot.repair_valid != 0 && bot.durability_pct < kRepairBelowPct;
-            Point const vendor = needRepair ? Point{ bot.repair_x, bot.repair_y, bot.repair_z }
-                                            : Point{ bot.vendor_x, bot.vendor_y, bot.vendor_z };
-            bool const vendorExists = needRepair || bot.vendor_valid != 0;
+            // Worn gear first: the repairman is the stop then, and the supplies wait for the next trip (a few minutes).
+            bool const supplyStopNow = supplyDue && !needRepair;
+            bool const ammoStop = supplyStopNow && supplyStop == supply::Stop::Ammo;
+            Point const vendor = supplyStopNow ? (ammoStop ? Point{ bot.ammo_vendor_x, bot.ammo_vendor_y, bot.ammo_vendor_z }
+                                                           : Point{ bot.food_vendor_x, bot.food_vendor_y, bot.food_vendor_z })
+                                 : needRepair  ? Point{ bot.repair_x, bot.repair_y, bot.repair_z }
+                                               : Point{ bot.vendor_x, bot.vendor_y, bot.vendor_z };
+            bool const vendorExists = supplyStopNow || needRepair || bot.vendor_valid != 0;
             bool const hasVendor = !partyMember && vendorExists;
             bool const inReach = vendorExists && DistanceTo(bot, vendor) <= kVendorReachYards;
             if (hasVendor && !inReach)
@@ -1969,6 +2050,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 {
                     state.Traveling = true;
                     state.TravelStartMs = nowMs;
+                    state.SupplyTrip = supplyStopNow;
                 }
                 if (nowMs - state.TravelStartMs <= kTravelTimeoutMs)
                 {
@@ -1979,7 +2061,14 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 {
                     state.Traveling = false;
                     state.ServiceUrgent = false;
-                    state.NextServiceMs = nowMs + _options.ServiceEveryMs;
+                    if (state.SupplyTrip)
+                    {
+                        // The walk never got there: a trip that bought nothing.
+                        state.SupplyTrip = false;
+                        state.NextSupplyMs = nowMs + supply::BackoffMs(_options.Supplies, ++state.SupplyFailures);
+                    }
+                    else
+                        state.NextServiceMs = nowMs + _options.ServiceEveryMs;
                 }
             }
             else if (inReach || !vendorExists)
@@ -1990,6 +2079,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 // bot, and PublishActions drops the whole tick when the list runs over) and pushed the next visit a whole ServiceEveryMs
                 // out. At the 1500-bot ceiling that is 1200 refused actions on one tick, over the budget the core granted.
                 state.Traveling = false;
+                state.SupplyTrip = false;
                 if (state.ServiceUrgent)
                 {
                     state.ServiceUrgent = false;
@@ -2002,8 +2092,32 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 // Layout 13: the NPC's guid, not just its position. An older core leaves it 0 and the core resolves the
                 // nearest vendor of the map instead.
                 vendor.target_guid = needRepair ? bot.repair_guid : bot.vendor_guid;
+                if (supplyStopNow)
+                {
+                    // Layout 15: buy what is short. The core picks the items from this vendor's stock and buys up to the counts given here.
+                    supply::Request const request = supply::RequestFor(_options.Supplies, supplyNeeds);
+                    vendor.target_guid = ammoStop ? bot.ammo_vendor_guid : bot.food_vendor_guid;
+                    if (request.Ammo != 0)
+                        vendor.spell_id |= kServiceBuyAmmo;
+                    if (request.Food != 0)
+                        vendor.spell_id |= kServiceBuyFood;
+                    if (request.Drink != 0)
+                        vendor.spell_id |= kServiceBuyDrink;
+                    vendor.dest_x = float(request.Ammo);
+                    vendor.dest_y = float(request.Food);
+                    vendor.dest_z = float(request.Drink);
+                    state.NextSupplyMs = nowMs + _options.Supplies.TripEveryMs;
+                    state.SupplyCheckAtMs = nowMs + kSupplyJudgeAfterMs;
+                    state.SupplyAsked = supplyNeeds;
+                    state.SupplyBefore = supplyFacts;
+                    if (_options.OnEvent)
+                        _options.OnEvent("supply_trip: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " ammo=" +
+                                         std::to_string(supplyFacts.AmmoCount) + " food=" + std::to_string(supplyFacts.FoodCount) + " drink=" +
+                                         std::to_string(supplyFacts.DrinkCount) + " copper=" + std::to_string(bot.copper));
+                }
                 actions.push_back(vendor);
-                state.NextServiceMs = nowMs + _options.ServiceEveryMs;
+                if (!supplyStopNow || serviceDue)
+                    state.NextServiceMs = nowMs + _options.ServiceEveryMs;
             }
         }
 
@@ -2199,6 +2313,23 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             rest.spell_id = sitWanted ? 1 : 0;
             actions.push_back(rest);
             state.Sitting = sitWanted;
+        }
+
+        // Eat or drink while resting (layout 15): a bot sat down because it is hurt or low on mana uses food or drink it carries, which restores
+        // far faster than sitting alone. Not while moving or fighting, and not again until the last piece has done its work.
+        if (_options.Supplies.Enabled && state.Sitting && sitWanted && bot.moving == 0 && bot.in_combat == 0 && nowMs >= state.NextConsumeMs)
+        {
+            std::uint32_t const healthPct = bot.max_health > 0 ? std::uint32_t(std::uint64_t(bot.health) * 100 / bot.max_health) : 100;
+            std::uint32_t const manaPct = manaUser && bot.max_power > 0 ? std::uint32_t(std::uint64_t(bot.power) * 100 / bot.max_power) : 100;
+            if (std::uint32_t const what = supply::ConsumeNow(_options.Supplies, supplyFacts, healthPct, manaPct))
+            {
+                BotAction eat;
+                eat.bot_guid = bot.guid;
+                eat.type = ActionType::kConsume;
+                eat.spell_id = what;
+                actions.push_back(eat);
+                state.NextConsumeMs = nowMs + _options.Supplies.ConsumeEveryMs;
+            }
         }
 
         bool const levelUp = bot.level != 0 && bot.level != state.LastTrainLevel;
@@ -2739,6 +2870,8 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 continue; // upkeep spells are cast out of combat, below
             if (row.Spell == kAutoShot && state.AutoShotTarget == targetRef)
                 continue; // already shooting this target
+            if (row.OnTarget && row.MaxRange > kMeleeApproachYards + 1.0f && NoAmmo(bot, classId))
+                continue; // a ranged attack of a hunter with no ammunition: refused by the core, so only the melee rows are used
             if (row.MaxLevel != 0 && bot.level > row.MaxLevel)
                 continue; // a better spell has replaced it
             // Not learned yet: below the level a trainer teaches it (the rotation file's level, else the built-in table). (A level of 0 is unknown.)

@@ -40,6 +40,29 @@ void ChatSettings()
     CHECK(on.ChatCommands && on.ChatOrders && on.ChatControl && on.QuestTeleport && warnings.empty());
 }
 
+void SayAndSupplySettings()
+{
+    std::vector<std::string> warnings;
+    BotSettings const off = ParseBotSettings({}, warnings);
+    CHECK(!off.ChatSay && off.ChatSayMax == 3 && !off.Supplies.Enabled); // off by default
+    CHECK(off.Supplies.AmmoLow == 100 && off.Supplies.AmmoTarget == 400 && off.Supplies.FoodTarget == 10 && off.Supplies.TripEveryMs == 120000);
+    CHECK(warnings.empty());
+
+    BotSettings const on = ParseBotSettings({ { "ChatSay", "1" }, { "ChatSayMax", "5" }, { "Supplies", "1" }, { "SupplyAmmoLow", "50" },
+                                              { "SupplyAmmoTarget", "300" }, { "SupplyFoodLow", "2" }, { "SupplyFoodTarget", "15" },
+                                              { "SupplyDrinkLow", "4" }, { "SupplyDrinkTarget", "20" }, { "SupplyTripSec", "300" } }, warnings);
+    CHECK(on.ChatSay && on.ChatSayMax == 5 && on.Supplies.Enabled);
+    CHECK(on.Supplies.AmmoLow == 50 && on.Supplies.AmmoTarget == 300 && on.Supplies.FoodLow == 2 && on.Supplies.FoodTarget == 15);
+    CHECK(on.Supplies.DrinkLow == 4 && on.Supplies.DrinkTarget == 20 && on.Supplies.TripEveryMs == 300000);
+    CHECK(warnings.empty());
+
+    // A target below its low mark is raised to it; a value out of range falls back with a warning.
+    warnings.clear();
+    BotSettings const odd = ParseBotSettings({ { "SupplyAmmoLow", "500" }, { "SupplyAmmoTarget", "100" }, { "ChatSayMax", "999" } }, warnings);
+    CHECK(odd.Supplies.AmmoLow == 500 && odd.Supplies.AmmoTarget == 500);
+    CHECK(odd.ChatSayMax == 3 && warnings.size() == 1);
+}
+
 void MaxBotsIsCapped()
 {
     std::vector<std::string> warnings;
@@ -192,6 +215,7 @@ void WipeRecoverySettings()
 int main()
 {
     ChatSettings();
+    SayAndSupplySettings();
     DefaultsWhenEmpty();
     TelemetrySettings();
     ReadsValidValues();

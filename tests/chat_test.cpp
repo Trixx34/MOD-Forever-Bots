@@ -618,8 +618,69 @@ void UnreachableHubsAreGivenUpForExploring()
 
 } // namespace
 
+// Say-back (chat_say.h): the bots that took an order answer out loud, at most SayMax of them, and only when Say is on.
+void BotsAnswerAnOrderOutLoudUpToTheCap()
+{
+    BotPolicy policy = Policy();
+    WorldTickSnapshotView view = Group();
+
+    // Off: nothing is said, whatever the cap.
+    {
+        std::vector<ChatAck> acks;
+        BotPolicy::ChatContext quiet = Ctx();
+        quiet.Say = false;
+        quiet.SayMax = 5;
+        policy.ApplyChat(view, quiet, *ParseChatCommand("follow", false), 1000, &acks);
+        CHECK(acks.empty());
+    }
+    // On, cap 2: two of the five bots answer, each with a line, and they are bots of the group.
+    {
+        std::vector<ChatAck> acks;
+        BotPolicy::ChatContext loud = Ctx();
+        loud.Say = true;
+        loud.SayMax = 2;
+        policy.ApplyChat(view, loud, *ParseChatCommand("follow", false), 1000, &acks);
+        CHECK(acks.size() == 2);
+        for (ChatAck const& ack : acks)
+            CHECK(ack.Bot >= 10 && ack.Bot <= 14 && !ack.Text.empty());
+    }
+    // A selector limits who can answer.
+    {
+        std::vector<ChatAck> acks;
+        BotPolicy::ChatContext loud = Ctx();
+        loud.Say = true;
+        loud.SayMax = 10;
+        policy.ApplyChat(view, loud, *ParseChatCommand("healer follow", false), 1000, &acks);
+        CHECK(acks.size() == 2); // the two healers of the group (bots 11 and 14)
+        for (ChatAck const& ack : acks)
+            CHECK(ack.Bot == 11 || ack.Bot == 14);
+    }
+    // A whisper to one bot is answered by that bot, even with a cap of 0.
+    {
+        std::vector<ChatAck> acks;
+        BotPolicy::ChatContext whisper = Ctx();
+        whisper.Say = true;
+        whisper.SayMax = 0;
+        whisper.Recipient = 12;
+        policy.ApplyChat(view, whisper, *ParseChatCommand("stay", false), 1000, &acks);
+        CHECK(acks.size() == 1 && acks[0].Bot == 12);
+    }
+    // Status already whispers its answer: no /say. A refused order is not acknowledged.
+    {
+        std::vector<ChatAck> acks;
+        BotPolicy::ChatContext loud = Ctx();
+        loud.Say = true;
+        loud.SayMax = 10;
+        policy.ApplyChat(view, loud, *ParseChatCommand("status", false), 1000, &acks);
+        CHECK(acks.empty());
+        policy.ApplyChat(view, loud, *ParseChatCommand("release", false), 1000, &acks); // nobody is dead
+        CHECK(acks.empty());
+    }
+}
+
 int main()
 {
+    BotsAnswerAnOrderOutLoudUpToTheCap();
     ParsesBasicVerbs();
     OrdersNeedTheSwitch();
     OrdinaryChatIsNotACommand();

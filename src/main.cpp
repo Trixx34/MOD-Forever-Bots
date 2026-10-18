@@ -80,6 +80,8 @@ char const* ActionTypeName(std::uint8_t type)
         case forever_module::ActionType::kReleaseSpirit: return "release";
         case forever_module::ActionType::kResurrect: return "resurrect";
         case forever_module::ActionType::kReclaimCorpse: return "reclaim";
+        case forever_module::ActionType::kConsume: return "consume";
+        default: break;
     }
     return "action";
 }
@@ -216,6 +218,7 @@ struct CommandQueue
     };
     std::vector<ChatItem> Chat;
     std::vector<std::pair<std::uint64_t, std::string>> Replies; // speaker character guid, text
+    std::vector<ChatAck> Says;                                  // lines a bot says out loud for an order it took (ChatSay)
 };
 
 // The words from index `from` on, joined with single spaces: a character name can have a last name ("Tinky Winky").
@@ -431,10 +434,14 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
                 }
                 for (CommandQueue::ChatItem const& item : chat)
                 {
-                    std::vector<std::string> const lines = policy.ApplyChat(view, item.Context, item.Command, nowMs());
+                    std::vector<ChatAck> acks;
+                    std::vector<std::string> const lines = policy.ApplyChat(view, item.Context, item.Command, nowMs(), &acks);
                     std::lock_guard<std::mutex> lock(extras.Commands->Lock);
                     for (std::string const& line : lines)
                         extras.Commands->Replies.emplace_back(item.Context.Issuer, line);
+                    for (ChatAck& ack : acks)
+                        if (extras.Commands->Says.size() < 64)
+                            extras.Commands->Says.push_back(std::move(ack));
                 }
             }
             if (director)
@@ -895,6 +902,8 @@ int main(int argc, char** argv)
         item.Context.MapId = chat.map_id();
         item.Context.Pos = Point{ chat.pos_x(), chat.pos_y(), chat.pos_z() };
         item.Context.TargetRef = chat.target_ref();
+        item.Context.Say = settings.ChatSay;
+        item.Context.SayMax = settings.ChatSayMax;
         std::lock_guard<std::mutex> lock(commands->Lock);
         if (commands->Chat.size() < 64)
             commands->Chat.push_back(std::move(item));
@@ -903,12 +912,16 @@ int main(int argc, char** argv)
     client.AddTimer(std::chrono::milliseconds(500), [commands, &client]
     {
         std::vector<std::pair<std::uint64_t, std::string>> replies;
+        std::vector<ChatAck> says;
         {
             std::lock_guard<std::mutex> lock(commands->Lock);
             replies.swap(commands->Replies);
+            says.swap(commands->Says);
         }
         for (auto const& [player, text] : replies)
             client.SendPlayerMessage(player, text);
+        for (ChatAck const& say : says)
+            client.BotSpeak(say.Bot, forever_module::ModuleClient::SpeakKind::kSay, 0, say.Text);
     });
 
     // Bots from last run are rows in the module store (bot/<guid>). Each row's value is "race class", read before the
@@ -977,6 +990,7 @@ int main(int argc, char** argv)
     policyOptions.ClassId = settings.Class;
     policyOptions.ServiceEveryMs = std::uint64_t(settings.ServiceEverySec) * 1000;
     policyOptions.TrainEveryMs = std::uint64_t(settings.TrainEverySec) * 1000;
+    policyOptions.Supplies = settings.Supplies;
     policyOptions.PartySize = settings.PartySize;
     policyOptions.PartyCount = settings.PartyCount;
     for (auto const& [mapId, spots] : settings.Hubs)
