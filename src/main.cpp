@@ -14,6 +14,7 @@
 #include "bot_settings.h"
 #include "bot_presence.h"
 #include "auction_policy.h"
+#include "sell_policy.h"
 #include "bot_store.h"
 #include "bot_live.h"
 #include "bot_telemetry.h"
@@ -76,6 +77,10 @@ constexpr std::size_t kAuctionItemsPerBot = 200;    // looted items kept per bot
 constexpr std::uint32_t kItemClassWeapon = 2;       // ITEM_CLASS_WEAPON
 constexpr std::uint32_t kItemClassArmor = 4;        // ITEM_CLASS_ARMOR
 constexpr std::uint32_t kItemClassQuest = 12;       // ITEM_CLASS_QUEST
+
+// Vendor sales (sell_policy.h, doc/economy.md): the white items a bot loots are kept for its next vendor visit, and a bot sells from a vendor in reach.
+constexpr std::size_t kSellItemsPerBot = 200;       // looted white items kept per bot for selling
+constexpr float kSellReachYards = 4.0f;             // a bot this close to its vendor can sell to it (the core allows 5)
 
 char const* ActionTypeName(std::uint8_t type)
 {
@@ -315,11 +320,84 @@ auction::Candidate CandidateOf(forever_module::PlayerItemLootedEvent const& even
     return item;
 }
 
+// The vendor sales, used on the Run() thread only: what each bot has looted that it may sell, and the sales its visit still has to make.
+struct SellBook
+{
+    std::unordered_map<std::uint64_t, std::unordered_map<std::uint64_t, sell::Item>> Items; // bot -> item guid -> what it looted
+    std::unordered_map<std::uint64_t, std::vector<sell::Sale>> Pending;                     // bot -> sales of the visit under way
+    std::unordered_map<std::uint64_t, std::uint64_t> LastVisitMs;                           // bot -> when it last visited a vendor to sell
+};
+
+// The loot event as a sale candidate.
+sell::Item SellItemOf(forever_module::PlayerItemLootedEvent const& event)
+{
+    sell::Item item;
+    item.Entry = event.item_entry();
+    item.Count = event.count() ? event.count() : 1;
+    item.Quality = static_cast<std::uint8_t>(event.quality());
+    item.VendorSellCopper = event.sell_price();
+    item.QuestItem = event.item_class() == kItemClassQuest;
+    item.Equipment = event.item_class() == kItemClassWeapon || event.item_class() == kItemClassArmor;
+    return item;
+}
+
+// Vendor sales (sell policy): an ordinary bot that stands in reach of a vendor, alive, out of combat and with no other action this tick sells the next
+// item of its visit. One sale a bot a tick, and never past the actions the core granted: PublishActions drops the whole tick when the list runs over.
+void AppendSales(SellBook& book, BotSettings const& settings, forever_module::WorldTickSnapshotView const& view,
+                 std::vector<forever_module::BotAction>& actions, std::uint32_t maxActions, std::uint64_t now, std::shared_ptr<AltRegistry> const& alts)
+{
+    std::unordered_set<std::uint64_t> busy;
+    for (forever_module::BotAction const& action : actions)
+        busy.insert(action.bot_guid);
+    for (forever_module::BotSnapshot const& bot : view.bots)
+    {
+        if (actions.size() >= maxActions)
+            return;
+        if (busy.count(bot.guid) || bot.group_role != 0 || (alts && alts->Has(bot.guid)) || bot.life_state != 0 || bot.in_combat != 0 ||
+            bot.vendor_valid == 0 || bot.vendor_guid == 0)
+            continue;
+        float const dx = bot.pos_x - bot.vendor_x;
+        float const dy = bot.pos_y - bot.vendor_y;
+        if (dx * dx + dy * dy > kSellReachYards * kSellReachYards)
+            continue;
+
+        std::vector<sell::Sale>& pending = book.Pending[bot.guid];
+        if (pending.empty())
+        {
+            std::vector<sell::Item> items;
+            for (auto const& [itemGuid, item] : book.Items[bot.guid])
+                items.push_back(item);
+            if (!sell::VisitDue(settings.Sell, !items.empty(), book.LastVisitMs[bot.guid], now))
+                continue;
+            book.LastVisitMs[bot.guid] = now;
+            pending = sell::PlanSales(settings.Sell, items);
+            if (pending.empty())
+                continue;
+        }
+        sell::Sale const sale = pending.front();
+        pending.erase(pending.begin());
+
+        forever_module::BotAction action;
+        action.bot_guid = bot.guid;
+        action.type = forever_module::ActionType::kSellToVendor;
+        action.spell_id = sale.Entry;
+        action.dest_x = 0.0f;                   // 0 = every one the bot carries of it
+        action.target_guid = bot.vendor_guid;
+        actions.push_back(action);
+
+        // Taken as sold: the core refuses a sale it cannot make (the item is gone, or the vendor will not take it), and then only the entry is lost.
+        auto& items = book.Items[bot.guid];
+        for (auto it = items.begin(); it != items.end();)
+            it = it->second.Entry == sale.Entry ? items.erase(it) : std::next(it);
+    }
+}
+
 // What the pump needs beyond the policy: the scenario (if one is configured) and the command queue.
 struct PumpExtras
 {
     std::shared_ptr<PresenceFeed> Presence;   // set when Presence is on
     std::shared_ptr<AuctionFeed> Auction;     // set when Auction is on
+    std::shared_ptr<SellBook> Sell;           // set when vendor sales are on
     std::shared_ptr<AltRegistry> Alts;
     std::optional<ScenarioPlan> Scenario;
     std::string ScenarioResultFile;
@@ -592,6 +670,8 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
             ++ticks;
             decideTotalUs += decideUs;
             decideMaxUs = std::max(decideMaxUs, decideUs);
+            if (extras.Sell)
+                AppendSales(*extras.Sell, settings, view, actions, session.MaxActions(), nowMs(), extras.Alts);
             actionsTotal += actions.size();
             lastBotCount = view.bots.size();
 
@@ -1243,16 +1323,31 @@ int main(int argc, char** argv)
         std::cerr << "forever-bots: presence is on: sessions " << settings.Presence.OnlineMinMin << " to " << settings.Presence.OnlineMaxMin
                   << " min, away " << settings.Presence.OfflineMinMin << " to " << settings.Presence.OfflineMaxMin << " min\n";
     }
-    if (settings.Auction.Enabled && !scenarioOn)
+    // Loot of the bots, kept as listing candidates for the Auction House (green or better, not equipment, not a quest item) and as sale candidates
+    // for the vendors (white, not equipment, not a quest item). One handler for both: the client keeps one handler per hook.
+    auto book = std::make_shared<AuctionBook>();
+    auto sells = std::make_shared<SellBook>();
+    if ((settings.Auction.Enabled || settings.Sell.Enabled) && !scenarioOn)
     {
-        // Loot of the bots, kept as listing candidates (only the items a bot may list: green or better, not equipment, not a quest item).
-        auto book = std::make_shared<AuctionBook>();
-        client.OnNotify("PlayerScript.OnLootItem", [&run, book](forever_module::EventNotify const& notify)
+        client.OnNotify("PlayerScript.OnLootItem", [&run, &settings, book, sells](forever_module::EventNotify const& notify)
         {
             if (notify.event_payload_case() != forever_module::EventNotify::kPlayerItemLooted)
                 return;
             forever_module::PlayerItemLootedEvent const& event = notify.player_item_looted();
-            if (!run.Roster.Owned().count(event.player_guid()) || event.quality() < auction::kUncommon)
+            if (!run.Roster.Owned().count(event.player_guid()))
+                return;
+            if (settings.Sell.Enabled)
+            {
+                sell::Item const sold = SellItemOf(event);
+                if (sell::Sellable(sold))
+                {
+                    auto& items = sells->Items[event.player_guid()];
+                    if (items.size() >= kSellItemsPerBot)
+                        items.erase(items.begin());
+                    items[event.item_guid()] = sold;
+                }
+            }
+            if (!settings.Auction.Enabled || event.quality() < auction::kUncommon)
                 return;
             auction::Candidate const item = CandidateOf(event);
             if (item.Needed || item.QuestItem || item.ItemGuid == 0)
@@ -1262,7 +1357,15 @@ int main(int argc, char** argv)
                 items.erase(items.begin());
             items[item.ItemGuid] = item;
         });
-
+        if (settings.Sell.Enabled)
+        {
+            extras.Sell = sells;
+            std::cerr << "forever-bots: vendor sales are on: a sale visit every " << settings.Sell.EveryMs / 1000 << " s per bot, at most "
+                      << settings.Sell.MaxSalesPerVisit << " items per visit, while the bot stands at a vendor\n";
+        }
+    }
+    if (settings.Auction.Enabled && !scenarioOn)
+    {
         auto feed = std::make_shared<AuctionFeed>();
         extras.Auction = feed;
         client.AddTimer(kAuctionInterval, [&run, &client, &settings, feed, book]

@@ -430,6 +430,13 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadKey(config, "AuctionBuyMaxPct", 1, 100, settings.Auction.BuyMaxPct, warnings);
     ReadKey(config, "AuctionBrowsePerVisit", 1, 20, settings.Auction.BrowsePerVisit, warnings);
     ReadKey(config, "AuctionCallsPerTick", 1, 50, settings.Auction.MaxCallsPerTick, warnings);
+    ReadBool(config, "SellVendor", settings.Sell.Enabled, warnings);
+    {
+        std::uint32_t everySec = static_cast<std::uint32_t>(settings.Sell.EveryMs / 1000);
+        ReadKey(config, "SellEverySec", 60, 86400, everySec, warnings);
+        settings.Sell.EveryMs = std::uint64_t(everySec) * 1000;
+    }
+    ReadKey(config, "SellPerVisit", 1, 20, settings.Sell.MaxSalesPerVisit, warnings);
     // A target below its "low" mark would send a bot shopping that then buys nothing: the target is raised to the mark.
     settings.Supplies.AmmoTarget = std::max(settings.Supplies.AmmoTarget, settings.Supplies.AmmoLow);
     settings.Supplies.FoodTarget = std::max(settings.Supplies.FoodTarget, settings.Supplies.FoodLow);

@@ -5,6 +5,7 @@
 #include "auction_policy.h"
 #include "bot_presence.h"
 #include "bot_ramp.h"
+#include "sell_policy.h"
 #include "supply_policy.h"
 #include "taxi_policy.h"
 
@@ -144,6 +145,8 @@ struct BotSettings
     // AuctionRunHours (2 only: the core runs every auction 2 hours), AuctionMinVendorCopper, AuctionBagFullPct, AuctionPerVisit, AuctionListedMax,
     // AuctionEverySec, AuctionBuyMaxPct, AuctionBrowsePerVisit, AuctionCallsPerTick; off by default). main.cpp drives the listing visits.
     auction::Settings Auction;
+    // Vendor sales (sell policy; config keys SellVendor, SellEverySec, SellPerVisit; off by default). main.cpp sends the sales on a vendor visit.
+    sell::Settings Sell;
     std::uint32_t AutoGearEveryLevels = 5;
     ScenarioSettings Scenario;
 };
