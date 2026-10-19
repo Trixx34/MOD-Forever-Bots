@@ -31,7 +31,7 @@ target_include_directories(forever_bots_settings PUBLIC src)
 add_library(forever_bots_store STATIC src/bot_store.cpp)
 target_include_directories(forever_bots_store PUBLIC src)
 
-add_library(forever_bots_policy STATIC src/bot_policy.cpp src/chat_commands.cpp src/combat_rotation.cpp src/quest_data.cpp src/quest_planner.cpp src/scenario.cpp src/grind_data.cpp src/supply_policy.cpp src/auction_policy.cpp src/taxi_policy.cpp src/dungeon_events.cpp src/chat_say.cpp src/errand_policy.cpp)
+add_library(forever_bots_policy STATIC src/bot_policy.cpp src/chat_commands.cpp src/combat_rotation.cpp src/quest_data.cpp src/quest_planner.cpp src/scenario.cpp src/grind_data.cpp src/supply_policy.cpp src/auction_policy.cpp src/taxi_policy.cpp src/dungeon_events.cpp src/chat_say.cpp src/errand_policy.cpp src/errand_trainers.cpp)
 target_include_directories(forever_bots_policy PUBLIC src)
 target_link_libraries(forever_bots_policy PUBLIC forever_module_sdk)
 
@@ -85,6 +85,11 @@ add_test(NAME taxi COMMAND taxi_test)
 add_executable(errand_test tests/errand_test.cpp)
 target_link_libraries(errand_test PRIVATE forever_bots_policy)
 add_test(NAME errand COMMAND errand_test)
+
+add_executable(errand_trainers_test tests/errand_trainers_test.cpp)
+target_link_libraries(errand_trainers_test PRIVATE forever_bots_policy)
+target_compile_definitions(errand_trainers_test PRIVATE FOREVER_ERRAND_TRAINERS_FILE="${CMAKE_CURRENT_SOURCE_DIR}/data/errand_trainers.txt")
+add_test(NAME errand_trainers COMMAND errand_trainers_test)
 
 add_executable(dungeon_events_test tests/dungeon_events_test.cpp)
 target_link_libraries(dungeon_events_test PRIVATE forever_bots_policy)

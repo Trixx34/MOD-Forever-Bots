@@ -2,6 +2,7 @@
 // prefix removed; see modules.d/forever-bots.conf.example). Pure logic, unit-tested in tests/settings_test.cpp.
 #pragma once
 
+#include "errand_policy.h"
 #include "auction_policy.h"
 #include "bot_presence.h"
 #include "bot_ramp.h"
@@ -144,6 +145,10 @@ struct BotSettings
     // AuctionRunHours (2 only: the core runs every auction 2 hours), AuctionMinVendorCopper, AuctionBagFullPct, AuctionPerVisit, AuctionListedMax,
     // AuctionEverySec, AuctionBuyMaxPct, AuctionBrowsePerVisit, AuctionCallsPerTick; off by default). main.cpp drives the listing visits.
     auction::Settings Auction;
+    // Town errands (config keys Errands, ErrandDailyMin, ErrandGapMin, ErrandMaxMin, ErrandPerCity, ErrandStartsPerTick; off by default): profession
+    // training trips to a capital trainer, scheduled by errand::Scheduler (errand_policy.h).
+    errand::Settings Errand;
+    std::string ErrandTrainerFile = "data/errand_trainers.txt"; // the trainer table (ErrandTrainerFile)
     std::uint32_t AutoGearEveryLevels = 5;
     ScenarioSettings Scenario;
 };

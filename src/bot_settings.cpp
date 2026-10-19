@@ -430,6 +430,14 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadKey(config, "AuctionBuyMaxPct", 1, 100, settings.Auction.BuyMaxPct, warnings);
     ReadKey(config, "AuctionBrowsePerVisit", 1, 20, settings.Auction.BrowsePerVisit, warnings);
     ReadKey(config, "AuctionCallsPerTick", 1, 50, settings.Auction.MaxCallsPerTick, warnings);
+    ReadBool(config, "Errands", settings.Errand.Enabled, warnings);
+    ReadKey(config, "ErrandDailyMin", 1, 1440, settings.Errand.DailyMinutes, warnings);
+    ReadKey(config, "ErrandGapMin", 0, 1440, settings.Errand.GapMinutes, warnings);
+    ReadKey(config, "ErrandMaxMin", 5, 240, settings.Errand.MaxMinutes, warnings);
+    ReadKey(config, "ErrandPerCity", 1, 20, settings.Errand.MaxPerCity, warnings);
+    ReadKey(config, "ErrandStartsPerTick", 1, 10, settings.Errand.MaxStartsPerTick, warnings);
+    if (auto const it = config.find("ErrandTrainerFile"); it != config.end())
+        settings.ErrandTrainerFile = it->second;
     // A target below its "low" mark would send a bot shopping that then buys nothing: the target is raised to the mark.
     settings.Supplies.AmmoTarget = std::max(settings.Supplies.AmmoTarget, settings.Supplies.AmmoLow);
     settings.Supplies.FoodTarget = std::max(settings.Supplies.FoodTarget, settings.Supplies.FoodLow);
