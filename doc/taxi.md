@@ -15,7 +15,7 @@ and flies from there to the flight node nearest to where it wants to go. Then it
 - **Core** (`Bots/BotTaxi.*`, `ModuleBotActions.cpp` `TaxiAction`, `ModuleBotSnapshot.cpp` `FillTaxi`, `Player::ActivateTaxiPathTo`):
   - The snapshot names the nearest flight master the bot can walk to (`taxi_master_*`; the 4 nearest of its faction are checked against the navmesh like supply vendors) and says whether it is on a flight (`in_flight`).
   - `ActionType::kTaxi` (24): `target_guid` is the flight master (0 = the nearest in reach), `spell_id` the map (the bot's own), `dest_x/y/z` the point. The core takes the node at the flight master and the node
-    nearest to the point, finds the shortest route in the faction's flight graph, and starts the flight. The check that a node is known is skipped for bots, and `Player::ActivateTaxiPathTo` charges a bot nothing.
+    nearest to the point, finds the shortest route in the faction's flight graph, and starts the flight. Bots get every flight node of their faction in their taxi mask (`BotTaxi::LearnAllNodes`, at login and again before a flight; the mask is what the player's flight handler checks, and this path does not check it). `Player::ActivateTaxiPathTo` charges a bot nothing.
   - Refused (and so the bot walks) in combat, on a flight, dead, with no flight master within 5 yards, on another map than the point, with no route, or when the landing is not at least `Bot.Taxi.MinGainYards` (600) closer to the point than the flight master is.
   - Settings: `Bot.Taxi.Enabled` (1), `Bot.Taxi.Free` (1), `Bot.Taxi.MinGainYards` (600).
 - **Module** (`taxi_policy.*`, `bot_policy.cpp` just before the mount step):

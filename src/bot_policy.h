@@ -342,6 +342,7 @@ private:
         std::uint64_t AcceptRetryMs = 0;
         std::uint64_t AcceptedFrom = 0;                  // the resurrecter of the last accept sent (0 = none)
         std::uint64_t ReclaimRetryMs = 0;
+        std::uint64_t CorpseTeleportRetryMs = 0;         // the next teleport of a ghost to its corpse (no portal route)
         bool Reclaimed = false;                          // a reclaim was sent in this death
         std::uint64_t RunStartMs = 0;                    // the corpse run began (0 = not yet)
         std::uint64_t InsideSinceMs = 0;                 // the ghost is on the corpse's map since

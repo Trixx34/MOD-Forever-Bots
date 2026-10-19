@@ -2045,7 +2045,8 @@ void GhostOnTheOutsideMapWalksToThePortal()
     CHECK(towardPortal);
 }
 
-void GhostWithoutAPortalGivesUp()
+// A dead member left on the outside map with its corpse in the dungeon and no portal (run 9): it is teleported to the corpse, paced, and walks on from there.
+void ADeadMemberOnMapZeroIsTeleportedBackToItsCorpse()
 {
     std::vector<std::string> events;
     PolicyOptions options = DeadOptions(&events);
@@ -2053,8 +2054,16 @@ void GhostWithoutAPortalGivesUp()
     BotPolicy policy(options);
     WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 });
     Ghost(v.bots[3], 0.0f, 36, 50.0f);
-    policy.Decide(v, 1000);
-    CHECK(Logged(events, "corpse_run_failed:"));
+    v.bots[3].map_id = 0;
+    std::optional<BotAction> teleport = TeleportOf(policy.Decide(v, 1000), 13);
+    CHECK(teleport.has_value() && teleport->spell_id == 36 && teleport->dest_x == 50.0f); // to the corpse's map and place
+    CHECK(Logged(events, "corpse_teleport:"));
+    CHECK(!TeleportOf(policy.Decide(v, 2000), 13).has_value());                             // not again at once
+    CHECK(TeleportOf(policy.Decide(v, 16000), 13).has_value());                             // again if the core did not apply it
+    v.bots[3].map_id = 36;                                                                  // now on the corpse's map: the corpse run goes on
+    std::vector<BotAction> onFoot = policy.Decide(v, 40000);
+    CHECK(HasAction(onFoot, 13, ActionType::kMoveTo) && !TeleportOf(onFoot, 13).has_value());
+    CHECK(!Logged(events, "corpse_run_failed:"));
 }
 
 void GhostReclaimsInRadiusAndRetries()
@@ -3573,7 +3582,7 @@ int main()
     ReleaseIsHeldInCombatUpToTheCap();
     GhostWalksToItsCorpseAndIgnoresCombat();
     GhostOnTheOutsideMapWalksToThePortal();
-    GhostWithoutAPortalGivesUp();
+    ADeadMemberOnMapZeroIsTeleportedBackToItsCorpse();
     GhostReclaimsInRadiusAndRetries();
     GhostCorpseRunTimesOut();
     DeadBotAcceptsAResurrectOffer();

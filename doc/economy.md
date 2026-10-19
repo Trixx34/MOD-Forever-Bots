@@ -1,19 +1,22 @@
 # Bot economy and the Auction House: design
 
-Status: **the decision logic is built and unit-tested** (`src/auction_policy.*`, `tests/auction_test.cpp`, settings `Auction*`, off by default); **the module does not
-carry it out yet**, and the core lacks what is listed under "Checks". Bots receive the pay of their sales: the core takes a bot's delivered mail for it (`Bot.Mail.Collect`,
-`Bots/BotMail.cpp`, branch `feature/auction-core`). Nothing has run on a sim. It says what exists, what is missing, a first version small enough to test, and the decisions that are the
+Status: **the decision logic is built and unit-tested** (`src/auction_policy.*`, `tests/auction_test.cpp`, settings `Auction*`, off by default). **The module drives
+the listings** (`main.cpp`, a visit timer every 10 s on the Run() thread, `AuctionHouseForBot` `kList`), from the bots' loot (`PlayerScript.OnLootItem`) and the pump's feed.
+It does **not** walk a bot to an auctioneer (that is the policy in `bot_policy.cpp`, not done), does not sell to vendors, and does not relist expired items. Bots receive the pay
+of their sales: the core takes a bot's delivered **auction house mail** for it (`Bot.Mail.Collect`, `Bots/BotMail.cpp`: only `MAIL_AUCTION` mail, letters are left alone). Nothing has run on a sim. It says what exists, what is missing, a first version small enough to test, and the decisions that are the
 owner's. The brief it replaces (`economy-design-prompt.md` in the old `.opencode/docs`) is not on the new servers.
 
 ## Checks of the core (read from the code, 2026-10-19)
 
 - **Mail** (the owner's requirement: bots get the money). A sale, a buyout, an expired or cancelled listing and an outbid bid all arrive as mail; the core delivers the sale mail after
   `MailDeliveryDelay` (3600 s by default). No code ever opened a mailbox for a bot, so the money and items would have stayed there. Built: `WorldSession::CollectMailAsBot` takes the money and
-  the items of every delivered mail without a mailbox (the same steps as `HandleMailTakeMoney` and `HandleMailTakeItem`), skips cash on delivery, and deletes the mail that is empty. `BotMgr` runs it for every
+  the items of each delivered **auction house** mail (`messageType` `MAIL_AUCTION` = 2; the sender of such mail is the house id, not a character; player, GM, creature and calendar mail is not touched),
+  without a mailbox (the same steps as `HandleMailTakeMoney` and `HandleMailTakeItem`), skips cash on delivery, and deletes the auction mail that is empty. `BotMgr` runs it for every
   online bot that is not an alt every `Bot.Mail.CollectEverySec` (30) seconds and at login, so mail that arrives while a bot is away (presence) is taken when it comes back. Compiles; **not run**.
 - **Listing** (`kList`, `ModuleActions.cpp`): works for a bot (the item's owner is found among the online players, or `PlayerGuid`). The core's handler lists **one non-stackable item
   at a time** (`UseCount` 1, `item->GetCount() == 1`); stackable goods go through `HandleAuctionSellCommodity`, which the module action does not call. So the first version lists pieces of equipment
-  only. The fork's auctions run **2, 8 or 24 hours** (`RunTime` 120, 480 or 1440; the action sends 120), not 12/24/48. The action also fixes the run time at 120: it must take the run time from the request.
+  only. The fork's auctions run **2, 8 or 24 hours** (`RunTime` 120, 480 or 1440). The action sends 120 for the deposit and the run, and the wire has no run time, so every
+  auction runs **2 hours**: the module's `RunMinutes` is 120 and `AuctionRunHours` accepts only 2. Making 8 or 24 hours needs a run-time field in `ActionRequestMsg` (a layout change).
 - **Browse** (`kBrowse`): by **item entry only**; it cannot ask for "upgrades for my slot". It answers with one `AuctionListingEvent` per listing, carrying the asking bot's guid and the request id, so
   results can be matched to a bot. It needs one online player to take a locale from (a bot is one).
 - **Bid and buyout**: need an acting player; with `AuctionHouseForBot` the bot is that player.
@@ -37,7 +40,7 @@ owner's. The brief it replaces (`economy-design-prompt.md` in the old `.opencode
 | Selling grey items, repairing, buying supplies at vendors | `kVendor`; `doc/supplies-2.md` | built, not run on the sim for long |
 | Money reserve | core `Bot.Supplies.ReserveCopperPerLevel` | built (protocol 11) |
 | The nearest auctioneer | snapshot `auctioneer_guid` (an NPC reference) | built |
-| Auction house operations: browse, bid, buyout, list, cancel | Tier 1 `ModuleClient::AuctionHouseForBot`, core `ModuleActions.cpp` (`AuctionHouseAction`) | built in the core and SDK; **no module uses it**; a browse answers with an `AuctionListingEvent` |
+| Auction house operations: browse, bid, buyout, list, cancel | Tier 1 `ModuleClient::AuctionHouseForBot`, core `ModuleActions.cpp` (`AuctionHouseAction`) | built in the core and SDK; the module lists (`kList`, `main.cpp`); browse, bid and buyout are not used yet; a browse answers with an `AuctionListingEvent` |
 | The core's own seller bot | worldserver `AuctionHouseBot.*` (off, `Sellers.Count = 0`) | exists in the fork; fills the house with items from a fixed list, not with what bots find |
 | Walking to an auctioneer, standing in reach | the vendor walk (`bot_policy.cpp`, kTravel...) | works for vendors; auctioneers are indexed separately |
 
@@ -58,22 +61,22 @@ Bots **sell** surplus on the house and **buy** upgrades and supplies they alread
 - *What:* any non-soulbound item of quality uncommon (green) or better that the bot will not use (`AutoGear` found it no better than what is worn, and it is not
   a quest item, a reagent the bot needs, or food/drink/ammunition/potion/bandage it uses) and that a vendor would pay at least `SellMinCopper` for.
   The core lists single non-stackable items only, so in practice this is equipment; stacks of trade goods stay with the vendor for now.
-- *Price:* a multiple of the vendor sell price by quality: green x3, blue x4, epic x5 (knob `SellMultiplier<q>`), rounded; buyout equals the starting bid
-  times 1.2. A multiple of the vendor price is a floor the market cannot go under: a player who undercuts it loses money to the vendor, so the house price
+- *Price:* a multiple of the vendor sell price by quality: green x3, blue x4, epic x5 (keys `AuctionSellPctGreen`, `AuctionSellPctBlue`, `AuctionSellPctEpic`: 300, 400, 500 percent), rounded; buyout equals the starting bid
+  times 1.2 (`AuctionBuyoutPct` 120). A multiple of the vendor price is a floor the market cannot go under: a player who undercuts it loses money to the vendor, so the house price
   stays near it.
-- *Duration:* 24 hours (the fork offers 2, 8 or 24), relisted once at 90 percent of the price if it did not sell, then sold to a vendor.
-- *When:* an idle bot with at least `SellBagFraction` (default 60 percent) of its bag slots used, standing near an auctioneer or due its service visit
-  (`ServiceEverySec`), lists at most `SellPerVisit` (default 5) items per visit.
-- *Limit:* at most `ListedMax` (default 10) listings per bot at once. The gold from sales is taken from the bot's mail by the core (`Bot.Mail.Collect`).
+- *Duration:* 2 hours (what the core sends; see Checks), relisted once at 90 percent of the price if it did not sell, then sold to a vendor. **Not built:** the relisting and the vendor sale.
+- *When:* an idle bot with at least `AuctionBagFullPct` (default 60 percent) of its bag slots used (the snapshot gives the free slots; the module assumes 16 in all), standing near an auctioneer or due its service visit
+  (`ServiceEverySec`), lists at most `AuctionPerVisit` (default 5) items per visit.
+- *Limit:* at most `AuctionListedMax` (default 10) listings per bot at once; a listing counts until its run ends. The gold from sales is taken from the bot's mail by the core (`Bot.Mail.Collect`).
 
 **Buying.**
 - *Gear upgrade:* when `AutoGear` shows a slot a level behind (the bot's item in that slot is below its level band), the bot browses its auctioneer for
   its slot and class (`kBrowse`, filtered by level range and quality), and buys the cheapest item that is an upgrade by the same score `AutoGear` uses and
-  costs at most `BuyMaxFraction` (default 40 percent) of its money above the reserve.
+  costs at most `AuctionBuyMaxPct` (default 40 percent) of its money above the reserve.
 - *Supplies:* food, drink, potions and bandages stay a vendor purchase. The house is not used for them (vendor stock is unlimited and cheaper).
 
-**Pace.** A bot visits the house at most every `AuctionEverySec` (default 1800) and the module makes at most `AuctionBudgetPerTick` house calls per tick across
-all bots: each call is a browse that walks the house's lists in the core.
+**Pace.** A bot visits the house at most every `AuctionEverySec` (default 1800) and the module makes at most `AuctionCallsPerTick` (default 4) house calls per tick across
+all bots, each one a listing (`kList`); browses are not wired yet.
 
 ## Controls that keep it from running away
 
@@ -95,8 +98,8 @@ all bots: each call is a browse that walks the house's lists in the core.
 ## Test plan
 
 1. Unit tests of the pure parts (price rule, what to list, what to buy), like `supply_test.cpp`.
-2. Sim: 100 bots, `Presence` off, `AuctionHouseBot.Sellers.Count = 0`; watch listings per hour, sales, the money total, and the core's world tick time
-   (browses are the cost to watch).
+2. Sim: 100 bots, `Presence` off, `AuctionHouseBot.Sellers.Count = 0`; watch listings per hour, sales, the money total, and the core's world tick time.
+   Not yet done: the bots do not walk to an auctioneer, so a visit happens only when a bot is already at one.
 3. Compare: the money total after 8 hours with and without the house.
 
 ## Decisions (answered by the owner, 2026-10-19)

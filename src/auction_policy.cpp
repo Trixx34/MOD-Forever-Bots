@@ -40,6 +40,21 @@ bool Listable(Settings const& settings, Candidate const& item)
     return StartingBid(settings, item.Quality, item.VendorSellCopper, 1) != 0;
 }
 
+void PruneExpired(std::vector<std::uint64_t>& endsMs, std::uint64_t nowMs)
+{
+    endsMs.erase(std::remove_if(endsMs.begin(), endsMs.end(), [nowMs](std::uint64_t end) { return end <= nowMs; }), endsMs.end());
+}
+
+ListFailure ClassifyListFailure(std::string const& reason)
+{
+    // The core's own words (ModuleActions.cpp, kList): the auctioneer is out of reach, the owner is offline, or the money is short.
+    static char const* const kRetry[] = { "auctioneer not found", "not enough money", "no online player" };
+    for (char const* text : kRetry)
+        if (reason.find(text) != std::string::npos)
+            return ListFailure::Retry;
+    return ListFailure::Skip;
+}
+
 bool VisitDue(Settings const& settings, Bags const& bags, Standing const& standing, bool relistingDue, std::uint64_t nowMs)
 {
     if (!settings.Enabled || bags.TotalSlots == 0)

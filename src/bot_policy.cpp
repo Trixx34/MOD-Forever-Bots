@@ -175,6 +175,7 @@ constexpr std::uint32_t kRezRefusalsLogged = 3;      // refusals in a row before
 constexpr std::uint64_t kReleaseRetryMs = 3000;      // a release not yet seen to work is not sent again before this
 constexpr std::uint64_t kAcceptRetryMs = 2000;
 constexpr std::uint64_t kReclaimRetryMs = 3000;
+constexpr std::uint64_t kCorpseTeleportRetryMs = 15000; // a ghost off its corpse's map with no portal is teleported to the corpse, not again before this
 constexpr float kReclaimYards = 35.0f;               // the core allows 39 yards; the ghost reclaims from this close
 
 // A cast or channel is in progress. cast_remaining_ms is no test: it is 0 while a spell is in flight (a Fireball after the cast, state
@@ -1537,8 +1538,22 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             }
             else if (_options.HasPortal && bot.map_id == _options.PortalMap && bot.corpse_map == _options.PortalInsideMap)
                 emit(Decision{ ActionType::kMoveTo, 0, _options.PortalPoint });
-            else
-                fail("no_route_to_corpse_map");
+            else if (nowMs >= state.CorpseTeleportRetryMs)
+            {
+                // No way on foot to the corpse's map (run 9: a member that died in the dungeon was left on the outside map and idled for 45 minutes
+                // after the run failed). The core does not refuse a teleport for a ghost (only one in combat), so the ghost is put at its corpse.
+                BotAction back;
+                back.bot_guid = bot.guid;
+                back.type = ActionType::kTeleport;
+                back.spell_id = bot.corpse_map;
+                back.dest_x = bot.corpse_x;
+                back.dest_y = bot.corpse_y;
+                back.dest_z = bot.corpse_z;
+                actions.push_back(back);
+                state.CorpseTeleportRetryMs = nowMs + kCorpseTeleportRetryMs;
+                event("corpse_teleport: bot=" + std::to_string(bot.guid) + " map=" + std::to_string(bot.map_id) + " corpse_map=" + std::to_string(bot.corpse_map) +
+                      " run_ms=" + std::to_string(nowMs - state.RunStartMs));
+            }
             continue;
         }
 
@@ -1843,9 +1858,11 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         // Fight watchdog: a visible hostile whose health, and the bot's own, have not gone down for kFightStallMs is unreachable,
         // evading or out of line of sight (the 8-hour soak had a fight of two hours). A threat the snapshot keeps set but that is not
         // in view is the same: telemetry holds the fight open until the guid clears, and the nearby list is all the bot can fight.
-        // A gap between snapshots does not restart the timer; the stall continued while this tick was late.
+        // A target the bot is not walking to and is not in combat with (it does not answer) stalls the same way: the dungeon route and
+        // its events only run while the bot has no target, so such a target must not hold the party for ever (run 9 held the leader for an hour).
+        // A walk to a target is ended by the approach timeout instead. A gap between snapshots does not restart the timer; the stall continued while this tick was late.
         bool const unseenThreat = hasTarget && targetUnit == nullptr;
-        bool const visibleStall = hasTarget && targetUnit && targetUnit->is_hostile && bot.in_combat != 0;
+        bool const visibleStall = hasTarget && targetUnit && targetUnit->is_hostile && (bot.in_combat != 0 || !state.Approaching);
         if (unseenThreat || visibleStall)
         {
             if (state.StallTarget != targetRef)

@@ -407,14 +407,11 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadKey(config, "AuctionBuyoutPct", 100, 500, settings.Auction.BuyoutPct, warnings);
     ReadKey(config, "AuctionRelistPct", 50, 100, settings.Auction.RelistPct, warnings);
     {
-        // The fork's auctions run 2, 8 or 24 hours.
+        // The core's kList sends every auction a 120-minute run (ModuleActions.cpp, sellItem.RunTime and the deposit), and the wire
+        // carries no run time. So 2 is the only value; any other is refused with a warning and the auction runs 2 hours.
         std::uint32_t hours = settings.Auction.RunMinutes / 60;
-        ReadKey(config, "AuctionRunHours", 2, 24, hours, warnings);
-        if (hours == 2 || hours == 8 || hours == 24)
-            settings.Auction.RunMinutes = hours * 60;
-        else
-            warnings.push_back("Module.forever-bots.AuctionRunHours: the fork's auctions run 2, 8 or 24 hours; using " +
-                               std::to_string(settings.Auction.RunMinutes / 60) + ".");
+        ReadKey(config, "AuctionRunHours", 2, 2, hours, warnings);
+        settings.Auction.RunMinutes = hours * 60;
     }
     {
         std::uint32_t minCopper = static_cast<std::uint32_t>(settings.Auction.MinVendorCopper);

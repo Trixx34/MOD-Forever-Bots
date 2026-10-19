@@ -140,8 +140,8 @@ struct BotSettings
     // of at least TaxiMinWalkYards with a flight from a flight master within TaxiMasterMaxYards that lies on the way. Needs Bot.Taxi.Enabled in the core (on by default).
     taxi::Settings Taxi;
     // Auction House (doc/economy.md; config keys Auction, AuctionSellPctGreen, AuctionSellPctBlue, AuctionSellPctEpic, AuctionBuyoutPct, AuctionRelistPct,
-    // AuctionRunHours (2, 8 or 24), AuctionMinVendorCopper, AuctionBagFullPct, AuctionPerVisit, AuctionListedMax, AuctionEverySec, AuctionBuyMaxPct,
-    // AuctionBrowsePerVisit, AuctionCallsPerTick; off by default). The decisions are built (auction_policy.h); the module does not carry them out yet.
+    // AuctionRunHours (2 only: the core runs every auction 2 hours), AuctionMinVendorCopper, AuctionBagFullPct, AuctionPerVisit, AuctionListedMax,
+    // AuctionEverySec, AuctionBuyMaxPct, AuctionBrowsePerVisit, AuctionCallsPerTick; off by default). main.cpp drives the listing visits.
     auction::Settings Auction;
     std::uint32_t AutoGearEveryLevels = 5;
     ScenarioSettings Scenario;

@@ -2,6 +2,8 @@
 #include "auction_policy.h"
 
 #include <cstdio>
+#include <string>
+#include <vector>
 
 using namespace auction;
 
@@ -108,7 +110,7 @@ void ThePlanTakesTheDearestFirstWithinTheLimits()
     CHECK(plan.size() == 3);
     if (plan.size() == 3)
     {
-        CHECK(plan[0].ItemGuid == 4 && plan[0].Bid == 4000 && plan[0].Buyout == 4800 && plan[0].RunMinutes == 1440);   // epic 800 -> 4000
+        CHECK(plan[0].ItemGuid == 4 && plan[0].Bid == 4000 && plan[0].Buyout == 4800 && plan[0].RunMinutes == 120);   // epic 800 -> 4000
         CHECK(plan[1].ItemGuid == 2 && plan[1].Bid == 3600);                                                       // rare 900 -> 3600
         CHECK(plan[2].ItemGuid == 3 && plan[2].Bid == 1200);                                                       // green 400 -> 1200
         CHECK(plan[0].Attempt == 1);
@@ -185,10 +187,33 @@ void TheCallBudgetLimitsATick()
     CHECK(!budget.Take());
 }
 
+void TheListingsThatRanOutAreDropped()
+{
+    std::vector<std::uint64_t> ends = { 100, 500, 300 };
+    PruneExpired(ends, 300);
+    CHECK(ends.size() == 1 && ends[0] == 500);
+    PruneExpired(ends, 1000);
+    CHECK(ends.empty());
+}
+
+void ARefusalForThePlaceOrTheMoneyIsTriedAgain()
+{
+    CHECK(ClassifyListFailure("auctioneer not found or cannot interact with it") == ListFailure::Retry);
+    CHECK(ClassifyListFailure("auctioneer not found on any map") == ListFailure::Retry);
+    CHECK(ClassifyListFailure("not enough money for the deposit") == ListFailure::Retry);
+    CHECK(ClassifyListFailure("no online player owns the listed item") == ListFailure::Retry);
+    // Anything about the item is not tried again: not in the bags, the wrong entry, or a refusal the core gives with no reason (bound, conjured).
+    CHECK(ClassifyListFailure("item is no longer in the player's bags") == ListFailure::Skip);
+    CHECK(ClassifyListFailure("item entry does not match the request") == ListFailure::Skip);
+    CHECK(ClassifyListFailure("") == ListFailure::Skip);
+}
+
 } // namespace
 
 int main()
 {
+    TheListingsThatRanOutAreDropped();
+    ARefusalForThePlaceOrTheMoneyIsTriedAgain();
     PricesAreMultiplesOfTheVendorPrice();
     TheSecondListingIsCheaperAndNeverBelowTheVendor();
     OnlyTheRightItemsAreListable();

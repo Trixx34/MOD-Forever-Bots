@@ -108,6 +108,34 @@ Module.forever-bots.TelemetrySummarySec = 60
 # SupplyDrinkLow = 3        SupplyDrinkTarget = 10     (drink: bots with mana only)
 # SupplyTripSec = 120       (a bot that needs supplies makes a trip at most this often, 30..3600)
 
+# Flight points (off by default). A bot not in a party replaces a walk of at least TaxiMinWalkYards with a flight from a flight master within
+# TaxiMasterMaxYards that lies on the way. Bots know their faction's flight points and fly free (Bot.Taxi.* in the core, on by default there).
+# Taxi = 0
+# TaxiMinWalkYards = 1500   (a shorter walk is walked, 300..20000)
+# TaxiMasterMaxYards = 600  (a flight master farther than this is not walked to, 50..5000)
+# TaxiBlockedSec = 600      (after a refused flight the bot walks for this long, 10..86400)
+
+# Auction house (off by default; doc/economy.md). An idle bot whose bags are at least AuctionBagFullPct used lists up to AuctionPerVisit
+# green-or-better items it looted (never equipment, a quest item or a stack), at a price that is a percent of the vendor sell price.
+# The core runs every auction 2 hours, so AuctionRunHours takes only 2. Needs the core's AuctionHouseAction (kList). Players can buy the listings.
+# The module does not walk bots to an auctioneer yet: a visit happens only when a bot is already at one. Keys that the module does not
+# use yet (AuctionRelistPct, AuctionBuyMaxPct, AuctionBrowsePerVisit) are read and checked but have no effect.
+# Auction = 0
+# AuctionSellPctGreen = 300     (green items: listed at this percent of the vendor price, 100..2000)
+# AuctionSellPctBlue = 400      (blue items, 100..2000)
+# AuctionSellPctEpic = 500      (epic and legendary items, 100..2000)
+# AuctionBuyoutPct = 120        (the buyout is the starting bid times this percent, 100..500)
+# AuctionRelistPct = 90         (not used yet: the second listing of an expired item, 50..100)
+# AuctionRunHours = 2           (2 only: the core's run time)
+# AuctionMinVendorCopper = 100  (an item a vendor would pay less than this for is not listed, 0..1000000 copper)
+# AuctionBagFullPct = 60        (a visit happens when this share of the bag is used, 1..100; the module assumes 16 bag slots)
+# AuctionPerVisit = 5           (items listed per visit, 1..20)
+# AuctionListedMax = 10         (listings a bot has at once, 1..50)
+# AuctionEverySec = 1800        (at most one visit per bot this often, 60..86400)
+# AuctionBuyMaxPct = 40         (not used yet: the most of a bot's spendable money one purchase may cost, 1..100)
+# AuctionBrowsePerVisit = 3     (not used yet: item entries a bot looks up per visit, 1..20)
+# AuctionCallsPerTick = 4       (house calls the whole module makes per tick, 1..50)
+
 # A scenario (doc 19 of the core): a repeatable test. A fixed roster is spawned at the staging place, dressed, put in one party,
 # teleported to the entry, and walked along the route by its leader for the duration. One result line is written to stderr and to
 # ScenarioResultFile: how it ended (complete, wipe, timeout, enter_failed), the furthest route point, deaths. The core needs

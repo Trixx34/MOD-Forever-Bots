@@ -13,6 +13,7 @@
 #include "trade_policy.h"
 #include "bot_settings.h"
 #include "bot_presence.h"
+#include "auction_policy.h"
 #include "bot_store.h"
 #include "bot_live.h"
 #include "bot_telemetry.h"
@@ -66,6 +67,15 @@ constexpr std::uint64_t kPresenceFeedMs = 2000;
 constexpr std::uint64_t kPresenceStaleMs = 15000; // a feed older than this is not acted on (the pump stalled)
 constexpr std::uint32_t kSpawnsPerRampTick = 10;
 constexpr std::uint64_t kSpawnBackoffMs = 30000; // after a refused spawn, wait this long before the next
+
+// Auction house (auction_policy.h, doc/economy.md): the Run() thread visits the house for each idle bot that is due, every kAuctionInterval,
+// with the bot's free bag slots and its auctioneer from the pump's feed (the same feed as presence, every kPresenceFeedMs).
+constexpr std::chrono::milliseconds kAuctionInterval(10000);
+constexpr std::uint32_t kBagSlotsAssumed = 16;      // the snapshot gives free slots only; a backpack's 16 stands for the total
+constexpr std::size_t kAuctionItemsPerBot = 200;    // looted items kept per bot for listing
+constexpr std::uint32_t kItemClassWeapon = 2;       // ITEM_CLASS_WEAPON
+constexpr std::uint32_t kItemClassArmor = 4;        // ITEM_CLASS_ARMOR
+constexpr std::uint32_t kItemClassQuest = 12;       // ITEM_CLASS_QUEST
 
 char const* ActionTypeName(std::uint8_t type)
 {
@@ -265,10 +275,51 @@ struct PresenceFeed
     std::uint64_t AtMs = 0;
 };
 
+// One ordinary bot as the auction visit needs it: idle (alive and out of combat), its free bag slots and the auctioneer NPC the core found.
+struct AuctionBot
+{
+    std::uint64_t Guid = 0;
+    std::uint32_t FreeSlots = 0;
+    std::uint64_t AuctioneerGuid = 0;
+    bool Idle = false;
+};
+
+struct AuctionFeed
+{
+    std::mutex Lock;
+    std::vector<AuctionBot> Bots;
+    std::uint64_t AtMs = 0;
+};
+
+// The auction state, used on the Run() thread only (the loot notify and the visit timer both run there).
+struct AuctionBook
+{
+    std::unordered_map<std::uint64_t, std::unordered_map<std::uint64_t, auction::Candidate>> Items; // bot -> item guid -> what it looted
+    std::unordered_map<std::uint64_t, auction::Standing> Standing;                                    // bot -> attempts, last visit
+    std::unordered_map<std::uint64_t, std::vector<std::uint64_t>> Ends;                             // bot -> when its listings run out
+};
+
+// The loot event as a listing candidate. A weapon or a piece of armour is marked Needed: the module does not know what a bot wears or keeps
+// for an upgrade, so it never lists equipment (the core's bag description would decide that; doc/economy.md).
+auction::Candidate CandidateOf(forever_module::PlayerItemLootedEvent const& event)
+{
+    auction::Candidate item;
+    item.ItemGuid = event.item_guid();
+    item.Entry = event.item_entry();
+    item.Count = event.count() ? event.count() : 1;
+    item.Quality = static_cast<std::uint8_t>(event.quality());
+    item.VendorSellCopper = event.sell_price();
+    item.QuestItem = event.item_class() == kItemClassQuest;
+    item.Needed = event.item_class() == kItemClassWeapon || event.item_class() == kItemClassArmor;
+    item.Stackable = item.Count != 1;   // the core lists single items only
+    return item;
+}
+
 // What the pump needs beyond the policy: the scenario (if one is configured) and the command queue.
 struct PumpExtras
 {
     std::shared_ptr<PresenceFeed> Presence;   // set when Presence is on
+    std::shared_ptr<AuctionFeed> Auction;     // set when Auction is on
     std::shared_ptr<AltRegistry> Alts;
     std::optional<ScenarioPlan> Scenario;
     std::string ScenarioResultFile;
@@ -325,6 +376,7 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
     bool sawSnapshot = false;
     std::uint64_t lastTick = 0;
     std::uint64_t presenceFedMs = 0;
+    std::uint64_t auctionFedMs = 0;
     // Last action sequence seen per bot, so each result is reported once.
     std::unordered_map<std::uint64_t, std::uint32_t> seenSequence;
     std::unordered_map<std::uint64_t, std::uint64_t> serviceNoticeMs; // bot -> when a service refusal was last logged
@@ -484,6 +536,21 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
                 extras.Presence->Bots.swap(list);
                 extras.Presence->AtMs = presenceFedMs;
             }
+            if (extras.Auction && nowMs() - auctionFedMs >= kPresenceFeedMs)
+            {
+                auctionFedMs = nowMs();
+                std::vector<AuctionBot> list;
+                list.reserve(view.bots.size());
+                for (forever_module::BotSnapshot const& bot : view.bots)
+                {
+                    if ((extras.Alts && extras.Alts->Has(bot.guid)) || bot.group_role != 0)
+                        continue;
+                    list.push_back({ bot.guid, bot.bag_free_slots, bot.auctioneer_guid, bot.life_state == 0 && bot.in_combat == 0 });
+                }
+                std::lock_guard<std::mutex> lock(extras.Auction->Lock);
+                extras.Auction->Bots.swap(list);
+                extras.Auction->AtMs = auctionFedMs;
+            }
             if (director)
             {
                 std::size_t const before = actions.size();
@@ -565,7 +632,7 @@ int main(int argc, char** argv)
     manifest.requested_max_bots = kMaxBotsCeiling;
     manifest.requested_max_nearby_units = kRequestedNearbyUnits;
     manifest.requested_max_actions = kRequestedActions;
-    manifest.tier1_hooks = { "CommandScript", "PlayerScript.OnChat", "PlayerScript.OnBotTrade" };
+    manifest.tier1_hooks = { "CommandScript", "PlayerScript.OnChat", "PlayerScript.OnBotTrade", "PlayerScript.OnLootItem" };
 
     forever_module::ModuleClient client(std::move(manifest));
     if (!client.Connect(argv[1]) || !client.Handshake())
@@ -1174,6 +1241,86 @@ int main(int argc, char** argv)
         });
         std::cerr << "forever-bots: presence is on: sessions " << settings.Presence.OnlineMinMin << " to " << settings.Presence.OnlineMaxMin
                   << " min, away " << settings.Presence.OfflineMinMin << " to " << settings.Presence.OfflineMaxMin << " min\n";
+    }
+    if (settings.Auction.Enabled && !scenarioOn)
+    {
+        // Loot of the bots, kept as listing candidates (only the items a bot may list: green or better, not equipment, not a quest item).
+        auto book = std::make_shared<AuctionBook>();
+        client.OnNotify("PlayerScript.OnLootItem", [&run, book](forever_module::EventNotify const& notify)
+        {
+            if (notify.event_payload_case() != forever_module::EventNotify::kPlayerItemLooted)
+                return;
+            forever_module::PlayerItemLootedEvent const& event = notify.player_item_looted();
+            if (!run.Roster.Owned().count(event.player_guid()) || event.quality() < auction::kUncommon)
+                return;
+            auction::Candidate const item = CandidateOf(event);
+            if (item.Needed || item.QuestItem || item.ItemGuid == 0)
+                return;
+            auto& items = book->Items[event.player_guid()];
+            if (items.size() >= kAuctionItemsPerBot)
+                items.erase(items.begin());
+            items[item.ItemGuid] = item;
+        });
+
+        auto feed = std::make_shared<AuctionFeed>();
+        extras.Auction = feed;
+        client.AddTimer(kAuctionInterval, [&run, &client, &settings, feed, book]
+        {
+            std::vector<AuctionBot> list;
+            std::uint64_t fedAt = 0;
+            {
+                std::lock_guard<std::mutex> lock(feed->Lock);
+                list = feed->Bots;
+                fedAt = feed->AtMs;
+            }
+            std::uint64_t const now = nowMs();
+            if (fedAt == 0 || now - fedAt > kPresenceStaleMs)
+                return;
+            auction::CallBudget budget(settings.Auction.MaxCallsPerTick);
+            budget.NewTick();
+            for (AuctionBot const& bot : list)
+            {
+                if (!bot.Idle || bot.AuctioneerGuid == 0)
+                    continue;
+                auction::Standing& standing = book->Standing[bot.Guid];
+                std::vector<std::uint64_t>& ends = book->Ends[bot.Guid];
+                auction::PruneExpired(ends, now);
+                standing.ListedNow = static_cast<std::uint32_t>(ends.size());
+                auction::Bags const bags{ kBagSlotsAssumed, kBagSlotsAssumed - std::min(bot.FreeSlots, kBagSlotsAssumed) };
+                if (!auction::VisitDue(settings.Auction, bags, standing, false, now))
+                    continue;
+                standing.LastVisitMs = now;
+
+                std::vector<auction::Candidate> items;
+                for (auto const& [itemGuid, candidate] : book->Items[bot.Guid])
+                    items.push_back(candidate);
+                for (auction::Listing const& listing : auction::PlanListings(settings.Auction, bags, standing, items))
+                {
+                    if (!budget.Take())
+                        break;
+                    std::uint64_t const botGuid = bot.Guid;
+                    client.AuctionHouseForBot(botGuid, forever_module::ModuleClient::AuctionHouseOp::kList, bot.AuctioneerGuid, listing.ItemGuid, 0, listing.Entry, 1,
+                                              listing.Bid, listing.Buyout, [book, botGuid, listing](forever_module::ActionReply const& reply)
+                    {
+                        auto& items = book->Items[botGuid];
+                        if (reply.success())
+                        {
+                            book->Ends[botGuid].push_back(nowMs() + std::uint64_t(listing.RunMinutes) * 60000u);
+                            book->Standing[botGuid].Attempts[listing.ItemGuid] = listing.Attempt;
+                            items.erase(listing.ItemGuid);
+                            std::cerr << "forever-bots: auction: bot " << botGuid << " listed item " << listing.ItemGuid << " for " << listing.Bid
+                                      << " copper (buyout " << listing.Buyout << ")\n";
+                            return;
+                        }
+                        // A refusal for the place or the money is tried again on a later visit; a refusal about the item drops it.
+                        if (auction::ClassifyListFailure(reply.reason()) == auction::ListFailure::Skip)
+                            items.erase(listing.ItemGuid);
+                    });
+                }
+            }
+        });
+        std::cerr << "forever-bots: auction house is on: a listing visit every " << settings.Auction.EveryMs / 1000 << " s per bot, at most "
+                  << settings.Auction.PerVisit << " items per visit\n";
     }
     if (scenarioOn)
     {

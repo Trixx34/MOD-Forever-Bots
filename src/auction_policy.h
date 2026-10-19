@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <functional>
 #include <optional>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -28,7 +29,7 @@ struct Settings
     std::uint32_t SellPctEpic = 500;
     std::uint32_t BuyoutPct = 120;              // the buyout is the starting bid times this percent
     std::uint32_t RelistPct = 90;               // a listing that ran out is listed again at this percent of the last price, once; then it goes to a vendor
-    std::uint32_t RunMinutes = 1440;            // 24 hours; the fork accepts 120, 480 and 1440 (MIN_AUCTION_TIME is 2 hours)
+    std::uint32_t RunMinutes = 120;             // 2 hours: the core's kList always sends this run (the wire has no run time), and the fork accepts 120, 480 and 1440
     std::uint64_t MinVendorCopper = 100;        // an item a vendor would pay less than this is not worth a listing fee
     std::uint32_t BagFullPct = 60;              // a bot lists when this share of its bag slots is used ...
     std::uint32_t PerVisit = 5;                 // ... up to this many items per visit ...
@@ -97,6 +98,14 @@ std::vector<Listing> PlanListings(Settings const& settings, Bags const& bags, St
 
 // Items that ran their course on the house and go to a vendor now: listed `attempts` times already (the second listing is the last).
 std::vector<std::uint64_t> ForVendor(Settings const& settings, Standing const& standing, std::vector<Candidate> const& items);
+
+// Drops the listings whose run has ended (their end time is at or before nowMs); what is left is still on the house.
+void PruneExpired(std::vector<std::uint64_t>& endsMs, std::uint64_t nowMs);
+
+// What a refused listing means. A refusal for the bot's place or its money is tried again on a later visit; any other refusal is about the item
+// (not in the bags, bound, conjured, not a single piece), so the item is not listed again.
+enum class ListFailure : std::uint8_t { Retry, Skip };
+ListFailure ClassifyListFailure(std::string const& reason);
 
 // ---- buying ----
 
