@@ -52,3 +52,12 @@ need an event or a door opened first. `mmap_check <mmaps> <dungeons.txt> <id>` c
 It routes the same way, from the live navmesh boss to boss, and has hand-written event tables per dungeon in code, a choice between running into packs and pulling them to a camp (by how many
 creatures would wake), resurrection of the fallen by a living healer before going on, and a test harness that runs random parties many times for a success rate. Of these, per-dungeon code
 was not copied (this table is data), and the success-rate harness is the useful thing left to build.
+
+## Recovery by teleport (DungeonTeleport)
+
+Bots that wander onto another level of an instance (a ledge above the route, a pit) have no path back, and the dungeon stalls. With `DungeonTeleport = 1` (and `Bot.Actions.Teleport` in the core, so for tests and
+scenarios, never in normal play):
+
+- A leader whose move to a route point is refused three times for lack of a route is put back on the route once, on the point before (`route_recover` in the log). If the same point fails
+  again, it is skipped (a boss point is never skipped: `route_blocked`).
+- A member more than 60 yards from its leader, or more than 25 yards above or below it, for 20 seconds is put next to the leader (`member_recover`), and not again for 30 seconds.

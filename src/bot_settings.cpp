@@ -335,6 +335,7 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
         ReadKey(config, "SupplyTripSec", 30, 3600, tripSec, warnings);
         settings.Supplies.TripEveryMs = std::uint64_t(tripSec) * 1000;
     }
+    ReadBool(config, "DungeonTeleport", settings.DungeonTeleport, warnings);
     if (auto const it = config.find("DungeonFile"); it != config.end())
         settings.DungeonFile = it->second;
     if (auto const it = config.find("DungeonEventsFile"); it != config.end())

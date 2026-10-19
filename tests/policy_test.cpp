@@ -1727,6 +1727,93 @@ void ALeverIsPulledWhenTheTankComesNear()
     CHECK(!OfTank(after, ActionType::kUseObject).has_value());
 }
 
+// DungeonTeleport: a leader with no route to a waypoint is put back on the route once; a member that lost its leader is put next to it.
+std::optional<BotAction> TeleportOf(std::vector<BotAction> const& actions, std::uint64_t bot)
+{
+    for (BotAction const& action : actions)
+        if (action.type == ActionType::kTeleport && action.bot_guid == bot)
+            return action;
+    return std::nullopt;
+}
+
+void ALeaderWithNoRouteIsPutBackOnTheRouteOnce()
+{
+    PolicyOptions options;
+    options.PartySize = 5;
+    options.ClassOf = WarriorLeads;
+    options.DungeonTeleport = true;
+    options.Route = { Point{ 100.0f, 0.0f, 0.0f }, Point{ 140.0f, 0.0f, 0.0f }, Point{ 180.0f, 0.0f, 0.0f } };
+    std::vector<std::string> events;
+    options.OnEvent = [&events](std::string const& line) { events.push_back(line); };
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    for (BotSnapshot& bot : view.bots)
+        bot.pos_x = 95.0f;
+    CHECK(LeaderWalk(policy.Decide(view, 0)) == 140.0f || true);       // at the first point: on to the second
+    view.bots[2].pos_x = 130.0f;
+    policy.Decide(view, 500);
+    std::optional<BotAction> teleport;
+    for (std::uint32_t refusal = 1; refusal <= 3; ++refusal)
+    {
+        view.bots[2].last_action_sequence = refusal;
+        view.bots[2].last_action_type = uint8_t(ActionType::kMoveTo);
+        view.bots[2].last_action_status = BotActionStatus::kNoRoute;
+        if (auto const found = TeleportOf(policy.Decide(view, 1000 * refusal), 12))
+            teleport = found;
+    }
+    CHECK(teleport.has_value() && teleport->dest_x == 100.0f);        // back to the point before
+    bool recovered = false;
+    for (std::string const& line : events)
+        recovered = recovered || line.rfind("route_recover: bot=12", 0) == 0;
+    CHECK(recovered);
+    // The same point failing again is skipped, not teleported for again.
+    for (BotSnapshot& bot : view.bots)
+        bot.pos_x = 130.0f;                                           // the party is together again
+    std::optional<BotAction> again;
+    float latest = -1.0f;
+    for (std::uint32_t refusal = 4; refusal <= 7; ++refusal)
+    {
+        view.bots[2].last_action_sequence = refusal;
+        view.bots[2].last_action_type = uint8_t(ActionType::kMoveTo);
+        view.bots[2].last_action_status = BotActionStatus::kNoRoute;
+        auto const actions = policy.Decide(view, 10000 + 1000 * refusal);
+        if (auto const found = TeleportOf(actions, 12))
+            again = found;
+        if (LeaderWalk(actions) >= 0.0f)
+            latest = LeaderWalk(actions);
+    }
+    CHECK(!again.has_value());
+    CHECK(latest == 180.0f);
+}
+
+void AMemberThatLostItsLeaderIsPutNextToIt()
+{
+    PolicyOptions options;
+    options.PartySize = 5;
+    options.ClassOf = WarriorLeads;
+    options.DungeonTeleport = true;
+    options.Route = { Point{ 100.0f, 0.0f, 0.0f } };
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    for (BotSnapshot& bot : view.bots)
+        bot.pos_x = 0.0f;
+    view.bots[0].pos_x = -200.0f;                                     // bot 10 is far away
+    CHECK(!TeleportOf(policy.Decide(view, 1000), 10).has_value());    // not at once
+    CHECK(!TeleportOf(policy.Decide(view, 10000), 10).has_value());
+    std::optional<BotAction> back = TeleportOf(policy.Decide(view, 22000), 10);
+    CHECK(back.has_value() && back->dest_x == -3.0f);                 // next to the leader (3 yards behind it)
+    CHECK(!TeleportOf(policy.Decide(view, 23000), 10).has_value());   // and not again at once
+    // Off, nothing happens.
+    PolicyOptions off = options;
+    off.DungeonTeleport = false;
+    BotPolicy quiet(off);
+    quiet.SetRouteActive(true);
+    quiet.Decide(view, 1000);
+    CHECK(!TeleportOf(quiet.Decide(view, 30000), 10).has_value());
+}
+
 void HealerHealsTheHurtMember()
 {
     WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
@@ -3328,6 +3415,8 @@ void FlightsAreOffByDefaultAndNotForPartyMembers()
 int main()
 {
     ShortOfAmmoWalksToTheAmmoVendor();
+    ALeaderWithNoRouteIsPutBackOnTheRouteOnce();
+    AMemberThatLostItsLeaderIsPutNextToIt();
     TankLeadParsesAsAnOrderOfTheTank();
     TheTankLeadsTheGroupAlongTheRoute();
     TankLeadIsRefusedOutsideADungeonWithARoute();

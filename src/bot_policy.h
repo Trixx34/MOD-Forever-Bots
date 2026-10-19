@@ -79,6 +79,9 @@ struct PolicyOptions
     // the teleport unless Bot.Actions.Teleport is on, and retrying it held level-1 bots in walk_to. With this off, that start is
     // dropped the same way a no-route move is, and the bot grinds. A refused teleport drops the start either way.
     bool QuestTeleport = false;
+    // Dungeon recovery by teleport (config DungeonTeleport; needs Bot.Actions.Teleport in the core, so for tests and scenarios): a leader that has no route to a waypoint is put
+    // back on the route once, and a member that has lost its leader (far away, or on another level) is put next to it. Off by default.
+    bool DungeonTeleport = false;
     // Dungeon route (doc 19): the waypoints the party leader walks, in order, while the route is active (SetRouteActive). Empty = none.
     std::vector<Point> Route;
     // Which route points (0-based) are bosses, and the entry of the boss at each (ScenarioBossAt): the leader waits at such a point until that boss is dead.
@@ -279,6 +282,9 @@ private:
         bool TankLead = false;                           // told "tank lead": this bot walks its group through the dungeon of its map
         std::shared_ptr<dungeon_events::Runner> Events;  // the events of the dungeon, run by the bot that leads the route
         std::uint32_t EventsMap = 0;                     // the map those events are for
+        std::size_t RouteRecoveredAt = std::size_t(-1);  // the route point the leader was last put back on the route for (once per point)
+        std::uint64_t LostSinceMs = 0;                   // a member has been far from its leader since this time (0 = not lost)
+        std::uint64_t NextRecoverMs = 0;                 // no teleport back to the leader before this
         std::uint64_t RouteBossSinceMs = 0;              // when the leader began to wait at a boss point (0 = not waiting)
         std::uint32_t RouteNoRoute = 0;                  // moves in a row to the current dungeon waypoint that the core found no route for
         std::uint64_t TaxiBlockedUntilMs = 0;            // the core refused a flight: walk until this

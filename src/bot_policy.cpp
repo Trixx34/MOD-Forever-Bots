@@ -106,6 +106,9 @@ constexpr std::uint64_t kHubRetryIdleMs = 5000;
 constexpr float kHubReachYards = 10.0f;          // a bot this close to its hub has arrived
 constexpr float kVendorReachYards = 4.0f;       // a bot this close to its vendor can use it (the core allows 5)
 constexpr std::uint64_t kBossHoldMs = 180000;     // how long the leader waits at a boss point for the boss to die before it goes on
+constexpr float kLostLeaderYards = 60.0f;         // a member this far from its leader (2D) has lost it ...
+constexpr float kLostLeaderHeight = 25.0f;        // ... or this far above or below it (another level of the dungeon)
+constexpr std::uint64_t kLostLeaderMs = 20000;    // for this long, then it is put next to the leader (DungeonTeleport)
 constexpr std::uint32_t kRouteNoRouteSkip = 3;     // refusals in a row (no route) after which a dungeon waypoint is skipped
 constexpr std::uint32_t kRepairBelowPct = 50;    // worn gear below this durability sends the bot to a repairman, not just any vendor
 constexpr float kRoutePointReachYards = 6.0f;    // the leader has arrived at a route waypoint this close to it
@@ -1988,6 +1991,28 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             }
             state.InFight = false;
             wanted = followRef ? Decision{ ActionType::kFollow, followRef } : Decision{ ActionType::kStop, 0 };
+            // A member that has lost its leader in a dungeon (far away, or on another level of the instance, so that it has no way to follow) is put next to it after a while
+            // (DungeonTeleport; the core's Bot.Actions.Teleport). Not in a fight, and not again for 30 seconds.
+            if (_options.DungeonTeleport && routeOn && partyMember && leaderSnap && bot.life_state == 0 && bot.in_combat == 0 && leaderSnap->life_state == 0)
+            {
+                bool const lost = Distance2d(bot, *leaderSnap) > kLostLeaderYards || std::fabs(bot.pos_z - leaderSnap->pos_z) > kLostLeaderHeight;
+                if (!lost)
+                    state.LostSinceMs = 0;
+                else if (state.LostSinceMs == 0)
+                    state.LostSinceMs = nowMs;
+                else if (nowMs - state.LostSinceMs >= kLostLeaderMs && nowMs >= state.NextRecoverMs)
+                {
+                    if (_options.OnEvent)
+                        _options.OnEvent("member_recover: bot=" + std::to_string(bot.guid) + " leader=" + std::to_string(leaderSnap->guid) + " from=" + std::to_string(int(bot.pos_x)) + "," +
+                                         std::to_string(int(bot.pos_y)) + "," + std::to_string(int(bot.pos_z)) + " leader_at=" + std::to_string(int(leaderSnap->pos_x)) + "," +
+                                         std::to_string(int(leaderSnap->pos_y)) + "," + std::to_string(int(leaderSnap->pos_z)));
+                    wanted = Decision{ ActionType::kTeleport, 0, Point{ leaderSnap->pos_x - 3.0f, leaderSnap->pos_y, leaderSnap->pos_z }, bot.map_id };
+                    state.NextRecoverMs = nowMs + 30000;
+                    state.LostSinceMs = 0;
+                    state.Last.reset();
+                }
+            }
+
             // Dungeon route (doc 19): the leader of a party walks the route while it is healthy and its members are close. Otherwise
             // it stands (and so rests), and the party catches up. The route is the scenario's, or for "tank lead" the one of the dungeon of the bot's map.
             std::vector<Point> const* routePoints = nullptr;
@@ -2057,6 +2082,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 // good: after kRouteNoRouteSkip refusals in a row the leader gives that point up and goes on to the next one.
                 // A boss point is never skipped: the boss stands between the party and the rest of the dungeon (a locked door opens when it dies, or it guards
                 // the way). A boss that cannot be reached stops the run at that point, which the result reports as the furthest point reached.
+                bool recovering = false;   // the leader was just put back on the route: no walking order this tick
                 bool const bossHere = (*routeBoss).count(state.RouteIndex) != 0 && !killedNow.count((*routeBoss).at(state.RouteIndex));
                 if (state.RouteNoRoute >= kRouteNoRouteSkip && bossHere)
                 {
@@ -2065,6 +2091,22 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                                          " boss=" + std::to_string((*routeBoss).at(state.RouteIndex)) + " reason=no_route map=" + std::to_string(bot.map_id) +
                                          " from=" + std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) + "," + std::to_string(int(bot.pos_z)));
                     state.RouteNoRoute = kRouteNoRouteSkip + 1; // logged once
+                }
+                else if (state.RouteNoRoute >= kRouteNoRouteSkip && _options.DungeonTeleport && state.RouteRecoveredAt != state.RouteIndex)
+                {
+                    // Off the mesh, on another level, or cut off: put the leader back on the route (the point before, or the first point) once; the same point failing again
+                    // after that is skipped (or blocks, for a boss).
+                    std::size_t const back = state.RouteIndex > 0 ? state.RouteIndex - 1 : 0;
+                    state.RouteRecoveredAt = state.RouteIndex;
+                    state.RouteNoRoute = 0;
+                    if (_options.OnEvent)
+                        _options.OnEvent("route_recover: bot=" + std::to_string(bot.guid) + " point=" + std::to_string(state.RouteIndex) + "/" + std::to_string(routePoints->size()) +
+                                         " from=" + std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) + "," + std::to_string(int(bot.pos_z)) + " to_point=" +
+                                         std::to_string(back));
+                    wanted = Decision{ ActionType::kTeleport, 0, (*routePoints)[back], bot.map_id };
+                    routeBusy = true;
+                    recovering = true;
+                    state.Last.reset();
                 }
                 else if (state.RouteNoRoute >= kRouteNoRouteSkip)
                 {
@@ -2129,7 +2171,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     if (eventBusy)
                         routeBusy = true;
                 }
-                Point const* waypoint = eventBusy || state.RouteIndex >= routePoints->size() ? nullptr : &(*routePoints)[state.RouteIndex];
+                Point const* waypoint = eventBusy || recovering || state.RouteIndex >= routePoints->size() ? nullptr : &(*routePoints)[state.RouteIndex];
                 if (waypoint)
                 {
                     float const dx = bot.pos_x - waypoint->X;
