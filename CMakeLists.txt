@@ -31,7 +31,7 @@ target_include_directories(forever_bots_settings PUBLIC src)
 add_library(forever_bots_store STATIC src/bot_store.cpp)
 target_include_directories(forever_bots_store PUBLIC src)
 
-add_library(forever_bots_policy STATIC src/bot_policy.cpp src/chat_commands.cpp src/combat_rotation.cpp src/quest_data.cpp src/quest_planner.cpp src/scenario.cpp src/grind_data.cpp src/supply_policy.cpp src/auction_policy.cpp src/taxi_policy.cpp src/dungeon_events.cpp src/chat_say.cpp src/errand_policy.cpp)
+add_library(forever_bots_policy STATIC src/bot_policy.cpp src/chat_commands.cpp src/combat_rotation.cpp src/quest_data.cpp src/quest_planner.cpp src/scenario.cpp src/grind_data.cpp src/supply_policy.cpp src/auction_policy.cpp src/taxi_policy.cpp src/dungeon_events.cpp src/chat_say.cpp src/errand_policy.cpp src/sell_policy.cpp)
 target_include_directories(forever_bots_policy PUBLIC src)
 target_link_libraries(forever_bots_policy PUBLIC forever_module_sdk)
 
@@ -161,3 +161,7 @@ if(Python3_Interpreter_FOUND)
     # The world database tools: dump_to_sqlite.py and export_world_quests.py on a tiny made-up dump.
     add_test(NAME world_data COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/world_data_test.py ${CMAKE_CURRENT_SOURCE_DIR})
 endif()
+
+add_executable(sell_test tests/sell_test.cpp)
+target_link_libraries(sell_test PRIVATE forever_bots_policy)
+add_test(NAME sell COMMAND sell_test)
