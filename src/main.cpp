@@ -1197,6 +1197,7 @@ int main(int argc, char** argv)
             plan.Route.push_back({ point[0], point[1], point[2] });
         plan.DurationMs = std::uint64_t(settings.Scenario.DurationSec) * 1000;
         plan.Gear = settings.Scenario.Gear;
+        plan.Supplies = settings.Scenario.Supplies;
         plan.Bosses = settings.Scenario.Bosses;
         plan.ClassOf = policyOptions.ClassOf;
         plan.WipeRecovery = settings.Scenario.WipeRecovery;

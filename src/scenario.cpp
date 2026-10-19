@@ -156,6 +156,21 @@ void ScenarioDirector::Decide(forever_module::WorldTickSnapshotView const& view,
                 actions.push_back(grant);
                 pending = true;
             }
+            // Supplies: food and drink, one kind per bot per tick, after its gear, so the party can eat and drink between pulls.
+            for (BotSnapshot const& bot : bots)
+            {
+                std::size_t& next = _nextSupply[bot.guid];
+                if (next >= _plan.Supplies.size())
+                    continue;
+                BotAction grant;
+                grant.bot_guid = bot.guid;
+                grant.type = ActionType::kGrant;
+                grant.spell_id = _plan.Supplies[next].first;
+                grant.dest_x = float(_plan.Supplies[next].second);
+                actions.push_back(grant);
+                ++next;
+                pending = true;
+            }
             if (pending)
             {
                 _phaseSinceMs = nowMs; // the pause counts from the last grant

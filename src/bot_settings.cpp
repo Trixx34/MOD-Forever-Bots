@@ -213,6 +213,21 @@ void ReadScenario(std::unordered_map<std::string, std::string> const& config, Sc
             else
                 warnings.push_back("Module.forever-bots." + key + ": not ScenarioRoute<n> = \"x y z\"; ignored.");
         }
+        else if (key == "ScenarioSupplies")
+        {
+            std::istringstream list(value);
+            std::string item;
+            while (std::getline(list, item, ','))
+            {
+                std::size_t const colon = item.find(':');
+                std::uint32_t entry = 0, count = 0;
+                if (colon != std::string::npos && std::from_chars(item.data(), item.data() + colon, entry).ec == std::errc{} && entry > 0 &&
+                    std::from_chars(item.data() + colon + 1, item.data() + item.size(), count).ec == std::errc{} && count > 0)
+                    scenario.Supplies.emplace_back(entry, count);
+                else
+                    warnings.push_back("Module.forever-bots.ScenarioSupplies: '" + item + "' is not item:count; ignored.");
+            }
+        }
         else if (key.rfind("ScenarioGear", 0) == 0)
         {
             std::uint32_t classId = 0;

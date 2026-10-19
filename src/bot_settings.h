@@ -47,6 +47,8 @@ struct ScenarioSettings
     std::uint32_t DurationSec = 1200;
     std::vector<std::array<float, 3>> Route;
     std::map<std::uint32_t, std::vector<std::uint32_t>> Gear;
+    // Food and drink (and anything else) every bot of the scenario is given, after its gear: item entry and count (ScenarioSupplies = "4540:5,1205:5").
+    std::vector<std::pair<std::uint32_t, std::uint32_t>> Supplies;
     std::vector<std::pair<std::uint32_t, std::string>> Bosses; // creature entry, name
     std::vector<std::pair<std::uint32_t, std::uint32_t>> BossAt; // route point (0-based) and the boss entry standing there (ScenarioBossAt)
     std::string ResultFile = "scenario-results.log";

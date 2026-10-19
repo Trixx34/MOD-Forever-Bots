@@ -37,6 +37,7 @@ struct ScenarioPlan
     std::vector<ScenarioPoint> Route;
     std::uint64_t DurationMs = 1200000;
     std::map<std::uint32_t, std::vector<std::uint32_t>> Gear; // class id -> item entries to grant and equip
+    std::vector<std::pair<std::uint32_t, std::uint32_t>> Supplies; // item entry and count granted to every bot after its gear (food, drink)
     std::vector<std::pair<std::uint32_t, std::string>> Bosses; // creature entry and name of each boss; one seen dead counts as killed
     std::function<std::uint32_t(std::uint64_t)> ClassOf;      // bot guid -> class id
     // Dead-bot recovery. With WipeRecovery on, an all-down state starts a timer of WipeRecoveryMs: if a bot is alive again before it ends,
@@ -120,6 +121,7 @@ private:
     std::uint64_t _phaseSinceMs = 0;
     bool _phaseStarted = false;
     std::map<std::uint64_t, std::size_t> _nextGrant;   // bot -> index of the next gear item to grant
+    std::map<std::uint64_t, std::size_t> _nextSupply;  // bot -> index of the next supply to grant
     bool _equipSent = false;
     std::uint64_t _lastEnterMs = 0;
     std::uint64_t _leaderArrivedMs = 0;

@@ -101,6 +101,13 @@ void SayAndSupplySettings()
     warnings.clear();
     BotSettings const files = ParseBotSettings({ { "DungeonFile", "data/dungeons.txt" }, { "DungeonEventsFile", "data/dungeon_events.txt" } }, warnings);
     CHECK(files.DungeonFile == "data/dungeons.txt" && files.DungeonEventsFile == "data/dungeon_events.txt" && off.DungeonFile.empty() && off.DungeonEventsFile.empty());
+    BotSettings const supplies = ParseBotSettings({ { "Scenario", "dm" }, { "ScenarioRoster", "2:1,5:5" }, { "ScenarioSupplies", "4540:5,1205:5,x" } }, warnings);
+    CHECK(supplies.Scenario.Supplies.size() == 2 && supplies.Scenario.Supplies[0].first == 4540 && supplies.Scenario.Supplies[1].second == 5);
+    bool warnedSupplies = false;
+    for (std::string const& line : warnings)
+        warnedSupplies = warnedSupplies || line.find("ScenarioSupplies") != std::string::npos;
+    CHECK(warnedSupplies);
+    warnings.clear();
     BotSettings const badCurve = ParseBotSettings({ { "PresenceDayPercent", "1,2,3" } }, warnings);
     CHECK(badCurve.Presence.DayPercent == presence::Settings().DayPercent && warnings.size() == 1);
     warnings.clear();
