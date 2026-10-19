@@ -1814,6 +1814,26 @@ void AMemberThatLostItsLeaderIsPutNextToIt()
     CHECK(!TeleportOf(quiet.Decide(view, 30000), 10).has_value());
 }
 
+// A party that flips between ready and not ready every tick (a member that is a ghost one moment and not the next) must not hold the leader forever.
+void AFlippingPartyDoesNotHoldTheLeaderForever()
+{
+    BotPolicy policy = DungeonPolicy();
+    WorldTickSnapshotView hurt = PartyView({ 10, 11, 12, 13, 14 });
+    hurt.bots[1].health = 400;                                        // bot 11 below the ready mark
+    WorldTickSnapshotView healthy = PartyView({ 10, 11, 12, 13, 14 });
+    AddNearby(healthy, 2, Unit(8, 7, 20.0f, true));
+    std::uint64_t now = 0;
+    bool pulled = false;
+    for (int tick = 0; tick < 400 && !pulled; ++tick)
+    {
+        now += 500;
+        WorldTickSnapshotView const& view = (tick % 2 == 0) ? hurt : healthy;   // flips every tick
+        pulled = HasAction(policy.Decide(view, now), 12, ActionType::kFollow, MakeUnitRef(8, 1, 7)) ||
+                 HasAction(policy.Decide(view, now), 12, ActionType::kAttackTarget);
+    }
+    CHECK(pulled);                                                    // the wait ends after kPullHoldMaxMs (120 s) of flipping
+}
+
 void HealerHealsTheHurtMember()
 {
     WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
@@ -3415,6 +3435,7 @@ void FlightsAreOffByDefaultAndNotForPartyMembers()
 int main()
 {
     ShortOfAmmoWalksToTheAmmoVendor();
+    AFlippingPartyDoesNotHoldTheLeaderForever();
     ALeaderWithNoRouteIsPutBackOnTheRouteOnce();
     AMemberThatLostItsLeaderIsPutNextToIt();
     TankLeadParsesAsAnOrderOfTheTank();

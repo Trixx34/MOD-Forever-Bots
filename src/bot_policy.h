@@ -319,6 +319,7 @@ private:
         std::uint64_t RangeCloserUntilMs = 0;            // standing closer to the target after an out-of-range refusal, until this time
         std::uint32_t LosRefusals = 0;                   // line-of-sight refusals in a row
         std::uint64_t CloserUntilMs = 0;                 // closing to melee range after a line-of-sight refusal, until this time
+        std::uint64_t HoldLastNotReadyMs = 0;            // the last tick the party was not ready (the pull hold ends after kPullHoldClearMs of readiness)
         std::uint64_t HoldSinceMs = 0;                   // the party leader waits for the party to be ready since this time (0 = not waiting)
         std::uint32_t GearedAtLevel = 0;                 // the level at the last auto gear (0 = not yet)
         bool GearRequested = false;                      // the .autogear command asked for it

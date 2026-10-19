@@ -118,6 +118,7 @@ constexpr std::uint32_t kRouteMinHealthPct = 80; // and for its own health to be
 constexpr std::uint32_t kPartyReadyHealthPct = 80;  // every living member has at least this much health
 constexpr std::uint32_t kPartyReadyPowerPct = 60;   // and every mana user at least this much mana
 constexpr std::uint32_t kPartyReadySitHealthPct = 95; // a sitting member rests up to this much
+constexpr std::uint64_t kPullHoldClearMs = 10000;  // the party must be ready this long in a row before a pull hold ends
 constexpr std::uint64_t kPullHoldMaxMs = 120000;    // the party never waits longer than this for itself
 constexpr std::uint64_t kTankHeadStartMs = 2500;    // the others join a fight this long after the tank started it, so the tank has the threat
 // Healing: a healer class heals the party member with the lowest health below this share, within this range.
@@ -1735,13 +1736,15 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     ready = false;
                     not_ready_reason = deadWaitKind == 1 ? "dead_member_rez" : "dead_member_ghost";
                 }
-                if (ready)
+                // The hold ends once the party has been ready for kPullHoldClearMs in a row. A party that flips between ready and not ready every tick (a member
+                // that is a ghost one moment and not the next) must not restart the wait each time, or it never ends (the soak's Deadmines run waited for 40 minutes).
+                if (ready && state.HoldSinceMs != 0 && nowMs - state.HoldLastNotReadyMs >= kPullHoldClearMs)
                 {
-                    if (state.HoldSinceMs != 0 && _options.OnEvent)
+                    if (_options.OnEvent)
                         _options.OnEvent("pull hold ended: leader=" + std::to_string(bot.guid) + " waited_ms=" + std::to_string(nowMs - state.HoldSinceMs));
                     state.HoldSinceMs = 0;
                 }
-                else
+                if (!ready)
                 {
                     if (state.HoldSinceMs == 0)
                     {
@@ -1749,8 +1752,9 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                         if (_options.OnEvent)
                             _options.OnEvent("pull hold started: leader=" + std::to_string(bot.guid) + " reason=" + not_ready_reason);
                     }
-                    dungeonHold = nowMs - state.HoldSinceMs < kPullHoldMaxMs;
+                    state.HoldLastNotReadyMs = nowMs;
                 }
+                dungeonHold = !ready ? nowMs - state.HoldSinceMs < kPullHoldMaxMs : false;
             }
             else
             {
