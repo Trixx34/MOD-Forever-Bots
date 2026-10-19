@@ -1024,6 +1024,7 @@ int main(int argc, char** argv)
     policyOptions.ServiceEveryMs = std::uint64_t(settings.ServiceEverySec) * 1000;
     policyOptions.TrainEveryMs = std::uint64_t(settings.TrainEverySec) * 1000;
     policyOptions.Supplies = settings.Supplies;
+    policyOptions.Taxi = settings.Taxi;
     policyOptions.PartySize = settings.PartySize;
     policyOptions.PartyCount = settings.PartyCount;
     for (auto const& [mapId, spots] : settings.Hubs)

@@ -352,6 +352,18 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
         else
             warnings.push_back("Module.forever-bots.PresenceDayPercent: expected 24 comma-separated numbers from 0 to 100; using the default curve.");
     }
+    ReadBool(config, "Taxi", settings.Taxi.Enabled, warnings);
+    {
+        std::uint32_t minWalk = static_cast<std::uint32_t>(settings.Taxi.MinWalkYards);
+        std::uint32_t masterMax = static_cast<std::uint32_t>(settings.Taxi.MasterMaxYards);
+        std::uint32_t blockedSec = static_cast<std::uint32_t>(settings.Taxi.BlockedMs / 1000);
+        ReadKey(config, "TaxiMinWalkYards", 300, 20000, minWalk, warnings);
+        ReadKey(config, "TaxiMasterMaxYards", 50, 5000, masterMax, warnings);
+        ReadKey(config, "TaxiBlockedSec", 10, 86400, blockedSec, warnings);
+        settings.Taxi.MinWalkYards = float(minWalk);
+        settings.Taxi.MasterMaxYards = float(masterMax);
+        settings.Taxi.BlockedMs = std::uint64_t(blockedSec) * 1000;
+    }
     ReadBool(config, "Auction", settings.Auction.Enabled, warnings);
     ReadKey(config, "AuctionSellPctGreen", 100, 2000, settings.Auction.SellPctGreen, warnings);
     ReadKey(config, "AuctionSellPctBlue", 100, 2000, settings.Auction.SellPctBlue, warnings);

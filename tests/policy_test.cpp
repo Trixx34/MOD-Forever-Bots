@@ -2911,9 +2911,93 @@ void ABotIsSafeToLogOutOnlyWhenNothingIsGoingOn()
     CHECK(policy.SafeToLogOut(stranger));
 }
 
+
+// ---- Flight points (layout 17, taxi_policy.h) ----
+BotPolicy TaxiPolicy()
+{
+    PolicyOptions options;
+    options.HubsByMap[1] = { Point{ 3000.0f, 0.0f, 0.0f } };   // a hub far away: the idle bot's walk is long
+    options.Taxi.Enabled = true;
+    return BotPolicy(options);
+}
+
+WorldTickSnapshotView TaxiView(float x)
+{
+    WorldTickSnapshotView view = OnMap(1);
+    view.bots[0].pos_x = x;
+    view.bots[0].taxi_master_valid = 1;
+    view.bots[0].taxi_master_x = 100.0f;
+    view.bots[0].taxi_master_guid = MakeUnitRef(8, 3838, 5);
+    return view;
+}
+
+std::optional<BotAction> FirstOf(std::vector<BotAction> const& actions, ActionType type)
+{
+    for (BotAction const& action : actions)
+        if (action.type == type && action.bot_guid == 10)
+            return action;
+    return std::nullopt;
+}
+
+void ALongWalkGoesToTheFlightMasterThenFlies()
+{
+    BotPolicy policy = TaxiPolicy();
+    WorldTickSnapshotView far = TaxiView(0.0f);
+    policy.Decide(far, 0);
+    auto const first = policy.Decide(far, 30000);
+    CHECK(WalkTo(first, 10) == 100.0f);                           // to the flight master, not to the hub
+    CHECK(!FirstOf(first, ActionType::kTaxi).has_value());
+
+    BotPolicy flier = TaxiPolicy();
+    WorldTickSnapshotView there = TaxiView(98.0f);                // 2 yards from the flight master
+    flier.Decide(there, 0);
+    auto const fly = flier.Decide(there, 30000);
+    std::optional<BotAction> order = FirstOf(fly, ActionType::kTaxi);
+    CHECK(order.has_value());
+    if (order)
+    {
+        CHECK(order->target_guid == MakeUnitRef(8, 3838, 5) && order->spell_id == 1 && order->dest_x == 3000.0f);
+    }
+    CHECK(WalkTo(fly, 10) < 0.0f);                                // no walking order with it
+    // The order is not repeated while it is given time to show, and a bot on the flight gets no orders.
+    CHECK(!FirstOf(flier.Decide(there, 31000), ActionType::kTaxi).has_value());
+    WorldTickSnapshotView flying = there;
+    flying.bots[0].in_flight = 1;
+    auto const during = flier.Decide(flying, 60000);
+    CHECK(!FirstOf(during, ActionType::kTaxi).has_value() && WalkTo(during, 10) < 0.0f);
+}
+
+void ARefusedFlightMakesTheBotWalk()
+{
+    BotPolicy policy = TaxiPolicy();
+    WorldTickSnapshotView there = TaxiView(98.0f);
+    policy.Decide(there, 0);
+    CHECK(FirstOf(policy.Decide(there, 30000), ActionType::kTaxi).has_value());
+    WorldTickSnapshotView refused = there;
+    refused.bots[0].last_action_sequence = 7;
+    refused.bots[0].last_action_type = uint8_t(ActionType::kTaxi);
+    refused.bots[0].last_action_status = BotActionStatus::kRefused;
+    auto const after = AfterMount(policy, refused, 50000);
+    CHECK(!FirstOf(after, ActionType::kTaxi).has_value());
+    CHECK(WalkTo(after, 10) == 3000.0f);                          // the walk goes on, to the hub
+}
+
+void FlightsAreOffByDefaultAndNotForPartyMembers()
+{
+    PolicyOptions options;
+    options.HubsByMap[1] = { Point{ 3000.0f, 0.0f, 0.0f } };
+    BotPolicy off(options);
+    WorldTickSnapshotView there = TaxiView(98.0f);
+    off.Decide(there, 0);
+    CHECK(!FirstOf(off.Decide(there, 30000), ActionType::kTaxi).has_value());
+}
+
 int main()
 {
     ShortOfAmmoWalksToTheAmmoVendor();
+    ALongWalkGoesToTheFlightMasterThenFlies();
+    ARefusedFlightMakesTheBotWalk();
+    FlightsAreOffByDefaultAndNotForPartyMembers();
     ABotIsSafeToLogOutOnlyWhenNothingIsGoingOn();
     AWarriorWithoutPotionsOrBandagesBuysThemAtTheGoodsVendor();
     AFarGoodsVendorIsWalkedTo();

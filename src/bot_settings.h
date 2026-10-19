@@ -6,6 +6,7 @@
 #include "bot_presence.h"
 #include "bot_ramp.h"
 #include "supply_policy.h"
+#include "taxi_policy.h"
 
 #include <array>
 #include <cstdint>
@@ -126,6 +127,9 @@ struct BotSettings
     // PresenceMaxOnline, PresenceDayPercent; off by default): bots log off and on like players, see bot_presence.h. Needs Bot.Presence.LogoutOnRelease
     // in the core, or a released bot stays in the world.
     presence::Settings Presence;
+    // Flight points (layout 17; config keys Taxi, TaxiMinWalkYards, TaxiMasterMaxYards, TaxiBlockedSec; off by default): a bot that is not in a party replaces a walk
+    // of at least TaxiMinWalkYards with a flight from a flight master within TaxiMasterMaxYards that lies on the way. Needs Bot.Taxi.Enabled in the core (on by default).
+    taxi::Settings Taxi;
     // Auction House (doc/economy.md; config keys Auction, AuctionSellPctGreen, AuctionSellPctBlue, AuctionSellPctEpic, AuctionBuyoutPct, AuctionRelistPct,
     // AuctionRunHours (2, 8 or 24), AuctionMinVendorCopper, AuctionBagFullPct, AuctionPerVisit, AuctionListedMax, AuctionEverySec, AuctionBuyMaxPct,
     // AuctionBrowsePerVisit, AuctionCallsPerTick; off by default). The decisions are built (auction_policy.h); the module does not carry them out yet.

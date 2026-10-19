@@ -31,6 +31,7 @@
 #include "quest_planner.h"
 #include "chat_say.h"
 #include "supply_policy.h"
+#include "taxi_policy.h"
 
 #include <cstdint>
 #include <functional>
@@ -111,6 +112,8 @@ struct PolicyOptions
     std::uint64_t WaitForGhostMs = 180000;      // and this long after the ghost entered the corpse's map
     // Supplies (layout 15): a bot short of ammunition, food or drink walks to a vendor that sells it and buys, and eats or drinks while resting.
     supply::Settings Supplies;
+    // Flight points (layout 17, taxi_policy.h): a long walk becomes a flight from the nearest flight master. Off by default.
+    taxi::Settings Taxi;
 };
 
 // Name of an action status, for logs.
@@ -256,6 +259,8 @@ private:
         supply::Facts SupplyBefore;                      // and what the bot carried before it
         bool SupplyTrip = false;                         // the walk in progress is a supply trip
         std::uint64_t NextConsumeMs = 0;                 // no eat or drink before this
+        std::uint64_t TaxiBlockedUntilMs = 0;            // the core refused a flight: walk until this
+        std::uint64_t TaxiWaitUntilMs = 0;               // a flight was ordered: give it time to show
         std::uint64_t NextPotionMs = 0;                  // no potion before this (the game shares one cooldown between potions)
         std::uint64_t TravelStartMs = 0;                 // when this walk began; it is dropped after kTravelTimeoutMs
         std::unordered_set<std::uint32_t> CastTimeSpells; // spells the core refused because the bot was moving: they need it standing

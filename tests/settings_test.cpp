@@ -88,6 +88,9 @@ void SayAndSupplySettings()
     BotSettings const badHours = ParseBotSettings({ { "AuctionRunHours", "12" } }, warnings);
     CHECK(badHours.Auction.RunMinutes == 1440 && warnings.size() == 1);
     warnings.clear();
+    CHECK(!off.Taxi.Enabled && off.Taxi.MinWalkYards == 1500.0f && off.Taxi.MasterMaxYards == 600.0f && off.Taxi.BlockedMs == 600000);
+    BotSettings const flights = ParseBotSettings({ { "Taxi", "1" }, { "TaxiMinWalkYards", "2000" }, { "TaxiMasterMaxYards", "800" }, { "TaxiBlockedSec", "120" } }, warnings);
+    CHECK(flights.Taxi.Enabled && flights.Taxi.MinWalkYards == 2000.0f && flights.Taxi.MasterMaxYards == 800.0f && flights.Taxi.BlockedMs == 120000 && warnings.empty());
     BotSettings const badCurve = ParseBotSettings({ { "PresenceDayPercent", "1,2,3" } }, warnings);
     CHECK(badCurve.Presence.DayPercent == presence::Settings().DayPercent && warnings.size() == 1);
     warnings.clear();

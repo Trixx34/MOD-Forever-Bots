@@ -559,6 +559,15 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
         return;
     }
 
+    // A flight refused (no flight master in reach, no path, not worth it, in combat): the bot walks for a while.
+    if (bot.last_action_type == uint8_t(ActionType::kTaxi) && bot.last_action_status != BotActionStatus::kApplied &&
+        bot.last_action_status != BotActionStatus::kNone)
+    {
+        state.TaxiBlockedUntilMs = nowMs + _options.Taxi.BlockedMs;
+        state.TaxiWaitUntilMs = 0;
+        return;
+    }
+
     // Eating or drinking refused: busy or moving is a short wait, anything else (nothing to eat, supplies off in the core) a long one.
     if (bot.last_action_type == uint8_t(ActionType::kConsume) && bot.last_action_status != BotActionStatus::kApplied &&
         bot.last_action_status != BotActionStatus::kNone)
@@ -2498,6 +2507,54 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
 
         if (IsResurrectSpell(bot.casting_spell) && bot.cast_remaining_ms != 0 && state.Last)
             wanted = *state.Last; // a resurrect cast is not broken by a new movement order
+
+        // Flight points (layout 17): a bot on a flight takes no walking orders; a long walk of a bot that is on its own is replaced by a walk to the nearest
+        // flight master and a flight from it (taxi_policy.h). The core refuses a flight that would not bring the bot closer, and the bot then walks.
+        if (_options.Taxi.Enabled && wanted.Type == ActionType::kMoveTo && !partyMember && !partyLeaderBot)
+        {
+            taxi::Facts facts;
+            facts.X = bot.pos_x;
+            facts.Y = bot.pos_y;
+            facts.InFlight = bot.in_flight != 0;
+            facts.InCombat = bot.in_combat != 0;
+            facts.Alive = bot.life_state == 0;
+            facts.MasterValid = bot.taxi_master_valid != 0;
+            facts.MasterX = bot.taxi_master_x;
+            facts.MasterY = bot.taxi_master_y;
+            switch (taxi::Decide(_options.Taxi, facts, wanted.Dest.X, wanted.Dest.Y, nowMs, state.TaxiBlockedUntilMs, state.TaxiWaitUntilMs))
+            {
+                case taxi::Move::Walk:
+                    break;
+                case taxi::Move::WalkToMaster:
+                    wanted.Dest = Point{ bot.taxi_master_x, bot.taxi_master_y, bot.taxi_master_z };
+                    break;
+                case taxi::Move::Fly:
+                {
+                    BotAction fly;
+                    fly.bot_guid = bot.guid;
+                    fly.type = ActionType::kTaxi;
+                    fly.target_guid = bot.taxi_master_guid;
+                    fly.spell_id = bot.map_id;
+                    fly.dest_x = wanted.Dest.X;
+                    fly.dest_y = wanted.Dest.Y;
+                    fly.dest_z = wanted.Dest.Z;
+                    actions.push_back(fly);
+                    state.TaxiWaitUntilMs = nowMs + _options.Taxi.WaitMs;
+                    if (_options.OnEvent)
+                        _options.OnEvent("taxi: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id) +
+                                         " walk=" + std::to_string(int(std::hypot(bot.pos_x - wanted.Dest.X, bot.pos_y - wanted.Dest.Y))));
+                    [[fallthrough]];
+                }
+                case taxi::Move::Wait:
+                    if (state.Last)
+                        wanted = *state.Last; // nothing new is sent while the flight starts or runs
+                    else
+                        wanted = Decision{};
+                    break;
+            }
+        }
+        else if (bot.in_flight != 0 && state.Last)
+            wanted = *state.Last; // on a flight with nothing to walk to: the stop order would be a new order too
 
         // Mount for long travel, dismount when the walk is short, combat starts, or the bot arrives.
         if (bot.in_combat == 0 && bot.life_state == 0 && bot.casting_spell == 0 && nowMs >= state.MountRetryMs)
