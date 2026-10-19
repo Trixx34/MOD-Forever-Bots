@@ -105,6 +105,7 @@ constexpr std::uint64_t kWanderTimeoutMs = 180000; // a walk to a hub longer tha
 constexpr std::uint64_t kHubRetryIdleMs = 5000;
 constexpr float kHubReachYards = 10.0f;          // a bot this close to its hub has arrived
 constexpr float kVendorReachYards = 4.0f;       // a bot this close to its vendor can use it (the core allows 5)
+constexpr std::uint32_t kRouteNoRouteSkip = 3;     // refusals in a row (no route) after which a dungeon waypoint is skipped
 constexpr std::uint32_t kRepairBelowPct = 50;    // worn gear below this durability sends the bot to a repairman, not just any vendor
 constexpr float kRoutePointReachYards = 6.0f;    // the leader has arrived at a route waypoint this close to it
 constexpr float kRouteWaitYards = 30.0f;         // the leader waits for a member farther behind than this
@@ -590,6 +591,8 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
     bool const noRoute = bot.last_action_type == uint8_t(ActionType::kMoveTo) && bot.last_action_status == BotActionStatus::kNoRoute;
     bool const teleportRefused = bot.last_action_type == uint8_t(ActionType::kTeleport) &&
                                  bot.last_action_status != BotActionStatus::kApplied && bot.last_action_status != BotActionStatus::kNone;
+    if (noRoute && bot.last_action_sequence != state.NoRouteSequence)
+        ++state.RouteNoRoute; // a dungeon leader counts these against its current waypoint (kRouteNoRouteSkip)
     if ((noRoute || teleportRefused) && bot.last_action_sequence != state.NoRouteSequence)
     {
         state.NoRouteSequence = bot.last_action_sequence;
@@ -1891,13 +1894,27 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 together = together && deadWaitKind == 0;
                 bool const strong = bot.max_health == 0 ||
                                     std::uint64_t(bot.health) * 100 >= std::uint64_t(bot.max_health) * kRouteMinHealthPct;
-                Point const* waypoint = &_options.Route[state.RouteIndex];
-                float const dx = bot.pos_x - waypoint->X;
-                float const dy = bot.pos_y - waypoint->Y;
-                if (std::sqrt(dx * dx + dy * dy) <= kRoutePointReachYards)
+                // A waypoint the core finds no route to (a spawn on a ledge or off the navmesh, a generated point inside a wall) would hold the whole run for
+                // good: after kRouteNoRouteSkip refusals in a row the leader gives that point up and goes on to the next one.
+                if (state.RouteNoRoute >= kRouteNoRouteSkip)
                 {
-                    ++state.RouteIndex; // arrived: on to the next point in the same tick
-                    waypoint = state.RouteIndex < _options.Route.size() ? &_options.Route[state.RouteIndex] : nullptr;
+                    if (_options.OnEvent)
+                        _options.OnEvent("route_skip: bot=" + std::to_string(bot.guid) + " point=" + std::to_string(state.RouteIndex) + "/" + std::to_string(_options.Route.size()) +
+                                         " reason=no_route");
+                    ++state.RouteIndex;
+                    state.RouteNoRoute = 0;
+                }
+                Point const* waypoint = state.RouteIndex < _options.Route.size() ? &_options.Route[state.RouteIndex] : nullptr;
+                if (waypoint)
+                {
+                    float const dx = bot.pos_x - waypoint->X;
+                    float const dy = bot.pos_y - waypoint->Y;
+                    if (std::sqrt(dx * dx + dy * dy) <= kRoutePointReachYards)
+                    {
+                        ++state.RouteIndex; // arrived: on to the next point in the same tick
+                        state.RouteNoRoute = 0;
+                        waypoint = state.RouteIndex < _options.Route.size() ? &_options.Route[state.RouteIndex] : nullptr;
+                    }
                 }
                 if (waypoint && together && strong)
                 {

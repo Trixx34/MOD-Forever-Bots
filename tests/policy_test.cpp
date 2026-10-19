@@ -1394,6 +1394,45 @@ BotPolicy DungeonPolicy()
     return policy;
 }
 
+// A dungeon waypoint the core finds no route to is given up after three refusals in a row; the leader goes on to the next point.
+void ALeaderSkipsAWaypointWithNoRoute()
+{
+    PolicyOptions options;
+    options.PartySize = 5;
+    options.ClassOf = WarriorLeads;
+    options.Route = { Point{ 500.0f, 0.0f, 0.0f }, Point{ 900.0f, 0.0f, 0.0f } };
+    std::vector<std::string> events;
+    options.OnEvent = [&events](std::string const& line) { events.push_back(line); };
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    auto first = AfterMount(policy, view, 0);
+    float toFirst = -1.0f;
+    for (BotAction const& action : first)
+        if (action.type == ActionType::kMoveTo && action.bot_guid == 12)
+            toFirst = action.dest_x;
+    CHECK(toFirst == 500.0f);
+
+    float latest = toFirst;
+    for (std::uint32_t refusal = 1; refusal <= 3; ++refusal)
+    {
+        view.bots[2].last_action_sequence = refusal;
+        view.bots[2].last_action_type = uint8_t(ActionType::kMoveTo);
+        view.bots[2].last_action_status = BotActionStatus::kNoRoute;
+        for (BotAction const& action : policy.Decide(view, 1000 * refusal))
+            if (action.type == ActionType::kMoveTo && action.bot_guid == 12)
+                latest = action.dest_x;
+        if (refusal < 3)
+            CHECK(latest == 500.0f);                          // two refusals: still trying the first point
+    }
+    CHECK(latest == 900.0f);                                  // the third gives it up
+    bool skipped = false;
+    for (std::string const& line : events)
+        skipped = skipped || line.rfind("route_skip: bot=12 point=0/2", 0) == 0;
+    CHECK(skipped);
+}
+
 void HealerHealsTheHurtMember()
 {
     WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
@@ -2995,6 +3034,7 @@ void FlightsAreOffByDefaultAndNotForPartyMembers()
 int main()
 {
     ShortOfAmmoWalksToTheAmmoVendor();
+    ALeaderSkipsAWaypointWithNoRoute();
     ALongWalkGoesToTheFlightMasterThenFlies();
     ARefusedFlightMakesTheBotWalk();
     FlightsAreOffByDefaultAndNotForPartyMembers();
