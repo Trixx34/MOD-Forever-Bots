@@ -2066,6 +2066,37 @@ void ADeadMemberOnMapZeroIsTeleportedBackToItsCorpse()
     CHECK(!Logged(events, "corpse_run_failed:"));
 }
 
+void ADeadMemberIsRevivedByItsLeaderOutOfCombat()
+{
+    std::vector<std::string> events;
+    PolicyOptions options = DeadOptions(&events);
+    options.DungeonReviveOutOfCombat = true;
+    options.Route = { Point{ 100.0f, 0.0f, 0.0f } };
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 });
+    Ghost(v.bots[3], 0.0f, 36, 50.0f);
+    v.bots[3].map_id = 0;
+    std::vector<BotAction> first = policy.Decide(v, 1000);
+    CHECK(HasAction(first, 13, ActionType::kRevive));                                     // the leader is up and quiet
+    CHECK(!HasAction(first, 13, ActionType::kMoveTo));                                    // and the ghost waits for it, not walking off
+    CHECK(Logged(events, "revive_out_of_combat:"));
+    CHECK(!HasAction(policy.Decide(v, 2000), 13, ActionType::kRevive));                   // not again before the retry
+    CHECK(HasAction(policy.Decide(v, 11000), 13, ActionType::kRevive));                   // again if the core refused it
+    CHECK(HasAction(policy.Decide(v, 22000), 13, ActionType::kRevive));                   // third try
+    std::vector<BotAction> given = policy.Decide(v, 33000);
+    CHECK(!HasAction(given, 13, ActionType::kRevive));                                    // given up after three tries
+    CHECK(HasAction(given, 13, ActionType::kMoveTo));                                     // the corpse run goes on: to the portal
+
+    BotPolicy busy(options);
+    busy.SetRouteActive(true);
+    WorldTickSnapshotView fighting = PartyView({ 10, 11, 12, 13, 14 });
+    Ghost(fighting.bots[3], 0.0f, 36, 50.0f);
+    fighting.bots[3].map_id = 0;
+    fighting.bots[2].in_combat = 1;                                                       // the leader (bot 12) fights: no revive
+    CHECK(!HasAction(busy.Decide(fighting, 1000), 13, ActionType::kRevive));
+}
+
 void GhostReclaimsInRadiusAndRetries()
 {
     BotPolicy policy(DeadOptions(nullptr));
@@ -3583,6 +3614,7 @@ int main()
     GhostWalksToItsCorpseAndIgnoresCombat();
     GhostOnTheOutsideMapWalksToThePortal();
     ADeadMemberOnMapZeroIsTeleportedBackToItsCorpse();
+    ADeadMemberIsRevivedByItsLeaderOutOfCombat();
     GhostReclaimsInRadiusAndRetries();
     GhostCorpseRunTimesOut();
     DeadBotAcceptsAResurrectOffer();

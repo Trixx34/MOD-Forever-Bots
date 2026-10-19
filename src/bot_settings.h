@@ -134,6 +134,7 @@ struct BotSettings
     // Dungeons (doc/dungeons.md): DungeonFile = the routes (data/dungeons.txt); with it set, "tank lead" works in every dungeon of the file. DungeonEventsFile = the
     // events table for all dungeons (data/dungeon_events.txt, dungeon_events.h): doors to open, charges to fire.
     bool DungeonTeleport = false;   // DungeonTeleport = 1: lost dungeon bots are put back by teleport (tests and scenarios; needs Bot.Actions.Teleport in the core)
+    bool DungeonReviveOutOfCombat = false;  // DungeonReviveOutOfCombat = 1: a dead member of a dungeon party is revived by its leader out of combat (needs Bot.Chat.Orders.Enabled in the core)
     std::string DungeonFile;
     std::string DungeonEventsFile;
     // Flight points (layout 17; config keys Taxi, TaxiMinWalkYards, TaxiMasterMaxYards, TaxiBlockedSec; off by default): a bot that is not in a party replaces a walk

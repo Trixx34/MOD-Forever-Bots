@@ -1096,6 +1096,7 @@ int main(int argc, char** argv)
     policyOptions.TrainEveryMs = std::uint64_t(settings.TrainEverySec) * 1000;
     policyOptions.Supplies = settings.Supplies;
     policyOptions.DungeonTeleport = settings.DungeonTeleport;
+    policyOptions.DungeonReviveOutOfCombat = settings.DungeonReviveOutOfCombat;
     // Dungeon routes for "tank lead" (every dungeon of DungeonFile, by the map of its entry) and the events table (DungeonEventsFile), shared by all dungeons.
     std::vector<dungeon_events::Event> allEvents;
     if (!settings.DungeonEventsFile.empty())

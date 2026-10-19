@@ -176,6 +176,8 @@ constexpr std::uint64_t kReleaseRetryMs = 3000;      // a release not yet seen t
 constexpr std::uint64_t kAcceptRetryMs = 2000;
 constexpr std::uint64_t kReclaimRetryMs = 3000;
 constexpr std::uint64_t kCorpseTeleportRetryMs = 15000; // a ghost off its corpse's map with no portal is teleported to the corpse, not again before this
+constexpr std::uint64_t kOutOfCombatReviveRetryMs = 10000; // a ghost of a dungeon party is revived by its leader out of combat, not again before this
+constexpr std::uint32_t kOutOfCombatReviveTries = 3;       // and after this many tries the ghost walks back to its corpse as before
 constexpr float kReclaimYards = 35.0f;               // the core allows 39 yards; the ghost reclaims from this close
 
 // A cast or channel is in progress. cast_remaining_ms is no test: it is 0 while a spell is in flight (a Fireball after the cast, state
@@ -1366,6 +1368,8 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 state.AcceptedFrom = 0;
                 state.ReclaimRetryMs = 0;
                 state.Reclaimed = false;
+                state.ReviveRetryMs = 0;
+                state.ReviveAttempts = 0;
                 state.RunStarted = false;
                 state.Inside = false;
                 state.RunFailed = false;
@@ -1473,6 +1477,33 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 event(std::string("release: bot=") + std::to_string(bot.guid) + " reason=" + reason + " waited_ms=" + std::to_string(waited) +
                       " rezzer_up=" + (rezzer ? "yes" : "no") + " alive_members=" + (anyAlive ? "yes" : "no"));
                 continue;
+            }
+
+            // Dungeon party, out of combat (DungeonReviveOutOfCombat): a ghost is revived by its leader instead of walking back to its corpse, once the
+            // leader is alive and not fighting. The core's revive order puts the bot at the leader's side, or where it fell when the leader is on another
+            // map. The ghost waits between tries and walks on only once they are used up (kOutOfCombatReviveTries), or when the leader is not up.
+            if (_options.DungeonReviveOutOfCombat && deadParty != 0 && deadParty != bot.guid && bot.in_combat == 0 && state.ReviveAttempts < kOutOfCombatReviveTries &&
+                (_routeActive || tankLed.count(deadParty) != 0))
+            {
+                auto const leaderAt = indexOf.find(deadParty);
+                BotSnapshot const* const leader = leaderAt == indexOf.end() ? nullptr : &view.bots[leaderAt->second];
+                if (leader && leader->life_state == 0 && leader->in_combat == 0)
+                {
+                    if (nowMs >= state.ReviveRetryMs)
+                    {
+                        BotAction revive;
+                        revive.bot_guid = bot.guid;
+                        revive.type = ActionType::kRevive;
+                        revive.target_guid = PlayerRef(deadParty);
+                        revive.dest_x = 0.0f;
+                        actions.push_back(revive);
+                        state.ReviveAttempts += 1;
+                        state.ReviveRetryMs = nowMs + kOutOfCombatReviveRetryMs;
+                        event("revive_out_of_combat: bot=" + std::to_string(bot.guid) + " leader=" + std::to_string(leader->guid) +
+                              " attempt=" + std::to_string(state.ReviveAttempts) + " map=" + std::to_string(bot.map_id));
+                    }
+                    continue;
+                }
             }
 
             // A ghost: back to the corpse. A corpse on another map (an instance, a ghost is released outside) is reached through the portal.

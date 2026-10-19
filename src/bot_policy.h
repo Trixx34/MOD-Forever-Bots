@@ -82,6 +82,9 @@ struct PolicyOptions
     // Dungeon recovery by teleport (config DungeonTeleport; needs Bot.Actions.Teleport in the core, so for tests and scenarios): a leader that has no route to a waypoint is put
     // back on the route once, and a member that has lost its leader (far away, or on another level) is put next to it. Off by default.
     bool DungeonTeleport = false;
+    // Dungeon revive out of combat (config DungeonReviveOutOfCombat; needs Bot.Chat.Orders.Enabled in the core): a dead member of a dungeon party is revived by its
+    // leader, when the leader is alive and not fighting, instead of walking back to its corpse. Off by default.
+    bool DungeonReviveOutOfCombat = false;
     // Dungeon route (doc 19): the waypoints the party leader walks, in order, while the route is active (SetRouteActive). Empty = none.
     std::vector<Point> Route;
     // Which route points (0-based) are bosses, and the entry of the boss at each (ScenarioBossAt): the leader waits at such a point until that boss is dead.
@@ -343,6 +346,8 @@ private:
         std::uint64_t AcceptedFrom = 0;                  // the resurrecter of the last accept sent (0 = none)
         std::uint64_t ReclaimRetryMs = 0;
         std::uint64_t CorpseTeleportRetryMs = 0;         // the next teleport of a ghost to its corpse (no portal route)
+        std::uint64_t ReviveRetryMs = 0;                 // the next out-of-combat revive order of this ghost by its leader
+        std::uint32_t ReviveAttempts = 0;                // revive orders sent in this death
         bool Reclaimed = false;                          // a reclaim was sent in this death
         std::uint64_t RunStartMs = 0;                    // the corpse run began (0 = not yet)
         std::uint64_t InsideSinceMs = 0;                 // the ghost is on the corpse's map since

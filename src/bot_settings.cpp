@@ -351,6 +351,7 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
         settings.Supplies.TripEveryMs = std::uint64_t(tripSec) * 1000;
     }
     ReadBool(config, "DungeonTeleport", settings.DungeonTeleport, warnings);
+    ReadBool(config, "DungeonReviveOutOfCombat", settings.DungeonReviveOutOfCombat, warnings);
     if (auto const it = config.find("DungeonFile"); it != config.end())
         settings.DungeonFile = it->second;
     if (auto const it = config.find("DungeonEventsFile"); it != config.end())
