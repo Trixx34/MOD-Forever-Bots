@@ -3346,8 +3346,8 @@ void ABotMissingAReagentBuysItAtTheReagentVendor()
         CHECK(buy->target_guid == MakeUnitRef(8, 5200, 7));
     }
     BotPolicy off = GoodsPolicy();
-    CHECK(!FindAction(off.Decide(view, 0), ActionType::kVendor).has_value() ||
-          (FindAction(off.Decide(view, 0), ActionType::kVendor)->spell_id & 512) == 0);
+    std::optional<BotAction> offBuy = FindAction(off.Decide(view, 0), ActionType::kVendor);   // one Decide: a second call changes the policy's state
+    CHECK(!offBuy.has_value() || (offBuy->spell_id & 512) == 0);
 }
 
 void AManaUserDrinksAManaPotionInAFight()
