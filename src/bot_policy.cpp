@@ -1899,8 +1899,13 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 if (state.RouteNoRoute >= kRouteNoRouteSkip)
                 {
                     if (_options.OnEvent)
+                    {
+                        Point const& given = _options.Route[state.RouteIndex];
                         _options.OnEvent("route_skip: bot=" + std::to_string(bot.guid) + " point=" + std::to_string(state.RouteIndex) + "/" + std::to_string(_options.Route.size()) +
-                                         " reason=no_route");
+                                         " reason=no_route map=" + std::to_string(bot.map_id) + " from=" + std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) + "," +
+                                         std::to_string(int(bot.pos_z)) + " to=" + std::to_string(int(given.X)) + "," + std::to_string(int(given.Y)) + "," + std::to_string(int(given.Z)) +
+                                         " mounted=" + std::to_string(state.Mounted));
+                    }
                     ++state.RouteIndex;
                     state.RouteNoRoute = 0;
                 }
