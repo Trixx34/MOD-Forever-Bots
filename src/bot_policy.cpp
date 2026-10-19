@@ -603,6 +603,14 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
 
     // A move the core found no route for, or a quest-walk teleport the core refused: that start's giver is left alone for a while
     // (the planner picks the next start). Each result is read once, by its sequence. A refused teleport must not be sent again.
+    // Diagnostics: a teleport the core did not apply (DungeonTeleport and the scenario's teleports) is logged with the reason the core gave, once per sequence.
+    if (bot.last_action_type == uint8_t(ActionType::kTeleport) && bot.last_action_status != BotActionStatus::kApplied &&
+        bot.last_action_status != BotActionStatus::kNone && bot.last_action_sequence != state.TeleportLoggedSequence && _options.OnEvent)
+    {
+        state.TeleportLoggedSequence = bot.last_action_sequence;
+        _options.OnEvent("teleport_refused: bot=" + std::to_string(bot.guid) + " status=" + ActionStatusName(bot.last_action_status) + " pos=" +
+                         std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) + "," + std::to_string(int(bot.pos_z)) + " in_combat=" + std::to_string(bot.in_combat));
+    }
     // Diagnostics: what a refusal for no route was for (the log otherwise says only "no route"), at most once in ten seconds for a bot.
     if (bot.last_action_status == BotActionStatus::kNoRoute && _options.OnEvent && nowMs - state.NoRouteLoggedMs >= 10000)
     {

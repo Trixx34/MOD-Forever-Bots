@@ -15,6 +15,7 @@
 #include <DetourNavMeshQuery.h>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -314,6 +315,66 @@ int main(int argc, char** argv)
     }
     bool const fix = argc > 4 && std::string(argv[4]) == "--fix";
     bool const plan = argc > 4 && std::string(argv[4]) == "--plan";
+    if (argc > 4 && std::string(argv[4]) == "--ring" && argc >= 10)
+    {
+        // mmap_check <mmaps> <dungeons.txt> <id> --ring <map> <x> <y> <z> <radius> : walkable points on a ring of that radius around a place that the place
+        // at <from x y z> can reach by walking: [map x y z] is taken from argv[5..8], the radius is argv[9], the start is argv[10..12]. Prints the points, nearest to the start first.
+        Mesh mesh;
+        std::uint32_t const map = std::uint32_t(std::atoi(argv[5]));
+        if (!mesh.Open(argv[1], map))
+            return 2;
+        float const centre[3] = { float(std::atof(argv[6])), float(std::atof(argv[7])), float(std::atof(argv[8])) };
+        float const radius = float(std::atof(argv[9]));
+        float const start[3] = { float(std::atof(argv[10])), float(std::atof(argv[11])), float(std::atof(argv[12])) };
+        float startPos[3];
+        dtPolyRef const startRef = NearestPoly(mesh, start, startPos);
+        if (!startRef)
+        {
+            std::printf("the start is off the mesh\n");
+            return 1;
+        }
+        std::vector<std::pair<float, std::array<float, 3>>> found;
+        for (int a = 0; a < 360; a += 10)
+        {
+            float const rad = float(a) * 3.14159265f / 180.0f;
+            float const probe[3] = { centre[0] + radius * std::cos(rad), centre[1] + radius * std::sin(rad), centre[2] };
+            float snapped[3];
+            if (!NearestPoly(mesh, probe, snapped))
+                continue;
+            float const onRing = std::hypot(snapped[2] - centre[0], snapped[0] - centre[1]);
+            Result const result = Walk(mesh, start, snapped);
+            if (result.Kind != Leg::Ok)
+                continue;
+            found.push_back({ result.Length, { snapped[2], snapped[0], snapped[1] } });
+            std::printf("%.1f %.1f %.1f  ring=%.1f walk=%.0f\n", snapped[2], snapped[0], snapped[1], onRing, result.Length);
+        }
+        if (found.empty())
+            std::printf("no point on the ring is walkable from the start\n");
+        return 0;
+    }
+    if (argc > 4 && std::string(argv[4]) == "--near" && argc >= 8)
+    {
+        // mmap_check <mmaps folder> <dungeons.txt> <dungeon id> --near <map> <x> <y> <z>: the walkable point nearest to a place (for doors and levers, which stand off the mesh)
+        Mesh mesh;
+        std::uint32_t const map = std::uint32_t(std::atoi(argv[5]));
+        if (!mesh.Open(argv[1], map))
+            return 2;
+        float world[3] = { float(std::atof(argv[6])), float(std::atof(argv[7])), float(std::atof(argv[8])) };
+        float pos[3];
+        float detour[3];
+        ToDetour(world[0], world[1], world[2], detour);
+        float const extents[3] = { 8.0f, 8.0f, 8.0f };
+        dtPolyRef ref = 0;
+        mesh.Query->findNearestPoly(detour, extents, &mesh.Filter, &ref, pos);
+        if (!ref)
+        {
+            std::printf("none within 8 yards\n");
+            return 1;
+        }
+        std::printf("%.2f %.2f %.2f  (%.2f yards away)\n", pos[2], pos[0], pos[1],
+                    std::hypot(pos[2] - world[0], pos[0] - world[1]));
+        return 0;
+    }
     Dungeon dungeon;
     if (!Load(argv[2], argv[3], dungeon) || dungeon.Route.empty() || dungeon.Map == 0)
     {
