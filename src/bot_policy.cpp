@@ -2587,7 +2587,10 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                                  " healthy=" + std::to_string(healthy) + " mana=" + std::to_string(manaResting) + " grind=" + std::to_string(grindMode) +
                                  " wandering=" + std::to_string(state.Wandering) + " traveling=" + std::to_string(state.Traveling) + " party=" + std::to_string(partyMember) +
                                  " stay=" + std::to_string(state.ChatStay) + " liveHostiles=" + std::to_string(hostiles) + " nearby=" + std::to_string(nearby.size()) +
-                                 " idleForS=" + std::to_string(state.Idling ? (nowMs - state.IdleSinceMs) / 1000 : 0));
+                                 " idleForS=" + std::to_string(state.Idling ? (nowMs - state.IdleSinceMs) / 1000 : 0) +
+                                 " pos=" + std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) + "," + std::to_string(int(bot.pos_z)) +
+                                 " in_combat=" + std::to_string(bot.in_combat) + " route_index=" + std::to_string(state.RouteIndex) +
+                                 " tank_lead=" + std::to_string(state.TankLead) + " event_active=" + std::to_string(state.Events && state.Events->Active()));
             }
             state.DiagAtMs = nowMs;
             state.DiagX = bot.pos_x;
