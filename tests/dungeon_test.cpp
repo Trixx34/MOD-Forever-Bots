@@ -97,6 +97,8 @@ void MergeFillsTheScenarioKeys()
     CHECK(sc.WipeRecovery && sc.WipeRecoverySec == 300 && sc.MinAlive == 2 && sc.LeaderDeadAbandonSec == 600);
     CHECK(sc.Route.size() == 3 && sc.Route[2][1] == 300.0f);
     CHECK(sc.Bosses.size() == 2 && sc.Bosses[0].first == 11517 && sc.Bosses[1].second == "Bazzalan" && sc.RequireBosses);
+    // The bosses' route points (from 1 in the key, from 0 in the settings), so the leader holds at them.
+    CHECK(sc.BossAt.size() == 2 && sc.BossAt[0].second == 11517 && sc.BossAt[1].second == 11519 && sc.BossAt[0].first < sc.BossAt[1].first && sc.BossAt[1].first < sc.Route.size());
     bool badWarning = false;
     for (std::string const& w : warnings)
         badWarning = badWarning || w.find("Module.forever-bots") != std::string::npos;

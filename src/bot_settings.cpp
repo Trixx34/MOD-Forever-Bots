@@ -170,6 +170,22 @@ void ReadScenario(std::unordered_map<std::string, std::string> const& config, Sc
                 warnings.push_back("Module.forever-bots.ScenarioBosses: '" + item + "' is not entry[:name]; ignored.");
         }
     }
+    if (auto const it = config.find("ScenarioBossAt"); it != config.end())
+    {
+        std::istringstream list(it->second);
+        std::string item;
+        while (std::getline(list, item, ','))
+        {
+            std::size_t const colon = item.find(':');
+            std::uint32_t point = 0;
+            std::uint32_t entry = 0;
+            if (colon != std::string::npos && std::from_chars(item.data(), item.data() + colon, point).ec == std::errc{} && point > 0 &&
+                std::from_chars(item.data() + colon + 1, item.data() + item.size(), entry).ec == std::errc{} && entry > 0)
+                scenario.BossAt.emplace_back(point - 1, entry);
+            else
+                warnings.push_back("Module.forever-bots.ScenarioBossAt: '" + item + "' is not point:entry; ignored.");
+        }
+    }
     if (auto const it = config.find("ScenarioResultFile"); it != config.end())
         scenario.ResultFile = it->second;
     // Dead-bot recovery. The portal is the instance door on the outside map; without it a ghost released outside cannot reach a corpse inside.

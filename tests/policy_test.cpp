@@ -1433,6 +1433,94 @@ void ALeaderSkipsAWaypointWithNoRoute()
     CHECK(skipped);
 }
 
+// A boss point is not passed until its boss is dead, and is never skipped for lack of a route.
+float LeaderWalk(std::vector<BotAction> const& actions)
+{
+    for (BotAction const& action : actions)
+        if (action.type == ActionType::kMoveTo && action.bot_guid == 12)
+            return action.dest_x;
+    return -1.0f;
+}
+
+void TheLeaderWaitsAtABossPointUntilTheBossIsDead()
+{
+    PolicyOptions options;
+    options.PartySize = 5;
+    options.ClassOf = WarriorLeads;
+    options.Route = { Point{ 100.0f, 0.0f, 0.0f }, Point{ 140.0f, 0.0f, 0.0f }, Point{ 180.0f, 0.0f, 0.0f } };   // 100 and 40 yards apart: no mount
+    options.RouteBossAt[1] = 644;
+    std::vector<std::string> events;
+    options.OnEvent = [&events](std::string const& line) { events.push_back(line); };
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    for (BotSnapshot& bot : view.bots)
+        bot.pos_x = 0.0f;
+    CHECK(LeaderWalk(policy.Decide(view, 0)) == 100.0f);
+    for (BotSnapshot& bot : view.bots)
+        bot.pos_x = 95.0f;                                        // the party at the first point: on to the boss point
+    CHECK(LeaderWalk(policy.Decide(view, 1000)) == 140.0f);
+    for (BotSnapshot& bot : view.bots)
+        bot.pos_x = 138.0f;                                       // at the boss point, the boss alive: it stays
+    CHECK(LeaderWalk(policy.Decide(view, 2000)) < 0.0f);
+    CHECK(LeaderWalk(policy.Decide(view, 60000)) < 0.0f);
+    policy.SetKilledBosses({ 644 });                              // the boss is dead: on
+    CHECK(LeaderWalk(policy.Decide(view, 61000)) == 180.0f);
+
+    // Given up after kBossHoldMs when the boss never shows.
+    BotPolicy patient(options);
+    patient.SetRouteActive(true);
+    WorldTickSnapshotView there = view;
+    for (BotSnapshot& bot : there.bots)
+        bot.pos_x = 95.0f;
+    patient.Decide(there, 0);
+    for (BotSnapshot& bot : there.bots)
+        bot.pos_x = 138.0f;
+    CHECK(LeaderWalk(patient.Decide(there, 1000)) < 0.0f);
+    CHECK(LeaderWalk(patient.Decide(there, 100000)) < 0.0f);
+    CHECK(LeaderWalk(patient.Decide(there, 200000)) == 180.0f);
+    bool missed = false;
+    for (std::string const& line : events)
+        missed = missed || line.rfind("boss_missed: bot=12 point=1 boss=644", 0) == 0;
+    CHECK(missed);
+}
+
+void ABossPointIsNeverSkippedForNoRoute()
+{
+    PolicyOptions options;
+    options.PartySize = 5;
+    options.ClassOf = WarriorLeads;
+    options.Route = { Point{ 100.0f, 0.0f, 0.0f }, Point{ 140.0f, 0.0f, 0.0f } };
+    options.RouteBossAt[0] = 644;
+    std::vector<std::string> events;
+    options.OnEvent = [&events](std::string const& line) { events.push_back(line); };
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    for (BotSnapshot& bot : view.bots)
+        bot.pos_x = 0.0f;
+    policy.Decide(view, 0);
+    float latest = 100.0f;
+    for (std::uint32_t refusal = 1; refusal <= 6; ++refusal)
+    {
+        view.bots[2].last_action_sequence = refusal;
+        view.bots[2].last_action_type = uint8_t(ActionType::kMoveTo);
+        view.bots[2].last_action_status = BotActionStatus::kNoRoute;
+        float const walk = LeaderWalk(policy.Decide(view, 1000 * refusal));
+        if (walk >= 0.0f)
+            latest = walk;
+    }
+    CHECK(latest == 100.0f);                                      // still on the boss point after six refusals
+    std::size_t blocked = 0, skipped = 0;
+    for (std::string const& line : events)
+    {
+        blocked += line.rfind("route_blocked: bot=12 point=0/2 boss=644", 0) == 0;
+        skipped += line.rfind("route_skip", 0) == 0;
+    }
+    CHECK(blocked == 1 && skipped == 0);                          // told once, not skipped
+}
+
 void HealerHealsTheHurtMember()
 {
     WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
@@ -3034,6 +3122,8 @@ void FlightsAreOffByDefaultAndNotForPartyMembers()
 int main()
 {
     ShortOfAmmoWalksToTheAmmoVendor();
+    TheLeaderWaitsAtABossPointUntilTheBossIsDead();
+    ABossPointIsNeverSkippedForNoRoute();
     ALeaderSkipsAWaypointWithNoRoute();
     ALongWalkGoesToTheFlightMasterThenFlies();
     ARefusedFlightMakesTheBotWalk();

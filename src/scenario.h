@@ -16,6 +16,7 @@
 #include <cstdint>
 #include <functional>
 #include <map>
+#include <set>
 #include <optional>
 #include <string>
 #include <vector>
@@ -108,6 +109,9 @@ public:
     // Bosses seen dead since the last call, by name (for the log as they happen).
     std::vector<std::string> TakeNewBossKills();
 
+    // The creature entries of the bosses seen dead so far.
+    std::set<std::uint32_t> const& KilledBossEntries() const { return _bossKilledEntries; }
+
 private:
     void Finish(std::string outcome, std::uint64_t nowMs);
 
@@ -121,6 +125,7 @@ private:
     std::uint64_t _leaderArrivedMs = 0;
     std::uint64_t _runStartMs = 0;
     std::uint64_t _routeDoneMs = 0;        // when the leader first touched the last waypoint (RequireBosses grace)
+    std::set<std::uint32_t> _bossKilledEntries;
     std::map<std::uint64_t, bool> _everDead;
     std::map<std::uint64_t, bool> _wasDown;            // bot -> down at the last tick (a bot never seen counts as up)
     std::uint32_t _deathEvents = 0;

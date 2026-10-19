@@ -105,6 +105,7 @@ constexpr std::uint64_t kWanderTimeoutMs = 180000; // a walk to a hub longer tha
 constexpr std::uint64_t kHubRetryIdleMs = 5000;
 constexpr float kHubReachYards = 10.0f;          // a bot this close to its hub has arrived
 constexpr float kVendorReachYards = 4.0f;       // a bot this close to its vendor can use it (the core allows 5)
+constexpr std::uint64_t kBossHoldMs = 180000;     // how long the leader waits at a boss point for the boss to die before it goes on
 constexpr std::uint32_t kRouteNoRouteSkip = 3;     // refusals in a row (no route) after which a dungeon waypoint is skipped
 constexpr std::uint32_t kRepairBelowPct = 50;    // worn gear below this durability sends the bot to a repairman, not just any vendor
 constexpr float kRoutePointReachYards = 6.0f;    // the leader has arrived at a route waypoint this close to it
@@ -1896,7 +1897,18 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                                     std::uint64_t(bot.health) * 100 >= std::uint64_t(bot.max_health) * kRouteMinHealthPct;
                 // A waypoint the core finds no route to (a spawn on a ledge or off the navmesh, a generated point inside a wall) would hold the whole run for
                 // good: after kRouteNoRouteSkip refusals in a row the leader gives that point up and goes on to the next one.
-                if (state.RouteNoRoute >= kRouteNoRouteSkip)
+                // A boss point is never skipped: the boss stands between the party and the rest of the dungeon (a locked door opens when it dies, or it guards
+                // the way). A boss that cannot be reached stops the run at that point, which the result reports as the furthest point reached.
+                bool const bossHere = _options.RouteBossAt.count(state.RouteIndex) != 0 && !_killedBosses.count(_options.RouteBossAt.at(state.RouteIndex));
+                if (state.RouteNoRoute >= kRouteNoRouteSkip && bossHere)
+                {
+                    if (state.RouteNoRoute == kRouteNoRouteSkip && _options.OnEvent)
+                        _options.OnEvent("route_blocked: bot=" + std::to_string(bot.guid) + " point=" + std::to_string(state.RouteIndex) + "/" + std::to_string(_options.Route.size()) +
+                                         " boss=" + std::to_string(_options.RouteBossAt.at(state.RouteIndex)) + " reason=no_route map=" + std::to_string(bot.map_id) +
+                                         " from=" + std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) + "," + std::to_string(int(bot.pos_z)));
+                    state.RouteNoRoute = kRouteNoRouteSkip + 1; // logged once
+                }
+                else if (state.RouteNoRoute >= kRouteNoRouteSkip)
                 {
                     if (_options.OnEvent)
                     {
@@ -1916,9 +1928,33 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     float const dy = bot.pos_y - waypoint->Y;
                     if (std::sqrt(dx * dx + dy * dy) <= kRoutePointReachYards)
                     {
-                        ++state.RouteIndex; // arrived: on to the next point in the same tick
-                        state.RouteNoRoute = 0;
-                        waypoint = state.RouteIndex < _options.Route.size() ? &_options.Route[state.RouteIndex] : nullptr;
+                        // At a boss point the leader stays until that boss is dead, so the party fights it where it stands (the pull logic takes what is near). A boss that
+                        // is not there to be fought, after kBossHoldMs, is given up and the route goes on.
+                        auto const boss = _options.RouteBossAt.find(state.RouteIndex);
+                        bool hold = boss != _options.RouteBossAt.end() && !_killedBosses.count(boss->second);
+                        if (hold)
+                        {
+                            if (state.RouteBossSinceMs == 0)
+                                state.RouteBossSinceMs = nowMs;
+                            if (nowMs - state.RouteBossSinceMs >= kBossHoldMs)
+                            {
+                                if (_options.OnEvent)
+                                    _options.OnEvent("boss_missed: bot=" + std::to_string(bot.guid) + " point=" + std::to_string(state.RouteIndex) + " boss=" + std::to_string(boss->second));
+                                hold = false;
+                            }
+                        }
+                        if (!hold)
+                        {
+                            ++state.RouteIndex; // arrived: on to the next point in the same tick
+                            state.RouteNoRoute = 0;
+                            state.RouteBossSinceMs = 0;
+                            waypoint = state.RouteIndex < _options.Route.size() ? &_options.Route[state.RouteIndex] : nullptr;
+                        }
+                        else
+                        {
+                            waypoint = nullptr; // stand here and let the party deal with the boss
+                            routeBusy = true;   // and do not wander off while idle
+                        }
                     }
                 }
                 if (waypoint && together && strong)

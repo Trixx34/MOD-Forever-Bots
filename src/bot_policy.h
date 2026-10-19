@@ -37,6 +37,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <set>
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -79,6 +80,8 @@ struct PolicyOptions
     bool QuestTeleport = false;
     // Dungeon route (doc 19): the waypoints the party leader walks, in order, while the route is active (SetRouteActive). Empty = none.
     std::vector<Point> Route;
+    // Which route points (0-based) are bosses, and the entry of the boss at each (ScenarioBossAt): the leader waits at such a point until that boss is dead.
+    std::map<std::size_t, std::uint32_t> RouteBossAt;
     // Auto gear (AutoGearing setting): every bot is dressed for its level when it first appears, and again after AutoGearEveryLevels levels.
     bool AutoGearing = false;
     // Receives one line per notable decision (a heal cast, a pull held back or released), for the run logs. Unset = silent.
@@ -128,6 +131,8 @@ public:
     // Decisions are sent only when they change; casts follow the rotation, the global cooldown and the retries.
     // Turns the dungeon route on or off (the scenario director does, once the party is inside).
     void SetRouteActive(bool active) { _routeActive = active; }
+    // The creature entries of the bosses seen dead so far (the scenario director's), for the route's boss points.
+    void SetKilledBosses(std::set<std::uint32_t> const& entries) { _killedBosses = entries; }
 
     // Dress this bot for its level at the next tick (the .autogear command).
     void RequestAutoGear(std::uint64_t botGuid) { _bots[botGuid].GearRequested = true; }
@@ -259,6 +264,7 @@ private:
         supply::Facts SupplyBefore;                      // and what the bot carried before it
         bool SupplyTrip = false;                         // the walk in progress is a supply trip
         std::uint64_t NextConsumeMs = 0;                 // no eat or drink before this
+        std::uint64_t RouteBossSinceMs = 0;              // when the leader began to wait at a boss point (0 = not waiting)
         std::uint32_t RouteNoRoute = 0;                  // moves in a row to the current dungeon waypoint that the core found no route for
         std::uint64_t TaxiBlockedUntilMs = 0;            // the core refused a flight: walk until this
         std::uint64_t TaxiWaitUntilMs = 0;               // a flight was ordered: give it time to show
@@ -357,4 +363,5 @@ private:
     PolicyOptions _options;
     QuestPlanner _quests;
     bool _routeActive = false;
+    std::set<std::uint32_t> _killedBosses;
 };

@@ -462,7 +462,10 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
                 }
             }
             if (director)
+            {
                 policy.SetRouteActive(director->RouteActive());
+                policy.SetKilledBosses(director->KilledBossEntries());
+            }
             std::vector<forever_module::BotAction> actions = policy.Decide(view, nowMs());
             if (extras.Presence && nowMs() - presenceFedMs >= kPresenceFeedMs)
             {
@@ -1134,6 +1137,8 @@ int main(int argc, char** argv)
         policyOptions.AutoGearing = false;
         for (auto const& point : settings.Scenario.Route)
             policyOptions.Route.push_back({ point[0], point[1], point[2] });
+        for (auto const& [point, entry] : settings.Scenario.BossAt)
+            policyOptions.RouteBossAt[point] = entry;
 
         ScenarioPlan plan;
         plan.Name = settings.Scenario.Name;

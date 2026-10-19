@@ -274,9 +274,12 @@ void ScenarioDirector::Decide(forever_module::WorldTickSnapshotView const& view,
                         if (unit.health != 0 || forever_module::UnitRefType(unit.guid) != 8)
                             continue;
                         for (auto const& [entry, name] : _plan.Bosses)
-                            if (entry == forever_module::UnitRefEntry(unit.guid) &&
-                                std::find(_bossKills.begin(), _bossKills.end(), name) == _bossKills.end())
-                                _bossKills.push_back(name);
+                            if (entry == forever_module::UnitRefEntry(unit.guid))
+                            {
+                                _bossKilledEntries.insert(entry);
+                                if (std::find(_bossKills.begin(), _bossKills.end(), name) == _bossKills.end())
+                                    _bossKills.push_back(name);
+                            }
                     }
             }
             std::uint32_t const alive = aliveCount();

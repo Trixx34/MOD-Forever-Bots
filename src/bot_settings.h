@@ -32,6 +32,7 @@
 //                                     inside map is ScenarioEntry's. Without it a ghost released outside cannot go back to a corpse inside)
 //   ScenarioMinAlive = 0              the run ends as "understrength" when fewer bots than this are alive for a while (0 = off, default)
 //   ScenarioLeaderDeadAbandonSec = 0  the run ends as "abandoned_dead_leader" when the party leader stays down this long (0 = off, default)
+//   ScenarioBossAt = "6:644,11:643"   (route point number from 1 : boss entry) the leader holds at such a point until that boss is dead
 //   ScenarioRequireBosses = 0         1: the run is complete when every boss of ScenarioBosses has been seen dead (not when the last waypoint is reached)
 // A dungeon file (doc/dungeons.md) fills most of these keys: DungeonFile = "data/dungeons.txt" and Dungeon = "rfc" (see dungeon_data.h).
 struct ScenarioSettings
@@ -47,6 +48,7 @@ struct ScenarioSettings
     std::vector<std::array<float, 3>> Route;
     std::map<std::uint32_t, std::vector<std::uint32_t>> Gear;
     std::vector<std::pair<std::uint32_t, std::string>> Bosses; // creature entry, name
+    std::vector<std::pair<std::uint32_t, std::uint32_t>> BossAt; // route point (0-based) and the boss entry standing there (ScenarioBossAt)
     std::string ResultFile = "scenario-results.log";
     bool WipeRecovery = false;                           // all down is not the end while a ghost may still come back
     std::uint32_t WipeRecoverySec = 300;

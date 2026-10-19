@@ -264,6 +264,13 @@ std::unordered_map<std::string, std::string> MergeDungeon(std::unordered_map<std
     {
         set("ScenarioBosses", bosses);
         set("ScenarioRequireBosses", "1");
+        // Which route points are bosses ("6:644,11:643": the point's number from 1, the creature entry): the leader does not go past one, and does not
+        // skip one that it cannot route to, before that boss is dead.
+        std::string at;
+        for (std::size_t i = 0; i < d.Route.size(); ++i)
+            if (d.Route[i].BossEntry != 0)
+                at += (at.empty() ? "" : ",") + std::to_string(i + 1) + ":" + std::to_string(d.Route[i].BossEntry);
+        set("ScenarioBossAt", at);
     }
 
     bool ownRoute = false;

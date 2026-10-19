@@ -91,6 +91,14 @@ void SayAndSupplySettings()
     CHECK(!off.Taxi.Enabled && off.Taxi.MinWalkYards == 1500.0f && off.Taxi.MasterMaxYards == 600.0f && off.Taxi.BlockedMs == 600000);
     BotSettings const flights = ParseBotSettings({ { "Taxi", "1" }, { "TaxiMinWalkYards", "2000" }, { "TaxiMasterMaxYards", "800" }, { "TaxiBlockedSec", "120" } }, warnings);
     CHECK(flights.Taxi.Enabled && flights.Taxi.MinWalkYards == 2000.0f && flights.Taxi.MasterMaxYards == 800.0f && flights.Taxi.BlockedMs == 120000 && warnings.empty());
+    BotSettings const bossAt = ParseBotSettings({ { "Scenario", "dm" }, { "ScenarioRoster", "2:1,5:5" }, { "ScenarioBossAt", "6:644,11:643,x" } }, warnings);
+    CHECK(bossAt.Scenario.BossAt.size() == 2 && bossAt.Scenario.BossAt[0].first == 5 && bossAt.Scenario.BossAt[0].second == 644 &&
+          bossAt.Scenario.BossAt[1].first == 10 && bossAt.Scenario.BossAt[1].second == 643);
+    bool warnedAboutX = false;
+    for (std::string const& line : warnings)
+        warnedAboutX = warnedAboutX || line.find("ScenarioBossAt") != std::string::npos;
+    CHECK(warnedAboutX);
+    warnings.clear();
     BotSettings const badCurve = ParseBotSettings({ { "PresenceDayPercent", "1,2,3" } }, warnings);
     CHECK(badCurve.Presence.DayPercent == presence::Settings().DayPercent && warnings.size() == 1);
     warnings.clear();
