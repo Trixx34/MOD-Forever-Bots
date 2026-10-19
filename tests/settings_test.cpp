@@ -99,6 +99,8 @@ void SayAndSupplySettings()
         warnedAboutX = warnedAboutX || line.find("ScenarioBossAt") != std::string::npos;
     CHECK(warnedAboutX);
     warnings.clear();
+    BotSettings const files = ParseBotSettings({ { "DungeonFile", "data/dungeons.txt" }, { "DungeonEventsFile", "data/dungeon_events.txt" } }, warnings);
+    CHECK(files.DungeonFile == "data/dungeons.txt" && files.DungeonEventsFile == "data/dungeon_events.txt" && off.DungeonFile.empty() && off.DungeonEventsFile.empty());
     BotSettings const badCurve = ParseBotSettings({ { "PresenceDayPercent", "1,2,3" } }, warnings);
     CHECK(badCurve.Presence.DayPercent == presence::Settings().DayPercent && warnings.size() == 1);
     warnings.clear();

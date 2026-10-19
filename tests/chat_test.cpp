@@ -375,6 +375,12 @@ void ParsesSecondSlice()
     CHECK(!ParseChatCommand("summon", false));
     CHECK(ParseChatCommand("summon", true)->Verb == ChatVerb::Summon);
     CHECK(ParseChatCommand("all revive", true)->Verb == ChatVerb::Revive);
+    {
+        std::optional<ChatCommand> lead = ParseChatCommand("tank lead", true);
+        CHECK(lead && lead->Verb == ChatVerb::Lead && lead->Selector.Matches(1) && !lead->Selector.Matches(5));
+        CHECK(ParseChatCommand("tank lead off", true)->Verb == ChatVerb::LeadOff && !ParseChatCommand("tank lead", false) && !ParseChatCommand("lead now", true));
+        CHECK(IsOrderVerb(ChatVerb::Lead) && IsOrderVerb(ChatVerb::LeadOff) && std::string(ChatVerbName(ChatVerb::Lead)) == "lead");
+    }
     CHECK(ParseChatCommand("mount", true)->Verb == ChatVerb::Mount && ParseChatCommand("dismount", true)->Verb == ChatVerb::Dismount);
     CHECK(!ParseChatCommand("role tank", true)); // control needs its own switch
     auto cmd = ParseChatCommand("role tank", false, true);

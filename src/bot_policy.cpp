@@ -553,6 +553,17 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
         return;
     state.LastSequence = bot.last_action_sequence;
 
+    // A click or an item used on a door, a lever or a charge (dungeon events): the answer goes to the event that sent it.
+    if (bot.last_action_type == uint8_t(ActionType::kUseObject) && state.Events)
+    {
+        state.Events->OnUseResult(bot.last_action_status == BotActionStatus::kApplied ? dungeon_events::UseResult::Applied
+                                  : bot.last_action_status == BotActionStatus::kOutOfRange ? dungeon_events::UseResult::OutOfRange
+                                                                                          : dungeon_events::UseResult::Failed, nowMs);
+        if (_options.OnEvent && bot.last_action_status != BotActionStatus::kApplied)
+            _options.OnEvent("use_object_refused: bot=" + std::to_string(bot.guid) + " status=" + ActionStatusName(bot.last_action_status));
+        return;
+    }
+
     // The core refuses a sit while in combat: the bot is not sitting, and the sit waits a second.
     if (bot.last_action_type == uint8_t(ActionType::kRest) && bot.last_action_status == BotActionStatus::kRefused)
     {
@@ -887,6 +898,47 @@ std::vector<std::string> BotPolicy::ApplyChat(WorldTickSnapshotView const& view,
                 state.GotoActive = false;
                 state.ForcedTarget = 0;
                 state.ForcedHeal = 0;
+                state.TankLead = false;
+                state.Events.reset();
+                state.Last.reset();
+                break;
+            case ChatVerb::Lead:
+            {
+                // Only in a dungeon the module has a route for, and only for a bot that is in the speaker's group (the loop above) and so can lead it.
+                auto const dungeon = _options.DungeonsByMap.find(bot.map_id);
+                if (dungeon == _options.DungeonsByMap.end() || dungeon->second.Route.empty())
+                {
+                    refuse("not in a dungeon with a known route");
+                    break;
+                }
+                state.TankLead = true;
+                state.ChatFollow = 0;
+                state.ChatStay = false;
+                state.GotoActive = false;
+                state.Events.reset();
+                _tankKilled[bot.map_id].clear();
+                // On from the point nearest to where the tank stands, not from the entrance: it can be told in the middle of a dungeon.
+                std::size_t nearest = 0;
+                float nearestDistance = 1e30f;
+                for (std::size_t i = 0; i < dungeon->second.Route.size(); ++i)
+                {
+                    float const distance = DistanceTo(bot, dungeon->second.Route[i]);
+                    if (distance < nearestDistance)
+                    {
+                        nearestDistance = distance;
+                        nearest = i;
+                    }
+                }
+                state.RouteIndex = nearest;
+                state.RouteNoRoute = 0;
+                state.RouteBossSinceMs = 0;
+                state.Last.reset();
+                lines.push_back("lead: " + std::to_string(bot.guid) + " leads from point " + std::to_string(nearest + 1) + " of " + std::to_string(dungeon->second.Route.size()) + ".");
+                break;
+            }
+            case ChatVerb::LeadOff:
+                state.TankLead = false;
+                state.Events.reset();
                 state.Last.reset();
                 break;
             case ChatVerb::GotoHere:
@@ -1028,6 +1080,20 @@ std::vector<std::string> BotPolicy::ApplyChat(WorldTickSnapshotView const& view,
             accepted.push_back(bot.guid);
         ++index;
     }
+    if (command.Verb == ChatVerb::Lead && !accepted.empty())
+    {
+        // The rest of the group follows the tank, not the speaker: orders to follow or hold the speaker are dropped.
+        for (BotSnapshot const& other : view.bots)
+        {
+            if (other.group_leader_guid != issuerRef || std::find(accepted.begin(), accepted.end(), other.guid) != accepted.end())
+                continue;
+            BotState& follower = _bots[other.guid];
+            follower.ChatFollow = 0;
+            follower.ChatStay = false;
+            follower.GotoActive = false;
+            follower.Last.reset();
+        }
+    }
     if (acks && chat.Say)
     {
         for (std::uint64_t const guid : PickSpeakers(accepted, command.Verb, chat.Recipient != 0, chat.SayMax))
@@ -1084,6 +1150,33 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     membersOf[leaderGuid].push_back(guids[p]);
             }
         }
+    }
+
+    // "tank lead" (chat): the tank bot walks its group through the dungeon. For the dungeon rules the group becomes a party with the tank as its leader: the
+    // tank pulls when the party is ready, the others follow it and join the fight. A tank that left the dungeon (its map has no route) stops leading.
+    std::unordered_set<std::uint64_t> tankLed;
+    for (BotSnapshot const& tank : view.bots)
+    {
+        auto const known = _bots.find(tank.guid);
+        if (known == _bots.end() || !known->second.TankLead)
+            continue;
+        if (_options.DungeonsByMap.find(tank.map_id) == _options.DungeonsByMap.end() || tank.group_leader_guid == 0)
+        {
+            if (_options.OnEvent)
+                _options.OnEvent("tank_lead_off: bot=" + std::to_string(tank.guid) + " map=" + std::to_string(tank.map_id) + " reason=" + (tank.group_leader_guid == 0 ? "no_group" : "no_route_for_map"));
+            known->second.TankLead = false;
+            known->second.Events.reset();
+            continue;
+        }
+        tankLed.insert(tank.guid);
+        leaderOf[tank.guid] = tank.guid;
+        membersOf[tank.guid].clear();
+        for (BotSnapshot const& other : view.bots)
+            if (other.guid != tank.guid && other.group_leader_guid == tank.group_leader_guid)
+            {
+                leaderOf[other.guid] = tank.guid;
+                membersOf[tank.guid].push_back(other.guid);
+            }
     }
 
     // A leader that has a target has begun a fight: note it before the members decide, so they see the same start whatever the bot order.
@@ -1465,6 +1558,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         std::uint64_t const partyLeader = led == leaderOf.end() ? 0 : led->second;
         bool const partyLeaderBot = partyLeader != 0 && partyLeader == bot.guid;
         bool const partyMember = partyLeader != 0 && !partyLeaderBot;
+        bool const routeOn = _routeActive || (partyLeader != 0 && tankLed.count(partyLeader) != 0);   // the dungeon party rules apply to this bot
         std::uint64_t const leaderRef = partyLeader != 0 ? PlayerRef(partyLeader) : 0;
         BotSnapshot const* leaderSnap = nullptr;
         if (partyMember)
@@ -1500,6 +1594,8 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         }
         if (state.ChatStay)
             followRef = 0;                // told to hold the position
+        if (state.TankLead)
+            followRef = 0;                // leading the group: it walks the route, not after the speaker
 
         // The party leader waits for a dead member (a corpse that a rezzer can still resurrect, a ghost on its way back), capped.
         std::uint8_t const deadWaitKind = partyLeader != 0 ? deadWait(partyLeader) : std::uint8_t(0);
@@ -1577,7 +1673,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         // fight once the tank has held it for a moment. A bot already in combat defends itself whatever the rule says.
         bool dungeonHold = false;
         bool tankHeadStart = false;
-        if (_routeActive && partyLeader != 0 && bot.in_combat == 0)
+        if (routeOn && partyLeader != 0 && bot.in_combat == 0)
         {
             if (partyLeaderBot)
             {
@@ -1692,7 +1788,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     targetUnit = &unit;
         }
         else if (NearbyUnit const* hostile = (dungeonHold || noSelfPull) ? nullptr
-                     : PullTarget(bot, nearby, avoided, bot.in_combat != 0, huntEntries, _routeActive))
+                     : PullTarget(bot, nearby, avoided, bot.in_combat != 0, huntEntries, routeOn))
         {
             targetUnit = hostile;
             targetRef = hostile->guid;
@@ -1881,8 +1977,49 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             state.InFight = false;
             wanted = followRef ? Decision{ ActionType::kFollow, followRef } : Decision{ ActionType::kStop, 0 };
             // Dungeon route (doc 19): the leader of a party walks the route while it is healthy and its members are close. Otherwise
-            // it stands (and so rests), and the party catches up.
-            if (_routeActive && partyLeaderBot && !state.ChatStay && !_options.Route.empty() && state.RouteIndex < _options.Route.size())
+            // it stands (and so rests), and the party catches up. The route is the scenario's, or for "tank lead" the one of the dungeon of the bot's map.
+            std::vector<Point> const* routePoints = nullptr;
+            std::map<std::size_t, std::uint32_t> const* routeBoss = nullptr;
+            std::vector<dungeon_events::Event> const* routeEvents = nullptr;
+            if (partyLeaderBot && !state.ChatStay)
+            {
+                if (_routeActive)
+                {
+                    routePoints = &_options.Route;
+                    routeBoss = &_options.RouteBossAt;
+                    routeEvents = &_options.Events;
+                }
+                else if (state.TankLead)
+                {
+                    if (auto const dungeon = _options.DungeonsByMap.find(bot.map_id); dungeon != _options.DungeonsByMap.end())
+                    {
+                        routePoints = &dungeon->second.Route;
+                        routeBoss = &dungeon->second.BossAt;
+                        routeEvents = &dungeon->second.Events;
+                    }
+                }
+            }
+            std::set<std::uint32_t> const& killedNow = _routeActive ? _killedBosses : _tankKilled[bot.map_id];
+            if (routePoints && !_routeActive && routeBoss && !routeBoss->empty())
+            {
+                // The bosses of a "tank lead" run: one seen dead by the leader or any member counts (the scenario director does this for a scenario).
+                std::set<std::uint32_t>& killedHere = _tankKilled[bot.map_id];
+                auto const scan = [&](std::uint64_t guid)
+                {
+                    auto const at = indexOf.find(guid);
+                    if (at == indexOf.end())
+                        return;
+                    for (NearbyUnit const& unit : view.NearbyOf(at->second))
+                        if (unit.health == 0 && forever_module::UnitRefType(unit.guid) == 8)
+                            for (auto const& [point, entry] : *routeBoss)
+                                if (entry == forever_module::UnitRefEntry(unit.guid))
+                                    killedHere.insert(entry);
+                };
+                scan(bot.guid);
+                for (std::uint64_t member : membersOf[bot.guid])
+                    scan(member);
+            }
+            if (routePoints && !routePoints->empty() && state.RouteIndex < routePoints->size())
             {
                 bool together = true;
                 for (std::uint64_t member : membersOf[bot.guid])
@@ -1892,6 +2029,15 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                         continue;
                     together = together && Distance2d(bot, view.bots[at->second]) <= kRouteWaitYards;
                 }
+                if (state.TankLead && !_routeActive)
+                {
+                    // The group's player: the tank does not run off without them. A player out of its view counts as far.
+                    bool playerNear = false;
+                    for (NearbyUnit const& unit : nearby)
+                        if (unit.guid == bot.group_leader_guid)
+                            playerNear = rotation::DistanceYards(bot, unit) <= kRouteWaitYards;
+                    together = together && playerNear;
+                }
                 together = together && deadWaitKind == 0;
                 bool const strong = bot.max_health == 0 ||
                                     std::uint64_t(bot.health) * 100 >= std::uint64_t(bot.max_health) * kRouteMinHealthPct;
@@ -1899,12 +2045,12 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 // good: after kRouteNoRouteSkip refusals in a row the leader gives that point up and goes on to the next one.
                 // A boss point is never skipped: the boss stands between the party and the rest of the dungeon (a locked door opens when it dies, or it guards
                 // the way). A boss that cannot be reached stops the run at that point, which the result reports as the furthest point reached.
-                bool const bossHere = _options.RouteBossAt.count(state.RouteIndex) != 0 && !_killedBosses.count(_options.RouteBossAt.at(state.RouteIndex));
+                bool const bossHere = (*routeBoss).count(state.RouteIndex) != 0 && !killedNow.count((*routeBoss).at(state.RouteIndex));
                 if (state.RouteNoRoute >= kRouteNoRouteSkip && bossHere)
                 {
                     if (state.RouteNoRoute == kRouteNoRouteSkip && _options.OnEvent)
-                        _options.OnEvent("route_blocked: bot=" + std::to_string(bot.guid) + " point=" + std::to_string(state.RouteIndex) + "/" + std::to_string(_options.Route.size()) +
-                                         " boss=" + std::to_string(_options.RouteBossAt.at(state.RouteIndex)) + " reason=no_route map=" + std::to_string(bot.map_id) +
+                        _options.OnEvent("route_blocked: bot=" + std::to_string(bot.guid) + " point=" + std::to_string(state.RouteIndex) + "/" + std::to_string(routePoints->size()) +
+                                         " boss=" + std::to_string((*routeBoss).at(state.RouteIndex)) + " reason=no_route map=" + std::to_string(bot.map_id) +
                                          " from=" + std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) + "," + std::to_string(int(bot.pos_z)));
                     state.RouteNoRoute = kRouteNoRouteSkip + 1; // logged once
                 }
@@ -1912,8 +2058,8 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 {
                     if (_options.OnEvent)
                     {
-                        Point const& given = _options.Route[state.RouteIndex];
-                        _options.OnEvent("route_skip: bot=" + std::to_string(bot.guid) + " point=" + std::to_string(state.RouteIndex) + "/" + std::to_string(_options.Route.size()) +
+                        Point const& given = (*routePoints)[state.RouteIndex];
+                        _options.OnEvent("route_skip: bot=" + std::to_string(bot.guid) + " point=" + std::to_string(state.RouteIndex) + "/" + std::to_string(routePoints->size()) +
                                          " reason=no_route map=" + std::to_string(bot.map_id) + " from=" + std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) + "," +
                                          std::to_string(int(bot.pos_z)) + " to=" + std::to_string(int(given.X)) + "," + std::to_string(int(given.Y)) + "," + std::to_string(int(given.Z)) +
                                          " mounted=" + std::to_string(state.Mounted));
@@ -1921,7 +2067,57 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     ++state.RouteIndex;
                     state.RouteNoRoute = 0;
                 }
-                Point const* waypoint = state.RouteIndex < _options.Route.size() ? &_options.Route[state.RouteIndex] : nullptr;
+                // Events (dungeon_events.h): a door to open, a charge to fire. While one runs the leader does only what it asks.
+                bool eventBusy = false;
+                if (routeEvents && !routeEvents->empty())
+                {
+                    if (!state.Events || state.EventsMap != bot.map_id)
+                    {
+                        state.Events = std::make_shared<dungeon_events::Runner>(dungeon_events::ForMap(*routeEvents, bot.map_id));
+                        state.EventsMap = bot.map_id;
+                    }
+                    dungeon_events::Facts facts;
+                    facts.X = bot.pos_x;
+                    facts.Y = bot.pos_y;
+                    facts.Z = bot.pos_z;
+                    facts.InCombat = bot.in_combat != 0;
+                    facts.Alive = bot.life_state == 0;
+                    facts.KilledBosses = &killedNow;
+                    dungeon_events::Command const command = state.Events->Next(facts, nowMs);
+                    for (std::string const& line : state.Events->TakeLog())
+                        if (_options.OnEvent)
+                            _options.OnEvent(line + " bot=" + std::to_string(bot.guid));
+                    switch (command.Do)
+                    {
+                        case dungeon_events::Command::What::Nothing:
+                            break;
+                        case dungeon_events::Command::What::Hold:
+                            eventBusy = true;
+                            break;
+                        case dungeon_events::Command::What::MoveTo:
+                            wanted = Decision{ ActionType::kMoveTo, 0, Point{ command.X, command.Y, command.Z } };
+                            eventBusy = true;
+                            break;
+                        case dungeon_events::Command::What::Use:
+                        {
+                            BotAction use;
+                            use.bot_guid = bot.guid;
+                            use.type = ActionType::kUseObject;
+                            use.spell_id = command.Object;
+                            use.target_guid = command.Item;
+                            use.dest_x = command.X;
+                            use.dest_y = command.Y;
+                            use.dest_z = command.Z;
+                            actions.push_back(use);
+                            wanted = Decision{ ActionType::kStop, 0 };
+                            eventBusy = true;
+                            break;
+                        }
+                    }
+                    if (eventBusy)
+                        routeBusy = true;
+                }
+                Point const* waypoint = eventBusy || state.RouteIndex >= routePoints->size() ? nullptr : &(*routePoints)[state.RouteIndex];
                 if (waypoint)
                 {
                     float const dx = bot.pos_x - waypoint->X;
@@ -1930,8 +2126,8 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     {
                         // At a boss point the leader stays until that boss is dead, so the party fights it where it stands (the pull logic takes what is near). A boss that
                         // is not there to be fought, after kBossHoldMs, is given up and the route goes on.
-                        auto const boss = _options.RouteBossAt.find(state.RouteIndex);
-                        bool hold = boss != _options.RouteBossAt.end() && !_killedBosses.count(boss->second);
+                        auto const boss = (*routeBoss).find(state.RouteIndex);
+                        bool hold = boss != (*routeBoss).end() && !killedNow.count(boss->second);
                         if (hold)
                         {
                             if (state.RouteBossSinceMs == 0)
@@ -1948,7 +2144,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                             ++state.RouteIndex; // arrived: on to the next point in the same tick
                             state.RouteNoRoute = 0;
                             state.RouteBossSinceMs = 0;
-                            waypoint = state.RouteIndex < _options.Route.size() ? &_options.Route[state.RouteIndex] : nullptr;
+                            waypoint = state.RouteIndex < routePoints->size() ? &(*routePoints)[state.RouteIndex] : nullptr;
                         }
                         else
                         {
@@ -2067,7 +2263,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 enemyNear = enemyNear || (IsLiveMob(unit) && (huntEntries.empty() ? !IsGrey(bot, unit) : true));
         }
         else
-            enemyNear = PullTarget(bot, nearby, avoided, false, huntEntries, _routeActive) != nullptr;
+            enemyNear = PullTarget(bot, nearby, avoided, false, huntEntries, routeOn) != nullptr;
         bool idle = !hasTarget && !enemyNear && wanted.Type == ActionType::kStop && questStep.Kind == QuestStepKind::None && !routeBusy;
 
         // Seeing nothing and doing nothing, for hubs (M7): the idle time starts when the bot first is idle, and any activity

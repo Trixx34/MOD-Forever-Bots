@@ -335,6 +335,10 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
         ReadKey(config, "SupplyTripSec", 30, 3600, tripSec, warnings);
         settings.Supplies.TripEveryMs = std::uint64_t(tripSec) * 1000;
     }
+    if (auto const it = config.find("DungeonFile"); it != config.end())
+        settings.DungeonFile = it->second;
+    if (auto const it = config.find("DungeonEventsFile"); it != config.end())
+        settings.DungeonEventsFile = it->second;
     ReadBool(config, "Presence", settings.Presence.Enabled, warnings);
     ReadKey(config, "PresenceOnlineMinMin", 1, 1440, settings.Presence.OnlineMinMin, warnings);
     ReadKey(config, "PresenceOnlineMaxMin", 1, 1440, settings.Presence.OnlineMaxMin, warnings);

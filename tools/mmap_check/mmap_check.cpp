@@ -5,6 +5,10 @@
 //   mmap_check <mmaps folder> <dungeons.txt> <dungeon id>            check the route, one line per leg
 //   mmap_check <mmaps folder> <dungeons.txt> <dungeon id> --fix      print the dungeon block again with the points that cannot be reached dropped and the rest
 //                                                                     ordered by walking distance (nearest next), bosses kept
+//   mmap_check <mmaps folder> <dungeons.txt> <dungeon id> --plan     print the dungeon block again with a new route: boss to boss over the navmesh. The bosses
+//                                                                     are visited nearest first by walking distance from the entry; between two bosses the
+//                                                                     route is the corners of the walkable path, so it follows the corridors and every point
+//                                                                     is on the mesh by construction. Trash is left to the party (it fights what it meets).
 // Build: tools/mmap_check/build.sh
 #include <DetourCommon.h>
 #include <DetourNavMesh.h>
@@ -255,6 +259,50 @@ char const* Name(Leg kind)
     return "?";
 }
 
+// The corners of the walkable path between two places, as world coordinates (the start is not included). Empty when there is no path.
+std::vector<Point> Corners(Mesh& mesh, float const from[3], float const to[3], bool& partial)
+{
+    std::vector<Point> out;
+    partial = false;
+    float startPos[3], endPos[3];
+    dtPolyRef const start = NearestPoly(mesh, from, startPos);
+    dtPolyRef const end = NearestPoly(mesh, to, endPos);
+    if (!start || !end)
+        return out;
+    dtPolyRef polys[512];
+    int count = 0;
+    if (dtStatusFailed(mesh.Query->findPath(start, end, startPos, endPos, &mesh.Filter, polys, &count, 512)) || count == 0)
+        return out;
+    float target[3] = { endPos[0], endPos[1], endPos[2] };
+    if (polys[count - 1] != end)
+    {
+        partial = true;
+        mesh.Query->closestPointOnPoly(polys[count - 1], endPos, target, nullptr);
+    }
+    float straight[3 * 512];
+    unsigned char flags[512];
+    dtPolyRef straightPolys[512];
+    int points = 0;
+    mesh.Query->findStraightPath(startPos, target, polys, count, straight, flags, straightPolys, &points, 512);
+    for (int i = 1; i < points; ++i)
+    {
+        Point point;
+        point.Kind = "go";
+        point.X = straight[3 * i + 2];   // back from Detour (y, z, x) to the world (x, y, z)
+        point.Y = straight[3 * i + 0];
+        point.Z = straight[3 * i + 1];
+        out.push_back(point);
+    }
+    return out;
+}
+
+std::string Fixed(float value)
+{
+    char buffer[32];
+    std::snprintf(buffer, sizeof(buffer), "%.1f", value);
+    return buffer;
+}
+
 } // namespace
 
 int main(int argc, char** argv)
@@ -265,6 +313,7 @@ int main(int argc, char** argv)
         return 2;
     }
     bool const fix = argc > 4 && std::string(argv[4]) == "--fix";
+    bool const plan = argc > 4 && std::string(argv[4]) == "--plan";
     Dungeon dungeon;
     if (!Load(argv[2], argv[3], dungeon) || dungeon.Route.empty() || dungeon.Map == 0)
     {
@@ -280,6 +329,73 @@ int main(int argc, char** argv)
     float snapped[3];
     if (!NearestPoly(mesh, entry, snapped))
         std::fprintf(stderr, "WARNING: the entry point itself is off the mesh\n");
+
+    if (plan)
+    {
+        constexpr float kMinCornerGap = 10.0f;   // corners closer than this to the one before are dropped (the final point of a leg is always kept)
+        std::vector<Point> bosses;
+        for (Point const& point : dungeon.Route)
+            if (point.Kind == "boss")
+                bosses.push_back(point);
+        float at[3] = { dungeon.EntryX, dungeon.EntryY, dungeon.EntryZ };
+        std::vector<Point> route;
+        int unreachable = 0;
+        while (!bosses.empty())
+        {
+            std::size_t best = bosses.size();
+            float bestLength = 1e30f;
+            for (std::size_t i = 0; i < bosses.size(); ++i)
+            {
+                float here[3] = { bosses[i].X, bosses[i].Y, bosses[i].Z };
+                Result const result = Walk(mesh, at, here);
+                if (result.Kind == Leg::Ok && result.Length < bestLength)
+                {
+                    bestLength = result.Length;
+                    best = i;
+                }
+            }
+            if (best == bosses.size())
+            {
+                for (Point const& lost : bosses)
+                    std::fprintf(stderr, "boss %s cannot be reached from the last boss: left out\n", lost.Name.c_str());
+                unreachable = int(bosses.size());
+                break;
+            }
+            float here[3] = { bosses[best].X, bosses[best].Y, bosses[best].Z };
+            bool partial = false;
+            std::vector<Point> corners = Corners(mesh, at, here, partial);
+            float last[2] = { at[0], at[1] };
+            for (std::size_t i = 0; i < corners.size(); ++i)
+            {
+                bool const final = i + 1 == corners.size();
+                if (!final && std::hypot(corners[i].X - last[0], corners[i].Y - last[1]) < kMinCornerGap)
+                    continue;
+                if (final)
+                    break;   // the boss itself is the last point of the leg
+                route.push_back(corners[i]);
+                last[0] = corners[i].X;
+                last[1] = corners[i].Y;
+            }
+            route.push_back(bosses[best]);
+            at[0] = bosses[best].X;
+            at[1] = bosses[best].Y;
+            at[2] = bosses[best].Z;
+            bosses.erase(bosses.begin() + std::ptrdiff_t(best));
+        }
+        std::fprintf(stderr, "planned %zu points for %zu legs; %d boss(es) left out\n", route.size(), dungeon.Route.size() - std::size_t(unreachable), unreachable);
+        for (std::string const& line : dungeon.Header)
+            std::printf("%s\n", line.c_str());
+        for (Point const& point : route)
+        {
+            if (point.Kind == "boss")
+                std::printf("%s\n", point.Line.c_str());
+            else
+                std::printf("go %s %s %s\n", Fixed(point.X).c_str(), Fixed(point.Y).c_str(), Fixed(point.Z).c_str());
+        }
+        for (std::string const& line : dungeon.Tail)
+            std::printf("%s\n", line.c_str());
+        return 0;
+    }
 
     if (!fix)
     {

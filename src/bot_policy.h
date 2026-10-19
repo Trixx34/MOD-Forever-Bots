@@ -30,6 +30,7 @@
 #include "grind_data.h"
 #include "quest_planner.h"
 #include "chat_say.h"
+#include "dungeon_events.h"
 #include "supply_policy.h"
 #include "taxi_policy.h"
 
@@ -82,6 +83,16 @@ struct PolicyOptions
     std::vector<Point> Route;
     // Which route points (0-based) are bosses, and the entry of the boss at each (ScenarioBossAt): the leader waits at such a point until that boss is dead.
     std::map<std::size_t, std::uint32_t> RouteBossAt;
+    // The events of the scenario's dungeon (dungeon_events.h): the leader runs them along the route.
+    std::vector<dungeon_events::Event> Events;
+    // The dungeons the "tank lead" chat command can run, by map id: the route, the boss points on it and the events.
+    struct DungeonRoute
+    {
+        std::vector<Point> Route;
+        std::map<std::size_t, std::uint32_t> BossAt;
+        std::vector<dungeon_events::Event> Events;
+    };
+    std::map<std::uint32_t, DungeonRoute> DungeonsByMap;
     // Auto gear (AutoGearing setting): every bot is dressed for its level when it first appears, and again after AutoGearEveryLevels levels.
     bool AutoGearing = false;
     // Receives one line per notable decision (a heal cast, a pull held back or released), for the run logs. Unset = silent.
@@ -264,6 +275,9 @@ private:
         supply::Facts SupplyBefore;                      // and what the bot carried before it
         bool SupplyTrip = false;                         // the walk in progress is a supply trip
         std::uint64_t NextConsumeMs = 0;                 // no eat or drink before this
+        bool TankLead = false;                           // told "tank lead": this bot walks its group through the dungeon of its map
+        std::shared_ptr<dungeon_events::Runner> Events;  // the events of the dungeon, run by the bot that leads the route
+        std::uint32_t EventsMap = 0;                     // the map those events are for
         std::uint64_t RouteBossSinceMs = 0;              // when the leader began to wait at a boss point (0 = not waiting)
         std::uint32_t RouteNoRoute = 0;                  // moves in a row to the current dungeon waypoint that the core found no route for
         std::uint64_t TaxiBlockedUntilMs = 0;            // the core refused a flight: walk until this
@@ -363,5 +377,6 @@ private:
     PolicyOptions _options;
     QuestPlanner _quests;
     bool _routeActive = false;
+    std::map<std::uint32_t, std::set<std::uint32_t>> _tankKilled;   // map -> bosses seen dead during a "tank lead" run
     std::set<std::uint32_t> _killedBosses;
 };

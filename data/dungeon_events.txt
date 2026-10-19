@@ -1,0 +1,42 @@
+# Dungeon events: one table for every dungeon (format and runner: src/dungeon_events.h, doc/dungeon-events.md). Keyed by map id; an event runs once per dungeon run.
+#
+# The Deadmines (map 36). The doors, levers and the cannon are in the world database (gameobject / gameobject_template):
+#   Factory Door 13965 (-191.4 -457.4 54.4)   lever 101831 (-188.1 -460.3 54.6)
+#   Foundry Door 16399 (-168.5 -579.9 19.3)   lever 101834 (-165.4 -576.9 19.3)
+#   Mast Room Door 16400 (-290.3 -537.0 49.4) lever 101832 (-287.3 -539.9 49.4)
+#   Heavy Doors 17153 (-262.7 -482.4 49.4) and 17154 (-243.0 -578.6 51.1): opened by a click
+#   Iron Clad Door 16397 (-100.5 -668.8 7.4), opened by firing the Defias Cannon 16398 (-107.6 -659.7 7.2) with Defias Gunpowder (item 5397); it also
+#   summons two Defias Squallshapers, which the party fights.
+# A door or lever that is open already is left alone, so these can fire whenever the leader comes near.
+
+event 36 factory-lever Factory Door (lever)
+near -188.1 -460.3 54.6 35
+use 101831 -188.1 -460.3 54.6
+end
+
+event 36 heavy-door-1 Heavy Door (north)
+near -262.7 -482.4 49.4 30
+use 17153 -262.7 -482.4 49.4
+end
+
+event 36 heavy-door-2 Heavy Door (south)
+near -243.0 -578.6 51.1 30
+use 17154 -243.0 -578.6 51.1
+end
+
+event 36 foundry-lever Foundry Door (lever)
+near -165.4 -576.9 19.3 30
+use 101834 -165.4 -576.9 19.3
+end
+
+event 36 mast-lever Mast Room Door (lever)
+near -287.3 -539.9 49.4 30
+use 101832 -287.3 -539.9 49.4
+end
+
+event 36 iron-clad Iron Clad Door (Defias Cannon)
+near -107.6 -659.7 7.2 40
+use 16398 -107.6 -659.7 7.2 item 5397
+wait 4
+timeout 90
+end

@@ -23,7 +23,7 @@ import os
 DUNGEONS = {
     "rfc": (389, "Ragefire Chasm", 13, 18, ["Oggleflint", "Taragaman the Hungerer", "Jergosh the Invoker", "Bazzalan"]),
     "wc": (43, "Wailing Caverns", 15, 25, ["Lady Anacondra", "Lord Cobrahn", "Kresh", "Lord Pythas", "Skum", "Lord Serpentis", "Verdan the Everliving", "Mutanus the Devourer"]),
-    "dm": (36, "Deadmines", 18, 23, ["Rhahk'Zor", "Sneed's Shredder", "Gilnid", "Mr. Smite", "Captain Greenskin", "Edwin VanCleef"]),
+    "dm": (36, "Deadmines", 18, 23, ["Rhahk'Zor", "Sneed's Shredder", "Gilnid", "Mr. Smite", "Cookie", "Captain Greenskin", "Edwin VanCleef"]),
     "sfk": (33, "Shadowfang Keep", 22, 30, ["Rethilgore", "Razorclaw the Butcher", "Baron Silverlaine", "Commander Springvale", "Odo the Blindwatcher", "Fenrus the Devourer", "Wolf Master Nandos", "Archmage Arugal"]),
     "stockade": (34, "Stormwind Stockades", 24, 32, ["Targorr the Dread", "Kam Deepfury", "Hamhock", "Bazil Thredd", "Dextren Ward", "Bruegal Ironknuckle"]),
     "bfd": (48, "Blackfathom Deeps", 24, 32, ["Ghamoo-ra", "Lady Sarevess", "Gelihast", "Baron Aquanis", "Twilight Lord Kelris", "Old Serra'kis", "Aku'mai"]),

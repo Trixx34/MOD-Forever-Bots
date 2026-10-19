@@ -32,6 +32,8 @@ std::string AckLine(ChatVerb verb, std::uint64_t botGuid)
         case ChatVerb::Stay: return Pick<3>({ "Holding here.", "Staying put.", "I'll wait here." }, botGuid, verb);
         case ChatVerb::StayOff: return Pick<2>({ "Moving again.", "Free to move." }, botGuid, verb);
         case ChatVerb::Stop: return Pick<2>({ "Stopping.", "Standing down." }, botGuid, verb);
+        case ChatVerb::Lead: return Pick<3>({ "I'll take the lead.", "Stay behind me.", "Follow me, I know the way." }, botGuid, verb);
+        case ChatVerb::LeadOff: return Pick<2>({ "All yours.", "I'll follow you now." }, botGuid, verb);
         case ChatVerb::GotoHere: return Pick<3>({ "Coming.", "On my way over.", "Be right there." }, botGuid, verb);
         case ChatVerb::Release: return Pick<2>({ "Releasing.", "Back to the graveyard." }, botGuid, verb);
         case ChatVerb::Pull: return Pick<2>({ "Pulling!", "Here it comes." }, botGuid, verb);

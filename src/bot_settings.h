@@ -129,6 +129,10 @@ struct BotSettings
     // PresenceMaxOnline, PresenceDayPercent; off by default): bots log off and on like players, see bot_presence.h. Needs Bot.Presence.LogoutOnRelease
     // in the core, or a released bot stays in the world.
     presence::Settings Presence;
+    // Dungeons (doc/dungeons.md): DungeonFile = the routes (data/dungeons.txt); with it set, "tank lead" works in every dungeon of the file. DungeonEventsFile = the
+    // events table for all dungeons (data/dungeon_events.txt, dungeon_events.h): doors to open, charges to fire.
+    std::string DungeonFile;
+    std::string DungeonEventsFile;
     // Flight points (layout 17; config keys Taxi, TaxiMinWalkYards, TaxiMasterMaxYards, TaxiBlockedSec; off by default): a bot that is not in a party replaces a walk
     // of at least TaxiMinWalkYards with a flight from a flight master within TaxiMasterMaxYards that lies on the way. Needs Bot.Taxi.Enabled in the core (on by default).
     taxi::Settings Taxi;

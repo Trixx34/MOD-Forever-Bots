@@ -1521,6 +1521,212 @@ void ABossPointIsNeverSkippedForNoRoute()
     CHECK(blocked == 1 && skipped == 0);                          // told once, not skipped
 }
 
+// ---- "tank lead" (chat) and dungeon events ----
+std::optional<BotAction> OfTank(std::vector<BotAction> const& actions, ActionType type)
+{
+    for (BotAction const& action : actions)
+        if (action.type == type && action.bot_guid == 12)
+            return action;
+    return std::nullopt;
+}
+
+// A player (counter 900) leads a group of five bots in a dungeon on map 36. Bot 12 is the warrior.
+WorldTickSnapshotView PlayerGroupView(float tankX = 0.0f)
+{
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    for (BotSnapshot& bot : view.bots)
+    {
+        bot.map_id = 36;
+        bot.group_leader_guid = PlayerOf(900);
+        bot.group_role = 1;
+        bot.pos_x = tankX - 15.0f;                                     // the members trail the tank
+    }
+    view.bots[2].pos_x = tankX;
+    // The player stands next to the tank (a unit in its view).
+    NearbyUnit player;
+    player.guid = PlayerOf(900);
+    player.pos_x = tankX;
+    player.is_hostile = false;
+    player.health = 100;
+    player.max_health = 100;
+    AddNearby(view, 2, player);
+    return view;
+}
+
+PolicyOptions LeadOptions()
+{
+    PolicyOptions options;
+    options.ClassOf = WarriorLeads;
+    options.WanderWhenIdle = false;
+    PolicyOptions::DungeonRoute route;
+    route.Route = { Point{ 100.0f, 0.0f, 0.0f }, Point{ 140.0f, 0.0f, 0.0f }, Point{ 180.0f, 0.0f, 0.0f } };
+    route.BossAt[1] = 644;
+    options.DungeonsByMap[36] = route;
+    return options;
+}
+
+PolicyOptions::DungeonRoute RouteWithAnEvent()
+{
+    PolicyOptions::DungeonRoute route;
+    route.Route = { Point{ 100.0f, 0.0f, 0.0f }, Point{ 140.0f, 0.0f, 0.0f }, Point{ 180.0f, 0.0f, 0.0f } };
+    std::vector<std::string> warnings;
+    route.Events = dungeon_events::Parse("event 36 lever Factory lever\nnear 100 0 0 30\nuse 101831 110 5 0\nend\n", warnings);
+    return route;
+}
+
+BotPolicy::ChatContext FromPlayer(std::uint32_t map = 36)
+{
+    BotPolicy::ChatContext chat;
+    chat.Issuer = 900;
+    chat.MapId = map;
+    return chat;
+}
+
+ChatCommand TankLead(bool off = false)
+{
+    std::optional<ChatCommand> command = ParseChatCommand(off ? "tank lead off" : "tank lead", true);
+    return command.value();
+}
+
+void TankLeadParsesAsAnOrderOfTheTank()
+{
+    std::optional<ChatCommand> command = ParseChatCommand("tank lead", true);
+    CHECK(command && command->Verb == ChatVerb::Lead && command->Selector.Matches(1) && !command->Selector.Matches(5));
+    CHECK(ParseChatCommand("lead off", true)->Verb == ChatVerb::LeadOff);
+    CHECK(!ParseChatCommand("tank lead", false));                      // an order: needs ChatOrders
+    CHECK(!ParseChatCommand("tank lead now", true));
+}
+
+void TheTankLeadsTheGroupAlongTheRoute()
+{
+    BotPolicy policy(LeadOptions());
+    WorldTickSnapshotView view = PlayerGroupView();
+    policy.Decide(view, 0);
+    std::vector<std::string> const reply = policy.ApplyChat(view, FromPlayer(), TankLead(), 1000);
+    bool led = false;
+    for (std::string const& line : reply)
+        led = led || line.rfind("lead: 12 leads from point 1 of 3", 0) == 0;
+    CHECK(led);
+
+    auto const actions = policy.Decide(view, 2000);
+    CHECK(WalkTo(actions, 12) == 100.0f);                              // the tank walks to the first route point
+    for (std::uint64_t member : { 10, 11, 13, 14 })
+    {
+        std::optional<BotAction> follow;
+        for (BotAction const& action : actions)
+            if (action.bot_guid == member && action.type == ActionType::kFollow)
+                follow = action;
+        CHECK(follow.has_value() && follow->target_guid == PlayerOf(12));   // behind the tank, not the player
+    }
+}
+
+void TankLeadIsRefusedOutsideADungeonWithARoute()
+{
+    BotPolicy policy(LeadOptions());
+    WorldTickSnapshotView view = PlayerGroupView();
+    for (BotSnapshot& bot : view.bots)
+        bot.map_id = 1;                                               // the open world
+    policy.Decide(view, 0);
+    std::vector<std::string> const reply = policy.ApplyChat(view, FromPlayer(1), TankLead(), 1000);
+    bool refused = false;
+    for (std::string const& line : reply)
+        refused = refused || line.find("not in a dungeon with a known route") != std::string::npos;
+    CHECK(refused);
+}
+
+void TankLeadEndsWithLeadOffAndWhenTheDungeonIsLeft()
+{
+    BotPolicy policy(LeadOptions());
+    WorldTickSnapshotView view = PlayerGroupView();
+    policy.Decide(view, 0);
+    policy.ApplyChat(view, FromPlayer(), TankLead(), 1000);
+    CHECK(WalkTo(policy.Decide(view, 2000), 12) == 100.0f);
+    policy.ApplyChat(view, FromPlayer(), TankLead(true), 3000);
+    CHECK(WalkTo(policy.Decide(view, 4000), 12) < 0.0f);              // the route is not walked any more
+
+    BotPolicy leaving(LeadOptions());
+    leaving.Decide(view, 0);
+    leaving.ApplyChat(view, FromPlayer(), TankLead(), 1000);
+    WorldTickSnapshotView outside = view;
+    for (BotSnapshot& bot : outside.bots)
+        bot.map_id = 1;                                               // out of the dungeon
+    CHECK(WalkTo(leaving.Decide(outside, 2000), 12) < 0.0f);
+    CHECK(WalkTo(leaving.Decide(view, 3000), 12) < 0.0f);             // and it does not start again by itself
+}
+
+void TheTankWaitsForThePlayerToCatchUp()
+{
+    BotPolicy policy(LeadOptions());
+    WorldTickSnapshotView view = PlayerGroupView();
+    policy.Decide(view, 0);
+    policy.ApplyChat(view, FromPlayer(), TankLead(), 1000);
+    // The player is far behind: not in the tank's view.
+    WorldTickSnapshotView alone = PlayerGroupView();
+    alone.bots[2].nearby_count = 0;
+    CHECK(WalkTo(policy.Decide(alone, 2000), 12) < 0.0f);
+}
+
+void TheTankHoldsAtABossUntilItIsSeenDead()
+{
+    BotPolicy policy(LeadOptions());
+    WorldTickSnapshotView view = PlayerGroupView();
+    policy.Decide(view, 0);
+    policy.ApplyChat(view, FromPlayer(), TankLead(), 1000);
+    for (BotSnapshot& bot : view.bots)
+        bot.pos_x = 98.0f;
+    view.bots[2].nearby_count = 0;
+    NearbyUnit player;
+    player.guid = PlayerOf(900);
+    player.pos_x = 98.0f;
+    AddNearby(view, 2, player);
+    CHECK(WalkTo(policy.Decide(view, 2000), 12) == 140.0f);            // on to the boss point
+    for (BotSnapshot& bot : view.bots)
+        bot.pos_x = 138.0f;
+    view.bots[2].nearby_count = 0;
+    player.pos_x = 138.0f;
+    AddNearby(view, 2, player);
+    CHECK(WalkTo(policy.Decide(view, 3000), 12) < 0.0f);               // at the boss point: holds
+    // The boss is seen dead (a creature of entry 644, no health) by a bot: on.
+    NearbyUnit corpse;
+    corpse.guid = MakeUnitRef(8, 644, 55);
+    corpse.health = 0;
+    AddNearby(view, 3, corpse);
+    CHECK(WalkTo(policy.Decide(view, 4000), 12) == 180.0f);
+}
+
+void ALeverIsPulledWhenTheTankComesNear()
+{
+    PolicyOptions options = LeadOptions();
+    options.DungeonsByMap[36] = RouteWithAnEvent();
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = PlayerGroupView(60.0f);              // 40 yards from the lever, within its 30? no: 60 is 40 yards away
+    policy.Decide(view, 0);
+    policy.ApplyChat(view, FromPlayer(), TankLead(), 1000);
+    CHECK(!OfTank(policy.Decide(view, 2000), ActionType::kUseObject).has_value());   // too far for the event to start
+    for (BotSnapshot& bot : view.bots)
+        bot.pos_x = 90.0f;
+    view.bots[2].nearby_count = 0;
+    NearbyUnit player;
+    player.guid = PlayerOf(900);
+    player.pos_x = 90.0f;
+    AddNearby(view, 2, player);
+    CHECK(WalkTo(policy.Decide(view, 3000), 12) == 110.0f);            // the event starts: walk to the lever
+    for (BotSnapshot& bot : view.bots)
+        bot.pos_x = 108.0f;
+    view.bots[2].pos_y = 4.0f;
+    view.bots[2].nearby_count = 0;
+    player.pos_x = 108.0f;
+    AddNearby(view, 2, player);
+    std::optional<BotAction> use = OfTank(policy.Decide(view, 4000), ActionType::kUseObject);
+    CHECK(use.has_value() && use->spell_id == 101831 && use->target_guid == 0);
+    // The click went through: the event is over and the route goes on.
+    view.bots[2].last_action_sequence = 9;
+    view.bots[2].last_action_type = uint8_t(ActionType::kUseObject);
+    view.bots[2].last_action_status = BotActionStatus::kApplied;
+    auto const after = policy.Decide(view, 5000);
+    CHECK(!OfTank(after, ActionType::kUseObject).has_value());
+}
+
 void HealerHealsTheHurtMember()
 {
     WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
@@ -3122,6 +3328,13 @@ void FlightsAreOffByDefaultAndNotForPartyMembers()
 int main()
 {
     ShortOfAmmoWalksToTheAmmoVendor();
+    TankLeadParsesAsAnOrderOfTheTank();
+    TheTankLeadsTheGroupAlongTheRoute();
+    TankLeadIsRefusedOutsideADungeonWithARoute();
+    TankLeadEndsWithLeadOffAndWhenTheDungeonIsLeft();
+    TheTankWaitsForThePlayerToCatchUp();
+    TheTankHoldsAtABossUntilItIsSeenDead();
+    ALeverIsPulledWhenTheTankComesNear();
     TheLeaderWaitsAtABossPointUntilTheBossIsDead();
     ABossPointIsNeverSkippedForNoRoute();
     ALeaderSkipsAWaypointWithNoRoute();

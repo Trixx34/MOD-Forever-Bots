@@ -1,5 +1,8 @@
 # Dungeon runs (M9)
 
+See also `doc/dungeon-events.md`: the one events table for all dungeons (doors, levers, the Deadmines cannon), the `tank lead` chat command that runs a dungeon with the bots of a
+player's group, and the routes planned over the navmesh (the section below describes how the older generated routes were made).
+
 Status: the data file, its parser, the config merge and the dungeon-clear rule are built and unit-tested (`src/dungeon_data.*`,
 `tests/dungeon_test.cpp`). **Nothing here has been run on the sim.** The sample route for Ragefire Chasm is hand-written and approximate.
 

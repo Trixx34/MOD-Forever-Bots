@@ -18,6 +18,7 @@
 #include "bot_telemetry.h"
 #include "rotating_file.h"
 #include "dungeon_data.h"
+#include "dungeon_events.h"
 #include "scenario.h"
 
 #include "forever_module/module_client.h"
@@ -1027,6 +1028,51 @@ int main(int argc, char** argv)
     policyOptions.ServiceEveryMs = std::uint64_t(settings.ServiceEverySec) * 1000;
     policyOptions.TrainEveryMs = std::uint64_t(settings.TrainEverySec) * 1000;
     policyOptions.Supplies = settings.Supplies;
+    // Dungeon routes for "tank lead" (every dungeon of DungeonFile, by the map of its entry) and the events table (DungeonEventsFile), shared by all dungeons.
+    std::vector<dungeon_events::Event> allEvents;
+    if (!settings.DungeonEventsFile.empty())
+    {
+        std::ifstream in(settings.DungeonEventsFile);
+        if (!in)
+            std::cerr << "forever-bots: DungeonEventsFile: cannot read '" << settings.DungeonEventsFile << "'\n";
+        else
+        {
+            std::ostringstream text;
+            text << in.rdbuf();
+            std::vector<std::string> eventWarnings;
+            allEvents = dungeon_events::Parse(text.str(), eventWarnings);
+            for (std::string const& warning : eventWarnings)
+                std::cerr << "forever-bots: " << warning << "\n";
+            std::cerr << "forever-bots: dungeon events: " << allEvents.size() << " from " << settings.DungeonEventsFile << "\n";
+        }
+    }
+    if (!settings.DungeonFile.empty())
+    {
+        std::ifstream in(settings.DungeonFile);
+        if (!in)
+            std::cerr << "forever-bots: DungeonFile: cannot read '" << settings.DungeonFile << "'\n";
+        else
+        {
+            std::ostringstream text;
+            text << in.rdbuf();
+            std::vector<std::string> dungeonWarnings;
+            for (Dungeon const& dungeon : ParseDungeons(text.str(), dungeonWarnings))
+            {
+                PolicyOptions::DungeonRoute route;
+                for (std::size_t i = 0; i < dungeon.Route.size(); ++i)
+                {
+                    route.Route.push_back({ dungeon.Route[i].X, dungeon.Route[i].Y, dungeon.Route[i].Z });
+                    if (dungeon.Route[i].BossEntry != 0)
+                        route.BossAt[i] = dungeon.Route[i].BossEntry;
+                }
+                route.Events = dungeon_events::ForMap(allEvents, std::uint32_t(dungeon.Entry[0]));
+                policyOptions.DungeonsByMap[std::uint32_t(dungeon.Entry[0])] = std::move(route);
+            }
+            for (std::string const& warning : dungeonWarnings)
+                std::cerr << "forever-bots: dungeons: " << warning << "\n";
+            std::cerr << "forever-bots: tank lead knows " << policyOptions.DungeonsByMap.size() << " dungeon(s) from " << settings.DungeonFile << "\n";
+        }
+    }
     policyOptions.Taxi = settings.Taxi;
     policyOptions.PartySize = settings.PartySize;
     policyOptions.PartyCount = settings.PartyCount;
@@ -1139,6 +1185,7 @@ int main(int argc, char** argv)
             policyOptions.Route.push_back({ point[0], point[1], point[2] });
         for (auto const& [point, entry] : settings.Scenario.BossAt)
             policyOptions.RouteBossAt[point] = entry;
+        policyOptions.Events = dungeon_events::ForMap(allEvents, std::uint32_t(settings.Scenario.Entry[0]));
 
         ScenarioPlan plan;
         plan.Name = settings.Scenario.Name;

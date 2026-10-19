@@ -5,7 +5,9 @@
 // Selectors: all | tank | healer | dps | <class> (also the plural), joined by commas for a union (healer,rogue). No selector means all.
 //   tank = warrior; healer = priest, paladin, shaman, druid; dps = hunter, rogue, mage, warlock.
 // Basic verbs (ChatCommands = 1):  follow [off] | stay [off] | goto here | release | status
-// Orders (ChatOrders = 1):          stop | pull | heal | passive | aggressive | summon | revive | mount | dismount
+// Orders (ChatOrders = 1):          stop | pull | heal | passive | aggressive | summon | revive | mount | dismount | lead [off]
+//   lead: "tank lead" - in a dungeon the module knows a route for, the tank bot walks the group through it, boss by boss, and the other bots follow the
+//   tank instead of the speaker (the dungeon party rules apply: the tank pulls when the group is ready, the others join). "tank lead off" or stop ends it.
 // Control panel (ChatControl = 1):  role tank|healer|dps|auto | stance aggressive|defensive|passive | focus [off] | distance <yards>|default
 //   follow: walk after the speaker. stay: hold the position (fights only what attacks it). stop: drop follow, goto and stay.
 //   goto here: walk to where the speaker stands (a spread of positions, so the bots do not share one point). release: a dead bot releases its
@@ -48,6 +50,8 @@ enum class ChatVerb : std::uint8_t
     Focus,
     FocusOff,
     Distance,
+    Lead,
+    LeadOff,
 };
 
 // Orders need ChatOrders = 1, the control panel ChatControl = 1 (the basic verbs only need ChatCommands = 1).
