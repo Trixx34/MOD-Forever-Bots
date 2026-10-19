@@ -600,6 +600,18 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
 
     // A move the core found no route for, or a quest-walk teleport the core refused: that start's giver is left alone for a while
     // (the planner picks the next start). Each result is read once, by its sequence. A refused teleport must not be sent again.
+    // Diagnostics: what a refusal for no route was for (the log otherwise says only "no route"), at most once in ten seconds for a bot.
+    if (bot.last_action_status == BotActionStatus::kNoRoute && _options.OnEvent && nowMs - state.NoRouteLoggedMs >= 10000)
+    {
+        state.NoRouteLoggedMs = nowMs;
+        std::string what = "action_type=" + std::to_string(int(bot.last_action_type));
+        if (state.Last)
+            what += " wanted=" + std::to_string(int(state.Last->Type)) + " target=" + std::to_string(state.Last->Target) + " target_entry=" +
+                    std::to_string(state.Last->Target ? forever_module::UnitRefEntry(state.Last->Target) : 0) + " dest=" + std::to_string(int(state.Last->Dest.X)) + "," +
+                    std::to_string(int(state.Last->Dest.Y)) + "," + std::to_string(int(state.Last->Dest.Z));
+        _options.OnEvent("no_route: bot=" + std::to_string(bot.guid) + " " + what + " pos=" + std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) + "," +
+                         std::to_string(int(bot.pos_z)) + " in_combat=" + std::to_string(bot.in_combat) + " route_index=" + std::to_string(state.RouteIndex));
+    }
     bool const noRoute = bot.last_action_type == uint8_t(ActionType::kMoveTo) && bot.last_action_status == BotActionStatus::kNoRoute;
     bool const teleportRefused = bot.last_action_type == uint8_t(ActionType::kTeleport) &&
                                  bot.last_action_status != BotActionStatus::kApplied && bot.last_action_status != BotActionStatus::kNone;
