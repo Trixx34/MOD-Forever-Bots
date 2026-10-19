@@ -618,8 +618,11 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
     bool const noRoute = bot.last_action_type == uint8_t(ActionType::kMoveTo) && bot.last_action_status == BotActionStatus::kNoRoute;
     bool const teleportRefused = bot.last_action_type == uint8_t(ActionType::kTeleport) &&
                                  bot.last_action_status != BotActionStatus::kApplied && bot.last_action_status != BotActionStatus::kNone;
-    if (noRoute && bot.last_action_sequence != state.NoRouteSequence)
-        ++state.RouteNoRoute; // a dungeon leader counts these against its current waypoint (kRouteNoRouteSkip)
+    // A dungeon leader counts these against its current waypoint (kRouteNoRouteSkip). A move to the very place the bot already stands at is refused for lack of a route too (a
+    // path of no length), which is an arrival, not a missing route: it is not counted.
+    if (noRoute && bot.last_action_sequence != state.NoRouteSequence &&
+        !(state.Last && state.Last->Type == ActionType::kMoveTo && std::hypot(bot.pos_x - state.Last->Dest.X, bot.pos_y - state.Last->Dest.Y) < 6.0f))
+        ++state.RouteNoRoute;
     if ((noRoute || teleportRefused) && bot.last_action_sequence != state.NoRouteSequence)
     {
         state.NoRouteSequence = bot.last_action_sequence;
