@@ -17,6 +17,14 @@ using forever_module::WorldTickSnapshotView;
 
 namespace {
 
+// The pull and combat tests were written for bots that start Aggressive; the defensive default has its own test.
+PolicyOptions AggressiveOptions()
+{
+    PolicyOptions options;
+    options.AggressiveStart = true;
+    return options;
+}
+
 int failures = 0;
 
 #define CHECK(cond)                                                    \
@@ -362,7 +370,7 @@ void WideMasksAreCutOrTreatedAsAny()
 
 BotPolicy QuestPolicy()
 {
-    PolicyOptions options;
+    PolicyOptions options = AggressiveOptions();
     options.Quests = Data();
     return BotPolicy(options);
 }
@@ -476,7 +484,7 @@ void PolicyDefendsAgainstAnyAttackerWhileHunting()
 // idle, and the hand-in is tried again after the visit instead of waiting out the block.
 void RefusedHandInSendsTheBotToAVendor()
 {
-    PolicyOptions options;
+    PolicyOptions options = AggressiveOptions();
     options.Quests = Data();
     options.ServiceEveryMs = 600000;
     BotPolicy policy(options);
@@ -563,7 +571,7 @@ bool WalksToGiver(std::vector<BotAction> const& actions)
 // Teleport is off (the sim default). A walk that does not move is dropped, not retried as a teleport the core will refuse.
 void StuckQuestWalkIsDroppedWhenTeleportIsOff()
 {
-    PolicyOptions options;
+    PolicyOptions options = AggressiveOptions();
     options.Quests = Data();
     options.WanderWhenIdle = false;
     BotPolicy policy(options);
@@ -578,7 +586,7 @@ void StuckQuestWalkIsDroppedWhenTeleportIsOff()
 // Teleport on: one attempt, then a refusal drops the start. A silent core does not get a second teleport.
 void StuckQuestWalkTeleportsOnceThenDropsTheStart()
 {
-    PolicyOptions options;
+    PolicyOptions options = AggressiveOptions();
     options.Quests = Data();
     options.QuestTeleport = true;
     options.WanderWhenIdle = false;

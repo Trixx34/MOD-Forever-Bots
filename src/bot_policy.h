@@ -4,7 +4,8 @@
 // Behaviour, in order: below 30% health disengage (follow the closest player, or stand still); with a target, approach it
 // when it is more than 5 yards away, otherwise attack it, and cast the class rotation (combat_rotation.h) once per global
 // cooldown; with no target, pull the closest hostile unless it is part of a group of more than three (over-pull control),
-// else follow the closest player or stand still. A threat target is always fought. Decisions are sent when they change.
+// else follow the closest player or stand still. A threat target is always fought. The default stance is defensive: a bot
+// pulls only when it is aggressive (chat "aggressive") and otherwise joins a fight that its group or it is in. Decisions are sent when they change.
 // A refused cast is retried after a while, and its spell is not used again before then. A spell the snapshot reports as on
 // cooldown is skipped. Rend's bleed is tracked per target from accepted casts (layout 13 puts the bot's own auras in the
 // snapshot, so a self buff is read as fact; a target's DOTs are only a coarse mask, so the estimate stays).
@@ -99,6 +100,9 @@ struct PolicyOptions
     // Dungeon revive out of combat (config DungeonReviveOutOfCombat; needs Bot.Chat.Orders.Enabled in the core): a dead member of a dungeon party is revived by its
     // leader, when the leader is alive and not fighting, instead of walking back to its corpse. Off by default.
     bool DungeonReviveOutOfCombat = false;
+    // Bots start Aggressive: they pull what is in range, as they did before the defensive default. Off by default; the combat and pull
+    // tests turn it on. A chat stance order still changes the stance either way.
+    bool AggressiveStart = false;
     // Dungeon route (doc 19): the waypoints the party leader walks, in order, while the route is active (SetRouteActive). Empty = none.
     std::vector<Point> Route;
     // Which route points (0-based) are bosses, and the entry of the boss at each (ScenarioBossAt): the leader waits at such a point until that boss is dead.
@@ -166,9 +170,9 @@ public:
     void SetKilledBosses(std::set<std::uint32_t> const& entries) { _killedBosses = entries; }
 
     // Dress this bot for its level at the next tick (the .autogear command).
-    void RequestAutoGear(std::uint64_t botGuid) { _bots[botGuid].GearRequested = true; }
+    void RequestAutoGear(std::uint64_t botGuid) { StateOf(botGuid).GearRequested = true; }
     // Asks for a bag-only gear pass at the next tick (a trade just finished): the core wears what the bot carries when it is better.
-    void RequestBagGear(std::uint64_t botGuid) { _bots[botGuid].BagGearRequested = true; }
+    void RequestBagGear(std::uint64_t botGuid) { StateOf(botGuid).BagGearRequested = true; }
     // Town errands: the bot walks to the order's trainer and trains there. CancelErrand drops it (the bot was called away); TakeErrandOutcome
     // returns how the errand ended (done or failed) once and clears it.
     void StartErrand(std::uint64_t botGuid, ErrandOrder const& order);
@@ -319,7 +323,7 @@ private:
         bool ChatStay = false;                           // hold the position
         std::uint64_t ChatFollow = 0;                    // follow this player reference (0 = no order)
         enum class Stance : std::uint8_t { Aggressive, Defensive, Passive };
-        Stance Stance_ = Stance::Aggressive;             // aggressive: fights what the group fights or meets; defensive: only what attacks it or the group; passive: only what attacks it
+        Stance Stance_ = Stance::Defensive;              // aggressive: fights what the group fights or meets; defensive: only what attacks it or the group; passive: only what attacks it
         enum class Role : std::uint8_t { Auto, Tank, Healer, Dps };
         Role Role_ = Role::Auto;                         // overrides what the class gives (tank pulls and leads, dps does not heal on its own)
         std::uint64_t FocusMissingMs = 0;                // since when the focus target has not been in view
@@ -387,6 +391,15 @@ private:
     std::uint64_t DurationMsOf(std::uint32_t classId, std::uint32_t spell) const;
 
     void ReadResult(BotState& state, forever_module::BotSnapshot const& bot, std::uint64_t nowMs);
+
+    // The state of a bot, created on first use with the starting stance (PolicyOptions::AggressiveStart).
+    BotState& StateOf(std::uint64_t botGuid)
+    {
+        auto const [at, created] = _bots.try_emplace(botGuid);
+        if (created && _options.AggressiveStart)
+            at->second.Stance_ = BotState::Stance::Aggressive;
+        return at->second;
+    }
 
     std::unordered_map<std::uint64_t, BotState> _bots; // bot guid -> state
     // Corpses a bot has sent a loot for -> the looter's group (its leader's reference, else its own guid) and when the claim ends. The

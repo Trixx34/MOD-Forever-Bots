@@ -12,6 +12,14 @@ using forever_module::WorldTickSnapshotView;
 
 namespace {
 
+// The pull and combat tests were written for bots that start Aggressive; the defensive default has its own test.
+PolicyOptions AggressiveOptions()
+{
+    PolicyOptions options;
+    options.AggressiveStart = true;
+    return options;
+}
+
 int failures = 0;
 
 #define CHECK(cond)                                                    \
@@ -128,7 +136,7 @@ bool WalksToAfterMount(BotPolicy& policy, WorldTickSnapshotView const& view, std
 void IdleBotWalksToAGrindSpotForItsLevel()
 {
     std::vector<std::string> warnings;
-    PolicyOptions options;
+    PolicyOptions options = AggressiveOptions();
     options.Grind = std::make_shared<GrindData>(Parse("spot 0 500 0 0 1 5 0\nspot 0 900 0 0 6 10 0\n", warnings));
     BotPolicy policy(options);
     WorldTickSnapshotView view = OneBot(7, 0);
@@ -141,7 +149,7 @@ void IdleBotWalksToAGrindSpotForItsLevel()
 void NoSpotForTheMapMeansExploringOnFoot()
 {
     std::vector<std::string> warnings;
-    PolicyOptions options;
+    PolicyOptions options = AggressiveOptions();
     options.Grind = std::make_shared<GrindData>(Parse("spot 1 500 0 0 1 5 0\n", warnings));
     BotPolicy policy(options);
     WorldTickSnapshotView view = OneBot(3, 0);
@@ -161,7 +169,7 @@ void NoSpotForTheMapMeansExploringOnFoot()
 
 void HubsAreTheFallbackWithoutGrindData()
 {
-    PolicyOptions options;
+    PolicyOptions options = AggressiveOptions();
     options.HubsByMap[0] = { Point{ 700.0f, 0.0f, 0.0f } };
     BotPolicy policy(options);
     WorldTickSnapshotView view = OneBot(3, 0);
@@ -172,7 +180,7 @@ void HubsAreTheFallbackWithoutGrindData()
 void NextWalkMovesOnToAnotherSpot()
 {
     std::vector<std::string> warnings;
-    PolicyOptions options;
+    PolicyOptions options = AggressiveOptions();
     options.Grind = std::make_shared<GrindData>(Parse("spot 0 100 0 0 1 5 0\nspot 0 400 0 0 1 5 0\n", warnings));
     BotPolicy policy(options);
     WorldTickSnapshotView view = OneBot(3, 0);
@@ -188,7 +196,7 @@ void NextWalkMovesOnToAnotherSpot()
 void UnpullableCreaturesDoNotKeepTheBotFromWalking()
 {
     std::vector<std::string> warnings;
-    PolicyOptions options;
+    PolicyOptions options = AggressiveOptions();
     options.Grind = std::make_shared<GrindData>(Parse("spot 0 900 0 0 1 5 0\n", warnings));
     BotPolicy policy(options);
     WorldTickSnapshotView view = OneBot(1, 0);
@@ -220,7 +228,7 @@ void UnpullableCreaturesDoNotKeepTheBotFromWalking()
 void BotsDoNotFollowEachOther()
 {
     std::vector<std::string> warnings;
-    PolicyOptions options;
+    PolicyOptions options = AggressiveOptions();
     options.Grind = std::make_shared<GrindData>(Parse("spot 0 900 0 0 1 5 0\n", warnings));
     BotPolicy policy(options);
     WorldTickSnapshotView view = OneBot(1, 0);

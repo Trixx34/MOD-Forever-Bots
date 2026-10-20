@@ -559,7 +559,7 @@ std::uint64_t BotPolicy::DurationMsOf(std::uint32_t classId, std::uint32_t spell
 
 void BotPolicy::StartErrand(std::uint64_t botGuid, ErrandOrder const& order)
 {
-    BotState& state = _bots[botGuid];
+    BotState& state = StateOf(botGuid);
     state.Errand = order;
     state.ErrandTrainSentMs = 0;
     state.ErrandRefusals = 0;
@@ -958,7 +958,7 @@ std::vector<std::string> BotPolicy::ApplyChat(WorldTickSnapshotView const& view,
         if (!command.Selector.Matches(classId))
             continue;
         ++matched;
-        BotState& state = _bots[bot.guid];
+        BotState& state = StateOf(bot.guid);
         std::uint32_t const refusedBefore = refused;
         auto const refuse = [&](char const* why)
         {
@@ -1182,7 +1182,7 @@ std::vector<std::string> BotPolicy::ApplyChat(WorldTickSnapshotView const& view,
         {
             if (other.group_leader_guid != issuerRef || std::find(accepted.begin(), accepted.end(), other.guid) != accepted.end())
                 continue;
-            BotState& follower = _bots[other.guid];
+            BotState& follower = StateOf(other.guid);
             follower.ChatFollow = 0;
             follower.ChatStay = false;
             follower.GotoActive = false;
@@ -1281,7 +1281,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         if (at == indexOf.end())
             continue;
         BotSnapshot const& leader = view.bots[at->second];
-        BotState& leaderState = _bots[leader.guid];
+        BotState& leaderState = StateOf(leader.guid);
         if (leader.life_state == 0 && leader.threat_target_guid != 0 && !leaderState.InFight)
         {
             leaderState.InFight = true;
@@ -1364,7 +1364,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
     {
         BotSnapshot const& bot = view.bots[i];
         present.insert(bot.guid);
-        BotState& state = _bots[bot.guid];
+        BotState& state = StateOf(bot.guid);
         ReadResult(state, bot, nowMs);
         if (state.OrderAction)
         {
@@ -1892,7 +1892,8 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         if (partyLeader != 0 && partyFighting(partyLeader))
             groupFighting = true;
         bool const noSelfPull = (state.Stance_ == BotState::Stance::Passive || state.ChatStay ||
-                                 (state.Stance_ == BotState::Stance::Defensive && !groupFighting)) && bot.in_combat == 0;
+                                 (state.Stance_ == BotState::Stance::Defensive && !groupFighting && state.Role_ != BotState::Role::Tank)) &&
+                                bot.in_combat == 0;
         if (state.Focus != 0 && (bot.in_combat != 0 || groupFighting))
         {
             if (FindLiveMob(nearby, state.Focus))

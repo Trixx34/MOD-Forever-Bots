@@ -13,6 +13,14 @@ using forever_module::WorldTickSnapshotView;
 
 namespace {
 
+// The pull and combat tests were written for bots that start Aggressive; the defensive default has its own test.
+PolicyOptions AggressiveOptions()
+{
+    PolicyOptions options;
+    options.AggressiveStart = true;
+    return options;
+}
+
 int failures = 0;
 
 #define CHECK(cond)                                                    \
@@ -210,7 +218,7 @@ void EnteringTimesOut()
 
 BotPolicy RoutePolicy()
 {
-    PolicyOptions options;
+    PolicyOptions options = AggressiveOptions();
     options.PartySize = 2;
     options.PartyCount = 1;
     options.ClassOf = [](std::uint64_t guid) { return guid == 12 ? 1u : 5u; };
@@ -291,7 +299,7 @@ void TheRoutePartyPullsElitesButGrindingBotsDoNot()
 
 void AutoGearingDressesEachBotOnceAndAgainAfterLevels()
 {
-    PolicyOptions options;
+    PolicyOptions options = AggressiveOptions();
     options.AutoGearing = true;
     options.AutoGearEveryLevels = 5;
     BotPolicy policy(options);
@@ -307,7 +315,7 @@ void AutoGearingDressesEachBotOnceAndAgainAfterLevels()
 
 void WithoutAutoGearingOnlyTheCommandDressesABot()
 {
-    BotPolicy policy;
+    BotPolicy policy(AggressiveOptions());
     std::vector<BotSnapshot> bots = { Bot(10, 0, 0, 0) };
     CHECK(Count(policy.Decide(View(1, bots), 1000), ActionType::kAutoGear) == 0);
     policy.RequestAutoGear(10);
@@ -338,7 +346,7 @@ void BotsWearBetterGearFromTheirBagsOnASchedule()
 
 void BagGearIsNotAskedForAltsTheDeadOrBotsInACombat()
 {
-    PolicyOptions options;
+    PolicyOptions options = AggressiveOptions();
     options.IsAlt = [](std::uint64_t guid) { return guid == 11; };
     BotPolicy policy(options);
     std::vector<BotSnapshot> bots = { Bot(10, 0, 0, 0), Bot(11, 0, 0, 0), Bot(12, 0, 0, 0) };
@@ -358,7 +366,7 @@ void BagGearIsNotAskedForAltsTheDeadOrBotsInACombat()
 
 void ARequestAsksAtOnceAndOnlyOnce()
 {
-    BotPolicy policy;
+    BotPolicy policy(AggressiveOptions());
     std::vector<BotSnapshot> bots = { Bot(10, 0, 0, 0) };
     policy.Decide(View(1, bots), 1000);
     policy.RequestBagGear(10);
@@ -368,7 +376,7 @@ void ARequestAsksAtOnceAndOnlyOnce()
 
 void AFullGearPassAndABagPassNeverShareATick()
 {
-    PolicyOptions options;
+    PolicyOptions options = AggressiveOptions();
     options.AutoGearing = true;
     BotPolicy policy(options);
     std::vector<BotSnapshot> bots = { Bot(10, 0, 0, 0) };
@@ -399,7 +407,7 @@ WorldTickSnapshotView MageFacingAMob(BotSnapshot bot)
 
 BotPolicy MagePolicy()
 {
-    PolicyOptions options;
+    PolicyOptions options = AggressiveOptions();
     options.ClassId = 8;
     return BotPolicy(options);
 }
