@@ -271,8 +271,25 @@ void WipeRecoverySettings()
     CHECK(s.Scenario.HasPortal);
 }
 
+void ErrandSettings()
+{
+    std::vector<std::string> warnings;
+    BotSettings const off = ParseBotSettings({}, warnings);
+    CHECK(!off.Errand.Enabled && off.Errand.DailyMinutes == 60 && off.Errand.GapMinutes == 120 && off.Errand.MaxMinutes == 60);
+    CHECK(off.Errand.MaxPerCity == 2 && off.Errand.MaxStartsPerTick == 2);
+    BotSettings const on = ParseBotSettings({ { "Errands", "1" }, { "ErrandDailyMin", "90" }, { "ErrandGapMin", "30" }, { "ErrandMaxMin", "45" },
+                                              { "ErrandPerCity", "3" }, { "ErrandStartsPerTick", "1" } }, warnings);
+    CHECK(on.Errand.Enabled && on.Errand.DailyMinutes == 90 && on.Errand.GapMinutes == 30 && on.Errand.MaxMinutes == 45);
+    CHECK(on.Errand.MaxPerCity == 3 && on.Errand.MaxStartsPerTick == 1);
+    CHECK(warnings.empty());
+    BotSettings const bad = ParseBotSettings({ { "ErrandMaxMin", "1" }, { "ErrandPerCity", "0" } }, warnings);
+    CHECK(bad.Errand.MaxMinutes == 60 && bad.Errand.MaxPerCity == 2);
+    CHECK(warnings.size() == 2);
+}
+
 int main()
 {
+    ErrandSettings();
     ChatSettings();
     SayAndSupplySettings();
     DefaultsWhenEmpty();

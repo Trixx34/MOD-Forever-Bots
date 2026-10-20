@@ -31,6 +31,7 @@
 #include "quest_planner.h"
 #include "chat_say.h"
 #include "dungeon_events.h"
+#include "errand_trainers.h"
 #include "supply_policy.h"
 #include "taxi_policy.h"
 
@@ -52,6 +53,17 @@ struct Point
     float Y = 0.0f;
     float Z = 0.0f;
 };
+
+// A town errand order (errand_trainers.h, errand_policy.h): walk to a capital trainer, then train. The trip is done when the core applies the train.
+struct ErrandOrder
+{
+    std::uint32_t Map = 0;
+    Point Dest;                 // the trainer's position
+    std::uint32_t Skill = 0;    // the profession skill line the bot trains
+    std::uint32_t Entry = 0;    // the trainer's creature entry
+};
+
+enum class ErrandOutcome : std::uint8_t { kNone, kDone, kFailed };
 
 // Options for the policy. TestSpell (0 = off) replaces the rotation: it is cast at the target every CastEveryTicks
 // ticks, which exercises the cast path (milestone M1). ClassId selects the rotation (0 = none).
@@ -155,6 +167,11 @@ public:
     void RequestAutoGear(std::uint64_t botGuid) { _bots[botGuid].GearRequested = true; }
     // Asks for a bag-only gear pass at the next tick (a trade just finished): the core wears what the bot carries when it is better.
     void RequestBagGear(std::uint64_t botGuid) { _bots[botGuid].BagGearRequested = true; }
+    // Town errands: the bot walks to the order's trainer and trains there. CancelErrand drops it (the bot was called away); TakeErrandOutcome
+    // returns how the errand ended (done or failed) once and clears it.
+    void StartErrand(std::uint64_t botGuid, ErrandOrder const& order);
+    void CancelErrand(std::uint64_t botGuid);
+    ErrandOutcome TakeErrandOutcome(std::uint64_t botGuid);
 
     // Who said a chat command and where, for ApplyChat. Issuer is the speaker's character guid counter (the group leader), Recipient the
     // whispered bot's guid counter (0 for party or raid chat). Pos and MapId are the speaker's; TargetRef is its selected unit (0 = none).
@@ -349,6 +366,10 @@ private:
         std::uint64_t ReviveRetryMs = 0;                 // the next out-of-combat revive order of this ghost by its leader
         std::uint32_t ReviveAttempts = 0;                // revive orders sent in this death
         bool Reclaimed = false;                          // a reclaim was sent in this death
+        std::optional<ErrandOrder> Errand;               // the town errand this bot is on (none = not on one)
+        std::uint64_t ErrandTrainSentMs = 0;             // the next train order of the errand (0 = send now)
+        std::uint32_t ErrandRefusals = 0;                // train refusals in a row
+        ErrandOutcome ErrandResult = ErrandOutcome::kNone; // the errand's end, until the module takes it
         std::uint64_t RunStartMs = 0;                    // the corpse run began (0 = not yet)
         std::uint64_t InsideSinceMs = 0;                 // the ghost is on the corpse's map since
         bool RunFailed = false;

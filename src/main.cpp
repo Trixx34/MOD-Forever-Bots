@@ -15,6 +15,8 @@
 #include "bot_presence.h"
 #include "auction_policy.h"
 #include "sell_policy.h"
+#include "errand_policy.h"
+#include "errand_trainers.h"
 #include "bot_store.h"
 #include "bot_live.h"
 #include "bot_telemetry.h"
@@ -241,6 +243,14 @@ struct CommandQueue
     };
     std::vector<ChatItem> Chat;
     std::vector<std::pair<std::uint64_t, std::string>> Replies; // speaker character guid, text
+    // Town errands from the Run() thread: start (with the trainer) or cancel, applied on the pump thread before the decisions.
+    struct ErrandItem
+    {
+        std::uint64_t Guid = 0;
+        bool Cancel = false;
+        ErrandOrder Order;
+    };
+    std::vector<ErrandItem> Errands;
     std::vector<ChatAck> Says;                                  // lines a bot says out loud for an order it took (ChatSay)
 };
 
@@ -293,6 +303,29 @@ struct AuctionFeed
 {
     std::mutex Lock;
     std::vector<AuctionBot> Bots;
+    std::uint64_t AtMs = 0;
+};
+
+// Town errands (errand_policy.h, errand_trainers.h): the pump's view of each bot, the orders for the pump, and how each errand ended. The Run() thread
+// decides the starts and ends from the feed every kErrandInterval; the pump applies the orders and reports the outcomes.
+constexpr std::chrono::milliseconds kErrandInterval(10000);
+struct ErrandBot
+{
+    std::uint64_t Guid = 0;
+    bool Available = false;   // alive, out of combat, not on a flight
+    bool Called = false;      // in a party: called, so an errand is abandoned
+    bool TrainDue = false;    // a primary profession below its maximum
+    std::uint32_t Side = 0;   // 1 Alliance, 2 Horde (0 = unknown: no errand)
+    std::uint32_t Skill = 0;  // the due profession's skill line
+    std::uint32_t Map = 0;
+    float X = 0.0f, Y = 0.0f, Z = 0.0f;
+};
+
+struct ErrandFeed
+{
+    std::mutex Lock;
+    std::vector<ErrandBot> Bots;
+    std::vector<std::pair<std::uint64_t, ErrandOutcome>> Outcomes; // taken by the Run() thread; kept until then
     std::uint64_t AtMs = 0;
 };
 
@@ -398,6 +431,7 @@ struct PumpExtras
     std::shared_ptr<PresenceFeed> Presence;   // set when Presence is on
     std::shared_ptr<AuctionFeed> Auction;     // set when Auction is on
     std::shared_ptr<SellBook> Sell;           // set when vendor sales are on
+    std::shared_ptr<ErrandFeed> Errand;       // set when Errands is on
     std::shared_ptr<AltRegistry> Alts;
     std::optional<ScenarioPlan> Scenario;
     std::string ScenarioResultFile;
@@ -455,6 +489,7 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
     std::uint64_t lastTick = 0;
     std::uint64_t presenceFedMs = 0;
     std::uint64_t auctionFedMs = 0;
+    std::uint64_t errandFedMs = 0;
     // Last action sequence seen per bot, so each result is reported once.
     std::unordered_map<std::uint64_t, std::uint32_t> seenSequence;
     std::unordered_map<std::uint64_t, std::uint64_t> serviceNoticeMs; // bot -> when a service refusal was last logged
@@ -575,6 +610,21 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
             // Chat commands: applied before this tick's decisions; the lines for the speaker go back through the Run() thread.
             if (extras.Commands)
             {
+                std::vector<CommandQueue::ErrandItem> errands;
+                {
+                    std::lock_guard<std::mutex> lock(extras.Commands->Lock);
+                    errands.swap(extras.Commands->Errands);
+                }
+                for (CommandQueue::ErrandItem const& item : errands)
+                {
+                    if (item.Cancel)
+                        policy.CancelErrand(item.Guid);
+                    else
+                        policy.StartErrand(item.Guid, item.Order);
+                }
+            }
+            if (extras.Commands)
+            {
                 std::vector<CommandQueue::ChatItem> chat;
                 {
                     std::lock_guard<std::mutex> lock(extras.Commands->Lock);
@@ -613,6 +663,39 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
                 std::lock_guard<std::mutex> lock(extras.Presence->Lock);
                 extras.Presence->Bots.swap(list);
                 extras.Presence->AtMs = presenceFedMs;
+            }
+            if (extras.Errand && nowMs() - errandFedMs >= kPresenceFeedMs)
+            {
+                errandFedMs = nowMs();
+                std::vector<ErrandBot> list;
+                list.reserve(view.bots.size());
+                std::vector<std::pair<std::uint64_t, ErrandOutcome>> outcomes;
+                for (forever_module::BotSnapshot const& bot : view.bots)
+                {
+                    if (ErrandOutcome const outcome = policy.TakeErrandOutcome(bot.guid); outcome != ErrandOutcome::kNone)
+                        outcomes.emplace_back(bot.guid, outcome);
+                    if ((extras.Alts && extras.Alts->Has(bot.guid)) || bot.life_state != 0)
+                        continue;
+                    ErrandBot entry;
+                    entry.Guid = bot.guid;
+                    entry.Available = bot.in_combat == 0 && bot.in_flight == 0;
+                    entry.Called = bot.group_role != 0 || bot.group_leader_guid != 0;
+                    int const slot = errand::TrainingDueSlot(bot.profession_skill, bot.profession_value, bot.profession_max);
+                    entry.TrainDue = slot >= 0;
+                    entry.Skill = slot >= 0 ? bot.profession_skill[slot] : 0;
+                    entry.Side = options.SideOf ? options.SideOf(bot.guid) : 0;
+                    entry.Map = bot.map_id;
+                    entry.X = bot.pos_x;
+                    entry.Y = bot.pos_y;
+                    entry.Z = bot.pos_z;
+                    list.push_back(entry);
+                }
+                std::lock_guard<std::mutex> lock(extras.Errand->Lock);
+                extras.Errand->Bots.swap(list);
+                extras.Errand->AtMs = errandFedMs;
+                for (auto& outcome : outcomes)
+                    if (extras.Errand->Outcomes.size() < 256)
+                        extras.Errand->Outcomes.push_back(outcome);
             }
             if (extras.Auction && nowMs() - auctionFedMs >= kPresenceFeedMs)
             {
@@ -1425,6 +1508,108 @@ int main(int argc, char** argv)
         });
         std::cerr << "forever-bots: auction house is on: a listing visit every " << settings.Auction.EveryMs / 1000 << " s per bot, at most "
                   << settings.Auction.PerVisit << " items per visit\n";
+    }
+    if (settings.Errand.Enabled && !scenarioOn)
+    {
+        // The trainer table (ErrandTrainerFile): without it no errand can be made, so the errands stay off.
+        auto trainers = std::make_shared<std::vector<errand::Trainer>>();
+        std::ifstream in(settings.ErrandTrainerFile);
+        if (!in)
+            std::cerr << "forever-bots: ErrandTrainerFile: cannot read '" << settings.ErrandTrainerFile << "'; errands are off\n";
+        else
+        {
+            std::ostringstream text;
+            text << in.rdbuf();
+            std::vector<std::string> trainerWarnings;
+            *trainers = errand::ParseTrainerTable(text.str(), trainerWarnings);
+            for (std::string const& warning : trainerWarnings)
+                std::cerr << "forever-bots: " << settings.ErrandTrainerFile << ": " << warning << "\n";
+            std::cerr << "forever-bots: errands: " << trainers->size() << " trainers from " << settings.ErrandTrainerFile << "\n";
+        }
+        if (!trainers->empty())
+        {
+            auto feed = std::make_shared<ErrandFeed>();
+            extras.Errand = feed;
+            auto scheduler = std::make_shared<errand::Scheduler>(settings.Errand);
+            std::shared_ptr<CommandQueue> queue = commands;
+            client.AddTimer(kErrandInterval, [feed, scheduler, trainers, queue, &settings]
+            {
+                std::uint64_t const now = nowMs();
+                std::vector<ErrandBot> list;
+                std::vector<std::pair<std::uint64_t, ErrandOutcome>> outcomes;
+                std::uint64_t fedAt = 0;
+                {
+                    std::lock_guard<std::mutex> lock(feed->Lock);
+                    list = feed->Bots;
+                    outcomes.swap(feed->Outcomes);
+                    fedAt = feed->AtMs;
+                }
+                for (auto const& [guid, outcome] : outcomes)
+                    scheduler->Finish(guid, now); // done or failed: the trip is over either way
+                if (fedAt == 0 || now - fedAt > kPresenceStaleMs)
+                    return;
+
+                std::vector<errand::Bot> bots;
+                std::unordered_map<std::uint64_t, ErrandBot const*> byGuid;
+                for (ErrandBot const& bot : list)
+                {
+                    byGuid[bot.Guid] = &bot;
+                    errand::Bot b;
+                    b.Guid = bot.Guid;
+                    b.Available = bot.Available;
+                    b.Called = bot.Called;
+                    if (bot.TrainDue && bot.Side != 0)
+                    {
+                        // Only the capitals of the bot's faction that have a trainer for its skill: a start always has a trainer to walk to.
+                        for (std::uint32_t city = errand::kStormwind; city <= errand::kThunderBluff; ++city)
+                        {
+                            if (errand::ChooseTrainer(*trainers, bot.Side, bot.Skill, city, bot.Map, bot.X, bot.Y, bot.Z))
+                                b.Cities.push_back(city);
+                        }
+                        b.TrainDue = !b.Cities.empty();
+                    }
+                    bots.push_back(std::move(b));
+                }
+
+                errand::Decisions const decisions = scheduler->Tick(now, bots);
+                std::vector<CommandQueue::ErrandItem> items;
+                for (errand::End const& end : decisions.Ends)
+                {
+                    CommandQueue::ErrandItem item;
+                    item.Guid = end.Guid;
+                    item.Cancel = true;
+                    items.push_back(item);
+                }
+                for (errand::Start const& start : decisions.Starts)
+                {
+                    auto const found = byGuid.find(start.Guid);
+                    if (found == byGuid.end())
+                        continue;
+                    ErrandBot const& bot = *found->second;
+                    auto const pick = errand::ChooseTrainer(*trainers, bot.Side, bot.Skill, start.City, bot.Map, bot.X, bot.Y, bot.Z);
+                    if (!pick)
+                        continue;
+                    errand::Trainer const& trainer = (*trainers)[*pick];
+                    CommandQueue::ErrandItem item;
+                    item.Guid = start.Guid;
+                    item.Order.Map = trainer.Map;
+                    item.Order.Dest = Point{ trainer.X, trainer.Y, trainer.Z };
+                    item.Order.Skill = trainer.Skill;
+                    item.Order.Entry = trainer.Entry;
+                    items.push_back(item);
+                    std::cerr << "forever-bots: errand: bot " << start.Guid << " to " << trainer.Name << " (" << trainer.Subname << ") in city " << start.City << "\n";
+                }
+                if (!items.empty() && queue)
+                {
+                    std::lock_guard<std::mutex> lock(queue->Lock);
+                    for (auto& item : items)
+                        queue->Errands.push_back(std::move(item));
+                }
+                for (errand::End const& end : decisions.Ends)
+                    std::cerr << "forever-bots: errand: bot " << end.Guid << " ended (reason " << int(end.Why) << ")\n";
+            });
+            std::cerr << "forever-bots: town errands are on: a check every " << kErrandInterval.count() / 1000 << " s\n";
+        }
     }
     if (scenarioOn)
     {

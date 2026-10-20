@@ -1,0 +1,101 @@
+# Profession trainers in the capitals, for the town errands (src/errand_trainers.h). One trainer per line:
+# side|city|map|entry|skill|x y z|name|subname|profession|guid
+# side: 1 Alliance, 2 Horde. skill: the profession skill line id (BotProfessions). map: 0 Eastern Kingdoms, 1 Kalimdor.
+# Selection (from the scratch world DB, read only): creature_template rows whose subname names a profession trainer (a rank such as
+# Journeyman, Artisan, Expert or Master, or a plain "X Trainer") with npcflag bit 16 (trainer), and creature spawns inside a hand-drawn box around
+# each capital. Junior trainers (low-level, Stormwind only) are left out. The boxes are approximate; the spawn positions come from the DB, not from a
+# live client.
+# UNVERIFIED: no trainer here has been checked in game. Positions, the box edges and the trainer taught skills must be confirmed on a live
+# realm before errands are switched on. Known gaps: Stormwind has no Engineering trainer in the boxes; Darnassus has no Blacksmithing,
+# Engineering or Mining trainer; Orgrimmar has no Blacksmithing trainer; Thunder Bluff has no Engineering trainer.
+# Undercity's Doctor Martin Felben sits on the edge of the Undercity box.
+1|Darnassus|1|4212|165|10086.3 2256.5 1343.4|Telonis|Artisan Leatherworker|Leatherworking|20046466
+1|Darnassus|1|11081|165|10084.3 2252.8 1343.4|Faldron|Expert Leatherworker|Leatherworking|20046334
+1|Darnassus|1|11083|165|10091.0 2256.4 1343.4|Darianna|Journeyman Leatherworker|Leatherworking|20046336
+1|Darnassus|1|4160|171|10068.8 2357.6 1321.7|Ainethil|Artisan Alchemist|Alchemy|20046285
+1|Darnassus|1|11041|171|10078.0 2352.2 1321.7|Milla Fairancora|Journeyman Alchemist|Alchemy|20046208
+1|Darnassus|1|11042|171|10067.3 2341.6 1321.7|Sylvanna Forestmoon|Expert Alchemist|Alchemy|20046210
+1|Darnassus|1|4204|182|9758.2 2430.9 1334.0|Firodren Mooncaller|Herbalism Trainer|Herbalism|20046413
+1|Darnassus|1|4159|197|10080.4 2267.3 1333.1|Me'lynn|Expert Tailor|Tailoring|20046244
+1|Darnassus|1|11050|197|10088.6 2265.8 1333.1|Trianna|Journeyman Tailor|Tailoring|20046218
+1|Darnassus|1|4213|333|10145.7 2320.3 1333.1|Taladan|Expert Enchanter|Enchanting|20046467
+1|Darnassus|1|11070|333|10148.4 2316.2 1333.1|Lalina Summermoon|Journeyman Enchanter|Enchanting|20046241
+1|Darnassus|1|6292|393|10081.2 2259.6 1343.4|Eladriel|Skinning Trainer|Skinning|20046813
+1|Ironforge|0|4258|164|-4788.0 -1129.0 498.9|Bengus Deepforge|Artisan Blacksmith|Blacksmithing|20002013
+1|Ironforge|0|10276|164|-4793.8 -1127.5 498.9|Rotgath Stonebeard|Expert Blacksmith|Blacksmithing|20002011
+1|Ironforge|0|10277|164|-4790.5 -1126.8 498.9|Groum Stonebeard|Journeyman Blacksmith|Blacksmithing|20002012
+1|Ironforge|0|1466|165|-4742.7 -1020.5 504.5|Gretta Finespindle|Journeyman Leatherworker|Leatherworking|20001763
+1|Ironforge|0|5127|165|-4746.9 -1031.7 504.5|Fimble Finespindle|Expert Leatherworker|Leatherworking|20002084
+1|Ironforge|0|1246|171|-4863.0 -1238.0 501.8|Vosur Brakthel|Journeyman Alchemist|Alchemy|20000031
+1|Ironforge|0|5177|171|-4863.0 -1240.3 501.8|Tally Berryfizz|Expert Alchemist|Alchemy|20000029
+1|Ironforge|0|5137|182|-4881.2 -1155.5 505.9|Reyna Stonebranch|Herbalism Trainer|Herbalism|20000096
+1|Ironforge|0|4254|186|-4708.0 -1108.9 504.5|Geofram Bouldertoe|Mining Trainer|Mining|20001811
+1|Ironforge|0|1703|197|-4716.2 -1060.0 504.3|Uthrar Threx|Journeyman Tailor|Tailoring|20001796
+1|Ironforge|0|5153|197|-4724.1 -1054.7 504.3|Jormund Stonebrow|Expert Tailor|Tailoring|20001795
+1|Ironforge|0|11028|202|-4802.5 -1248.5 502.1|Jemma Quikswitch|Journeyman Engineer|Engineering|20000032
+1|Ironforge|0|11029|202|-4795.6 -1247.1 502.1|Trixie Quikswitch|Expert Engineer|Engineering|20000043
+1|Ironforge|0|5157|333|-4809.0 -1186.1 512.6|Gimble Thistlefuzz|Expert Enchanter|Enchanting|20000049
+1|Ironforge|0|11065|333|-4808.6 -1190.1 505.9|Thonys Pillarstone|Journeyman Enchanter|Enchanting|20000050
+1|Ironforge|0|6291|393|-4740.7 -1028.8 504.5|Balthus Stoneflayer|Skinning Trainer|Skinning|20002082
+1|Stormwind|0|957|164|-8424.7 608.8 95.3|Dane Lindgren|Journeyman Blacksmith|Blacksmithing|20005169
+1|Stormwind|0|5511|164|-8424.5 616.9 95.5|Therum Deepforge|Expert Blacksmith|Blacksmithing|20037604
+1|Stormwind|0|5564|165|-8725.5 477.4 98.7|Simon Tanner|Expert Leatherworker|Leatherworking|20079727
+1|Stormwind|0|11096|165|-8723.9 469.4 98.7|Randal Worth|Journeyman Leatherworker|Leatherworking|20079734
+1|Stormwind|0|1215|171|-9056.2 152.6 115.1|Alchemist Mallory|Journeyman Alchemist|Alchemy|20000011
+1|Stormwind|0|5499|171|-8993.0 755.8 98.4|Lilyssia Nightbreeze|Expert Alchemist|Alchemy|20079832
+1|Stormwind|0|5500|171|-8987.9 759.2 98.4|Tel'Athir|Journeyman Alchemist|Alchemy|20079834
+1|Stormwind|0|1218|182|-9059.7 148.6 115.2|Herbalist Pomeroy|Herbalism Trainer|Herbalism|20000012
+1|Stormwind|0|5566|182|-8970.0 779.6 96.0|Tannysa|Herbalism Trainer|Herbalism|20079825
+1|Stormwind|0|5513|186|-8434.0 693.4 103.4|Gelman Stonehand|Mining Trainer|Mining|20037606
+1|Stormwind|0|1300|197|-8939.5 793.7 91.0|Lawrence Schneider|Journeyman Tailor|Tailoring|20079824
+1|Stormwind|0|1346|197|-8938.1 800.7 91.0|Georgio Bolero|Artisan Tailor|Tailoring|20079826
+1|Stormwind|0|5567|197|-8958.8 816.4 109.5|Sellandus|Expert Tailor|Tailoring|20090469
+1|Stormwind|0|1317|333|-8858.3 803.7 96.5|Lucan Cordell|Expert Enchanter|Enchanting|20079828
+1|Stormwind|0|11068|333|-8849.9 801.5 96.4|Betty Quin|Journeyman Enchanter|Enchanting|20079829
+1|Stormwind|0|1292|393|-8716.4 469.4 98.7|Maris Granger|Skinning Trainer|Skinning|20079735
+2|Orgrimmar|1|3365|165|1860.9 -4561.5 24.8|Karolek|Expert Leatherworker|Leatherworking|20006630
+2|Orgrimmar|1|5811|165|1855.3 -4568.1 24.8|Kamari|Journeyman Leatherworker|Leatherworking|20004686
+2|Orgrimmar|1|3347|171|1964.9 -4477.8 25.8|Yelmak|Expert Alchemist|Alchemy|20004681
+2|Orgrimmar|1|11046|171|1966.2 -4463.1 25.8|Whuut|Journeyman Alchemist|Alchemy|20006624
+2|Orgrimmar|1|3404|182|1904.8 -4460.7 53.3|Jandi|Herbalism Trainer|Herbalism|20006625
+2|Orgrimmar|1|3357|186|2029.9 -4706.2 26.9|Makaru|Mining Trainer|Mining|20004671
+2|Orgrimmar|1|2855|197|1813.3 -4563.3 22.9|Snang|Journeyman Tailor|Tailoring|20004680
+2|Orgrimmar|1|3363|197|1806.8 -4573.3 22.9|Magar|Expert Tailor|Tailoring|20006629
+2|Orgrimmar|1|2857|202|2048.0 -4746.0 29.2|Thund|Journeyman Engineer|Engineering|20004676
+2|Orgrimmar|1|3412|202|2036.2 -4746.5 29.2|Nogg|Expert Engineer|Engineering|20004672
+2|Orgrimmar|1|11017|202|2038.4 -4749.0 29.2|Roxxik|Artisan Engineer|Engineering|20007969
+2|Orgrimmar|1|3345|333|1912.2 -4436.6 24.7|Godan|Expert Enchanter|Enchanting|20006626
+2|Orgrimmar|1|11066|333|1913.2 -4430.5 24.6|Jhag|Journeyman Enchanter|Enchanting|20007479
+2|Orgrimmar|1|7088|393|1849.0 -4569.2 24.8|Thuwd|Skinning Trainer|Skinning|20006622
+2|ThunderBluff|1|2998|164|-1233.3 105.6 129.5|Karn Stonehoof|Expert Blacksmith|Blacksmithing|20026618
+2|ThunderBluff|1|10278|164|-1244.2 105.1 129.1|Thrag Stonehoof|Journeyman Blacksmith|Blacksmithing|20024714
+2|ThunderBluff|1|3007|165|-1146.2 83.5 145.9|Una|Artisan Leatherworker|Leatherworking|20026626
+2|ThunderBluff|1|3008|165|-1152.3 77.7 145.9|Mak|Journeyman Leatherworker|Leatherworking|20026627
+2|ThunderBluff|1|11084|165|-1146.5 74.9 145.9|Tarn|Expert Leatherworker|Leatherworking|20024770
+2|ThunderBluff|1|3009|171|-1080.8 30.1 140.9|Bena Winterhoof|Expert Alchemist|Alchemy|20026628
+2|ThunderBluff|1|11047|171|-1089.6 29.4 140.9|Kray|Journeyman Alchemist|Alchemy|20024721
+2|ThunderBluff|1|3013|182|-1131.2 -4.7 143.6|Komin Winterhoof|Herbalism Trainer|Herbalism|20026632
+2|ThunderBluff|1|3001|186|-1252.9 158.0 133.6|Brek Stonehoof|Mining Trainer|Mining|20026620
+2|ThunderBluff|1|3004|197|-1165.6 51.9 145.9|Tepa|Expert Tailor|Tailoring|20026623
+2|ThunderBluff|1|11051|197|-1158.6 54.7 145.9|Vhan|Journeyman Tailor|Tailoring|20024723
+2|ThunderBluff|1|3011|333|-1110.9 47.9 140.5|Teg Dawnstrider|Expert Enchanter|Enchanting|20026630
+2|ThunderBluff|1|11071|333|-1117.9 51.0 141.2|Mot Dawnstrider|Journeyman Enchanter|Enchanting|20024760
+2|ThunderBluff|1|7089|393|-1150.3 52.8 144.9|Mooranta|Skinning Trainer|Skinning|20026612
+2|Undercity|0|4596|164|1681.9 285.5 -62.1|James Van Brunt|Expert Blacksmith|Blacksmithing|20041843
+2|Undercity|0|4605|164|1691.7 295.9 -62.1|Basil Frye|Journeyman Blacksmith|Blacksmithing|20038428
+2|Undercity|0|223|165|1504.0 192.7 -62.1|Dan Golthas|Journeyman Leatherworker|Leatherworking|20031887
+2|Undercity|0|4588|165|1510.4 199.9 -62.1|Arthur Moore|Expert Leatherworker|Leatherworking|20031884
+2|Undercity|0|4609|171|1400.7 384.6 -66.0|Doctor Marsh|Expert Alchemist|Alchemy|20017647
+2|Undercity|0|4611|171|1408.5 414.9 -84.9|Doctor Herbert Halsey|Artisan Alchemist|Alchemy|20038073
+2|Undercity|0|11044|171|1403.7 426.1 -80.3|Doctor Martin Felben|Journeyman Alchemist Trainer|Alchemy|20031876
+2|Undercity|0|4614|182|1560.8 355.1 -62.1|Martha Alliestar|Herbalism Trainer|Herbalism|20031871
+2|Undercity|0|4598|186|1638.2 335.6 -62.1|Brom Killian|Mining Trainer|Mining|20031891
+2|Undercity|0|4576|197|1681.5 194.4 -62.1|Josef Gregorian|Artisan Tailor|Tailoring|20038067
+2|Undercity|0|4578|197|1736.6 41.9 -59.2|Josephine Lister|Master Shadoweave Tailor|Tailoring|20031868
+2|Undercity|0|11048|197|1687.0 200.9 -62.1|Victor Ward|Journeyman Tailor|Tailoring|20038066
+2|Undercity|0|11049|197|1682.3 201.3 -62.1|Rhiannon Davis|Expert Tailor|Tailoring|20038069
+2|Undercity|0|4586|202|1409.8 150.4 -62.3|Graham Van Talen|Journeyman Engineer|Engineering|20038096
+2|Undercity|0|11031|202|1404.1 142.9 -62.2|Franklin Lloyd|Expert Engineer|Engineering|20038103
+2|Undercity|0|4616|333|1482.4 273.9 -62.1|Lavinia Crowe|Expert Enchanter|Enchanting|20031879
+2|Undercity|0|11067|333|1491.7 273.2 -62.1|Malcomb Wynn|Journeyman Enchanter|Enchanting|20031878
+2|Undercity|0|7087|393|1499.2 200.1 -62.1|Killian Hagey|Skinning Trainer|Skinning|20038098

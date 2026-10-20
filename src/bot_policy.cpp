@@ -154,6 +154,9 @@ constexpr std::uint64_t kCloserAfterLosMs = 5000;   // after a line-of-sight ref
 constexpr std::uint64_t kBagGearEveryMs = 300000;
 constexpr std::uint64_t kBagGearSpreadMs = 60000;
 constexpr std::uint64_t kTravelTimeoutMs = 180000; // a walk to the vendor longer than this is dropped for now
+constexpr float kTrainReachYards = 5.0f;          // a bot this close to its errand trainer sends the train order (the core allows about 5)
+constexpr std::uint64_t kErrandTrainRetryMs = 3000; // the next train order of an errand, while the core has not answered
+constexpr std::uint32_t kErrandTrainRefusalMax = 3; // train refusals in a row that end the errand as failed
 constexpr float kMountMinDistanceYards = 100.0f;   // a walk this long: mount up before it
 constexpr float kMountDismountDistanceYards = 15.0f; // arrived or close: dismount
 // A quest walk that keeps the bot within kQuestWalkStuckYards for kQuestWalkStuckMs has no route to its giver (seen on the sim: 11
@@ -554,11 +557,73 @@ std::uint64_t BotPolicy::DurationMsOf(std::uint32_t classId, std::uint32_t spell
     return DotDurationMs(spell);
 }
 
+void BotPolicy::StartErrand(std::uint64_t botGuid, ErrandOrder const& order)
+{
+    BotState& state = _bots[botGuid];
+    state.Errand = order;
+    state.ErrandTrainSentMs = 0;
+    state.ErrandRefusals = 0;
+    state.ErrandResult = ErrandOutcome::kNone;
+}
+
+void BotPolicy::CancelErrand(std::uint64_t botGuid)
+{
+    auto const it = _bots.find(botGuid);
+    if (it != _bots.end())
+        it->second.Errand.reset();
+}
+
+ErrandOutcome BotPolicy::TakeErrandOutcome(std::uint64_t botGuid)
+{
+    auto const it = _bots.find(botGuid);
+    if (it == _bots.end())
+        return ErrandOutcome::kNone;
+    ErrandOutcome const result = it->second.ErrandResult;
+    it->second.ErrandResult = ErrandOutcome::kNone;
+    return result;
+}
+
 void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_t nowMs)
 {
     if (bot.last_action_sequence == 0 || bot.last_action_sequence == state.LastSequence)
         return;
     state.LastSequence = bot.last_action_sequence;
+
+    // A town errand whose walk to the trainer has no route: the trip cannot be made, so it fails.
+    if (state.Errand && bot.last_action_type == uint8_t(ActionType::kMoveTo) && bot.last_action_status == BotActionStatus::kNoRoute)
+    {
+        state.ErrandResult = ErrandOutcome::kFailed;
+        state.Errand.reset();
+        if (_options.OnEvent)
+            _options.OnEvent("errand_failed: bot=" + std::to_string(bot.guid) + " reason=no_route");
+    }
+    // A town errand's train order: applied ends the trip; out of range, busy or moving is retried; any other refusal counts toward a failure.
+    if (state.Errand && bot.last_action_type == uint8_t(ActionType::kTrain) && bot.last_action_status != BotActionStatus::kNone)
+    {
+        if (bot.last_action_status == BotActionStatus::kApplied)
+        {
+            state.ErrandResult = ErrandOutcome::kDone;
+            state.Errand.reset();
+            if (_options.OnEvent)
+                _options.OnEvent("errand_done: bot=" + std::to_string(bot.guid));
+        }
+        else if (bot.last_action_status == BotActionStatus::kOutOfRange || bot.last_action_status == BotActionStatus::kBusy ||
+                 bot.last_action_status == BotActionStatus::kMoving)
+        {
+            state.ErrandTrainSentMs = 0;
+        }
+        else if (++state.ErrandRefusals >= kErrandTrainRefusalMax)
+        {
+            state.ErrandResult = ErrandOutcome::kFailed;
+            state.Errand.reset();
+            if (_options.OnEvent)
+                _options.OnEvent("errand_failed: bot=" + std::to_string(bot.guid) + " status=" + std::to_string(int(bot.last_action_status)));
+        }
+        else
+        {
+            state.ErrandTrainSentMs = 0;
+        }
+    }
 
     // A click or an item used on a door, a lever or a charge (dungeon events): the answer goes to the event that sent it.
     if (bot.last_action_type == uint8_t(ActionType::kUseObject) && state.Events)
@@ -2382,6 +2447,32 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         else
             enemyNear = PullTarget(bot, nearby, avoided, false, huntEntries, routeOn) != nullptr;
         bool idle = !hasTarget && !enemyNear && wanted.Type == ActionType::kStop && questStep.Kind == QuestStepKind::None && !routeBusy;
+
+        // A town errand (errand_trainers.h): walk to the trainer, then train once in reach. Only for a bot free to walk, as the vendor visit is. The
+        // walk is a kMoveTo, so the taxi rules below apply to it as to any walk.
+        if (state.Errand && !hasTarget && !enemyNear && wanted.Type == ActionType::kStop && questStep.Kind == QuestStepKind::None && !routeBusy)
+        {
+            ErrandOrder const& order = *state.Errand;
+            float const dist = bot.map_id == order.Map ? std::hypot(bot.pos_x - order.Dest.X, bot.pos_y - order.Dest.Y) : 1e9f;
+            if (dist <= kTrainReachYards)
+            {
+                if (bot.in_combat == 0 && bot.life_state == 0 && nowMs >= state.ErrandTrainSentMs)
+                {
+                    BotAction train;
+                    train.bot_guid = bot.guid;
+                    train.type = ActionType::kTrain;
+                    actions.push_back(train);
+                    state.ErrandTrainSentMs = nowMs + kErrandTrainRetryMs;
+                }
+                wanted = Decision{};
+            }
+            else
+            {
+                wanted = Decision{ ActionType::kMoveTo, 0, order.Dest };
+            }
+            routeBusy = true;
+            idle = false;
+        }
 
         // Seeing nothing and doing nothing, for hubs (M7): the idle time starts when the bot first is idle, and any activity
         // resets it.
