@@ -111,6 +111,35 @@ void MaxLevelRetiresASupersededBuff()
     CHECK(!Casts(actions, 10, 168, 0) && Casts(actions, 10, 7302, 0));
 }
 
+void ABuffRefusedForPowerWaitsLongBeforeItIsTriedAgain()
+{
+    // A warrior has no rage out of combat, a caster waits to drink: a buff the core refused for power was tried every two seconds (about 20,000
+    // refused casts in 20 minutes on 300 bots). It waits 30 seconds now; a fight spell keeps the short retry.
+    BotPolicy policy = MagePolicy("class 8\nbuff 168 duration 1800 self\n");
+    WorldTickSnapshotView view = Group(10);
+    CHECK(Casts(policy.Decide(view, 1000), 10, 168, 0));
+    view.bots[0].last_action_type = std::uint8_t(ActionType::kCastSpell);
+    view.bots[0].last_action_spell = 168;
+    view.bots[0].last_action_status = forever_module::BotActionStatus::kNotEnoughPower;
+    view.bots[0].last_action_sequence = 1;
+    policy.Decide(view, 2000);
+    CHECK(!Casts(policy.Decide(view, 5000), 10, 168, 0));            // not after the short retry
+    CHECK(!Casts(policy.Decide(view, 20000), 10, 168, 0));
+    CHECK(Casts(policy.Decide(view, 2000 + 30000 + 100), 10, 168, 0)); // but after the long one
+
+    // Refused for another reason (not ready, the global cooldown): five seconds, not one.
+    BotPolicy other = MagePolicy("class 8\nbuff 168 duration 1800 self\n");
+    WorldTickSnapshotView view2 = Group(10);
+    CHECK(Casts(other.Decide(view2, 1000), 10, 168, 0));
+    view2.bots[0].last_action_type = std::uint8_t(ActionType::kCastSpell);
+    view2.bots[0].last_action_spell = 168;
+    view2.bots[0].last_action_status = forever_module::BotActionStatus::kRefused;
+    view2.bots[0].last_action_sequence = 1;
+    other.Decide(view2, 2000);
+    CHECK(!Casts(other.Decide(view2, 4000), 10, 168, 0));
+    CHECK(Casts(other.Decide(view2, 2000 + 5000 + 100), 10, 168, 0));
+}
+
 void SelfBuffIsCastOutOfCombatThenHeldForItsDuration()
 {
     BotPolicy policy = MagePolicy("class 8\nbuff 168 duration 1800 self\n");
@@ -211,6 +240,7 @@ int main()
     ParsesRowsAndBuffs();
     MaxLevelRetiresASupersededBuff();
     SelfBuffIsCastOutOfCombatThenHeldForItsDuration();
+    ABuffRefusedForPowerWaitsLongBeforeItIsTriedAgain();
     PartyBuffGoesToEveryMemberOneAfterTheOther();
     NoBuffsInCombatOrBelowTheLevel();
     FightRowsFollowTheFileAndItsLevels();

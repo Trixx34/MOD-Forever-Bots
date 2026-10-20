@@ -26,6 +26,8 @@ constexpr std::uint64_t kRetryMs = 1000;     // out of range, invalid target, re
 constexpr std::uint64_t kCooldownRetryMs = 2000;
 constexpr float kRangeSlackYards = 2.0f;        // a ranged row is used this far inside its range: the snapshot is a tick old and the units move
 constexpr std::uint64_t kPowerRetryMs = 2000;    // a cast refused for lack of mana, rage or energy: power comes back slowly
+constexpr std::uint64_t kBuffPowerRetryMs = 30000; // an upkeep buff refused for power: it is cast out of combat, where a warrior has no rage at all
+constexpr std::uint64_t kBuffRefusedRetryMs = 5000; // an upkeep buff refused for another reason (not ready, the global cooldown): not worth a try a second
 constexpr std::uint64_t kHeldCastMs = 500;       // after a cooldown or generic refusal no other spell is tried for this long (often the global cooldown)
 constexpr std::uint64_t kCloserAfterRangeMs = 5000; // after an out-of-range refusal the bot stands closer for this long
 constexpr float kCasterCloserYards = 15.0f;      // the closer stand-off of a ranged bot after an out-of-range refusal
@@ -902,6 +904,13 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
             state.ComboPoints = 0;
     }
 
+    // An upkeep buff (Battle Shout, Rockbiter Weapon, Lightning Shield...) is cast out of combat, nobody waits for it, and it was retried as fast as a fight
+    // spell: about 20,000 refused casts in 20 minutes on 300 bots. Refused buffs wait longer (see kBuffPowerRetryMs and kBuffRefusedRetryMs).
+    bool buff = false;
+    if (bot.last_action_status == BotActionStatus::kNotEnoughPower || bot.last_action_status == BotActionStatus::kRefused)
+        for (rotation::Row const& row : RowsFor(ClassFor(_options, bot.guid)))
+            buff = buff || (row.Buff && row.Spell == spell);
+
     switch (bot.last_action_status)
     {
         case BotActionStatus::kNotKnown:
@@ -921,10 +930,11 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
             state.RetryAtMs[spell] = nowMs + kBusyRetryMs;
             break;
         case BotActionStatus::kNotEnoughPower:
-            state.RetryAtMs[spell] = nowMs + kPowerRetryMs;
+            // Out of combat a warrior has no rage at all and a caster is waiting to drink, so the buff has to wait.
+            state.RetryAtMs[spell] = nowMs + (buff ? kBuffPowerRetryMs : kPowerRetryMs);
             break;
         case BotActionStatus::kRefused:
-            state.RetryAtMs[spell] = nowMs + kRetryMs;
+            state.RetryAtMs[spell] = nowMs + (buff ? kBuffRefusedRetryMs : kRetryMs);
             // A silent refusal (result 32) is the global cooldown too. A refused pet cast is the answer to "is there a pet": no hold, the
             // follow-up (Revive Pet after Call Pet) goes at once.
             if (spell != kCallPet && spell != kRevivePet && spell != kMendPet)
