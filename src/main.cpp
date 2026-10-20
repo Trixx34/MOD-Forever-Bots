@@ -319,6 +319,8 @@ struct ErrandBot
     std::uint32_t Skill = 0;  // the due profession's skill line
     std::uint32_t Map = 0;
     float X = 0.0f, Y = 0.0f, Z = 0.0f;
+    bool AuctioneerValid = false; // the snapshot found the bot's faction's auctioneer on its map
+    float AuctioneerX = 0.0f, AuctioneerY = 0.0f, AuctioneerZ = 0.0f;
 };
 
 struct ErrandFeed
@@ -688,6 +690,10 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
                     entry.X = bot.pos_x;
                     entry.Y = bot.pos_y;
                     entry.Z = bot.pos_z;
+                    entry.AuctioneerValid = bot.auctioneer_valid != 0;
+                    entry.AuctioneerX = bot.auctioneer_x;
+                    entry.AuctioneerY = bot.auctioneer_y;
+                    entry.AuctioneerZ = bot.auctioneer_z;
                     list.push_back(entry);
                 }
                 std::lock_guard<std::mutex> lock(extras.Errand->Lock);
@@ -1532,7 +1538,7 @@ int main(int argc, char** argv)
             extras.Errand = feed;
             auto scheduler = std::make_shared<errand::Scheduler>(settings.Errand);
             std::shared_ptr<CommandQueue> queue = commands;
-            client.AddTimer(kErrandInterval, [feed, scheduler, trainers, queue, &settings]
+            client.AddTimer(kErrandInterval, [feed, scheduler, trainers, queue, book, &settings]
             {
                 std::uint64_t const now = nowMs();
                 std::vector<ErrandBot> list;
@@ -1568,6 +1574,19 @@ int main(int argc, char** argv)
                         }
                         b.TrainDue = !b.Cities.empty();
                     }
+                    // Looted items to list (the Auction House, when it is on): the walk goes to the faction's auctioneer on the bot's map, and the
+                    // visit (the listing timer) lists the items once the bot is there. Off until both the errands and the auction are on.
+                    auto const looted = book->Items.find(bot.Guid);
+                    bool const auctionDue = settings.Auction.Enabled && bot.Side != 0 && bot.AuctioneerValid && looted != book->Items.end() && !looted->second.empty();
+                    if (!b.TrainDue && auctionDue)
+                    {
+                        b.AuctionDue = true;
+                        // The faction's capitals, as for training; the city is only the errand count per capital.
+                        if (bot.Side == errand::kAlliance)
+                            b.Cities = { errand::kStormwind, errand::kIronforge, errand::kDarnassus };
+                        else
+                            b.Cities = { errand::kUndercity, errand::kOrgrimmar, errand::kThunderBluff };
+                    }
                     bots.push_back(std::move(b));
                 }
 
@@ -1586,6 +1605,17 @@ int main(int argc, char** argv)
                     if (found == byGuid.end())
                         continue;
                     ErrandBot const& bot = *found->second;
+                    if (start.What == errand::Kind::kAuction)
+                    {
+                        CommandQueue::ErrandItem item;
+                        item.Guid = start.Guid;
+                        item.Order.Map = bot.Map;
+                        item.Order.Dest = Point{ bot.AuctioneerX, bot.AuctioneerY, bot.AuctioneerZ };
+                        item.Order.Auction = true;
+                        items.push_back(item);
+                        std::cerr << "forever-bots: errand: bot " << start.Guid << " to the auctioneer (city " << start.City << ")\n";
+                        continue;
+                    }
                     auto const pick = errand::ChooseTrainer(*trainers, bot.Side, bot.Skill, start.City, bot.Map, bot.X, bot.Y, bot.Z);
                     if (!pick)
                         continue;

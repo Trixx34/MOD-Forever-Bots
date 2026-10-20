@@ -2454,7 +2454,16 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         {
             ErrandOrder const& order = *state.Errand;
             float const dist = bot.map_id == order.Map ? std::hypot(bot.pos_x - order.Dest.X, bot.pos_y - order.Dest.Y) : 1e9f;
-            if (dist <= kTrainReachYards)
+            if (dist <= kTrainReachYards && order.Auction)
+            {
+                // At the Auction House: the errand is done here. The listing visit (main.cpp) lists the items; the bot does not wait for it.
+                state.ErrandResult = ErrandOutcome::kDone;
+                state.Errand.reset();
+                if (_options.OnEvent)
+                    _options.OnEvent("errand_done: bot=" + std::to_string(bot.guid) + " auction");
+                wanted = Decision{};
+            }
+            else if (dist <= kTrainReachYards)
             {
                 if (bot.in_combat == 0 && bot.life_state == 0 && nowMs >= state.ErrandTrainSentMs)
                 {
