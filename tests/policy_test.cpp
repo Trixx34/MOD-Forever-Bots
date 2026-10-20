@@ -953,6 +953,22 @@ void ABotLeadersInviteIsAnsweredOnce()
     CHECK(HasGroup(policy.Decide(human, 0), 20, 2));
 }
 
+void UnknownSideBotsAreLeftOutOfParties()
+{
+    // Bot 14's race is not known (side 0) while the module can tell the sides of the others: it is not put into a party, so it is never invited
+    // across the sides. The other four party up as before.
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.PartyCount = 1;
+    options.ClassOf = WarriorLeads;
+    options.PartySideOf = [](std::uint64_t guid) { return std::uint8_t(guid == 14 ? 0 : 1); };
+    BotPolicy policy(options);
+    auto const actions = policy.Decide(PartyView({ 10, 11, 12, 13, 14 }), 0);
+    CHECK(HasGroup(actions, 12, 1, PlayerOf(10)) && HasGroup(actions, 12, 1, PlayerOf(11)) && HasGroup(actions, 12, 1, PlayerOf(13)));
+    CHECK(!HasGroup(actions, 12, 1, PlayerOf(14)));
+    CHECK(!HasAnyGroup(actions, 14));
+}
+
 void ABotInAHumansPartyIsLeftAlone()
 {
     // Bot 10 is invited by a human player (not a bot in the view): the bot party assignment leaves it out, and nobody invites or declines for it.
@@ -3700,6 +3716,7 @@ int main()
     ALeaderWithItsOwnPendingPartyKeepsInviting();
     PartySideOfDecidesTheSides();
     ABotLeadersInviteIsAnsweredOnce();
+    UnknownSideBotsAreLeftOutOfParties();
     ABotInAHumansPartyIsLeftAlone();
     OnlyTheFirstPartyIsFormed();
     InvitesWaitForTheRetry();

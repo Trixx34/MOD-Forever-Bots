@@ -1259,10 +1259,18 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         std::sort(guids.begin(), guids.end());
 
         // A party is one faction: the server refuses an invite across the sides. Each side's bots, in guid order, are cut into parties of PartySize,
-        // and the PartyCount parties with the lowest first guids are kept. Bots whose side is not known (0) form parties among themselves.
+        // and the PartyCount parties with the lowest first guids are kept. When the module can tell the sides, a bot whose side is not known (its race is
+        // not in the table) is left out: it could land in a party of the other side, and the server would refuse that invite for ever. Without a side
+        // lookup (the tests) every bot has side 0 and they all party together.
+        bool const sidesKnown = bool(_options.PartySideOf) || bool(_options.SideOf);
         std::map<std::uint8_t, std::vector<std::uint64_t>> bySide;
         for (std::uint64_t guid : guids)
-            bySide[_options.PartySideOf ? _options.PartySideOf(guid) : (_options.SideOf ? _options.SideOf(guid) : std::uint8_t(0))].push_back(guid);
+        {
+            std::uint8_t const side = _options.PartySideOf ? _options.PartySideOf(guid) : (_options.SideOf ? _options.SideOf(guid) : std::uint8_t(0));
+            if (sidesKnown && side == 0)
+                continue;
+            bySide[side].push_back(guid);
+        }
         std::vector<std::vector<std::uint64_t>> parties;
         for (auto const& side : bySide)
             for (std::size_t from = 0; from < side.second.size(); from += _options.PartySize)
