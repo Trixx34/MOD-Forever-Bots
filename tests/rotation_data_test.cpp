@@ -102,6 +102,54 @@ BotPolicy MagePolicy(char const* text)
     return BotPolicy(options);
 }
 
+BotPolicy MagePolicyWithCosts(char const* text, char const* costs)
+{
+    std::vector<std::string> warnings;
+    PolicyOptions options;
+    options.ClassOf = ClassOf;
+    options.Rotations = Parse(text, warnings);
+    std::istringstream in(costs);
+    options.SpellCosts = std::make_shared<spell_cost::SpellCostData>(spell_cost::ParseSpellCosts(in, warnings));
+    return BotPolicy(options);
+}
+
+void ABuffTheBotCannotPayForIsNotCast()
+{
+    // The cost file says Frost Armor costs 60 mana. A mage with 20 does not try it (the core would refuse it); with 60 it does.
+    char const* const rotation = "class 8\nbuff 168 duration 1800 self\n";
+    BotPolicy policy = MagePolicyWithCosts(rotation, "168\t1\t0\t60\t0\t0\t0\tFrost Armor\n");
+    WorldTickSnapshotView view = Group(10);
+    view.bots[0].power_type = 0;
+    view.bots[0].max_power = 300;
+    view.bots[0].power = 20;
+    CHECK(!Casts(policy.Decide(view, 1000), 10, 168, 0));
+    view.bots[0].power = 60;
+    CHECK(Casts(policy.Decide(view, 1100), 10, 168, 0));
+
+    // A spell the file does not price is tried whatever the power is.
+    BotPolicy unpriced = MagePolicyWithCosts(rotation, "999\t1\t0\t60\t0\t0\t0\tSomething else\n");
+    view.bots[0].power = 0;
+    CHECK(Casts(unpriced.Decide(view, 1000), 10, 168, 0));
+
+    // A cost in another power than the bot's main one (a druid in a form) is not checked.
+    BotPolicy rage = MagePolicyWithCosts(rotation, "168\t1\t1\t100\t0\t0\t0\tRage cost\n");
+    CHECK(Casts(rage.Decide(view, 1000), 10, 168, 0));
+
+    // A rank chain: at level 10 the first rank (30 mana) is what it pays, from level 12 the second (90).
+    BotPolicy ranks = MagePolicyWithCosts(rotation, "168\t1\t0\t30\t0\t0\t169\tr1\n169\t12\t0\t90\t0\t0\t0\tr2\n");
+    view.bots[0].power = 50;
+    CHECK(Casts(ranks.Decide(Group(10), 1000), 10, 168, 0) == false); // Group() has no power: 0 < 30
+    WorldTickSnapshotView low = Group(10);
+    low.bots[0].power = 50;
+    CHECK(Casts(ranks.Decide(low, 1100), 10, 168, 0));
+    BotPolicy later = MagePolicyWithCosts(rotation, "168\t1\t0\t30\t0\t0\t169\tr1\n169\t12\t0\t90\t0\t0\t0\tr2\n");
+    WorldTickSnapshotView high = Group(15);
+    high.bots[0].power = 50;
+    CHECK(!Casts(later.Decide(high, 1000), 10, 168, 0));              // 50 < 90
+    high.bots[0].power = 90;
+    CHECK(Casts(later.Decide(high, 1100), 10, 168, 0));
+}
+
 void MaxLevelRetiresASupersededBuff()
 {
     BotPolicy policy = MagePolicy("class 8\nbuff 168 level 1 duration 1800 self maxlevel 10   # Frost Armor\nbuff 7302 level 11 duration 1800 self   # Ice Armor\n");
@@ -238,6 +286,7 @@ void ClassesMissingFromTheFileKeepTheBuiltInRows()
 int main()
 {
     ParsesRowsAndBuffs();
+    ABuffTheBotCannotPayForIsNotCast();
     MaxLevelRetiresASupersededBuff();
     SelfBuffIsCastOutOfCombatThenHeldForItsDuration();
     ABuffRefusedForPowerWaitsLongBeforeItIsTriedAgain();

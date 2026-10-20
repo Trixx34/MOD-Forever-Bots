@@ -485,6 +485,18 @@ bool NoAmmo(BotSnapshot const& bot, std::uint32_t classId)
     return classId == kHunterClass && bot.ammo_entry != 0 && bot.ammo_count == 0;
 }
 
+// False when the cost file says the spell costs more power than the bot has now: the core would refuse the cast, so it is not tried. A spell the file
+// does not price (no file, an unknown spell, a percent cost) or a cost in another power than the bot's main one (a druid in a form) is always tried.
+bool CanPay(spell_cost::SpellCostData const* costs, std::uint32_t spell, BotSnapshot const& bot)
+{
+    if (!costs)
+        return true;
+    auto const payment = costs->CostAtLevel(spell, bot.level);
+    if (!payment || payment->PowerType != std::int32_t(bot.power_type))
+        return true;
+    return bot.power >= payment->Cost;
+}
+
 // The snapshot facts the supply logic reads (supply_policy.h).
 supply::Facts FactsOf(BotSnapshot const& bot)
 {
@@ -3218,7 +3230,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         {
             std::uint32_t const healSpell = state.Role_ == BotState::Role::Dps ? 0u : HealSpellFor(classId, bot.level);
             auto const retry = healSpell != 0 ? state.RetryAtMs.find(healSpell) : state.RetryAtMs.end();
-            if (healSpell != 0 && (retry == state.RetryAtMs.end() || nowMs >= retry->second))
+            if (healSpell != 0 && (retry == state.RetryAtMs.end() || nowMs >= retry->second) && CanPay(_options.SpellCosts.get(), healSpell, bot))
             {
                 std::uint64_t const healGroup = partyLeader != 0 ? partyLeader : bot.guid;
                 if (_healClaims.size() > 64)
@@ -3437,6 +3449,8 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 auto const retry = state.RetryAtMs.find(row.Spell);
                 if (retry != state.RetryAtMs.end() && nowMs < retry->second)
                     continue;
+                if (!CanPay(_options.SpellCosts.get(), row.Spell, bot))
+                    continue; // a warrior has no rage out of combat: Battle Shout waits until it has some, instead of a cast the core refuses
                 // The recipients: the bot itself (reference 0), and for a party buff the members of its group that are alive and close.
                 std::vector<std::uint64_t> recipients{ 0 };
                 if (row.Party)
@@ -3578,6 +3592,8 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 continue;
             if (cooling.count(row.Spell))
                 continue;
+            if (!CanPay(_options.SpellCosts.get(), row.Spell, bot))
+                continue; // not enough mana, rage or energy for it now: the next row, not a refused cast
             if (row.OnTarget && castDistance < row.MinRange)
                 continue;
             if (row.OnTarget && row.MaxRange > 0.0f && castDistance > (row.MaxRange > kRangeSlackYards * 2.0f ? row.MaxRange - kRangeSlackYards : row.MaxRange))

@@ -30,6 +30,7 @@
 #include "combat_rotation.h"
 #include "grind_data.h"
 #include "quest_planner.h"
+#include "spell_costs.h"
 #include "chat_say.h"
 #include "dungeon_events.h"
 #include "errand_trainers.h"
@@ -135,6 +136,8 @@ struct PolicyOptions
     // Rotations from a file (data/rotations.txt, tools/make_rotations.py): the fight rows and the upkeep buffs of the classes it lists. A class it does
     // not list keeps the built-in rows.
     std::shared_ptr<rotation::RotationData const> Rotations;
+    // What spells cost (data/spell_costs.txt, made by the core): with it a bot does not try a spell it cannot pay for. Unset, every cast is tried.
+    std::shared_ptr<spell_cost::SpellCostData const> SpellCosts;
     // Chat commands: a bot accepts a party invite from a player (a human leader), so the player can bring bots into a group and command them.
     bool AcceptInvites = false;
     // Alts (a player's own characters playing as bots): never dressed by the module.

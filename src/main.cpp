@@ -1365,6 +1365,15 @@ int main(int argc, char** argv)
         std::cerr << "forever-bots: rotations for " << rotations->ByClass.size() << " class(es) from " << settings.RotationFile << "\n";
         policyOptions.Rotations = std::move(rotations);
     }
+    if (!settings.SpellCostFile.empty())
+    {
+        std::vector<std::string> costWarnings;
+        auto costs = std::make_shared<spell_cost::SpellCostData>(spell_cost::LoadSpellCosts(settings.SpellCostFile, costWarnings));
+        for (std::string const& warning : costWarnings)
+            std::cerr << "forever-bots: " << warning << "\n";
+        std::cerr << "forever-bots: spell costs for " << costs->BySpell.size() << " spell(s) from " << settings.SpellCostFile << "\n";
+        policyOptions.SpellCosts = std::move(costs);
+    }
     if (!settings.GrindFile.empty())
     {
         std::vector<std::string> grindWarnings;

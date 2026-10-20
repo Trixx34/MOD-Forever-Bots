@@ -109,6 +109,9 @@ struct BotSettings
     std::string GrindFile;
     // Rotations (config key RotationFile, see combat_rotation.h): fight rows and upkeep buffs per class from a file. Empty = the built-in rotations.
     std::string RotationFile;
+    // Spell costs (config key SpellCostFile, see spell_costs.h): what each spell costs in mana, rage or energy, so a bot does not try a cast it cannot pay for.
+    // Empty = no check (the core refuses the cast instead).
+    std::string SpellCostFile;
     // Auto gear (config key AutoGearing, 0 or 1): the core dresses every bot for its level when it first appears and after it gains
     // AutoGearEveryLevels levels. Off by default; when it is off, the .autogear command in a party does it for that party's bots.
     bool AutoGearing = false;

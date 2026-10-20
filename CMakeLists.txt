@@ -31,7 +31,7 @@ target_include_directories(forever_bots_settings PUBLIC src)
 add_library(forever_bots_store STATIC src/bot_store.cpp)
 target_include_directories(forever_bots_store PUBLIC src)
 
-add_library(forever_bots_policy STATIC src/bot_policy.cpp src/chat_commands.cpp src/combat_rotation.cpp src/quest_data.cpp src/quest_planner.cpp src/scenario.cpp src/grind_data.cpp src/supply_policy.cpp src/auction_policy.cpp src/taxi_policy.cpp src/dungeon_events.cpp src/chat_say.cpp src/errand_policy.cpp src/sell_policy.cpp src/errand_trainers.cpp)
+add_library(forever_bots_policy STATIC src/bot_policy.cpp src/chat_commands.cpp src/combat_rotation.cpp src/quest_data.cpp src/quest_planner.cpp src/scenario.cpp src/grind_data.cpp src/supply_policy.cpp src/auction_policy.cpp src/taxi_policy.cpp src/dungeon_events.cpp src/chat_say.cpp src/errand_policy.cpp src/sell_policy.cpp src/errand_trainers.cpp src/spell_costs.cpp)
 target_include_directories(forever_bots_policy PUBLIC src)
 target_link_libraries(forever_bots_policy PUBLIC forever_module_sdk)
 
@@ -106,6 +106,10 @@ add_test(NAME grind COMMAND grind_test)
 add_executable(rotation_data_test tests/rotation_data_test.cpp)
 target_link_libraries(rotation_data_test PRIVATE forever_bots_policy)
 add_test(NAME rotation_data COMMAND rotation_data_test)
+
+add_executable(spell_costs_test tests/spell_costs_test.cpp)
+target_link_libraries(spell_costs_test PRIVATE forever_bots_policy)
+add_test(NAME spell_costs COMMAND spell_costs_test)
 
 add_executable(scenario_test tests/scenario_test.cpp)
 target_link_libraries(scenario_test PRIVATE forever_bots_policy forever_bots_settings)
