@@ -388,6 +388,40 @@ int RestAt(std::vector<BotAction> const& actions, std::uint32_t& spellId)
     return -1;
 }
 
+// Bots at 89 % health, all idle: with RandomPct 0 every bot sits down (the shared threshold is 90 %); with it on the thresholds differ per bot (a trait drawn once
+// from the seed), so some sit and some do not.
+void RestThresholdIsAPerBotTrait()
+{
+    auto const sitting = [](PolicyOptions options)
+    {
+        BotPolicy policy(options);
+        WorldTickSnapshotView view;
+        view.tick_number = 1;
+        view.max_nearby_units = 2;
+        for (std::uint64_t guid = 1; guid <= 60; ++guid)
+        {
+            BotSnapshot bot;
+            bot.guid = guid;
+            bot.health = 890;
+            bot.max_health = 1000;
+            view.bots.push_back(bot);
+        }
+        view.nearby.resize(2 * 60);
+        int sat = 0;
+        for (BotAction const& action : policy.Decide(view, 1000))
+            sat += action.type == ActionType::kRest && action.spell_id == 1;
+        return sat;
+    };
+    PolicyOptions plain = AggressiveOptions();
+    CHECK(sitting(plain) == 60);                                   // 89 % is under the shared 90 %: all of them sit
+    PolicyOptions varied = AggressiveOptions();
+    varied.RandomPct = 25;
+    varied.RandomSeed = 5;
+    int const sat = sitting(varied);
+    CHECK(sat > 5 && sat < 55);                                    // some thresholds are above 89 %, some below
+    CHECK(sitting(varied) == sat);                                 // and the same seed gives the same bots
+}
+
 void RestsWhenHurtAndIdle()
 {
     BotPolicy policy(AggressiveOptions());
@@ -3808,6 +3842,7 @@ int main()
     PartySideOfDecidesTheSides();
     ABotLeadersInviteIsAnsweredOnce();
     OnlyAShareOfTheBotsFormParties();
+    RestThresholdIsAPerBotTrait();
     FullBagsMakeTheVisitSellWhiteJunkToo();
     UnknownSideBotsAreLeftOutOfParties();
     ABotInAHumansPartyIsLeftAlone();
