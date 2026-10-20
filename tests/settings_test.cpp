@@ -227,6 +227,19 @@ void PartySettings()
     CHECK(warnings.size() == 1);
 }
 
+void RandomnessAndStanceSettings()
+{
+    std::vector<std::string> warnings;
+    BotSettings const defaults = ParseBotSettings({}, warnings);
+    CHECK(defaults.PartyPercent == 30 && defaults.RandomPct == 25);   // only a share of the bots party, and everything varies a little
+    CHECK(!defaults.AggressiveStart);                                  // the default stance stays defensive
+    BotSettings const s = ParseBotSettings({ { "PartyPercent", "60" }, { "RandomPct", "10" }, { "AggressiveStart", "1" } }, warnings);
+    CHECK(s.PartyPercent == 60 && s.RandomPct == 10 && s.AggressiveStart);
+    CHECK(warnings.empty());
+    CHECK(ParseBotSettings({ { "PartyPercent", "120" } }, warnings).PartyPercent == 30); // out of range: the default, with a warning
+    CHECK(warnings.size() == 1);
+}
+
 void HubSettings()
 {
     std::vector<std::string> warnings;
@@ -305,6 +318,7 @@ int main()
     EffectiveMaxBotsIsCappedByGrant();
     TestSpellIsOptional();
     PartySettings();
+    RandomnessAndStanceSettings();
     HubSettings();
     WipeRecoverySettings();
 

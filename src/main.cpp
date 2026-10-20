@@ -1295,6 +1295,7 @@ int main(int argc, char** argv)
     policyOptions.Supplies = settings.Supplies;
     policyOptions.DungeonTeleport = settings.DungeonTeleport;
     policyOptions.DungeonReviveOutOfCombat = settings.DungeonReviveOutOfCombat;
+    policyOptions.AggressiveStart = settings.AggressiveStart;
     // Dungeon routes for "tank lead" (every dungeon of DungeonFile, by the map of its entry) and the events table (DungeonEventsFile), shared by all dungeons.
     std::vector<dungeon_events::Event> allEvents;
     if (!settings.DungeonEventsFile.empty())
