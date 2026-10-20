@@ -97,6 +97,11 @@ struct BotSettings
     // cut from the lowest-guid bots (config key PartyCount, 1..100).
     std::uint32_t PartySize = 0;
     std::uint32_t PartyCount = 1;
+    // Randomness (bot_random.h): PartyPercent is the share of the bots that take part in the parties at all (config key PartyPercent, 0..100); the others
+    // play on their own, and the parties are of random sizes from 2 to PartySize. RandomPct is how much the bots' timers and walks vary, +- this many percent
+    // (config key RandomPct, 0..90, 0 = none). Both follow RandomSeed, so a run with the same seed behaves the same.
+    std::uint32_t PartyPercent = 30;
+    std::uint32_t RandomPct = 25;
     // Hubs (M7): where an idle bot walks when it has seen nothing for a while, per map, in the order given by n. Config keys
     // Hub<map>_<n> = "x y z" (n counts from 1).
     std::map<std::uint32_t, std::vector<std::array<float, 3>>> Hubs;

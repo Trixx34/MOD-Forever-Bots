@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <memory>
 #include <optional>
+#include <set>
 #include <sstream>
 #include <string>
 
@@ -951,6 +952,60 @@ void ABotLeadersInviteIsAnsweredOnce()
     WorldTickSnapshotView human = PartyView({ 20 });
     human.bots[0].group_invite_from = PlayerOf(900);
     CHECK(HasGroup(policy.Decide(human, 0), 20, 2));
+}
+
+// The invites of a tick as (leader, invited member) pairs.
+std::set<std::pair<std::uint64_t, std::uint64_t>> InvitesOf(std::vector<BotAction> const& actions)
+{
+    std::set<std::pair<std::uint64_t, std::uint64_t>> invites;
+    for (BotAction const& action : actions)
+        if (action.type == ActionType::kGroup && action.spell_id == 1)
+            invites.emplace(action.bot_guid, action.target_guid);
+    return invites;
+}
+
+void OnlyAShareOfTheBotsFormParties()
+{
+    // 100 bots, PartyPercent 30: about 30 of them take part, in parties of 2 to 5 (the sizes drawn), the rest play on their own.
+    std::vector<std::uint64_t> guids;
+    for (std::uint64_t guid = 100; guid < 200; ++guid)
+        guids.push_back(guid);
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.PartyCount = 100;
+    options.PartyPercent = 30;
+    options.RandomSeed = 7;
+    BotPolicy policy(options);
+    auto const first = InvitesOf(policy.Decide(PartyView(guids), 0));
+
+    std::set<std::uint64_t> invited;
+    std::map<std::uint64_t, int> members;
+    for (auto const& [leader, member] : first)
+    {
+        invited.insert(member);
+        ++members[leader];
+    }
+    CHECK(invited.size() >= 8 && invited.size() <= 45);   // about 30 bots take part, the leaders not counted
+    std::set<int> sizes;
+    for (auto const& [leader, count] : members)
+    {
+        CHECK(count >= 1 && count <= 4);                  // a party is 2 to 5 bots: the leader and 1 to 4 members
+        sizes.insert(count);
+    }
+    CHECK(sizes.size() >= 2);                             // and not all of one size
+
+    // The same seed gives the same parties; another seed gives other ones.
+    BotPolicy same(options);
+    CHECK(InvitesOf(same.Decide(PartyView(guids), 0)) == first);
+    options.RandomSeed = 8;
+    BotPolicy other(options);
+    CHECK(InvitesOf(other.Decide(PartyView(guids), 0)) != first);
+
+    // PartyPercent 100 (the default) keeps every bot in the parties, of the full size.
+    options.PartyPercent = 100;
+    options.RandomSeed = 7;
+    BotPolicy everyone(options);
+    CHECK(InvitesOf(everyone.Decide(PartyView(guids), 0)).size() == 80);   // 20 parties of 5: 4 invites each
 }
 
 void UnknownSideBotsAreLeftOutOfParties()
@@ -3716,6 +3771,7 @@ int main()
     ALeaderWithItsOwnPendingPartyKeepsInviting();
     PartySideOfDecidesTheSides();
     ABotLeadersInviteIsAnsweredOnce();
+    OnlyAShareOfTheBotsFormParties();
     UnknownSideBotsAreLeftOutOfParties();
     ABotInAHumansPartyIsLeftAlone();
     OnlyTheFirstPartyIsFormed();

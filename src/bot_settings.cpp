@@ -321,6 +321,8 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
         ReadKey(config, "TrainEverySec", 60, 86400, settings.TrainEverySec, warnings);
     ReadKey(config, "PartySize", 0, 5, settings.PartySize, warnings);
     ReadKey(config, "PartyCount", 1, 100, settings.PartyCount, warnings);
+    ReadKey(config, "PartyPercent", 0, 100, settings.PartyPercent, warnings);
+    ReadKey(config, "RandomPct", 0, 90, settings.RandomPct, warnings);
     ReadHubs(config, settings.Hubs, warnings);
     ReadBool(config, "AutoGearing", settings.AutoGearing, warnings);
     ReadBool(config, "QuestTeleport", settings.QuestTeleport, warnings);

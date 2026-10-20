@@ -1343,6 +1343,9 @@ int main(int argc, char** argv)
     policyOptions.Taxi = settings.Taxi;
     policyOptions.PartySize = settings.PartySize;
     policyOptions.PartyCount = settings.PartyCount;
+    policyOptions.PartyPercent = settings.PartyPercent;
+    policyOptions.RandomPct = settings.RandomPct;
+    policyOptions.RandomSeed = settings.RandomSeed;
     for (auto const& [mapId, spots] : settings.Hubs)
         for (auto const& spot : spots)
             policyOptions.HubsByMap[mapId].push_back({ spot[0], spot[1], spot[2] });
@@ -1693,6 +1696,8 @@ int main(int argc, char** argv)
         // The scenario takes over the party, the route and the dressing: no vendor walks, no ramp, one party of the whole roster.
         policyOptions.PartySize = std::uint32_t(settings.Scenario.Roster.size());
         policyOptions.PartyCount = 1;
+        policyOptions.PartyPercent = 100; // every bot of the roster is in the one party
+        policyOptions.RandomPct = 0;      // and a scenario is a test run: it is not varied
         policyOptions.ServiceEveryMs = 0;
         policyOptions.AutoGearing = false;
         for (auto const& point : settings.Scenario.Route)

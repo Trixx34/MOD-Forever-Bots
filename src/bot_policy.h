@@ -31,6 +31,7 @@
 #include "grind_data.h"
 #include "quest_planner.h"
 #include "spell_costs.h"
+#include "bot_random.h"
 #include "chat_say.h"
 #include "dungeon_events.h"
 #include "errand_trainers.h"
@@ -86,6 +87,12 @@ struct PolicyOptions
     // leader is its first warrior, else its lowest-guid bot. PartySize 0 turns parties off.
     std::uint32_t PartySize = 0;
     std::uint32_t PartyCount = 1;
+    // Randomness (bot_random.h). RandomSeed makes a run repeatable. RandomPct is how much the bots' timers and thresholds vary from bot to bot and from time
+    // to time (+- this many percent); 0 turns the variation off (the tests). PartyPercent is the share of the bots that take part in the parties at all
+    // (the others stay on their own); the parties are then of random sizes from 2 up to PartySize. The defaults keep the old behavior: no variation, every bot partied.
+    std::uint64_t RandomSeed = 0;
+    std::uint32_t RandomPct = 0;
+    std::uint32_t PartyPercent = 100;
     // Hubs (M7): the places an idle bot walks to when it has seen nothing for a while, per map, in order. The bot's map
     // comes from its snapshot. A map with no hubs has no wandering.
     std::map<std::uint32_t, std::vector<Point>> HubsByMap;
@@ -280,6 +287,8 @@ private:
         std::uint64_t GrindRetryAtMs = 0;                // no grind spot on this map for this level: explore on foot until this time, then look again
         std::uint32_t HubFailures = 0;                   // hub walks in a row that ended without arriving
         std::uint32_t ExploreStep = 0;                   // random walks made, for the direction of the next
+        std::uint32_t WanderCycles = 0;                  // walks to a grind spot or hub begun, the counter of the random draws for the next one
+        std::uint64_t WanderIdleMs = 0;                  // how long this bot idles before the next walk (varied per bot and per walk; 0 = not drawn yet)
         Point ExploreTarget;
         std::uint64_t InviteAcceptAtMs = 0;              // a player's invite is not answered again before this
         std::uint64_t PartyRetryAtMs = 0;                // a party action is not sent again before this

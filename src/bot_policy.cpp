@@ -133,6 +133,8 @@ constexpr std::uint64_t kHealClaimMs = 2500;
 constexpr float kHealRangeYards = 30.0f;
 constexpr float kBuffRangeYards = 30.0f;            // a party buff reaches members this close
 constexpr std::size_t kGrindMemory = 2;           // grind spots remembered as just visited
+constexpr std::size_t kGrindPickAmong = 4;        // with randomness on, a bot takes one of this many of the best grind spots, not always the first
+constexpr double kStandJitterYards = 6.0;         // with randomness on, a bot stands up to this far from the exact point of its spot
 constexpr std::uint32_t kAcceptRefusalsMax = 3;       // resurrect answers refused this often in a row: the offer is left alone for a while
 constexpr std::uint64_t kAcceptIgnoreMs = 60000;
 constexpr std::uint64_t kFightStallMs = 45000;       // a fight in which neither side's health went down this long is given up (the telemetry calls 60 s "stuck")
@@ -1276,6 +1278,10 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             std::uint64_t const heldBy = bot.group_role != 0 ? bot.group_leader_guid : bot.group_invite_from;
             if (heldBy != 0 && !isOurBot(heldBy))
                 continue;
+            // Not every bot is sociable: PartyPercent of them take part in the parties, chosen by the run's seed, the rest stay on their own.
+            if (_options.PartyPercent < 100 &&
+                bot_random::Below(bot_random::Draw(_options.RandomSeed, bot.guid, bot_random::kSaltParty), 100) >= _options.PartyPercent)
+                continue;
             guids.push_back(bot.guid);
         }
         std::sort(guids.begin(), guids.end());
@@ -1293,12 +1299,18 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 continue;
             bySide[side].push_back(guid);
         }
+        // With PartyPercent or RandomPct set the parties are not all of the full size: each is 2 to PartySize bots, the size drawn from its first bot.
+        bool const variedSizes = _options.PartySize > 2 && (_options.PartyPercent < 100 || _options.RandomPct > 0);
         std::vector<std::vector<std::uint64_t>> parties;
         for (auto const& side : bySide)
-            for (std::size_t from = 0; from < side.second.size(); from += _options.PartySize)
+            for (std::size_t from = 0; from < side.second.size();)
             {
-                std::size_t const to = std::min<std::size_t>(from + _options.PartySize, side.second.size());
+                std::size_t size = _options.PartySize;
+                if (variedSizes)
+                    size = 2 + bot_random::Below(bot_random::Draw(_options.RandomSeed, side.second[from], bot_random::kSaltPartySize), _options.PartySize - 1);
+                std::size_t const to = std::min<std::size_t>(from + size, side.second.size());
                 parties.emplace_back(side.second.begin() + from, side.second.begin() + to);
+                from = to;
             }
         std::sort(parties.begin(), parties.end(), [](auto const& a, auto const& b) { return a.front() < b.front(); });
         if (parties.size() > _options.PartyCount)
@@ -2766,6 +2778,17 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         bool const healthy = !manaResting && (bot.max_health == 0 || std::uint64_t(bot.health) * 100 >= std::uint64_t(bot.max_health) * kRestBelowPct);
         auto const hubs = _options.HubsByMap.find(bot.map_id);
         bool const grindMode = _options.Grind && !_options.Grind->Spots.empty() && bot.level != 0;
+        // How long this bot idles before its next walk: kWanderIdleMs varied by twice RandomPct (+-50 % at 25), drawn once per walk, so the bots do not all
+        // set off at the same moment.
+        auto const wanderIdle = [&]() -> std::uint64_t
+        {
+            if (_options.RandomPct == 0)
+                return kWanderIdleMs;
+            if (state.WanderIdleMs == 0)
+                state.WanderIdleMs = bot_random::Vary(kWanderIdleMs, std::min<std::uint32_t>(_options.RandomPct * 2, 90),
+                                                      bot_random::Draw(_options.RandomSeed, bot.guid, bot_random::kSaltIdle, state.WanderCycles));
+            return state.WanderIdleMs;
+        };
         if (idle && healthy && _options.WanderWhenIdle && grindMode && nowMs >= state.GrindRetryAtMs && !partyMember && !state.ChatStay && state.ChatFollow == 0)
         {
             // Leveling: after a quiet spell the bot walks to a grind spot that suits its level (nearest first, not the ones it just left), and
@@ -2785,15 +2808,30 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     idle = false;
                 }
             }
-            else if (nowMs - state.IdleSinceMs >= kWanderIdleMs)
+            else if (nowMs - state.IdleSinceMs >= wanderIdle())
             {
                 std::uint8_t const side = _options.SideOf ? _options.SideOf(bot.guid) : std::uint8_t(0);
                 std::vector<std::size_t> const spots = GrindSpotsFor(*_options.Grind, bot.map_id, bot.level, side, bot.pos_x, bot.pos_y, state.GrindVisited);
                 if (!spots.empty())
                 {
-                    GrindSpot const& spot = _options.Grind->Spots[spots.front()];
+                    // Not always the nearest spot: with randomness on the bot takes one of the nearest few, and stands somewhere around it, not on the
+                    // spot's exact point, so the bots of a level do not pile up on one place.
+                    std::size_t pick = 0;
+                    if (_options.RandomPct > 0 && spots.size() > 1)
+                        pick = bot_random::Below(bot_random::Draw(_options.RandomSeed, bot.guid, bot_random::kSaltGrindPick, state.WanderCycles),
+                                                 std::uint32_t(std::min<std::size_t>(spots.size(), kGrindPickAmong)));
+                    GrindSpot const& spot = _options.Grind->Spots[spots[pick]];
                     state.GrindTarget = Point{ spot.X, spot.Y, spot.Z };
-                    state.GrindVisited.push_back(spots.front());
+                    if (_options.RandomPct > 0)
+                    {
+                        double const angle = bot_random::Unit(bot_random::Draw(_options.RandomSeed, bot.guid, bot_random::kSaltJitter, std::uint64_t(state.WanderCycles) * 2)) * 6.283185307;
+                        double const radius = kStandJitterYards * std::sqrt(bot_random::Unit(bot_random::Draw(_options.RandomSeed, bot.guid, bot_random::kSaltJitter, std::uint64_t(state.WanderCycles) * 2 + 1)));
+                        state.GrindTarget.X += float(std::cos(angle) * radius);
+                        state.GrindTarget.Y += float(std::sin(angle) * radius);
+                    }
+                    ++state.WanderCycles;
+                    state.WanderIdleMs = 0; // the next walk draws its own idle time
+                    state.GrindVisited.push_back(spots[pick]);
                     if (state.GrindVisited.size() > kGrindMemory)
                         state.GrindVisited.erase(state.GrindVisited.begin());
                     state.Wandering = true;
@@ -2802,7 +2840,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     idle = false;
                     if (_options.OnEvent)
                         _options.OnEvent("grind_spot: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id) +
-                                         " spot=" + std::to_string(spots.front()) + " levels=" + std::to_string(spot.MinLevel) + "-" + std::to_string(spot.MaxLevel));
+                                         " spot=" + std::to_string(spots[pick]) + " levels=" + std::to_string(spot.MinLevel) + "-" + std::to_string(spot.MaxLevel));
                 }
                 else
                 {
@@ -2839,8 +2877,10 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     idle = false;
                 }
             }
-            else if (nowMs - state.IdleSinceMs >= kWanderIdleMs)
+            else if (nowMs - state.IdleSinceMs >= wanderIdle())
             {
+                ++state.WanderCycles;
+                state.WanderIdleMs = 0; // the next walk draws its own idle time
                 state.Wandering = true;
                 state.WanderStartMs = nowMs;
                 wanted = Decision{ ActionType::kMoveTo, 0, list[state.NextHub % list.size()] };
@@ -2870,10 +2910,14 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     idle = false;
                 }
             }
-            else if (nowMs - state.IdleSinceMs >= kExploreIdleMs)
+            else if (nowMs - state.IdleSinceMs >= bot_random::Vary(kExploreIdleMs, std::min<std::uint32_t>(_options.RandomPct * 2, 90),
+                                                                   bot_random::Draw(_options.RandomSeed, bot.guid, bot_random::kSaltIdle, 0x100000000ull + state.ExploreStep)))
             {
                 float const angle = float((bot.guid * 2654435761ull) % 628) * 0.01f + float(state.ExploreStep) * 2.399963f;
-                float const radius = 50.0f + 25.0f * float(state.ExploreStep % 3);
+                float radius = 50.0f + 25.0f * float(state.ExploreStep % 3);
+                if (_options.RandomPct > 0)
+                    radius = float(bot_random::Vary(std::uint64_t(radius), _options.RandomPct,
+                                                    bot_random::Draw(_options.RandomSeed, bot.guid, bot_random::kSaltJitter, 0x200000000ull + state.ExploreStep)));
                 ++state.ExploreStep;
                 state.ExploreTarget = Point{ bot.pos_x + std::cos(angle) * radius, bot.pos_y + std::sin(angle) * radius, bot.pos_z };
                 state.Wandering = true;
@@ -3058,6 +3102,17 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     actions.push_back(party);
                     state.PartyRetryAtMs = nowMs + kPartyRetryMs;
                 }
+            }
+            else if (partyLeader == 0 && bot.group_role != 0 && isOurBot(bot.group_leader_guid) && !(_options.IsAlt && _options.IsAlt(bot.guid)))
+            {
+                // Not one of the bots chosen for the parties (PartyPercent), but still in a bot party left from an earlier run: it leaves, and plays on
+                // its own. A bot in a human's party, and a player's alt, are not touched.
+                BotAction leave;
+                leave.bot_guid = bot.guid;
+                leave.type = ActionType::kGroup;
+                leave.spell_id = kGroupLeave;
+                actions.push_back(leave);
+                state.PartyRetryAtMs = nowMs + kPartyRetryMs;
             }
         }
 

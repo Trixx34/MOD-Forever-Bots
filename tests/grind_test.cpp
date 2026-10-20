@@ -2,7 +2,10 @@
 #include "bot_policy.h"
 #include "grind_data.h"
 
+#include <cmath>
 #include <cstdio>
+#include <map>
+#include <set>
 #include <sstream>
 
 using forever_module::ActionType;
@@ -142,6 +145,60 @@ void IdleBotWalksToAGrindSpotForItsLevel()
     WorldTickSnapshotView view = OneBot(7, 0);
     CHECK(!WalksTo(policy.Decide(view, 1000), 900.0f));      // idle for a moment only
     CHECK(WalksToAfterMount(policy, view, 1000 + 31000, 900.0f)); // a quiet spell: to the spot for level 7
+}
+
+// With randomness on, bots of one level do not all take the nearest spot after exactly the same quiet spell, and they do not all stand on the exact point.
+void RandomnessSpreadsTheBotsOverSpotsAndTimes()
+{
+    std::vector<std::string> warnings;
+    PolicyOptions options = AggressiveOptions();
+    options.Grind = std::make_shared<GrindData>(Parse("spot 0 500 0 0 1 10 0\nspot 0 600 0 0 1 10 0\nspot 0 700 0 0 1 10 0\nspot 0 800 0 0 1 10 0\n", warnings));
+    options.RandomPct = 25;
+    options.RandomSeed = 42;
+    BotPolicy policy(options);
+
+    WorldTickSnapshotView view;
+    view.tick_number = 1;
+    view.max_nearby_units = 2;
+    for (std::uint64_t guid = 1; guid <= 40; ++guid)
+    {
+        BotSnapshot bot;
+        bot.guid = guid;
+        bot.health = 1000;
+        bot.max_health = 1000;
+        bot.level = 5;
+        view.bots.push_back(bot);
+    }
+    view.nearby.resize(2 * 40);
+
+    // Every bot is idle from the first tick; note when each one first sets off (a mount, then a walk) and where to.
+    policy.Decide(view, 1000);
+    std::map<std::uint64_t, std::uint64_t> setOffAt;
+    std::set<int> spots;
+    bool anyExactPoint = false, allWithinSix = true;
+    for (std::uint64_t now = 1000 + 5000; now <= 1000 + 80000; now += 500)
+        for (BotAction const& action : policy.Decide(view, now))
+        {
+            if ((action.type == ActionType::kMount || action.type == ActionType::kMoveTo) && !setOffAt.count(action.bot_guid))
+                setOffAt[action.bot_guid] = now;
+            if (action.type == ActionType::kMoveTo)
+            {
+                float const nearest = std::floor((action.dest_x + 50.0f) / 100.0f) * 100.0f;   // the spot this point belongs to (500, 600, 700 or 800)
+                spots.insert(int(nearest));
+                if (action.dest_x == nearest && action.dest_y == 0.0f)
+                    anyExactPoint = true;
+                float const dx = action.dest_x - nearest, dy = action.dest_y;
+                if (dx * dx + dy * dy > 6.01f * 6.01f)
+                    allWithinSix = false;
+            }
+        }
+    std::set<std::uint64_t> times;
+    for (auto const& [bot, at] : setOffAt)
+        times.insert(at);
+    CHECK(setOffAt.size() == 40);        // they all set off within the 80 s
+    CHECK(times.size() >= 8);            // at many different moments, not all at 31 s
+    CHECK(spots.size() >= 3);            // to different spots, not all the nearest
+    CHECK(!anyExactPoint && allWithinSix); // standing near the spot, not on its exact point
 }
 
 // A map the spot file does not cover: the bot used to stand at its start for the whole run (the new races' island). It now takes short walks
@@ -284,6 +341,7 @@ int main()
     RichSpotsCountAsCloser();
     SidesOfRaces();
     IdleBotWalksToAGrindSpotForItsLevel();
+    RandomnessSpreadsTheBotsOverSpotsAndTimes();
     NoSpotForTheMapMeansExploringOnFoot();
     HubsAreTheFallbackWithoutGrindData();
     NextWalkMovesOnToAnotherSpot();
