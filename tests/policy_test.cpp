@@ -848,6 +848,66 @@ void LeaderInvitesItsMembers()
     CHECK(!HasAnyGroup(actions, 10));                // members invite no one
 }
 
+void PartiesNeverMixSides()
+{
+    // Ten bots, even guids Alliance and odd guids Horde: two parties of five, one per side. The server refuses an invite across the sides.
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.PartyCount = 2;
+    options.ClassOf = WarriorLeads;
+    options.SideOf = [](std::uint64_t guid) { return std::uint8_t(guid % 2 == 0 ? 1 : 2); };
+    BotPolicy policy(options);
+    auto const actions = policy.Decide(PartyView({ 10, 11, 12, 13, 14, 15, 16, 17, 18, 19 }), 0);
+    for (std::uint64_t member : { 10, 14, 16, 18 })
+        CHECK(HasGroup(actions, 12, 1, PlayerOf(member)));      // the Alliance party, led by the warrior
+    for (std::uint64_t other : { 11, 13, 15, 17, 19 })
+        CHECK(!HasGroup(actions, 12, 1, PlayerOf(other)));
+    for (std::uint64_t member : { 13, 15, 17, 19 })
+        CHECK(HasGroup(actions, 11, 1, PlayerOf(member)));      // the Horde party, led by its lowest guid (no warrior)
+    for (std::uint64_t other : { 10, 12, 14, 16, 18 })
+        CHECK(!HasGroup(actions, 11, 1, PlayerOf(other)));
+}
+
+void OldPartiesAreLeftBeforeTheNewOnesForm()
+{
+    // Bot 10 sits in the old party of bot 20 (a bot that is online), and bot 12 (the new leader) is itself a member of it.
+    std::vector<std::uint64_t> guids = { 10, 11, 12, 13, 14, 20 };
+    WorldTickSnapshotView view = PartyView(guids);
+    for (BotSnapshot& bot : view.bots)
+        if (bot.guid == 10 || bot.guid == 12)
+        {
+            bot.group_role = 1;
+            bot.group_leader_guid = PlayerOf(20);
+        }
+    BotPolicy policy = PartyPolicy(5);
+    auto actions = policy.Decide(view, 0);
+    CHECK(HasGroup(actions, 12, 3));                  // the new leader leaves the old party first (kGroupLeave)
+    CHECK(!HasGroup(actions, 12, 1));                 // and invites no one meanwhile
+    CHECK(HasGroup(actions, 10, 3));                  // a member in the old party leaves it too
+    CHECK(!HasGroup(actions, 12, 1, PlayerOf(10)));
+
+    // Once the leader is free, it invites the members that are free, and skips the one still in the old party.
+    for (BotSnapshot& bot : view.bots)
+        if (bot.guid == 12)
+        {
+            bot.group_role = 0;
+            bot.group_leader_guid = 0;
+        }
+    actions = policy.Decide(view, 20000);
+    CHECK(HasGroup(actions, 12, 1, PlayerOf(11)));
+    CHECK(!HasGroup(actions, 12, 1, PlayerOf(10)));
+}
+
+void ABotInAHumansPartyIsLeftAlone()
+{
+    // Bot 10 is invited by a human player (not a bot in the view): the bot party assignment leaves it out, and nobody invites or declines for it.
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    view.bots[0].group_invite_from = PlayerOf(900);
+    auto const actions = PartyPolicy(5).Decide(view, 0);
+    CHECK(!HasGroup(actions, 12, 1, PlayerOf(10)));
+    CHECK(!HasGroup(actions, 10, 3));
+}
+
 void OnlyTheFirstPartyIsFormed()
 {
     // Ten bots, two parties of five: the first party's leader (bot 12) invites its members; bots 15..19 are not
@@ -886,10 +946,16 @@ void MemberAcceptsItsLeadersInvite()
 
 void MemberLeavesAForeignParty()
 {
-    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    // Bot 20 is another bot of the module (online): bot 11 leaves its party for its own leader's.
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14, 20 });
     view.bots[1].group_role = 1;
-    view.bots[1].group_leader_guid = PlayerOf(99);
+    view.bots[1].group_leader_guid = PlayerOf(20);
     CHECK(HasGroup(PartyPolicy(5).Decide(view, 0), 11, 3));
+
+    // A party led by a human player (99 is not a bot of the module) is left alone: the bot stays and is not invited.
+    view.bots[1].group_leader_guid = PlayerOf(99);
+    auto const human = PartyPolicy(5).Decide(view, 0);
+    CHECK(!HasAnyGroup(human, 11) && !HasGroup(human, 12, 1, PlayerOf(11)));
 
     // In its own party already: nothing to do.
     view.bots[1].group_leader_guid = PlayerOf(12);
@@ -3574,6 +3640,9 @@ int main()
     NoVendorOnTheMapMeansNoWalk();
     PartyOffByDefault();
     LeaderInvitesItsMembers();
+    PartiesNeverMixSides();
+    OldPartiesAreLeftBeforeTheNewOnesForm();
+    ABotInAHumansPartyIsLeftAlone();
     OnlyTheFirstPartyIsFormed();
     InvitesWaitForTheRetry();
     InvitedMemberIsNotInvitedAgain();

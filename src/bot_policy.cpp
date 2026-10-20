@@ -6,6 +6,7 @@
 #include <cmath>
 #include <iterator>
 #include <limits>
+#include <map>
 #include <span>
 
 using forever_module::ActionType;
@@ -1235,6 +1236,8 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
     std::unordered_map<std::uint64_t, std::size_t> indexOf; // bot guid -> index in view.bots
     for (std::size_t i = 0; i < view.bots.size(); ++i)
         indexOf[view.bots[i].guid] = i;
+    // A leader or inviter reference that is one of this module's bots, as against a human player (both are players to the core).
+    auto const isOurBot = [&indexOf](std::uint64_t ref) { return ref != 0 && indexOf.count(ref & forever_module::kUnitRefCounterMask) != 0; };
 
     std::unordered_map<std::uint64_t, std::uint64_t> leaderOf;                // bot guid -> its party's leader
     std::unordered_map<std::uint64_t, std::vector<std::uint64_t>> membersOf;  // leader guid -> the other members
@@ -1243,30 +1246,55 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         std::vector<std::uint64_t> guids;
         guids.reserve(view.bots.size());
         for (BotSnapshot const& bot : view.bots)
+        {
+            // A player's own character (an alt), or a bot that sits in, or is invited to, a human's party, is not put into a bot party:
+            // the human is the one who invites it and commands it.
+            if (_options.IsAlt && _options.IsAlt(bot.guid))
+                continue;
+            std::uint64_t const heldBy = bot.group_role != 0 ? bot.group_leader_guid : bot.group_invite_from;
+            if (heldBy != 0 && !isOurBot(heldBy))
+                continue;
             guids.push_back(bot.guid);
+        }
         std::sort(guids.begin(), guids.end());
 
-        std::size_t const partied = std::min<std::size_t>(guids.size(), std::size_t(_options.PartySize) * _options.PartyCount);
-        for (std::size_t start = 0; start < partied; start += _options.PartySize)
+        // A party is one faction: the server refuses an invite across the sides. Each side's bots, in guid order, are cut into parties of PartySize,
+        // and the PartyCount parties with the lowest first guids are kept. Bots whose side is not known (0) form parties among themselves.
+        std::map<std::uint8_t, std::vector<std::uint64_t>> bySide;
+        for (std::uint64_t guid : guids)
+            bySide[_options.SideOf ? _options.SideOf(guid) : std::uint8_t(0)].push_back(guid);
+        std::vector<std::vector<std::uint64_t>> parties;
+        for (auto const& side : bySide)
+            for (std::size_t from = 0; from < side.second.size(); from += _options.PartySize)
+            {
+                std::size_t const to = std::min<std::size_t>(from + _options.PartySize, side.second.size());
+                parties.emplace_back(side.second.begin() + from, side.second.begin() + to);
+            }
+        std::sort(parties.begin(), parties.end(), [](auto const& a, auto const& b) { return a.front() < b.front(); });
+        if (parties.size() > _options.PartyCount)
+            parties.resize(_options.PartyCount);
+
+        for (std::vector<std::uint64_t> const& party : parties)
         {
-            std::size_t const end = std::min<std::size_t>(start + _options.PartySize, partied);
+            std::size_t const start = 0;
+            std::size_t const end = party.size();
             std::size_t leader = start;
             for (std::size_t p = start; p < end; ++p)
             {
-                auto const known = _bots.find(guids[p]);
+                auto const known = _bots.find(party[p]);
                 bool const tankRole = known != _bots.end() && known->second.Role_ == BotState::Role::Tank;
-                if (tankRole || (ClassFor(_options, guids[p]) == kWarriorClass && (known == _bots.end() || known->second.Role_ == BotState::Role::Auto)))
+                if (tankRole || (ClassFor(_options, party[p]) == kWarriorClass && (known == _bots.end() || known->second.Role_ == BotState::Role::Auto)))
                 {
                     leader = p;
                     break;
                 }
             }
-            std::uint64_t const leaderGuid = guids[leader];
+            std::uint64_t const leaderGuid = party[leader];
             for (std::size_t p = start; p < end; ++p)
             {
-                leaderOf[guids[p]] = leaderGuid;
+                leaderOf[party[p]] = leaderGuid;
                 if (p != leader)
-                    membersOf[leaderGuid].push_back(guids[p]);
+                    membersOf[leaderGuid].push_back(party[p]);
             }
         }
     }
@@ -2943,7 +2971,21 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         {
             if (partyLeaderBot)
             {
-                for (std::uint64_t member : membersOf[bot.guid])
+                // A leader that sits in another bot's party (old parties come back from the saved game), or holds an invite to one, leaves it first:
+                // a member cannot invite, and a pending invite on it would be refused for the others.
+                bool const foreign = (bot.group_role != 0 && bot.group_leader_guid != leaderRef && isOurBot(bot.group_leader_guid)) ||
+                                     (bot.group_role == 0 && isOurBot(bot.group_invite_from));
+                if (foreign)
+                {
+                    BotAction leave;
+                    leave.bot_guid = bot.guid;
+                    leave.type = ActionType::kGroup;
+                    leave.spell_id = kGroupLeave;
+                    actions.push_back(leave);
+                    state.PartyRetryAtMs = nowMs + kPartyRetryMs;
+                }
+                std::vector<std::uint64_t> const none;
+                for (std::uint64_t member : foreign ? none : membersOf[bot.guid])
                 {
                     auto const at = indexOf.find(member);
                     if (at == indexOf.end())
@@ -2951,6 +2993,9 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     BotSnapshot const& other = view.bots[at->second];
                     if (other.group_leader_guid == leaderRef || other.group_invite_from == leaderRef)
                         continue; // in this party already, or invited and waiting for the answer
+                    if ((other.group_role != 0 && other.group_leader_guid != leaderRef) ||
+                        (other.group_role == 0 && other.group_invite_from != 0 && other.group_invite_from != leaderRef))
+                        continue; // in another party, or invited to one: it leaves or declines on its own turn, then it is invited
                     auto const invited = state.InvitedAtMs.find(member);
                     if (invited != state.InvitedAtMs.end() && nowMs < invited->second + kInviteRetryMs)
                         continue;
@@ -2971,6 +3016,8 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 party.type = ActionType::kGroup;
                 if (bot.group_role == 0 && bot.group_invite_from == leaderRef)
                     party.spell_id = kGroupAccept;
+                else if (bot.group_role == 0 && isOurBot(bot.group_invite_from))
+                    party.spell_id = kGroupLeave; // declines an invite from another bot leader (an invite from a human is left to the player's own accept)
                 else if (bot.group_role != 0 && bot.group_leader_guid != leaderRef)
                     party.spell_id = kGroupLeave;
                 if (party.spell_id != 0)
