@@ -234,6 +234,49 @@ void GotoHereSendsTheBotsToTheSpeaker()
     CHECK(moves == 5);
 }
 
+void TrainWalksToTheSpeakerThenTrains()
+{
+    CHECK(ParseChatCommand("train", true)->Verb == ChatVerb::Train && IsOrderVerb(ChatVerb::Train) && !ParseChatCommand("train", false));
+    CHECK(ParseChatCommand("priest train", true)->Selector.Matches(5) && !ParseChatCommand("priest train", true)->Selector.Matches(1));
+
+    BotPolicy policy = Policy();
+    WorldTickSnapshotView view = Group();
+    policy.ApplyChat(view, Ctx(), *ParseChatCommand("train", true), 1000);
+    policy.Decide(view, 1000);
+    auto actions = policy.Decide(view, 1001);
+    CHECK(!Has(actions, 10, ActionType::kTrain));               // still far from the speaker: walking, not training
+    for (BotSnapshot& bot : view.bots)
+    {
+        bot.pos_x = 100.0f;                                     // at the speaker's spot (the trainer)
+        bot.pos_y = 200.0f;
+    }
+    actions = policy.Decide(view, 1500);
+    for (std::uint64_t guid = 10; guid <= 14; ++guid)
+        CHECK(Has(actions, guid, ActionType::kTrain));
+    int trains = 0;
+    for (BotAction const& action : actions)
+        trains += action.type == ActionType::kTrain && action.bot_guid == 10;
+    CHECK(trains == 1);                                         // not twice with the periodic check
+    CHECK(!Has(policy.Decide(view, 1600), 10, ActionType::kTrain)); // and only once
+}
+
+void TrainIsRefusedForTheDeadAndOnAnotherMap()
+{
+    BotPolicy policy = Policy();
+    WorldTickSnapshotView view = Group();
+    view.bots[2].health = 0;
+    view.bots[2].life_state = 1;
+    auto lines = policy.ApplyChat(view, Ctx(), *ParseChatCommand("train", true), 1000);
+    CHECK(!lines.empty() && lines[0].find("refused") != std::string::npos);
+
+    BotPolicy other = Policy();
+    WorldTickSnapshotView view2 = Group();
+    BotPolicy::ChatContext ctx = Ctx();
+    ctx.MapId = 36;
+    lines = other.ApplyChat(view2, ctx, *ParseChatCommand("train", true), 1000);
+    CHECK(lines.size() == 1 && lines[0].find("refused") != std::string::npos);
+}
+
 void GotoOnAnotherMapIsRefused()
 {
     BotPolicy policy = Policy();
@@ -699,6 +742,8 @@ int main()
     StayBotsStartNoFights();
     GotoHereSendsTheBotsToTheSpeaker();
     GotoOnAnotherMapIsRefused();
+    TrainWalksToTheSpeakerThenTrains();
+    TrainIsRefusedForTheDeadAndOnAnotherMap();
     PullIsForTanksAndNeedsATarget();
     HealCastsOnTheSelectedFriend();
     ReleaseOnlyForTheDead();

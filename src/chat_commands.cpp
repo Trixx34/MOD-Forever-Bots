@@ -78,6 +78,7 @@ bool IsOrderVerb(ChatVerb verb)
         case ChatVerb::Revive:
         case ChatVerb::Mount:
         case ChatVerb::Dismount:
+        case ChatVerb::Train:
         case ChatVerb::Lead:
         case ChatVerb::LeadOff:
             return true;
@@ -121,6 +122,7 @@ char const* ChatVerbName(ChatVerb verb)
         case ChatVerb::Revive: return "revive";
         case ChatVerb::Mount: return "mount";
         case ChatVerb::Dismount: return "dismount";
+        case ChatVerb::Train: return "train";
         case ChatVerb::Role: return "role";
         case ChatVerb::Stance: return "stance";
         case ChatVerb::Focus: return "focus";
@@ -245,6 +247,7 @@ std::optional<ChatCommand> ParseChatCommand(std::string_view text, bool orders, 
     if (verb == "revive") return finish(ChatVerb::Revive);
     if (verb == "mount") return finish(ChatVerb::Mount);
     if (verb == "dismount") return finish(ChatVerb::Dismount);
+    if (verb == "train") return finish(ChatVerb::Train);
     return std::nullopt;
 }
 

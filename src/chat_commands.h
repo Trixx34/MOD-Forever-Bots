@@ -5,7 +5,7 @@
 // Selectors: all | tank | healer | dps | <class> (also the plural), joined by commas for a union (healer,rogue). No selector means all.
 //   tank = warrior; healer = priest, paladin, shaman, druid; dps = hunter, rogue, mage, warlock.
 // Basic verbs (ChatCommands = 1):  follow [off] | stay [off] | goto here | release | status
-// Orders (ChatOrders = 1):          stop | pull | heal | passive | aggressive | summon | revive | mount | dismount | lead [off]
+// Orders (ChatOrders = 1):          stop | pull | heal | passive | aggressive | summon | revive | mount | dismount | train | lead [off]
 //   lead: "tank lead" - in a dungeon the module knows a route for, the tank bot walks the group through it, boss by boss, and the other bots follow the
 //   tank instead of the speaker (the dungeon party rules apply: the tank pulls when the group is ready, the others join). "tank lead off" or stop ends it.
 // Control panel (ChatControl = 1):  role tank|healer|dps|auto | stance aggressive|defensive|passive | focus [off] | distance <yards>|default
@@ -14,7 +14,8 @@
 //   spirit now. status: one line per bot, whispered back. pull: the tank attacks the speaker's selected target. heal: a healer casts its
 //   heal on the speaker's selected friend. passive: fights only what attacks it. aggressive: back to normal.
 //   summon: the bots walk (teleport) next to the speaker. revive: a dead bot is resurrected at 35% health and put next to the speaker. mount /
-//   dismount: the fastest ground mount it knows. role: overrides what the class gives (tank pulls on `pull` and leads a dungeon party; dps does
+//   dismount: the fastest ground mount it knows. train: the bots walk to the speaker, who stands at a class trainer, and learn what that trainer
+//   teaches them. role: overrides what the class gives (tank pulls on `pull` and leads a dungeon party; dps does
 //   not heal on its own). stance: aggressive fights what the group fights or meets, defensive only what attacks it or the group, passive only
 //   what attacks the bot. focus: the speaker's selected target is attacked first in a fight. distance: how far from the speaker a following
 //   bot stops (3 to 40 yards).
@@ -52,6 +53,7 @@ enum class ChatVerb : std::uint8_t
     Distance,
     Lead,
     LeadOff,
+    Train,
 };
 
 // Orders need ChatOrders = 1, the control panel ChatControl = 1 (the basic verbs only need ChatCommands = 1).

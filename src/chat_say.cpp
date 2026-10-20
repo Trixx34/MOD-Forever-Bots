@@ -44,6 +44,7 @@ std::string AckLine(ChatVerb verb, std::uint64_t botGuid)
         case ChatVerb::Revive: return Pick<2>({ "Thanks!", "Back on my feet." }, botGuid, verb);
         case ChatVerb::Mount: return Pick<2>({ "Mounting up.", "Hop on." }, botGuid, verb);
         case ChatVerb::Dismount: return Pick<2>({ "Getting off.", "On foot again." }, botGuid, verb);
+        case ChatVerb::Train: return Pick<2>({ "Off to the trainer.", "Time to learn something." }, botGuid, verb);
         case ChatVerb::Role: return Pick<2>({ "Role set.", "Got it, new role." }, botGuid, verb);
         case ChatVerb::Stance: return Pick<2>({ "Stance set.", "Understood." }, botGuid, verb);
         case ChatVerb::Focus: return Pick<2>({ "Focusing it.", "Target noted." }, botGuid, verb);

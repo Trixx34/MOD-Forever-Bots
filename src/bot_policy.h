@@ -334,6 +334,7 @@ private:
         bool GotoActive = false;                         // walking to GotoPoint
         Point GotoPoint;
         std::uint64_t GotoUntilMs = 0;
+        bool TrainAfterGoto = false;                     // a train order: when the goto ends, the bot learns from the trainer it stands at
         std::uint64_t ForcedTarget = 0;                  // the creature a pull order points at
         std::uint64_t ForcedUntilMs = 0;
         std::uint64_t ForcedHeal = 0;                    // the friend a heal order points at (once)

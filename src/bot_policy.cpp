@@ -1050,6 +1050,30 @@ std::vector<std::string> BotPolicy::ApplyChat(WorldTickSnapshotView const& view,
                 state.GotoUntilMs = nowMs + kGotoTimeoutMs;
                 state.ChatFollow = 0;
                 state.ChatStay = true; // holds the spot once there
+                state.TrainAfterGoto = false;
+                state.Last.reset();
+                break;
+            }
+            case ChatVerb::Train:
+            {
+                // The speaker stands at a class trainer: the bot walks up to the speaker's own spot (no spread, a trainer is only reachable within a few
+                // yards), then learns what that trainer teaches it (the goto ending sends the train action).
+                if (bot.life_state != 0)
+                {
+                    refuse("dead");
+                    break;
+                }
+                if (bot.map_id != chat.MapId)
+                {
+                    refuse("on another map");
+                    break;
+                }
+                state.GotoPoint = Point{ chat.Pos.X, chat.Pos.Y, chat.Pos.Z };
+                state.GotoActive = true;
+                state.GotoUntilMs = nowMs + kGotoTimeoutMs;
+                state.ChatFollow = 0;
+                state.ChatStay = true; // holds the spot once there
+                state.TrainAfterGoto = true;
                 state.Last.reset();
                 break;
             }
@@ -2426,7 +2450,20 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             if (state.GotoActive)
             {
                 if (nowMs >= state.GotoUntilMs || DistanceTo(bot, state.GotoPoint) <= 3.0f)
+                {
                     state.GotoActive = false;
+                    // A train order: arrived (a timeout drops it), so the bot learns from the trainer in reach. The core refuses when none is.
+                    if (state.TrainAfterGoto && nowMs < state.GotoUntilMs)
+                    {
+                        BotAction train;
+                        train.bot_guid = bot.guid;
+                        train.type = ActionType::kTrain;
+                        actions.push_back(train);
+                        state.LastTrainLevel = bot.level;             // the periodic check does not repeat it right away
+                        state.NextTrainMs = nowMs + _options.TrainEveryMs;
+                    }
+                    state.TrainAfterGoto = false;
+                }
                 else
                 {
                     wanted = Decision{ ActionType::kMoveTo, 0, state.GotoPoint };
