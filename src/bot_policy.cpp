@@ -48,6 +48,8 @@ constexpr std::uint32_t kServiceBuyHealthPotion = 64; // layout 16: the core's s
 constexpr std::uint32_t kServiceBuyManaPotion = 128;
 constexpr std::uint32_t kServiceBuyBandage = 256;
 constexpr std::uint32_t kServiceBuyReagent = 512;  // the item and the count are the core's
+constexpr std::uint32_t kServiceSellJunk = 1024;   // SDK 0.16: also sell white junk (trade goods, spare bags, miscellaneous items)
+constexpr std::uint32_t kBagsLowSlots = 4;         // a vendor visit of a bot with this many free slots or fewer also sells the white junk
 constexpr std::uint32_t kServiceBuyAmmo = 8;     // layout 15: buy ammunition (dest_x = the count to carry), food (dest_y), drink (dest_z)
 constexpr std::uint32_t kServiceBuyFood = 16;
 constexpr std::uint32_t kServiceBuyDrink = 32;
@@ -2717,6 +2719,10 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 vendor.bot_guid = bot.guid;
                 vendor.type = ActionType::kVendor;
                 vendor.spell_id = kServiceSell | kServiceRepair | kServiceEquip;
+                // Nearly full bags (113 of 300 soak bots had every slot taken by cloth, meat and spare bags and could not turn in a quest): the visit also
+                // sells the white junk, not only the grey items.
+                if (bot.bag_free_slots <= kBagsLowSlots)
+                    vendor.spell_id |= kServiceSellJunk;
                 // Layout 13: the NPC's guid, not just its position. An older core leaves it 0 and the core resolves the
                 // nearest vendor of the map instead.
                 vendor.target_guid = needRepair ? bot.repair_guid : bot.vendor_guid;

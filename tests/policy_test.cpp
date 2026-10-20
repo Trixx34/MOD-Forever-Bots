@@ -439,13 +439,49 @@ void RefusedSitIsRetriedLater()
     CHECK(RestAt(policy.Decide(Hurt(600, {}, 0), 3500), spell) >= 0 && spell == 1);
 }
 
-// Whether `actions` holds a kVendor with this spell_id, or a kTrain.
+// Whether `actions` holds a kVendor with this spell_id, or a kTrain. The white junk bit (1024, set for a bot with nearly full bags, which a default test
+// bot with no free slots is) is not part of what these tests compare.
 bool HasVendor(std::vector<BotAction> const& actions, std::uint32_t services)
 {
     for (BotAction const& action : actions)
-        if (action.type == ActionType::kVendor && action.spell_id == services)
+        if (action.type == ActionType::kVendor && (action.spell_id & ~1024u) == services)
             return true;
     return false;
+}
+
+// The services of the first kVendor of a tick (0 when there is none).
+std::uint32_t VendorServices(std::vector<BotAction> const& actions)
+{
+    for (BotAction const& action : actions)
+        if (action.type == ActionType::kVendor)
+            return action.spell_id;
+    return 0;
+}
+
+void FullBagsMakeTheVisitSellWhiteJunkToo()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.ServiceEveryMs = 600000;
+    BotPolicy policy(options);
+    WorldTickSnapshotView full = View(1, 0, {});
+    full.bots[0].level = 10;
+    full.bots[0].bag_free_slots = 0;
+    CHECK(VendorServices(policy.Decide(full, 1000)) == (7u | 1024u));      // sell grey, repair, equip, and the white junk
+
+    BotPolicy other(options);
+    WorldTickSnapshotView roomy = View(1, 0, {});
+    roomy.bots[0].level = 10;
+    roomy.bots[0].bag_free_slots = 20;
+    CHECK(VendorServices(other.Decide(roomy, 1000)) == 7u);                // room in the bags: the grey items only
+
+    BotPolicy edge(options);
+    WorldTickSnapshotView four = View(1, 0, {});
+    four.bots[0].level = 10;
+    four.bots[0].bag_free_slots = 4;
+    CHECK((VendorServices(edge.Decide(four, 1000)) & 1024u) != 0);          // four free slots is still "nearly full"
+    BotPolicy five(options);
+    four.bots[0].bag_free_slots = 5;
+    CHECK((VendorServices(five.Decide(four, 1000)) & 1024u) == 0);
 }
 
 bool HasTrain(std::vector<BotAction> const& actions)
@@ -3772,6 +3808,7 @@ int main()
     PartySideOfDecidesTheSides();
     ABotLeadersInviteIsAnsweredOnce();
     OnlyAShareOfTheBotsFormParties();
+    FullBagsMakeTheVisitSellWhiteJunkToo();
     UnknownSideBotsAreLeftOutOfParties();
     ABotInAHumansPartyIsLeftAlone();
     OnlyTheFirstPartyIsFormed();
