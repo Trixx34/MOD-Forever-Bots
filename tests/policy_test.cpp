@@ -457,12 +457,12 @@ void StandsBeforeAFight()
     CHECK(attack >= 0 && stand < attack);
 }
 
-// The skill lines of the kSkillUp actions bot 10 sent in a tick.
+// The skill lines of the kSkillUp actions sent in a tick (these views have a single bot).
 std::vector<std::uint32_t> CraftsOf(std::vector<BotAction> const& actions)
 {
     std::vector<std::uint32_t> skills;
     for (BotAction const& action : actions)
-        if (action.type == ActionType::kSkillUp && action.bot_guid == 10)
+        if (action.type == ActionType::kSkillUp)
             skills.push_back(action.spell_id);
     return skills;
 }
