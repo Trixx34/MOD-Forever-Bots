@@ -1262,7 +1262,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         // and the PartyCount parties with the lowest first guids are kept. Bots whose side is not known (0) form parties among themselves.
         std::map<std::uint8_t, std::vector<std::uint64_t>> bySide;
         for (std::uint64_t guid : guids)
-            bySide[_options.SideOf ? _options.SideOf(guid) : std::uint8_t(0)].push_back(guid);
+            bySide[_options.PartySideOf ? _options.PartySideOf(guid) : (_options.SideOf ? _options.SideOf(guid) : std::uint8_t(0))].push_back(guid);
         std::vector<std::vector<std::uint64_t>> parties;
         for (auto const& side : bySide)
             for (std::size_t from = 0; from < side.second.size(); from += _options.PartySize)
@@ -2974,7 +2974,8 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 // A leader that sits in another bot's party (old parties come back from the saved game), or holds an invite to one, leaves it first:
                 // a member cannot invite, and a pending invite on it would be refused for the others.
                 bool const foreign = (bot.group_role != 0 && bot.group_leader_guid != leaderRef && isOurBot(bot.group_leader_guid)) ||
-                                     (bot.group_role == 0 && isOurBot(bot.group_invite_from));
+                                     (bot.group_role == 0 && bot.group_invite_from != leaderRef && isOurBot(bot.group_invite_from));
+                // (a leader that has just invited holds a pending invite to its own party: that one is not foreign, leaving would drop the party)
                 if (foreign)
                 {
                     BotAction leave;

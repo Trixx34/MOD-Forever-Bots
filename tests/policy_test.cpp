@@ -898,6 +898,35 @@ void OldPartiesAreLeftBeforeTheNewOnesForm()
     CHECK(!HasGroup(actions, 12, 1, PlayerOf(10)));
 }
 
+void ALeaderWithItsOwnPendingPartyKeepsInviting()
+{
+    // A leader that has just invited holds a pending invite to its own party (the core adds the leader as invited until a member accepts).
+    // That is not a foreign invite: leaving would drop the party it is building.
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    for (BotSnapshot& bot : view.bots)
+        if (bot.guid == 12)
+            bot.group_invite_from = PlayerOf(12);
+    view.bots[0].group_invite_from = PlayerOf(12);   // bot 10 already has the invite waiting
+    auto const actions = PartyPolicy(5).Decide(view, 0);
+    CHECK(!HasGroup(actions, 12, 3));                // does not leave
+    CHECK(HasGroup(actions, 12, 1, PlayerOf(11)));   // and invites the others
+    CHECK(HasGroup(actions, 10, 2));                 // the member with the invite accepts it
+}
+
+void PartySideOfDecidesTheSides()
+{
+    // PartySideOf wins over SideOf: the custom races (unknown to SideOf) still split into one party per side.
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.PartyCount = 2;
+    options.ClassOf = WarriorLeads;
+    options.SideOf = [](std::uint64_t) { return std::uint8_t(0); };
+    options.PartySideOf = [](std::uint64_t guid) { return std::uint8_t(guid % 2 == 0 ? 1 : 2); };
+    BotPolicy policy(options);
+    auto const actions = policy.Decide(PartyView({ 10, 11, 12, 13, 14, 15, 16, 17, 18, 19 }), 0);
+    CHECK(HasGroup(actions, 12, 1, PlayerOf(10)) && !HasGroup(actions, 12, 1, PlayerOf(11)));
+}
+
 void ABotInAHumansPartyIsLeftAlone()
 {
     // Bot 10 is invited by a human player (not a bot in the view): the bot party assignment leaves it out, and nobody invites or declines for it.
@@ -3642,6 +3671,8 @@ int main()
     LeaderInvitesItsMembers();
     PartiesNeverMixSides();
     OldPartiesAreLeftBeforeTheNewOnesForm();
+    ALeaderWithItsOwnPendingPartyKeepsInviting();
+    PartySideOfDecidesTheSides();
     ABotInAHumansPartyIsLeftAlone();
     OnlyTheFirstPartyIsFormed();
     InvitesWaitForTheRetry();

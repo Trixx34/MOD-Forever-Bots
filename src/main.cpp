@@ -1376,6 +1376,15 @@ int main(int argc, char** argv)
     }
     policyOptions.RaceOf = [&races](std::uint64_t botGuid) { return races.Get(botGuid); };
     policyOptions.SideOf = [&races](std::uint64_t botGuid) { return SideOfRace(races.Get(botGuid)); };
+    policyOptions.PartySideOf = [&races](std::uint64_t botGuid) -> std::uint8_t
+    {
+        std::uint32_t const race = races.Get(botGuid);
+        if (race == 95)
+            return 1; // Skyborne (Alliance)
+        if (race == 96)
+            return 2; // Skyborne (Horde)
+        return SideOfRace(race);
+    };
     policyOptions.ClassOf = [&classes](std::uint64_t botGuid) { return classes.Get(botGuid); };
     policyOptions.AutoGearing = settings.AutoGearing;
     policyOptions.AcceptInvites = settings.ChatCommands;

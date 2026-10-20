@@ -128,6 +128,8 @@ struct PolicyOptions
     // 2 Horde, 0 unknown).
     std::shared_ptr<GrindData const> Grind;
     std::function<std::uint8_t(std::uint64_t botGuid)> SideOf;
+    // The faction for the bot parties (a party is one side): like SideOf, and it also knows the custom races. Unset, SideOf is used.
+    std::function<std::uint8_t(std::uint64_t botGuid)> PartySideOf;
     // A bot's race id (0 unknown), for the quests' race limits.
     std::function<std::uint32_t(std::uint64_t botGuid)> RaceOf;
     // Rotations from a file (data/rotations.txt, tools/make_rotations.py): the fight rows and the upkeep buffs of the classes it lists. A class it does
