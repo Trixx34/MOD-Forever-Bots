@@ -119,8 +119,7 @@ void ABuffTheBotCannotPayForIsNotCast()
     char const* const rotation = "class 8\nbuff 168 duration 1800 self\n";
     BotPolicy policy = MagePolicyWithCosts(rotation, "168\t1\t0\t60\t0\t0\t0\tFrost Armor\n");
     WorldTickSnapshotView view = Group(10);
-    view.bots[0].power_type = 0;
-    view.bots[0].max_power = 300;
+    view.bots[0].power_type = 0;          // max_power stays 0: with a small maximum the bot would be low on mana and sit down to drink instead
     view.bots[0].power = 20;
     CHECK(!Casts(policy.Decide(view, 1000), 10, 168, 0));
     view.bots[0].power = 60;

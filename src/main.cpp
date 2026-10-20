@@ -825,7 +825,7 @@ int main(int argc, char** argv)
 
     forever_module::ModuleManifest manifest;
     manifest.module_name = "forever-bots";
-    manifest.module_version = "0.1.0";
+    manifest.module_version = FOREVER_MODULE_VERSION; // from module.json, see CMakeLists.txt
     manifest.tier2_participates = true;
     manifest.requested_max_bots = kMaxBotsCeiling;
     manifest.requested_max_nearby_units = kRequestedNearbyUnits;

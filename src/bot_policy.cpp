@@ -921,9 +921,21 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
     // An upkeep buff (Battle Shout, Rockbiter Weapon, Lightning Shield...) is cast out of combat, nobody waits for it, and it was retried as fast as a fight
     // spell: about 20,000 refused casts in 20 minutes on 300 bots. Refused buffs wait longer (see kBuffPowerRetryMs and kBuffRefusedRetryMs).
     bool buff = false;
-    if (bot.last_action_status == BotActionStatus::kNotEnoughPower || bot.last_action_status == BotActionStatus::kRefused)
+    bool const castFailed = bot.last_action_status != BotActionStatus::kApplied && bot.last_action_status != BotActionStatus::kNone &&
+                            bot.last_action_status != BotActionStatus::kNotOnline;
+    if (castFailed)
         for (rotation::Row const& row : RowsFor(ClassFor(_options, bot.guid)))
             buff = buff || (row.Buff && row.Spell == spell);
+    if (buff)
+    {
+        // The buff claim is made when the cast is sent (so a party mate deciding a moment later does not cast it too), for the whole length of the buff.
+        // A cast the core refused never gave the buff: the claim goes, or nobody (this bot included) would try it again until the buff would have ended.
+        auto const cast = state.CastTarget.find(spell);
+        std::uint64_t const recipient = cast != state.CastTarget.end() ? cast->second : 0;
+        _buffClaims.erase({ spell, recipient });
+        if (recipient == 0)
+            _buffClaims.erase({ spell, PlayerRef(bot.guid) });
+    }
 
     switch (bot.last_action_status)
     {
