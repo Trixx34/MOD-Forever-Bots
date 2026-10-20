@@ -1474,6 +1474,20 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         present.insert(bot.guid);
         BotState& state = StateOf(bot.guid);
         ReadResult(state, bot, nowMs);
+        if (state.RestPct == 0)
+        {
+            // Traits, drawn once per bot from the seed: the health below which it rests, and how close to its leader it stays put. Without randomness
+            // (RandomPct 0) every bot has the shared values.
+            state.RestPct = kRestBelowPct;
+            state.LeaderYards = kFollowLeaderYards;
+            if (_options.RandomPct > 0)
+            {
+                state.RestPct = std::clamp<std::uint32_t>(std::uint32_t(bot_random::Vary(kRestBelowPct, std::max(1u, _options.RandomPct / 3),
+                                                                                         bot_random::Draw(_options.RandomSeed, bot.guid, bot_random::kSaltRest, 0))), 70, 98);
+                state.LeaderYards = float(bot_random::Vary(std::uint64_t(kFollowLeaderYards * 10.0f), _options.RandomPct,
+                                                           bot_random::Draw(_options.RandomSeed, bot.guid, bot_random::kSaltRest, 1))) / 10.0f;
+            }
+        }
         if (state.OrderAction)
         {
             actions.push_back(*state.OrderAction);
@@ -1812,7 +1826,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             if (auto const at = indexOf.find(partyLeader); at != indexOf.end())
                 leaderSnap = &view.bots[at->second];
         }
-        bool const atLeader = leaderSnap && Distance2d(bot, *leaderSnap) <= (state.FollowYards > 0.0f ? state.FollowYards : kFollowLeaderYards);
+        bool const atLeader = leaderSnap && Distance2d(bot, *leaderSnap) <= (state.FollowYards > 0.0f ? state.FollowYards : state.LeaderYards);
 
         // Who an idle bot follows: a member its leader (and stays put once close), else the closest player.
         std::uint64_t followRef = player ? player->guid : 0;
@@ -2793,7 +2807,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         }
         else
             state.ManaRestSinceMs = 0;
-        bool const healthy = !manaResting && (bot.max_health == 0 || std::uint64_t(bot.health) * 100 >= std::uint64_t(bot.max_health) * kRestBelowPct);
+        bool const healthy = !manaResting && (bot.max_health == 0 || std::uint64_t(bot.health) * 100 >= std::uint64_t(bot.max_health) * state.RestPct);
         auto const hubs = _options.HubsByMap.find(bot.map_id);
         bool const grindMode = _options.Grind && !_options.Grind->Spots.empty() && bot.level != 0;
         // How long this bot idles before its next walk: kWanderIdleMs varied by twice RandomPct (+-50 % at 25), drawn once per walk, so the bots do not all
@@ -2977,7 +2991,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         // Idle means no fight and no player to follow, with no live hostile anywhere near: a sitting bot is easy prey.
         // Creatures only: a hostile player that is not attacking the bot does not stop it from resting (its threat target
         // already does, through hasTarget).
-        bool const hurtEnough = bot.max_health > 0 && std::uint64_t(bot.health) * 100 < std::uint64_t(bot.max_health) * kRestBelowPct;
+        bool const hurtEnough = bot.max_health > 0 && std::uint64_t(bot.health) * 100 < std::uint64_t(bot.max_health) * state.RestPct;
         bool const stillHurt = bot.max_health > 0 && bot.health < bot.max_health;
         // Waiting for the party (dungeon): sits to recover health, and mana for a mana user, even with creatures in view.
         bool const holdIdle = dungeonHold && !hasTarget && wanted.Type == ActionType::kStop && !routeBusy;

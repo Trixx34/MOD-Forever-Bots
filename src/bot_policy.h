@@ -287,6 +287,8 @@ private:
         std::uint64_t GrindRetryAtMs = 0;                // no grind spot on this map for this level: explore on foot until this time, then look again
         std::uint32_t HubFailures = 0;                   // hub walks in a row that ended without arriving
         std::uint32_t ExploreStep = 0;                   // random walks made, for the direction of the next
+        std::uint32_t RestPct = 0;                       // the health below which this bot rests (a trait drawn once from the seed; 0 = not drawn yet)
+        float LeaderYards = 0.0f;                        // how close to its leader this bot stays put (a trait, like RestPct)
         std::uint32_t WanderCycles = 0;                  // walks to a grind spot or hub begun, the counter of the random draws for the next one
         std::uint64_t WanderIdleMs = 0;                  // how long this bot idles before the next walk (varied per bot and per walk; 0 = not drawn yet)
         Point ExploreTarget;

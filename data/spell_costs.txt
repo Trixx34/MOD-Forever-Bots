@@ -1,0 +1,2932 @@
+# Spell power costs, written by the core at startup (worldserver.conf: Bot.Dump.SpellCosts = <file>), copied here unchanged. 2026-10-20, core test branch
+# b5ca4d60f1, game data of the Classic beta client. The module reads it as SpellCostFile (see src/spell_costs.h for the format). To make it again:
+# set Bot.Dump.SpellCosts to a path, start the worldserver once, copy the file over this one. Costs are in the core's units (rage in tenths).
+# spell_id	level	power_type	cost	cost_per_level	cost_pct	next_rank	name
+15472	20	0	90	0	0	0	Shadow Bolt
+15787	20	0	200	0	0	0	Moonflare Totem
+1222942	0	0	110	0	0	0	Flame Shock
+24043	60	3	30	0	0	0	Test Fury
+1004	30	0	140	0	0	0	Smite
+22885	20	0	130	0	0	0	Earth Shock
+11661	60	0	370	0	0	0	Shadow Bolt
+22275	20	0	260	0	0	0	Flamestrike
+11730	58	0	1120	0	0	0	Create Healthstone
+22783	58	0	490	0	0	0	Mage Armor
+1320930	20	0	135	0	0	0	Shock
+24670	50	0	350	0	0	0	Inferno
+5176	1	0	10	0	0	0	Wrath
+3133	26	0	15	0	0	0	Beast Claws III
+5177	6	0	20	0	0	0	Wrath
+8446	40	0	100	0	0	0	Scorch
+26064	20	2	10	0	0	0	Shell Shield
+21807	20	0	75	0	0	0	Wrath
+20697	0	0	200	0	0	0	Power Word: Shield
+19283	40	0	130	0	0	0	Hex of Weakness
+412788	1	0	0	0	5	0	Demon Charge
+9739	20	0	75	0	0	0	Wrath
+10202	54	0	390	0	0	0	Arcane Explosion
+8921	4	0	25	0	0	0	Moonfire
+28612	60	0	705	0	0	0	Conjure Food
+10953	52	0	90	0	0	0	Mind Soothe
+22168	1	0	5	5	0	0	Renew
+27607	60	0	500	0	0	0	Power Word: Shield
+21367	62	0	150	0	0	0	Blizzard
+23411	0	0	400	0	0	0	Fireball
+16033	20	0	150	0	0	0	Chain Lightning
+22709	24	0	90	0	0	0	Void Bolt
+9492	28	3	30	0	0	9493	Rip
+9492	28	4	1	0	0	9493	Rip
+412787	1	0	0	0	5	0	Disrupt
+11281	60	3	60	0	0	25300	Backstab
+246	28	0	140	0	0	0	Slow
+436938	18	0	205	0	0	0	Regrowth
+28412	58	0	565	0	0	0	Death Coil
+22919	20	0	60	0	0	0	Mind Flay
+461828	28	1	200	0	0	0	Thunder Clap
+9616	19	0	65	5	0	0	Wild Regeneration
+21670	60	0	50	0	0	0	Faerie Fire
+403687	38	0	370	0	0	0	Drain Life
+21096	1	0	8	8	0	0	Blizzard
+10462	50	0	70	0	0	0	Healing Stream Totem
+9857	54	0	445	0	0	0	Regrowth
+704	14	0	35	0	0	0	Curse of Recklessness
+1245	24	0	400	0	0	0	Power Word: Fortitude
+21401	20	0	115	0	0	0	Frost Shock
+24530	60	0	100	0	0	0	Felfire
+22271	20	0	120	0	0	0	Arcane Explosion
+17201	20	0	75	0	0	0	Dispel Magic
+17924	56	0	335	0	0	0	Soul Fire
+21552	54	1	300	0	0	21553	Mortal Strike
+9858	60	0	525	0	0	0	Regrowth
+20661	48	1	150	0	0	20662	Execute
+9894	52	3	30	0	0	9896	Rip
+9894	52	4	1	0	0	9896	Rip
+21669	62	0	150	0	0	0	Moonfire
+20357	58	0	200	0	0	0	Seal of Wisdom
+13375	20	0	110	0	0	0	Fireball
+425204	1	0	0	0	13	0	Void Plague
+15632	60	0	110	0	0	0	Distracting Shot
+20473	40	0	225	0	0	0	Holy Shock
+21963	30	0	50	0	0	0	Force of Nature
+3565	30	0	120	0	0	0	Teleport: Darnassus
+1256145	0	0	250000	0	0	0	Allstrike
+8406	26	0	100	0	0	0	Frostbolt
+20905	50	0	425	0	0	0	Trueshot Aura
+1757	6	3	45	0	0	1758	Sinister Strike
+5759	5	0	9	0	0	0	Cat Form
+976	30	0	250	0	0	0	Shadow Protection
+20820	20	0	75	0	0	0	Holy Smite
+26188	50	2	60	0	0	1264455	Thunderstomp
+10392	44	0	160	0	0	0	Lightning Bolt
+446292	22	0	100	0	0	0	Sorrowful Wilting
+687	1	0	50	0	0	0	Demon Skin
+20740	10	0	30	0	0	0	Dominate Mind
+9901	54	0	100	0	0	0	Soothe Animal
+20484	20	0	0	0	85	0	Rebirth
+20299	20	0	150	0	0	0	Forked Lightning
+20812	1	0	200	0	0	0	Cripple
+17261	56	2	35	0	0	0	Bite
+20681	62	0	200	0	0	0	Summon Water Elementals
+18091	35	0	80	0	0	0	Arcane Blast
+20422	50	0	170	0	0	0	Seal of Fury
+21564	60	0	3400	0	0	0	Prayer of Fortitude
+469056	8	0	85	0	0	0	Frost Volley
+20696	0	0	100	0	0	0	Holy Smite
+20569	60	1	200	0	0	0	Cleave
+770	18	0	55	0	0	0	Faerie Fire
+15473	0	0	0	0	40	0	Shadowform
+429146	60	0	805	0	0	0	Holy Wrath
+413259	1	0	0	0	28	0	Mind Sear
+1116	38	0	25	0	0	0	Chaos Shield
+21030	20	0	115	0	0	0	Frost Shock
+1270178	20	0	10	0	0	0	Cosmic Wrath
+8992	38	3	60	0	0	9829	Shred
+20347	40	0	140	0	0	0	Seal of Light
+20349	60	0	210	0	0	0	Seal of Light
+450662	20	0	9	0	0	0	Sleep
+11895	34	0	560	0	0	0	Healing Wave of Antu'sul
+1305748	20	0	90	4	0	0	Fireball
+13747	28	0	140	0	0	0	Slow
+18932	60	0	255	0	0	0	Conflagrate
+20252	30	1	100	0	0	20616	Intercept
+23924	54	1	200	0	0	23925	Shield Slam
+20918	40	0	140	0	0	0	Seal of Command
+20787	20	0	95	0	0	0	Immolate
+412758	40	0	205	0	0	0	Incinerate
+9578	20	0	75	0	0	0	Fade
+20923	50	0	435	0	0	0	Consecration
+22938	20	0	20	0	0	0	Arcane Explosion
+408681	4	0	30	0	0	0	Earth Shock
+23858	0	0	315	0	0	0	Holy Nova
+20690	62	0	375	0	0	0	Moonfire
+19137	28	0	140	0	0	0	Slow
+19482	60	0	250	0	0	0	War Stomp
+25307	60	0	380	0	0	0	Shadow Bolt
+417448	1	3	40	0	0	0	Thrash (Cat)
+24604	10	2	60	0	0	24605	Furious Howl
+1310703	40	3	25	0	0	0	Venom
+1310703	40	4	1	0	0	0	Venom
+3045	26	0	100	0	0	0	Rapid Fire
+408124	1	0	0	0	14	0	Lifebloom
+469320	1	0	0	0	10	0	Lava Burst
+9904	54	3	40	0	0	0	Rake
+7386	10	1	150	0	0	7405	Sunder Armor
+27685	60	2	35	0	0	0	Charge
+1286252	60	0	125	0	0	0	(DNT) Blessing of Wisdom - TEST RAID SPELL
+19836	32	0	60	0	0	0	Blessing of Might
+19506	40	0	325	0	0	0	Trueshot Aura
+19647	52	0	200	0	0	0	Spell Lock
+20296	20	0	260	0	0	0	Flamestrike
+1277331	20	0	50	0	0	0	Chastise
+20305	22	0	65	0	0	0	Seal of the Crusader
+19852	34	0	65	0	0	0	Blessing of Wisdom
+412789	1	0	0	0	5	0	Demonic Howl
+22417	20	0	10	8	0	0	Shadow Shield
+408	30	3	25	0	0	8643	Kidney Shot
+408	30	4	1	0	0	8643	Kidney Shot
+1241584	60	3	60	0	0	0	Mutilate
+19940	34	0	70	0	0	0	Flash of Light
+19939	26	0	50	0	0	0	Flash of Light
+20166	38	0	135	0	0	0	Seal of Wisdom
+20657	20	0	90	4	0	0	Acid Spit
+12675	20	0	90	0	0	0	Frostbolt
+425273	38	0	205	0	0	0	Renew
+20375	20	0	65	0	0	0	Seal of Command
+19837	42	0	85	0	0	0	Blessing of Might
+19282	30	0	90	0	0	0	Hex of Weakness
+23380	20	0	95	0	0	0	Moonfire
+19028	40	0	0	0	20	0	Soul Link
+19303	42	0	245	0	0	0	Starshards
+14	1	0	10	0	0	0	Mana Drain
+2908	22	0	50	0	0	0	Soothe Animal
+18931	54	0	230	0	0	0	Conflagrate
+1303226	20	0	90	0	0	0	Frostbolt
+10170	54	0	450	0	0	0	Amplify Magic
+3661	28	0	155	0	0	0	Mend Pet
+2055	22	0	205	0	0	0	Heal
+6215	56	0	0	0	15	0	Fear
+11719	50	0	110	0	0	0	Curse of Tongues
+6808	18	1	150	0	0	6809	Maul
+11433	20	0	320	0	0	0	Death & Decay
+8380	34	1	150	0	0	11596	Sunder Armor
+10473	58	0	430	0	0	0	Frost Shock
+16827	1	2	25	0	0	16828	Claw
+412231	50	0	255	0	0	0	Fire Ward
+10406	34	0	115	0	0	0	Stoneskin Totem
+27760	8	0	0	0	10	0	Polymorph
+6574	24	1	50	0	0	7379	Revenge
+19463	20	0	90	4	0	0	Corrosive Acid Spit
+8024	10	0	30	0	0	0	Flametongue Weapon
+10957	42	0	450	0	0	0	Shadow Protection
+8725	34	3	60	0	0	11267	Ambush
+10191	44	0	100	0	0	0	Mana Shield
+6785	32	3	60	0	0	6787	Ravage
+1756	45	2	15	0	0	16697	Cower
+11565	40	1	150	0	0	11566	Heroic Strike
+10324	36	0	0	0	80	0	Redemption
+10199	54	0	340	0	0	0	Fire Blast
+438335	34	0	120	0	0	0	Healing Ward
+10322	24	0	0	0	80	0	Redemption
+10407	44	0	160	0	0	0	Stoneskin Totem
+8249	38	0	140	0	0	0	Flametongue Totem
+1608	24	1	150	0	0	11564	Heroic Strike
+9771	20	0	90	4	0	0	Radiation Bolt
+15228	20	0	90	0	0	0	Fireball
+401417	1	0	0	0	28	0	Regeneration
+5730	8	0	15	0	0	0	Stoneclaw Totem
+9081	20	0	160	0	0	0	Shadow Bolt Volley
+10179	44	0	195	0	0	0	Frostbolt
+22371	1	0	5	5	0	0	Curse of Impotence
+8928	34	0	190	0	0	0	Moonfire
+19505	30	0	100	0	0	19731	Devour Magic
+21964	30	0	50	0	0	0	Force of Nature
+1320095	20	0	0	0	20	0	Entangling Roots
+30093	1	0	100	0	0	0	Blizzard
+14321	48	0	90	0	0	0	Aspect of the Hawk
+1264933	60	2	35	0	0	0	Dismember
+440580	1	0	0	0	12	0	Feral Spirit
+18214	30	0	40	0	0	0	Shadow Bolt
+1277333	40	0	135	0	0	0	Chastise
+22917	0	0	0	0	40	0	Shadowform
+421	32	0	225	0	0	0	Chain Lightning
+8457	30	0	135	0	0	0	Fire Ward
+600	18	0	130	0	0	0	Power Word: Shield
+8820	38	1	150	0	0	11604	Slam
+10909	44	0	150	0	0	0	Mind Vision
+8939	24	0	170	0	0	0	Regrowth
+1310196	20	1	150	0	0	0	Slam
+462728	38	3	50	0	0	0	Garrote
+9853	58	0	125	0	0	0	Entangling Roots
+9885	60	0	445	0	0	0	Mark of the Wild
+14914	20	0	85	0	0	0	Holy Fire
+12674	20	0	75	0	0	0	Frost Nova
+5676	18	0	45	0	0	0	Searing Pain
+436342	30	0	95	0	0	0	Bloodbonded Grove Talisman
+15629	30	0	50	0	0	0	Distracting Shot
+14269	30	0	40	0	0	0	Mongoose Bite
+26192	20	0	20	0	0	0	Arcane Explosion
+5276	30	0	98	0	0	0	Freeze
+9456	1	0	40	0	0	0	Tharnariun Cure 1
+20701	62	0	200	0	0	0	Rejuvenation
+408514	1	0	0	0	5	0	Earth Shield
+8040	6	0	60	0	0	0	Druid's Slumber
+20295	20	0	90	0	0	0	Lightning Bolt
+1311015	30	0	110	0	0	0	Templar's Bulwark
+24118	30	0	40	0	0	0	Lacerate
+66	99	0	110	0	0	0	Lesser Invisibility
+14302	26	0	90	0	0	0	Immolation Trap
+205	8	0	35	0	0	0	Frostbolt
+12167	20	0	90	0	0	0	Lightning Bolt
+8177	30	0	0	0	6	0	Grounding Totem
+17162	0	0	500	0	0	0	Summon Water Elemental
+24597	56	2	60	0	0	0	Furious Howl
+11642	20	0	215	0	0	0	Heal
+8170	38	0	0	0	10	0	Disease Cleansing Totem
+3561	20	0	120	0	0	0	Teleport: Stormwind
+597	12	0	105	0	0	0	Conjure Food
+17928	54	0	200	0	0	0	Howl of Terror
+455987	0	0	250000	0	0	0	Decisive Strike
+20869	30	0	80	0	0	0	Frost Blast
+462586	60	3	20	0	0	0	Shadowstalker Slash
+8264	26	0	175	0	0	0	Lava Spout Totem
+8918	40	0	505	0	0	0	Tranquility
+7405	22	1	150	0	0	8380	Sunder Armor
+8643	50	3	25	0	0	0	Kidney Shot
+8643	50	4	1	0	0	0	Kidney Shot
+16355	48	0	135	0	0	0	Frostbrand Weapon
+425276	56	0	365	0	0	0	Renew
+10174	60	0	500	0	0	0	Dampen Magic
+8364	1	0	8	8	0	0	Blizzard
+16830	24	2	25	0	0	16831	Claw
+692	1	0	17	0	0	0	Terror (TEST)
+462718	18	3	60	0	0	0	Ambush
+14920	50	2	15	0	0	14921	Growl
+1299346	25	0	180	0	0	0	Trueshot Aura
+8647	14	3	25	0	0	8649	Expose Armor
+8647	14	4	1	0	0	8649	Expose Armor
+11608	40	1	200	0	0	11609	Cleave
+8640	36	3	25	0	0	11273	Rupture
+8640	36	4	1	0	0	11273	Rupture
+122	10	0	55	0	0	0	Frost Nova
+425225	20	0	95	0	0	0	Fire Damage Check
+8623	32	3	35	0	0	8624	Eviscerate
+8623	32	4	1	0	0	8624	Eviscerate
+29228	60	0	410	0	0	0	Flame Shock
+447547	20	0	260	0	0	0	Flamestrike
+10467	52	0	305	0	0	0	Lesser Healing Wave
+11285	46	3	45	0	0	11286	Gouge
+8925	16	0	75	0	0	0	Moonfire
+3562	20	0	120	0	0	0	Teleport: Ironforge
+21850	60	0	1200	0	0	0	Gift of the Wild
+19977	40	0	85	0	0	0	Blessing of Light
+17313	44	0	135	0	0	0	Mind Flay
+17286	26	0	50	0	0	0	Crusader's Hammer
+8154	14	0	60	0	0	0	Stoneskin Totem
+18658	58	0	150	0	0	0	Hibernate
+8129	24	0	95	0	0	0	Mana Burn
+14286	52	0	160	0	0	0	Arcane Shot
+8512	32	0	115	0	0	0	Windfury Totem
+8019	16	0	50	0	0	0	Rockbiter Weapon
+8104	28	0	150	0	0	0	Mind Blast
+8492	34	0	290	0	0	0	Cone of Cold
+16170	1	0	10	2	0	0	Bloodlust
+2871	28	0	100	0	0	0	Nullify Disease
+462710	12	3	60	0	0	0	Backstab
+491	18	0	100	0	0	0	Khadgar's Unlocking
+15265	42	0	170	0	0	0	Holy Fire
+24942	20	0	90	0	0	0	Frostbolt
+9053	20	0	90	0	0	0	Fireball
+10586	46	0	500	0	0	0	Magma Totem
+11660	52	0	315	0	0	0	Shadow Bolt
+446361	20	0	90	0	0	0	Shadow Bolt
+415072	52	0	285	0	0	0	Exorcism
+6196	26	0	80	0	0	0	Far Sight
+8632	30	3	50	0	0	8633	Garrote
+3566	30	0	120	0	0	0	Teleport: Thunder Bluff
+6075	20	0	105	0	0	0	Renew
+143	6	0	45	0	0	0	Fireball
+13020	52	0	450	0	0	0	Blast Wave
+20816	20	0	90	0	0	0	Shadow Bolt
+10463	60	0	80	0	0	0	Healing Stream Totem
+1079	20	3	30	0	0	9492	Rip
+1079	20	4	1	0	0	9492	Rip
+1515	10	0	0	0	60	0	Tame Beast
+2362	36	0	500	0	0	0	Create Spellstone
+8316	24	0	90	0	0	8317	Fire Shield
+9829	46	3	60	0	0	9830	Shred
+407778	1	0	0	0	12	0	Divine Storm
+1238214	50	0	755	0	0	0	Wild Growth
+17434	20	0	90	0	0	0	Shadow Bolt
+1450	21	0	33	0	0	0	Arcane Spirit II
+2121	24	0	330	0	0	0	Flamestrike
+11420	50	0	850	0	0	0	Portal: Thunder Bluff
+10173	48	0	400	0	0	0	Dampen Magic
+27799	44	0	520	0	0	0	Holy Nova
+10260	36	-2	40	0	0	0	Reconstruct
+1161	26	1	50	0	0	0	Challenging Shout
+7290	1	0	10	2	0	0	Soul Siphon
+1513	14	0	35	0	0	0	Scare Beast
+6957	1	0	20	0	0	0	Frostmane Strength
+18099	20	0	75	0	0	0	Chill Nova
+1462	24	0	40	0	0	0	Beast Lore
+700	8	0	60	0	0	0	Sleep
+1769	58	3	25	0	0	0	Kick
+10328	46	0	465	0	0	0	Holy Light
+10197	46	0	280	0	0	0	Fire Blast
+10495	36	0	60	0	0	0	Mana Spring Totem
+20906	60	0	525	0	0	0	Trueshot Aura
+5589	40	0	75	0	0	0	Hammer of Justice
+8038	28	0	85	0	0	0	Frostbrand Weapon
+3657	32	0	50	0	0	0	Summon Spell Guard
+408507	1	0	0	0	1	0	Lava Lash
+24612	20	0	260	0	0	0	Flamestrike
+13813	34	0	275	0	0	0	Explosive Trap
+8835	42	0	155	0	0	0	Grace of Air Totem
+16387	58	0	275	0	0	0	Flametongue Totem
+25289	60	1	100	0	0	0	Battle Shout
+20660	40	1	150	0	0	20661	Execute
+31018	60	3	35	0	0	0	Ferocious Bite
+31018	60	4	1	0	0	0	Ferocious Bite
+29166	40	0	0	0	5	0	Innervate
+7802	38	0	70	0	0	11762	Firebolt
+14515	10	0	30	0	0	0	Dominate Mind
+6807	10	1	150	0	0	6808	Maul
+8052	18	0	95	0	0	0	Flame Shock
+11564	32	1	150	0	0	11565	Heroic Strike
+14868	20	0	75	0	0	0	Curse of Agony
+27637	20	0	250	0	0	0	Regrowth
+20831	20	0	150	0	0	0	Chain Lightning
+23894	60	1	300	0	0	0	Bloodthirst
+11734	50	0	1150	0	0	0	Demon Armor
+1742	5	2	15	0	0	1753	Cower
+20819	20	0	90	0	0	0	Frostbolt
+9433	38	0	330	0	0	0	Arcane Explosion
+23960	54	3	45	0	0	0	Test Strike R50
+11647	1	0	100	0	0	0	Power Word: Shield
+25306	60	0	410	0	0	0	Fireball
+6725	15	0	153	0	0	0	Flame Spike
+8650	36	3	25	0	0	11197	Expose Armor
+8650	36	4	1	0	0	11197	Expose Armor
+1672	52	1	100	0	0	0	Shield Bash
+6229	32	0	135	0	0	0	Shadow Ward
+24682	1	0	150	0	0	0	Forked Lightning
+21551	48	1	300	0	0	21552	Mortal Strike
+6343	6	1	200	0	0	8198	Thunder Clap
+1240774	56	0	380	0	0	0	Binding Heal
+25314	60	0	710	0	0	0	Greater Heal
+5615	36	0	180	0	0	0	Exorcism
+10181	56	0	260	0	0	0	Frostbolt
+10874	40	0	185	0	0	0	Mana Burn
+25315	60	0	410	0	0	0	Renew
+15286	30	0	40	0	0	0	Vampiric Embrace
+527	18	0	0	0	18	0	Dispel Magic
+20290	34	0	120	0	0	0	Seal of Righteousness
+11921	20	0	90	0	0	0	Fireball
+9438	34	0	75	0	0	0	Arcane Bubble
+18879	38	0	205	0	0	0	Siphon Life
+12845	45	0	110	0	0	0	Lesser Invisibility
+415073	60	0	345	0	0	0	Exorcism
+8413	38	0	220	0	0	0	Fire Blast
+774	4	0	25	0	0	0	Rejuvenation
+18796	45	0	45	0	0	0	Fireball
+1245324	20	0	150	0	0	0	Chain Lightning
+14871	20	0	400	0	0	0	Shadow Bolt Misfire
+11299	48	3	35	0	0	11300	Eviscerate
+11299	48	4	1	0	0	11300	Eviscerate
+11279	44	3	60	0	0	11280	Backstab
+7372	32	1	100	0	0	7373	Hamstring
+458856	1	0	0	0	61	0	Divine Light
+8289	38	0	210	0	0	0	Drain Soul
+19302	34	0	190	0	0	0	Starshards
+3017	0	0	10	0	0	0	Immune Effect (TEST)
+120	26	0	210	0	0	0	Cone of Cold
+17405	10	0	30	0	0	0	Domination
+1310503	60	0	445	0	0	0	Mark of the Wild
+13748	20	0	90	0	0	0	Arcane Bolt
+12039	20	0	215	0	0	0	Heal
+461633	58	0	160	0	0	0	Frostbrand Weapon
+10497	56	0	100	0	0	0	Mana Spring Totem
+20163	25	0	90	0	0	0	Seal of Fury
+8292	30	0	150	0	0	0	Chain Bolt
+8402	36	0	220	0	0	0	Fireball
+676	18	1	200	0	0	0	Disarm
+13787	20	0	275	20	0	0	Demon Armor
+8211	26	0	110	0	0	0	Chain Burn
+9876	58	0	315	0	0	0	Starfire
+20815	20	0	90	0	0	0	Fireball
+11597	58	1	150	0	0	0	Sunder Armor
+17952	46	0	900	0	0	0	Create Firestone
+18085	30	0	80	0	0	0	Frost Blast
+6365	40	0	110	0	0	0	Searing Totem
+9484	20	0	90	0	0	0	Shackle Undead
+1849	12	0	11	0	0	0	Beast Claws II
+11729	46	0	750	0	0	0	Create Healthstone
+15124	20	0	90	0	0	0	Arcane Bolt
+6146	40	0	180	0	0	0	Slow
+8676	18	3	60	0	0	8724	Ambush
+8936	12	0	70	0	0	0	Regrowth
+15407	20	0	45	0	0	0	Mind Flay
+1292152	0	0	18	0	0	0	Firebolt
+15969	20	0	65	0	0	0	Lash of Pain
+17740	20	0	40	0	0	0	Mana Shield
+7108	20	0	45	0	0	0	Moist Towelette
+16034	20	0	135	0	0	0	Shock
+420526	20	0	90	0	0	0	Frostbolt
+8450	24	0	200	0	0	0	Dampen Magic
+6222	14	0	55	0	0	0	Corruption
+1310785	48	0	365	0	0	0	Sniper Shot
+21668	58	0	100	0	0	0	Starfire
+6364	30	0	75	0	0	0	Searing Totem
+19274	50	0	190	0	0	0	Feedback
+8190	26	0	230	0	0	0	Magma Totem
+604	12	0	100	0	0	0	Dampen Magic
+20930	56	0	325	0	0	0	Holy Shock
+1265067	36	2	50	0	0	1265068	Savage Rend
+27567	20	0	150	0	0	0	Chain Lightning
+1122	50	0	0	0	100	0	Inferno
+9827	56	3	50	0	0	0	Pounce
+1754	25	2	15	0	0	1755	Cower
+14294	50	0	420	0	0	0	Volley
+8927	28	0	150	0	0	0	Moonfire
+8106	40	0	225	0	0	0	Mind Blast
+20825	20	0	90	0	0	0	Shadow Bolt
+411128	1	3	50	0	0	0	Swipe
+992	26	0	155	0	0	0	Shadow Word: Pain
+6390	18	0	30	0	0	0	Stoneclaw Totem
+1213480	1	0	40	0	0	0	Earthbind Totem
+21849	50	0	900	0	0	0	Gift of the Wild
+2137	14	0	75	0	0	0	Fire Blast
+5187	14	0	110	0	0	0	Healing Touch
+457848	1	0	75	0	0	0	Holy Strike
+6726	30	0	30	0	0	0	Silence
+6495	34	0	65	0	0	0	Sentry Totem
+19725	20	0	75	0	0	0	Turn Undead
+9750	42	0	305	0	0	0	Regrowth
+9749	42	0	95	0	0	0	Faerie Fire
+15665	20	0	110	0	0	0	Fireball
+3109	35	0	75	0	0	0	Presence of Death
+6546	10	1	100	0	0	6547	Rend
+8458	40	0	195	0	0	0	Fire Ward
+2947	14	0	60	0	0	8316	Fire Shield
+27530	20	0	500	0	0	0	Hurricane
+10180	50	0	225	0	0	0	Frostbolt
+10140	60	0	780	0	0	0	Conjure Water
+5782	8	0	0	0	15	0	Fear
+16828	8	2	25	0	0	16829	Claw
+5234	30	0	160	0	0	0	Mark of the Wild
+5487	10	0	0	0	55	9634	Bear Form
+21162	63	0	45	0	0	0	Fireball
+6728	10	0	19	0	0	0	Enveloping Winds
+8910	40	0	195	0	0	0	Rejuvenation
+22414	20	0	90	0	0	0	Lightning Bolt
+15090	20	0	75	0	0	0	Dispel Magic
+20679	62	0	150	0	0	0	Fire Blast
+436429	20	0	400	0	0	0	Gift of the Sun
+17259	40	2	35	0	0	17260	Bite
+1823	34	3	40	0	0	1824	Rake
+6065	30	0	210	0	0	0	Power Word: Shield
+16	1	0	56	0	0	0	Fear (NYI)
+1265040	36	2	25	0	0	1265041	Tendon Rip
+403619	1	0	0	0	28	0	Fel Armor
+24603	40	2	60	0	0	24597	Furious Howl
+14053	30	0	95	0	0	0	Heal
+16831	32	2	25	0	0	16832	Claw
+20066	20	0	60	0	0	0	Repentance
+425893	20	0	95	0	0	0	Grease-Matted Fur
+5171	10	3	25	0	0	6774	Slice and Dice
+5171	10	4	1	0	0	6774	Slice and Dice
+28478	20	0	200	0	0	0	Frostbolt
+10059	40	0	850	0	0	0	Portal: Stormwind
+17715	20	0	200	0	0	0	Consuming Shadows
+7811	40	0	90	0	0	11774	Torment
+6127	30	0	285	0	0	0	Conjure Water
+24975	40	0	100	0	0	0	Insect Swarm
+16588	20	0	215	0	0	0	Dark Mending
+6742	1	0	10	2	0	0	Bloodlust
+19308	28	0	85	0	0	0	Shadowguard
+22	0	0	10	0	0	0	Super Food (TEST)
+11740	52	0	255	0	0	0	Shadow Ward
+15453	20	0	120	0	0	0	Arcane Explosion
+6490	0	0	30	0	0	0	Sarilus's Elementals
+10395	48	0	440	0	0	0	Healing Wave
+10479	54	0	180	0	0	0	Frost Resistance Totem
+133	1	0	30	0	0	0	Fireball
+5588	24	0	50	0	0	0	Hammer of Justice
+14034	20	0	90	0	0	0	Fireball
+23099	30	2	20	0	0	23109	Dash
+13527	28	0	20	0	0	0	Lightning Bolt
+6353	48	0	305	0	0	0	Soul Fire
+461695	30	0	80	0	0	0	Firebolt
+1953	20	0	0	0	35	0	Blink
+23920	64	1	150	0	0	0	Spell Reflection
+17738	8	0	0	0	10	0	Curse of the Plague Rat
+7806	15	0	75	0	0	0	Flameblade
+20678	62	0	250	0	0	0	Fireball
+20162	12	0	40	0	0	0	Seal of the Crusader
+24680	20	0	150	0	0	0	Chain Lightning
+6143	22	0	85	0	0	0	Frost Ward
+1277335	60	0	225	0	0	0	Chastise
+19750	20	0	35	0	0	0	Flash of Light
+19816	20	0	90	0	0	0	Fireball
+17140	20	0	115	0	0	0	Holy Fire
+5394	20	0	40	0	0	0	Healing Stream Totem
+13809	28	0	60	0	0	0	Frost Trap
+1096	25	0	34	0	0	0	Firebolt IV
+20665	20	0	280	0	0	0	Regrowth
+2096	22	0	65	0	0	0	Mind Vision
+412510	1	0	0	0	45	0	Mass Regeneration
+543	20	0	85	0	0	0	Fire Ward
+12470	20	0	95	0	0	0	Fire Nova
+14875	20	0	75	0	0	0	Curse of Agony
+408696	1	0	0	0	8	0	Spirit of the Alpha
+8439	38	0	250	0	0	0	Arcane Explosion
+24423	8	2	20	0	0	24577	Demoralizing Screech
+11567	56	1	150	0	0	25286	Heroic Strike
+18108	60	0	45	0	0	0	Fireball
+14902	20	3	60	0	0	0	Cheap Shot
+14274	20	0	30	0	0	0	Distracting Shot
+2652	10	0	25	0	0	0	Touch of Weakness
+12040	20	0	10	8	0	0	Shadow Shield
+20830	20	0	110	0	0	0	Mind Blast
+10157	56	0	1510	0	0	0	Arcane Intellect
+5144	16	0	140	0	0	0	Arcane Missiles
+16570	20	0	90	0	0	0	Charged Arcane Bolt
+27870	50	0	295	0	0	0	Lightwell
+13552	34	0	115	0	0	0	Serpent Sting
+9487	5	0	30	0	0	0	Fireball
+507	17	0	16	0	0	0	Fumble II
+13953	1	0	75	0	0	0	Holy Strike
+1235317	0	0	95	0	0	0	Immolate
+7621	27	0	75	0	0	0	Arugal's Curse
+15346	30	0	95	0	0	0	Seal of Reckoning
+3029	28	3	45	0	0	5201	Claw
+13903	36	0	60	0	0	0	Seal of Sacrifice
+398198	10	3	20	0	0	0	Storm of Swords
+398198	10	4	1	0	0	0	Storm of Swords
+1289530	20	0	75	0	0	0	Wrath
+22945	0	0	150	0	0	0	Forked Lightning
+8949	26	0	135	0	0	0	Starfire
+1310786	58	0	365	0	0	0	Sniper Shot
+324	8	0	45	0	0	0	Lightning Shield
+446301	22	0	100	0	0	0	Conceptualize Dreamscapes
+1248152	20	0	90	0	0	0	Lightning Bolt
+1304398	0	0	50	0	0	0	Arcane Explosion
+8988	30	0	30	0	0	0	Silence
+943	26	0	85	0	0	0	Lightning Bolt
+707	10	0	45	0	0	0	Immolate
+19838	52	0	110	0	0	0	Blessing of Might
+1453	40	0	49	0	0	0	Arcane Spirit V
+1464	30	1	150	0	0	8820	Slam
+22884	60	0	210	0	0	0	Psychic Scream
+6375	30	0	50	0	0	0	Healing Stream Totem
+10605	56	0	485	0	0	0	Chain Lightning
+10880	34	0	0	0	75	0	Resurrection
+9493	36	3	30	0	0	9752	Rip
+9493	36	4	1	0	0	9752	Rip
+1449	14	0	75	0	0	0	Arcane Explosion
+25010	36	2	50	0	0	25011	Lightning Breath
+1319632	20	0	150	0	0	0	Holy Light
+7810	30	0	65	0	0	7811	Torment
+10496	46	0	80	0	0	0	Mana Spring Totem
+429823	25	0	0	0	15	0	Moonfire
+20904	60	0	310	0	0	0	Aimed Shot
+1050	39	0	28	0	0	0	Sacrifice
+435849	25	0	350	0	0	0	Conjure Comprehension Charms
+415336	8	0	25	0	0	0	Raptor Strike
+461826	48	1	200	0	0	0	Thunder Clap
+8455	30	0	250	0	0	0	Amplify Magic
+18164	20	0	90	0	0	0	Shadow Bolt
+10595	30	0	75	0	0	0	Nature Resistance Totem
+339	8	0	50	0	0	0	Entangling Roots
+10139	50	0	585	0	0	0	Conjure Water
+407632	40	0	0	0	6	0	Hammer of the Righteous
+1126	1	0	20	0	0	0	Mark of the Wild
+11735	60	0	1580	0	0	0	Demon Armor
+131	22	0	50	0	0	0	Water Breathing
+8649	26	3	25	0	0	8650	Expose Armor
+8649	26	4	1	0	0	8650	Expose Armor
+8946	14	0	0	0	16	0	Cure Poison
+1064	40	0	260	0	0	0	Chain Heal
+7809	20	0	40	0	0	7810	Torment
+710	28	0	100	0	0	0	Banish
+17289	20	0	135	0	0	0	Shadow Shock
+17256	16	2	35	0	0	17257	Bite
+6360	22	0	30	0	0	7813	Soothing Kiss
+18111	30	0	40	0	0	0	Shadow Bolt
+9907	54	0	115	0	0	0	Faerie Fire
+12491	20	0	145	0	0	0	Healing Wave
+11770	44	0	140	0	0	11771	Fire Shield
+11668	60	0	370	0	0	0	Immolate
+440802	1	0	0	0	11	0	Frozen Orb
+12826	60	0	150	0	0	0	Polymorph
+14145	20	0	120	0	0	0	Fire Blast
+18657	38	0	120	0	0	0	Hibernate
+10431	48	0	305	0	0	0	Lightning Shield
+23893	54	1	300	0	0	23894	Bloodthirst
+2912	20	0	95	0	0	0	Starfire
+10900	54	0	425	0	0	0	Power Word: Shield
+8435	1	0	150	0	0	0	Forked Lightning
+2606	12	0	80	0	0	0	Shock
+1978	4	0	15	0	0	0	Serpent Sting
+8633	38	3	50	0	0	11289	Garrote
+6305	18	0	25	0	0	0	Flame Burst
+509	18	0	16	0	0	0	Feeblemind II
+2495	36	0	16	0	0	0	Holy Strike
+15605	20	0	135	0	0	0	Shock
+12526	54	0	385	0	0	0	Pyroblast
+17139	20	0	110	5	0	0	Power Word: Shield
+25296	60	0	120	0	0	0	Aspect of the Hawk
+19260	30	0	80	0	0	0	Frost Blast
+7960	4	0	60	0	0	0	Scry on Azrethoc
+8401	30	0	185	0	0	0	Fireball
+1038	26	0	0	0	8	0	Blessing of Salvation
+1310911	40	0	730	0	0	0	Light's Vigil
+58	0	0	10	0	0	0	Magic Missile (TEST)
+7815	28	0	80	0	0	7816	Lash of Pain
+8030	26	0	80	0	0	0	Flametongue Weapon
+9488	10	0	45	0	0	0	Fireball
+22661	60	0	150	0	0	0	Enervate
+20915	30	0	110	0	0	0	Seal of Command
+1232740	0	0	215	0	0	0	Heal
+78156	0	0	0	0	2	0	Tremor Totem
+885	99	0	200	0	0	0	Invisibility
+6552	38	1	100	0	0	6554	Pummel
+18671	20	0	50	0	0	0	Curse of Agony
+1240827	60	0	390	0	0	0	Prayer of Mending
+7128	20	0	65	0	0	0	Inner Fire
+7801	28	0	50	0	0	7802	Firebolt
+1062	18	0	65	0	0	0	Entangling Roots
+8232	30	0	90	0	0	0	Windfury Weapon
+460698	34	0	605	0	0	0	Rain of Fire
+9839	46	0	235	0	0	0	Rejuvenation
+5232	10	0	50	0	0	0	Mark of the Wild
+15784	1	0	10	5	0	0	Frost Armor
+1271521	20	0	90	0	0	0	Lightning Bolt
+24022	0	0	315	0	0	0	Cleanse Nova
+429827	25	0	0	0	15	0	Shock
+17172	30	0	300	0	0	0	Hex
+2893	26	0	0	0	16	0	Abolish Poison
+6572	14	1	50	0	0	6574	Revenge
+19273	40	0	140	0	0	0	Feedback
+14316	44	0	395	0	0	0	Explosive Trap
+1220854	0	0	90	0	0	0	Frostbolt
+414684	1	0	0	0	21	0	Sunfire
+18960	10	0	120	0	0	0	Teleport: Moonglade
+775	44	0	0	0	20	0	Tree Form
+853	8	0	30	0	0	0	Hammer of Justice
+17165	20	0	60	0	0	0	Mind Flay
+11269	58	3	60	0	0	0	Ambush
+22128	20	0	105	0	0	0	Thorns
+20695	0	0	100	0	0	0	Holy Smite
+6762	24	3	35	0	0	8623	Eviscerate
+6762	24	4	1	0	0	8623	Eviscerate
+10438	60	0	170	0	0	0	Searing Totem
+429151	1	0	0	0	12	0	Hammer of Wrath
+10478	38	0	120	0	0	0	Frost Resistance Totem
+11975	20	0	120	0	0	0	Arcane Explosion
+9035	10	0	35	0	0	0	Hex of Weakness
+8722	20	0	0	0	100	0	Summon Succubus
+693	18	0	0	0	85	0	Create Soulstone
+19266	60	0	195	0	0	0	Touch of Weakness
+14261	16	0	35	0	0	0	Raptor Strike
+18223	0	0	0	0	8	0	Curse of Exhaustion
+1776	6	3	45	0	0	1777	Gouge
+1088	20	0	110	0	0	0	Shadow Bolt
+10216	56	0	990	0	0	0	Flamestrike
+9915	40	0	115	0	0	0	Frost Nova
+16697	55	2	15	0	0	0	Cower
+8416	32	0	320	0	0	0	Arcane Missiles
+16412	45	0	45	0	0	0	Fireball
+25012	60	2	50	0	0	0	Lightning Breath
+8950	34	0	180	0	0	0	Starfire
+17919	26	0	68	0	0	0	Searing Pain
+8629	32	3	45	0	0	11285	Gouge
+1310197	30	1	150	0	0	0	Slam
+1680	36	1	250	0	0	0	Whirlwind
+1086	30	0	520	0	0	0	Demon Armor
+403688	46	0	480	0	0	0	Drain Life
+8823	99	0	40	0	0	0	Crusader Strike
+440658	1	0	0	0	6	0	Shield of Righteousness
+2565	16	1	100	0	0	0	Shield Block
+409593	1	0	0	0	3	0	Kill Shot
+21335	20	0	105	0	0	0	Thorns
+8010	36	0	185	0	0	0	Lesser Healing Wave
+462720	34	3	60	0	0	0	Ambush
+781	20	0	50	0	0	0	Disengage
+1213268	58	0	60	0	0	0	Hunter's Mark
+19777	62	0	250	0	0	0	Dark Strike
+2354	30	0	23	0	0	0	Sanctuary III
+11268	50	3	60	0	0	11269	Ambush
+65	12	0	14	0	0	0	Haste
+10219	50	0	410	0	0	0	Ice Armor
+18398	30	0	80	0	0	0	Frost Blast
+412113	1	0	0	0	10	0	Remove Greater Curse
+15798	20	0	95	0	0	0	Moonfire
+7288	1	0	10	0	0	0	Immolate Cumulative (TEST)
+1014	18	0	50	0	0	0	Bane of Agony
+11445	35	0	0	0	10	0	Bone Armor
+1256141	0	0	250000	0	0	0	Allstrike
+400616	22	0	115	0	0	0	Fire Blast
+602	30	0	105	0	0	0	Inner Fire
+434842	45	0	20	0	0	0	Lightning Bolt
+25292	60	0	660	0	0	0	Holy Light
+10312	44	0	235	0	0	0	Exorcism
+9912	54	0	120	0	0	0	Wrath
+15968	20	0	65	0	0	0	Lash of Pain
+6673	1	1	100	0	0	5242	Battle Shout
+457	6	0	9	0	0	0	Feeblemind
+982	10	0	0	0	100	0	Revive Pet
+14752	30	0	285	0	0	0	Divine Spirit
+18137	20	0	50	0	0	0	Shadowguard
+2484	6	0	0	0	6	0	Earthbind Totem
+410	17	0	23	0	0	0	Shadowskin II
+699	22	0	85	0	0	0	Drain Life
+11708	52	0	175	0	0	0	Curse of Weakness
+20694	0	0	315	0	0	0	Holy Nova
+417061	28	0	135	0	0	0	Rejuvenation
+550	26	0	100	0	0	0	Nullify Poison
+3009	56	2	25	0	0	0	Claw
+12746	10	0	0	0	100	0	Summon Voidwalker
+6217	28	0	90	0	0	0	Bane of Agony
+348	1	0	25	0	0	0	Immolate
+19285	60	0	240	0	0	0	Hex of Weakness
+724	40	0	225	0	0	0	Lightwell
+6787	42	3	60	0	0	9866	Ravage
+1130	6	0	15	0	0	0	Hunter's Mark
+403	1	0	15	0	0	0	Lightning Bolt
+6192	22	1	100	0	0	11549	Battle Shout
+20826	20	0	95	0	0	0	Immolate
+7814	20	0	65	0	0	7815	Lash of Pain
+529	8	0	30	0	0	0	Lightning Bolt
+16832	40	2	25	0	0	3010	Claw
+15111	46	0	170	0	0	0	Windwall Totem
+8598	18	0	90	0	0	0	Lightning Blast
+689	14	0	55	0	0	0	Drain Life
+412214	20	0	85	0	0	0	Fire Ward
+585	1	0	20	0	0	0	Smite
+1220747	14	0	85	0	0	0	Earth Shock
+10890	56	0	210	0	0	0	Psychic Scream
+11267	42	3	60	0	0	11268	Ambush
+528	14	0	0	0	15	0	Cure Disease
+26097	20	0	145	0	0	0	Healing Wave
+24274	52	0	360	0	0	0	Hammer of Wrath
+425269	14	0	65	0	0	0	Renew
+1044	18	0	0	0	10	0	Blessing of Freedom
+10951	50	0	235	0	0	0	Inner Fire
+586	8	0	40	0	0	0	Fade
+6761	16	3	35	0	0	6762	Eviscerate
+6761	16	4	1	0	0	6762	Eviscerate
+1293693	50	0	200	0	0	0	Haunt
+1245338	0	0	0	0	20	0	Feral Spirit
+13442	30	0	18	0	0	0	Firebolt
+548	14	0	45	0	0	0	Lightning Bolt
+6213	32	0	0	0	15	0	Fear
+17751	48	0	450	0	0	17752	Suffering
+2091	28	0	135	0	0	0	Rejuvenation
+9485	40	0	120	0	0	0	Shackle Undead
+68	0	0	10	0	0	0	Editor Test Spell
+678	12	0	9	0	0	0	Holy Strike
+1308568	4	0	90	0	0	0	Rejuvenation
+9373	1	0	10	2	0	0	Soul Siphon
+594	10	0	50	0	0	0	Shadow Word: Pain
+10952	60	0	315	0	0	0	Inner Fire
+450086	60	0	3400	0	0	0	Prayer of Fortitude
+778	30	0	75	0	0	0	Faerie Fire
+417060	22	0	105	0	0	0	Rejuvenation
+11604	46	1	150	0	0	11605	Slam
+26	0	0	10	0	0	0	Bind Self (TEST)
+20813	20	0	260	0	0	0	Flamestrike
+17615	20	0	95	0	0	0	Mana Burn
+425121	1	0	0	0	3	0	Icy Veins
+13381	20	0	260	0	0	0	Torch
+10212	56	0	595	0	0	0	Arcane Missiles
+1214290	1	0	95	0	0	0	Idol of Health
+18399	20	0	260	0	0	0	Flamestrike
+24	0	0	10	0	0	0	Major Heal Self (TEST)
+772	4	1	100	0	0	6546	Rend
+19311	52	0	200	0	0	0	Shadowguard
+271	1	0	7	1	0	0	Call of the Void
+6346	20	0	100	0	0	0	Fear Ward
+116	4	0	25	0	0	0	Frostbolt
+17735	24	0	150	0	0	17750	Suffering
+437169	60	0	0	0	12	0	Portal of Summoning
+10201	46	0	315	0	0	0	Arcane Explosion
+14265	48	0	85	0	0	0	Raptor Strike
+2626	33	0	79	0	0	0	Lightning Bolt Proc V
+12248	0	0	0	0	10	0	Amplify Damage
+10961	60	0	1030	0	0	0	Prayer of Healing
+1265056	30	2	20	0	0	1265057	Mine!
+21562	48	0	2600	0	0	0	Prayer of Fortitude
+603	60	0	300	0	0	0	Bane of Doom
+20901	36	0	160	0	0	0	Aimed Shot
+16316	54	0	150	0	0	0	Rockbiter Weapon
+17439	20	0	135	0	0	0	Shadow Shock
+14109	28	0	20	0	0	0	Lightning Bolt
+1066	16	0	0	0	20	0	Aquatic Form
+709	30	0	135	0	0	0	Drain Life
+8627	4	3	10	0	0	0	Backstab (TEST)
+1543	32	0	50	0	0	0	Flare
+5188	20	0	190	0	0	0	Healing Touch
+20777	60	0	0	0	90	0	Ancestral Spirit
+968	40	0	33	0	0	0	Feral Spirit II
+414687	1	1	200	0	0	0	Sunfire
+984	22	0	95	0	0	0	Smite
+17920	34	0	91	0	0	0	Searing Pain
+1240045	42	0	105	0	0	0	Ice Lance
+5605	10	0	30	3	0	0	Healing Ward
+8362	1	0	5	5	0	0	Renew
+20827	20	0	260	0	0	0	Flamestrike
+469059	1	0	0	0	7	0	Prismatic Bolt
+1758	14	3	45	0	0	1759	Sinister Strike
+9888	50	0	630	0	0	0	Healing Touch
+1293020	60	0	250	0	0	0	Hydra Shot
+8246	26	0	150	0	0	0	Lightning Bolt
+18503	30	0	120	0	0	0	Hex
+2136	6	0	40	0	0	0	Fire Blast
+23039	20	0	120	0	0	0	Blast Wave
+25298	60	0	340	0	0	0	Starfire
+690	9	0	18	0	0	0	Firebolt II
+1082	20	3	45	0	0	3029	Claw
+1833	26	3	60	0	0	0	Cheap Shot
+23202	20	0	260	0	0	0	Torch
+1460	14	0	185	0	0	0	Arcane Intellect
+635	1	0	35	0	0	0	Holy Light
+10881	46	0	0	0	75	0	Resurrection
+3662	36	0	225	0	0	0	Mend Pet
+10941	50	0	225	0	0	0	Fade
+6141	28	0	520	0	0	0	Blizzard
+462709	4	3	60	0	0	0	Backstab
+591	6	0	30	0	0	0	Smite
+9841	58	0	335	0	0	0	Rejuvenation
+1240721	50	0	270	0	0	0	Penance
+16568	20	0	60	0	0	0	Mind Flay
+553	60	0	29	0	0	0	Bloodlust II
+462580	60	0	75	0	0	0	Wrath
+6358	26	0	0	0	24	0	Seduction
+25291	60	0	130	0	0	0	Blessing of Might
+19656	48	0	135	0	0	19660	Tainted Blood
+8924	10	0	50	0	0	0	Moonfire
+21141	60	0	40	0	0	0	Shadow Bolt
+9734	20	0	75	0	0	0	Holy Smite
+13857	20	0	400	0	0	0	Prayer of Healing
+1311656	18	0	60	0	0	0	Seal of Fury
+24209	1	0	215	0	0	0	Great Heal
+18376	20	0	100	0	0	0	Corruption
+1237312	50	0	285	0	0	0	Frostfire Bolt
+18870	48	0	305	0	0	0	Shadowburn
+9758	44	0	520	0	0	0	Healing Touch
+5740	20	0	295	0	0	0	Rain of Fire
+101	12	3	15	0	0	0	Trip
+589	4	0	25	0	0	0	Shadow Word: Pain
+1237948	24	0	0	0	75	0	Revive
+1240046	48	0	120	0	0	0	Ice Lance
+8227	28	0	90	0	0	0	Flametongue Totem
+10600	44	0	120	0	0	0	Nature Resistance Totem
+8012	32	0	0	0	10	0	Purge
+1236174	0	0	0	0	10	0	Polymorph
+1459	1	0	60	0	0	0	Arcane Intellect
+6366	28	0	500	0	0	0	Create Firestone
+10947	58	0	350	0	0	0	Mind Blast
+8905	46	0	100	0	0	0	Wrath
+10934	54	0	280	0	0	0	Smite
+1714	26	0	80	0	0	0	Curse of Tongues
+10399	24	0	75	0	0	0	Rockbiter Weapon
+2645	20	0	100	0	0	0	Ghost Wolf
+1304401	30	0	30	0	0	0	Silence
+547	12	0	80	0	0	0	Healing Wave
+25288	60	1	50	0	0	0	Revenge
+13441	30	0	80	0	0	0	Firebolt
+14251	0	3	10	0	0	0	Riposte
+19278	44	0	645	0	0	0	Devouring Plague
+447548	20	0	200	0	0	0	Twisted Tranquility
+10437	50	0	145	0	0	0	Searing Totem
+19296	18	0	85	0	0	0	Starshards
+23848	60	1	300	0	0	0	Test Strike W50
+9823	46	3	50	0	0	9827	Pounce
+8046	24	0	145	0	0	0	Earth Shock
+16102	20	0	260	0	0	0	Flamestrike
+16430	1	0	10	2	0	0	Soul Tap
+20603	20	0	135	0	0	0	Shadow Shock
+458371	1	0	35	0	0	0	Divine Protection
+2649	1	2	15	0	0	14916	Growl
+740	30	0	375	0	0	0	Tranquility
+11784	46	0	75	0	0	11785	Soothing Kiss
+8955	38	0	75	0	0	0	Soothe Animal
+857	30	0	220	0	0	0	Khadgar's Unlocking
+10892	42	0	305	0	0	0	Shadow Word: Pain
+691	30	0	0	0	100	0	Summon Felhunter
+25890	60	0	260	0	0	0	Greater Blessing of Light
+8926	22	0	105	0	0	0	Moonfire
+415338	24	0	45	0	0	0	Raptor Strike
+959	32	0	265	0	0	0	Healing Wave
+697	10	0	0	0	100	0	Summon Voidwalker
+712	20	0	0	0	100	0	Summon Succubus
+10797	10	0	50	0	0	0	Starshards
+10150	54	0	350	0	0	0	Fireball
+8399	20	0	80	0	0	0	Sleep
+14819	50	0	785	0	0	0	Divine Spirit
+6774	42	3	25	0	0	0	Slice and Dice
+6774	42	4	1	0	0	0	Slice and Dice
+1463	20	0	40	0	0	0	Mana Shield
+14303	36	0	135	0	0	0	Immolation Trap
+457569	28	0	100	0	0	0	Banish
+285	16	1	150	0	0	1608	Heroic Strike
+415071	44	0	235	0	0	0	Exorcism
+895	40	0	37	0	0	0	Fire Elemental
+284	8	1	150	0	0	285	Heroic Strike
+8033	20	0	60	0	0	0	Frostbrand Weapon
+6548	30	1	100	0	0	11572	Rend
+9856	48	0	370	0	0	0	Regrowth
+1943	20	3	25	0	0	8639	Rupture
+1943	20	4	1	0	0	8639	Rupture
+17273	20	0	130	0	0	0	Pyroblast
+10337	99	0	90	0	0	0	Crusader Strike
+1316995	60	0	355	0	0	0	Penance
+16810	18	0	65	0	0	0	Nature's Grasp
+1452	35	0	41	0	0	0	Arcane Spirit IV
+1229228	0	3	50	0	0	0	Pounce
+713	20	0	0	0	100	0	Summon Incubus
+996	40	0	560	0	0	0	Prayer of Healing
+332	6	0	45	0	0	0	Healing Wave
+1056	60	0	51	0	0	0	Slow Poison II
+1022	10	0	25	0	0	0	Blessing of Protection
+11392	47	0	31	0	0	0	Invisibility
+1256147	0	0	250000	0	0	0	Allstrike
+10587	56	0	650	0	0	0	Magma Totem
+10160	50	0	465	0	0	0	Cone of Cold
+768	20	0	0	0	55	0	Cat Form
+10466	44	0	235	0	0	0	Lesser Healing Wave
+20829	20	0	90	0	0	0	Arcane Bolt
+1220746	8	0	50	0	0	0	Earth Shock
+1766	12	3	25	0	0	1767	Kick
+8018	8	0	25	0	0	0	Rockbiter Weapon
+428741	1	0	0	0	28	0	Molten Armor
+5505	10	0	105	0	0	0	Conjure Water
+26226	10	2	40	0	0	0	Widow Bite
+429838	64	0	0	0	14	0	Incinerate
+19277	36	0	495	0	0	0	Devouring Plague
+15585	20	0	400	0	0	0	Prayer of Healing
+8361	26	0	40	0	0	0	Purity
+16409	30	0	40	0	0	0	Shadow Bolt
+1084	17	0	26	0	0	0	Firebolt III
+461084	1	0	0	0	4	0	Duke's Domain
+20794	20	0	260	0	0	0	Flamestrike
+402792	1	0	0	0	20	0	Curse of the Elements
+8004	20	0	105	0	0	0	Lesser Healing Wave
+18540	60	0	0	0	100	0	Ritual of Doom
+7371	1	2	35	0	0	26177	Charge
+5201	38	3	45	0	0	9849	Claw
+4	0	0	10	0	0	0	Word of Recall Other
+17	6	0	45	0	0	0	Power Word: Shield
+31016	60	3	35	0	0	0	Eviscerate
+31016	60	4	1	0	0	0	Eviscerate
+14518	20	0	40	2	0	0	Crusader Strike
+849	25	0	35	0	0	0	Elemental Armor
+15242	20	0	90	0	0	0	Fireball
+15245	20	0	160	0	0	0	Shadow Bolt Volley
+785	0	0	260	0	0	0	True Fulfillment
+7369	30	1	200	0	0	11608	Cleave
+18871	56	0	365	0	0	0	Shadowburn
+78159	0	0	0	0	11	0	Windfury Totem
+9000	40	3	20	0	0	9892	Cower
+19503	30	0	0	0	8	0	Scatter Shot
+412019	1	0	0	0	12	0	Sacred Shield
+24452	40	2	40	0	0	24453	Prowl
+467	6	0	35	0	0	0	Thorns
+27746	0	0	10	0	0	0	Nitrous Boost
+364163	50	0	340	0	0	0	Mark of the Wild
+28479	20	0	300	0	0	0	Frostbolt
+15586	20	0	215	0	0	0	Heal
+1755	35	2	15	0	0	1756	Cower
+11824	20	0	135	0	0	0	Shock
+10186	52	0	1160	0	0	0	Blizzard
+915	20	0	60	0	0	0	Lightning Bolt
+3655	32	0	50	0	0	0	Summon Shield Guard
+8293	1	0	100	0	0	0	Lightning Cloud
+1264501	48	2	20	0	0	1264502	Swipe
+7933	0	0	60	0	0	0	Strong Anti-Venom
+20423	58	0	200	0	0	0	Seal of Fury
+9747	42	1	100	0	0	9898	Demoralizing Roar
+462717	60	3	60	0	0	0	Backstab
+14818	40	0	420	0	0	0	Divine Spirit
+1310200	54	1	150	0	0	0	Slam
+6778	32	0	350	0	0	0	Healing Touch
+18869	40	0	245	0	0	0	Shadowburn
+688	1	0	0	0	80	0	Summon Imp
+14103	45	0	18	0	0	0	Firebolt
+22566	30	0	120	0	0	0	Hex
+25024	0	0	30	0	0	0	Drop Mine
+6756	20	0	100	0	0	0	Mark of the Wild
+6772	30	3	15	0	0	0	Trip
+3043	22	0	0	0	9	0	Scorpid Sting
+14105	30	0	80	0	0	0	Frost Blast
+11683	42	0	975	0	0	0	Hellfire
+415069	28	0	135	0	0	0	Exorcism
+8376	29	0	95	0	0	0	Earthgrab Totem
+13819	40	0	100	0	0	0	Summon Warhorse
+10442	52	0	225	0	0	0	Strength of Earth Totem
+8045	14	0	85	0	0	0	Earth Shock
+17926	58	0	600	0	0	0	Death Coil
+8105	34	0	185	0	0	0	Mind Blast
+14318	18	0	35	0	0	0	Aspect of the Hawk
+8277	4	0	30	0	0	0	Voodoo Hex
+13585	1	0	5	5	0	0	Lightning Shield
+5108	3	0	32	5	0	0	Voidwalker
+13554	50	0	190	0	0	0	Serpent Sting
+2070	28	3	65	0	0	11297	Sap
+17771	20	0	75	0	0	0	Curse of Agony
+5138	24	0	95	0	0	0	Drain Mana
+23162	30	2	20	0	0	0	Harass
+2643	18	0	0	0	13.9	0	Multi-Shot
+939	24	0	200	0	0	0	Healing Wave
+8444	28	0	65	0	0	0	Scorch
+1244	12	0	155	0	0	0	Power Word: Fortitude
+8204	28	1	200	0	0	8205	Thunder Clap
+20811	20	0	90	0	0	0	Fireball
+29163	4	0	25	0	0	0	Copy of Frostbolt
+2008	12	0	0	0	90	0	Ancestral Spirit
+7641	36	0	210	0	0	0	Shadow Bolt
+21082	6	0	25	0	0	0	Seal of the Crusader
+11555	44	1	100	0	0	11556	Demoralizing Shout
+8122	14	0	100	0	0	0	Psychic Scream
+5242	12	1	100	0	0	6192	Battle Shout
+9552	34	0	185	0	0	0	Searing Flames
+1256148	0	0	250000	0	0	0	Allstrike
+10148	42	0	260	0	0	0	Fireball
+11672	54	0	290	0	0	0	Corruption
+10308	54	0	100	0	0	0	Hammer of Justice
+6064	34	0	305	0	0	0	Heal
+11775	60	0	145	0	0	0	Torment
+10225	60	0	320	0	0	0	Fire Ward
+10942	60	0	275	0	0	0	Fade
+1239697	40	0	0	0	15	0	Arcane Blast
+428885	1	0	0	0	11	0	Temporal Anomaly
+11763	58	0	115	0	0	0	Firebolt
+17951	36	0	700	0	0	0	Create Firestone
+15038	20	0	65	0	0	0	Scorching Totem
+19731	38	0	130	0	0	19734	Devour Magic
+10138	40	0	420	0	0	0	Conjure Water
+20307	42	0	125	0	0	0	Seal of the Crusader
+8938	18	0	125	0	0	0	Regrowth
+7384	12	1	50	0	0	7887	Overpower
+7384	12	4	1	0	0	7887	Overpower
+429687	10	0	30	0	0	0	Dominate Mind
+13165	10	0	20	0	0	0	Aspect of the Hawk
+1094	20	0	90	0	0	0	Immolate
+12739	20	0	90	0	0	0	Shadow Bolt
+556	30	0	150	0	0	0	Astral Recall
+1461	28	0	520	0	0	0	Arcane Intellect
+12557	20	0	120	0	0	0	Cone of Cold
+711	20	0	25	0	0	0	Hellfire
+13752	45	0	55	0	0	0	Faerie Fire
+10313	52	0	285	0	0	0	Exorcism
+429765	1	1	200	0	0	0	Quick Strike
+400613	1	0	0	0	22	0	Living Bomb
+99	10	1	100	0	0	1735	Demoralizing Roar
+1124	28	0	27	0	0	0	Hellfire II
+8462	42	0	195	0	0	0	Frost Ward
+15263	30	0	125	0	0	0	Holy Fire
+10332	52	0	19	0	0	0	Holy Strike
+1152	8	0	0	0	8	0	Purify
+462726	22	3	50	0	0	0	Garrote
+5185	1	0	25	0	0	0	Healing Touch
+17203	20	0	90	0	0	0	Fireball Volley
+851	40	0	200	0	0	0	Polymorph: Sheep
+879	20	0	85	0	0	0	Exorcism
+8461	32	0	135	0	0	0	Frost Ward
+7807	25	0	150	0	0	0	Flameblade
+26187	40	2	60	0	0	26188	Thunderstomp
+11739	42	0	195	0	0	0	Shadow Ward
+11762	48	0	95	0	0	11763	Firebolt
+436516	1	0	0	0	24	0	Chronostatic Preservation
+6201	10	0	95	0	0	0	Create Healthstone
+3140	18	0	95	0	0	0	Fireball
+14305	56	0	245	0	0	0	Immolation Trap
+1220749	36	0	240	0	0	0	Earth Shock
+7813	34	0	50	0	0	11784	Soothing Kiss
+15253	20	0	120	0	0	0	Arcane Explosion
+642	34	0	75	0	0	0	Divine Shield
+14287	60	0	190	0	0	0	Arcane Shot
+15266	48	0	200	0	0	0	Holy Fire
+1495	16	0	30	0	0	0	Mongoose Bite
+20823	20	0	90	0	0	0	Fireball
+7302	30	0	240	0	0	0	Ice Armor
+1264481	48	2	80	0	0	0	Sonic Blast
+400619	14	0	75	0	0	0	Fire Blast
+1316601	20	0	215	0	0	0	Heal
+20821	20	0	90	4	0	0	Acid Spit
+19978	50	0	110	0	0	0	Blessing of Light
+1232013	0	0	50	5	0	0	Chains of Zeal
+8624	40	3	35	0	0	11299	Eviscerate
+8624	40	4	1	0	0	11299	Eviscerate
+8053	28	0	160	0	0	0	Flame Shock
+450658	1	0	5	0	0	0	Renew
+2590	20	3	60	0	0	2591	Backstab
+11694	52	-2	62	0	0	0	Health Funnel
+595	15	0	15	0	0	0	Prayer of Protection
+466841	1	1	150	0	0	0	Meathook
+460673	44	0	0	0	15	0	Demonskin
+460692	20	0	295	0	0	0	Rain of Fire
+15055	24	3	30	0	0	0	Distract Test
+25054	20	0	75	0	0	0	Holy Smite
+1451	29	0	37	0	0	0	Arcane Spirit III
+10223	50	0	255	0	0	0	Fire Ward
+7887	28	1	50	0	0	11584	Overpower
+7887	28	4	1	0	0	11584	Overpower
+9490	32	1	100	0	0	9747	Demoralizing Roar
+8348	50	0	30	0	0	0	Julie's Blessing
+3567	20	0	120	0	0	0	Teleport: Orgrimmar
+513	30	0	37	0	0	0	Earth Elemental
+8809	40	0	100	0	0	0	Slave Drain
+15867	20	0	65	0	0	0	Flame Buffet Totem
+16587	0	0	250	0	0	0	Dark Whispers
+6077	32	0	170	0	0	0	Renew
+10220	60	0	500	0	0	0	Ice Armor
+6949	1	0	25	0	0	0	Weak Frostbolt
+11958	4	0	15	0	0	0	Ice Block
+408490	40	0	165	0	0	0	Lava Burst
+1236173	0	0	130	0	0	0	Pyroblast
+17149	20	0	85	0	0	0	Exorcism
+18146	10	0	125	0	0	0	Chilling Touch
+1725	22	3	30	0	0	0	Distract
+3121	1	0	8	0	0	0	Kev
+399956	40	3	60	0	0	1241582	Mutilate
+1317516	0	0	90	0	0	0	Rejuvenation
+6377	40	0	60	0	0	0	Healing Stream Totem
+8166	22	0	0	0	10	0	Poison Cleansing Totem
+1020	50	0	110	0	0	0	Divine Shield
+20154	1	0	20	0	0	21084	Seal of Righteousness
+988	36	0	0	0	18	0	Dispel Magic
+6202	22	0	240	0	0	0	Create Healthstone
+20294	62	0	300	0	0	0	Immolate
+9754	44	1	200	0	0	411128	Swipe
+425711	1	0	0	0	4	0	Carve
+6760	8	3	35	0	0	6761	Eviscerate
+6760	8	4	1	0	0	6761	Eviscerate
+20776	48	0	0	0	90	0	Ancestral Spirit
+1213271	56	0	245	0	0	0	Immolation Trap
+1264497	24	2	20	0	0	1264498	Swipe
+11640	20	0	90	0	0	0	Renew
+462715	52	3	60	0	0	0	Backstab
+20822	20	0	90	0	0	0	Frostbolt
+5675	26	0	40	0	0	0	Mana Spring Totem
+605	30	0	350	0	0	0	Mind Control
+16367	20	0	150	0	0	0	Chain Heal
+22910	56	0	245	0	0	0	Immolation Trap
+18205	30	0	40	0	0	0	Shadow Bolt
+3552	38	0	800	0	0	0	Conjure Mana Jade
+26201	48	2	35	0	0	0	Charge
+20287	10	0	40	0	0	0	Seal of Righteousness
+429688	10	0	30	0	0	0	Dominate Mind
+455991	0	0	200000	0	0	0	Thunder Stomp
+17195	22	0	50	0	0	0	Scorch
+9889	56	0	755	0	0	0	Healing Touch
+25304	60	0	290	0	0	0	Frostbolt
+12529	10	0	125	0	0	0	Chilling Touch
+5504	4	0	60	0	0	0	Conjure Water
+453	20	0	50	0	0	0	Mind Soothe
+6940	46	0	80	0	0	0	Blessing of Sacrifice
+19265	50	0	145	0	0	0	Touch of Weakness
+20356	48	0	170	0	0	0	Seal of Wisdom
+28401	20	0	75	0	0	0	Blink
+7932	0	0	60	0	0	0	Anti-Venom
+5110	16	0	50	0	0	0	Summon Living Flame
+49	0	0	10	0	0	0	Healing Touch (TEST)
+15799	20	0	150	0	0	0	Chain Heal
+462730	54	3	50	0	0	0	Garrote
+11986	20	0	145	0	0	0	Healing Wave
+20748	60	0	0	0	85	0	Rebirth
+429125	20	0	0	0	3	0	Icy Veins
+13021	60	0	545	0	0	0	Blast Wave
+364812	1	0	500	0	0	0	Dispel Magic
+6960	1	0	15	0	0	0	Lightning Barrier
+17147	20	0	85	0	0	0	Exorcism
+1238073	60	1	200	0	0	0	Primal Bite
+17883	20	0	95	0	0	0	Immolate
+552	32	0	0	0	15	0	Abolish Disease
+7588	24	0	90	0	0	0	Void Bolt
+10929	56	0	365	0	0	0	Renew
+24640	8	2	30	0	0	24583	Scorpid Poison
+1310222	1	1	150	0	0	0	Spearing Strike
+15786	1	0	40	0	0	0	Earthbind Totem
+10	20	0	320	0	0	0	Blizzard
+5180	30	0	70	0	0	0	Wrath
+461635	54	0	150	0	0	0	Rockbiter Weapon
+20664	20	0	90	0	0	0	Rejuvenation
+22575	20	0	135	0	0	0	Shadow Shock
+26178	24	2	35	0	0	26179	Charge
+444894	56	0	325	0	0	0	Holy Shock
+6512	26	0	45	0	0	0	Detect Lesser Invisibility
+1293526	48	0	135	0	0	0	Summon Hawk
+21968	30	0	50	0	0	0	Corrupt Forces of Nature
+1264478	12	2	80	0	0	0	Sonic Blast
+5143	8	0	85	0	0	0	Arcane Missiles
+15267	54	0	230	0	0	0	Holy Fire
+1293525	36	0	105	0	0	0	Summon Hawk
+462722	50	3	60	0	0	0	Ambush
+462727	30	3	50	0	0	0	Garrote
+20743	20	0	75	5	0	0	Drain Life
+606	99	0	240	0	0	0	Mind Rot
+10964	52	0	545	0	0	0	Greater Heal
+1232709	0	0	150	0	0	0	Holy Light
+462853	1	0	0	0	6	0	Hand of Sacrifice
+10206	52	0	135	0	0	0	Scorch
+11596	46	1	150	0	0	11597	Sunder Armor
+465352	28	0	100	0	0	0	Banish
+13032	52	0	420	0	0	0	Ice Barrier
+17618	20	0	100	0	0	0	Summon Risen Lackey
+15430	28	0	290	0	0	0	Holy Nova
+12098	20	0	90	5	0	0	Sleep
+1265041	48	2	25	0	0	1265042	Tendon Rip
+20662	56	1	150	0	0	0	Execute
+16569	50	-2	75	0	0	0	Health Funnel
+408343	32	0	280	0	0	0	Fire Nova
+16342	56	0	155	0	0	0	Flametongue Weapon
+14295	58	0	490	0	0	0	Volley
+21962	30	0	50	0	0	0	Force of Nature
+19834	12	0	30	0	0	0	Blessing of Might
+11550	42	1	100	0	0	11551	Battle Shout
+467740	30	0	40	0	0	0	Shadow Bolt
+1265038	12	2	25	0	0	1265039	Tendon Rip
+2054	16	0	155	0	0	0	Heal
+13874	34	0	75	0	0	0	Divine Shield
+1265902	36	2	10	0	0	1265903	Dust Cloud
+18881	58	0	365	0	0	0	Siphon Life
+1256146	0	0	250000	0	0	0	Allstrike
+783	30	0	0	0	20	0	Travel Form
+11021	20	0	90	4	0	0	Flamespit
+13341	20	0	120	0	0	0	Fire Blast
+28609	60	0	320	0	0	0	Frost Ward
+130	12	0	40	0	0	0	Slow Fall
+2970	38	0	90	0	0	0	Detect Invisibility
+2608	20	0	135	0	0	0	Shock
+19943	58	0	140	0	0	0	Flash of Light
+1213451	1	0	15	15	0	0	Rain of Fire
+17255	8	2	35	0	0	17256	Bite
+469057	8	0	85	0	0	0	Earth Volley
+1264758	12	2	35	0	0	1264927	Dismember
+2609	28	0	200	0	0	0	Shock
+8412	30	0	165	0	0	0	Fire Blast
+10447	40	0	250	0	0	0	Flame Shock
+469145	60	0	120	0	0	0	Aspect of the Falcon
+10228	99	0	300	0	0	0	Greater Invisibility
+22206	20	0	95	0	0	0	Moonfire
+469155	20	0	90	5	0	0	Deep Sleep
+23860	0	0	115	0	0	0	Holy Fire
+462723	58	3	60	0	0	0	Ambush
+8929	40	0	235	0	0	0	Moonfire
+460756	20	0	90	5	0	0	Sleep
+11713	58	0	215	0	0	0	Bane of Agony
+426320	1	0	0	0	27	0	Shadowflame
+18105	60	0	45	0	0	0	Fireball
+23381	20	0	180	0	0	0	Healing Touch
+20739	30	0	0	0	85	0	Rebirth
+22823	1	0	8	8	0	0	Starshards
+546	28	0	95	0	0	0	Water Walking
+13005	26	0	50	0	0	0	Hammer of Justice
+1220855	20	0	75	0	0	0	Frost Nova
+21793	20	0	200	0	0	0	Twisted Tranquility
+1213278	58	0	480	0	0	0	Ice Barrier
+1213298	20	0	150	0	0	0	Holy Light
+1213334	0	0	0	0	40	0	Shadowform
+1320509	20	0	135	0	0	0	Shadow Shock
+7800	18	0	35	0	0	7801	Firebolt
+22167	20	0	215	0	0	0	Heal
+1213479	1	0	5	5	0	0	Lightning Shield
+6780	38	0	80	0	0	0	Wrath
+10149	48	0	305	0	0	0	Fireball
+460699	46	0	885	0	0	0	Rain of Fire
+17260	48	2	35	0	0	17261	Bite
+930	40	0	305	0	0	0	Chain Lightning
+17503	20	0	90	0	0	0	Frostbolt
+20298	20	0	90	0	0	0	Shadow Bolt
+13019	44	0	355	0	0	0	Blast Wave
+1214293	1	0	95	0	0	0	Totem of Life
+1217157	60	0	50	0	0	0	Test Torch
+18807	60	0	205	0	0	0	Mind Flay
+436343	30	0	95	0	0	0	Bloodbonded Sacrifice
+10412	36	0	240	0	0	0	Earth Shock
+588	12	0	30	0	0	0	Inner Fire
+1303228	0	0	90	0	0	0	Shadow Bolt
+1213248	20	0	75	0	0	0	Wrath
+10938	60	0	1695	0	0	0	Power Word: Fortitude
+11585	60	1	50	0	0	0	Overpower
+11585	60	4	1	0	0	0	Overpower
+27532	20	0	90	0	0	0	Rejuvenation
+463285	58	0	100	0	0	0	Starfire
+25816	60	0	320	0	0	0	Hex of Weakness
+5189	26	0	280	0	0	0	Healing Touch
+8272	30	0	100	0	0	0	Mind Tremor
+11572	40	1	100	0	0	11573	Rend
+8205	38	1	200	0	0	11580	Thunder Clap
+403851	60	0	185	0	0	0	Shadow Cleave
+23979	1	0	100	0	0	0	Holy Wrath
+2010	22	0	0	0	75	0	Resurrection
+438019	20	0	145	0	0	0	Healing Wave
+701	1	0	10	0	0	0	Firebolt
+8131	32	0	140	0	0	0	Mana Burn
+8044	8	0	50	0	0	0	Earth Shock
+17613	20	0	215	0	0	0	Dark Mending
+8102	16	0	80	0	0	0	Mind Blast
+10928	50	0	305	0	0	0	Renew
+461	0	0	10	0	0	0	Righteous Flame On
+23165	50	2	20	0	0	0	Harass
+13551	26	0	80	0	0	0	Serpent Sting
+1269323	7	0	60	0	0	0	Lightning Cloud
+1257106	20	0	150	0	0	0	Chain Lightning
+8437	22	0	120	0	0	0	Arcane Explosion
+587	6	0	60	0	0	0	Conjure Food
+598	14	0	60	0	0	0	Smite
+15306	20	0	135	0	0	0	Shock
+15254	20	0	90	0	0	0	Arcane Bolt
+10230	54	0	145	0	0	0	Frost Nova
+415335	1	0	15	0	0	0	Raptor Strike
+8445	34	0	80	0	0	0	Scorch
+20190	56	0	115	0	0	0	Aspect of the Wild
+1237949	36	0	0	0	75	0	Revive
+11014	44	0	265	0	0	0	Flow of the Northspring
+6789	42	0	435	0	0	0	Death Coil
+5195	28	0	80	0	0	0	Entangling Roots
+20909	42	0	65	0	0	0	Counterattack
+8288	24	0	125	0	0	0	Drain Soul
+2006	10	0	0	0	75	0	Resurrection
+2782	24	0	0	0	10	0	Remove Curse
+8262	28	0	85	0	0	0	Elemental Protection Totem
+5697	16	0	50	0	0	0	Unending Breath
+408341	12	0	95	0	0	0	Fire Nova
+1263343	32	0	0	0	10	0	Attempt to Summon Undead Ravager
+776	99	0	24	0	0	0	Abolish Magic
+14253	26	0	100	0	0	0	Abolish Poison
+20348	50	0	180	0	0	0	Seal of Light
+462729	46	3	50	0	0	0	Garrote
+1264498	36	2	20	0	0	1264501	Swipe
+5308	24	1	150	0	0	20658	Execute
+11712	48	0	170	0	0	0	Bane of Agony
+79431	0	0	0	0	11	0	Flametongue Totem
+1265066	24	2	50	0	0	1265067	Savage Rend
+23922	40	1	200	0	0	23923	Shield Slam
+16829	16	2	25	0	0	16830	Claw
+113	10	0	20	0	0	0	Chains of Ice
+13424	18	0	55	0	0	0	Faerie Fire
+17750	36	0	300	0	0	17751	Suffering
+6115	0	-2	20	0	0	0	Far Sight (PT)
+3700	36	-2	39	0	0	0	Health Funnel
+7948	19	0	65	0	0	0	Wild Regeneration
+1265883	60	2	20	0	0	0	Web
+1213482	20	0	110	0	0	0	Flame Shock
+19280	60	0	985	0	0	0	Devouring Plague
+19714	62	0	250	0	0	0	Deaden Magic
+16249	20	0	90	0	0	0	Frostbolt
+89	60	0	210	0	0	0	Cripple
+5938	70	3	20	0	0	0	Shiv
+9840	52	0	280	0	0	0	Rejuvenation
+8427	36	0	720	0	0	0	Blizzard
+20924	60	0	565	0	0	0	Consecration
+10538	58	0	180	0	0	0	Fire Resistance Totem
+11839	20	0	110	0	0	0	Fireball
+8972	34	1	150	0	0	9745	Maul
+403685	22	0	170	0	0	0	Drain Life
+24120	50	0	80	0	0	0	Lacerate
+8017	1	0	15	0	0	0	Rockbiter Weapon
+429145	50	0	645	0	0	0	Holy Wrath
+1220748	24	0	145	0	0	0	Earth Shock
+1220853	20	0	180	0	0	0	Frostbolt Volley
+23161	60	0	150	0	0	0	Summon Dreadsteed
+11641	30	0	120	0	0	0	Hex
+1243	1	0	60	0	0	0	Power Word: Fortitude
+1760	30	3	45	0	0	8621	Sinister Strike
+11733	40	0	800	0	0	0	Demon Armor
+19271	30	0	100	0	0	0	Feedback
+10187	60	0	1400	0	0	0	Blizzard
+1108	12	0	35	0	0	0	Curse of Weakness
+408345	52	0	520	0	0	0	Fire Nova
+14310	40	0	75	0	0	0	Freezing Trap
+23948	60	0	1695	0	0	0	Power Word: Fortitude
+9833	46	0	280	0	0	0	Moonfire
+10888	42	0	180	0	0	0	Psychic Scream
+7803	27	0	75	0	0	0	Thundershock
+2120	16	0	195	0	0	0	Flamestrike
+466740	20	0	90	0	0	0	Lightning Bolt
+1271522	20	0	150	0	0	0	Thundercrack
+136	12	0	50	0	0	0	Mend Pet
+15264	36	0	145	0	0	0	Holy Fire
+1309595	32	0	175	0	0	0	Shadow Word: Death
+15530	20	0	90	0	0	0	Frostbolt
+11289	46	3	50	0	0	11290	Garrote
+15091	20	0	120	0	0	0	Blast Wave
+21084	1	0	20	0	0	0	Seal of Righteousness
+845	20	1	200	0	0	7369	Cleave
+364908	62	0	500	0	0	0	Dark Mending
+10391	38	0	135	0	0	0	Lightning Bolt
+1232710	0	0	30	0	0	0	Seal of Protection
+10333	60	0	20	0	0	0	Holy Strike
+12493	1	0	105	5	0	0	Curse of Weakness
+1280356	20	0	160	0	0	0	Shadow Bolt Volley
+19299	26	0	140	0	0	0	Starshards
+3010	48	2	25	0	0	3009	Claw
+19262	30	0	75	0	0	0	Touch of Weakness
+11286	60	3	45	0	0	0	Gouge
+1264739	36	2	50	0	0	1264741	Pinch
+16407	30	0	80	0	0	0	Frost Blast
+6063	28	0	255	0	0	0	Heal
+11678	58	0	1185	0	0	0	Rain of Fire
+13902	26	0	50	0	0	0	Fist of Ragnaros
+1310199	46	1	150	0	0	0	Slam
+10053	48	0	1130	0	0	0	Conjure Mana Citrine
+14283	28	0	80	0	0	0	Arcane Shot
+14266	56	0	100	0	0	0	Raptor Strike
+8423	40	0	650	0	0	0	Flamestrike
+1225228	1	0	0	0	5	0	Bane of Havoc
+10893	50	0	385	0	0	0	Shadow Word: Pain
+3044	6	0	25	0	0	0	Arcane Shot
+27	1	0	10	0	0	0	Goldshire Portal
+7300	10	0	110	0	0	0	Frost Armor
+6724	20	0	30	0	0	0	Light of Elune
+1303350	0	0	350	0	0	0	Slow
+25782	52	0	220	0	0	0	Greater Blessing of Might
+2882	40	0	45	0	0	0	Bear Form (PT) (NYI)
+21151	60	0	40	0	0	0	Gutgore Ripper
+1238069	36	1	200	0	0	0	Primal Bite
+10448	52	0	345	0	0	0	Flame Shock
+118	8	0	60	0	0	0	Polymorph
+436372	30	0	95	0	0	0	Sanguine Sanctuary Sacrifice
+1217158	60	0	50	0	0	0	Test Torch
+11671	44	0	225	0	0	0	Corruption
+445870	22	0	100	0	0	0	Eye of Ysera
+19281	20	0	55	0	0	0	Hex of Weakness
+10946	52	0	310	0	0	0	Mind Blast
+8400	24	0	140	0	0	0	Fireball
+17850	26	0	150	0	0	17851	Consume Shadows
+7739	30	0	300	0	0	0	Inferno Shell
+27871	60	0	365	0	0	0	Lightwell
+16356	58	0	160	0	0	0	Frostbrand Weapon
+1236307	0	0	90	0	0	0	Rejuvenation
+7121	19	0	75	0	0	0	Anti-Magic Shield
+14272	34	0	100	0	0	0	Disengage
+1240193	20	1	150	0	0	1464	Slam
+6190	24	1	100	0	0	11554	Demoralizing Shout
+10166	54	0	460	0	0	0	Khadgar's Unlocking
+5221	22	3	60	0	0	6800	Shred
+25898	60	0	150	0	0	0	Greater Blessing of Kings
+18159	0	0	0	0	10	0	Curse of the Vengeful Centaur
+1222574	20	0	110	0	0	0	Mind Blast
+5627	38	0	50	0	0	0	Turn Undead
+1268650	20	0	150	0	0	0	Lightning Strike
+2052	4	0	45	0	0	0	Lesser Heal
+780	24	1	200	0	0	769	Swipe
+16315	44	0	125	0	0	0	Rockbiter Weapon
+126	22	0	100	0	0	0	Eye of Kilrogg
+53601	80	0	0	0	12	0	Sacred Shield
+1213477	20	0	150	0	0	0	Chain Lightning
+469143	20	0	75	0	0	0	Wrath
+12524	42	0	285	0	0	0	Pyroblast
+1230697	0	0	100	0	0	0	Cessation
+19276	28	0	350	0	0	0	Devouring Plague
+20920	60	0	210	0	0	0	Seal of Command
+12522	30	0	195	0	0	0	Pyroblast
+428739	60	0	0	0	9	0	Deep Freeze
+9866	50	3	60	0	0	9867	Ravage
+425271	26	0	140	0	0	0	Renew
+13550	18	0	50	0	0	0	Serpent Sting
+20687	62	0	500	0	0	0	Starfall
+20747	50	0	0	0	85	0	Rebirth
+1238640	20	0	100	0	0	0	Ghost Wolf
+20900	28	0	115	0	0	0	Aimed Shot
+19478	32	0	75	0	0	19655	Tainted Blood
+17401	50	0	1180	0	0	0	Hurricane
+27801	60	0	750	0	0	0	Holy Nova
+331	1	0	25	0	0	0	Healing Wave
+27633	60	0	80	0	0	0	Wing Clip
+400009	1	3	35	0	0	0	Between the Eyes
+400009	1	4	1	0	0	0	Between the Eyes
+14887	20	0	160	0	0	0	Shadow Bolt Volley
+1310087	20	0	75	5	0	0	Drain Life
+15507	1	0	5	5	0	0	Lightning Shield
+9830	54	3	60	0	0	0	Shred
+25311	60	0	340	0	0	0	Corruption
+6060	38	0	185	0	0	0	Smite
+5384	30	0	80	0	0	0	Feign Death
+23206	20	0	150	0	0	0	Chain Lightning
+19655	40	0	105	0	0	19656	Tainted Blood
+1239696	30	0	0	0	15	0	Arcane Blast
+24683	13	0	60	0	0	0	Lightning Cloud
+14279	46	0	175	0	0	0	Viper Sting
+460671	62	0	200	0	0	0	Wrath
+17366	20	0	95	0	0	0	Fire Nova
+18557	20	0	75	5	0	0	Drain Life
+19309	36	0	120	0	0	0	Shadowguard
+10472	46	0	325	0	0	0	Frost Shock
+15970	20	0	90	5	0	0	Sleep
+3472	38	0	365	0	0	0	Holy Light
+1256144	0	0	250000	0	0	0	Allstrike
+3111	20	0	90	0	0	0	Mend Pet
+1309635	48	0	250	0	0	0	Shadow Word: Death
+10207	58	0	150	0	0	0	Scorch
+17854	58	0	480	0	0	0	Consume Shadows
+25774	30	0	100	0	0	0	Mind Shatter
+16410	30	0	40	0	0	0	Shadow Bolt
+19574	40	0	0	0	12	0	Bestial Wrath
+30091	20	0	260	0	0	0	Flamestrike
+1280354	1	0	75	0	0	0	Holy Strike
+8417	40	0	410	0	0	0	Arcane Missiles
+13543	52	0	385	0	0	0	Mend Pet
+1256139	0	0	250000	0	0	0	Allstrike
+1329	40	3	60	0	0	0	Mutilate
+10408	54	0	210	0	0	0	Stoneskin Totem
+9752	44	3	30	0	0	9894	Rip
+9752	44	4	1	0	0	9894	Rip
+1247998	20	0	90	0	0	0	Lightning Bolt
+1286257	60	0	1940	0	0	0	(DNT) Prayer of Spirit - TEST RAID SPELL
+15232	20	0	90	0	0	0	Shadow Bolt
+1256143	0	0	250000	0	0	0	Allstrike
+78	1	1	150	0	0	284	Heroic Strike
+20919	50	0	180	0	0	0	Seal of Command
+10192	52	0	120	0	0	0	Mana Shield
+1822	24	3	40	0	0	1823	Rake
+446258	50	0	70	0	0	0	Shadow Bolt
+7101	17	0	50	0	0	0	Flame Blast
+639	6	0	60	0	0	0	Holy Light
+26179	36	2	35	0	0	26201	Charge
+8814	15	0	153	0	0	0	Flame Spike
+11659	44	0	265	0	0	0	Shadow Bolt
+702	4	0	20	0	0	0	Curse of Weakness
+8184	28	0	75	0	0	0	Fire Resistance Totem
+2589	12	3	60	0	0	2590	Backstab
+25052	20	0	90	4	0	0	Acid Spit
+19261	20	0	45	0	0	0	Touch of Weakness
+27737	20	0	150	0	0	0	Moonfire
+417063	40	0	195	0	0	0	Rejuvenation
+19284	50	0	180	0	0	0	Hex of Weakness
+14317	54	0	520	0	0	0	Explosive Trap
+15630	40	0	70	0	0	0	Distracting Shot
+20800	20	0	95	0	0	0	Immolate
+20757	60	0	0	0	85	0	Create Soulstone
+13159	40	0	100	0	0	0	Aspect of the Pack
+11293	46	3	45	0	0	11294	Sinister Strike
+1293817	25	0	100	0	0	0	Conflagrate
+15729	20	0	60	0	0	0	Remove Curse
+15063	20	0	75	0	0	0	Frost Nova
+28023	10	0	95	0	0	0	Create Healthstone
+13519	6	0	35	0	0	0	Holy Smite
+17284	1	0	75	0	0	0	Holy Strike
+19312	60	0	250	0	0	0	Shadowguard
+460700	58	0	1185	0	0	0	Rain of Fire
+28610	60	0	320	0	0	0	Shadow Ward
+20805	20	0	90	0	0	0	Lightning Bolt
+1293812	50	0	265	0	0	0	Incinerate
+400622	46	0	280	0	0	0	Fire Blast
+14278	0	3	40	0	0	0	Ghostly Strike
+2767	34	0	230	0	0	0	Shadow Word: Pain
+431655	1	0	0	0	6	0	Mind Spike
+8983	46	1	100	0	0	0	Bash
+17274	20	0	130	0	0	0	Pyroblast
+18211	30	0	40	0	0	0	Shadow Bolt
+1311606	30	0	160	0	0	0	Holy Shock
+7379	34	1	50	0	0	11600	Revenge
+20647	1	1	1	0	0	0	Execute
+28391	20	0	75	0	0	0	Blink
+25055	20	0	90	0	0	0	Arcane Bolt
+1296534	60	0	150	0	0	0	Summon Forsaken Charger
+1293241	25	0	80	0	0	0	Summon Hawk
+20609	24	0	0	0	90	0	Ancestral Spirit
+1768	42	3	25	0	0	1769	Kick
+1735	20	1	100	0	0	9490	Demoralizing Roar
+11778	44	0	125	0	0	11779	Lash of Pain
+8812	34	0	450	0	0	0	Heal
+18880	48	0	285	0	0	0	Siphon Life
+6223	24	0	100	0	0	0	Corruption
+1240772	44	0	265	0	0	0	Binding Heal
+11609	50	1	200	0	0	20569	Cleave
+20798	1	0	50	7	0	0	Demon Skin
+15236	20	0	135	0	0	0	Shock
+11573	50	1	100	0	0	11574	Rend
+415070	36	0	180	0	0	0	Exorcism
+837	14	0	50	0	0	0	Frostbolt
+1293813	60	0	325	0	0	0	Incinerate
+11699	46	0	240	0	0	0	Drain Life
+7328	12	0	0	0	80	0	Redemption
+22460	54	0	390	0	0	0	Arcane Explosion
+9481	40	0	220	0	0	0	Holy Smite
+1277334	50	0	180	0	0	0	Chastise
+22574	62	0	250	0	0	0	Dark Strike
+20240	1	1	1	0	0	0	Retaliation
+8181	24	0	75	0	0	0	Frost Resistance Totem
+20772	48	0	0	0	80	0	Redemption
+450663	20	0	9	0	0	0	Acid Spit
+23603	8	0	150	0	0	0	Wild Polymorph
+13323	8	0	0	0	10	0	Polymorph
+18545	1	0	10	3	0	0	Scorpid Sting
+469228	52	0	200	0	0	0	Felhunted
+425274	44	0	250	0	0	0	Renew
+12825	40	0	120	0	0	0	Polymorph
+20658	32	1	150	0	0	20660	Execute
+1235826	50	1	150	0	0	1235827	Lacerate
+13864	1	0	60	4	0	0	Power Word: Fortitude
+1241506	20	0	150	0	0	0	Arcane Bolt
+17138	20	0	125	0	0	0	Flash Heal
+1241515	0	0	350	0	0	0	Bounding Mana
+1289450	0	0	365	0	0	0	Renew
+469566	20	0	150	0	0	0	Holy Light
+16914	40	0	880	0	0	0	Hurricane
+15500	20	0	135	0	0	0	Shock
+3205	50	0	1	0	0	0	Sol M
+436937	12	0	120	0	0	0	Regrowth
+945	32	0	180	0	0	0	Lightning Shield
+13860	20	0	110	0	0	0	Mind Blast
+11774	50	0	115	0	0	11775	Torment
+404275	20	0	75	0	0	0	Aqua Strike
+913	18	0	155	0	0	0	Healing Wave
+498	6	0	15	0	0	0	Divine Protection
+17177	20	0	30	0	0	0	Seal of Protection
+15493	20	0	150	0	0	0	Holy Light
+461682	60	0	40	0	0	0	Gutgore Ripper
+7373	54	1	100	0	0	0	Hamstring
+17253	1	2	35	0	0	17255	Bite
+399986	1	3	30	0	0	0	Shuriken Toss
+2353	17	0	19	0	0	0	Sanctuary II
+24947	20	0	215	0	0	0	Heal
+8317	34	0	115	0	0	11770	Fire Shield
+20216	0	0	0	0	4	0	Divine Favor
+1213300	18	0	35	0	0	0	Divine Protection
+16511	30	3	35	0	0	0	Hemorrhage
+11677	46	0	885	0	0	0	Rain of Fire
+27608	56	0	380	0	0	0	Flash Heal
+400640	28	0	55	0	0	0	Ice Lance
+15095	20	0	70	0	0	0	Molten Blast
+17509	30	0	40	0	0	0	Shadow Bolt
+863	30	0	37	0	0	0	Blur III
+25918	60	0	250	0	0	0	Greater Blessing of Wisdom
+27623	52	0	640	0	0	0	Fire Nova Totem
+18082	30	0	45	0	0	0	Fireball
+11684	54	0	1300	0	0	0	Hellfire
+9532	20	0	90	0	0	0	Lightning Bolt
+9591	20	0	90	4	0	0	Acid Spit
+1237313	60	0	370	0	0	0	Frostfire Bolt
+9852	48	0	110	0	0	0	Entangling Roots
+20910	54	0	85	0	0	0	Counterattack
+15979	20	0	90	0	0	0	Arcane Bolt
+24374	20	0	90	0	0	0	Fireball
+8422	32	0	490	0	0	0	Flamestrike
+14916	10	2	15	0	0	14917	Growl
+409	7	0	14	0	0	0	Shadowskin
+1322605	1	0	0	0	55	0	Shifting Power
+9881	58	1	150	0	0	0	Maul
+8495	36	0	80	0	0	0	Mana Shield
+24208	1	0	215	0	0	0	Great Heal
+25817	20	0	200	0	0	0	Tranquility
+8998	28	3	20	0	0	9000	Cower
+24042	58	1	300	0	0	0	Test Maul
+1302352	10	0	75	0	0	0	Lava Spout Totem
+11017	30	0	0	0	20	0	Summon Witherbark Felhunter
+17852	42	0	285	0	0	17853	Consume Shadows
+16979	20	1	50	0	0	0	Feral Charge (Bear)
+2607	4	0	40	0	0	0	Shock
+2138	22	0	115	0	0	0	Fire Blast
+905	24	0	125	0	0	0	Lightning Shield
+25316	60	0	1070	0	0	0	Prayer of Healing
+15790	20	0	235	0	0	0	Arcane Missiles
+1311649	10	0	40	0	0	0	Seal of Fury
+1242972	50	0	340	0	0	0	Unstable Affliction
+6927	26	3	20	0	0	0	Shadowstalker Slash
+1767	26	3	25	0	0	1768	Kick
+414689	1	3	40	0	0	0	Sunfire
+408521	40	0	245	0	0	0	Riptide
+3443	26	0	90	0	0	0	Enchanted Quickness
+2637	18	0	90	0	0	0	Hibernate
+9862	50	0	695	0	0	0	Tranquility
+13281	20	0	130	0	0	0	Earth Shock
+1302768	20	0	90	0	0	0	Shadow Bolt
+1232702	0	1	150	0	0	0	Shockwave
+15869	10	0	30	0	0	0	Superior Healing Ward
+428861	1	0	0	0	35	0	Displacement
+1264455	60	2	60	0	0	0	Thunderstomp
+22274	8	0	0	0	10	0	Greater Polymorph
+1256140	0	0	250000	0	0	0	Allstrike
+15277	30	0	95	0	0	0	Seal of Reckoning
+10486	50	0	140	0	0	0	Windfury Weapon
+22187	20	0	110	5	0	0	Power Word: Shield
+18867	24	0	130	0	0	0	Shadowburn
+1310612	20	2	10	0	0	0	Trickster's Dance
+1277332	30	0	100	0	0	0	Chastise
+11580	48	1	200	0	0	11581	Thunder Clap
+11695	60	-2	79	0	0	0	Health Funnel
+18868	32	0	190	0	0	0	Shadowburn
+12809	30	1	100	0	0	0	Concussion Blow
+172	4	0	35	0	0	0	Corruption
+17359	58	0	60	0	0	0	Mana Tide Totem
+14281	12	0	35	0	0	0	Arcane Shot
+18267	1	0	105	5	0	0	Curse of Weakness
+1321196	20	0	150	0	0	0	Chain Lightning
+1303227	20	0	215	0	0	0	Heal
+13374	20	0	120	0	0	0	Fire Blast
+1715	8	1	100	0	0	7372	Hamstring
+8050	10	0	55	0	0	0	Flame Shock
+1299447	60	0	110	0	0	0	Aspect of the Beast
+11549	32	1	100	0	0	11550	Battle Shout
+474204	60	0	60	0	0	0	Mind Flay
+23164	40	2	20	0	0	0	Harass
+9613	20	0	90	0	0	0	Shadow Bolt
+18100	1	0	10	5	0	0	Frost Armor
+461896	60	0	115	0	0	0	Fire Blast
+1236175	0	0	75	0	0	0	Blink
+13490	35	0	100	0	0	0	Howling Blade
+10336	99	0	70	0	0	0	Crusader Strike
+9863	60	0	925	0	0	0	Tranquility
+111	1	0	5	0	0	0	Time Step
+461636	60	0	165	0	0	0	Windfury Weapon
+13018	36	0	270	0	0	0	Blast Wave
+22782	46	0	380	0	0	0	Mage Armor
+16592	0	0	0	0	40	0	Shadowform
+9835	58	0	375	0	0	0	Moonfire
+446287	22	0	100	0	0	0	Unbound Soul
+1312002	20	0	45	0	0	0	Ice Lance
+1220744	4	0	30	0	0	0	Earth Shock
+1232743	0	0	110	0	0	0	Mind Blast
+10144	42	0	420	0	0	0	Conjure Food
+6226	34	0	155	0	0	0	Drain Mana
+25916	60	0	260	0	0	0	Greater Blessing of Might
+27683	56	0	1300	0	0	0	Prayer of Shadow Protection
+25756	0	0	12000	0	0	0	Purge
+1240826	50	0	305	0	0	0	Prayer of Mending
+11198	56	3	25	0	0	0	Expose Armor
+11198	56	4	1	0	0	0	Expose Armor
+4971	34	0	120	0	0	0	Healing Ward
+11743	50	0	140	0	0	0	Detect Invisibility
+17728	60	0	1000	0	0	0	Create Spellstone
+1265069	60	2	50	0	0	0	Savage Rend
+20243	50	1	150	0	0	0	Devastate
+19434	20	0	75	0	0	0	Aimed Shot
+1264482	60	2	80	0	0	0	Sonic Blast
+1214157	1	0	95	0	0	0	Libram of Purification
+24238	60	3	30	0	0	0	Test Rip
+1311676	30	0	100	0	0	0	Curse of the Elements
+970	18	0	95	0	0	0	Shadow Word: Pain
+18562	1	0	0	0	20	0	Swiftmend
+15451	20	0	90	0	0	0	Arcane Bolt
+6554	58	1	100	0	0	0	Pummel
+1303499	0	0	235	0	0	0	Arcane Missiles
+706	20	0	275	0	0	0	Demon Armor
+20729	54	0	100	0	0	0	Blessing of Sacrifice
+13007	18	0	35	0	0	0	Divine Protection
+19801	60	0	270	0	0	0	Tranquilizing Shot
+8907	40	0	240	0	0	0	Mark of the Wild
+1265901	24	2	10	0	0	1265902	Dust Cloud
+6770	10	3	65	0	0	2070	Sap
+17767	18	0	85	0	0	17850	Consume Shadows
+1291335	60	0	445	0	0	0	Mark of the Wild
+17953	56	0	1100	0	0	0	Create Firestone
+1319259	60	0	40	2	0	0	Crusader Strike
+17287	20	0	110	0	0	0	Mind Blast
+16561	20	0	280	0	0	0	Regrowth
+9435	35	0	153	0	0	0	Detonation
+19474	60	0	850	0	0	0	Rain of Fire
+466739	1	0	0	0	5	0	Lightning Shield
+19660	56	0	170	0	0	0	Tainted Blood
+9654	20	0	90	4	0	0	Jumping Lightning
+436945	54	0	740	0	0	0	Regrowth
+11371	1	0	60	0	0	0	Gift of Arthas
+15744	20	0	120	0	0	0	Blast Wave
+7154	24	-2	180	9	0	0	Dark Offering
+22047	10	0	30	0	0	0	Testing Totem
+415343	56	0	100	0	0	0	Raptor Strike
+1264741	48	2	50	0	0	1264742	Pinch
+24453	50	2	40	0	0	0	Prowl
+1265881	48	2	20	0	0	1265883	Web
+468078	0	0	50000	0	0	0	Nullify
+5484	40	0	150	0	0	0	Howl of Terror
+11275	60	3	25	0	0	0	Rupture
+11275	60	4	1	0	0	0	Rupture
+3110	1	0	10	0	0	7799	Firebolt
+19835	22	0	45	0	0	0	Blessing of Might
+1286251	26	0	0	0	8	0	(DNT) Blessing of Salvation - TEST RAID SPELL
+20754	1	0	15	15	0	0	Rain of Fire
+1270462	1	0	5	5	0	0	Lightning Shield
+10413	48	0	345	0	0	0	Earth Shock
+6768	28	3	20	0	0	8637	Feint
+22677	20	0	90	0	0	0	Shadow Bolt
+20802	20	0	35	0	0	0	Lightning Bolt
+705	12	0	70	0	0	0	Shadow Bolt
+1310687	40	0	365	0	0	0	Sniper Shot
+436946	60	0	880	0	0	0	Regrowth
+10145	52	0	585	0	0	0	Conjure Food
+415337	16	0	35	0	0	0	Raptor Strike
+8071	4	0	30	0	0	0	Stoneskin Totem
+1242634	30	0	45	0	0	0	Counterattack
+403689	54	0	600	0	0	0	Drain Life
+12258	32	0	0	0	10	0	Summon Shadowcaster
+1265878	24	2	20	0	0	1265880	Web
+23895	0	0	400	0	0	0	Renew
+1264930	48	2	35	0	0	1264933	Dismember
+11297	48	3	65	0	0	0	Sap
+8056	20	0	115	0	0	0	Frost Shock
+17843	20	0	125	0	0	0	Flash Heal
+1299332	60	0	95	0	0	0	Lacerate
+6274	24	0	80	0	0	0	Healing Ward
+401946	1	0	0	0	56	0	Circle of Healing
+1309636	56	0	340	0	0	0	Shadow Word: Death
+462713	36	3	60	0	0	0	Backstab
+14921	60	2	15	0	0	0	Growl
+1308733	0	0	0	0	5	0	Overdrive
+1248148	20	0	90	0	0	0	Frostbolt
+2090	22	0	105	0	0	0	Rejuvenation
+14122	30	0	40	0	0	0	Shadow Bolt
+403840	12	0	35	0	0	0	Shadow Cleave
+27841	60	0	970	0	0	0	Divine Spirit
+462711	20	3	60	0	0	0	Backstab
+10414	60	0	450	0	0	0	Earth Shock
+19304	50	0	300	0	0	0	Starshards
+17312	36	0	100	0	0	0	Mind Flay
+15631	50	0	90	0	0	0	Distracting Shot
+9472	26	0	155	0	0	0	Flash Heal
+1250426	1	0	0	0	8	0	Cripple
+17752	60	0	600	0	0	0	Suffering
+10622	46	0	315	0	0	0	Chain Heal
+2812	50	0	645	0	0	0	Holy Wrath
+703	14	3	50	0	0	8631	Garrote
+19942	50	0	115	0	0	0	Flash of Light
+1264736	24	2	50	0	0	1264739	Pinch
+30096	20	0	120	0	0	0	Arcane Explosion
+18092	0	0	80	0	0	0	Frost Blast
+526	16	0	0	0	9	0	Cure Poison
+1264927	24	2	35	0	0	1264929	Dismember
+1265057	40	2	20	0	0	1265058	Mine!
+694	16	1	100	0	0	7400	Mocking Blow
+14304	46	0	190	0	0	0	Immolation Trap
+12611	20	0	120	0	0	0	Cone of Cold
+1265055	20	2	20	0	0	1265056	Mine!
+15112	56	0	225	0	0	0	Windwall Totem
+15262	24	0	95	0	0	0	Holy Fire
+1264480	36	2	80	0	0	0	Sonic Blast
+7799	8	0	20	0	0	7800	Firebolt
+20610	36	0	0	0	90	0	Ancestral Spirit
+23954	1	0	215	0	0	0	Great Heal
+8161	38	0	125	0	0	0	Strength of Earth Totem
+15982	20	0	145	0	0	0	Healing Wave
+10156	42	0	945	0	0	0	Arcane Intellect
+10314	60	0	345	0	0	0	Exorcism
+20925	40	0	150	0	0	0	Holy Shield
+12471	20	0	90	0	0	0	Shadow Bolt
+17281	20	0	40	2	0	0	Crusader Strike
+20752	30	0	0	0	85	0	Create Soulstone
+14514	20	0	75	0	0	0	Blink
+877	35	0	41	0	0	0	Elemental Fury
+1299348	32	0	245	0	0	0	Trueshot Aura
+1314069	0	0	40	0	0	0	Fire Blast
+11981	20	0	95	0	0	0	Mana Burn
+14033	20	0	95	0	0	0	Mana Burn
+16431	55	0	400	0	10	0	Bone Armor
+20793	20	0	90	0	0	0	Fireball
+1303551	0	0	150	0	0	0	Chain Lightning
+3652	32	0	75	0	0	0	Summon Spirit of Old
+450646	20	0	95	0	0	0	Shadow Word: Pain
+17853	50	0	380	0	0	17854	Consume Shadows
+20288	18	0	60	0	0	0	Seal of Righteousness
+408342	22	0	170	0	0	0	Fire Nova
+1239243	60	0	385	0	0	0	Riptide
+1238300	60	0	265	0	0	0	Lava Burst
+1239699	50	0	0	0	15	0	Arcane Blast
+11990	1	0	15	15	0	0	Rain of Fire
+1319258	20	0	150	0	0	0	Holy Light
+17329	58	0	125	0	0	0	Nature's Grasp
+15587	20	0	110	0	0	0	Mind Blast
+2870	22	0	0	0	9	0	Cure Disease
+1238122	20	1	50	0	0	0	Feral Charge
+12544	1	0	10	5	0	0	Frost Armor
+25514	0	0	200	0	0	0	Flash of Light
+20797	20	0	110	0	0	0	Fireball
+6041	32	0	110	0	0	0	Lightning Bolt
+53	4	3	60	0	0	2589	Backstab
+9850	58	3	45	0	0	0	Claw
+10169	42	0	350	0	0	0	Amplify Magic
+462724	14	3	50	0	0	0	Garrote
+1265903	48	2	10	0	0	1265904	Dust Cloud
+25302	60	3	20	0	0	0	Feint
+15122	24	0	100	0	0	0	Counterspell
+2941	30	0	155	0	0	0	Immolate
+1265068	48	2	50	0	0	1265069	Savage Rend
+17151	56	0	450	0	0	0	Shadow Barrier
+17141	20	0	115	0	0	0	Holy Fire
+1265065	12	2	50	0	0	1265066	Savage Rend
+1265058	50	2	20	0	0	0	Mine!
+15244	20	0	120	0	0	0	Cone of Cold
+1265054	10	2	20	0	0	1265055	Mine!
+1220517	55	0	400	0	10	0	Bone Armor
+461829	18	1	200	0	0	0	Thunder Clap
+3716	10	0	20	0	0	7809	Torment
+1264479	24	2	80	0	0	0	Sonic Blast
+28304	20	0	145	0	0	0	Copy of Healing Wave
+1233255	0	0	100	0	0	0	Counterspell
+20306	32	0	90	0	0	0	Seal of the Crusader
+1263350	20	0	125	0	0	0	Shadow Mend
+13544	60	0	480	0	0	0	Mend Pet
+1310198	38	1	150	0	0	0	Slam
+18809	60	0	440	0	0	0	Pyroblast
+8552	14	0	70	0	0	0	Curse of Weakness
+16869	0	0	400	0	0	0	Ice Tomb
+1213301	26	0	50	0	0	0	Hammer of Justice
+1293694	60	0	240	0	0	0	Haunt
+11601	54	1	50	0	0	25288	Revenge
+15735	20	0	235	0	0	0	Arcane Missiles
+12323	20	1	100	0	0	0	Piercing Howl
+9892	52	3	20	0	0	0	Cower
+8192	36	0	70	0	0	0	Mind Soothe
+1260424	0	0	0	0	18	0	Fireball
+6535	13	0	60	0	0	0	Lightning Cloud
+1866	20	0	12	0	0	0	Holy Strike
+1248147	20	0	90	0	0	0	Shadow Bolt
+17922	50	0	141	0	0	0	Searing Pain
+462721	42	3	60	0	0	0	Ambush
+1002	14	0	20	0	0	0	Eyes of the Beast
+17311	28	0	70	0	0	0	Mind Flay
+10151	60	0	395	0	0	0	Fireball
+20832	20	0	120	0	0	0	Fire Blast
+139	8	0	30	0	0	0	Renew
+20736	12	0	20	0	0	0	Distracting Shot
+12738	0	0	0	0	10	0	Amplify Damage
+27989	20	0	120	0	0	0	Arcane Explosion
+21896	1	0	1	0	0	0	Zaetar's Release (DND)
+10427	48	0	105	0	0	0	Stoneclaw Totem
+1090	20	0	90	0	0	0	Sleep
+28146	40	0	850	0	0	0	Copy of Portal: Undercity
+1316677	20	0	75	0	0	0	Wrath
+1256142	0	0	250000	0	0	0	Allstrike
+10054	58	0	1470	0	0	0	Conjure Mana Ruby
+411	30	0	28	0	0	0	Shadowskin III
+1256138	0	0	250000	0	0	0	Allstrike
+22336	20	0	90	0	0	0	Shadow Bolt
+399985	1	3	20	0	0	0	Shadowstrike
+17921	42	0	118	0	0	0	Searing Pain
+20663	20	0	90	5	0	0	Sleep
+10159	42	0	380	0	0	0	Cone of Cold
+1	0	0	10	0	0	0	Word of Recall (OLD)
+20791	20	0	90	0	0	0	Shadow Bolt
+1293527	60	0	190	0	0	0	Summon Hawk
+27681	60	0	1940	0	0	0	Prayer of Spirit
+1279399	40	0	100	0	0	0	Summon Warhorse
+1299446	50	0	90	0	0	0	Aspect of the Beast
+11574	60	1	100	0	0	0	Rend
+1759	22	3	45	0	0	1760	Sinister Strike
+19476	60	0	120	0	0	0	Dispel Magic
+8027	18	0	55	0	0	0	Flametongue Weapon
+12741	1	0	105	5	0	0	Curse of Weakness
+20756	50	0	0	0	85	0	Create Soulstone
+1238299	50	0	230	0	0	0	Lava Burst
+10899	48	0	355	0	0	0	Power Word: Shield
+11600	44	1	50	0	0	11601	Revenge
+10278	38	0	0	0	7	0	Blessing of Protection
+16689	10	0	50	0	0	0	Nature's Grasp
+400610	1	0	0	0	8	0	Arcane Barrage
+1233077	0	0	50	0	0	0	Curse of Agony
+427745	1	0	0	0	10	0	Intercept
+11274	52	3	25	0	0	11275	Rupture
+11274	52	4	1	0	0	11275	Rupture
+5196	38	0	95	0	0	0	Entangling Roots
+20801	20	0	20	0	0	0	Firebolt
+19264	40	0	105	0	0	0	Touch of Weakness
+1213336	20	0	30	0	0	0	Mind Blast
+466987	63	0	0	0	5	0	Squall
+462585	20	0	145	0	0	0	Healing Touch
+11693	44	-2	45	0	0	0	Health Funnel
+14270	44	0	50	0	0	0	Mongoose Bite
+9896	60	3	30	0	0	0	Rip
+9896	60	4	1	0	0	0	Rip
+10627	56	0	250	0	0	0	Grace of Air Totem
+25895	60	0	0	0	16	0	Greater Blessing of Salvation
+11605	54	1	150	0	0	0	Slam
+13704	60	0	210	0	0	0	Psychic Scream
+20807	20	0	90	0	0	0	Shadow Bolt
+455994	0	0	250000	0	0	0	Crescent Smash
+19740	4	0	20	0	0	0	Blessing of Might
+15498	20	0	75	0	0	0	Holy Smite
+79429	0	0	0	0	11	0	Elemental Resistance Totem
+3599	10	0	25	0	0	0	Searing Totem
+10945	46	0	265	0	0	0	Mind Blast
+11704	54	0	310	0	0	0	Drain Mana
+14264	40	0	70	0	0	0	Raptor Strike
+20616	42	1	100	0	0	20617	Intercept
+1240773	50	0	315	0	0	0	Binding Heal
+458436	1	0	55	0	0	0	Wyvern Strike
+10526	48	0	200	0	0	0	Flametongue Totem
+20604	10	0	30	0	0	0	Dominate Mind
+1308652	50	0	120	0	0	0	Teleport: Dalaran
+13031	46	0	360	0	0	0	Ice Barrier
+15743	0	0	0	0	25	0	Flamecrack
+20291	42	0	140	0	0	0	Seal of Righteousness
+1248000	20	0	110	0	0	0	Flame Shock
+402791	1	0	200	0	20	0	Curse of Shadow
+8005	40	0	340	0	0	0	Healing Wave
+20297	20	0	90	0	0	0	Frostbolt
+3699	28	-2	24	0	0	0	Health Funnel
+17851	34	0	215	0	0	17852	Consume Shadows
+11584	44	1	50	0	0	11585	Overpower
+11584	44	4	1	0	0	11585	Overpower
+5186	8	0	55	0	0	0	Healing Touch
+1311677	40	0	150	0	0	0	Curse of the Elements
+438338	20	0	145	0	0	0	Healing Wave
+8407	32	0	130	0	0	0	Frostbolt
+20698	62	0	200	0	0	0	Wrath
+5934	0	3	25	0	0	0	Flourish
+5934	0	4	1	0	0	0	Flourish
+1241582	50	3	60	0	0	1241584	Mutilate
+19306	30	0	30	0	0	0	Counterattack
+22946	1	0	100	0	0	0	Lightning Cloud
+8631	22	3	50	0	0	8632	Garrote
+15261	60	0	255	0	0	0	Holy Fire
+1240720	40	0	185	0	0	0	Penance
+17258	32	2	35	0	0	17259	Bite
+1239242	50	0	300	0	0	0	Riptide
+1235318	0	0	120	0	0	0	Blast Wave
+1237950	48	0	0	0	75	0	Revive
+8903	38	0	425	0	0	0	Healing Touch
+2944	20	0	215	0	0	0	Devouring Plague
+17877	20	0	105	0	0	0	Shadowburn
+6950	1	0	15	2	0	0	Faerie Fire
+426223	0	0	0	0	40	0	Shadowform
+1317257	30	0	0	0	5.81	0	Strider Kick
+1824	44	3	40	0	0	9904	Rake
+20808	20	0	110	0	0	0	Fireball
+5178	14	0	40	0	0	0	Wrath
+8621	38	3	45	0	0	11293	Sinister Strike
+3108	35	0	250	0	0	0	Touch of Death
+994	30	0	20	0	0	0	Prayer of Protection II
+12160	20	0	90	0	0	0	Rejuvenation
+417057	4	0	25	0	0	0	Rejuvenation
+15238	20	0	75	0	0	0	Holy Smite
+11294	54	3	45	0	0	0	Sinister Strike
+11366	20	0	125	0	0	0	Pyroblast
+14326	30	0	50	0	0	0	Scare Beast
+17727	48	0	750	0	0	0	Create Spellstone
+8438	30	0	185	0	0	0	Arcane Explosion
+1311680	50	0	200	0	0	0	Curse of the Elements
+20795	20	0	120	0	0	0	Fire Blast
+17257	24	2	35	0	0	17258	Bite
+12737	20	0	90	0	0	0	Frostbolt Volley
+14327	46	0	75	0	0	0	Scare Beast
+839	22	0	17	0	0	0	Haste II
+1266680	55	0	400	0	10	0	Bone Armor
+8639	28	3	25	0	0	8640	Rupture
+8639	28	4	1	0	0	8640	Rupture
+11197	46	3	25	0	0	11198	Expose Armor
+11197	46	4	1	0	0	11198	Expose Armor
+25263	20	0	150	0	0	0	Holy Light
+449010	1	0	0	0	10	0	Dispel Shadows (DNT)
+424785	1	3	45	0	0	0	Saber Slash
+10894	58	0	470	0	0	0	Shadow Word: Pain
+364161	14	0	185	0	0	0	Arcane Intellect
+1430	16	0	75	0	0	0	Rejuvenation
+26552	0	0	50000	0	0	0	Nullify
+1671	32	1	100	0	0	1672	Shield Bash
+11974	20	0	110	5	0	0	Power Word: Shield
+28271	60	0	150	0	0	0	Polymorph
+8914	34	0	170	0	0	0	Thorns
+401859	40	0	210	0	0	0	Prayer of Mending
+412116	20	0	40	0	0	0	Mana Shield
+17630	20	0	95	0	0	0	Mana Burn
+1213331	20	0	95	0	0	0	Mana Burn
+5116	8	0	0	0	8	0	Concussive Shot
+10960	50	0	770	0	0	0	Prayer of Healing
+132	26	0	50	0	0	0	Detect Invisibility
+980	8	0	25	0	0	0	Bane of Agony
+20742	40	0	0	0	85	0	Rebirth
+10613	42	0	175	0	0	0	Windfury Totem
+403839	6	0	20	0	0	0	Shadow Cleave
+450650	20	0	21	0	0	0	Heal
+9875	50	0	275	0	0	0	Starfire
+8235	40	0	115	0	0	0	Windfury Weapon
+5246	22	1	250	0	0	0	Intimidating Shout
+50	1	0	30	0	0	0	Zone Recall (OLD)
+1222581	10	0	30	0	0	0	Domination
+14271	58	0	65	0	0	0	Mongoose Bite
+12328	1	1	100	0	0	0	Death Wish
+11290	54	3	50	0	0	0	Garrote
+5570	20	0	45	0	0	0	Insect Swarm
+15499	20	0	115	0	0	0	Frost Shock
+18930	48	0	200	0	0	0	Conflagrate
+1240770	32	0	185	0	0	0	Binding Heal
+10468	60	0	380	0	0	0	Lesser Healing Wave
+3	0	0	10	0	0	0	Word of Mass Recall (OLD)
+436382	30	0	95	0	0	0	Bloodlight Offering
+990	22	0	180	0	0	0	Conjure Food
+12549	20	0	150	0	0	0	Forked Lightning
+5118	20	0	40	0	0	0	Aspect of the Cheetah
+10326	52	0	75	0	0	0	Turn Undead
+16097	30	0	120	0	0	0	Hex
+13901	20	0	90	0	0	0	Arcane Bolt
+11711	38	0	130	0	0	0	Bane of Agony
+11556	54	1	100	0	0	0	Demoralizing Shout
+450654	20	0	10	0	0	0	Shadow Shield
+11785	58	0	100	0	0	0	Soothing Kiss
+16799	20	0	90	0	0	0	Frostbolt
+403501	40	0	170	0	0	0	Haunt
+865	26	0	85	0	0	0	Frost Nova
+21072	20	0	110	0	0	0	Fireball
+448572	20	0	90	0	0	0	Sleep
+1286254	20	0	0	0	8	0	(DNT) Blessing of Kings - TEST RAID SPELL
+18972	28	0	140	0	0	0	Slow
+24579	56	2	20	0	0	0	Demoralizing Screech
+8103	22	0	110	0	0	0	Mind Blast
+19979	60	0	135	0	0	0	Blessing of Light
+1949	30	0	645	0	0	0	Hellfire
+20308	52	0	160	0	0	0	Seal of the Crusader
+1277455	10	0	0	0	3	0	Confounding Flash
+12058	20	0	150	0	0	0	Chain Lightning
+412123	60	0	140	0	0	0	Mana Shield
+10396	56	0	560	0	0	0	Healing Wave
+8176	30	0	0	0	100	0	Summon Felhunter
+17402	60	0	1495	0	0	0	Hurricane
+1752	1	3	45	0	0	1757	Sinister Strike
+461830	6	1	200	0	0	0	Thunder Clap
+16339	36	0	105	0	0	0	Flametongue Weapon
+18833	30	0	80	0	0	0	Firebolt
+18763	0	0	98	0	0	0	Freeze
+2878	24	0	35	0	0	0	Turn Undead
+15207	50	0	190	0	0	0	Lightning Bolt
+23028	56	0	3400	0	0	0	Arcane Brilliance
+17194	20	0	110	0	0	0	Mind Blast
+24300	60	0	200	0	0	0	Drain Life
+11300	56	3	35	0	0	31016	Eviscerate
+11300	56	4	1	0	0	31016	Eviscerate
+17682	1	0	75	6	0	0	Drain Mana
+11703	44	0	225	0	0	0	Drain Mana
+1242971	60	0	265	0	0	0	Unstable Affliction
+3698	20	-2	15	0	0	0	Health Funnel
+16006	20	0	150	0	0	0	Chain Lightning
+6066	36	0	250	0	0	0	Power Word: Shield
+17923	58	0	168	0	0	0	Searing Pain
+17962	40	0	165	0	0	0	Conflagrate
+27636	0	0	500	0	0	0	Starshards
+25260	60	0	210	0	0	0	Wings of Despair
+1112	30	0	28	0	0	0	Shadow Nova II
+8008	28	0	145	0	0	0	Lesser Healing Wave
+10537	42	0	120	0	0	0	Fire Resistance Totem
+15288	52	0	90	4	0	0	Fury of Ragnaros
+10963	46	0	455	0	0	0	Greater Heal
+16811	28	0	80	0	0	0	Nature's Grasp
+1264502	60	2	20	0	0	0	Swipe
+20419	34	0	120	0	0	0	Seal of Fury
+22827	40	3	35	0	0	22828	Ferocious Bite
+22827	40	4	1	0	0	22828	Ferocious Bite
+27626	32	0	0	0	5	0	Purge
+11980	1	0	105	5	0	0	Curse of Weakness
+408683	8	0	50	0	0	0	Earth Shock
+8092	10	0	50	0	0	0	Mind Blast
+20617	52	1	100	0	0	0	Intercept
+1264929	36	2	35	0	0	1264930	Dismember
+1238215	60	0	1050	0	0	0	Wild Growth
+12550	1	0	5	5	0	0	Lightning Shield
+14280	56	0	215	0	0	0	Viper Sting
+16812	38	0	95	0	0	0	Nature's Grasp
+10193	60	0	140	0	0	0	Mana Shield
+10623	54	0	405	0	0	0	Chain Heal
+12742	20	0	95	0	0	0	Immolate
+15785	20	0	95	0	0	0	Mana Burn
+1213276	20	0	90	0	0	0	Frostbolt
+5211	14	1	100	0	0	6798	Bash
+12523	36	0	240	0	0	0	Pyroblast
+9908	54	1	200	0	0	0	Swipe
+10927	44	0	250	0	0	0	Renew
+19310	44	0	160	0	0	0	Shadowguard
+14282	20	0	50	0	0	0	Arcane Shot
+1248131	20	0	90	0	0	0	Fireball
+8398	20	0	180	0	0	0	Frostbolt Volley
+438341	1	0	5	5	0	0	Renew
+23923	48	1	200	0	0	23924	Shield Slam
+10601	60	0	180	0	0	0	Nature Resistance Totem
+27621	52	0	250	0	0	0	Windfury Totem
+8042	4	0	30	0	0	0	Earth Shock
+2098	1	3	35	0	0	6760	Eviscerate
+2098	1	4	1	0	0	6760	Eviscerate
+1265904	60	2	10	0	0	0	Dust Cloud
+14311	60	0	100	0	0	0	Freezing Trap
+7648	34	0	160	0	0	0	Corruption
+436944	48	0	615	0	0	0	Regrowth
+10432	56	0	370	0	0	0	Lightning Shield
+11554	34	1	100	0	0	11555	Demoralizing Shout
+1510	40	0	350	0	0	0	Volley
+17314	52	0	165	0	0	0	Mind Flay
+512	30	0	35	0	0	0	Chains of Ice
+10965	58	0	655	0	0	0	Greater Heal
+24844	1	2	50	0	0	25008	Lightning Breath
+24309	60	0	200	0	0	0	Powerful Healing Ward
+402174	30	0	100	0	0	0	Penance
+20560	56	1	100	0	0	0	Mocking Blow
+2651	20	0	0	0	3	0	Elune's Grace
+475	18	0	0	0	10	0	Remove Lesser Curse
+10177	52	0	255	0	0	0	Frost Ward
+7808	35	0	225	0	0	0	Flameblade
+12505	24	0	150	0	0	0	Pyroblast
+17142	20	0	115	0	0	0	Holy Fire
+13140	20	0	90	4	0	0	Fireball
+16067	35	0	80	0	0	0	Arcane Blast
+12468	20	0	260	0	0	0	Flamestrike
+30095	20	0	120	0	0	0	Cone of Cold
+15800	20	0	95	5	0	0	Mana Burn
+686	1	0	25	0	0	0	Shadow Bolt
+23148	50	2	20	0	0	0	Dive
+10318	60	0	805	0	0	0	Holy Wrath
+25815	60	0	210	0	0	0	Frightening Shriek
+698	20	0	300	0	0	0	Ritual of Summoning
+455989	0	0	250000	0	0	0	Decisive Strike
+5699	34	0	475	0	0	0	Create Healthstone
+401955	1	0	0	0	12	0	Shadow Word: Death
+10912	58	0	750	0	0	0	Mind Control
+5862	22	0	66	0	0	0	Blessing of Aman
+1221404	32	0	50	0	0	0	Enchanted Flare
+458482	1	0	100	0	0	0	Wyvern Strike
+11416	40	0	850	0	0	0	Portal: Ironforge
+25295	60	0	250	0	0	0	Serpent Sting
+1098	30	0	300	0	0	0	Subjugate Demon
+27527	20	0	250	0	0	0	Healing Touch
+13033	58	0	480	0	0	0	Ice Barrier
+1218134	60	0	270	0	0	0	Tranquilizing Shot
+10205	46	0	115	0	0	0	Scorch
+15230	20	0	90	0	0	0	Arcane Bolt
+16362	60	0	165	0	0	0	Windfury Weapon
+26652	40	1	300	0	0	0	Copy of Mortal Strike
+20903	52	0	260	0	0	0	Aimed Shot
+8951	42	0	230	0	0	0	Starfire
+1310180	12	0	40	0	0	0	Wing Clip
+14917	20	2	15	0	0	14918	Growl
+16429	55	0	300	0	0	0	Piercing Shadow
+7320	40	0	320	0	0	0	Ice Armor
+15208	56	0	220	0	0	0	Lightning Bolt
+15305	20	0	150	0	0	0	Chain Lightning
+9834	52	0	325	0	0	0	Moonfire
+19742	14	0	30	0	0	0	Blessing of Wisdom
+450659	20	0	9	0	0	0	Shadow Bolt
+20421	42	0	140	0	0	0	Seal of Fury
+5145	24	0	235	0	0	0	Arcane Missiles
+23592	30	0	20	0	0	0	Lightning Bolt
+15592	60	0	18	0	0	0	Firebolt
+17741	20	0	40	0	0	0	Mana Shield
+11273	44	3	25	0	0	11274	Rupture
+11273	44	4	1	0	0	11274	Rupture
+15107	36	0	115	0	0	0	Windwall Totem
+19305	58	0	350	0	0	0	Starshards
+6219	34	0	605	0	0	0	Rain of Fire
+18502	0	0	200	0	0	0	Curse of Hakkar
+28448	20	0	160	0	0	0	Shadow Bolt Volley
+417066	58	0	335	0	0	0	Rejuvenation
+462590	60	0	160	0	0	0	Shadow Bolt Volley
+10901	60	0	500	0	0	0	Power Word: Shield
+1160	14	1	100	0	0	6190	Demoralizing Shout
+14918	30	2	15	0	0	14919	Growl
+23959	60	3	60	0	0	0	Test Stab R50
+1042	30	0	275	0	0	0	Holy Light
+14285	44	0	135	0	0	0	Arcane Shot
+417440	1	1	100	0	0	0	Thrash (Bear)
+1265899	12	2	10	0	0	1265901	Dust Cloud
+17290	20	0	90	0	0	0	Fireball
+25299	60	0	360	0	0	0	Rejuvenation
+5614	28	0	135	0	0	0	Exorcism
+8075	10	0	25	0	0	0	Strength of Earth Totem
+461330	0	0	250000	0	0	0	Decisive Strike
+1499	20	0	50	0	0	0	Freezing Trap
+408690	60	0	450	0	0	0	Earth Shock
+10211	48	0	500	0	0	0	Arcane Missiles
+20806	20	0	90	0	0	0	Frostbolt
+1226282	20	0	90	0	0	0	Shadow Bolt
+20929	48	0	275	0	0	0	Holy Shock
+25297	60	0	840	0	0	0	Healing Touch
+1264494	12	2	20	0	0	1264497	Swipe
+4987	42	0	0	0	8	0	Cleanse
+9634	40	0	0	0	55	0	Dire Bear Form
+759	28	0	530	0	0	0	Conjure Mana Agate
+1006	40	0	165	0	0	0	Inner Fire
+7646	32	0	95	0	0	0	Curse of Weakness
+5784	40	0	100	0	0	0	Summon Felsteed
+18327	30	0	30	0	0	0	Silence
+3747	24	0	175	0	0	0	Power Word: Shield
+18	0	0	10	0	0	0	Heal Self (TEST)
+3563	20	0	120	0	0	0	Teleport: Undercity
+24248	56	3	35	0	0	0	Copy of Ferocious Bite
+17925	50	0	525	0	0	0	Death Coil
+6205	22	0	70	0	0	0	Curse of Weakness
+782	14	0	60	0	0	0	Thorns
+26643	20	0	20	0	0	0	Arcane Explosion
+20165	30	0	110	0	0	0	Seal of Light
+7651	38	0	185	0	0	0	Drain Life
+1286253	60	0	130	0	0	0	(DNT) Blessing of Might - TEST RAID SPELL
+26042	60	0	210	0	0	0	Psychic Scream
+11717	56	0	115	0	0	0	Curse of Recklessness
+11566	48	1	150	0	0	11567	Heroic Strike
+24976	50	0	140	0	0	0	Insect Swarm
+20043	46	0	90	0	0	0	Aspect of the Wild
+6487	20	0	50	0	0	0	Ilkrud's Guardians
+6547	20	1	100	0	0	6548	Rend
+10614	52	0	250	0	0	0	Windfury Totem
+6905	0	0	50	0	0	0	Summon Illusionary Nightmare
+14129	30	0	40	0	0	0	Item - Purify
+20277	62	0	50	0	0	0	Fist of Ragnaros
+18166	32	0	0	0	10	0	Summon Undead Ravager
+427717	40	0	200	0	0	0	Unstable Affliction
+15783	1	0	8	8	0	0	Blizzard
+1106	28	0	160	0	0	0	Shadow Bolt
+14322	58	0	110	0	0	0	Aspect of the Hawk
+14903	20	3	25	0	0	0	Rupture
+14903	20	4	1	0	0	0	Rupture
+1008	18	0	150	0	0	0	Amplify Magic
+24583	24	2	30	0	0	24586	Scorpid Poison
+17146	20	0	95	0	0	0	Shadow Word: Pain
+18112	60	0	18	0	0	0	Firebolt
+16813	48	0	110	0	0	0	Nature's Grasp
+1316474	20	0	95	0	0	0	Moonfire
+145	12	0	65	0	0	0	Fireball
+24450	30	2	40	0	0	24452	Prowl
+7301	20	0	170	0	0	0	Frost Armor
+14319	28	0	50	0	0	0	Aspect of the Hawk
+19941	42	0	90	0	0	0	Flash of Light
+15532	20	0	75	0	0	0	Frost Nova
+12471	20	0	90	0	0	0	Shadow Bolt
+15531	20	0	75	0	0	0	Frost Nova
+15234	20	0	90	0	0	0	Lightning Bolt
+10876	56	0	270	0	0	0	Mana Burn
+403228	1	1	150	0	0	0	Meathook
+20922	40	0	320	0	0	0	Consecration
+6809	26	1	150	0	0	8972	Maul
+18138	30	0	40	0	0	0	Shadow Bolt
+13877	1	3	25	0	0	0	Blade Flurry
+15801	20	0	90	0	0	0	Lightning Bolt
+23267	30	0	80	0	0	0	Firebolt
+8788	32	0	185	0	0	0	Lightning Shield
+428878	1	0	0	0	20	0	Balefire Bolt
+20292	50	0	170	0	0	0	Seal of Righteousness
+5179	22	0	50	0	0	0	Wrath
+855	34	0	20	0	0	0	Feeblemind III
+22829	56	3	35	0	0	31018	Ferocious Bite
+22829	56	4	1	0	0	31018	Ferocious Bite
+10937	48	0	1170	0	0	0	Power Word: Fortitude
+28447	50	0	380	0	0	0	Shadow Burst
+20289	26	0	90	0	0	0	Seal of Righteousness
+15043	20	0	90	0	0	0	Frostbolt
+42896	76	0	0	0	7	0	Arcane Blast
+15044	20	0	95	0	0	0	Frost Ward
+14032	20	0	95	0	0	0	Shadow Word: Pain
+3207	50	0	1	0	0	0	Sol U
+15616	20	0	110	0	0	0	Flame Shock
+2094	34	3	30	0	0	0	Blind
+19275	60	0	230	0	0	0	Feedback
+15054	24	3	30	0	0	0	Distract Test
+7400	26	1	100	0	0	7402	Mocking Blow
+9756	44	0	240	0	0	0	Thorns
+8134	40	0	240	0	0	0	Lightning Shield
+464592	60	0	90	0	0	0	Fireball Volley
+409580	1	0	0	0	8	0	Heart of the Lion
+1235827	58	1	150	0	0	0	Lacerate
+26177	12	2	35	0	0	26178	Charge
+408120	40	0	550	0	0	0	Wild Growth
+417062	34	0	160	0	0	0	Rejuvenation
+14267	38	0	60	0	0	0	Wing Clip
+2973	1	0	10	0	0	0	Raptor Strike
+11899	34	0	120	0	0	0	Healing Ward
+11419	50	0	850	0	0	0	Portal: Darnassus
+8143	18	0	60	0	0	0	Tremor Totem
+17173	20	0	75	5	0	0	Drain Life
+16415	60	0	45	0	0	0	Fireball
+2061	20	0	125	0	0	0	Flash Heal
+427742	1	0	0	0	10	0	Anguish
+13549	10	0	30	0	0	0	Serpent Sting
+1311590	50	0	1000	0	0	0	Light's Vigil
+9898	52	1	100	0	0	0	Demoralizing Roar
+974	50	0	0	0	15	0	Earth Shield
+20824	20	0	90	0	0	0	Lightning Bolt
+408247	1	0	0	0	26	0	Nourish
+440882	1	0	0	0	3	0	Infernal Armor
+8941	36	0	250	0	0	0	Regrowth
+18647	48	0	200	0	0	0	Banish
+14106	30	0	40	0	0	0	Shadow Bolt
+11	20	0	33	0	0	0	Swiftness
+461634	56	0	155	0	0	0	Flametongue Weapon
+15041	20	0	95	0	0	0	Fire Ward
+370	12	0	0	0	10	0	Purge
+17234	20	0	135	0	0	0	Shadow Shock
+8994	28	0	100	0	0	0	Banish
+14273	48	0	150	0	0	0	Disengage
+13952	20	0	150	0	0	0	Holy Light
+412120	36	0	80	0	0	0	Mana Shield
+695	6	0	40	0	0	0	Shadow Bolt
+15659	20	0	150	0	0	0	Chain Lightning
+462716	60	3	60	0	0	0	Backstab
+1266642	20	0	180	0	0	0	Frostbolt Volley
+1026	22	0	190	0	0	0	Holy Light
+17238	20	0	75	5	0	0	Drain Life
+12294	40	1	300	0	0	21551	Mortal Strike
+15039	20	0	110	0	0	0	Flame Shock
+17364	40	0	125	0	0	0	Stormstrike
+11113	30	0	215	0	0	0	Blast Wave
+17243	1	0	75	6	0	0	Drain Mana
+11665	40	0	220	0	0	0	Immolate
+1239700	60	0	0	0	15	0	Arcane Blast
+14119	30	0	20	0	0	0	Lightning Bolt
+14325	58	0	60	0	0	0	Hunter's Mark
+1753	15	2	15	0	0	1754	Cower
+15537	20	0	90	0	0	0	Shadow Bolt
+461810	58	1	200	0	0	0	Thunder Clap
+13339	20	0	120	0	0	0	Fire Blast
+14134	6	0	25	0	0	0	Item - Purify
+15431	36	0	400	0	0	0	Holy Nova
+15487	0	0	225	0	0	0	Silence
+6074	14	0	65	0	0	0	Renew
+14284	36	0	105	0	0	0	Arcane Shot
+9474	38	0	215	0	0	0	Flash Heal
+15654	20	0	95	0	0	0	Shadow Word: Pain
+1265039	24	2	25	0	0	1265040	Tendon Rip
+412205	32	0	135	0	0	0	Frost Ward
+13163	4	0	20	0	0	0	Aspect of the Monkey
+18199	30	0	45	0	0	0	Fireball
+13555	58	0	230	0	0	0	Serpent Sting
+12528	30	0	30	0	0	0	Silence
+15653	20	0	90	4	0	0	Acid Spit
+19244	36	0	120	0	0	19647	Spell Lock
+19577	30	0	0	0	8	0	Intimidation
+20116	30	0	235	0	0	0	Consecration
+19736	54	0	215	0	0	0	Devour Magic
+11779	52	0	145	0	0	11780	Lash of Pain
+9745	42	1	150	0	0	9880	Maul
+20770	58	0	0	0	75	0	Resurrection
+16314	34	0	100	0	0	0	Rockbiter Weapon
+5209	28	1	150	0	0	0	Challenging Roar
+12824	20	0	90	0	0	0	Polymorph
+1706	34	0	100	0	0	0	Levitate
+434838	30	0	20	0	0	0	Lightning Bolt
+19775	62	0	500	0	0	0	Dark Mending
+3206	50	0	1	0	0	0	Sol H
+23214	60	0	150	0	0	0	Summon Charger
+10161	58	0	555	0	0	0	Cone of Cold
+15981	20	0	90	0	0	0	Rejuvenation
+415068	20	0	85	0	0	0	Exorcism
+2951	36	0	32	0	0	0	Hellfire III
+13322	20	0	90	0	0	0	Frostbolt
+11639	20	0	95	0	0	0	Shadow Word: Pain
+402668	1	0	0	0	16	0	Vampiric Touch
+20559	46	1	100	0	0	20560	Mocking Blow
+13161	30	0	50	0	0	0	Aspect of the Beast
+1293818	32	0	130	0	0	0	Conflagrate
+425012	1	3	25	0	0	0	Poisoned Knife
+408687	24	0	145	0	0	0	Earth Shock
+6391	28	0	55	0	0	0	Stoneclaw Totem
+14263	32	0	55	0	0	0	Raptor Strike
+12748	20	0	75	0	0	0	Frost Nova
+11551	52	1	100	0	0	25289	Battle Shout
+5259	0	0	2	0	0	0	Disarm (TEST)
+14262	24	0	45	0	0	0	Raptor Strike
+11675	52	0	290	0	0	0	Drain Soul
+20927	50	0	195	0	0	0	Holy Shield
+11835	20	0	125	0	0	0	Power Word: Shield
+11780	60	0	160	0	0	0	Lash of Pain
+6798	30	1	100	0	0	8983	Bash
+12466	20	0	90	0	0	0	Fireball
+19734	46	0	170	0	0	19736	Devour Magic
+11280	52	3	60	0	0	11281	Backstab
+462712	28	3	60	0	0	0	Backstab
+12492	20	0	145	0	0	0	Healing Wave
+11771	54	0	165	0	0	0	Fire Shield
+11726	58	0	700	0	0	0	Subjugate Demon
+8000	27	0	160	0	0	0	Area Burn
+17633	1	0	10	2	0	0	Arcane Focus
+1010	38	0	110	0	0	0	Curse of Idiocy
+1966	16	3	20	0	0	6768	Feint
+15501	20	0	130	0	0	0	Earth Shock
+22828	48	3	35	0	0	22829	Ferocious Bite
+22828	48	4	1	0	0	22829	Ferocious Bite
+15237	20	0	185	0	0	0	Holy Nova
+19775	62	0	500	0	0	0	Dark Mending
+1264735	12	2	50	0	0	1264736	Pinch
+11707	42	0	130	0	0	0	Curse of Weakness
+3332	40	0	29	0	0	0	Slow Poison
+1179	1	0	7	0	0	0	Beast Claws
+11831	20	0	75	0	0	0	Frost Nova
+7322	20	0	65	0	0	0	Frostbolt
+436943	42	0	510	0	0	0	Regrowth
+8155	24	0	90	0	0	0	Stoneskin Totem
+5506	20	0	180	0	0	0	Conjure Water
+1237951	60	0	0	0	75	0	Revive
+436940	30	0	350	0	0	0	Regrowth
+13553	42	0	150	0	0	0	Serpent Sting
+18266	20	0	75	0	0	0	Curse of Agony
+409433	1	0	0	0	6	0	Chimera Shot
+2974	12	0	40	0	0	0	Wing Clip
+6913	30	0	50	0	0	0	Force of Nature
+407988	44	3	25	0	0	0	Savage Roar
+407988	44	4	1	0	0	0	Savage Roar
+20006	55	0	70	0	0	0	Unholy Curse
+5252	20	0	50	0	0	0	Voidwalker Guardian
+10933	46	0	230	0	0	0	Smite
+8124	28	0	140	0	0	0	Psychic Scream
+11418	40	0	850	0	0	0	Portal: Undercity
+19854	54	0	115	0	0	0	Blessing of Wisdom
+10916	50	0	315	0	0	0	Flash Heal
+28608	58	0	215	0	0	0	Test Curse of Agony
+2591	28	3	60	0	0	8721	Backstab
+11417	40	0	850	0	0	0	Portal: Orgrimmar
+12292	30	1	300	0	0	0	Sweeping Strikes
+11436	28	0	140	0	0	0	Slow
+10955	60	0	150	0	0	0	Shackle Undead
+14324	40	0	45	0	0	0	Hunter's Mark
+11649	40	0	90	0	0	0	Detect Invisibility
+20773	60	0	0	0	80	0	Redemption
+1075	24	0	105	0	0	0	Thorns
+11444	20	0	50	5	0	0	Shackle Undead
+8408	38	0	160	0	0	0	Frostbolt
+20755	40	0	0	0	85	0	Create Soulstone
+6800	30	3	60	0	0	8992	Shred
+1309633	40	0	205	0	0	0	Shadow Word: Death
+11962	20	0	95	0	0	0	Immolate
+3034	36	0	135	0	0	0	Viper Sting
+168	1	0	60	0	0	0	Frost Armor
+23850	60	1	300	0	0	0	Test Strike W35
+3627	34	0	160	0	0	0	Rejuvenation
+11426	40	0	305	0	0	0	Ice Barrier
+2610	36	0	260	0	0	0	Shock
+13878	22	0	50	0	0	0	Scorch
+16190	40	0	10	0	0	0	Mana Tide Totem
+407880	1	0	0	0	2	0	Inspiration Exemplar
+10329	54	0	580	0	0	0	Holy Light
+17399	20	0	135	0	0	0	Shadow Shock
+9880	50	1	150	0	0	9881	Maul
+20792	20	0	90	0	0	0	Frostbolt
+9005	36	3	50	0	0	9823	Pounce
+11829	20	0	260	0	0	0	Flamestrike
+8494	28	0	60	0	0	0	Mana Shield
+696	10	0	120	0	0	0	Demon Skin
+6131	40	0	115	0	0	0	Frost Nova
+13542	44	0	300	0	0	0	Mend Pet
+462719	26	3	60	0	0	0	Ambush
+9473	32	0	185	0	0	0	Flash Heal
+142	0	0	10	0	0	0	New Magic Missile (Test)
+6076	26	0	140	0	0	0	Renew
+9884	50	0	340	0	0	0	Mark of the Wild
+425874	1	0	0	0	11	0	Decoy Totem
+555	20	0	22	0	0	0	Feral Spirit
+412121	44	0	100	0	0	0	Mana Shield
+19776	20	0	95	0	0	0	Shadow Word: Pain
+769	34	1	200	0	0	9754	Swipe
+16231	28	0	70	0	0	0	Curse of Recklessness
+5573	18	0	35	0	0	0	Divine Protection
+13896	20	0	55	0	0	0	Feedback
+679	6	0	5	0	0	0	Holy Strike
+6117	34	0	270	0	0	0	Mage Armor
+16583	20	0	135	0	0	0	Shadow Shock
+11581	58	1	200	0	0	0	Thunder Clap
+1233079	0	0	235	0	0	0	Radiant Missiles
+2860	48	0	390	0	0	0	Chain Lightning
+15241	22	0	50	0	0	0	Scorch
+7658	28	0	60	0	0	0	Curse of Recklessness
+7659	42	0	90	0	0	0	Curse of Recklessness
+2139	24	0	100	0	0	0	Counterspell
+9672	20	0	90	0	0	0	Frostbolt
+10875	48	0	225	0	0	0	Mana Burn
+1777	18	3	45	0	0	8629	Gouge
+22822	1	0	8	8	0	0	Starshards
+9867	58	3	60	0	0	0	Ravage
+10165	42	0	340	0	0	0	Khadgar's Unlocking
+5569	44	0	17	0	0	0	Holy Strike
+18265	30	0	150	0	0	0	Siphon Life
+23145	30	2	20	0	0	23147	Dive
+1297659	50	0	120	0	0	0	Teleport: Dalaran
+24239	60	0	425	0	0	0	Hammer of Wrath
+23147	40	2	20	0	0	23148	Dive
+24006	6	0	60	0	0	0	Bounty of the Harvest
+22272	20	0	235	0	0	0	Arcane Missiles
+17137	20	0	125	0	0	0	Flash Heal
+27640	20	0	60	0	0	0	Baron Rivendare's Soul Drain
+17150	52	0	90	4	0	0	Arcane Might
+22883	20	0	215	0	0	0	Heal
+14919	40	2	15	0	0	14920	Growl
+2948	22	0	50	0	0	0	Scorch
+23413	0	0	400	0	0	0	Arcane Explosion
+24212	1	0	350	0	0	0	Shadow Word: Pain
+25309	60	0	380	0	0	0	Immolate
+22568	32	3	35	0	0	22827	Ferocious Bite
+22568	32	4	1	0	0	22827	Ferocious Bite
+1220751	60	0	450	0	0	0	Earth Shock
+22666	30	0	30	0	0	0	Silence
+23415	40	0	100	0	0	0	Improved Blessing of Protection
+22357	20	0	90	0	0	0	Icebolt
+23412	0	0	300	0	0	0	Frostbolt
+23038	20	0	110	0	0	0	Flame Shock
+647	14	0	110	0	0	0	Holy Light
+3658	32	0	50	0	0	0	Summon Theurgist
+25008	12	2	50	0	0	25009	Lightning Breath
+2791	36	0	745	0	0	0	Power Word: Fortitude
+1265880	36	2	20	0	0	1265881	Web
+24119	40	0	65	0	0	0	Lacerate
+23881	40	1	300	0	0	23892	Bloodthirst
+15096	20	0	110	0	0	0	Flame Shock
+25780	16	0	0	0	30	0	Righteous Fury
+7645	10	0	30	0	0	0	Dominate Mind
+25300	60	3	60	0	0	0	Backstab
+29515	1	0	1	0	0	0	TEST Scorch
+325	16	0	80	0	0	0	Lightning Shield
+8824	99	0	55	0	0	0	Crusader Strike
+9849	48	3	45	0	0	9850	Claw
+24858	40	0	0	0	35	0	Moonkin Form
+446338	20	0	150	0	0	0	Chain Lightning
+592	12	0	80	0	0	0	Power Word: Shield
+22947	20	0	95	0	0	0	Mana Burn
+24185	1	0	200	0	0	0	Bloodlust
+24393	60	1	300	0	0	0	Test Strike
+462714	44	3	60	0	0	0	Backstab
+10915	44	0	265	0	0	0	Flash Heal
+25009	24	2	50	0	0	25010	Lightning Breath
+24415	28	0	140	0	0	0	Slow
+10456	38	0	110	0	0	0	Frostbrand Weapon
+11700	54	0	300	0	0	0	Drain Life
+15859	10	0	30	0	0	0	Dominate Mind
+7816	36	0	105	0	0	11778	Lash of Pain
+23892	48	1	300	0	0	23893	Bloodthirst
+24335	60	0	205	0	0	0	Wyvern Sting
+23110	50	2	20	0	0	0	Dash
+468766	60	0	845	0	0	0	Conjure Water
+12548	20	0	115	0	0	0	Frost Shock
+425207	1	0	0	0	4	0	Power Word: Barrier
+20828	20	0	120	0	0	0	Cone of Cold
+23859	20	0	75	0	0	0	Dispel Magic
+24053	30	0	300	0	0	0	Hex
+24618	20	0	75	5	0	0	Drain Life
+596	30	0	410	0	0	0	Prayer of Healing
+23109	40	2	20	0	0	23110	Dash
+14900	20	0	150	0	0	0	Chain Heal
+27565	28	0	100	0	0	0	Banish
+11969	20	0	95	0	0	0	Fire Nova
+23952	1	0	350	0	0	0	Shadow Word: Pain
+8721	36	3	60	0	0	11279	Backstab
+24669	1	0	250	0	0	0	Rain of Fire
+25359	60	0	310	0	0	0	Grace of Air Totem
+24974	30	0	85	0	0	0	Insect Swarm
+24605	24	2	60	0	0	24603	Furious Howl
+25357	60	0	620	0	0	0	Healing Wave
+25361	60	0	275	0	0	0	Strength of Earth Totem
+408688	36	0	240	0	0	0	Earth Shock
+10060	40	0	0	0	20	0	Power Infusion
+21791	20	0	200	0	0	0	Tranquility
+23953	1	0	100	0	0	0	Mind Flay
+27632	60	0	310	0	0	0	Aimed Shot
+23925	60	1	200	0	0	0	Shield Slam
+24611	0	0	90	0	0	0	Fireball
+24672	1	0	200	0	0	0	Unholy Frenzy
+25515	0	0	50	0	0	0	Bash
+2351	7	0	11	0	0	0	Sanctuary
+13326	20	0	90	4	0	0	Arcane Intellect
+2050	1	0	30	0	0	0	Lesser Heal
+24275	44	0	295	0	0	0	Hammer of Wrath
+24587	56	2	30	0	0	0	Scorpid Poison
+25894	54	0	230	0	0	0	Greater Blessing of Wisdom
+436939	24	0	280	0	0	0	Regrowth
+444678	48	2	50	0	0	444681	Lava Breath
+24586	40	2	30	0	0	24587	Scorpid Poison
+24577	24	2	20	0	0	24578	Demoralizing Screech
+11988	20	0	90	0	0	0	Fireball Volley
+13482	30	0	20	0	0	0	Lightning Bolt
+20928	60	0	240	0	0	0	Holy Shield
+23951	1	0	450	0	0	0	Bloodlust
+24578	48	2	20	0	0	24579	Demoralizing Screech
+24977	60	0	160	0	0	0	Insect Swarm
+417059	16	0	75	0	0	0	Rejuvenation
+9579	30	0	125	0	0	0	Fade
+25290	60	0	125	0	0	0	Blessing of Wisdom
+28683	1	3	25	0	0	0	Leap
+26090	30	2	60	0	0	26187	Thunderstomp
+2053	10	0	75	0	0	0	Lesser Heal
+25011	48	2	50	0	0	25012	Lightning Breath
+25345	56	0	655	0	0	0	Arcane Missiles
+24957	20	0	95	0	0	0	Moonfire
+403843	36	0	105	0	0	0	Shadow Cleave
+1240771	38	0	215	0	0	0	Binding Heal
+1311595	60	0	1340	0	0	0	Light's Vigil
+27286	1	0	100	0	0	0	Shadow Wrath
+19850	24	0	45	0	0	0	Blessing of Wisdom
+1229236	0	0	100	0	0	0	Reclamation
+446299	22	0	100	0	0	0	Familiar Chaos
+26098	20	0	90	0	0	0	Lightning Bolt
+19279	52	0	810	0	0	0	Devouring Plague
+402790	20	0	0	0	5	0	Shadow Bolt
+8724	26	3	60	0	0	8725	Ambush
+25058	20	0	90	0	0	0	Renew
+407788	1	0	0	0	8	0	Avenging Wrath
+469142	30	0	50	0	0	0	Force of Nature
+1240044	34	0	70	0	0	0	Ice Lance
+26006	20	0	90	0	0	0	Shadow Bolt
+403629	1	0	0	0	7	0	Chaos Bolt
+24668	20	0	250	0	0	0	Shadow Bolt
+25286	60	1	150	0	0	0	Heroic Strike
+26194	20	0	130	0	0	0	Earth Shock
+72	12	1	100	0	0	1671	Shield Bash
+16341	46	0	130	0	0	0	Flametongue Weapon
+19775	62	0	500	0	0	0	Dark Mending
+11431	20	0	180	0	0	0	Healing Touch
+2537	99	0	25	0	0	0	Crusader Strike
+27759	0	0	10	0	0	0	Shield Generator
+1312438	30	0	40	0	0	0	Shadow Bolt
+26458	0	0	24000	0	0	0	Shock Blast
+28272	60	0	150	0	0	0	Polymorph
+29317	20	0	90	0	0	0	Shadow Bolt
+26386	20	0	95	0	0	0	Copy of Moonfire
+13745	20	0	120	0	0	0	Arcane Explosion
+403852	60	0	190	0	0	0	Shadow Cleave
+228	30	0	120	0	0	0	Polymorph: Chicken
+440488	1	1	150	0	0	0	Shockwave
+431681	0	0	0	0	21	0	Void Zone
+27609	36	0	0	0	18	0	Dispel Magic
+27618	60	0	1400	0	0	0	Blizzard
+6129	32	0	285	0	0	0	Conjure Food
+11443	1	0	0	0	8	0	Cripple
+27624	60	0	380	0	0	0	Lesser Healing Wave
+2687	10	-2	0	0	20	0	Bloodrage
+27619	4	0	15	0	0	0	Ice Block
+17145	20	0	120	0	0	0	Blast Wave
+1220750	48	0	345	0	0	0	Earth Shock
+25672	0	0	25000	0	0	0	Arcane Eruption
+680	28	0	14	0	0	0	Holy Strike
+1319257	1	0	75	0	0	0	Holy Strike
+10898	42	0	300	0	0	0	Power Word: Shield
+20902	44	0	210	0	0	0	Aimed Shot
+458312	1	0	15	0	0	0	Divine Protection
+11303	52	3	20	0	0	25302	Feint
+1265843	12	2	20	0	0	1265878	Web
+401556	1	0	0	0	11	0	Living Flame
+436383	30	0	95	0	0	0	Bloodlight Offering
+15497	20	0	90	0	0	0	Frostbolt
+27986	34	0	100	0	0	0	Levitate
+28270	60	0	150	0	0	0	Polymorph: Cow
+434523	1	0	0	0	10	0	Lava Burst
+8451	36	0	300	0	0	0	Dampen Magic
+7870	32	0	100	0	0	0	Lesser Invisibility
+20217	20	0	0	0	8	0	Blessing of Kings
+10958	56	0	650	0	0	0	Shadow Protection
+403842	28	0	80	0	0	0	Shadow Cleave
+403841	20	0	55	0	0	0	Shadow Cleave
+409379	1	0	0	0	1.5	0	Kill Command
+27753	60	0	100	0	0	0	Freezing Trap
+469673	1	0	100	0	0	0	Collateral Sting
+6277	0	0	0	0	50	0	Bind Sight (PT)
+26573	20	0	135	0	0	0	Consecration
+10917	56	0	380	0	0	0	Flash Heal
+16250	20	0	90	0	0	0	Fireball Volley
+27606	56	0	365	0	0	0	Renew
+403677	14	0	110	0	0	0	Drain Life
+27800	52	0	635	0	0	0	Holy Nova
+27610	56	0	210	0	0	0	Psychic Scream
+403835	1	0	12	0	0	0	Shadow Cleave
+6392	38	0	75	0	0	0	Stoneclaw Totem
+417065	52	0	280	0	0	0	Rejuvenation
+412209	52	0	255	0	0	0	Frost Ward
+27605	58	0	470	0	0	0	Shadow Word: Pain
+30094	20	0	75	0	0	0	Frost Nova
+14268	60	0	80	0	0	0	Wing Clip
+1009	10	2	45	0	0	0	Savage Pummel
+14260	8	0	25	0	0	0	Raptor Strike
+17393	20	0	90	0	0	0	Shadow Bolt
+14517	20	0	40	2	0	0	Crusader Strike
+438339	20	0	145	0	0	0	Healing Wave
+28788	1	0	95	0	0	0	Cleanse
+9910	54	0	320	0	0	0	Thorns
+10585	36	0	360	0	0	0	Magma Totem
+20683	62	0	100	0	0	0	Highlord's Justice
+19853	44	0	90	0	0	0	Blessing of Wisdom
+447546	20	0	90	0	0	0	Fireball
+755	12	-2	11	0	0	0	Health Funnel
+415342	48	0	85	0	0	0	Raptor Strike
+6197	14	0	25	0	0	0	Eagle Eye
+417064	46	0	235	0	0	0	Rejuvenation
+1310707	30	3	60	0	0	399956	Mutilate
+350025	8	0	35	0	0	0	Frostbolt
+350026	12	0	70	0	0	0	Shadow Bolt
+10185	44	0	935	0	0	0	Blizzard
+364908	62	0	500	0	0	0	Dark Mending
+12151	1	0	150	0	0	0	Summon Atal'ai Skeleton
+428713	1	0	0	0	15	0	Barkskin
+20680	62	0	150	0	0	0	Blizzard
+18278	60	0	30	0	0	0	Silence
+12096	8	0	35	4	0	0	Fear
+20164	22	0	0	0	13	0	Seal of Justice
+400623	54	0	340	0	0	0	Fire Blast
+10215	48	0	815	0	0	0	Flamestrike
+425275	50	0	305	0	0	0	Renew
+414644	42	1	150	0	0	1235826	Lacerate
+8940	30	0	210	0	0	0	Regrowth
+461827	38	1	200	0	0	0	Thunder Clap
+398196	1	3	25	0	0	0	Quick Draw
+398199	10	3	40	0	0	0	Hubris Tunic
+436564	1	3	20	0	0	0	Blunderbuss
+400012	1	3	25	0	0	0	Blade Dance
+400012	1	4	1	0	0	0	Blade Dance
+400574	20	0	0	0	15	0	Arcane Blast
+400618	6	0	40	0	0	0	Fire Blast
+400621	38	0	220	0	0	0	Fire Blast
+401460	1	0	0	0	32	0	Rapid Regeneration
+401502	40	0	205	0	0	0	Frostfire Bolt
+10911	44	0	550	0	0	0	Mind Control
+13795	16	0	50	0	0	0	Immolation Trap
+401937	25	0	155	0	0	0	Binding Heal
+12525	48	0	335	0	0	0	Pyroblast
+402004	1	0	0	0	8	0	Pain Suppression
+6363	20	0	45	0	0	0	Searing Totem
+1316697	40	0	200	0	0	0	Wrack
+403686	30	0	270	0	0	0	Drain Life
+403789	1	0	0	0	100	0	Metamorphosis
+403844	44	0	132	0	0	0	Shadow Cleave
+1232758	0	0	125	0	0	0	Flash Heal
+1058	10	0	40	0	0	0	Rejuvenation
+2647	1	0	68	0	0	0	Freeze III PROC
+407798	1	0	0	0	4	0	Seal of Martyrdom
+408344	42	0	395	0	0	0	Fire Nova
+408685	14	0	85	0	0	0	Earth Shock
+408689	48	0	345	0	0	0	Earth Shock
+1120	10	0	55	0	0	0	Drain Soul
+409240	1	3	50	0	0	0	Fan of Knives
+410176	1	3	25	0	0	0	Skull Bash
+410176	1	1	100	0	0	0	Skull Bash
+411631	10	0	0	0	60	0	Tame Beast
+412096	1	3	35	0	0	0	Crimson Tempest
+412096	1	4	1	0	0	0	Crimson Tempest
+412118	28	0	60	0	0	0	Mana Shield
+412122	52	0	120	0	0	0	Mana Shield
+412202	22	0	85	0	0	0	Frost Ward
+412207	42	0	195	0	0	0	Frost Ward
+412210	60	0	320	0	0	0	Frost Ward
+412218	30	0	135	0	0	0	Fire Ward
+412230	40	0	195	0	0	0	Fire Ward
+412232	60	0	320	0	0	0	Fire Ward
+412437	1	0	0	0	1	0	Waterbolt
+412532	1	0	0	0	12	0	Spellfrost Bolt
+400620	30	0	165	0	0	0	Fire Blast
+458481	1	0	75	0	0	0	Wyvern Strike
+415233	20	0	100	0	0	0	Ghost Wolf
+415236	0	0	0	0	21	0	Healing Rain
+415320	1	0	0	0	1.5	0	Flanking Strike
+415340	32	0	55	0	0	0	Raptor Strike
+415341	40	0	70	0	0	0	Raptor Strike
+1265042	60	2	25	0	0	0	Tendon Rip
+15040	20	0	70	0	0	0	Molten Blast
+474	8	0	10	0	0	0	Fumble
+417058	10	0	40	0	0	0	Rejuvenation
+867	31	0	19	0	0	0	Fumble III
+417068	60	0	360	0	0	0	Rejuvenation
+1240047	56	0	160	0	0	0	Ice Lance
+449432	60	0	300	0	0	0	Curse of Doom
+8140	24	0	75	0	0	0	Befuddlement
+11667	50	0	295	0	0	0	Immolate
+2060	40	0	370	0	0	0	Greater Heal
+9592	40	0	175	0	0	0	Fade
+424919	0	3	15	0	0	0	Main Gauche
+425268	8	0	30	0	0	0	Renew
+425270	20	0	105	0	0	0	Renew
+425272	32	0	170	0	0	0	Renew
+425277	60	0	410	0	0	0	Renew
+425339	1	0	0	0	18	0	Molten Blast
+9771	20	0	90	4	0	0	Radiation Bolt
+425600	1	0	0	0	10	0	Horn of Lordaeron
+425609	1	0	0	0	10	0	Rebuke
+22373	20	0	280	0	0	0	Regrowth
+427733	10	0	0	0	80	0	Summon Felguard
+427744	1	0	0	0	10	0	Cleave
+403848	52	0	157	0	0	0	Shadow Cleave
+8198	18	1	200	0	0	8204	Thunder Clap
+10428	58	0	140	0	0	0	Stoneclaw Totem
+17354	48	0	30	0	0	0	Mana Tide Totem
+1248001	20	0	115	0	0	0	Frost Shock
+8736	15	0	60	0	0	0	Conjure Food
+1299445	40	0	70	0	0	0	Aspect of the Beast
+7402	36	1	100	0	0	20559	Mocking Blow
+22418	0	0	200	0	0	0	Chaotic Focus
+469055	8	0	85	0	0	0	Fire Volley
+1264742	60	2	50	0	0	0	Pinch
+21553	60	1	300	0	0	0	Mortal Strike
+20271	4	0	0	0	6	0	Judgement
+17435	20	0	90	0	0	0	Shadow Bolt
+6078	38	0	205	0	0	0	Renew
+436380	30	0	95	0	0	0	Bloodstorm Sacrifice
+779	16	1	200	0	0	780	Swipe
+14320	38	0	70	0	0	0	Aspect of the Hawk
+402794	50	0	0	0	20	0	Curse of Tongues
+436942	36	0	420	0	0	0	Regrowth
+437009	22	0	0	0	25	0	Totemic Projection
+437123	1	0	0	0	5	0	Steady Shot
+437138	12	0	0	0	75	0	Revive
+17143	1	0	75	0	0	0	Holy Strike
+426821	20	0	145	0	0	0	Healing Touch
+14323	22	0	30	0	0	0	Hunter's Mark
+23947	48	0	1170	0	0	0	Power Word: Fortitude
+438350	52	0	160	0	0	0	Shadow Bolt Volley
+469058	8	0	85	0	0	0	Lightning Volley
+5599	24	0	45	0	0	0	Blessing of Protection
+439733	1	0	0	0	13	0	Tree of Life
+439748	1	0	0	0	39	0	Starfall
+8058	34	0	225	0	0	0	Frost Shock
+8637	40	3	20	0	0	11303	Feint
+17620	20	0	75	5	0	0	Drain Life
+440892	20	0	50	0	0	0	Curse of the Elements
+441450	26	0	110	0	0	0	Chain Burn
+442948	38	0	0	0	7	0	Blessing of Protection
+19460	20	0	135	0	0	0	Shadow Shock
+8160	24	0	65	0	0	0	Strength of Earth Totem
+407995	25	1	200	0	0	0	Primal Bite
+444681	48	2	50	0	0	0	Lava Breath
+20293	58	0	200	0	0	0	Seal of Righteousness
+11725	44	0	500	0	0	0	Subjugate Demon
+15	0	0	10	0	0	0	Leech (TEST)
+1238070	48	1	200	0	0	0	Primal Bite
+447587	50	0	50	0	0	0	Force of Nature
+447588	22	0	100	0	0	0	Wake Up Dead
+424799	1	3	20	0	0	0	Shiv
