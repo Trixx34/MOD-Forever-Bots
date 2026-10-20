@@ -55,12 +55,14 @@ struct Point
 };
 
 // A town errand order (errand_trainers.h, errand_policy.h): walk to a capital trainer, then train. The trip is done when the core applies the train.
+// An auction order walks to the auctioneer instead and is done once the bot is in reach (the listing visit does the rest).
 struct ErrandOrder
 {
     std::uint32_t Map = 0;
-    Point Dest;                 // the trainer's position
+    Point Dest;                 // the trainer's or the auctioneer's position
     std::uint32_t Skill = 0;    // the profession skill line the bot trains
     std::uint32_t Entry = 0;    // the trainer's creature entry
+    bool Auction = false;       // walk to the Auction House, not a trainer
 };
 
 enum class ErrandOutcome : std::uint8_t { kNone, kDone, kFailed };

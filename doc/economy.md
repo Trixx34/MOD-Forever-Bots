@@ -2,7 +2,7 @@
 
 Status: **the decision logic is built and unit-tested** (`src/auction_policy.*`, `tests/auction_test.cpp`, settings `Auction*`, off by default). **The module drives
 the listings** (`main.cpp`, a visit timer every 10 s on the Run() thread, `AuctionHouseForBot` `kList`), from the bots' loot (`PlayerScript.OnLootItem`) and the pump's feed.
-It does **not** walk a bot to an auctioneer (that is the policy in `bot_policy.cpp`, not done), does not sell to vendors, and does not relist expired items. Bots receive the pay
+A town errand (`errand_policy.*`, config key `Errands`, off by default) walks a bot with looted items to the faction's auctioneer on its map, using the snapshot's `auctioneer_x/y/z` (layout 20), and ends there; the listing visit then lists the items. The walk is not checked in game: the auctioneer's reach and the visit's range are unverified. Errands and listings both need their own switch on. It does not sell to vendors (that is `sell-visit-walk`, not merged), and does not relist expired items. Bots receive the pay
 of their sales: the core takes a bot's delivered **auction house mail** for it (`Bot.Mail.Collect`, `Bots/BotMail.cpp`: only `MAIL_AUCTION` mail, letters are left alone). Nothing has run on a sim. It says what exists, what is missing, a first version small enough to test, and the decisions that are the
 owner's. The brief it replaces (`economy-design-prompt.md` in the old `.opencode/docs`) is not on the new servers.
 
