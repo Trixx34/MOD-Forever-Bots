@@ -91,7 +91,7 @@ struct PolicyOptions
     // to time (+- this many percent); 0 turns the variation off (the tests). PartyPercent is the share of the bots that take part in the parties at all
     // (the others stay on their own); the parties are then of random sizes from 2 up to PartySize. The defaults keep the old behavior: no variation, every bot partied.
     std::uint64_t RandomSeed = 0;
-    // Crafting (SDK 0.17, kCraft): a bot with nothing to fight makes bandages from cloth and cooks meat, which raises First Aid and Cooking and uses up what fills its
+    // Crafting (SDK 0.17, kSkillUp): a bot with nothing to fight makes bandages from cloth and cooks meat, which raises First Aid and Cooking and uses up what fills its
     // bags. Off by default (the core must know the action); the module turns it on from its settings.
     bool Crafting = false;
     std::uint32_t RandomPct = 0;
@@ -290,7 +290,7 @@ private:
         std::uint64_t GrindRetryAtMs = 0;                // no grind spot on this map for this level: explore on foot until this time, then look again
         std::uint32_t HubFailures = 0;                   // hub walks in a row that ended without arriving
         std::uint32_t ExploreStep = 0;                   // random walks made, for the direction of the next
-        std::uint64_t CraftRetryAtMs[2] = { 0, 0 };      // First Aid and Cooking: no kCraft for the skill before this time
+        std::uint64_t CraftRetryAtMs[2] = { 0, 0 };      // First Aid and Cooking: no kSkillUp for the skill before this time
         std::uint32_t CraftTurn = 0;                     // which skill is tried first next (they take turns)
         std::uint32_t RestPct = 0;                       // the health below which this bot rests (a trait drawn once from the seed; 0 = not drawn yet)
         float LeaderYards = 0.0f;                        // how close to its leader this bot stays put (a trait, like RestPct)

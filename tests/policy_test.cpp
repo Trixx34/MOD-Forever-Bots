@@ -457,12 +457,12 @@ void StandsBeforeAFight()
     CHECK(attack >= 0 && stand < attack);
 }
 
-// The skill lines of the kCraft actions bot 10 sent in a tick.
+// The skill lines of the kSkillUp actions bot 10 sent in a tick.
 std::vector<std::uint32_t> CraftsOf(std::vector<BotAction> const& actions)
 {
     std::vector<std::uint32_t> skills;
     for (BotAction const& action : actions)
-        if (action.type == ActionType::kCraft && action.bot_guid == 10)
+        if (action.type == ActionType::kSkillUp && action.bot_guid == 10)
             skills.push_back(action.spell_id);
     return skills;
 }
@@ -475,7 +475,7 @@ void IdleBotsCraftTheirTwoSkillsInTurnAndWaitAfterARefusal()
     WorldTickSnapshotView view = View(1, 0, {});
     auto const answer = [&](std::uint32_t skill, BotActionStatus status, std::uint32_t sequence)
     {
-        view.bots[0].last_action_type = std::uint8_t(ActionType::kCraft);
+        view.bots[0].last_action_type = std::uint8_t(ActionType::kSkillUp);
         view.bots[0].last_action_spell = skill;
         view.bots[0].last_action_status = status;
         view.bots[0].last_action_sequence = sequence;
@@ -493,7 +493,7 @@ void IdleBotsCraftTheirTwoSkillsInTurnAndWaitAfterARefusal()
     BotPolicy second(options);
     WorldTickSnapshotView busy = View(1, 0, {});
     CHECK((CraftsOf(second.Decide(busy, 1000)) == std::vector<std::uint32_t>{ 129 }));
-    busy.bots[0].last_action_type = std::uint8_t(ActionType::kCraft);
+    busy.bots[0].last_action_type = std::uint8_t(ActionType::kSkillUp);
     busy.bots[0].last_action_spell = 129;
     busy.bots[0].last_action_status = forever_module::BotActionStatus::kApplied;
     busy.bots[0].last_action_sequence = 1;

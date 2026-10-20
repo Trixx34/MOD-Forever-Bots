@@ -48,13 +48,13 @@ constexpr std::uint32_t kServiceBuyHealthPotion = 64; // layout 16: the core's s
 constexpr std::uint32_t kServiceBuyManaPotion = 128;
 constexpr std::uint32_t kServiceBuyBandage = 256;
 constexpr std::uint32_t kServiceBuyReagent = 512;  // the item and the count are the core's
-// kCraft (SDK 0.17): the skill lines, and how long the policy waits after each answer.
+// kSkillUp (SDK 0.17): the skill lines, and how long the policy waits after each answer.
 constexpr std::uint32_t kSkillFirstAid = 129;
 constexpr std::uint32_t kSkillCooking = 185;
-constexpr std::uint64_t kCraftCastMs = 4000;        // after a craft was sent: the cast takes a few seconds, the answer decides what comes next
-constexpr std::uint64_t kCraftNextMs = 3500;        // a craft that started: the next one is tried when the cast is done
-constexpr std::uint64_t kCraftBusyMs = 1500;        // the bot was casting or moving: soon
-constexpr std::uint64_t kCraftRefusedMs = 300000;   // no materials, no recipe, or the skill is too high for the recipes: five minutes (varied per bot)
+constexpr std::uint64_t kSkillUpCastMs = 4000;        // after a craft was sent: the cast takes a few seconds, the answer decides what comes next
+constexpr std::uint64_t kSkillUpNextMs = 3500;        // a craft that started: the next one is tried when the cast is done
+constexpr std::uint64_t kSkillUpBusyMs = 1500;        // the bot was casting or moving: soon
+constexpr std::uint64_t kSkillUpRefusedMs = 300000;   // no materials, no recipe, or the skill is too high for the recipes: five minutes (varied per bot)
 constexpr std::uint32_t kServiceSellJunk = 1024;   // SDK 0.16: also sell white junk (trade goods, spare bags, miscellaneous items)
 constexpr std::uint32_t kBagsLowSlots = 4;         // a vendor visit of a bot with this many free slots or fewer also sells the white junk
 constexpr std::uint32_t kServiceBuyAmmo = 8;     // layout 15: buy ammunition (dest_x = the count to carry), food (dest_y), drink (dest_z)
@@ -812,15 +812,15 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
 
     // A craft (SDK 0.17): started, the next one comes when the cast is done; busy or moving, soon; any other answer (no recipe, no materials, a skill too high
     // for the recipes it can make) means there is nothing to make now: that skill waits five minutes, varied per bot.
-    if (bot.last_action_type == uint8_t(ActionType::kCraft))
+    if (bot.last_action_type == uint8_t(ActionType::kSkillUp))
     {
         std::size_t const index = bot.last_action_spell == kSkillCooking ? 1 : 0;
         if (bot.last_action_status == BotActionStatus::kApplied)
-            state.CraftRetryAtMs[index] = nowMs + kCraftNextMs;
+            state.CraftRetryAtMs[index] = nowMs + kSkillUpNextMs;
         else if (bot.last_action_status == BotActionStatus::kBusy || bot.last_action_status == BotActionStatus::kMoving)
-            state.CraftRetryAtMs[index] = nowMs + kCraftBusyMs;
+            state.CraftRetryAtMs[index] = nowMs + kSkillUpBusyMs;
         else
-            state.CraftRetryAtMs[index] = nowMs + bot_random::Vary(kCraftRefusedMs, std::min<std::uint32_t>(_options.RandomPct * 2, 90),
+            state.CraftRetryAtMs[index] = nowMs + bot_random::Vary(kSkillUpRefusedMs, std::min<std::uint32_t>(_options.RandomPct * 2, 90),
                                                                    bot_random::Draw(_options.RandomSeed, bot.guid, bot_random::kSaltIdle, 0x400000000ull + nowMs / 1000));
         return;
     }
@@ -3629,11 +3629,11 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     continue;
                 BotAction craft;
                 craft.bot_guid = bot.guid;
-                craft.type = ActionType::kCraft;
+                craft.type = ActionType::kSkillUp;
                 craft.spell_id = index == 0 ? kSkillFirstAid : kSkillCooking;
                 actions.push_back(craft);
                 state.CraftTurn = std::uint32_t(index + 1);
-                state.CraftRetryAtMs[index] = nowMs + kCraftCastMs; // the answer decides the next try
+                state.CraftRetryAtMs[index] = nowMs + kSkillUpCastMs; // the answer decides the next try
                 state.NextCastMs = nowMs + kGlobalCooldownMs;
                 crafted = true;
             }

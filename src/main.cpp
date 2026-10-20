@@ -106,7 +106,7 @@ char const* ActionTypeName(std::uint8_t type)
         case forever_module::ActionType::kResurrect: return "resurrect";
         case forever_module::ActionType::kReclaimCorpse: return "reclaim";
         case forever_module::ActionType::kConsume: return "consume";
-        case forever_module::ActionType::kCraft: return "craft";
+        case forever_module::ActionType::kSkillUp: return "skillup";
         default: break;
     }
     return "action";
