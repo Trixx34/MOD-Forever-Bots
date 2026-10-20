@@ -927,6 +927,32 @@ void PartySideOfDecidesTheSides()
     CHECK(HasGroup(actions, 12, 1, PlayerOf(10)) && !HasGroup(actions, 12, 1, PlayerOf(11)));
 }
 
+void ABotLeadersInviteIsAnsweredOnce()
+{
+    // With AcceptInvites on (a player's invite is accepted), an invite from a bot leader is still answered by the party code only: one accept,
+    // not two. A leader that holds a pending invite to its own party never accepts it.
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.PartyCount = 1;
+    options.ClassOf = WarriorLeads;
+    options.AcceptInvites = true;
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    view.bots[1].group_invite_from = PlayerOf(12);
+    int accepts = 0;
+    for (BotAction const& action : policy.Decide(view, 0))
+        accepts += action.type == ActionType::kGroup && action.bot_guid == 11 && action.spell_id == 2;
+    CHECK(accepts == 1);
+
+    view.bots[2].group_invite_from = PlayerOf(12); // the leader, with its own pending party
+    CHECK(!HasGroup(policy.Decide(view, 20000), 12, 2));
+
+    // A human's invite (900 is not a bot of the module) is still accepted on the player path.
+    WorldTickSnapshotView human = PartyView({ 20 });
+    human.bots[0].group_invite_from = PlayerOf(900);
+    CHECK(HasGroup(policy.Decide(human, 0), 20, 2));
+}
+
 void ABotInAHumansPartyIsLeftAlone()
 {
     // Bot 10 is invited by a human player (not a bot in the view): the bot party assignment leaves it out, and nobody invites or declines for it.
@@ -3673,6 +3699,7 @@ int main()
     OldPartiesAreLeftBeforeTheNewOnesForm();
     ALeaderWithItsOwnPendingPartyKeepsInviting();
     PartySideOfDecidesTheSides();
+    ABotLeadersInviteIsAnsweredOnce();
     ABotInAHumansPartyIsLeftAlone();
     OnlyTheFirstPartyIsFormed();
     InvitesWaitForTheRetry();

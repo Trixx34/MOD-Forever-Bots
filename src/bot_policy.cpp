@@ -2952,9 +2952,11 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             state.NextTrainMs = nowMs + _options.TrainEveryMs;
         }
 
-        // A player's party invite is accepted (AcceptInvites, from the chat command switch): the player then commands the bot in chat.
-        if (_options.AcceptInvites && bot.group_invite_from != 0 && bot.in_combat == 0 && nowMs >= state.InviteAcceptAtMs &&
-            forever_module::UnitRefType(bot.group_invite_from) == kPlayerType)
+        // A player's party invite is accepted (AcceptInvites, from the chat command switch): the player then commands the bot in chat. An invite
+        // from one of this module's bots is not a player's: the party code above answers those (a second accept here was refused as "no pending
+        // invite", and a leader even tried to accept the party it leads).
+        if (_options.AcceptInvites && bot.group_invite_from != 0 && !isOurBot(bot.group_invite_from) && bot.in_combat == 0 &&
+            nowMs >= state.InviteAcceptAtMs && forever_module::UnitRefType(bot.group_invite_from) == kPlayerType)
         {
             BotAction accept;
             accept.bot_guid = bot.guid;
