@@ -48,4 +48,31 @@ bool VisitDue(Settings const& settings, bool hasSellable, std::uint64_t lastVisi
 // The sales for one visit: one per distinct entry, most money first, at most MaxSalesPerVisit. Items that cannot be sold are left out.
 std::vector<Sale> PlanSales(Settings const& settings, std::vector<Item> const& items);
 
+// A visit that has not finished this long after it started is dropped: the bot could not reach the vendor, and the items stay for a later visit.
+constexpr std::uint64_t kVisitTimeoutMs = 600000;
+bool VisitExpired(std::uint64_t visitStartMs, std::uint64_t nowMs);
+
+// A sale that has been sent and not yet answered by the core. The core's reply is the bot's last action: it is the answer to this sale once the
+// sequence has moved on and the last action was a sale of the same entry.
+struct InFlight
+{
+    Sale Sent;
+    std::uint32_t Sequence = 0;                 // the bot's last_action_sequence when the sale was sent
+    std::uint64_t SentMs = 0;
+};
+
+enum class Outcome
+{
+    kWaiting,                                   // no reply yet
+    kSold,                                      // the core applied the sale: the items are gone
+    kRefused,                                   // the core refused it, or no reply came in time: the items stay
+};
+
+// kReplyTimeoutMs: a sale with no reply after this long counts as refused, so a dropped tick does not hold the bot.
+constexpr std::uint64_t kReplyTimeoutMs = 20000;
+
+// What the core's reply means for an in-flight sale. lastSequence and lastWasSale describe the bot's last action in the current snapshot;
+// applied is whether the core applied that action.
+Outcome Resolve(InFlight const& flight, std::uint32_t lastSequence, bool lastWasSale, bool applied, std::uint64_t nowMs);
+
 } // namespace sell

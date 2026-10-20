@@ -359,6 +359,7 @@ struct SellBook
     std::unordered_map<std::uint64_t, std::unordered_map<std::uint64_t, sell::Item>> Items; // bot -> item guid -> what it looted
     std::unordered_map<std::uint64_t, std::vector<sell::Sale>> Pending;                     // bot -> sales of the visit under way
     std::unordered_map<std::uint64_t, std::uint64_t> LastVisitMs;                           // bot -> when it last visited a vendor to sell
+    std::unordered_map<std::uint64_t, sell::InFlight> Flight;                               // bot -> the sale sent, waiting for the core's reply
 };
 
 // The loot event as a sale candidate.
@@ -374,8 +375,9 @@ sell::Item SellItemOf(forever_module::PlayerItemLootedEvent const& event)
     return item;
 }
 
-// Vendor sales (sell policy): an ordinary bot that stands in reach of a vendor, alive, out of combat and with no other action this tick sells the next
-// item of its visit. One sale a bot a tick, and never past the actions the core granted: PublishActions drops the whole tick when the list runs over.
+// Vendor sales (sell policy): an ordinary bot, alive, out of combat and with no other action this tick, sells the next item of its visit. A bot
+// out of reach of its vendor walks there first. One action a bot a tick, and never past the actions the core granted: PublishActions drops the
+// whole tick when the list runs over. A sale leaves the book only when the core has applied it; a refused sale stays for a later visit.
 void AppendSales(SellBook& book, BotSettings const& settings, forever_module::WorldTickSnapshotView const& view,
                  std::vector<forever_module::BotAction>& actions, std::uint32_t maxActions, std::uint64_t now, std::shared_ptr<AltRegistry> const& alts)
 {
@@ -389,12 +391,29 @@ void AppendSales(SellBook& book, BotSettings const& settings, forever_module::Wo
         if (busy.count(bot.guid) || bot.group_role != 0 || (alts && alts->Has(bot.guid)) || bot.life_state != 0 || bot.in_combat != 0 ||
             bot.vendor_valid == 0 || bot.vendor_guid == 0)
             continue;
-        float const dx = bot.pos_x - bot.vendor_x;
-        float const dy = bot.pos_y - bot.vendor_y;
-        if (dx * dx + dy * dy > kSellReachYards * kSellReachYards)
-            continue;
+
+        // The sale sent last time: the core's reply to it is the bot's last action. Until the reply comes, the bot waits.
+        auto const flight = book.Flight.find(bot.guid);
+        if (flight != book.Flight.end())
+        {
+            bool const lastWasSale = bot.last_action_type == static_cast<std::uint8_t>(forever_module::ActionType::kSellToVendor) &&
+                                     bot.last_action_spell == flight->second.Sent.Entry;
+            sell::Outcome const outcome = sell::Resolve(flight->second, bot.last_action_sequence, lastWasSale,
+                                                        bot.last_action_status == forever_module::BotActionStatus::kApplied, now);
+            if (outcome == sell::Outcome::kWaiting)
+                continue;
+            if (outcome == sell::Outcome::kSold)
+            {
+                auto& items = book.Items[bot.guid];
+                for (auto it = items.begin(); it != items.end();)
+                    it = it->second.Entry == flight->second.Sent.Entry ? items.erase(it) : std::next(it);
+            }
+            book.Flight.erase(flight);
+        }
 
         std::vector<sell::Sale>& pending = book.Pending[bot.guid];
+        if (!pending.empty() && sell::VisitExpired(book.LastVisitMs[bot.guid], now))
+            pending.clear();                    // the bot never got there: the items stay for the next visit
         if (pending.empty())
         {
             std::vector<sell::Item> items;
@@ -407,6 +426,20 @@ void AppendSales(SellBook& book, BotSettings const& settings, forever_module::Wo
             if (pending.empty())
                 continue;
         }
+
+        float const dx = bot.pos_x - bot.vendor_x;
+        float const dy = bot.pos_y - bot.vendor_y;
+        if (dx * dx + dy * dy > kSellReachYards * kSellReachYards)
+        {
+            forever_module::BotAction walk;     // the vendor's position is on the bot's map, so the walk stays on it
+            walk.bot_guid = bot.guid;
+            walk.type = forever_module::ActionType::kMoveTo;
+            walk.dest_x = bot.vendor_x;
+            walk.dest_y = bot.vendor_y;
+            actions.push_back(walk);
+            continue;
+        }
+
         sell::Sale const sale = pending.front();
         pending.erase(pending.begin());
 
@@ -417,11 +450,7 @@ void AppendSales(SellBook& book, BotSettings const& settings, forever_module::Wo
         action.dest_x = 0.0f;                   // 0 = every one the bot carries of it
         action.target_guid = bot.vendor_guid;
         actions.push_back(action);
-
-        // Taken as sold: the core refuses a sale it cannot make (the item is gone, or the vendor will not take it), and then only the entry is lost.
-        auto& items = book.Items[bot.guid];
-        for (auto it = items.begin(); it != items.end();)
-            it = it->second.Entry == sale.Entry ? items.erase(it) : std::next(it);
+        book.Flight[bot.guid] = sell::InFlight{ sale, bot.last_action_sequence, now };
     }
 }
 

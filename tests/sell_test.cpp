@@ -120,6 +120,42 @@ void UnsellableItemsLeftOut()
     CHECK(PlanSales(On(), { grey, White(1, 1, 0) }).empty());
 }
 
+InFlight Sent(std::uint32_t sequence, std::uint64_t sentMs)
+{
+    InFlight flight;
+    flight.Sent.Entry = 1;
+    flight.Sequence = sequence;
+    flight.SentMs = sentMs;
+    return flight;
+}
+
+void ReplyDecidesTheSale()
+{
+    InFlight flight = Sent(5, 0);
+    constexpr std::uint64_t kSoon = 5000;       // inside the reply timeout
+    // No new reply yet: still waiting.
+    CHECK(Resolve(flight, 5, false, false, kSoon) == Outcome::kWaiting);
+    // A new reply that is a sale and applied: sold.
+    CHECK(Resolve(flight, 6, true, true, kSoon) == Outcome::kSold);
+    // A new reply that is a sale and refused: the items stay.
+    CHECK(Resolve(flight, 6, true, false, kSoon) == Outcome::kRefused);
+    // A new reply for some other action (a policy move left over from before): keep waiting for ours.
+    CHECK(Resolve(flight, 6, false, true, kSoon) == Outcome::kWaiting);
+}
+
+void NoReplyInTimeIsRefused()
+{
+    InFlight flight = Sent(5, 0);
+    CHECK(Resolve(flight, 5, false, false, kReplyTimeoutMs - 1) == Outcome::kWaiting);
+    CHECK(Resolve(flight, 5, false, false, kReplyTimeoutMs) == Outcome::kRefused);
+}
+
+void VisitEndsAfterTheTimeout()
+{
+    CHECK(!VisitExpired(10 * kMin, 19 * kMin));
+    CHECK(VisitExpired(10 * kMin, 20 * kMin));
+}
+
 } // namespace
 
 int main()
@@ -133,6 +169,9 @@ int main()
     MostMoneyFirst();
     CappedPerVisit();
     UnsellableItemsLeftOut();
+    ReplyDecidesTheSale();
+    NoReplyInTimeIsRefused();
+    VisitEndsAfterTheTimeout();
     if (failures == 0)
         std::printf("sell_test: all passed\n");
     return failures == 0 ? 0 : 1;

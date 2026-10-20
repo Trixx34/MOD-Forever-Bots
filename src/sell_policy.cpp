@@ -46,4 +46,18 @@ std::vector<Sale> PlanSales(Settings const& settings, std::vector<Item> const& i
     return sales;
 }
 
+bool VisitExpired(std::uint64_t visitStartMs, std::uint64_t nowMs)
+{
+    return nowMs >= visitStartMs + kVisitTimeoutMs;
+}
+
+Outcome Resolve(InFlight const& flight, std::uint32_t lastSequence, bool lastWasSale, bool applied, std::uint64_t nowMs)
+{
+    if (lastSequence != flight.Sequence && lastWasSale)
+        return applied ? Outcome::kSold : Outcome::kRefused;
+    if (nowMs >= flight.SentMs + kReplyTimeoutMs)
+        return Outcome::kRefused;
+    return Outcome::kWaiting;
+}
+
 } // namespace sell
