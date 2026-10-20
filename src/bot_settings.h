@@ -147,6 +147,9 @@ struct BotSettings
     // AggressiveStart = 1: bots start Aggressive, so a bot on its own pulls the creatures of its level and levels. The default stance is defensive (a bot fights only
     // what attacks it, or what its group fights); a bot that only defends itself earns almost no experience: on the 300-bot soak the deaths equalled the kills.
     bool AggressiveStart = false;
+    // Crafting = 1 (default): a bot with nothing to fight makes bandages from its cloth and cooks its meat (kCraft, SDK 0.17; the core must have the action), which
+    // raises First Aid and Cooking and uses up what fills its bags. 0 turns it off.
+    bool Crafting = true;
     bool DungeonReviveOutOfCombat = false;  // DungeonReviveOutOfCombat = 1: a dead member of a dungeon party is revived by its leader out of combat (needs Bot.Chat.Orders.Enabled in the core)
     std::string DungeonFile;
     std::string DungeonEventsFile;

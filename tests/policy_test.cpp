@@ -457,6 +457,55 @@ void StandsBeforeAFight()
     CHECK(attack >= 0 && stand < attack);
 }
 
+// The skill lines of the kCraft actions bot 10 sent in a tick.
+std::vector<std::uint32_t> CraftsOf(std::vector<BotAction> const& actions)
+{
+    std::vector<std::uint32_t> skills;
+    for (BotAction const& action : actions)
+        if (action.type == ActionType::kCraft && action.bot_guid == 10)
+            skills.push_back(action.spell_id);
+    return skills;
+}
+
+void IdleBotsCraftTheirTwoSkillsInTurnAndWaitAfterARefusal()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.Crafting = true;
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = View(1, 0, {});
+    auto const answer = [&](std::uint32_t skill, BotActionStatus status, std::uint32_t sequence)
+    {
+        view.bots[0].last_action_type = std::uint8_t(ActionType::kCraft);
+        view.bots[0].last_action_spell = skill;
+        view.bots[0].last_action_status = status;
+        view.bots[0].last_action_sequence = sequence;
+    };
+
+    CHECK((CraftsOf(policy.Decide(view, 1000)) == std::vector<std::uint32_t>{ 129 }));   // First Aid first
+    answer(129, forever_module::BotActionStatus::kRefused, 1);                           // no cloth, or a skill too high: First Aid waits 5 minutes
+    CHECK((CraftsOf(policy.Decide(view, 3000)) == std::vector<std::uint32_t>{ 185 }));   // Cooking has its turn
+    answer(185, forever_module::BotActionStatus::kRefused, 2);
+    CHECK(CraftsOf(policy.Decide(view, 5000)).empty());                                  // both wait
+    CHECK(CraftsOf(policy.Decide(view, 100000)).empty());
+    CHECK((CraftsOf(policy.Decide(view, 305000)) == std::vector<std::uint32_t>{ 129 })); // and First Aid is tried again after its five minutes
+
+    // A craft that started: the same skill again when the cast is done, the other one in between.
+    BotPolicy second(options);
+    WorldTickSnapshotView busy = View(1, 0, {});
+    CHECK((CraftsOf(second.Decide(busy, 1000)) == std::vector<std::uint32_t>{ 129 }));
+    busy.bots[0].last_action_type = std::uint8_t(ActionType::kCraft);
+    busy.bots[0].last_action_spell = 129;
+    busy.bots[0].last_action_status = forever_module::BotActionStatus::kApplied;
+    busy.bots[0].last_action_sequence = 1;
+    CHECK(CraftsOf(second.Decide(busy, 1600)).size() <= 1);
+
+    // Off by default, and never in a fight.
+    BotPolicy off(AggressiveOptions());
+    CHECK(CraftsOf(off.Decide(View(1, 0, {}), 1000)).empty());
+    BotPolicy fight(options);
+    CHECK(CraftsOf(fight.Decide(View(1, 0, { Hostile(2, 3.0f, 100) }), 1000)).empty());
+}
+
 void RefusedSitIsRetriedLater()
 {
     BotPolicy policy(AggressiveOptions());
@@ -3842,6 +3891,7 @@ int main()
     PartySideOfDecidesTheSides();
     ABotLeadersInviteIsAnsweredOnce();
     OnlyAShareOfTheBotsFormParties();
+    IdleBotsCraftTheirTwoSkillsInTurnAndWaitAfterARefusal();
     RestThresholdIsAPerBotTrait();
     FullBagsMakeTheVisitSellWhiteJunkToo();
     UnknownSideBotsAreLeftOutOfParties();

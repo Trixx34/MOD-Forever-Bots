@@ -106,6 +106,7 @@ char const* ActionTypeName(std::uint8_t type)
         case forever_module::ActionType::kResurrect: return "resurrect";
         case forever_module::ActionType::kReclaimCorpse: return "reclaim";
         case forever_module::ActionType::kConsume: return "consume";
+        case forever_module::ActionType::kCraft: return "craft";
         default: break;
     }
     return "action";
@@ -1296,6 +1297,7 @@ int main(int argc, char** argv)
     policyOptions.DungeonTeleport = settings.DungeonTeleport;
     policyOptions.DungeonReviveOutOfCombat = settings.DungeonReviveOutOfCombat;
     policyOptions.AggressiveStart = settings.AggressiveStart;
+    policyOptions.Crafting = settings.Crafting;
     // Dungeon routes for "tank lead" (every dungeon of DungeonFile, by the map of its entry) and the events table (DungeonEventsFile), shared by all dungeons.
     std::vector<dungeon_events::Event> allEvents;
     if (!settings.DungeonEventsFile.empty())
@@ -1699,6 +1701,7 @@ int main(int argc, char** argv)
         policyOptions.PartyCount = 1;
         policyOptions.PartyPercent = 100; // every bot of the roster is in the one party
         policyOptions.RandomPct = 0;      // and a scenario is a test run: it is not varied
+        policyOptions.Crafting = false;
         policyOptions.ServiceEveryMs = 0;
         policyOptions.AutoGearing = false;
         for (auto const& point : settings.Scenario.Route)
