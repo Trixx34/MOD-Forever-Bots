@@ -19,6 +19,14 @@ using forever_module::WorldTickSnapshotView;
 
 namespace {
 
+// The pull and combat tests were written for bots that start Aggressive; the defensive default has its own test.
+PolicyOptions AggressiveOptions()
+{
+    PolicyOptions options;
+    options.AggressiveStart = true;
+    return options;
+}
+
 int failures = 0;
 
 #define CHECK(cond)                                                    \
@@ -62,7 +70,7 @@ NearbyUnit Unit(std::uint8_t type, std::uint64_t counter, float x, bool hostile,
 
 void AttacksClosestHostile()
 {
-    BotPolicy policy;
+    BotPolicy policy(AggressiveOptions());
     auto actions = policy.Decide(View(1, 0, { Unit(8, 1, 30.0f, true), Unit(8, 2, 5.0f, true), Unit(2, 3, 1.0f, false) }));
     CHECK(actions.size() == 1);
     if (actions.size() == 1)
@@ -75,7 +83,7 @@ void AttacksClosestHostile()
 
 void KeepsCurrentThreatTarget()
 {
-    BotPolicy policy;
+    BotPolicy policy(AggressiveOptions());
     std::uint64_t const threat = MakeUnitRef(8, 1, 9);
     auto actions = policy.Decide(View(1, threat, { Unit(8, 2, 5.0f, true) }));
     CHECK(actions.size() == 1 && actions[0].target_guid == threat);
@@ -83,7 +91,7 @@ void KeepsCurrentThreatTarget()
 
 void FollowsPlayerWhenNoEnemy()
 {
-    BotPolicy policy;
+    BotPolicy policy(AggressiveOptions());
     auto actions = policy.Decide(View(1, 0, { Unit(2, 7, 12.0f, false), Unit(8, 3, 4.0f, false) }));
     CHECK(actions.size() == 1);
     if (actions.size() == 1)
@@ -95,14 +103,14 @@ void FollowsPlayerWhenNoEnemy()
 
 void StopsWhenNothingNearby()
 {
-    BotPolicy policy;
+    BotPolicy policy(AggressiveOptions());
     auto actions = policy.Decide(View(1, 0, {}));
     CHECK(actions.size() == 1 && actions[0].type == ActionType::kStop);
 }
 
 void DeadUnitsAreNotAttacked()
 {
-    BotPolicy policy;
+    BotPolicy policy(AggressiveOptions());
     auto actions = policy.Decide(View(1, 0, { Unit(8, 2, 5.0f, true, 0) }));
     CHECK(actions.size() == 1 && actions[0].type == ActionType::kStop);
 }
@@ -118,7 +126,7 @@ WorldTickSnapshotView Hurt(std::uint32_t health, std::vector<NearbyUnit> nearby,
 
 void RetreatsBelowThirtyPercent()
 {
-    BotPolicy policy;
+    BotPolicy policy(AggressiveOptions());
     // 250 of 1000 is below 30%: a hostile five yards away is what it runs from now, and it keeps running until it is clear
     // of it. Standing still was the whole reply before, and the creature killed the bot where it stood.
     auto actions = policy.Decide(Hurt(250, { Unit(8, 2, 5.0f, true), Unit(2, 7, 12.0f, false) }, MakeUnitRef(8, 1, 9)));
@@ -129,7 +137,7 @@ void RetreatsBelowThirtyPercent()
 
 void RetreatFollowsAPlayerWhenNothingNearToFlee()
 {
-    BotPolicy policy;
+    BotPolicy policy(AggressiveOptions());
     // Nothing close by that can still kill it: it follows the player again, as before.
     auto actions = policy.Decide(Hurt(250, { Unit(2, 7, 12.0f, false) }));
     CHECK(actions.size() == 1);
@@ -142,7 +150,7 @@ void RetreatFollowsAPlayerWhenNothingNearToFlee()
 
 void RetreatWithNoPlayerStillFlees()
 {
-    BotPolicy policy;
+    BotPolicy policy(AggressiveOptions());
     // 100 of 1000 is below 30%: no player to follow, but a hostile five yards away, so it runs.
     auto actions = policy.Decide(Hurt(100, { Unit(8, 2, 5.0f, true) }));
     CHECK(actions.size() == 1);
@@ -152,21 +160,21 @@ void RetreatWithNoPlayerStillFlees()
 
 void ThirtyPercentIsNotLow()
 {
-    BotPolicy policy;
+    BotPolicy policy(AggressiveOptions());
     auto actions = policy.Decide(Hurt(300, { Unit(8, 2, 5.0f, true) }));
     CHECK(actions.size() == 1 && actions[0].type == ActionType::kAttackTarget);
 }
 
 void LoneCorpseReleasesAndDoesNotFight()
 {
-    BotPolicy policy;
+    BotPolicy policy(AggressiveOptions());
     auto const actions = policy.Decide(Hurt(0, { Unit(8, 2, 5.0f, true) }), 1000);
     CHECK(actions.size() == 1 && actions[0].type == ActionType::kReleaseSpirit);
 }
 
 void OnlyChangesArePublished()
 {
-    BotPolicy policy;
+    BotPolicy policy(AggressiveOptions());
     CHECK(policy.Decide(View(1, 0, { Unit(8, 2, 5.0f, true) })).size() == 1);
     CHECK(policy.Decide(View(2, 0, { Unit(8, 2, 5.0f, true) })).empty()); // same decision, next tick
     CHECK(policy.Decide(View(3, 0, { Unit(8, 2, 5.0f, true) })).empty()); // unchanged, no action
@@ -178,7 +186,7 @@ void OnlyChangesArePublished()
 // Test casts: a bot fighting a hostile gets the test spell at its target on its own timer, after the attack decision.
 void TestCastOnItsOwnTimer()
 {
-    PolicyOptions options;
+    PolicyOptions options = AggressiveOptions();
     options.TestSpell = 585;
     options.CastEveryTicks = 20;
     BotPolicy policy(options);
@@ -202,7 +210,7 @@ void TestCastOnItsOwnTimer()
 
 void NoTestCastWhenOff()
 {
-    BotPolicy policy;
+    BotPolicy policy(AggressiveOptions());
     auto first = policy.Decide(View(1, 0, { Unit(8, 2, 5.0f, true) }));
     CHECK(first.size() == 1 && first[0].type == ActionType::kAttackTarget);
     CHECK(policy.Decide(View(100, 0, { Unit(8, 2, 5.0f, true) })).empty());
@@ -225,7 +233,7 @@ NearbyUnit Hostile(std::uint64_t counter, float x, std::uint32_t healthPct)
 // A warrior fighting one hostile, with the rotation on.
 BotPolicy WarriorPolicy()
 {
-    PolicyOptions options;
+    PolicyOptions options = AggressiveOptions();
     options.ClassId = 1;
     return BotPolicy(options);
 }
@@ -381,7 +389,7 @@ int RestAt(std::vector<BotAction> const& actions, std::uint32_t& spellId)
 
 void RestsWhenHurtAndIdle()
 {
-    BotPolicy policy;
+    BotPolicy policy(AggressiveOptions());
     std::uint32_t spell = 99;
     CHECK(RestAt(policy.Decide(Hurt(600, {}), 1000), spell) >= 0);
     CHECK(spell == 1); // sit down
@@ -389,17 +397,17 @@ void RestsWhenHurtAndIdle()
 
 void NoRestAtFullHealthOrWithAPlayerNear()
 {
-    BotPolicy policy;
+    BotPolicy policy(AggressiveOptions());
     std::uint32_t spell = 99;
     CHECK(RestAt(policy.Decide(View(1, 0, {}), 1000), spell) < 0); // full health
 
-    BotPolicy withPlayer;
+    BotPolicy withPlayer(AggressiveOptions());
     CHECK(RestAt(withPlayer.Decide(Hurt(600, { Unit(2, 7, 4.0f, false, 100) }), 1000), spell) < 0); // a player to follow
 }
 
 void StandsBeforeAFight()
 {
-    BotPolicy policy;
+    BotPolicy policy(AggressiveOptions());
     std::uint32_t spell = 99;
     CHECK(RestAt(policy.Decide(Hurt(600, {}), 1000), spell) >= 0 && spell == 1);
 
@@ -416,7 +424,7 @@ void StandsBeforeAFight()
 
 void RefusedSitIsRetriedLater()
 {
-    BotPolicy policy;
+    BotPolicy policy(AggressiveOptions());
     std::uint32_t spell = 99;
     CHECK(RestAt(policy.Decide(Hurt(600, {}), 1000), spell) >= 0 && spell == 1);
 
@@ -449,7 +457,7 @@ bool HasTrain(std::vector<BotAction> const& actions)
 
 void ServicesWhenIdleOnTimerAndOnLevelUp()
 {
-    PolicyOptions options;
+    PolicyOptions options = AggressiveOptions();
     options.ServiceEveryMs = 600000;
     options.TrainEveryMs = 600000;
     BotPolicy policy(options);
@@ -479,7 +487,7 @@ void ServicesWhenIdleOnTimerAndOnLevelUp()
 
 void NoServicesInAFight()
 {
-    BotPolicy policy;
+    BotPolicy policy(AggressiveOptions());
     WorldTickSnapshotView fighting = View(1, MakeUnitRef(8, 1, 2), { Hostile(2, 3.0f, 100) });
     fighting.bots[0].level = 10;
     auto actions = policy.Decide(fighting, 1000);
@@ -490,7 +498,7 @@ void NoServicesInAFight()
 void HostilePlayersAreNotAttacked()
 {
     // Another bot of the other faction, hostile and alive, three yards away: the bot does not attack it.
-    BotPolicy policy;
+    BotPolicy policy(AggressiveOptions());
     NearbyUnit rival = Unit(2, 7, 3.0f, true, 100); // player (type 2), hostile
     rival.max_health = 100;
     auto actions = policy.Decide(View(1, 0, { rival }), 1000);
@@ -498,7 +506,7 @@ void HostilePlayersAreNotAttacked()
         CHECK(action.type != ActionType::kAttackTarget);
 
     // A creature at the same range is attacked.
-    BotPolicy creature;
+    BotPolicy creature(AggressiveOptions());
     auto mob = creature.Decide(View(1, 0, { Hostile(2, 3.0f, 100) }), 1000);
     bool attacked = false;
     for (BotAction const& action : mob)
@@ -509,7 +517,7 @@ void HostilePlayersAreNotAttacked()
 // A policy for one class with its rotation on, and no per-bot class table.
 BotPolicy ClassPolicy(std::uint32_t classId)
 {
-    PolicyOptions options;
+    PolicyOptions options = AggressiveOptions();
     options.ClassId = classId;
     options.WanderWhenIdle = false;       // these tests look at casts and rests: the bot stays where it is
     return BotPolicy(options);
@@ -697,7 +705,7 @@ void EviscerateAtFivePoints()
 void SaberSlashCountsAsAComboPoint()
 {
     // Saber Slash (Forever) gives one combo point like Sinister Strike: a Saber Slash and four Sinister Strikes make five on one target.
-    PolicyOptions options;
+    PolicyOptions options = AggressiveOptions();
     options.ClassId = 4;
     std::istringstream file("class 4\nrow 2098 combo 5 target range 0 5\nrow 424785 duration 12 always target range 0 5\nrow 1752 always target range 0 5\n");
     std::vector<std::string> warnings;
@@ -724,7 +732,7 @@ void SaberSlashCountsAsAComboPoint()
 void HostilePlayerDoesNotBlockRest()
 {
     // A hostile player three yards away is neither followed nor a reason not to sit down.
-    BotPolicy policy;
+    BotPolicy policy(AggressiveOptions());
     std::uint32_t spell = 99;
     NearbyUnit rival = Unit(2, 9, 3.0f, true, 100);
     rival.max_health = 100;
@@ -784,7 +792,7 @@ std::uint32_t WarriorLeads(std::uint64_t guid)
 
 BotPolicy PartyPolicy(std::uint32_t size, std::uint32_t count = 1)
 {
-    PolicyOptions options;
+    PolicyOptions options = AggressiveOptions();
     options.PartySize = size;
     options.PartyCount = count;
     options.ClassOf = WarriorLeads;
@@ -939,7 +947,7 @@ void SetVendor(WorldTickSnapshotView& view, float x)
 
 BotPolicy VendorPolicy(bool party = false)
 {
-    PolicyOptions options;
+    PolicyOptions options = AggressiveOptions();
     options.ServiceEveryMs = 60000;
     if (party)
     {
@@ -1051,7 +1059,7 @@ void PartyMembersDoNotWalkAlone()
 // Hubs (M7). A bot on map 1 with two hubs on that map. Services are off, so the walk is the only move.
 BotPolicy HubPolicy()
 {
-    PolicyOptions options;
+    PolicyOptions options = AggressiveOptions();
     options.HubsByMap[1] = { Point{ 500.0f, 0.0f, 0.0f }, Point{ 900.0f, 0.0f, 0.0f } };
     return BotPolicy(options);
 }
@@ -1131,7 +1139,7 @@ void PartyMembersDoNotWanderAlone()
     WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
     for (BotSnapshot& bot : view.bots)
         bot.map_id = 1;
-    PolicyOptions options;
+    PolicyOptions options = AggressiveOptions();
     options.HubsByMap[1] = { Point{ 500.0f, 0.0f, 0.0f } };
     options.PartySize = 5;
     options.PartyCount = 1;
@@ -1144,7 +1152,7 @@ void PartyMembersDoNotWanderAlone()
 // Refused targets (M7 fix). A bot that is refused an attack, or a cast with no valid target, picks another unit.
 void RefusedAttackPicksAnotherTarget()
 {
-    BotPolicy policy;
+    BotPolicy policy(AggressiveOptions());
     NearbyUnit const wolf = Hostile(7, 2.0f, 100);
     NearbyUnit const boar = Hostile(8, 3.0f, 100);
     WorldTickSnapshotView view = PartyView({ 10 });
@@ -1162,7 +1170,7 @@ void RefusedAttackPicksAnotherTarget()
 
 void InvalidCastTargetIsNotCastAtAgain()
 {
-    PolicyOptions options;
+    PolicyOptions options = AggressiveOptions();
     options.TestSpell = 585;
     options.CastEveryTicks = 1;
     BotPolicy policy(options);
@@ -1182,7 +1190,7 @@ void InvalidCastTargetIsNotCastAtAgain()
 // A target the bot cannot reach is given up after kApproachTimeoutMs of walking toward it.
 void UnreachableTargetIsGivenUp()
 {
-    BotPolicy policy;
+    BotPolicy policy(AggressiveOptions());
     NearbyUnit const far = Hostile(7, 30.0f, 100); // 30 yards, beyond melee range
     WorldTickSnapshotView view = PartyView({ 10 });
     AddNearby(view, 0, far);
@@ -1196,7 +1204,7 @@ void UnreachableTargetIsGivenUp()
 // A target given up again is avoided for longer: the second time, twice kAvoidMs.
 void RepeatedlyAvoidedTargetIsLeftLonger()
 {
-    BotPolicy policy;
+    BotPolicy policy(AggressiveOptions());
     NearbyUnit const trainer = Hostile(7, 30.0f, 100);
     WorldTickSnapshotView view = PartyView({ 10 });
     AddNearby(view, 0, trainer);
@@ -1224,7 +1232,7 @@ void BotDoesNotPullAboveItsLevel()
     view.bots[0].level = 1;
     AddNearby(view, 0, strong);
     AddNearby(view, 0, fair);
-    BotPolicy policy;
+    BotPolicy policy(AggressiveOptions());
     auto const actions = policy.Decide(view, 0);
     CHECK(!HasAction(actions, 10, ActionType::kAttackTarget, strong.guid));
     CHECK(HasAction(actions, 10, ActionType::kFollow, fair.guid) || HasAction(actions, 10, ActionType::kAttackTarget, fair.guid));
@@ -1238,7 +1246,7 @@ void BotDoesNotPullAnElite()
     WorldTickSnapshotView view = PartyView({ 10 });
     view.bots[0].level = 1;
     AddNearby(view, 0, elite);
-    BotPolicy policy;
+    BotPolicy policy(AggressiveOptions());
     CHECK(!HasAction(policy.Decide(view, 0), 10, ActionType::kAttackTarget, elite.guid));
 }
 
@@ -1250,14 +1258,14 @@ void CreatureAttackingTheBotIsFoughtWhateverItsLevel()
     view.bots[0].level = 1;
     view.bots[0].threat_target_guid = strong.guid; // it is already fighting the bot
     AddNearby(view, 0, strong);
-    BotPolicy policy;
+    BotPolicy policy(AggressiveOptions());
     CHECK(HasAction(policy.Decide(view, 0), 10, ActionType::kAttackTarget, strong.guid));
 }
 
 // Looting (M7). A bot loots the creature it fought once that is dead, close, and the bot is out of combat. Once per corpse.
 void BotLootsTheCreatureItKilled()
 {
-    BotPolicy policy;
+    BotPolicy policy(AggressiveOptions());
     NearbyUnit const alive = Hostile(7, 2.0f, 100);
     WorldTickSnapshotView fight = PartyView({ 10 });
     AddNearby(fight, 0, alive);
@@ -1281,7 +1289,7 @@ void BotLootsTheCreatureItKilled()
 void GroupmateDoesNotLootACorpseAlreadyTaken()
 {
     // Two members of one group fought the same creature: the core loots the whole corpse for the group, so only one sends the loot.
-    BotPolicy policy;
+    BotPolicy policy(AggressiveOptions());
     NearbyUnit const alive = Hostile(7, 2.0f, 100);
     WorldTickSnapshotView fight = PartyView({ 10, 11 });
     for (std::size_t i = 0; i < 2; ++i)
@@ -1307,7 +1315,7 @@ void GroupmateDoesNotLootACorpseAlreadyTaken()
 
 void NoLootWhileInCombat()
 {
-    BotPolicy policy;
+    BotPolicy policy(AggressiveOptions());
     NearbyUnit const alive = Hostile(7, 2.0f, 100);
     WorldTickSnapshotView fight = PartyView({ 10 });
     AddNearby(fight, 0, alive);
@@ -1323,7 +1331,7 @@ void NoLootWhileInCombat()
 
 void NoLootForACorpseItDidNotFight()
 {
-    BotPolicy policy;
+    BotPolicy policy(AggressiveOptions());
     WorldTickSnapshotView view = PartyView({ 10 });
     AddNearby(view, 0, Hostile(7, 2.0f, 0)); // dead when first seen, never its target
     CHECK(!HasAction(policy.Decide(view, 0), 10, ActionType::kLoot));
@@ -1331,7 +1339,7 @@ void NoLootForACorpseItDidNotFight()
 
 void NoLootForADistantCorpse()
 {
-    BotPolicy policy;
+    BotPolicy policy(AggressiveOptions());
     WorldTickSnapshotView fight = PartyView({ 10 });
     AddNearby(fight, 0, Hostile(7, 2.0f, 100));
     policy.Decide(fight, 0);
@@ -1350,11 +1358,11 @@ void BotFightsBackAgainstAStrongAttacker()
     view.bots[0].level = 1;
     AddNearby(view, 0, strong);
 
-    BotPolicy calm;
+    BotPolicy calm(AggressiveOptions());
     CHECK(!HasAction(calm.Decide(view, 0), 10, ActionType::kAttackTarget, strong.guid)); // not pulled when the bot is not in combat
 
     view.bots[0].in_combat = 1; // the same creature is now hitting the bot
-    BotPolicy attacked;
+    BotPolicy attacked(AggressiveOptions());
     CHECK(HasAction(attacked.Decide(view, 0), 10, ActionType::kAttackTarget, strong.guid));
 }
 
@@ -1363,14 +1371,14 @@ void BotInCombatIgnoresThePackLimit()
     WorldTickSnapshotView view = PartyView({ 10 });
     for (std::uint64_t counter = 1; counter <= 4; ++counter) // four creatures within 10 yards of each other: more than the limit of three
         AddNearby(view, 0, Hostile(counter, 2.0f + float(counter) * 0.5f, 100));
-    BotPolicy calm;
+    BotPolicy calm(AggressiveOptions());
     bool pulled = false;
     for (BotAction const& action : calm.Decide(view, 0))
         pulled = pulled || action.type == ActionType::kAttackTarget || action.type == ActionType::kFollow;
     CHECK(!pulled); // a pack of four is not pulled
 
     view.bots[0].in_combat = 1;
-    BotPolicy attacked;
+    BotPolicy attacked(AggressiveOptions());
     bool fights = false;
     for (BotAction const& action : attacked.Decide(view, 0))
         fights = fights || action.type == ActionType::kAttackTarget;
@@ -1397,7 +1405,7 @@ BotPolicy DungeonPolicy()
 // A dungeon waypoint the core finds no route to is given up after three refusals in a row; the leader goes on to the next point.
 void ALeaderSkipsAWaypointWithNoRoute()
 {
-    PolicyOptions options;
+    PolicyOptions options = AggressiveOptions();
     options.PartySize = 5;
     options.ClassOf = WarriorLeads;
     options.Route = { Point{ 500.0f, 0.0f, 0.0f }, Point{ 900.0f, 0.0f, 0.0f } };
@@ -1444,7 +1452,7 @@ float LeaderWalk(std::vector<BotAction> const& actions)
 
 void TheLeaderWaitsAtABossPointUntilTheBossIsDead()
 {
-    PolicyOptions options;
+    PolicyOptions options = AggressiveOptions();
     options.PartySize = 5;
     options.ClassOf = WarriorLeads;
     options.Route = { Point{ 100.0f, 0.0f, 0.0f }, Point{ 140.0f, 0.0f, 0.0f }, Point{ 180.0f, 0.0f, 0.0f } };   // 100 and 40 yards apart: no mount
@@ -1488,7 +1496,7 @@ void TheLeaderWaitsAtABossPointUntilTheBossIsDead()
 
 void ABossPointIsNeverSkippedForNoRoute()
 {
-    PolicyOptions options;
+    PolicyOptions options = AggressiveOptions();
     options.PartySize = 5;
     options.ClassOf = WarriorLeads;
     options.Route = { Point{ 100.0f, 0.0f, 0.0f }, Point{ 140.0f, 0.0f, 0.0f } };
@@ -1555,7 +1563,7 @@ WorldTickSnapshotView PlayerGroupView(float tankX = 0.0f)
 
 PolicyOptions LeadOptions()
 {
-    PolicyOptions options;
+    PolicyOptions options = AggressiveOptions();
     options.ClassOf = WarriorLeads;
     options.WanderWhenIdle = false;
     PolicyOptions::DungeonRoute route;
@@ -1738,7 +1746,7 @@ std::optional<BotAction> TeleportOf(std::vector<BotAction> const& actions, std::
 
 void ALeaderWithNoRouteIsPutBackOnTheRouteOnce()
 {
-    PolicyOptions options;
+    PolicyOptions options = AggressiveOptions();
     options.PartySize = 5;
     options.ClassOf = WarriorLeads;
     options.DungeonTeleport = true;
@@ -1789,7 +1797,7 @@ void ALeaderWithNoRouteIsPutBackOnTheRouteOnce()
 
 void AMemberThatLostItsLeaderIsPutNextToIt()
 {
-    PolicyOptions options;
+    PolicyOptions options = AggressiveOptions();
     options.PartySize = 5;
     options.ClassOf = WarriorLeads;
     options.DungeonTeleport = true;
@@ -1812,6 +1820,18 @@ void AMemberThatLostItsLeaderIsPutNextToIt()
     quiet.SetRouteActive(true);
     quiet.Decide(view, 1000);
     CHECK(!TeleportOf(quiet.Decide(view, 30000), 10).has_value());
+}
+
+// The default stance is defensive: a bot does not pull what is in range on its own, and it fights what attacks it.
+void DefaultBotsDoNotPullWhatIsInRange()
+{
+    BotPolicy policy(PolicyOptions{});
+    NearbyUnit const mob = Hostile(7, 3.0f, 100);
+    WorldTickSnapshotView view = PartyView({ 10 });
+    AddNearby(view, 0, mob);
+    CHECK(!HasAction(policy.Decide(view, 0), 10, ActionType::kAttackTarget, mob.guid));
+    view.bots[0].threat_target_guid = mob.guid;
+    CHECK(HasAction(policy.Decide(view, 1000), 10, ActionType::kAttackTarget, mob.guid));
 }
 
 // A party that flips between ready and not ready every tick (a member that is a ghost one moment and not the next) must not hold the leader forever.
@@ -1938,7 +1958,7 @@ std::uint32_t AllWarriors(std::uint64_t) { return 1; }
 // A five-bot party (12 leads) whose events are collected. classOf defaults to WarriorLeads (priests follow the warrior).
 PolicyOptions DeadOptions(std::vector<std::string>* events, std::function<std::uint32_t(std::uint64_t)> classOf = WarriorLeads)
 {
-    PolicyOptions options;
+    PolicyOptions options = AggressiveOptions();
     options.PartySize = 5;
     options.PartyCount = 1;
     options.ClassOf = classOf;
@@ -2233,7 +2253,7 @@ void PartyWaitIsLoggedForARezAndForAGhost()
 void StalledTargetIsLeftAloneForMinutes()
 {
     NearbyUnit const mob = Hostile(7, 3.0f, 100);
-    BotPolicy policy;
+    BotPolicy policy(AggressiveOptions());
     auto const view = [&mob]
     {
         WorldTickSnapshotView v = PartyView({ 10 });
@@ -2270,7 +2290,7 @@ void StalledTargetIsLeftAloneForMinutes()
 void SparseSnapshotsStillEndAStalledFight()
 {
     NearbyUnit const mob = Hostile(7, 3.0f, 100);
-    BotPolicy policy;
+    BotPolicy policy(AggressiveOptions());
     auto const view = [&mob]
     {
         WorldTickSnapshotView v = PartyView({ 10 });
@@ -2293,7 +2313,7 @@ void SparseSnapshotsStillEndAStalledFight()
 void UnseenThreatIsGivenUp()
 {
     std::uint64_t const threat = MakeUnitRef(8, 1, 9);
-    BotPolicy policy;
+    BotPolicy policy(AggressiveOptions());
     auto const view = [&threat]
     {
         WorldTickSnapshotView v = PartyView({ 10 });
@@ -2319,7 +2339,7 @@ void GreyCreatureIsNotPulled()
     WorldTickSnapshotView view = PartyView({ 10 });
     view.bots[0].level = 10;
     AddNearby(view, 0, grey);
-    BotPolicy policy;
+    BotPolicy policy(AggressiveOptions());
     auto actions = policy.Decide(view, 0);
     CHECK(!HasAction(actions, 10, ActionType::kAttackTarget, grey.guid) && !HasAction(actions, 10, ActionType::kFollow, grey.guid));
 
@@ -2327,7 +2347,7 @@ void GreyCreatureIsNotPulled()
     withGreen.bots[0].level = 10;
     AddNearby(withGreen, 0, grey);
     AddNearby(withGreen, 0, green);
-    BotPolicy other;
+    BotPolicy other(AggressiveOptions());
     actions = other.Decide(withGreen, 0);
     CHECK(HasAction(actions, 10, ActionType::kAttackTarget, green.guid) || HasAction(actions, 10, ActionType::kFollow, green.guid));
 
@@ -2336,7 +2356,7 @@ void GreyCreatureIsNotPulled()
     attacked.bots[0].level = 10;
     attacked.bots[0].in_combat = 1;
     AddNearby(attacked, 0, grey);
-    BotPolicy defender;
+    BotPolicy defender(AggressiveOptions());
     actions = defender.Decide(attacked, 0);
     CHECK(HasAction(actions, 10, ActionType::kAttackTarget, grey.guid) || HasAction(actions, 10, ActionType::kFollow, grey.guid));
 }
@@ -2368,7 +2388,7 @@ WorldTickSnapshotView ManaView(std::uint32_t powerPct)
 
 void IdleCasterDrinksWhenLowOnMana()
 {
-    BotPolicy policy;
+    BotPolicy policy(AggressiveOptions());
     std::uint32_t spell = 99;
     CHECK(RestAt(policy.Decide(ManaView(20), 1000), spell) >= 0 && spell == 1); // sits
     CHECK(RestAt(policy.Decide(ManaView(60), 5000), spell) < 0);               // keeps sitting: no new action
@@ -2380,7 +2400,7 @@ void IdleCasterDrinksWhenLowOnMana()
 
 void ManaRestIsCappedAndNotRepeatedAtOnce()
 {
-    BotPolicy policy;
+    BotPolicy policy(AggressiveOptions());
     std::uint32_t spell = 99;
     CHECK(RestAt(policy.Decide(ManaView(10), 1000), spell) >= 0 && spell == 1);
     CHECK(RestAt(policy.Decide(ManaView(10), 100000), spell) < 0);              // still drinking
@@ -2390,7 +2410,7 @@ void ManaRestIsCappedAndNotRepeatedAtOnce()
 
 void FighterWithoutManaDoesNotDrink()
 {
-    BotPolicy policy;
+    BotPolicy policy(AggressiveOptions());
     WorldTickSnapshotView view = ManaView(0);
     view.bots[0].power_type = 1; // rage
     std::uint32_t spell = 99;
@@ -2615,7 +2635,7 @@ void HurtBotFleesFromThreat()
 {
     WorldTickSnapshotView view = Hurt(250, { Unit(8, 2, 10.0f, true) }, MakeUnitRef(8, 1, 9));
     view.bots[0].in_combat = 1;
-    BotPolicy policy;
+    BotPolicy policy(AggressiveOptions());
     auto actions = policy.Decide(view, 1000);
     bool fled = false;
     for (BotAction const& action : actions)
@@ -2628,7 +2648,7 @@ void HurtBotDoesNotFleeWhenThreatIsFar()
 {
     WorldTickSnapshotView view = Hurt(250, { Unit(8, 2, 20.0f, true) }, MakeUnitRef(8, 1, 9));
     view.bots[0].in_combat = 1;
-    BotPolicy policy;
+    BotPolicy policy(AggressiveOptions());
     auto actions = policy.Decide(view, 1000);
     for (BotAction const& action : actions)
         CHECK(action.type != ActionType::kMoveTo);
@@ -2699,7 +2719,7 @@ void BotDoesNotMountInCombat()
 void LowHealthFleesFromAHostileItIsNotFighting()
 {
     WorldTickSnapshotView view = Hurt(250, { Unit(8, 2, 10.0f, true) });
-    BotPolicy policy;
+    BotPolicy policy(AggressiveOptions());
     auto actions = policy.Decide(view, 0);
     CHECK(actions.size() == 1);
     if (actions.size() == 1)
@@ -2711,7 +2731,7 @@ void LowHealthFleesFromAHostileItIsNotFighting()
 // A pull is the weakest creature that may be pulled, not the closest: finishing it before the next is more experience per hour.
 void WeakestTargetIsPulledFirst()
 {
-    BotPolicy policy;
+    BotPolicy policy(AggressiveOptions());
     WorldTickSnapshotView view = PartyView({ 10 });
     AddNearby(view, 0, Hostile(7, 20.0f, 20)); // hurt, far away
     AddNearby(view, 0, Hostile(8, 3.0f, 100)); // healthy, close
@@ -2723,7 +2743,7 @@ void WeakestTargetIsPulledFirst()
 // walking up (a target still out of range is kFollow: see WeakestTargetIsPulledFirst).
 void ClosestBreaksTheTieBetweenEqualTargets()
 {
-    BotPolicy policy;
+    BotPolicy policy(AggressiveOptions());
     WorldTickSnapshotView view = PartyView({ 10 });
     AddNearby(view, 0, Hostile(7, 12.0f, 100));
     AddNearby(view, 0, Hostile(8, 3.0f, 100));
@@ -2734,7 +2754,7 @@ void ClosestBreaksTheTieBetweenEqualTargets()
 // Two rogues of one party, a target that is casting: one interrupts it and the other keeps building combo points.
 void OnlyOneRogueInterruptsACastingTarget()
 {
-    PolicyOptions options;
+    PolicyOptions options = AggressiveOptions();
     options.PartySize = 5;
     options.PartyCount = 1;
     options.ClassOf = [](std::uint64_t) { return 4; }; // every bot a rogue
@@ -2761,7 +2781,7 @@ void RogueWithoutAPartyStillInterrupts()
 // Two priests of one party, one member hurt: one heals it and the others look elsewhere while that heal is in flight.
 void TwoHealersDoNotHealTheSameMember()
 {
-    PolicyOptions options;
+    PolicyOptions options = AggressiveOptions();
     options.PartySize = 5;
     options.PartyCount = 1;
     options.ClassOf = [](std::uint64_t) { return 5; }; // every bot a priest
@@ -2784,7 +2804,7 @@ void TwoHealersDoNotHealTheSameMember()
 // The leader (the tank) is kept alive first while it holds a target, even when someone else is on less health.
 void TankIsHealedBeforeTheLowestMember()
 {
-    PolicyOptions options;
+    PolicyOptions options = AggressiveOptions();
     options.PartySize = 5;
     options.PartyCount = 1;
     options.ClassOf = WarriorLeads; // bot 12 is the warrior and leads
@@ -2803,7 +2823,7 @@ void TwoDruidsDoNotBothCastThePartyBuff()
 {
     std::istringstream file("class 11\nbuff 1126 duration 1800 party\n");
     std::vector<std::string> drop;
-    PolicyOptions options;
+    PolicyOptions options = AggressiveOptions();
     options.Rotations = std::make_shared<rotation::RotationData>(rotation::ParseRotationData(file, drop));
     CHECK(drop.empty());
     options.PartySize = 5;
@@ -2851,7 +2871,7 @@ void HubTimeoutTriesTheNextHubSoonerThanAnArrival()
 void LeashedTargetIsNotPulledAgain()
 {
     NearbyUnit const mob = Hostile(7, 3.0f, 100);
-    BotPolicy policy;
+    BotPolicy policy(AggressiveOptions());
     WorldTickSnapshotView fighting = PartyView({ 10 });
     AddNearby(fighting, 0, mob);
     fighting.bots[0].threat_target_guid = mob.guid;
@@ -2867,7 +2887,7 @@ void LeashedTargetIsNotPulledAgain()
     CHECK(!HasAction(after, 10, ActionType::kAttackTarget, mob.guid));
     CHECK(!HasAction(after, 10, ActionType::kFollow, mob.guid));
     // A kill is different: the bot goes straight on to the next creature.
-    BotPolicy killer;
+    BotPolicy killer(AggressiveOptions());
     WorldTickSnapshotView killed = PartyView({ 10 });
     killed.bots[0].last_target_lost_reason = 1; // killed
     AddNearby(killed, 0, Hostile(8, 5.0f, 100));
@@ -2932,7 +2952,7 @@ void SelfBuffIsReadFromTheAura()
 {
     std::istringstream file("class 5\nbuff 17 duration 1800 self\n");
     std::vector<std::string> drop;
-    PolicyOptions options;
+    PolicyOptions options = AggressiveOptions();
     options.Rotations = std::make_shared<rotation::RotationData>(rotation::ParseRotationData(file, drop));
     CHECK(drop.empty());
     options.ClassId = 5;
@@ -2981,7 +3001,7 @@ void VendorCarriesItsGuid()
 // while it rests.
 BotPolicy SupplyPolicy(std::uint32_t classId = 0)
 {
-    PolicyOptions options;
+    PolicyOptions options = AggressiveOptions();
     options.ClassId = classId;
     options.WanderWhenIdle = false; // an idle bot would take an exploring walk; these tests look at trips, rests and eating
     options.Supplies.Enabled = true;
@@ -3028,7 +3048,7 @@ void ShortOfAmmoWalksToTheAmmoVendor()
 
 void NoSuppliesTripWhenTheFeatureIsOff()
 {
-    PolicyOptions options;
+    PolicyOptions options = AggressiveOptions();
     options.ClassId = 3;
     options.WanderWhenIdle = false;
     BotPolicy policy(options);
@@ -3132,7 +3152,7 @@ void WornGearGoesToTheRepairmanBeforeTheSupplyVendor()
 
 void PartyMembersAndHeldBotsDoNotShop()
 {
-    PolicyOptions options;
+    PolicyOptions options = AggressiveOptions();
     options.ClassOf = WarriorLeads;
     options.PartySize = 5;
     options.PartyCount = 1;
@@ -3198,7 +3218,7 @@ void ARestingHurtBotEatsAndDrinks()
 void AHunterWithoutAmmunitionFightsInMelee()
 {
     NearbyUnit const mob = Hostile(2, 20.0f, 100);
-    PolicyOptions options;
+    PolicyOptions options = AggressiveOptions();
     options.ClassId = 3;
     options.WanderWhenIdle = false;
 
@@ -3223,7 +3243,7 @@ void AHunterWithoutAmmunitionFightsInMelee()
 // ---- Potions and bandages (layout 16) ----
 BotPolicy GoodsPolicy(std::uint32_t classId = 1)
 {
-    PolicyOptions options;
+    PolicyOptions options = AggressiveOptions();
     options.ClassId = classId;
     options.WanderWhenIdle = false;
     options.Supplies.Enabled = true;
@@ -3326,7 +3346,7 @@ void ARestingBotWithoutFoodBandagesItself()
 
 void ABotMissingAReagentBuysItAtTheReagentVendor()
 {
-    PolicyOptions options;
+    PolicyOptions options = AggressiveOptions();
     options.ClassId = 1;
     options.WanderWhenIdle = false;
     options.Supplies.Enabled = true;
@@ -3395,7 +3415,7 @@ void ABotIsSafeToLogOutOnlyWhenNothingIsGoingOn()
 // ---- Flight points (layout 17, taxi_policy.h) ----
 BotPolicy TaxiPolicy()
 {
-    PolicyOptions options;
+    PolicyOptions options = AggressiveOptions();
     options.HubsByMap[1] = { Point{ 3000.0f, 0.0f, 0.0f } };   // a hub far away: the idle bot's walk is long
     options.Taxi.Enabled = true;
     return BotPolicy(options);
@@ -3464,7 +3484,7 @@ void ARefusedFlightMakesTheBotWalk()
 
 void FlightsAreOffByDefaultAndNotForPartyMembers()
 {
-    PolicyOptions options;
+    PolicyOptions options = AggressiveOptions();
     options.HubsByMap[1] = { Point{ 3000.0f, 0.0f, 0.0f } };
     BotPolicy off(options);
     WorldTickSnapshotView there = TaxiView(98.0f);
@@ -3658,6 +3678,7 @@ int main()
     TankIsHealedBeforeTheLowestMember();
     TwoDruidsDoNotBothCastThePartyBuff();
     HubTimeoutTriesTheNextHubSoonerThanAnArrival();
+    DefaultBotsDoNotPullWhatIsInRange();
 
     if (failures == 0)
         std::printf("policy_test: all checks passed\n");
