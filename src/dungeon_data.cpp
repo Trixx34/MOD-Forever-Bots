@@ -270,6 +270,14 @@ std::unordered_map<std::string, std::string> MergeDungeonSet(std::unordered_map<
     if (d.LeaderDeadAbandonSec != 0)
         set("ScenarioLeaderDeadAbandonSec", std::to_string(d.LeaderDeadAbandonSec));
 
+    if (!d.KillPriority.empty())
+    {
+        std::string order;
+        for (std::uint32_t entry : d.KillPriority)
+            order += (order.empty() ? "" : ",") + std::to_string(entry);
+        set("ScenarioKillPriority", order);
+    }
+
     std::string bosses;
     for (DungeonWaypoint const& point : d.Route)
         if (point.BossEntry != 0)

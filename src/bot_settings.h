@@ -62,6 +62,8 @@ struct ScenarioSettings
     // ScenarioParties (1 to 8, default 1): this many parties of the roster run at the same time, each with its own director and its own dungeon instance (the core makes an
     // instance per group). Bot guids in order are cut into parties of the roster's size, as the policy's party logic does. MaxBots must cover Parties x roster.
     std::uint32_t Parties = 1;
+    // ScenarioKillPriority = "entry,entry,..": creature entries in the order the party kills them (the dungeon file's kill_priority).
+    std::vector<std::uint32_t> KillPriority;
     bool HasPortal = false;
     std::array<float, 4> Portal{};                       // map, x, y, z: the instance door, outside
 };
@@ -153,6 +155,8 @@ struct BotSettings
     // Crafting = 1 (default): a bot with nothing to fight makes bandages from its cloth and cooks its meat (kSkillUp, SDK 0.17; the core must have the action), which
     // raises First Aid and Cooking and uses up what fills its bags. 0 turns it off.
     bool Crafting = true;
+    // DungeonTactics = "focus,interrupt,heal,rest" (default: all) or "none": which of the dungeon party's tactics are on (bot_policy.h). Measured one at a time on the sim.
+    bool TacticFocus = true, TacticInterrupt = true, TacticHeal = true, TacticRest = true;
     // ActionStats = 1: every minute the module logs the ten (bot, action, spell) combinations it sent most often in that minute ("actions_top"), to find a bot that
     // repeats an action every tick. Off by default.
     bool ActionStats = false;

@@ -81,6 +81,9 @@ struct Dungeon
     std::uint32_t MinAlive = 0;
     std::uint32_t LeaderDeadAbandonSec = 0;
     std::vector<DungeonWaypoint> Route;
+    // Creature entries in the order the party should kill them (casters and healers first): the damage dealers of a party fight the one of these that is
+    // next to the tank's target before the tank's own target (kill_priority in the JSON file). Empty: they fight the tank's target.
+    std::vector<std::uint32_t> KillPriority;
     // Filled by the JSON dungeon files (dungeon_files.h); empty for a block of the old text file.
     std::vector<DungeonBoss> Bosses;
     std::vector<dungeon_events::Event> Events;

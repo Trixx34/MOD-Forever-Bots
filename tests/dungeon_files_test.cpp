@@ -413,8 +413,9 @@ void ShippedFilesEqualTheOldTextFiles()
         std::unordered_map<std::string, std::string> const config{ { "Dungeon", old.Id } };
         std::vector<std::string> mergeWarnings;
         auto const fromText = MergeDungeon(config, oldText, mergeWarnings);
-        auto const fromJson = MergeDungeonSet(config, json, mergeWarnings);
+        auto fromJson = MergeDungeonSet(config, json, mergeWarnings);
         CHECK(mergeWarnings.empty());
+        fromJson.erase("ScenarioKillPriority"); // new in the JSON file (kill_priority): the old text file has no such line
         CHECK(fromText == fromJson);
         CHECK(fromJson.size() > 10);
     }

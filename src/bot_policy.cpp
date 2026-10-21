@@ -8,6 +8,7 @@
 #include <limits>
 #include <map>
 #include <span>
+#include <tuple>
 
 using forever_module::ActionType;
 using forever_module::BotAction;
@@ -159,17 +160,20 @@ constexpr float kRouteSkipAheadYards = 25.0f;
 // its party, onto the next packs): the target is avoided for a while and the bot stands.
 constexpr float kPartyChaseYards = 45.0f;
 constexpr float kRoutePointReachYards = 6.0f;    // the leader has arrived at a route waypoint this close to it
+constexpr float kFocusPackYards = 12.0f;         // a unit this close to the tank's target is of the same pack: the damage dealers may take it first
 constexpr float kRouteWaitYards = 30.0f;         // the leader waits for a member farther behind than this
 constexpr std::uint32_t kRouteMinHealthPct = 80; // and for its own health to be at least this
 // Dungeon pull control: the tank (the party leader) pulls only when the party is ready, and the others wait for the tank to hold the target.
-constexpr std::uint32_t kPartyReadyHealthPct = 80;  // every living member has at least this much health
-constexpr std::uint32_t kPartyReadyPowerPct = 60;   // and every mana user at least this much mana
+constexpr std::uint32_t kPartyReadyHealthOldPct = 80, kPartyReadyPowerOldPct = 60; // with the Rest tactic off
+constexpr std::uint32_t kPartyReadyHealthPct = 90;  // every living member has at least this much health
+constexpr std::uint32_t kPartyReadyPowerPct = 80;   // and every mana user at least this much mana
 constexpr std::uint32_t kPartyReadySitHealthPct = 95; // a sitting member rests up to this much
 constexpr std::uint64_t kPullHoldClearMs = 10000;  // the party must be ready this long in a row before a pull hold ends
 constexpr std::uint64_t kPullHoldMaxMs = 120000;    // the party never waits longer than this for itself
 constexpr std::uint64_t kTankHeadStartMs = 2500;    // the others join a fight this long after the tank started it, so the tank has the threat
 // Healing: a healer class heals the party member with the lowest health below this share, within this range.
 constexpr std::uint32_t kHealBelowPct = 60;
+constexpr std::uint32_t kDungeonHealBelowPct = 75;   // a healer of a dungeon party heals a member below this share (the pulls hit harder than the ones of a leveling party)
 // The tank (the party leader) is kept alive first while it holds a target, even a little below this.
 constexpr std::uint32_t kTankHealBelowPct = 90;
 // How long a heal claim on a member lasts: one global cooldown and the cast, so a second healer looks elsewhere meanwhile.
@@ -219,6 +223,10 @@ constexpr float kQuestWalkStuckYards = 5.0f;
 constexpr std::uint32_t kResurrection = 2006;
 constexpr std::uint32_t kRedemption = 7328;
 constexpr std::uint32_t kAncestralSpirit = 2008;
+// A dungeon party's dead wait longer for a resurrect than a leveling party's: the healer needs the fight to end, to get within range, and a 10 s cast. A bot that releases too early
+// stands at the graveyard outside the instance (one tank was killed there seven times in a row by a wandering scout, with every re-entry refused for being in combat).
+constexpr std::uint64_t kDungeonReleaseDelayMs = 90000;
+constexpr std::uint64_t kDungeonReleaseCombatHoldMs = 180000;
 constexpr float kRezRangeYards = 30.0f;              // a rezzer resurrects a corpse within this range
 constexpr std::uint32_t kRezManaPct = 35;            // and starts the 10 s cast with at least this much mana
 constexpr std::uint64_t kRezCastMs = 11000;          // after a resurrect cast started, the same target is left alone this long
@@ -1834,18 +1842,21 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                         rezzer = rezzer || isRezzer(member);
                         fighting = fighting || member.in_combat != 0;
                     });
+                bool const dungeonParty = routeActiveOf(bot.guid) || (deadParty != 0 && tankLed.count(deadParty) != 0);
+                std::uint64_t const releaseDelayMs = dungeonParty ? std::max(_options.ReleaseDelayMs, kDungeonReleaseDelayMs) : _options.ReleaseDelayMs;
+                std::uint64_t const releaseCombatHoldMs = dungeonParty ? std::max(_options.ReleaseCombatHoldMs, kDungeonReleaseCombatHoldMs) : _options.ReleaseCombatHoldMs;
                 char const* reason = nullptr;
                 if (!anyAlive)
                     reason = "release_all_down";
                 else if (!rezzer)
                     reason = "release_no_rezzer";
-                else if (waited >= _options.ReleaseDelayMs)
+                else if (waited >= releaseDelayMs)
                     reason = "release_timeout";
                 if (!reason && state.ReleaseNow)
                     reason = "release_ordered";
                 if (!reason)
                     continue; // waiting for a resurrect
-                if (fighting && waited < _options.ReleaseCombatHoldMs)
+                if (fighting && waited < releaseCombatHoldMs)
                 {
                     // The core refuses a release in combat, and the party is still fighting: held back, capped.
                     if (!state.ReleaseHeldLogged)
@@ -2194,13 +2205,13 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 {
                     if (member.life_state != 0)
                         return;
-                    if (member.max_health > 0 && std::uint64_t(member.health) * 100 < std::uint64_t(member.max_health) * kPartyReadyHealthPct)
+                    if (member.max_health > 0 && std::uint64_t(member.health) * 100 < std::uint64_t(member.max_health) * (_options.TacticRest ? kPartyReadyHealthPct : kPartyReadyHealthOldPct))
                     {
                         ready = false;
                         not_ready_reason = "health bot=" + std::to_string(member.guid) + " pct=" + std::to_string(std::uint64_t(member.health) * 100 / member.max_health);
                     }
                     else if (member.power_type == 0 && member.max_power > 0 &&
-                             std::uint64_t(member.power) * 100 < std::uint64_t(member.max_power) * kPartyReadyPowerPct)
+                             std::uint64_t(member.power) * 100 < std::uint64_t(member.max_power) * (_options.TacticRest ? kPartyReadyPowerPct : kPartyReadyPowerOldPct))
                     {
                         ready = false;
                         not_ready_reason = "mana bot=" + std::to_string(member.guid) + " pct=" + std::to_string(std::uint64_t(member.power) * 100 / member.max_power);
@@ -2294,7 +2305,44 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             !avoided(leaderSnap->threat_target_guid))
         {
             if (NearbyUnit const* assist = FindLiveMob(nearby, leaderSnap->threat_target_guid))
+            {
                 targetRef = assist->guid;
+                // Focus fire (the dungeon's kill priority): a damage dealer fights the best-ranked live hostile of the tank's pack, not just the tank's own target: the casters
+                // and healers of the pack first (the dungeon file's kill_priority), then any unit that is casting right now, then the weakest.
+                bool const canInterrupt = classId == 2 || classId == 4 || classId == 7 || classId == 8; // paladin, rogue, shaman, mage: an interrupt row in the rotation
+                bool const interruptNow = _options.TacticInterrupt && canInterrupt && !interruptTaken(bot, partyLeader);
+                if (routeOn && HealSpellFor(classId, bot.level) == 0 && ((_options.TacticFocus && !_options.KillPriority.empty()) || interruptNow))
+                {
+                    auto const rankOf = [this](NearbyUnit const& unit)
+                    {
+                        if (!_options.TacticFocus)
+                            return std::uint32_t(1000);
+                        auto const at = _options.KillPriority.find(forever_module::UnitRefEntry(unit.guid));
+                        return at == _options.KillPriority.end() ? std::uint32_t(1000) : at->second;
+                    };
+                    NearbyUnit const* best = assist;
+                    // A bot that can interrupt turns on a casting unit of the pack first (its rotation then fires the interrupt at its target); then the priority list, then the
+                    // casters, then the weakest.
+                    auto const keyOf = [&rankOf, interruptNow](NearbyUnit const& unit)
+                    {
+                        return std::make_tuple(interruptNow && unit.casting != 0 ? 0 : 1, rankOf(unit), unit.casting != 0 ? 0 : 1, unit.health);
+                    };
+                    for (NearbyUnit const& unit : nearby)
+                        if (unit.is_hostile && unit.health != 0 && IsLiveMob(unit) && !avoided(unit.guid) && unit.guid != assist->guid &&
+                            std::hypot(unit.pos_x - assist->pos_x, unit.pos_y - assist->pos_y) <= kFocusPackYards && keyOf(unit) < keyOf(*best))
+                            best = &unit;
+                    if (best != assist)
+                    {
+                        targetRef = best->guid;
+                        if (state.FocusLoggedFor != best->guid && _options.OnEvent)
+                        {
+                            state.FocusLoggedFor = best->guid;
+                            _options.OnEvent(std::string(interruptNow && best->casting != 0 ? "interrupt_target: bot=" : "focus: bot=") + std::to_string(bot.guid) + " entry=" + std::to_string(forever_module::UnitRefEntry(best->guid)) + " instead_of=" +
+                                             std::to_string(forever_module::UnitRefEntry(assist->guid)) + (best->casting != 0 ? " casting" : ""));
+                        }
+                    }
+                }
+            }
         }
         if (targetRef != 0)
         {
@@ -3341,7 +3389,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         // Waiting for the party (dungeon): sits to recover health, and mana for a mana user, even with creatures in view.
         bool const holdIdle = dungeonHold && !hasTarget && wanted.Type == ActionType::kStop && !routeBusy;
         bool const manaLow = holdIdle && manaUser &&
-                             std::uint64_t(bot.power) * 100 < std::uint64_t(bot.max_power) * (state.Sitting ? kPartyReadySitHealthPct : kPartyReadyPowerPct);
+                             std::uint64_t(bot.power) * 100 < std::uint64_t(bot.max_power) * (state.Sitting ? kPartyReadySitHealthPct : (_options.TacticRest ? kPartyReadyPowerPct : kPartyReadyPowerOldPct));
         bool const sitWanted = (idle || holdIdle) && (state.Sitting ? (stillHurt || manaLow || manaResting) : (hurtEnough || manaLow || manaResting)) &&
                                nowMs >= state.RestRetryAtMs;
         if (sitWanted != state.Sitting)
@@ -3688,7 +3736,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     for (auto it = _healClaims.begin(); it != _healClaims.end();)
                         it = nowMs >= it->second.UntilMs ? _healClaims.erase(it) : std::next(it);
                 BotSnapshot const* hurt = nullptr;
-                std::uint64_t hurtPct = kHealBelowPct;
+                std::uint64_t hurtPct = (routeActiveOf(bot.guid) && _options.TacticHeal) ? kDungeonHealBelowPct : kHealBelowPct;
                 BotSnapshot const* leaderHurt = nullptr;   // the tank with a target: healed first, whatever its share
                 std::uint64_t leaderHurtPct = kTankHealBelowPct;
                 auto const consider = [&](BotSnapshot const& member)

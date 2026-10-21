@@ -331,7 +331,7 @@ bool ParseDungeonJson(std::string_view text, std::string const& source, std::opt
         Value const& root = parsed.Root;
         if (!root.IsObject())
             r.Fail("", "the file must hold one object { ... }");
-        r.CheckKeys(root, "", { "schema", "id", "map", "name", "levels", "roster", "entrance", "run", "route", "events", "bosses", "notes" });
+        r.CheckKeys(root, "", { "schema", "id", "map", "name", "levels", "roster", "entrance", "run", "route", "events", "bosses", "kill_priority", "notes" });
         Value const* schema = root.Find("schema");
         if (!schema)
             r.Fail("", "the key \"schema\" is missing (this module reads schema 1)");
@@ -361,6 +361,8 @@ bool ParseDungeonJson(std::string_view text, std::string const& source, std::opt
             if (d.MaxLevel < d.MinLevel)
                 r.Fail("levels", "the maximum is below the minimum");
         }
+        if (Value const* priority = root.Find("kill_priority"))
+            d.KillPriority = r.UintList(*priority, "kill_priority", 64);
         Value const* roster = root.Find("roster");
         if (!roster)
             r.Fail("", "the key \"roster\" is missing (race:class of the tank, healer and dps, for example \"2:1,5:5,8:8,2:9,5:4\")");

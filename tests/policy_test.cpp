@@ -1253,6 +1253,79 @@ void MemberFightsItsLeadersTarget()
     CHECK(engages);
 }
 
+// Focus fire: with a kill priority a damage dealer takes the priority caster of the tank's pack, not only the tank's own target.
+void ADamageDealerFightsThePriorityCasterOfThePack()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.PartyCount = 1;
+    options.ClassOf = [](std::uint64_t guid) { return guid == 12 ? 1u : guid == 11 ? 8u : 5u; }; // bot 11 is the mage, 12 the warrior, the rest priests
+    options.KillPriority = { { 1729, 0 } };                                                    // Defias Evoker first
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    NearbyUnit tankTarget = Hostile(7, 2.0f, 100);
+    tankTarget.guid = MakeUnitRef(8, 598, 7);        // a miner, the tank's own target
+    NearbyUnit caster = Hostile(8, 5.0f, 100);
+    caster.guid = MakeUnitRef(8, 1729, 8);           // an evoker of the same pack
+    view.bots[2].threat_target_guid = tankTarget.guid;
+    AddNearby(view, 1, tankTarget);
+    AddNearby(view, 1, caster);
+    bool onCaster = false, onMiner = false;
+    for (std::uint64_t at = 0; at < 6000; at += 500)
+        for (BotAction const& action : policy.Decide(view, at))
+            if (action.bot_guid == 11)
+            {
+                onCaster = onCaster || action.target_guid == caster.guid;
+                onMiner = onMiner || action.target_guid == tankTarget.guid;
+            }
+    CHECK(onCaster);
+    CHECK(!onMiner);
+    // Without a priority list it assists the tank's target as before.
+    PolicyOptions plain = options;
+    plain.KillPriority.clear();
+    BotPolicy plainPolicy(plain);
+    plainPolicy.SetRouteActive(true);
+    bool plainOnMiner = false;
+    for (std::uint64_t at = 0; at < 6000; at += 500)
+        for (BotAction const& action : plainPolicy.Decide(view, at))
+            plainOnMiner = plainOnMiner || (action.bot_guid == 11 && action.target_guid == tankTarget.guid);
+    CHECK(plainOnMiner);
+}
+
+// Interrupt: a mage (Counterspell in its rotation) turns on a unit of the tank's pack that is casting; with the tactic off it keeps to the tank's target.
+void ACasterOfThePackIsTargetedForAnInterrupt()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.PartyCount = 1;
+    options.ClassOf = [](std::uint64_t guid) { return guid == 12 ? 1u : guid == 11 ? 8u : 5u; };
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    NearbyUnit tankTarget = Hostile(7, 2.0f, 100);
+    tankTarget.guid = MakeUnitRef(8, 598, 7);
+    NearbyUnit caster = Hostile(8, 5.0f, 100);
+    caster.guid = MakeUnitRef(8, 1729, 8);
+    caster.casting = 1;
+    view.bots[2].threat_target_guid = tankTarget.guid;
+    AddNearby(view, 1, tankTarget);
+    AddNearby(view, 1, caster);
+    auto const targets = [&](PolicyOptions const& o, std::uint64_t unit)
+    {
+        BotPolicy policy(o);
+        policy.SetRouteActive(true);
+        for (std::uint64_t at = 0; at < 6000; at += 500)
+            for (BotAction const& action : policy.Decide(view, at))
+                if (action.bot_guid == 11 && action.target_guid == unit)
+                    return true;
+        return false;
+    };
+    CHECK(targets(options, caster.guid));
+    PolicyOptions off = options;
+    off.TacticInterrupt = false;
+    CHECK(!targets(off, caster.guid));
+    CHECK(targets(off, tankTarget.guid));
+}
+
 void NoPartyActionsInCombat()
 {
     WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
@@ -2502,6 +2575,18 @@ void CorpseWaitsForARezzerThenReleases()
     CHECK(!HasAction(policy.Decide(build(), 1000), 13, ActionType::kReleaseSpirit));
     CHECK(!HasAction(policy.Decide(build(), 11000), 13, ActionType::kReleaseSpirit));
     CHECK(HasAction(policy.Decide(build(), 21500), 13, ActionType::kReleaseSpirit));
+}
+
+// A dungeon party's dead wait much longer for the healer (90 s, not 20 s): releasing early left the tank standing at the graveyard outside, killed again and again.
+void ADungeonCorpseWaitsLongerForARezzer()
+{
+    BotPolicy policy(DeadOptions(nullptr));
+    policy.SetRouteActive(true);
+    auto const build = [] { WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 }); Corpse(v.bots[3], 10.0f); return v; };
+    CHECK(!HasAction(policy.Decide(build(), 1000), 13, ActionType::kReleaseSpirit));
+    CHECK(!HasAction(policy.Decide(build(), 21500), 13, ActionType::kReleaseSpirit));
+    CHECK(!HasAction(policy.Decide(build(), 80000), 13, ActionType::kReleaseSpirit));
+    CHECK(HasAction(policy.Decide(build(), 92000), 13, ActionType::kReleaseSpirit));
 }
 
 // A ghost whose run takes too long is put at its corpse once, and the run starts over; it does not stay a ghost for good.
@@ -4313,6 +4398,8 @@ int main()
     MemberLeavesAForeignParty();
     MemberFollowsItsLeaderUntilClose();
     MemberFightsItsLeadersTarget();
+    ADamageDealerFightsThePriorityCasterOfThePack();
+    ACasterOfThePackIsTargetedForAnInterrupt();
     NoPartyActionsInCombat();
     SealIsNotRecastWhileUp();
     EviscerateAtFivePoints();
@@ -4362,6 +4449,7 @@ int main()
     GhostThatCannotReachItsCorpseIsPutThereOnce();
     DeathLoopMovesTheBotToAGrindSpot();
     CorpseWaitsForARezzerThenReleases();
+    ADungeonCorpseWaitsLongerForARezzer();
     CorpseReleasesAtOnceWithoutARezzer();
     CorpseReleasesWhenTheWholePartyIsDown();
     ReleaseIsHeldInCombatUpToTheCap();

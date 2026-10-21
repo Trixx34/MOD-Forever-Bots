@@ -145,6 +145,19 @@ void ReadScenario(std::unordered_map<std::string, std::string> const& config, Sc
         scenario.Roster.resize(5);
 
     ReadKey(config, "ScenarioLevel", 1, 60, scenario.Level, warnings);
+    if (auto const it = config.find("ScenarioKillPriority"); it != config.end())
+    {
+        std::istringstream list(it->second);
+        std::string item;
+        while (std::getline(list, item, ','))
+        {
+            std::uint32_t entry = 0;
+            if (std::from_chars(item.data(), item.data() + item.size(), entry).ec == std::errc{} && entry != 0)
+                scenario.KillPriority.push_back(entry);
+            else
+                warnings.push_back("Module.forever-bots.ScenarioKillPriority: '" + item + "' is not a creature entry; ignored.");
+        }
+    }
     ReadKey(config, "ScenarioParties", 1, 8, scenario.Parties, warnings);
     ReadKey(config, "ScenarioDurationSec", 30, 86400, scenario.DurationSec, warnings);
     if (auto const it = config.find("ScenarioStaging"); it != config.end())
@@ -356,6 +369,31 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadBool(config, "DungeonTeleport", settings.DungeonTeleport, warnings);
     ReadBool(config, "DungeonReviveOutOfCombat", settings.DungeonReviveOutOfCombat, warnings);
     ReadBool(config, "AggressiveStart", settings.AggressiveStart, warnings);
+    if (auto const it = config.find("DungeonTactics"); it != config.end())
+    {
+        settings.TacticFocus = settings.TacticInterrupt = settings.TacticHeal = settings.TacticRest = false;
+        std::istringstream list(it->second);
+        std::string item;
+        while (std::getline(list, item, ','))
+        {
+            while (!item.empty() && item.front() == ' ')
+                item.erase(item.begin());
+            while (!item.empty() && item.back() == ' ')
+                item.pop_back();
+            if (item == "all")
+                settings.TacticFocus = settings.TacticInterrupt = settings.TacticHeal = settings.TacticRest = true;
+            else if (item == "focus")
+                settings.TacticFocus = true;
+            else if (item == "interrupt")
+                settings.TacticInterrupt = true;
+            else if (item == "heal")
+                settings.TacticHeal = true;
+            else if (item == "rest")
+                settings.TacticRest = true;
+            else if (item != "none" && !item.empty())
+                warnings.push_back("Module.forever-bots.DungeonTactics: '" + item + "' is not focus, interrupt, heal, rest, all or none; ignored.");
+        }
+    }
     ReadBool(config, "Crafting", settings.Crafting, warnings);
     ReadBool(config, "ActionStats", settings.ActionStats, warnings);
     ReadKey(config, "MountMinLevel", 0, 80, settings.MountMinLevel, warnings);

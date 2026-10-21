@@ -1452,6 +1452,10 @@ int main(int argc, char** argv)
     policyOptions.AggressiveStart = settings.AggressiveStart;
     policyOptions.Crafting = settings.Crafting;
     policyOptions.MountMinLevel = settings.MountMinLevel;
+    policyOptions.TacticFocus = settings.TacticFocus;
+    policyOptions.TacticInterrupt = settings.TacticInterrupt;
+    policyOptions.TacticHeal = settings.TacticHeal;
+    policyOptions.TacticRest = settings.TacticRest;
     policyOptions.Gathering = settings.Gathering;
     if (!settings.CraftingFociFile.empty())
     {
@@ -1861,6 +1865,8 @@ int main(int argc, char** argv)
             policyOptions.RouteBossAt[point] = entry;
         policyOptions.Events = dungeon_events::ForMap(allEvents, std::uint32_t(settings.Scenario.Entry[0]));
         policyOptions.RouteMap = static_cast<std::uint32_t>(settings.Scenario.Entry[0]);
+        for (std::size_t i = 0; i < settings.Scenario.KillPriority.size(); ++i)
+            policyOptions.KillPriority.emplace(settings.Scenario.KillPriority[i], std::uint32_t(i));
 
         ScenarioPlan plan;
         plan.Name = settings.Scenario.Name;

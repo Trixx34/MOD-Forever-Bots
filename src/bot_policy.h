@@ -138,6 +138,15 @@ struct PolicyOptions
         std::vector<dungeon_events::Event> Events;
     };
     std::map<std::uint32_t, DungeonRoute> DungeonsByMap;
+    // Creature entry -> rank (0 first): the dungeon's kill priority. The damage dealers of a dungeon party fight the best-ranked live hostile next to the tank's target.
+    std::map<std::uint32_t, std::uint32_t> KillPriority;
+    // Dungeon tactics (the DungeonTactics setting), each on its own so a run can show what it is worth. Focus: the damage dealers take the pack's priority caster first
+    // (KillPriority). Interrupt: a bot with an interrupt in its rotation turns on a casting hostile of the tank's pack, one bot at a time. Heal: a healer heals a member
+    // below 75 % (not 60). Rest: the party holds a pull until every member has 90 % health and 80 % mana (not 80 and 60).
+    bool TacticFocus = true;
+    bool TacticInterrupt = true;
+    bool TacticHeal = true;
+    bool TacticRest = true;
     // Auto gear (AutoGearing setting): every bot is dressed for its level when it first appears, and again after AutoGearEveryLevels levels.
     bool AutoGearing = false;
     // Receives one line per notable decision (a heal cast, a pull held back or released), for the run logs. Unset = silent.
@@ -316,6 +325,7 @@ private:
         Point NoRouteDest{};                             // the destination of the last move the core found no route to
         std::uint64_t NoRouteUntilMs = 0;                // a move to (about) that place is not sent before this time
         std::uint32_t NoRouteStreak = 0;                 // no-route answers in a row for that place: the pause doubles each time
+        std::uint64_t FocusLoggedFor = 0;                // the unit a focus event was last written for (once per target)
         std::uint64_t WalkBlockedAtMs = 0;               // when a move got the answer "no route": the walk (grind spot, hub, exploring) that began before it is over, and the bot picks another later
         std::uint64_t NoRouteLoggedMs = 0;               // when a no-route refusal of any action was last written to the log (diagnostics)
         std::uint32_t NoRouteSequence = 0;               // the last kNoRoute result read (last_action_sequence)
