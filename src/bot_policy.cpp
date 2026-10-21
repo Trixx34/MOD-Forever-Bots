@@ -1455,6 +1455,9 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
 {
     std::vector<BotAction> actions;
     std::unordered_set<std::uint64_t> present;
+    // The route is on per bot when parallel parties are run (each has its own director), else for all.
+    auto const routeActiveOf = [this](std::uint64_t guid) { return _routeActiveFn ? _routeActiveFn(guid) : _routeActive; };
+    auto const killedBossesOf = [this](std::uint64_t guid) -> std::set<std::uint32_t> const& { return _killedBossesFn ? _killedBossesFn(guid) : _killedBosses; };
 
     // Parties (M8): the lowest-guid bots, in guid order, cut into parties of PartySize. Computed once per tick.
     std::unordered_map<std::uint64_t, std::size_t> indexOf; // bot guid -> index in view.bots
@@ -1867,7 +1870,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             // leader is alive and not fighting. The core's revive order puts the bot at the leader's side, or where it fell when the leader is on another
             // map. The ghost waits between tries and walks on only once they are used up (kOutOfCombatReviveTries), or when the leader is not up.
             if (_options.DungeonReviveOutOfCombat && deadParty != 0 && deadParty != bot.guid && bot.in_combat == 0 && state.ReviveAttempts < kOutOfCombatReviveTries &&
-                (_routeActive || tankLed.count(deadParty) != 0))
+                (routeActiveOf(bot.guid) || tankLed.count(deadParty) != 0))
             {
                 auto const leaderAt = indexOf.find(deadParty);
                 BotSnapshot const* const leader = leaderAt == indexOf.end() ? nullptr : &view.bots[leaderAt->second];
@@ -2066,7 +2069,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         std::uint64_t const partyLeader = led == leaderOf.end() ? 0 : led->second;
         bool const partyLeaderBot = partyLeader != 0 && partyLeader == bot.guid;
         bool const partyMember = partyLeader != 0 && !partyLeaderBot;
-        bool const routeOn = _routeActive || (partyLeader != 0 && tankLed.count(partyLeader) != 0);   // the dungeon party rules apply to this bot
+        bool const routeOn = routeActiveOf(bot.guid) || (partyLeader != 0 && tankLed.count(partyLeader) != 0);   // the dungeon party rules apply to this bot
         std::uint64_t const leaderRef = partyLeader != 0 ? PlayerRef(partyLeader) : 0;
         BotSnapshot const* leaderSnap = nullptr;
         if (partyMember)
@@ -2155,7 +2158,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         // leaves quests alone until it is done.
         QuestStep questStep;
         bool routeBusy = false;
-        bool const questsAllowed = _quests.Enabled() && !partyMember && !(_routeActive && _options.RouteMap != 0) /* a dungeon run: the leader walks the route, not to a quest giver */ && !lowHealth && bot.in_combat == 0 && !state.ChatStay && state.ChatFollow == 0 && nowMs >= state.QuestPausedUntilMs;
+        bool const questsAllowed = _quests.Enabled() && !partyMember && !(routeActiveOf(bot.guid) && _options.RouteMap != 0) /* a dungeon run: the leader walks the route, not to a quest giver */ && !lowHealth && bot.in_combat == 0 && !state.ChatStay && state.ChatFollow == 0 && nowMs >= state.QuestPausedUntilMs;
         if (questsAllowed)
             questStep = _quests.Next(bot, state.Quest, nowMs, QuestBotInfo{ classId, _options.RaceOf ? _options.RaceOf(bot.guid) : 0u });
         // Every five minutes, what the quest planner is doing for this bot and what keeps it from doing more (the events are the only record,
@@ -2538,7 +2541,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             std::vector<dungeon_events::Event> const* routeEvents = nullptr;
             if (partyLeaderBot && !state.ChatStay)
             {
-                if (_routeActive && (_options.RouteMap == 0 || bot.map_id == _options.RouteMap))
+                if (routeActiveOf(bot.guid) && (_options.RouteMap == 0 || bot.map_id == _options.RouteMap))
                 {
                     routePoints = &_options.Route;
                     routeBoss = &_options.RouteBossAt;
@@ -2554,8 +2557,8 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     }
                 }
             }
-            std::set<std::uint32_t> const& killedNow = _routeActive ? _killedBosses : _tankKilled[bot.map_id];
-            if (routePoints && !_routeActive && routeBoss && !routeBoss->empty())
+            std::set<std::uint32_t> const& killedNow = routeActiveOf(bot.guid) ? killedBossesOf(bot.guid) : _tankKilled[bot.map_id];
+            if (routePoints && !routeActiveOf(bot.guid) && routeBoss && !routeBoss->empty())
             {
                 // The bosses of a "tank lead" run: one seen dead by the leader or any member counts (the scenario director does this for a scenario).
                 std::set<std::uint32_t>& killedHere = _tankKilled[bot.map_id];
@@ -2584,7 +2587,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                         continue;
                     together = together && Distance2d(bot, view.bots[at->second]) <= kRouteWaitYards;
                 }
-                if (state.TankLead && !_routeActive)
+                if (state.TankLead && !routeActiveOf(bot.guid))
                 {
                     // The group's player: the tank does not run off without them. A player out of its view counts as far.
                     bool playerNear = false;

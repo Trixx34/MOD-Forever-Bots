@@ -527,6 +527,7 @@ struct PumpExtras
     std::shared_ptr<ErrandFeed> Errand;       // set when Errands is on
     std::shared_ptr<AltRegistry> Alts;
     std::optional<ScenarioPlan> Scenario;
+    std::uint32_t ScenarioParties = 1; // parallel parties of the scenario's roster, each with its own director
     std::string ScenarioResultFile;
     std::shared_ptr<CommandQueue> Commands;
 };
@@ -535,10 +536,10 @@ struct PumpExtras
 void ScenarioSpawnTick(RunContext& run, std::size_t& spawned)
 {
     ScenarioSettings const& scenario = run.Settings.Scenario;
-    if (spawned >= scenario.Roster.size() || !run.Roster.CanRequest() || nowMs() < run.BackoffUntilMs)
+    if (spawned >= scenario.Roster.size() * scenario.Parties || !run.Roster.CanRequest() || nowMs() < run.BackoffUntilMs)
         return;
 
-    RaceClass const combo{ scenario.Roster[spawned][0], scenario.Roster[spawned][1] };
+    RaceClass const combo{ scenario.Roster[spawned % scenario.Roster.size()][0], scenario.Roster[spawned % scenario.Roster.size()][1] };
     forever_module::SpawnParams params = ParamsFor(combo);
     params.set_level(scenario.Level);
     if (scenario.HasStaging)
@@ -576,9 +577,22 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
 {
     BotPolicy policy(options);
     std::uint64_t dungeonGeneration = extras.Dungeons ? extras.Dungeons->Generation.load() : 0;
-    std::optional<ScenarioDirector> director;
+    // One director per party of the scenario (ScenarioParties): the bots, in guid order, are cut into parties of the roster's size, the same cut the policy makes, and a
+    // director sees only its own party's bots. With several parties each result and log line carries the party number ("dm#2").
+    std::vector<ScenarioDirector> directors;
+    std::vector<ScenarioPhase> lastPhases;
+    std::unordered_map<std::uint64_t, std::size_t> partyOf; // bot guid -> party index (recomputed each tick)
+    std::size_t const partySize = extras.Scenario ? std::max<std::size_t>(1, extras.Scenario->RosterSize) : 1;
     if (extras.Scenario)
-        director.emplace(*extras.Scenario);
+        for (std::uint32_t k = 0; k < std::max<std::uint32_t>(1, extras.ScenarioParties); ++k)
+        {
+            ScenarioPlan plan = *extras.Scenario;
+            if (extras.ScenarioParties > 1)
+                plan.Name += "#" + std::to_string(k + 1);
+            directors.emplace_back(std::move(plan));
+            lastPhases.push_back(ScenarioPhase::Done);
+        }
+    std::vector<bool> phaseLogged(directors.size(), false);
     bool sawSnapshot = false;
     std::uint64_t lastTick = 0;
     std::uint64_t presenceFedMs = 0;
@@ -760,10 +774,27 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
                             extras.Commands->Says.push_back(std::move(ack));
                 }
             }
-            if (director)
+            if (!directors.empty())
             {
-                policy.SetRouteActive(director->RouteActive());
-                policy.SetKilledBosses(director->KilledBossEntries());
+                std::vector<std::uint64_t> guids;
+                guids.reserve(view.bots.size());
+                for (forever_module::BotSnapshot const& bot : view.bots)
+                    guids.push_back(bot.guid);
+                std::sort(guids.begin(), guids.end());
+                partyOf.clear();
+                for (std::size_t i = 0; i < guids.size(); ++i)
+                    partyOf[guids[i]] = std::min(i / partySize, directors.size() - 1);
+                policy.SetRouteActiveFor([&directors, &partyOf](std::uint64_t guid)
+                {
+                    auto const at = partyOf.find(guid);
+                    return at != partyOf.end() && directors[at->second].RouteActive();
+                });
+                policy.SetKilledBossesFor([&directors, &partyOf](std::uint64_t guid) -> std::set<std::uint32_t> const&
+                {
+                    static std::set<std::uint32_t> const none;
+                    auto const at = partyOf.find(guid);
+                    return at == partyOf.end() ? none : directors[at->second].KilledBossEntries();
+                });
             }
             std::vector<forever_module::BotAction> actions = policy.Decide(view, nowMs());
             if (extras.Presence && nowMs() - presenceFedMs >= kPresenceFeedMs)
@@ -834,30 +865,38 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
                 extras.Auction->Bots.swap(list);
                 extras.Auction->AtMs = auctionFedMs;
             }
-            if (director)
+            for (std::size_t k = 0; k < directors.size(); ++k)
             {
+                // The director of party k sees the bots of its party only.
+                forever_module::WorldTickSnapshotView partyView = view;
+                partyView.bots.clear();
+                for (forever_module::BotSnapshot const& bot : view.bots)
+                {
+                    auto const at = partyOf.find(bot.guid);
+                    if (at != partyOf.end() && at->second == k)
+                        partyView.bots.push_back(bot);
+                }
+                ScenarioDirector& director = directors[k];
+                std::string const name = extras.Scenario->Name + (directors.size() > 1 ? "#" + std::to_string(k + 1) : std::string());
                 std::size_t const before = actions.size();
-                director->Decide(view, nowMs(), actions);
-                policy.SetRouteActive(director->RouteActive());
+                director.Decide(partyView, nowMs(), actions);
 
                 // The scenario's progress, in the module's log: each phase as it starts, and every teleport the director sends.
-                static ScenarioPhase lastPhase = ScenarioPhase::Done;
-                static bool phaseLogged = false;
-                if (!phaseLogged || director->Phase() != lastPhase)
+                if (!phaseLogged[k] || director.Phase() != lastPhases[k])
                 {
                     static char const* const names[] = { "waiting for the roster", "dressing", "grouping", "entering", "running", "done" };
-                    std::cerr << "forever-bots: scenario " << extras.Scenario->Name << ": phase " << names[int(director->Phase())] << " ("
-                              << view.bots.size() << " bots in view)\n";
-                    lastPhase = director->Phase();
-                    phaseLogged = true;
+                    std::cerr << "forever-bots: scenario " << name << ": phase " << names[int(director.Phase())] << " ("
+                              << partyView.bots.size() << " bots in view)\n";
+                    lastPhases[k] = director.Phase();
+                    phaseLogged[k] = true;
                 }
                 for (std::size_t i = before; i < actions.size(); ++i)
                     if (actions[i].type == forever_module::ActionType::kTeleport)
-                        std::cerr << "forever-bots: scenario " << extras.Scenario->Name << ": teleport bot " << actions[i].bot_guid << " to map "
+                        std::cerr << "forever-bots: scenario " << name << ": teleport bot " << actions[i].bot_guid << " to map "
                                   << actions[i].spell_id << " (" << actions[i].dest_x << ", " << actions[i].dest_y << ", " << actions[i].dest_z << ")\n";
-                for (std::string const& boss : director->TakeNewBossKills())
-                    std::cerr << "forever-bots: scenario " << extras.Scenario->Name << ": boss killed: " << boss << "\n";
-                if (auto const result = director->TakeResult())
+                for (std::string const& boss : director.TakeNewBossKills())
+                    std::cerr << "forever-bots: scenario " << name << ": boss killed: " << boss << "\n";
+                if (auto const result = director.TakeResult())
                 {
                     std::string const line = FormatScenarioResult(*result);
                     std::cerr << "forever-bots: " << line << "\n";
@@ -1375,8 +1414,8 @@ int main(int argc, char** argv)
     std::size_t scenarioSpawned = 0;
     if (scenarioOn)
     {
-        roster.SetMaxBots(std::min<std::uint32_t>(std::uint32_t(settings.Scenario.Roster.size()), maxBots));
-        std::cerr << "forever-bots: scenario " << settings.Scenario.Name << ": " << settings.Scenario.Roster.size() << " bots at level "
+        roster.SetMaxBots(std::min<std::uint32_t>(std::uint32_t(settings.Scenario.Roster.size() * settings.Scenario.Parties), maxBots));
+        std::cerr << "forever-bots: scenario " << settings.Scenario.Name << ": " << settings.Scenario.Parties << " part" << (settings.Scenario.Parties == 1 ? "y" : "ies") << " of " << settings.Scenario.Roster.size() << " bots at level "
                   << settings.Scenario.Level << ", route of " << settings.Scenario.Route.size() << " point(s), "
                   << settings.Scenario.DurationSec << " s\n";
         client.AddTimer(std::chrono::milliseconds(3000), [&run, &scenarioSpawned] { ScenarioSpawnTick(run, scenarioSpawned); });
@@ -1810,8 +1849,8 @@ int main(int argc, char** argv)
     {
         // The scenario takes over the party, the route and the dressing: no vendor walks, no ramp, one party of the whole roster.
         policyOptions.PartySize = std::uint32_t(settings.Scenario.Roster.size());
-        policyOptions.PartyCount = 1;
-        policyOptions.PartyPercent = 100; // every bot of the roster is in the one party
+        policyOptions.PartyCount = settings.Scenario.Parties;
+        policyOptions.PartyPercent = 100; // every bot of the roster is in its party
         policyOptions.RandomPct = 0;      // and a scenario is a test run: it is not varied
         policyOptions.Crafting = false;
         policyOptions.ServiceEveryMs = 0;
@@ -1848,6 +1887,7 @@ int main(int argc, char** argv)
             policyOptions.PortalInsideMap = plan.EntryMap;
         }
         extras.Scenario = std::move(plan);
+        extras.ScenarioParties = settings.Scenario.Parties;
         extras.ScenarioResultFile = settings.Scenario.ResultFile;
     }
 

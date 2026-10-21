@@ -190,7 +190,11 @@ public:
     // Actions for the bots in `view`. nowMs is a monotonic clock in milliseconds (cooldowns, retries, fight time).
     // Decisions are sent only when they change; casts follow the rotation, the global cooldown and the retries.
     // Turns the dungeon route on or off (the scenario director does, once the party is inside).
-    void SetRouteActive(bool active) { _routeActive = active; }
+    void SetRouteActive(bool active) { _routeActive = active; _routeActiveFn = nullptr; }
+    // Parallel parties: the route is active per bot (the director of the bot's own party says), and each party has its own killed bosses (a boss dead in one instance is
+    // alive in the next). With these set, SetRouteActive and SetKilledBosses are not used.
+    void SetRouteActiveFor(std::function<bool(std::uint64_t)> fn) { _routeActiveFn = std::move(fn); }
+    void SetKilledBossesFor(std::function<std::set<std::uint32_t> const&(std::uint64_t)> fn) { _killedBossesFn = std::move(fn); }
     // The dungeons "tank lead" knows (routes, boss points, events), replaced between two Decide calls when the dungeon files are reloaded. A tank that is
     // running a dungeon keeps the route it started with: its event runner has its own copy.
     void SetDungeons(std::map<std::uint32_t, PolicyOptions::DungeonRoute> dungeons) { _options.DungeonsByMap = std::move(dungeons); }
@@ -491,6 +495,8 @@ private:
     PolicyOptions _options;
     QuestPlanner _quests;
     bool _routeActive = false;
+    std::function<bool(std::uint64_t)> _routeActiveFn;
+    std::function<std::set<std::uint32_t> const&(std::uint64_t)> _killedBossesFn;
     std::map<std::uint32_t, std::set<std::uint32_t>> _tankKilled;   // map -> bosses seen dead during a "tank lead" run
     std::set<std::uint32_t> _killedBosses;
 };

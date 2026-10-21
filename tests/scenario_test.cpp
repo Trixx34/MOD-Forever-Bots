@@ -297,6 +297,35 @@ void LeaderWalksTheRouteWhileTheRouteIsActive()
     CHECK(toFirst);
 }
 
+// Parallel parties (ScenarioParties): the route is on per party. Party 1 (bots 12, 13) is inside and running, party 2 (14, 15) is still at its staging place: only
+// the leader of party 1 walks, and a boss dead in one party's instance is not dead in the other's.
+void TwoPartiesRunTheirRoutesApartFromEachOther()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 2;
+    options.PartyCount = 2;
+    options.ClassOf = [](std::uint64_t guid) { return (guid == 12 || guid == 14) ? 1u : 5u; };
+    options.Route = { { 0.0f, 100.0f, 0.0f }, { 0.0f, 200.0f, 0.0f } };
+    options.RouteBossAt[1] = 4242;
+    BotPolicy policy(options);
+    bool partyOneRuns = true;
+    std::set<std::uint32_t> const killed = { 4242 };
+    std::set<std::uint32_t> const none;
+    policy.SetRouteActiveFor([&partyOneRuns](std::uint64_t guid) { return partyOneRuns && (guid == 12 || guid == 13); });
+    policy.SetKilledBossesFor([&killed, &none](std::uint64_t guid) -> std::set<std::uint32_t> const& { return (guid == 12 || guid == 13) ? killed : none; });
+    std::vector<BotSnapshot> bots = { Bot(12, 36, 0, 0, 2, 2), Bot(13, 36, 5, 0, 1, 2), Bot(14, 0, 0, 0, 2, 2), Bot(15, 0, 5, 0, 1, 2) };
+    bool oneWalks = false;
+    int twoWalks = 0;
+    for (std::uint64_t at = 1000; at < 4000; at += 500)
+        for (BotAction const& action : policy.Decide(View(at / 500, bots), at))
+        {
+            oneWalks = oneWalks || (action.type == ActionType::kMoveTo && action.bot_guid == 12 && action.dest_y == 100.0f);
+            twoWalks += action.type == ActionType::kMoveTo && action.bot_guid == 14 && action.dest_y == 100.0f;
+        }
+    CHECK(oneWalks);
+    CHECK(twoWalks == 0);
+}
+
 void LeaderDoesNotWalkTheDungeonRouteOutsideTheDungeon()
 {
     PolicyOptions options = AggressiveOptions();
@@ -879,6 +908,7 @@ int main()
     TimeoutEndsTheRun();
     EnteringTimesOut();
     PartyRestsAtStagingBeforeEntering();
+    TwoPartiesRunTheirRoutesApartFromEachOther();
     LeaderDoesNotWalkTheDungeonRouteOutsideTheDungeon();
     LeaderDropsARoutePointItHasAlreadyPassed();
     RevivedPartyOutsideIsPutBackAtTheEntry();

@@ -59,6 +59,9 @@ struct ScenarioSettings
     std::uint32_t MinAlive = 0;                          // 0 = the understrength stop is off
     std::uint32_t LeaderDeadAbandonSec = 0;              // 0 = off
     bool RequireBosses = false;
+    // ScenarioParties (1 to 8, default 1): this many parties of the roster run at the same time, each with its own director and its own dungeon instance (the core makes an
+    // instance per group). Bot guids in order are cut into parties of the roster's size, as the policy's party logic does. MaxBots must cover Parties x roster.
+    std::uint32_t Parties = 1;
     bool HasPortal = false;
     std::array<float, 4> Portal{};                       // map, x, y, z: the instance door, outside
 };

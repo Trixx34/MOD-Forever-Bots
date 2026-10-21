@@ -145,6 +145,7 @@ void ReadScenario(std::unordered_map<std::string, std::string> const& config, Sc
         scenario.Roster.resize(5);
 
     ReadKey(config, "ScenarioLevel", 1, 60, scenario.Level, warnings);
+    ReadKey(config, "ScenarioParties", 1, 8, scenario.Parties, warnings);
     ReadKey(config, "ScenarioDurationSec", 30, 86400, scenario.DurationSec, warnings);
     if (auto const it = config.find("ScenarioStaging"); it != config.end())
         scenario.HasStaging = ParseNumbers(it->second, scenario.Staging.data(), 4);
