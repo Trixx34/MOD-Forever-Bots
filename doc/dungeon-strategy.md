@@ -92,7 +92,7 @@ Events with the same trigger run one after another in file order.
 
 ### `kill_priority` (top level, used since bots 0.19.3)
 
-A list of creature entries, the first to be killed first: `"kill_priority": [1729, 4418, 1732, 622, 634]` (Deadmines: Defias Evoker, Wizard, Squallshaper, Goblin Engineer, Defias Overseer).
+A list of creature entries, the first to be killed first: `"kill_priority": [1729, 4418, 1731, 1732, 622, 634]` (Deadmines: Defias Evoker, Defias Wizard, Goblin Craftsman, Defias Squallshaper, Goblin Engineer, Defias Overseer: the creatures with cast abilities in the world database's smart scripts and spell lists).
 The damage dealers of the party (not the tank and not the healer) fight the best-ranked live hostile within 12 yards of the tank's target, not only the tank's own target; with
 nothing listed they assist the tank's target as before. The setting `ScenarioKillPriority` (a comma list) does the same from the config and wins over the file. It needs the
 `focus` tactic (below).
