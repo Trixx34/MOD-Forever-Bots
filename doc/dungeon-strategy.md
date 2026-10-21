@@ -90,6 +90,32 @@ Same behaviour as before (`doc/dungeon-events.md`): the leader runs an event as 
 
 Events with the same trigger run one after another in file order.
 
+### `kill_priority` (top level, used since bots 0.19.3)
+
+A list of creature entries, the first to be killed first: `"kill_priority": [1729, 4418, 1732, 622, 634]` (Deadmines: Defias Evoker, Wizard, Squallshaper, Goblin Engineer, Defias Overseer).
+The damage dealers of the party (not the tank and not the healer) fight the best-ranked live hostile within 12 yards of the tank's target, not only the tank's own target; with
+nothing listed they assist the tank's target as before. The setting `ScenarioKillPriority` (a comma list) does the same from the config and wins over the file. It needs the
+`focus` tactic (below).
+
+### Dungeon tactics (`Module.forever-bots.DungeonTactics`)
+
+A comma list of `focus`, `interrupt`, `heal`, `rest`, or `all` (default) / `none`. Each is a rule of a dungeon party that can be measured on its own:
+
+| Tactic | What it does |
+|---|---|
+| `focus` | the damage dealers take the pack's `kill_priority` unit first (above) |
+| `interrupt` | a paladin, rogue, shaman or mage turns on a unit of the tank's pack that is casting, so its rotation's interrupt (Hammer of Justice, Kick, Earth Shock, Counterspell) fires; one bot at a time |
+| `heal` | a healer heals a party member below 75 % health (60 % without the tactic); the tank first, as before |
+| `rest` | the leader pulls the next pack only when every member has 90 % health and 80 % mana (80 / 60 without the tactic) |
+
+Always on, not a tactic: a dungeon party's dead wait 90 s for the healer before they release their spirit (20 s in other parties).
+
+### Parallel parties (`ScenarioParties`)
+
+`Module.forever-bots.ScenarioParties = N` (1 to 8, default 1) runs N parties of the dungeon's roster at once for a scenario. Each has its own director, so its own phases, boss kills and
+result line (`scenario dm#2: ...`); the core makes one instance per group. The bots, in guid order, are cut into parties of the roster size, as the policy's party logic cuts them;
+`MaxBots` is set to N x the roster size by the scenario. `tools/dungeon_report.py` reads the log and prints per party and in aggregate.
+
 ### Boss strategy (`bosses[].strategy`): reserved, not used yet
 
 The module **reads, checks and keeps** these fields, but **no bot behaviour uses them yet**. They exist so that you can write down how a fight is meant to go and so that a file written today keeps
