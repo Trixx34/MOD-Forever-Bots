@@ -3215,6 +3215,33 @@ void PartyMemberDoesNotFleeOnLowHealth()
     CHECK(fled);
 }
 
+// A party member in a fight does not chase a target that has run far off (a fleeing creature): it stands with its party.
+void PartyMemberDoesNotChaseAFleeingTarget()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 2;
+    options.PartyCount = 1;
+    options.WanderWhenIdle = false;
+    options.ClassOf = [](std::uint64_t guid) { return guid == 10 ? 1u : 5u; };
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = PartyView({ 10, 11 });
+    NearbyUnit mob = Hostile(2, 70.0f, 20);                 // 70 yards off and running
+    for (std::size_t i = 0; i < 2; ++i)
+    {
+        view.bots[i].in_combat = 1;
+        view.bots[i].threat_target_guid = MakeUnitRef(8, 1, 2);
+        AddNearby(view, i, mob);
+    }
+    int follows = 0;
+    for (std::uint64_t at = 1000; at < 4000; at += 100)
+    {
+        view.tick_number = at / 100;
+        for (BotAction const& action : policy.Decide(view, at))
+            follows += action.bot_guid == 10 && action.type == ActionType::kFollow && action.target_guid == MakeUnitRef(8, 1, 2);
+    }
+    CHECK(follows == 0);
+}
+
 // A ranged bot at or beyond kiting distance attacks normally.
 void RangedBotAttacksWhenBackAtRange()
 {
@@ -4331,6 +4358,7 @@ int main()
     RangedBotKitesACloseTarget();
     PartyCasterDoesNotKite();
     PartyMemberDoesNotFleeOnLowHealth();
+    PartyMemberDoesNotChaseAFleeingTarget();
     RangedBotAttacksWhenBackAtRange();
     HurtBotFleesFromThreat();
     HurtBotDoesNotFleeWhenThreatIsFar();

@@ -155,6 +155,9 @@ constexpr std::uint32_t kRepairBelowPct = 50;    // worn gear below this durabil
 // The fights draw the leader past route points: when it is this close to the next point, the one it was heading for (not a boss point) is dropped, so it never walks back
 // for it (it did, through the whole dungeon by the pathfinder's only route, with the party standing behind).
 constexpr float kRouteSkipAheadYards = 25.0f;
+// A party member in a fight does not chase a target farther than this (a creature that flees at low health runs on for hundreds of yards and takes the chaser away from
+// its party, onto the next packs): the target is avoided for a while and the bot stands.
+constexpr float kPartyChaseYards = 45.0f;
 constexpr float kRoutePointReachYards = 6.0f;    // the leader has arrived at a route waypoint this close to it
 constexpr float kRouteWaitYards = 30.0f;         // the leader waits for a member farther behind than this
 constexpr std::uint32_t kRouteMinHealthPct = 80; // and for its own health to be at least this
@@ -2459,12 +2462,25 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             {
                 // Walking to a target that never gets in range (behind a wall, or unreachable) is given up after a while:
                 // the target is avoided, and the bot picks another one next tick.
-                if (!state.Approaching || state.ApproachTarget != targetRef)
+                if (partyLeader != 0 && bot.in_combat != 0 && distance > kPartyChaseYards)
+                {
+                    state.Approaching = false;
+                    AvoidUnit(state.AvoidUntilMs, state.AvoidCount, targetRef, nowMs);
+                    wanted = Decision{ ActionType::kStop, 0 };
+                    if (_options.OnEvent && nowMs - state.MoveWhyLoggedMs >= 5000)
+                    {
+                        state.MoveWhyLoggedMs = nowMs;
+                        _options.OnEvent("chase_dropped: bot=" + std::to_string(bot.guid) + " distance=" + std::to_string(int(distance)) + " at=" + std::to_string(int(bot.pos_x)) + "," +
+                                         std::to_string(int(bot.pos_y)) + "," + std::to_string(int(bot.pos_z)));
+                    }
+                }
+                else if (!state.Approaching || state.ApproachTarget != targetRef)
                 {
                     state.Approaching = true;
                     state.ApproachTarget = targetRef;
                     state.ApproachSinceMs = nowMs;
                     wanted = Decision{ ActionType::kFollow, targetRef };
+                    moveWhy = "approach_target";
                 }
                 else if (nowMs - state.ApproachSinceMs > kApproachTimeoutMs)
                 {
@@ -3601,12 +3617,12 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             }
         }
 
-        if (_options.OnEvent && _options.RouteMap != 0 && partyLeader != 0 && wanted.Type == ActionType::kMoveTo && nowMs - state.MoveWhyLoggedMs >= 5000 &&
-            std::hypot(wanted.Dest.X - state.MoveWhyDest.X, wanted.Dest.Y - state.MoveWhyDest.Y) > 8.0f)
+        if (_options.OnEvent && _options.RouteMap != 0 && partyLeader != 0 && (wanted.Type == ActionType::kMoveTo || (wanted.Type == ActionType::kFollow && partyLeaderBot)) &&
+            nowMs - state.MoveWhyLoggedMs >= 5000 && (wanted.Type == ActionType::kFollow || std::hypot(wanted.Dest.X - state.MoveWhyDest.X, wanted.Dest.Y - state.MoveWhyDest.Y) > 8.0f))
         {
             state.MoveWhyLoggedMs = nowMs;
             state.MoveWhyDest = wanted.Dest;
-            _options.OnEvent("move_why: bot=" + std::to_string(bot.guid) + " why=" + (*moveWhy ? moveWhy : "other") + " to=" + std::to_string(int(wanted.Dest.X)) + "," +
+            _options.OnEvent("move_why: bot=" + std::to_string(bot.guid) + " why=" + (*moveWhy ? moveWhy : "other") + " type=" + std::to_string(int(wanted.Type)) + " target=" + std::to_string(wanted.Target) + " to=" + std::to_string(int(wanted.Dest.X)) + "," +
                              std::to_string(int(wanted.Dest.Y)) + "," + std::to_string(int(wanted.Dest.Z)) + " from=" + std::to_string(int(bot.pos_x)) + "," +
                              std::to_string(int(bot.pos_y)) + "," + std::to_string(int(bot.pos_z)) + " leader=" + (partyLeaderBot ? "1" : "0") + " combat=" + std::to_string(bot.in_combat));
         }
