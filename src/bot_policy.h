@@ -291,6 +291,9 @@ private:
         std::uint64_t DiagAtMs = 0;                      // when the stuck check last ran
         std::uint64_t QuestDiagAtMs = 0;                 // when the quest line was last written (quest_state event)
         std::uint32_t TeleportLoggedSequence = 0;        // the last teleport result written to the log
+        Point NoRouteDest{};                             // the destination of the last move the core found no route to
+        std::uint64_t NoRouteUntilMs = 0;                // a move to (about) that place is not sent before this time
+        std::uint32_t NoRouteStreak = 0;                 // no-route answers in a row for that place: the pause doubles each time
         std::uint64_t WalkBlockedAtMs = 0;               // when a move got the answer "no route": the walk (grind spot, hub, exploring) that began before it is over, and the bot picks another later
         std::uint64_t NoRouteLoggedMs = 0;               // when a no-route refusal of any action was last written to the log (diagnostics)
         std::uint32_t NoRouteSequence = 0;               // the last kNoRoute result read (last_action_sequence)

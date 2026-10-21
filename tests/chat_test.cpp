@@ -234,6 +234,30 @@ void GotoHereSendsTheBotsToTheSpeaker()
     CHECK(moves == 5);
 }
 
+void ANoRouteAnswerPausesTheMoveToThatPlace()
+{
+    BotPolicy policy = Policy();
+    WorldTickSnapshotView view = Group();
+    policy.ApplyChat(view, Ctx(), *ParseChatCommand("goto here", false), 1000);
+    policy.Decide(view, 1000);
+    policy.Decide(view, 1001);
+    auto const movesOf = [&](std::vector<BotAction> const& actions)
+    {
+        int moves = 0;
+        for (BotAction const& action : actions)
+            moves += action.type == ActionType::kMoveTo && action.bot_guid == 10;
+        return moves;
+    };
+    // the core found no route for bot 10: its move to that place waits (5 s), and the same answer in a row does not bring it back every tick
+    view.bots[0].last_action_type = std::uint8_t(ActionType::kMoveTo);
+    view.bots[0].last_action_status = forever_module::BotActionStatus::kNoRoute;
+    view.bots[0].last_action_sequence = 1;
+    int sent = 0;
+    for (std::uint64_t at = 1500; at < 6000; at += 50)
+        sent += movesOf(policy.Decide(view, at));
+    CHECK(sent == 0);
+}
+
 void TrainWalksToTheSpeakerThenTrains()
 {
     CHECK(ParseChatCommand("train", true)->Verb == ChatVerb::Train && IsOrderVerb(ChatVerb::Train) && !ParseChatCommand("train", false));
@@ -741,6 +765,7 @@ int main()
     StayHoldsAndFollowOffReleases();
     StayBotsStartNoFights();
     GotoHereSendsTheBotsToTheSpeaker();
+    ANoRouteAnswerPausesTheMoveToThatPlace();
     GotoOnAnotherMapIsRefused();
     TrainWalksToTheSpeakerThenTrains();
     TrainIsRefusedForTheDeadAndOnAnotherMap();

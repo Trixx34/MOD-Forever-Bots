@@ -51,6 +51,8 @@ constexpr std::uint32_t kServiceBuyReagent = 512;  // the item and the count are
 // kSkillUp (SDK 0.17): the skill lines, and how long the policy waits after each answer.
 constexpr std::uint32_t kSkillFirstAid = 129;
 constexpr std::uint32_t kSkillCooking = 185;
+constexpr std::uint64_t kNoRoutePauseMs = 5000;        // the first pause after a move got "no route"; it doubles with each refusal in a row (up to 6 doublings is 2.7 minutes)
+constexpr float kNoRouteSameYards = 12.0f;               // a destination this close to the refused one is the same place
 constexpr std::uint64_t kSkillUpCastMs = 4000;        // after a craft was sent: the cast takes a few seconds, the answer decides what comes next
 constexpr std::uint64_t kSkillUpNextMs = 3500;        // a craft that started: the next one is tried when the cast is done
 constexpr std::uint64_t kSkillUpBusyMs = 1500;        // the bot was casting or moving: soon
@@ -752,7 +754,18 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
     {
         state.NoRouteSequence = bot.last_action_sequence;
         if (noRoute)
+        {
             state.WalkBlockedAtMs = nowMs;
+            // The same refused move must not be sent again every tick (it was 26 times a second for 220 bots): the place is blocked for a pause that
+            // doubles with every refusal in a row, 5 s up to 2 minutes.
+            if (state.Last && state.Last->Type == ActionType::kMoveTo)
+            {
+                bool const same = state.NoRouteUntilMs != 0 && std::hypot(state.NoRouteDest.X - state.Last->Dest.X, state.NoRouteDest.Y - state.Last->Dest.Y) < kNoRouteSameYards;
+                state.NoRouteStreak = same ? std::min<std::uint32_t>(state.NoRouteStreak + 1, 6) : 1;
+                state.NoRouteDest = state.Last->Dest;
+                state.NoRouteUntilMs = nowMs + (kNoRoutePauseMs << (state.NoRouteStreak - 1));
+            }
+        }
         state.QuestTeleportSent = false;
         _quests.NoteNoRoute(state.Quest, nowMs);
         if (teleportRefused && _options.OnEvent)
@@ -3436,8 +3449,11 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             }
         }
 
-        if (!state.Last || state.Last->Type != wanted.Type || state.Last->Target != wanted.Target ||
-            state.Last->Dest.X != wanted.Dest.X || state.Last->Dest.Y != wanted.Dest.Y || state.Last->Dest.Z != wanted.Dest.Z)
+        // A move to a place the core found no route to a moment ago is not sent again yet.
+        bool const blockedMove = wanted.Type == ActionType::kMoveTo && nowMs < state.NoRouteUntilMs &&
+                                 std::hypot(wanted.Dest.X - state.NoRouteDest.X, wanted.Dest.Y - state.NoRouteDest.Y) < kNoRouteSameYards;
+        if (!blockedMove && (!state.Last || state.Last->Type != wanted.Type || state.Last->Target != wanted.Target ||
+            state.Last->Dest.X != wanted.Dest.X || state.Last->Dest.Y != wanted.Dest.Y || state.Last->Dest.Z != wanted.Dest.Z))
         {
             BotAction action;
             action.bot_guid = bot.guid;
