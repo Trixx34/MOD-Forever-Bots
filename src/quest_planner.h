@@ -79,6 +79,7 @@ constexpr std::uint64_t kQuestActionGapMs = 3000;       // wait this long after 
 constexpr std::uint64_t kBlockAfterRefusalMs = 60000;
 constexpr std::uint64_t kStuckMs = 600000;              // no progress for 10 minutes: abandon
 constexpr std::uint64_t kBlockAfterAbandonMs = 3600000;
+constexpr std::uint64_t kWalkStuckBlockMs = 900000;          // a quest whose walk is stuck (no route to its ender or hunting ground) is left alone this long
 constexpr float kWorldStartRadiusYards = 2000.0f;      // a world start (its quests carry levels) is walked to from up to this far (see kStartRadiusYards)
 constexpr std::uint64_t kNoRouteBlockMs = 1800000;     // a start whose giver the core found no route to is left alone for this long
 constexpr std::uint32_t kGreyQuestMargin = 7;          // a bot this many levels above a quest's level skips it (little experience)
@@ -115,6 +116,8 @@ public:
     // The core found no route for the move to the step's destination (kNoRoute). When that was the walk to a start's giver, the start is left
     // alone for kNoRouteBlockMs and the planner looks for the next start.
     void NoteNoRoute(QuestMemory& memory, std::uint64_t nowMs) const;
+    // The walk to a quest in the log (its ender, or its hunting ground) got nowhere for a long time: the quest is left alone for kWalkStuckBlockMs.
+    void NoteWalkStuck(QuestMemory& memory, std::uint32_t quest, std::uint64_t nowMs) const;
 
 private:
     int FindStart(forever_module::BotSnapshot const& bot) const;

@@ -192,6 +192,8 @@ constexpr std::uint32_t kRezRefusalsLogged = 3;      // refusals in a row before
 constexpr std::uint64_t kReleaseRetryMs = 3000;      // a release not yet seen to work is not sent again before this
 constexpr std::uint64_t kAcceptRetryMs = 2000;
 constexpr std::uint64_t kReclaimRetryMs = 3000;
+constexpr std::uint64_t kDeathLoopMs = 120000;         // three deaths within this time are a death loop: the bot is moved to a grind spot for its level
+constexpr float kDeathLoopAwayYards = 400.0f;           // ... one at least this far from where it keeps dying
 constexpr std::uint64_t kCorpseTeleportRetryMs = 15000; // a ghost off its corpse's map with no portal is teleported to the corpse, not again before this
 constexpr std::uint64_t kOutOfCombatReviveRetryMs = 10000; // a ghost of a dungeon party is revived by its leader out of combat, not again before this
 constexpr std::uint32_t kOutOfCombatReviveTries = 3;       // and after this many tries the ghost walks back to its corpse as before
@@ -1588,6 +1590,10 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 state.RunStarted = false;
                 state.Inside = false;
                 state.RunFailed = false;
+                state.RunTimeoutTeleported = false;
+                state.DeathTimesMs[0] = state.DeathTimesMs[1];
+                state.DeathTimesMs[1] = state.DeathTimesMs[2];
+                state.DeathTimesMs[2] = nowMs;
                 state.RunStartDist = 0.0f;
                 state.RunProgress = 0;
                 state.InFight = false;
@@ -1745,6 +1751,24 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             }
             if (nowMs - state.RunStartMs > _options.CorpseRunTimeoutMs)
             {
+                // Four minutes of walking and the corpse is not reached: the ghost is put at the corpse once (the core does not refuse a teleport for a ghost),
+                // and the run starts over. A ghost that gave up here stayed a ghost for good (34 bots in 55 minutes on the sim).
+                if (!state.RunTimeoutTeleported)
+                {
+                    state.RunTimeoutTeleported = true;
+                    state.RunStartMs = nowMs;
+                    BotAction back;
+                    back.bot_guid = bot.guid;
+                    back.type = ActionType::kTeleport;
+                    back.spell_id = bot.corpse_map;
+                    back.dest_x = bot.corpse_x;
+                    back.dest_y = bot.corpse_y;
+                    back.dest_z = bot.corpse_z;
+                    actions.push_back(back);
+                    event("corpse_run_teleport: bot=" + std::to_string(bot.guid) + " map=" + std::to_string(bot.map_id) + " corpse_map=" + std::to_string(bot.corpse_map) +
+                          " reason=timeout");
+                    continue;
+                }
                 fail("timeout");
                 continue;
             }
@@ -1815,6 +1839,39 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             state.Last.reset();
             state.Sitting = false;
             state.NextCastMs = 0;
+
+            // A death loop: the bot stands up among what killed it and dies again (a party member following a leader into a zone far above its level, a
+            // grind spot with something strong on it; 470 of 942 deaths in 55 minutes on the sim, 17 bots dying every few seconds). The third death within
+            // kDeathLoopMs puts the bot at the nearest grind spot for its level that is not near its corpse.
+            if (_options.Grind && !_options.Grind->Spots.empty() && bot.level != 0 && state.DeathTimesMs[0] != 0 &&
+                nowMs - state.DeathTimesMs[0] <= kDeathLoopMs && nowMs >= state.EscapeUntilMs)
+            {
+                std::uint8_t const side = _options.SideOf ? _options.SideOf(bot.guid) : std::uint8_t(0);
+                std::vector<std::size_t> const spots = GrindSpotsFor(*_options.Grind, bot.map_id, bot.level, side, bot.pos_x, bot.pos_y, state.GrindVisited);
+                for (std::size_t const index : spots)
+                {
+                    GrindSpot const& spot = _options.Grind->Spots[index];
+                    if (std::hypot(spot.X - bot.pos_x, spot.Y - bot.pos_y) < kDeathLoopAwayYards)
+                        continue;
+                    BotAction away;
+                    away.bot_guid = bot.guid;
+                    away.type = ActionType::kTeleport;
+                    away.spell_id = bot.map_id;
+                    away.dest_x = spot.X;
+                    away.dest_y = spot.Y;
+                    away.dest_z = spot.Z;
+                    actions.push_back(away);
+                    state.EscapeUntilMs = nowMs + kDeathLoopMs;
+                    state.Wandering = false;
+                    state.GrindVisited.push_back(index);
+                    if (state.GrindVisited.size() > kGrindMemory)
+                        state.GrindVisited.erase(state.GrindVisited.begin());
+                    if (_options.OnEvent)
+                        _options.OnEvent("death_loop_escape: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id) +
+                                         " from=" + std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) + " spot=" + std::to_string(index));
+                    break;
+                }
+            }
         }
 
         // The closest friendly player an idle bot follows. A player is someone else: another bot this module controls is not one. Bots standing
@@ -2516,7 +2573,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                         state.QuestTeleportSent = false;
                     }
                     bool const stuck = nowMs - state.WalkStillSinceMs >= kQuestWalkStuckMs;
-                    if (stuck && questStep.StartGiver && _options.QuestTeleport && !state.QuestTeleportSent)
+                    if (stuck && _options.QuestTeleport && !state.QuestTeleportSent)
                     {
                         wanted = Decision{ ActionType::kTeleport, 0, Point{ questStep.Dest.X, questStep.Dest.Y, questStep.Dest.Z }, bot.map_id };
                         state.QuestTeleportSent = true;
@@ -2528,9 +2585,13 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                                              std::to_string(int(questStep.Dest.X)) + "," + std::to_string(int(questStep.Dest.Y)) + "," +
                                              std::to_string(int(questStep.Dest.Z)));
                     }
-                    else if (stuck && questStep.StartGiver)
+                    else if (stuck)
                     {
-                        _quests.NoteNoRoute(state.Quest, nowMs);
+                        if (questStep.StartGiver)
+                            _quests.NoteNoRoute(state.Quest, nowMs);
+                        else
+                            _quests.NoteWalkStuck(state.Quest, questStep.Quest, nowMs); // a hand-in or hunting walk with no route: left alone for a while, the bot grinds
+                        
                         state.QuestTeleportSent = false;
                         state.WalkStillSinceMs = 0;
                         state.WalkAnchored = false;

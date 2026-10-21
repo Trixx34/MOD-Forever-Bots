@@ -403,6 +403,9 @@ private:
         std::uint64_t RunStartMs = 0;                    // the corpse run began (0 = not yet)
         std::uint64_t InsideSinceMs = 0;                 // the ghost is on the corpse's map since
         bool RunFailed = false;
+        bool RunTimeoutTeleported = false;               // the ghost was put at its corpse once after a run that took too long (a corpse far away, or a route that goes nowhere)
+        std::uint64_t DeathTimesMs[3] = { 0, 0, 0 };     // when this bot last died (newest last): two deaths close together mean it dies where it stands up (DeathLoopMs)
+        std::uint64_t EscapeUntilMs = 0;                 // after a death loop the bot is put at a suitable grind spot; not again before this
         float RunStartDist = 0.0f;                       // distance to the corpse at the start (same map), for progress lines
         std::uint32_t RunProgress = 0;                   // 25, 50 or 75: the last progress line written
         std::unordered_map<std::uint64_t, std::uint64_t> RezRetryAtMs; // dead member -> no resurrect cast on it before this

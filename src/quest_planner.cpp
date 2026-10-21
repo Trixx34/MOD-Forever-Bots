@@ -275,6 +275,12 @@ void QuestPlanner::NoteNoRoute(QuestMemory& memory, std::uint64_t nowMs) const
     memory.WalkingToStart = false;
 }
 
+void QuestPlanner::NoteWalkStuck(QuestMemory& memory, std::uint32_t quest, std::uint64_t nowMs) const
+{
+    if (quest != 0)
+        memory.BlockedUntilMs[quest] = nowMs + kWalkStuckBlockMs;
+}
+
 bool QuestPlanner::NoteRefused(QuestMemory& memory, std::uint64_t nowMs) const
 {
     if (memory.LastActionQuest == 0)

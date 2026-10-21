@@ -651,8 +651,19 @@ void NoRouteAtTheGiverIsIgnored()
     CHECK(memory.StartIndex == 0); // the start is kept: the planner was not walking to it
 }
 
+void AStuckWalkToAnEnderBlocksThatQuestForAWhile()
+{
+    QuestPlanner planner(World());
+    QuestMemory memory;
+    planner.NoteWalkStuck(memory, 100, 5000);
+    CHECK(memory.BlockedUntilMs[100] == 5000 + kWalkStuckBlockMs);
+    planner.NoteWalkStuck(memory, 0, 6000); // no quest: nothing is blocked
+    CHECK(memory.BlockedUntilMs.count(0) == 0);
+}
+
 int main()
 {
+    AStuckWalkToAnEnderBlocksThatQuestForAWhile();
     StuckQuestWalkIsDroppedWhenTeleportIsOff();
     StuckQuestWalkTeleportsOnceThenDropsTheStart();
     WorldStartFarAwayIsNotWalkedTo();

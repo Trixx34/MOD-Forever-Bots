@@ -1,5 +1,6 @@
 // Unit tests for BotPolicy, on hand-built snapshots. No core needed.
 #include "bot_policy.h"
+#include "grind_data.h"
 
 #include "combat_rotation.h"
 
@@ -2349,6 +2350,70 @@ void CorpseWaitsForARezzerThenReleases()
     CHECK(HasAction(policy.Decide(build(), 21500), 13, ActionType::kReleaseSpirit));
 }
 
+// A ghost whose run takes too long is put at its corpse once, and the run starts over; it does not stay a ghost for good.
+void GhostThatCannotReachItsCorpseIsPutThereOnce()
+{
+    std::vector<std::string> events;
+    PolicyOptions options = AggressiveOptions();
+    options.OnEvent = [&events](std::string const& text) { events.push_back(text); };
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = View(1, 0, {});
+    Ghost(view.bots[0], 0.0f, view.bots[0].map_id, 3000.0f);
+    policy.Decide(view, 1000);
+    auto const teleportsTo = [](std::vector<BotAction> const& actions, float x)
+    {
+        for (BotAction const& action : actions)
+            if (action.type == ActionType::kTeleport && action.dest_x == x)
+                return true;
+        return false;
+    };
+    CHECK(!teleportsTo(policy.Decide(view, 2000), 3000.0f));
+    CHECK(teleportsTo(policy.Decide(view, 1000 + options.CorpseRunTimeoutMs + 1000), 3000.0f));   // the run took too long: to the corpse
+    CHECK(Logged(events, "corpse_run_teleport:"));
+    CHECK(!Logged(events, "corpse_run_failed:"));
+    // Not again: the second timeout is a real failure.
+    CHECK(!teleportsTo(policy.Decide(view, 1000 + 2 * options.CorpseRunTimeoutMs + 5000), 3000.0f));
+    CHECK(Logged(events, "corpse_run_failed:"));
+}
+
+// A bot that stands up among what killed it and dies again three times within two minutes is put at a grind spot for its level, away from the corpse.
+void DeathLoopMovesTheBotToAGrindSpot()
+{
+    std::vector<std::string> events;
+    std::vector<std::string> warnings;
+    std::istringstream spots("spot 0 40 0 0 1 10 0\nspot 0 5000 0 0 1 10 0\n");   // one spot beside the corpse, one far away
+    PolicyOptions options = AggressiveOptions();
+    options.Grind = std::make_shared<GrindData>(ParseGrindData(spots, warnings));
+    options.OnEvent = [&events](std::string const& text) { events.push_back(text); };
+    BotPolicy policy(options);
+    auto const escapeTo = [](std::vector<BotAction> const& actions)
+    {
+        for (BotAction const& action : actions)
+            if (action.type == ActionType::kTeleport)
+                return action.dest_x;
+        return -1.0f;
+    };
+    std::uint64_t now = 1000;
+    float escape = -1.0f;
+    for (int death = 0; death < 3; ++death)
+    {
+        WorldTickSnapshotView dead = View(1, 0, {});
+        dead.bots[0].level = 6;
+        Corpse(dead.bots[0], 10.0f);
+        policy.Decide(dead, now);
+        now += 3000;
+        WorldTickSnapshotView up = View(1, 0, {});
+        up.bots[0].level = 6;
+        up.bots[0].pos_x = 10.0f;
+        escape = escapeTo(policy.Decide(up, now));
+        now += 5000;
+        if (death < 2)
+            CHECK(escape < 0.0f);   // the first two deaths are ordinary
+    }
+    CHECK(escape == 5000.0f);       // the third: away, to the spot that is not beside the corpse
+    CHECK(Logged(events, "death_loop_escape:"));
+}
+
 void CorpseReleasesAtOnceWithoutARezzer()
 {
     std::vector<std::string> events;
@@ -2474,7 +2539,9 @@ void GhostCorpseRunTimesOut()
     BotPolicy policy(DeadOptions(&events));
     auto const build = [] { WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 }); Ghost(v.bots[3], 5000.0f, 0, 0.0f); return v; };
     policy.Decide(build(), 1000);
-    policy.Decide(build(), 250000);
+    policy.Decide(build(), 250000);                          // the first timeout puts the ghost at its corpse and starts the run over
+    CHECK(Logged(events, "corpse_run_teleport:") && !Logged(events, "corpse_run_failed:"));
+    policy.Decide(build(), 500000);                          // the second one is a failure
     CHECK(Logged(events, "corpse_run_failed:"));
 }
 
@@ -3980,6 +4047,8 @@ int main()
     RetreatWithNoPlayerStillFlees();
     ThirtyPercentIsNotLow();
     LoneCorpseReleasesAndDoesNotFight();
+    GhostThatCannotReachItsCorpseIsPutThereOnce();
+    DeathLoopMovesTheBotToAGrindSpot();
     CorpseWaitsForARezzerThenReleases();
     CorpseReleasesAtOnceWithoutARezzer();
     CorpseReleasesWhenTheWholePartyIsDown();
