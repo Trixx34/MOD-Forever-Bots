@@ -2577,6 +2577,34 @@ void CorpseWaitsForARezzerThenReleases()
     CHECK(HasAction(policy.Decide(build(), 21500), 13, ActionType::kReleaseSpirit));
 }
 
+// Recover: the leader of a dungeon party stands a dead member up at its side 8 s after the fight, once it is up and quiet (not waiting 90 s for the healer, not releasing).
+void ACorpseIsRevivedByTheQuietLeaderAfterAFewSeconds()
+{
+    PolicyOptions options = DeadOptions(nullptr);
+    options.DungeonReviveOutOfCombat = true;
+    options.Route = { Point{ 100.0f, 0.0f, 0.0f } };
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    auto const build = [] { WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 }); Corpse(v.bots[3], 10.0f); return v; };
+    CHECK(!HasAction(policy.Decide(build(), 1000), 13, ActionType::kRevive));
+    CHECK(!HasAction(policy.Decide(build(), 5000), 13, ActionType::kRevive));
+    std::vector<BotAction> later = policy.Decide(build(), 9500);
+    CHECK(HasAction(later, 13, ActionType::kRevive));
+    CHECK(!HasAction(later, 13, ActionType::kReleaseSpirit));
+    PolicyOptions off = options;
+    off.TacticRecover = false;
+    BotPolicy plain(off);
+    plain.SetRouteActive(true);
+    plain.Decide(build(), 1000);
+    CHECK(!HasAction(plain.Decide(build(), 9500), 13, ActionType::kRevive));
+    // a leader in a fight does not revive anyone
+    BotPolicy fighting(options);
+    fighting.SetRouteActive(true);
+    auto const busy = [] { WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 }); Corpse(v.bots[3], 10.0f); v.bots[2].in_combat = 1; return v; };
+    fighting.Decide(busy(), 1000);
+    CHECK(!HasAction(fighting.Decide(busy(), 9500), 13, ActionType::kRevive));
+}
+
 // A dungeon party's dead wait much longer for the healer (90 s, not 20 s): releasing early left the tank standing at the graveyard outside, killed again and again.
 void ADungeonCorpseWaitsLongerForARezzer()
 {
@@ -4450,6 +4478,7 @@ int main()
     DeathLoopMovesTheBotToAGrindSpot();
     CorpseWaitsForARezzerThenReleases();
     ADungeonCorpseWaitsLongerForARezzer();
+    ACorpseIsRevivedByTheQuietLeaderAfterAFewSeconds();
     CorpseReleasesAtOnceWithoutARezzer();
     CorpseReleasesWhenTheWholePartyIsDown();
     ReleaseIsHeldInCombatUpToTheCap();

@@ -24,7 +24,7 @@ EOT
 systemctl restart forever-sim'" 
     date '+%F %T' > $STAMP; cat $STAMP;;
   report)
-    ssh forever-test "sudo -n journalctl -u forever-sim --since '$(cat $STAMP)' --no-pager -q 2>/dev/null | grep -E 'forever-bots: (scenario|event (died|ghost|revived)|bot [0-9]+ .* not done)'" > ${RUN_DIR:-/tmp}/dm-run.log
+    ssh forever-test "sudo -n journalctl -u forever-sim --since '$(cat $STAMP)' --no-pager -q 2>/dev/null | grep -E 'forever-bots: (scenario|event (died|ghost|revived|focus|interrupt_target|heal)|bot [0-9]+ .* not done)'" > ${RUN_DIR:-/tmp}/dm-run.log
     wc -l < ${RUN_DIR:-/tmp}/dm-run.log
     python3 -I $(dirname "$0")/dungeon_report.py ${RUN_DIR:-/tmp}/dm-run.log --names $(dirname "$0")/names-dm.tsv;;
   leveling)

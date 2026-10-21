@@ -371,7 +371,7 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadBool(config, "AggressiveStart", settings.AggressiveStart, warnings);
     if (auto const it = config.find("DungeonTactics"); it != config.end())
     {
-        settings.TacticFocus = settings.TacticInterrupt = settings.TacticHeal = settings.TacticRest = false;
+        settings.TacticFocus = settings.TacticInterrupt = settings.TacticHeal = settings.TacticRest = settings.TacticRecover = false;
         std::istringstream list(it->second);
         std::string item;
         while (std::getline(list, item, ','))
@@ -381,7 +381,7 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
             while (!item.empty() && item.back() == ' ')
                 item.pop_back();
             if (item == "all")
-                settings.TacticFocus = settings.TacticInterrupt = settings.TacticHeal = settings.TacticRest = true;
+                settings.TacticFocus = settings.TacticInterrupt = settings.TacticHeal = settings.TacticRest = settings.TacticRecover = true;
             else if (item == "focus")
                 settings.TacticFocus = true;
             else if (item == "interrupt")
@@ -390,8 +390,10 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
                 settings.TacticHeal = true;
             else if (item == "rest")
                 settings.TacticRest = true;
+            else if (item == "recover")
+                settings.TacticRecover = true;
             else if (item != "none" && !item.empty())
-                warnings.push_back("Module.forever-bots.DungeonTactics: '" + item + "' is not focus, interrupt, heal, rest, all or none; ignored.");
+                warnings.push_back("Module.forever-bots.DungeonTactics: '" + item + "' is not focus, interrupt, heal, rest, recover, all or none; ignored.");
         }
     }
     ReadBool(config, "Crafting", settings.Crafting, warnings);

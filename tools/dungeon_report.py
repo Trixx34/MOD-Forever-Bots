@@ -47,6 +47,7 @@ RESULT = re.compile(r"forever-bots: scenario (?P<name>[\w.-]+?)(?:#(?P<party>\d+
 DIED = re.compile(r"forever-bots: event died: bot=(?P<bot>\d+) life=(?P<life>\d+) map=(?P<map>\d+).* killer_entry=(?P<killer>\w+)")
 GHOST = re.compile(r"forever-bots: event ghost: bot=(?P<bot>\d+)")
 REVIVED = re.compile(r"forever-bots: event revived: bot=(?P<bot>\d+)")
+TACTIC = re.compile(r"forever-bots: event (?P<kind>focus|interrupt_target|heal): (?:bot|healer)=(?P<bot>\d+)")
 NOTDONE = re.compile(r"forever-bots: bot (?P<bot>\d+) (?P<what>.+?) not done: (?P<why>.+)$")
 
 
@@ -63,6 +64,7 @@ class Party:
         self.revives = 0
         self.no_route = 0
         self.refusals = collections.Counter()
+        self.tactics = collections.Counter()
         self.bots = []
 
 
@@ -111,6 +113,10 @@ def read(lines, since=None):
         if m:
             events.append((t, "revived", (int(m["bot"]),)))
             continue
+        m = TACTIC.search(line)
+        if m:
+            events.append((t, "tactic", (int(m["bot"]), m["kind"])))
+            continue
         m = NOTDONE.search(line)
         if m:
             events.append((t, "notdone", (int(m["bot"]), m["what"], m["why"])))
@@ -139,6 +145,8 @@ def assign(parties, spawned, events, roster):
             party.ghosts += 1
         elif kind == "revived":
             party.revives += 1
+        elif kind == "tactic":
+            party.tactics[data[1]] += 1
         elif kind == "notdone":
             if "no route" in data[2]:
                 party.no_route += 1
@@ -179,6 +187,8 @@ def report(parties, names, total_bosses):
             print("   result       (none yet: still running, or the run did not end in this log)")
         refusals = ", ".join(f"{count}x {what}" for what, count in party.refusals.most_common(4)) or "none"
         print(f"   no route {party.no_route}; other refusals: {refusals}")
+        if party.tactics:
+            print("   tactics      " + ", ".join(f"{count}x {kind}" for kind, count in sorted(party.tactics.items())))
         killed = int(r["killed"]) if r and r["killed"] else len(party.bosses)
         rows.append({
             "key": key, "complete": bool(r and r["outcome"] == "complete"), "killed": killed, "deaths": int(r["events"]) if r else len(party.deaths),

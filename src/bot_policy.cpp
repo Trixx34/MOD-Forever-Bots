@@ -239,6 +239,7 @@ constexpr std::uint64_t kDeathLoopMs = 120000;         // three deaths within th
 constexpr float kDeathLoopAwayYards = 400.0f;           // ... one at least this far from where it keeps dying
 constexpr std::uint64_t kCorpseTeleportRetryMs = 15000; // a ghost off its corpse's map with no portal is teleported to the corpse, not again before this
 constexpr std::uint64_t kOutOfCombatReviveRetryMs = 10000; // a ghost of a dungeon party is revived by its leader out of combat, not again before this
+constexpr std::uint64_t kCorpseReviveDelayMs = 8000;       // the Recover tactic: a dead member of a dungeon party whose leader is up and quiet is revived by the leader this long after the fight ended
 constexpr std::uint32_t kOutOfCombatReviveTries = 3;       // and after this many tries the ghost walks back to its corpse as before
 constexpr float kReclaimYards = 35.0f;               // the core allows 39 yards; the ghost reclaims from this close
 
@@ -1845,6 +1846,31 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 bool const dungeonParty = routeActiveOf(bot.guid) || (deadParty != 0 && tankLed.count(deadParty) != 0);
                 std::uint64_t const releaseDelayMs = dungeonParty ? std::max(_options.ReleaseDelayMs, kDungeonReleaseDelayMs) : _options.ReleaseDelayMs;
                 std::uint64_t const releaseCombatHoldMs = dungeonParty ? std::max(_options.ReleaseCombatHoldMs, kDungeonReleaseCombatHoldMs) : _options.ReleaseCombatHoldMs;
+                // The Recover tactic (the core's revive order, as for a ghost): the leader is up and nothing is fighting, so the dead member is stood up at the leader's side after a few
+                // seconds instead of waiting for the healer's 10 s cast, a release and a corpse run (the members that released were killed again outside by the wolves of Westfall).
+                if (_options.TacticRecover && _options.DungeonReviveOutOfCombat && dungeonParty && deadParty != 0 && deadParty != bot.guid && !fighting &&
+                    state.ReviveAttempts < kOutOfCombatReviveTries && waited >= kCorpseReviveDelayMs && bot.resurrect_from == 0)
+                {
+                    auto const leaderAt = indexOf.find(deadParty);
+                    BotSnapshot const* const leader = leaderAt == indexOf.end() ? nullptr : &view.bots[leaderAt->second];
+                    if (leader && leader->life_state == 0 && leader->in_combat == 0)
+                    {
+                        if (nowMs >= state.ReviveRetryMs)
+                        {
+                            BotAction revive;
+                            revive.bot_guid = bot.guid;
+                            revive.type = ActionType::kRevive;
+                            revive.target_guid = PlayerRef(deadParty);
+                            revive.dest_x = 0.0f;
+                            actions.push_back(revive);
+                            state.ReviveAttempts += 1;
+                            state.ReviveRetryMs = nowMs + kOutOfCombatReviveRetryMs;
+                            event("revive_corpse: bot=" + std::to_string(bot.guid) + " leader=" + std::to_string(leader->guid) + " attempt=" + std::to_string(state.ReviveAttempts) +
+                                  " waited_ms=" + std::to_string(waited));
+                        }
+                        continue;
+                    }
+                }
                 char const* reason = nullptr;
                 if (!anyAlive)
                     reason = "release_all_down";
@@ -3390,7 +3416,10 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         bool const holdIdle = dungeonHold && !hasTarget && wanted.Type == ActionType::kStop && !routeBusy;
         bool const manaLow = holdIdle && manaUser &&
                              std::uint64_t(bot.power) * 100 < std::uint64_t(bot.max_power) * (state.Sitting ? kPartyReadySitHealthPct : (_options.TacticRest ? kPartyReadyPowerPct : kPartyReadyPowerOldPct));
-        bool const sitWanted = (idle || holdIdle) && (state.Sitting ? (stillHurt || manaLow || manaResting) : (hurtEnough || manaLow || manaResting)) &&
+        // The Rest tactic: the party waits for every member to reach the pull share (90 %), so a member below it sits to get there (it only sat below its own rest share).
+        bool const healthLow = holdIdle && _options.TacticRest && bot.max_health > 0 &&
+                               std::uint64_t(bot.health) * 100 < std::uint64_t(bot.max_health) * kPartyReadyHealthPct;
+        bool const sitWanted = (idle || holdIdle) && (state.Sitting ? (stillHurt || manaLow || manaResting) : (hurtEnough || healthLow || manaLow || manaResting)) &&
                                nowMs >= state.RestRetryAtMs;
         if (sitWanted != state.Sitting)
         {

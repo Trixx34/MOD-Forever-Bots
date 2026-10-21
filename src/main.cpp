@@ -1456,6 +1456,7 @@ int main(int argc, char** argv)
     policyOptions.TacticInterrupt = settings.TacticInterrupt;
     policyOptions.TacticHeal = settings.TacticHeal;
     policyOptions.TacticRest = settings.TacticRest;
+    policyOptions.TacticRecover = settings.TacticRecover;
     policyOptions.Gathering = settings.Gathering;
     if (!settings.CraftingFociFile.empty())
     {

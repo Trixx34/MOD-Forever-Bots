@@ -147,6 +147,8 @@ struct PolicyOptions
     bool TacticInterrupt = true;
     bool TacticHeal = true;
     bool TacticRest = true;
+    // Recover: the leader of a dungeon party stands a dead member up at its side (the core's revive order) a few seconds after the fight, once it is up and quiet.
+    bool TacticRecover = true;
     // Auto gear (AutoGearing setting): every bot is dressed for its level when it first appears, and again after AutoGearEveryLevels levels.
     bool AutoGearing = false;
     // Receives one line per notable decision (a heal cast, a pull held back or released), for the run logs. Unset = silent.

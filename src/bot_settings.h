@@ -156,7 +156,7 @@ struct BotSettings
     // raises First Aid and Cooking and uses up what fills its bags. 0 turns it off.
     bool Crafting = true;
     // DungeonTactics = "focus,interrupt,heal,rest" (default: all) or "none": which of the dungeon party's tactics are on (bot_policy.h). Measured one at a time on the sim.
-    bool TacticFocus = true, TacticInterrupt = true, TacticHeal = true, TacticRest = true;
+    bool TacticFocus = true, TacticInterrupt = true, TacticHeal = true, TacticRest = true, TacticRecover = true;
     // ActionStats = 1: every minute the module logs the ten (bot, action, spell) combinations it sent most often in that minute ("actions_top"), to find a bot that
     // repeats an action every tick. Off by default.
     bool ActionStats = false;
