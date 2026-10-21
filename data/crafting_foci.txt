@@ -1,0 +1,79 @@
+# Anvils, forges and cooking fires in the capitals, for crafting (src/crafting_foci.h). One per line:
+# city|map|focus|x y z|radius|entry|name
+# focus: 1 anvil, 3 forge, 4 cooking fire (the Spell.RequiresSpellFocus ids of this client). radius: yards the crafter must stand within.
+# From the scratch world DB (gameobject_template type 8, read only), made by tools/gen_crafting_foci.py: only objects within 120 yards of a
+# profession trainer of the capital; of the fires the 6 nearest the middle of the trainers.
+Darnassus|1|4|10090.9 2425.2 1321.7|10|91673|Stove
+Ironforge|0|1|-4789.2 -1128.7 498.9|10|171713|Anvil
+Ironforge|0|1|-4792.5 -1127.9 498.9|10|171714|Anvil
+Ironforge|0|1|-4799.4 -1107.2 498.8|17|171715|The Great Anvil
+Ironforge|0|3|-4807.9 -1130.2 499.5|30|171717|Forge
+Ironforge|0|3|-4763 -1117.1 499.3|30|171716|Forge
+Ironforge|0|3|-4816.3 -1250.1 501.9|10|1685|Forge
+Ironforge|0|4|-4771 -1171.3 502.2|10|32416|Dwarven Brazier
+Ironforge|0|4|-4802.9 -1175.1 502.2|10|137647|Dwarven Brazier
+Ironforge|0|4|-4737.6 -1152.6 502.2|10|32391|Dwarven Brazier
+Ironforge|0|4|-4821.7 -1178 502.2|10|171706|Dwarven Brazier
+Ironforge|0|4|-4774 -1191 509.4|10|171742|Potbelly Stove
+Ironforge|0|4|-4773 -1193.3 509.4|10|171743|Potbelly Stove
+Orgrimmar|1|1|2057.7 -4798.6 22.5|10|658992|Anvil
+Orgrimmar|1|1|2057.7 -4798.6 22.5|10|173065|Anvil
+Orgrimmar|1|1|2052.8 -4806.2 22.5|10|658993|Anvil
+Orgrimmar|1|1|2052.8 -4806.2 22.5|10|173066|Anvil
+Orgrimmar|1|1|2056.7 -4836.1 24.5|10|659029|Anvil
+Orgrimmar|1|1|2056.7 -4836.1 24.5|10|173094|Anvil
+Orgrimmar|1|1|2099.8 -4835.1 24.2|10|659035|Anvil
+Orgrimmar|1|1|2099.8 -4835.1 24.2|10|175744|Anvil
+Orgrimmar|1|1|2104.8 -4831.9 24.2|10|659034|Anvil
+Orgrimmar|1|1|2104.8 -4831.9 24.2|10|175743|Anvil
+Orgrimmar|1|3|2021.6 -4688.1 25.2|10|658990|Forge
+Orgrimmar|1|3|2021.6 -4688.1 25.2|10|173063|Forge
+Orgrimmar|1|3|2048.7 -4812.2 22.4|10|658991|Forge
+Orgrimmar|1|3|2048.7 -4812.2 22.4|10|173064|Forge
+Orgrimmar|1|3|2051.6 -4839 24.4|10|659030|Forge
+Orgrimmar|1|3|2051.6 -4839 24.4|10|173095|Forge
+Orgrimmar|1|4|1920.5 -4570 33.9|10|658961|Mighty Blaze
+Orgrimmar|1|4|1920.5 -4570 33.9|10|173038|Mighty Blaze
+Orgrimmar|1|4|1920.6 -4591.2 33.9|10|658962|Mighty Blaze
+Orgrimmar|1|4|1920.6 -4591.2 33.9|10|173039|Mighty Blaze
+Orgrimmar|1|4|1912.7 -4547.6 30.1|10|658968|Mighty Blaze
+Orgrimmar|1|4|1912.7 -4547.6 30.1|10|173045|Mighty Blaze
+Stormwind|0|1|-8425.1 614.5 95.2|10|696439|Anvil
+Stormwind|0|1|-8425.1 614.5 95.2|10|23303|Anvil
+Stormwind|0|1|-8420.8 616.4 95.5|10|696438|Anvil
+Stormwind|0|1|-8420.8 616.4 95.5|10|23302|Anvil
+Stormwind|0|1|-8387.8 684.4 95.3|10|92011|Grimand's Anvil
+Stormwind|0|3|-8427.1 631.1 95.6|10|696441|Forge
+Stormwind|0|3|-8427.1 631.1 95.6|10|24746|Forge
+Stormwind|0|3|-8425.2 618.1 95.4|10|696443|Forge
+Stormwind|0|3|-8425.2 618.1 95.4|10|23305|Forge
+Stormwind|0|3|-8421.3 613.4 95.2|10|696442|Forge
+Stormwind|0|3|-8421.3 613.4 95.2|10|23304|Forge
+Stormwind|0|3|-8420.1 633.5 95.7|10|696440|Forge
+Stormwind|0|3|-8420 633.5 95.7|10|24745|Forge
+Stormwind|0|4|-9053 151.8 115|8|694822|Cozy Fire
+Stormwind|0|4|-9053 151.8 115|8|3800|Cozy Fire
+Stormwind|0|4|-9053 150.9 115|8|694821|Cozy Fire
+Stormwind|0|4|-9053 150.9 115|8|3799|Cozy Fire
+ThunderBluff|1|1|-1240.2 112.2 129.7|10|50468|Anvil
+ThunderBluff|1|3|-1240.5 104.8 128.6|10|50469|Thunder Bluff Forge
+ThunderBluff|1|4|-1156 66.8 146|10|3286|Roaring Fire
+ThunderBluff|1|4|-1241.9 42 127.2|10|3298|Blazing Fire
+ThunderBluff|1|4|-1173.3 -26.3 164.5|10|3303|Warm Fire
+ThunderBluff|1|4|-1221.9 -18.1 165.4|10|3315|Boiling Cauldron
+ThunderBluff|1|4|-1227.4 -19.9 165.3|10|160426|Brazier
+ThunderBluff|1|4|-1299.8 129.2 131.6|10|3296|Scorching Fire
+Undercity|0|1|1681.8 286.7 -62.5|10|644495|Anvil
+Undercity|0|1|1681.8 286.7 -62.5|10|77813|Anvil
+Undercity|0|1|1693.9 282 -62.5|10|644500|Anvil
+Undercity|0|1|1693.9 282 -62.5|10|113753|Anvil
+Undercity|0|1|1395.3 140.1 -62.5|10|644464|Anvil
+Undercity|0|1|1395.3 140.1 -62.5|10|40303|Anvil
+Undercity|0|3|1684.7 276.8 -62.2|10|644494|Forge
+Undercity|0|3|1684.7 276.8 -62.2|10|52176|Forge
+Undercity|0|3|1694.1 294 -62.2|10|644501|Forge
+Undercity|0|3|1694.1 294 -62.2|10|113754|Forge
+Undercity|0|3|1392.6 148 -62.4|10|644465|Forge
+Undercity|0|3|1392.6 148 -62.4|10|52175|Forge
+Undercity|0|4|1589.7 274.3 -55.2|10|644462|Campfire
+Undercity|0|4|1589.7 274.3 -55.2|10|153695|Campfire
