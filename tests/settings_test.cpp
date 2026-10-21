@@ -20,7 +20,10 @@ void DefaultsWhenEmpty()
     std::vector<std::string> warnings;
     BotSettings const s = ParseBotSettings({}, warnings);
     CHECK(s.MaxBots == 1 && s.Race == 1 && s.Class == 1);
+    CHECK(s.MountMinLevel == 40);                                  // classic riding is learned at 40
     CHECK(warnings.empty());
+    std::vector<std::string> more;
+    CHECK(ParseBotSettings({ { "MountMinLevel", "0" } }, more).MountMinLevel == 0);
 }
 
 void ReadsValidValues()

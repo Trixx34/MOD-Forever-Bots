@@ -356,6 +356,7 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadBool(config, "DungeonReviveOutOfCombat", settings.DungeonReviveOutOfCombat, warnings);
     ReadBool(config, "AggressiveStart", settings.AggressiveStart, warnings);
     ReadBool(config, "Crafting", settings.Crafting, warnings);
+    ReadKey(config, "MountMinLevel", 0, 80, settings.MountMinLevel, warnings);
     ReadBool(config, "Gathering", settings.Gathering, warnings);
     if (auto const it = config.find("CraftingFociFile"); it != config.end())
         settings.CraftingFociFile = it->second;

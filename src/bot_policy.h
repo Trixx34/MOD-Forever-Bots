@@ -95,6 +95,8 @@ struct PolicyOptions
     // Crafting (SDK 0.17, kSkillUp): a bot with nothing to fight makes bandages from cloth and cooks meat, which raises First Aid and Cooking and uses up what fills its
     // bags. Off by default (the core must know the action); the module turns it on from its settings.
     bool Crafting = false;
+    // The level from which a bot asks to mount up for a long walk (riding is learned at 40 in classic). 0 = any level (the policy tests).
+    std::uint32_t MountMinLevel = 0;
     // SDK 0.18: with Crafting, the bot also makes things for the crafting profession it has (Blacksmithing, Leatherworking, Alchemy, Tailoring, Engineering, Smelting),
     // and walks to the nearest anvil, forge or fire of Foci when the core says a recipe needs one (kNeedsFocus). Gathering: it asks the core to gather (kGather) with
     // the gathering profession it has (Mining, Herbalism, Skinning).

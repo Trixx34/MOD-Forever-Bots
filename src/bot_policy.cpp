@@ -3511,7 +3511,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         // Mount for long travel, dismount when the walk is short, combat starts, or the bot arrives.
         if (bot.in_combat == 0 && bot.life_state == 0 && bot.casting_spell == 0 && nowMs >= state.MountRetryMs)
         {
-            if (wanted.Type == ActionType::kMoveTo && !state.Mounted)
+            if (wanted.Type == ActionType::kMoveTo && !state.Mounted && bot.level >= _options.MountMinLevel)
             {
                 float const destDist = DistanceTo(bot, wanted.Dest);
                 if (destDist > kMountMinDistanceYards)

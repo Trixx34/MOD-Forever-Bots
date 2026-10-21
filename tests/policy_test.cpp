@@ -3198,6 +3198,32 @@ void BotMountsForALongWalk()
     CHECK(mounted);
 }
 
+// Riding is learned at level 40: below MountMinLevel the bot walks the long way on foot and never sends a mount.
+void BotBelowTheMountLevelNeverAsksToMount()
+{
+    WorldTickSnapshotView view = PartyView({ 10 });
+    SetVendor(view, 200.0f);
+    view.bots[0].level = 30;
+    PolicyOptions options = AggressiveOptions();
+    options.ServiceEveryMs = 60000;
+    options.MountMinLevel = 40;
+    BotPolicy policy(options);
+    bool walks = false;
+    for (std::uint64_t at = 0; at < 3000; at += 100)
+        for (BotAction const& action : policy.Decide(view, at))
+        {
+            CHECK(action.type != ActionType::kMount);
+            walks = walks || action.type == ActionType::kMoveTo;
+        }
+    CHECK(walks);
+    view.bots[0].level = 40;
+    BotPolicy rider(options);
+    bool mounts = false;
+    for (BotAction const& action : rider.Decide(view, 0))
+        mounts = mounts || (action.type == ActionType::kMount && action.spell_id == 1);
+    CHECK(mounts);
+}
+
 // Vendor 50 yards away: below the mount threshold, the bot walks without mounting.
 void BotDoesNotMountForAShortWalk()
 {
@@ -4239,6 +4265,7 @@ int main()
     HurtBotFleesFromThreat();
     HurtBotDoesNotFleeWhenThreatIsFar();
     BotMountsForALongWalk();
+    BotBelowTheMountLevelNeverAsksToMount();
     BotDoesNotMountForAShortWalk();
     BotDismountsWhenClose();
     BotDoesNotMountInCombat();

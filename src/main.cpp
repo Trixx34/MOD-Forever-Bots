@@ -1334,6 +1334,7 @@ int main(int argc, char** argv)
     policyOptions.DungeonReviveOutOfCombat = settings.DungeonReviveOutOfCombat;
     policyOptions.AggressiveStart = settings.AggressiveStart;
     policyOptions.Crafting = settings.Crafting;
+    policyOptions.MountMinLevel = settings.MountMinLevel;
     policyOptions.Gathering = settings.Gathering;
     if (!settings.CraftingFociFile.empty())
     {
