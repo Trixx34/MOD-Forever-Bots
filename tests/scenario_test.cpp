@@ -324,6 +324,34 @@ void LeaderDoesNotWalkTheDungeonRouteOutsideTheDungeon()
     CHECK(toFirst);
 }
 
+void LeaderDropsARoutePointItHasAlreadyPassed()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 2;
+    options.PartyCount = 1;
+    options.ClassOf = [](std::uint64_t guid) { return guid == 12 ? 1u : 5u; };
+    options.Route = { { 0.0f, 100.0f, 0.0f }, { 0.0f, 200.0f, 0.0f }, { 0.0f, 300.0f, 0.0f } };
+    options.WanderWhenIdle = false;
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    // The fights drew the leader to y = 185: the first point (100 yards behind) is dropped, it walks to the second.
+    std::vector<BotSnapshot> bots = { Bot(12, 36, 0, 185, 2, 2), Bot(13, 36, 5, 185, 1, 2) };
+    float to = -1.0f;
+    for (BotAction const& action : policy.Decide(View(1, bots), 1000))
+        if (action.type == ActionType::kMoveTo && action.bot_guid == 12)
+            to = action.dest_y;
+    CHECK(to == 200.0f);
+    // A leader that is farther than the skip distance from the next point still goes to the first one.
+    BotPolicy slow(options);
+    slow.SetRouteActive(true);
+    std::vector<BotSnapshot> start = { Bot(12, 36, 0, 40, 2, 2), Bot(13, 36, 5, 40, 1, 2) };
+    to = -1.0f;
+    for (BotAction const& action : slow.Decide(View(1, start), 1000))
+        if (action.type == ActionType::kMoveTo && action.bot_guid == 12)
+            to = action.dest_y;
+    CHECK(to == 100.0f);
+}
+
 void LeaderWaitsForAMemberWhoFellBehind()
 {
     BotPolicy policy = RoutePolicy();
@@ -852,6 +880,7 @@ int main()
     EnteringTimesOut();
     PartyRestsAtStagingBeforeEntering();
     LeaderDoesNotWalkTheDungeonRouteOutsideTheDungeon();
+    LeaderDropsARoutePointItHasAlreadyPassed();
     RevivedPartyOutsideIsPutBackAtTheEntry();
     PartyEntersAfterTheRestCapEvenWhenHurt();
     LeaderWalksTheRouteWhileTheRouteIsActive();

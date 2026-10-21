@@ -152,6 +152,9 @@ constexpr float kLostLeaderHeight = 25.0f;        // ... or this far above or be
 constexpr std::uint64_t kLostLeaderMs = 20000;    // for this long, then it is put next to the leader (DungeonTeleport)
 constexpr std::uint32_t kRouteNoRouteSkip = 3;     // refusals in a row (no route) after which a dungeon waypoint is skipped
 constexpr std::uint32_t kRepairBelowPct = 50;    // worn gear below this durability sends the bot to a repairman, not just any vendor
+// The fights draw the leader past route points: when it is this close to the next point, the one it was heading for (not a boss point) is dropped, so it never walks back
+// for it (it did, through the whole dungeon by the pathfinder's only route, with the party standing behind).
+constexpr float kRouteSkipAheadYards = 25.0f;
 constexpr float kRoutePointReachYards = 6.0f;    // the leader has arrived at a route waypoint this close to it
 constexpr float kRouteWaitYards = 30.0f;         // the leader waits for a member farther behind than this
 constexpr std::uint32_t kRouteMinHealthPct = 80; // and for its own health to be at least this
@@ -2358,7 +2361,8 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
 
         Decision wanted;
         char const* moveWhy = ""; // which part of the policy chose a kMoveTo (logged for a party in a dungeon run, move_why)
-        if (lowHealth)
+        // A member of a party does not run from the fight on low health: its healer can only heal a tank that holds still, and the pack follows a fleeing bot onto the party.
+        if (lowHealth && partyLeader == 0)
         {
             // Below kDisengagePct health: get clear of whatever is close enough to still kill it. In combat that is the threat
             // target; out of combat the closest live hostile is the one to run from, since nothing says yet that it is the target.
@@ -2669,6 +2673,16 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     }
                     if (eventBusy)
                         routeBusy = true;
+                }
+                while (!eventBusy && !recovering && state.RouteIndex + 1 < routePoints->size() && (*routeBoss).count(state.RouteIndex) == 0 &&
+                       DistanceTo(bot, (*routePoints)[state.RouteIndex]) > kRoutePointReachYards &&
+                       DistanceTo(bot, (*routePoints)[state.RouteIndex + 1]) <= kRouteSkipAheadYards)
+                {
+                    if (_options.OnEvent)
+                        _options.OnEvent("route_passed: bot=" + std::to_string(bot.guid) + " point=" + std::to_string(state.RouteIndex) + "/" + std::to_string(routePoints->size()) +
+                                         " from=" + std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) + "," + std::to_string(int(bot.pos_z)));
+                    ++state.RouteIndex;
+                    state.RouteNoRoute = 0;
                 }
                 Point const* waypoint = eventBusy || recovering || state.RouteIndex >= routePoints->size() ? nullptr : &(*routePoints)[state.RouteIndex];
                 if (waypoint)

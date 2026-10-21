@@ -3178,6 +3178,43 @@ void PartyCasterDoesNotKite()
     CHECK(casts > 0);
 }
 
+// A party member on low health keeps fighting: its healer needs it to hold still, and a fleeing bot drags the pack onto the party.
+void PartyMemberDoesNotFleeOnLowHealth()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 2;
+    options.PartyCount = 1;
+    options.WanderWhenIdle = false;
+    options.ClassOf = [](std::uint64_t guid) { return guid == 10 ? 1u : 5u; };   // 10 the warrior leads
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = PartyView({ 10, 11 });
+    NearbyUnit mob = Hostile(2, 3.0f, 100);
+    for (std::size_t i = 0; i < 2; ++i)
+    {
+        view.bots[i].in_combat = 1;
+        view.bots[i].threat_target_guid = MakeUnitRef(8, 1, 2);
+        AddNearby(view, i, mob);
+    }
+    view.bots[0].health = 100;                              // the tank at 10 %
+    int flees = 0;
+    for (std::uint64_t at = 1000; at < 4000; at += 100)
+    {
+        view.tick_number = at / 100;
+        for (BotAction const& action : policy.Decide(view, at))
+            flees += action.bot_guid == 10 && action.type == ActionType::kMoveTo;
+    }
+    CHECK(flees == 0);
+    // Alone, the same bot still runs.
+    BotPolicy alone = ClassPolicy(1);
+    WorldTickSnapshotView solo = View(1, MakeUnitRef(8, 1, 2), { Hostile(2, 3.0f, 100) });
+    solo.bots[0].in_combat = 1;
+    solo.bots[0].health = 100;
+    bool fled = false;
+    for (BotAction const& action : alone.Decide(solo, 1000))
+        fled = fled || action.type == ActionType::kMoveTo;
+    CHECK(fled);
+}
+
 // A ranged bot at or beyond kiting distance attacks normally.
 void RangedBotAttacksWhenBackAtRange()
 {
@@ -4293,6 +4330,7 @@ int main()
     FighterWithoutManaDoesNotDrink();
     RangedBotKitesACloseTarget();
     PartyCasterDoesNotKite();
+    PartyMemberDoesNotFleeOnLowHealth();
     RangedBotAttacksWhenBackAtRange();
     HurtBotFleesFromThreat();
     HurtBotDoesNotFleeWhenThreatIsFar();
