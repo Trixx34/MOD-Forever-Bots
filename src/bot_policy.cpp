@@ -55,6 +55,25 @@ constexpr std::uint64_t kSkillUpCastMs = 4000;        // after a craft was sent:
 constexpr std::uint64_t kSkillUpNextMs = 3500;        // a craft that started: the next one is tried when the cast is done
 constexpr std::uint64_t kSkillUpBusyMs = 1500;        // the bot was casting or moving: soon
 constexpr std::uint64_t kSkillUpRefusedMs = 300000;   // no materials, no recipe, or the skill is too high for the recipes: five minutes (varied per bot)
+// SDK 0.18: the lines a bot crafts (the two secondary skills for every bot, the others when the bot has that profession; 186 is smelting, Mining's recipes) and
+// gathers with. A skill the bot does not have is never asked for.
+constexpr std::size_t kCraftLineCount = 8;
+constexpr std::uint32_t kCraftLines[kCraftLineCount] = { 129, 185, 164, 165, 171, 197, 202, 186 };
+constexpr std::size_t kGatherLineCount = 3;
+constexpr std::uint32_t kGatherLines[kGatherLineCount] = { 186, 182, 393 };
+constexpr std::uint64_t kGatherNothingMs = 90000;     // nothing to gather near the bot: ask again in a minute and a half (varied per bot)
+constexpr std::uint64_t kGatherRefusedMs = 300000;    // any other refusal (no spell, no skill): five minutes
+constexpr std::uint64_t kCraftWalkTimeoutMs = 150000; // a walk to an anvil, forge or fire that has not arrived by now is over
+constexpr std::uint64_t kCraftWalkFailMs = 1800000;   // after a walk that failed, or when no object of the focus is on the map or near enough: half an hour
+constexpr float kCraftWalkMaxYards = 900.0f;          // farther than this a bot does not walk for a recipe's focus
+
+// Whether the bot has the profession of a craft or gather line: First Aid and Cooking every bot may learn, the others are its two primary professions.
+bool HasLine(BotSnapshot const& bot, std::uint32_t line)
+{
+    if (line == 129 || line == 185)
+        return true;
+    return (bot.profession_skill[0] == line && bot.profession_value[0] != 0) || (bot.profession_skill[1] == line && bot.profession_value[1] != 0);
+}
 constexpr std::uint32_t kServiceSellJunk = 1024;   // SDK 0.16: also sell white junk (trade goods, spare bags, miscellaneous items)
 constexpr std::uint32_t kBagsLowSlots = 4;         // a vendor visit of a bot with this many free slots or fewer also sells the white junk
 constexpr std::uint32_t kServiceBuyAmmo = 8;     // layout 15: buy ammunition (dest_x = the count to carry), food (dest_y), drink (dest_z)
@@ -564,6 +583,7 @@ char const* ActionStatusName(BotActionStatus status)
         case BotActionStatus::kBusy: return "busy casting";
         case BotActionStatus::kMoving: return "moving";
         case BotActionStatus::kNoRoute: return "no route";
+        case BotActionStatus::kNeedsFocus: return "needs focus";
     }
     return "unknown";
 }
@@ -814,18 +834,59 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
         return;
     }
 
-    // A craft (SDK 0.17): started, the next one comes when the cast is done; busy or moving, soon; any other answer (no recipe, no materials, a skill too high
-    // for the recipes it can make) means there is nothing to make now: that skill waits five minutes, varied per bot.
+    // A craft (SDK 0.17): started, the next one comes when the cast is done; busy or moving, soon; kNeedsFocus (SDK 0.18): the bot walks to the nearest anvil, forge or
+    // fire and asks again there; any other answer (no recipe, no materials, a skill too high for the recipes) means there is nothing to make now: that skill waits five
+    // minutes, varied per bot. The answer is for the line that was sent (CraftSent), whatever spell the core reports.
     if (bot.last_action_type == uint8_t(ActionType::kSkillUp))
     {
-        std::size_t const index = state.CraftSent == 1 ? 1 : 0;
+        std::size_t const index = std::min<std::size_t>(state.CraftSent, kCraftLineCount - 1);
+        auto const waitRefused = [&](std::uint64_t base)
+        {
+            state.CraftRetryAtMs[index] = nowMs + bot_random::Vary(base, std::min<std::uint32_t>(_options.RandomPct * 2, 90),
+                                                                   bot_random::Draw(_options.RandomSeed, bot.guid, bot_random::kSaltIdle, 0x400000000ull + nowMs / 1000));
+        };
         if (bot.last_action_status == BotActionStatus::kApplied)
             state.CraftRetryAtMs[index] = nowMs + kSkillUpNextMs;
         else if (bot.last_action_status == BotActionStatus::kBusy || bot.last_action_status == BotActionStatus::kMoving)
             state.CraftRetryAtMs[index] = nowMs + kSkillUpBusyMs;
+        else if (bot.last_action_status == BotActionStatus::kNeedsFocus)
+        {
+            // Where the focus is: the nearest object on this map, if the table is loaded and it is not too far; the walk is begun by the idle logic (CraftWalking).
+            std::uint32_t const focus = crafting::FocusOfSkill(kCraftLines[index]);
+            std::optional<std::size_t> object;
+            if (_options.Foci && focus != 0)
+                object = crafting::NearestFocus(*_options.Foci, focus, bot.map_id, bot.pos_x, bot.pos_y);
+            if (object && std::hypot(bot.pos_x - (*_options.Foci)[*object].X, bot.pos_y - (*_options.Foci)[*object].Y) <= kCraftWalkMaxYards)
+            {
+                state.CraftWalking = true;
+                state.CraftWalkLine = std::uint32_t(index);
+                state.CraftWalkIndex = std::uint32_t(*object);
+                state.CraftWalkStartMs = nowMs;
+                state.CraftRetryAtMs[index] = nowMs + kCraftWalkTimeoutMs; // held while the walk runs; its end sets the time
+                if (_options.OnEvent)
+                    _options.OnEvent("craft_walk: bot=" + std::to_string(bot.guid) + " skill=" + std::to_string(kCraftLines[index]) + " focus=" + std::to_string(focus) +
+                                     " object=" + (*_options.Foci)[*object].Name);
+            }
+            else
+                waitRefused(kCraftWalkFailMs);
+        }
         else
-            state.CraftRetryAtMs[index] = nowMs + bot_random::Vary(kSkillUpRefusedMs, std::min<std::uint32_t>(_options.RandomPct * 2, 90),
-                                                                   bot_random::Draw(_options.RandomSeed, bot.guid, bot_random::kSaltIdle, 0x400000000ull + nowMs / 1000));
+            waitRefused(kSkillUpRefusedMs);
+        return;
+    }
+
+    // A gather (SDK 0.18): started, the next ask comes when the cast is done (and takes the loot); walking to the node, soon; nothing near: a minute and a half.
+    if (bot.last_action_type == uint8_t(ActionType::kGather))
+    {
+        std::size_t const index = std::min<std::size_t>(state.GatherSent, kGatherLineCount - 1);
+        if (bot.last_action_status == BotActionStatus::kApplied)
+            state.GatherRetryAtMs[index] = nowMs + kSkillUpNextMs;
+        else if (bot.last_action_status == BotActionStatus::kBusy || bot.last_action_status == BotActionStatus::kMoving)
+            state.GatherRetryAtMs[index] = nowMs + kSkillUpBusyMs;
+        else
+            state.GatherRetryAtMs[index] = nowMs + bot_random::Vary(bot.last_action_status == BotActionStatus::kRefused ? kGatherNothingMs : kGatherRefusedMs,
+                                                                    std::min<std::uint32_t>(_options.RandomPct * 2, 90),
+                                                                    bot_random::Draw(_options.RandomSeed, bot.guid, bot_random::kSaltIdle, 0x500000000ull + nowMs / 1000));
         return;
     }
 
@@ -1508,7 +1569,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             state.LeaderYards = kFollowLeaderYards;
             // The first craft of each skill comes some seconds after the bot appears, not for all the bots at once.
             if (_options.RandomPct > 0)
-                for (std::size_t skill = 0; skill < 2; ++skill)
+                for (std::size_t skill = 0; skill < kCraftLineCount; ++skill)
                     state.CraftRetryAtMs[skill] = nowMs + bot_random::Below(bot_random::Draw(_options.RandomSeed, bot.guid, bot_random::kSaltIdle, 0x300000000ull + skill), 60000);
             if (_options.RandomPct > 0)
             {
@@ -2910,7 +2971,25 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                                                       bot_random::Draw(_options.RandomSeed, bot.guid, bot_random::kSaltIdle, state.WanderCycles));
             return state.WanderIdleMs;
         };
-        if (idle && healthy && _options.WanderWhenIdle && grindMode && nowMs >= state.GrindRetryAtMs && !partyMember && !state.ChatStay && state.ChatFollow == 0)
+        // Walking to the anvil, forge or fire a recipe needs (SDK 0.18, after kNeedsFocus): nothing in view and healthy, the bot goes there; arrived, it asks the core again; a walk
+        // with no route, or too long, is over and the skill waits half an hour.
+        if (state.CraftWalking && _options.Foci && state.CraftWalkIndex < _options.Foci->size() && idle && healthy)
+        {
+            crafting::FocusPoint const& point = (*_options.Foci)[state.CraftWalkIndex];
+            bool const arrived = crafting::InReach(point, bot.map_id, bot.pos_x, bot.pos_y);
+            bool const blocked = state.WalkBlockedAtMs != 0 && state.WalkBlockedAtMs >= state.CraftWalkStartMs;
+            if (arrived || blocked || nowMs - state.CraftWalkStartMs > kCraftWalkTimeoutMs)
+            {
+                state.CraftWalking = false;
+                state.CraftRetryAtMs[state.CraftWalkLine] = arrived ? nowMs : nowMs + kCraftWalkFailMs;
+            }
+            else
+            {
+                wanted = Decision{ ActionType::kMoveTo, 0, Point{ point.X, point.Y, point.Z } };
+                idle = false;
+            }
+        }
+        else if (idle && healthy && _options.WanderWhenIdle && grindMode && nowMs >= state.GrindRetryAtMs && !partyMember && !state.ChatStay && state.ChatFollow == 0)
         {
             // Leveling: after a quiet spell the bot walks to a grind spot that suits its level (nearest first, not the ones it just left), and
             // stays to fight what lives there until it sees nothing for a while again.
@@ -3680,20 +3759,23 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         }
 
         // Crafting (SDK 0.17): a bot with nothing to fight, standing still, makes bandages from its cloth and cooks its meat. That raises First Aid and Cooking, and uses up
-        // what fills its bags. The core picks the recipe; when there is nothing to make it answers kRefused and the skill waits (ReadResult). The two skills take turns.
-        if (_options.Crafting && !hasTarget && bot.in_combat == 0 && bot.moving == 0 && bot.life_state == 0 && nowMs >= state.NextCastMs && !(IsCasting(bot)) &&
-            !state.Sitting)
+        // what fills its bags. SDK 0.18: and the things of its crafting profession (Blacksmithing, Leatherworking, Alchemy, Tailoring, Engineering, Smelting). The core picks the
+        // recipe; when there is nothing to make it answers kRefused and the skill waits (ReadResult); when a recipe needs an anvil, forge or fire it answers kNeedsFocus and the
+        // bot walks to one. The lines take turns.
+        bool const calm = !hasTarget && bot.in_combat == 0 && bot.moving == 0 && bot.life_state == 0 && nowMs >= state.NextCastMs && !(IsCasting(bot)) && !state.Sitting &&
+                          !state.CraftWalking;
+        if (_options.Crafting && calm)
         {
             bool crafted = false;
-            for (std::size_t turn = 0; turn < 2 && !crafted; ++turn)
+            for (std::size_t turn = 0; turn < kCraftLineCount && !crafted; ++turn)
             {
-                std::size_t const index = (state.CraftTurn + turn) % 2;
-                if (nowMs < state.CraftRetryAtMs[index])
+                std::size_t const index = (state.CraftTurn + turn) % kCraftLineCount;
+                if (nowMs < state.CraftRetryAtMs[index] || !HasLine(bot, kCraftLines[index]))
                     continue;
                 BotAction craft;
                 craft.bot_guid = bot.guid;
                 craft.type = ActionType::kSkillUp;
-                craft.spell_id = index == 0 ? kSkillFirstAid : kSkillCooking;
+                craft.spell_id = kCraftLines[index];
                 actions.push_back(craft);
                 state.CraftTurn = std::uint32_t(index + 1);
                 state.CraftSent = std::uint32_t(index);
@@ -3702,6 +3784,29 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 crafted = true;
             }
             if (crafted)
+                continue;
+        }
+
+        // Gathering (SDK 0.18, off by default): a bot with Mining, Herbalism or Skinning asks the core to gather what is within 30 yards of it: a vein or herb its skill allows, or a
+        // corpse it can skin. The core walks the bot there and casts; the next ask takes the loot.
+        if (_options.Gathering && calm)
+        {
+            bool gathered = false;
+            for (std::size_t index = 0; index < kGatherLineCount && !gathered; ++index)
+            {
+                if (nowMs < state.GatherRetryAtMs[index] || !HasLine(bot, kGatherLines[index]))
+                    continue;
+                BotAction gather;
+                gather.bot_guid = bot.guid;
+                gather.type = ActionType::kGather;
+                gather.spell_id = kGatherLines[index];
+                actions.push_back(gather);
+                state.GatherSent = std::uint32_t(index);
+                state.GatherRetryAtMs[index] = nowMs + kSkillUpCastMs; // the answer decides the next try
+                state.NextCastMs = nowMs + kGlobalCooldownMs;
+                gathered = true;
+            }
+            if (gathered)
                 continue;
         }
 

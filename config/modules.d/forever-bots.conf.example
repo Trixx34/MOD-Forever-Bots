@@ -162,3 +162,9 @@ Module.forever-bots.TelemetrySummarySec = 60
 # DungeonFile = data/dungeons.txt
 # Dungeon = rfc
 # ScenarioRequireBosses = 1                      # complete when every boss of ScenarioBosses is seen dead (the dungeon file turns it on when it lists bosses)
+
+# Crafting and gathering (SDK 0.18). Crafting = 1 (default) makes bots craft First Aid and Cooking and, with their profession, Blacksmithing, Leatherworking, Alchemy,
+# Tailoring, Engineering and Smelting. A recipe that needs an anvil, forge or cooking fire sends the bot to the nearest one in CraftingFociFile (absolute path;
+# data/crafting_foci.txt lists the capitals' objects). Gathering = 1 makes a bot with Mining, Herbalism or Skinning gather what is within 30 yards (off by default).
+# Module.forever-bots.CraftingFociFile = /srv/forever/sim/modules_runtime/forever-bots/data/crafting_foci.txt
+# Module.forever-bots.Gathering = 1

@@ -150,6 +150,11 @@ struct BotSettings
     // Crafting = 1 (default): a bot with nothing to fight makes bandages from its cloth and cooks its meat (kSkillUp, SDK 0.17; the core must have the action), which
     // raises First Aid and Cooking and uses up what fills its bags. 0 turns it off.
     bool Crafting = true;
+    // Gathering = 1: a bot with Mining, Herbalism or Skinning asks the core to gather what is near it (kGather, SDK 0.18). Off by default.
+    bool Gathering = false;
+    // CraftingFociFile (data/crafting_foci.txt): the anvils, forges and cooking fires of the capitals. With it, a bot whose recipes need a focus (kNeedsFocus) walks to
+    // the nearest one on its map; without it the skill just waits. Use an absolute path: the worldserver's working directory is not the module's.
+    std::string CraftingFociFile;
     bool DungeonReviveOutOfCombat = false;  // DungeonReviveOutOfCombat = 1: a dead member of a dungeon party is revived by its leader out of combat (needs Bot.Chat.Orders.Enabled in the core)
     std::string DungeonFile;
     std::string DungeonEventsFile;

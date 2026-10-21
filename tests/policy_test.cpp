@@ -1444,6 +1444,128 @@ void ANoRouteAnswerEndsTheWalkInsteadOfBeingSentEveryTick()
     CHECK(WalkTo(policy.Decide(view, 80000), 10) == 900.0f);   // after the short pause for a walk that failed: the next hub
 }
 
+// SDK 0.18: a crafting profession's line is asked for, a recipe that needs an anvil sends the bot to the nearest one, and it asks again there.
+PolicyOptions CraftingWithAnAnvil()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.Crafting = true;
+    auto foci = std::make_shared<std::vector<crafting::FocusPoint>>();
+    crafting::FocusPoint anvil;
+    anvil.City = "Test";
+    anvil.Map = 0;
+    anvil.Focus = crafting::kFocusAnvil;
+    anvil.X = 300.0f;
+    anvil.Radius = 10;
+    anvil.Name = "Test Anvil";
+    foci->push_back(anvil);
+    options.Foci = foci;
+    return options;
+}
+
+// The craft answer of the core for the line of the skill, as the snapshot carries it.
+void CraftAnswer(WorldTickSnapshotView& view, BotActionStatus status, std::uint32_t sequence)
+{
+    view.bots[0].last_action_type = std::uint8_t(ActionType::kSkillUp);
+    view.bots[0].last_action_spell = 0; // the core need not report the spell: the answer is for the skill that was sent
+    view.bots[0].last_action_status = status;
+    view.bots[0].last_action_sequence = sequence;
+}
+
+void ABlacksmithAsksForItsLineAndWalksToAnAnvilWhenTheRecipeNeedsOne()
+{
+    BotPolicy policy(CraftingWithAnAnvil());
+    WorldTickSnapshotView view = View(1, 0, {});
+    view.bots[0].profession_skill[0] = 164; // Blacksmithing
+    view.bots[0].profession_value[0] = 50;
+    CHECK((CraftsOf(policy.Decide(view, 1000)) == std::vector<std::uint32_t>{ 129 }));
+    CraftAnswer(view, BotActionStatus::kRefused, 1);
+    CHECK((CraftsOf(policy.Decide(view, 3000)) == std::vector<std::uint32_t>{ 185 }));
+    CraftAnswer(view, BotActionStatus::kRefused, 2);
+    CHECK((CraftsOf(policy.Decide(view, 5000)) == std::vector<std::uint32_t>{ 164 }));     // its own line, after the two secondary skills
+    CraftAnswer(view, BotActionStatus::kNeedsFocus, 3);                                   // the recipes need an anvil within reach
+    CHECK(CraftsOf(policy.Decide(view, 7000)).empty());                                    // no craft while walking
+    CHECK(WalkTo(policy.Decide(view, 7500), kBot) == 300.0f);                              // the nearest anvil (the tick of the answer may mount first)
+    view.bots[0].pos_x = 295.0f;                                                           // arrived within its radius
+    CHECK((CraftsOf(policy.Decide(view, 20000)) == std::vector<std::uint32_t>{ 164 }));    // and it asks again at once
+}
+
+void ANeedsFocusAnswerWithNoRouteOrNoTableEndsInAWait()
+{
+    // The walk gets "no route": it is over, and the line waits half an hour.
+    BotPolicy policy(CraftingWithAnAnvil());
+    WorldTickSnapshotView view = View(1, 0, {});
+    view.bots[0].profession_skill[0] = 164;
+    view.bots[0].profession_value[0] = 50;
+    policy.Decide(view, 1000);
+    CraftAnswer(view, BotActionStatus::kRefused, 1);
+    policy.Decide(view, 3000);
+    CraftAnswer(view, BotActionStatus::kRefused, 2);
+    policy.Decide(view, 5000);
+    CraftAnswer(view, BotActionStatus::kNeedsFocus, 3);
+    policy.Decide(view, 7000);
+    CHECK(WalkTo(policy.Decide(view, 7500), kBot) == 300.0f);
+    view.bots[0].last_action_type = std::uint8_t(ActionType::kMoveTo);
+    view.bots[0].last_action_status = BotActionStatus::kNoRoute;
+    view.bots[0].last_action_sequence = 4;
+    CHECK(WalkTo(policy.Decide(view, 9000), kBot) < 0.0f);
+    CHECK(CraftsOf(policy.Decide(view, 60000)).empty());                                   // the line waits (the secondary skills too, from their refusals)
+    CHECK(CraftsOf(policy.Decide(view, 9000 + 1900000)).size() == 1);                      // and is asked for again after half an hour
+
+    // No table loaded: the bot does not walk, the line waits.
+    PolicyOptions none = AggressiveOptions();
+    none.Crafting = true;
+    BotPolicy blind(none);
+    WorldTickSnapshotView plain = View(1, 0, {});
+    plain.bots[0].profession_skill[0] = 164;
+    plain.bots[0].profession_value[0] = 50;
+    blind.Decide(plain, 1000);
+    CraftAnswer(plain, BotActionStatus::kRefused, 1);
+    blind.Decide(plain, 3000);
+    CraftAnswer(plain, BotActionStatus::kRefused, 2);
+    blind.Decide(plain, 5000);
+    CraftAnswer(plain, BotActionStatus::kNeedsFocus, 3);
+    blind.Decide(plain, 7000);
+    CHECK(WalkTo(blind.Decide(plain, 7500), kBot) < 0.0f);
+}
+
+std::vector<std::uint32_t> GathersOf(std::vector<BotAction> const& actions)
+{
+    std::vector<std::uint32_t> skills;
+    for (BotAction const& action : actions)
+        if (action.type == ActionType::kGather)
+            skills.push_back(action.spell_id);
+    return skills;
+}
+
+void AGatheringBotAsksForItsSkillAndBacksOffAfterARefusal()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.Gathering = true;
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = View(1, 0, {});
+    view.bots[0].profession_skill[1] = 393; // Skinning
+    view.bots[0].profession_value[1] = 10;
+    CHECK((GathersOf(policy.Decide(view, 1000)) == std::vector<std::uint32_t>{ 393 }));
+    view.bots[0].last_action_type = std::uint8_t(ActionType::kGather);
+    view.bots[0].last_action_status = BotActionStatus::kRefused;                            // nothing near
+    view.bots[0].last_action_sequence = 1;
+    CHECK(GathersOf(policy.Decide(view, 5000)).empty());
+    CHECK(GathersOf(policy.Decide(view, 60000)).empty());
+    CHECK((GathersOf(policy.Decide(view, 95000)) == std::vector<std::uint32_t>{ 393 }));    // asked again after the wait
+    view.bots[0].last_action_status = BotActionStatus::kMoving;                             // the core is walking the bot to the corpse
+    view.bots[0].last_action_sequence = 2;
+    CHECK(GathersOf(policy.Decide(view, 96000)).empty());                                   // the answer is read
+    CHECK((GathersOf(policy.Decide(view, 98000)) == std::vector<std::uint32_t>{ 393 }));    // and the next ask comes soon
+    // No gathering profession, or the setting off: never asked.
+    BotPolicy none(options);
+    CHECK(GathersOf(none.Decide(View(1, 0, {}), 1000)).empty());
+    BotPolicy off(AggressiveOptions());
+    WorldTickSnapshotView skinner = View(1, 0, {});
+    skinner.bots[0].profession_skill[1] = 393;
+    skinner.bots[0].profession_value[1] = 10;
+    CHECK(GathersOf(off.Decide(skinner, 1000)).empty());
+}
+
 void NoHubsOnTheBotsMapMeansNoWalk()
 {
     BotPolicy policy = HubPolicy();
@@ -3969,6 +4091,9 @@ int main()
     IdleBotWandersToAHubAfterAWhile();
     ArrivalMovesOnToTheNextHubAfterAnInterval();
     ANoRouteAnswerEndsTheWalkInsteadOfBeingSentEveryTick();
+    ABlacksmithAsksForItsLineAndWalksToAnAnvilWhenTheRecipeNeedsOne();
+    ANeedsFocusAnswerWithNoRouteOrNoTableEndsInAWait();
+    AGatheringBotAsksForItsSkillAndBacksOffAfterARefusal();
     NoHubsOnTheBotsMapMeansNoWalk();
     AnythingSeenStopsTheWalk();
     HurtBotRestsInsteadOfWalking();

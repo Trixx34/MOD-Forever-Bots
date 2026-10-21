@@ -31,6 +31,7 @@
 #include "grind_data.h"
 #include "quest_planner.h"
 #include "spell_costs.h"
+#include "crafting_foci.h"
 #include "bot_random.h"
 #include "chat_say.h"
 #include "dungeon_events.h"
@@ -94,6 +95,11 @@ struct PolicyOptions
     // Crafting (SDK 0.17, kSkillUp): a bot with nothing to fight makes bandages from cloth and cooks meat, which raises First Aid and Cooking and uses up what fills its
     // bags. Off by default (the core must know the action); the module turns it on from its settings.
     bool Crafting = false;
+    // SDK 0.18: with Crafting, the bot also makes things for the crafting profession it has (Blacksmithing, Leatherworking, Alchemy, Tailoring, Engineering, Smelting),
+    // and walks to the nearest anvil, forge or fire of Foci when the core says a recipe needs one (kNeedsFocus). Gathering: it asks the core to gather (kGather) with
+    // the gathering profession it has (Mining, Herbalism, Skinning).
+    bool Gathering = false;
+    std::shared_ptr<std::vector<crafting::FocusPoint> const> Foci;
     std::uint32_t RandomPct = 0;
     std::uint32_t PartyPercent = 100;
     // Hubs (M7): the places an idle bot walks to when it has seen nothing for a while, per map, in order. The bot's map
@@ -291,9 +297,15 @@ private:
         std::uint64_t GrindRetryAtMs = 0;                // no grind spot on this map for this level: explore on foot until this time, then look again
         std::uint32_t HubFailures = 0;                   // hub walks in a row that ended without arriving
         std::uint32_t ExploreStep = 0;                   // random walks made, for the direction of the next
-        std::uint64_t CraftRetryAtMs[2] = { 0, 0 };      // First Aid and Cooking: no kSkillUp for the skill before this time
-        std::uint32_t CraftTurn = 0;                     // which skill is tried first next (they take turns)
-        std::uint32_t CraftSent = 0;                     // the skill of the last kSkillUp sent (0 index = First Aid, 1 = Cooking): its answer is for that skill, whatever spell the core reports
+        std::uint64_t CraftRetryAtMs[8] = { 0, 0, 0, 0, 0, 0, 0, 0 }; // per craft line (kCraftLines in bot_policy.cpp): no kSkillUp for the skill before this time
+        std::uint32_t CraftTurn = 0;                     // which line is tried first next (they take turns)
+        std::uint32_t CraftSent = 0;                     // the line of the last kSkillUp sent: its answer is for that line, whatever spell the core reports
+        std::uint64_t GatherRetryAtMs[3] = { 0, 0, 0 };  // Mining, Herbalism, Skinning: no kGather for the skill before this time
+        std::uint32_t GatherSent = 0;                    // the line of the last kGather sent
+        bool CraftWalking = false;                       // walking to an anvil, forge or fire because a recipe needs one (kNeedsFocus)
+        std::uint32_t CraftWalkLine = 0;                 // the craft line whose recipes need it
+        std::uint32_t CraftWalkIndex = 0;                // the object, an index into Foci
+        std::uint64_t CraftWalkStartMs = 0;
         std::uint32_t RestPct = 0;                       // the health below which this bot rests (a trait drawn once from the seed; 0 = not drawn yet)
         float LeaderYards = 0.0f;                        // how close to its leader this bot stays put (a trait, like RestPct)
         std::uint32_t WanderCycles = 0;                  // walks to a grind spot or hub begun, the counter of the random draws for the next one

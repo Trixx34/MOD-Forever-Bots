@@ -36,6 +36,7 @@
 #include <exception>
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -107,6 +108,8 @@ char const* ActionTypeName(std::uint8_t type)
         case forever_module::ActionType::kReclaimCorpse: return "reclaim";
         case forever_module::ActionType::kConsume: return "consume";
         case forever_module::ActionType::kSkillUp: return "skillup";
+        case forever_module::ActionType::kCraft: return "craft";
+        case forever_module::ActionType::kGather: return "gather";
         default: break;
     }
     return "action";
@@ -585,10 +588,13 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
             }
             if (bot.last_action_status != forever_module::BotActionStatus::kApplied)
             {
-                // A vendor or trainer is refused whenever no NPC is in range, the normal state of an idle bot. Those are
-                // logged at most once per bot every ten minutes, so 1500 bots do not flood the log.
+                // A vendor or trainer is refused whenever no NPC is in range, the normal state of an idle bot, and a craft or a gather whenever there is nothing to
+                // make or gather. Those are logged at most once per bot every ten minutes, so 1500 bots do not flood the log.
                 bool const service = bot.last_action_type == static_cast<std::uint8_t>(forever_module::ActionType::kVendor) ||
-                                     bot.last_action_type == static_cast<std::uint8_t>(forever_module::ActionType::kTrain);
+                                     bot.last_action_type == static_cast<std::uint8_t>(forever_module::ActionType::kTrain) ||
+                                     bot.last_action_type == static_cast<std::uint8_t>(forever_module::ActionType::kSkillUp) ||
+                                     bot.last_action_type == static_cast<std::uint8_t>(forever_module::ActionType::kGather) ||
+                                     bot.last_action_type == static_cast<std::uint8_t>(forever_module::ActionType::kCraft);
                 if (service)
                 {
                     std::uint64_t const now = nowMs();
@@ -1298,6 +1304,22 @@ int main(int argc, char** argv)
     policyOptions.DungeonReviveOutOfCombat = settings.DungeonReviveOutOfCombat;
     policyOptions.AggressiveStart = settings.AggressiveStart;
     policyOptions.Crafting = settings.Crafting;
+    policyOptions.Gathering = settings.Gathering;
+    if (!settings.CraftingFociFile.empty())
+    {
+        std::ifstream fociFile(settings.CraftingFociFile);
+        std::stringstream fociText;
+        fociText << fociFile.rdbuf();
+        std::vector<std::string> fociErrors;
+        auto foci = std::make_shared<std::vector<crafting::FocusPoint>>(crafting::ParseFociTable(fociText.str(), fociErrors));
+        for (std::string const& error : fociErrors)
+            std::cerr << "forever-bots: CraftingFociFile: " << error << "\n";
+        if (!fociFile || foci->empty())
+            std::cerr << "forever-bots: CraftingFociFile: cannot read '" << settings.CraftingFociFile << "' (or it holds no object); bots do not walk to a recipe's anvil, forge or fire\n";
+        else
+            std::cerr << "forever-bots: crafting foci: " << foci->size() << " object(s) from " << settings.CraftingFociFile << "\n";
+        policyOptions.Foci = std::move(foci);
+    }
     // Dungeon routes for "tank lead" (every dungeon of DungeonFile, by the map of its entry) and the events table (DungeonEventsFile), shared by all dungeons.
     std::vector<dungeon_events::Event> allEvents;
     if (!settings.DungeonEventsFile.empty())
