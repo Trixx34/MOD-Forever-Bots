@@ -258,6 +258,34 @@ void ANoRouteAnswerPausesTheMoveToThatPlace()
     CHECK(sent == 0);
 }
 
+// A bot with no mount learned (every bot below the riding level) was refused every 15 seconds. The answer is for the request that was sent, and a mount refusal pauses
+// further mount requests: two minutes, longer after each. The mount is the last action of the batch, so its answer is the one the bot reports.
+void ARefusedMountPausesTheNextOnes()
+{
+    BotPolicy policy = Policy();
+    WorldTickSnapshotView view = Group();
+    policy.ApplyChat(view, Ctx(), *ParseChatCommand("goto here", false), 1000);
+    auto const first = policy.Decide(view, 1000);              // the speaker is over 100 yards away: the bots mount first
+    ptrdiff_t lastOfBot10 = -1, mountOfBot10 = -1;
+    for (std::size_t i = 0; i < first.size(); ++i)
+        if (first[i].bot_guid == 10)
+        {
+            lastOfBot10 = ptrdiff_t(i);
+            if (first[i].type == ActionType::kMount)
+                mountOfBot10 = ptrdiff_t(i);
+        }
+    CHECK(mountOfBot10 >= 0 && mountOfBot10 == lastOfBot10);
+    view.bots[0].last_action_type = std::uint8_t(ActionType::kMount);
+    view.bots[0].last_action_spell = 0;                         // the core does not echo the spell
+    view.bots[0].last_action_status = forever_module::BotActionStatus::kRefused;
+    view.bots[0].last_action_sequence = 1;
+    bool mounted = false;
+    for (std::uint64_t at = 1500; at < 100000; at += 1000)
+        for (BotAction const& action : policy.Decide(view, at))
+            mounted = mounted || (action.type == ActionType::kMount && action.bot_guid == 10);
+    CHECK(!mounted);
+}
+
 void TrainWalksToTheSpeakerThenTrains()
 {
     CHECK(ParseChatCommand("train", true)->Verb == ChatVerb::Train && IsOrderVerb(ChatVerb::Train) && !ParseChatCommand("train", false));
@@ -766,6 +794,7 @@ int main()
     StayBotsStartNoFights();
     GotoHereSendsTheBotsToTheSpeaker();
     ANoRouteAnswerPausesTheMoveToThatPlace();
+    ARefusedMountPausesTheNextOnes();
     GotoOnAnotherMapIsRefused();
     TrainWalksToTheSpeakerThenTrains();
     TrainIsRefusedForTheDeadAndOnAnotherMap();

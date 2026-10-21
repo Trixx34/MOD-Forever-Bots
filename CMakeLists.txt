@@ -121,6 +121,10 @@ add_executable(spell_costs_test tests/spell_costs_test.cpp)
 target_link_libraries(spell_costs_test PRIVATE forever_bots_policy)
 add_test(NAME spell_costs COMMAND spell_costs_test)
 
+add_executable(move_gate_test tests/move_gate_test.cpp)
+target_link_libraries(move_gate_test PRIVATE forever_bots_policy)
+add_test(NAME move_gate COMMAND move_gate_test)
+
 add_executable(bot_random_test tests/bot_random_test.cpp)
 target_include_directories(bot_random_test PRIVATE src)
 add_test(NAME bot_random COMMAND bot_random_test)

@@ -51,6 +51,14 @@ constexpr std::uint32_t kServiceBuyReagent = 512;  // the item and the count are
 // kSkillUp (SDK 0.17): the skill lines, and how long the policy waits after each answer.
 constexpr std::uint32_t kSkillFirstAid = 129;
 constexpr std::uint32_t kSkillCooking = 185;
+constexpr std::uint64_t kMountFailBaseMs = 120000;      // no mount learned: the first pause is two minutes, doubling up to kMountFailMaxMs
+constexpr std::uint64_t kMountFailMaxMs = 3600000;
+constexpr std::uint64_t kQuestWindowMs = 300000;        // quest refusals are counted over five minutes
+constexpr std::uint32_t kQuestRefusalsPause = 4;        // this many in a window: no quest actions for kQuestPauseMs
+constexpr std::uint64_t kQuestPauseMs = 600000;
+constexpr std::uint64_t kBuffFailBaseMs = 5000;         // an upkeep buff (or a spell not known) that keeps failing: 5 s, doubling to kSpellFailMaxMs
+constexpr std::uint64_t kSpellFailMaxMs = 600000;
+constexpr std::uint32_t kGatherFailDoublings = 5;       // nothing to gather near the bot, again: 90 s, 3, 6, 12, 24, 48 minutes at most
 constexpr std::uint64_t kNoRoutePauseMs = 5000;        // the first pause after a move got "no route"; it doubles with each refusal in a row (up to 6 doublings is 2.7 minutes)
 constexpr float kNoRouteSameYards = 12.0f;               // a destination this close to the refused one is the same place
 constexpr std::uint64_t kSkillUpCastMs = 4000;        // after a craft was sent: the cast takes a few seconds, the answer decides what comes next
@@ -776,6 +784,23 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
     // A quest action refused (not eligible, bags full, no NPC in reach): the quest is left alone for a while.
     if (bot.last_action_type == uint8_t(ActionType::kQuest) && bot.last_action_status == BotActionStatus::kRefused)
     {
+        // Each answer once (the snapshot repeats the last one every tick). Three bots sent a refused quest action every three seconds for two hours (5,400 of the 6,000
+        // refusals): a run of refusals, whichever quests they were for, now pauses the quest engine for ten minutes and the bot grinds meanwhile.
+        if (bot.last_action_sequence == state.QuestSeenSeq)
+            return;
+        state.QuestSeenSeq = bot.last_action_sequence;
+        if (nowMs - state.QuestWindowMs > kQuestWindowMs)
+        {
+            state.QuestWindowMs = nowMs;
+            state.QuestRefusals = 0;
+        }
+        if (++state.QuestRefusals >= kQuestRefusalsPause)
+        {
+            state.QuestPausedUntilMs = nowMs + kQuestPauseMs;
+            state.QuestRefusals = 0;
+            if (_options.OnEvent)
+                _options.OnEvent("quest_paused: bot=" + std::to_string(bot.guid) + " reason=refused_run minutes=" + std::to_string(kQuestPauseMs / 60000));
+        }
         if (_quests.NoteRefused(state.Quest, nowMs))
         {
             // A hand-in the core refused: the reward did not fit in the bags. A bot with quest work is never idle, so the vendor visit that
@@ -794,14 +819,34 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
     }
 
     // Mount / dismount: record whether the request succeeded so the policy does not keep repeating it.
+    // The answer is for the request that was sent (MountSentUp), whatever spell the core reports, and each answer is read once. A bot with no mount learned
+    // (every bot below the riding level) was refused every 15 seconds: 19,000 refusals in two hours on 300 bots. Mount refusals now pause for two minutes, then
+    // four, up to an hour; an answer for a dismount of a bot that was not mounted only clears the flag.
     if (bot.last_action_type == uint8_t(ActionType::kMount))
     {
-        if (bot.last_action_status == BotActionStatus::kApplied)
-            state.Mounted = (bot.last_action_spell == 1);
-        else
+        if (bot.last_action_sequence != state.MountSeenSeq)
         {
-            state.Mounted = false;
-            state.MountRetryMs = nowMs + 15000;
+            state.MountSeenSeq = bot.last_action_sequence;
+            if (bot.last_action_status == BotActionStatus::kApplied)
+            {
+                state.Mounted = state.MountSentUp || bot.last_action_spell == 1; // (a bot already mounted when the policy began has sent nothing: the spell tells)
+                if (state.Mounted)
+                    state.MountFails = 0;
+            }
+            else
+            {
+                state.Mounted = false;
+                if (state.MountSentUp)
+                {
+                    state.MountFails = std::min<std::uint32_t>(state.MountFails + 1, 12);
+                    std::uint64_t wait = kMountFailBaseMs;
+                    for (std::uint32_t i = 1; i < state.MountFails && wait < kMountFailMaxMs; ++i)
+                        wait *= 2;
+                    state.MountRetryMs = nowMs + std::min(wait, kMountFailMaxMs);
+                }
+                else
+                    state.MountRetryMs = nowMs + 15000;
+            }
         }
         return;
     }
@@ -893,13 +938,29 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
     {
         std::size_t const index = std::min<std::size_t>(state.GatherSent, kGatherLineCount - 1);
         if (bot.last_action_status == BotActionStatus::kApplied)
+        {
             state.GatherRetryAtMs[index] = nowMs + kSkillUpNextMs;
+            state.GatherFails[index] = 0;
+        }
         else if (bot.last_action_status == BotActionStatus::kBusy || bot.last_action_status == BotActionStatus::kMoving)
             state.GatherRetryAtMs[index] = nowMs + kSkillUpBusyMs;
         else
-            state.GatherRetryAtMs[index] = nowMs + bot_random::Vary(bot.last_action_status == BotActionStatus::kRefused ? kGatherNothingMs : kGatherRefusedMs,
-                                                                    std::min<std::uint32_t>(_options.RandomPct * 2, 90),
+        {
+            // "nothing to gather within 30 yards" is the normal answer where the bot stands, and the module does not look for nodes: the pause doubles with every
+            // answer in a row (90 s up to 48 minutes), and starts again after a gather that worked.
+            std::uint64_t base = bot.last_action_status == BotActionStatus::kRefused ? kGatherNothingMs : kGatherRefusedMs;
+            if (bot.last_action_status == BotActionStatus::kRefused)
+            {
+                if (bot.last_action_sequence != state.GatherSeenSeq)
+                {
+                    state.GatherSeenSeq = bot.last_action_sequence;
+                    state.GatherFails[index] = std::min<std::uint32_t>(state.GatherFails[index] + 1, kGatherFailDoublings + 1);
+                }
+                base <<= std::min<std::uint32_t>(state.GatherFails[index] == 0 ? 0 : state.GatherFails[index] - 1, kGatherFailDoublings);
+            }
+            state.GatherRetryAtMs[index] = nowMs + bot_random::Vary(base, std::min<std::uint32_t>(_options.RandomPct * 2, 90),
                                                                     bot_random::Draw(_options.RandomSeed, bot.guid, bot_random::kSaltIdle, 0x500000000ull + nowMs / 1000));
+        }
         return;
     }
 
@@ -1039,14 +1100,33 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
             _buffClaims.erase({ spell, PlayerRef(bot.guid) });
     }
 
+    // A spell that keeps failing for a reason that is not a fight's business (an upkeep buff on a target that is not valid, in range or in sight, a buff on cooldown, a
+    // spell the bot has not learned) waits twice as long after each answer in a row: 5 s up to ten minutes (a spell not known: a minute up to ten). Heard once per
+    // answer, since the snapshot repeats the last one. Mark of the Wild, Thorns, Arcane Intellect and Power Word: Fortitude were refused 30,000 times in two hours.
+    auto const failWait = [&](std::uint64_t base) -> std::uint64_t
+    {
+        std::uint32_t& streak = state.SpellFails[spell];
+        if (bot.last_action_sequence != state.SpellFailSeq)
+        {
+            state.SpellFailSeq = bot.last_action_sequence;
+            streak = std::min<std::uint32_t>(streak + 1, 12);
+        }
+        std::uint64_t wait = base;
+        for (std::uint32_t i = 1; i < streak && wait < kSpellFailMaxMs; ++i)
+            wait *= 2;
+        return std::min(wait, kSpellFailMaxMs);
+    };
+    bool const wasApplied = bot.last_action_status == BotActionStatus::kApplied;
+    if (wasApplied)
+        state.SpellFails.erase(spell);
     switch (bot.last_action_status)
     {
         case BotActionStatus::kNotKnown:
         case BotActionStatus::kUnknownSpell:
-            state.RetryAtMs[spell] = nowMs + kNotKnownRetryMs;
+            state.RetryAtMs[spell] = nowMs + failWait(kNotKnownRetryMs);
             break;
         case BotActionStatus::kOnCooldown:
-            state.RetryAtMs[spell] = nowMs + kCooldownRetryMs;
+            state.RetryAtMs[spell] = nowMs + (buff ? failWait(kBuffFailBaseMs) : kCooldownRetryMs);
             state.NextCastMs = std::max(state.NextCastMs, nowMs + kHeldCastMs); // usually the global cooldown: no other spell meanwhile
             break;
         case BotActionStatus::kBusy:
@@ -1062,7 +1142,7 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
             state.RetryAtMs[spell] = nowMs + (buff ? kBuffPowerRetryMs : kPowerRetryMs);
             break;
         case BotActionStatus::kRefused:
-            state.RetryAtMs[spell] = nowMs + (buff ? kBuffRefusedRetryMs : kRetryMs);
+            state.RetryAtMs[spell] = nowMs + (buff ? failWait(kBuffRefusedRetryMs) : kRetryMs);
             // A silent refusal (result 32) is the global cooldown too. A refused pet cast is the answer to "is there a pet": no hold, the
             // follow-up (Revive Pet after Call Pet) goes at once.
             if (spell != kCallPet && spell != kRevivePet && spell != kMendPet)
@@ -1071,7 +1151,7 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
         case BotActionStatus::kOutOfRange:
         case BotActionStatus::kNoLineOfSight:
         case BotActionStatus::kInvalidTarget:
-            state.RetryAtMs[spell] = nowMs + kRetryMs;
+            state.RetryAtMs[spell] = nowMs + (buff ? failWait(kBuffFailBaseMs) : kRetryMs);
             break;
         case BotActionStatus::kApplied:
         case BotActionStatus::kNone:
@@ -1635,6 +1715,9 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             };
             auto const emit = [&](Decision const& wantedDead)
             {
+                if (wantedDead.Type == ActionType::kMoveTo && nowMs < state.NoRouteUntilMs &&
+                    std::hypot(wantedDead.Dest.X - state.NoRouteDest.X, wantedDead.Dest.Y - state.NoRouteDest.Y) < kNoRouteSameYards)
+                    return; // the core found no route to that place a moment ago
                 if (state.Last && state.Last->Type == wantedDead.Type && state.Last->Target == wantedDead.Target &&
                     state.Last->Dest.X == wantedDead.Dest.X && state.Last->Dest.Y == wantedDead.Dest.Y && state.Last->Dest.Z == wantedDead.Dest.Z)
                     return;
@@ -2066,7 +2149,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         // leaves quests alone until it is done.
         QuestStep questStep;
         bool routeBusy = false;
-        bool const questsAllowed = _quests.Enabled() && !partyMember && !lowHealth && bot.in_combat == 0 && !state.ChatStay && state.ChatFollow == 0;
+        bool const questsAllowed = _quests.Enabled() && !partyMember && !lowHealth && bot.in_combat == 0 && !state.ChatStay && state.ChatFollow == 0 && nowMs >= state.QuestPausedUntilMs;
         if (questsAllowed)
             questStep = _quests.Next(bot, state.Quest, nowMs, QuestBotInfo{ classId, _options.RaceOf ? _options.RaceOf(bot.guid) : 0u });
         // Every five minutes, what the quest planner is doing for this bot and what keeps it from doing more (the events are the only record,
@@ -2697,6 +2780,15 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     std::uint32_t const operation = questStep.Kind == QuestStepKind::Accept ? kQuestAccept
                                                     : questStep.Kind == QuestStepKind::HandIn ? kQuestHandIn : kQuestAbandon;
                     quest.spell_id = QuestCode(operation, questStep.Quest);
+                    // A stop first when the bot was walking, so the quest action is the last one applied and its answer is the one the policy reads.
+                    if (!(state.Last && state.Last->Type == ActionType::kStop))
+                    {
+                        BotAction stop;
+                        stop.bot_guid = bot.guid;
+                        stop.type = ActionType::kStop;
+                        actions.push_back(stop);
+                        state.Last = Decision{ ActionType::kStop, 0 };
+                    }
                     actions.push_back(quest);
                     _quests.NoteSent(state.Quest, operation, questStep.Quest, nowMs);
                     wanted = Decision{ ActionType::kStop, 0 };
@@ -3424,15 +3516,21 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 float const destDist = DistanceTo(bot, wanted.Dest);
                 if (destDist > kMountMinDistanceYards)
                 {
+                    // Stop first and mount last: the core keeps only the last action's answer, and with the stop after the mount its refusal was never seen.
+                    BotAction stop;
+                    stop.bot_guid = bot.guid;
+                    stop.type = ActionType::kStop;
+                    actions.push_back(stop);
                     BotAction mount;
                     mount.bot_guid = bot.guid;
                     mount.type = ActionType::kMount;
                     mount.spell_id = 1; // the core interprets 1 as mount up
                     actions.push_back(mount);
                     state.Mounted = true;
+                    state.MountSentUp = true;
                     state.MountRetryMs = nowMs + 5000;
-                    wanted.Type = ActionType::kStop; // stop moving while the mount cast completes
-                    wanted.Target = 0;
+                    state.Last = Decision{ ActionType::kStop, 0 };
+                    wanted = Decision{ ActionType::kStop, 0 }; // stop moving while the mount cast completes (the stop is already sent: Last equals it, so no second one follows the mount)
                 }
             }
             else if (state.Mounted &&
@@ -3445,6 +3543,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 dismount.spell_id = 0; // 0 = dismount
                 actions.push_back(dismount);
                 state.Mounted = false;
+                state.MountSentUp = false;
                 state.MountRetryMs = nowMs + 5000;
             }
         }

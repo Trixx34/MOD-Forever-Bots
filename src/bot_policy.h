@@ -270,6 +270,17 @@ private:
         std::uint64_t RestRetryAtMs = 0;                 // a refused sit is not tried again before this
         bool Mounted = false;                            // the bot is mounted: travel is faster, combat dismounts it
         std::uint64_t MountRetryMs = 0;                  // no mount or dismount request before this
+        bool MountSentUp = false;                        // the last kMount sent was a mount (not a dismount): its answer is for that
+        std::uint32_t MountSeenSeq = 0;                  // the last kMount result read (last_action_sequence)
+        std::uint32_t MountFails = 0;                    // mount requests refused in a row (no mount learned): the pause doubles
+        std::uint32_t QuestSeenSeq = 0;                  // the last kQuest result read
+        std::uint32_t QuestRefusals = 0;                 // refused quest actions in the current window
+        std::uint64_t QuestWindowMs = 0;                 // when that window began
+        std::uint64_t QuestPausedUntilMs = 0;            // no quest actions before this (a run of refusals: the bot grinds meanwhile)
+        std::uint32_t GatherSeenSeq = 0;                 // the last kGather result read
+        std::uint32_t GatherFails[3] = { 0, 0, 0 };      // gathers refused in a row per line: the pause doubles
+        std::uint32_t SpellFailSeq = 0;                  // the last spell answer counted in SpellFails
+        std::map<std::uint32_t, std::uint32_t> SpellFails; // per spell: refusals in a row that are not a fight's business (buffs; a spell not known): the pause doubles
         std::uint64_t NextServiceMs = 0;                 // next vendor visit (sell grey, repair, equip)
         std::uint64_t NextTrainMs = 0;                   // next trainer check
         std::uint32_t ComboPoints = 0;                   // combo points on ComboTarget, from the bot's own Sinister Strikes

@@ -539,6 +539,33 @@ void RefusedHandInSendsTheBotToAVendor()
     CHECK(again); // not blocked for a minute any more
 }
 
+// Three bots sent a refused quest action every three seconds for two hours. A run of refusals (four within five minutes, each answer counted once) pauses the
+// bot's quest actions for ten minutes, whichever quests they were for.
+void ARunOfRefusedQuestActionsPausesTheQuestEngine()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.Quests = Data();
+    bool paused = false;
+    options.OnEvent = [&](std::string const& text) { paused = paused || text.find("quest_paused") != std::string::npos; };
+    BotPolicy policy(options);
+    BotSnapshot bot = Bot(-8902.6f, -162.6f);
+    LogQuest(bot, 783, 2);
+    std::uint64_t now = 1000;
+    for (std::uint32_t sequence = 1; sequence <= 4; ++sequence, now += 4000)
+    {
+        bot.last_action_sequence = sequence;
+        bot.last_action_type = std::uint8_t(ActionType::kQuest);
+        bot.last_action_status = forever_module::BotActionStatus::kRefused;
+        policy.Decide(OneBotView(bot, {}), now);
+    }
+    CHECK(paused);
+    bool sent = false;
+    for (std::uint64_t at = now; at < now + 540000; at += 5000)
+        for (BotAction const& action : policy.Decide(OneBotView(bot, {}), at))
+            sent = sent || action.type == ActionType::kQuest;
+    CHECK(!sent);
+}
+
 void HandInRefusalsBlockLessThanOtherRefusals()
 {
     QuestPlanner planner(Data());
@@ -670,6 +697,7 @@ int main()
     NoRouteToAStartGiverBlocksThatStart();
     NoRouteAtTheGiverIsIgnored();
     RefusedHandInSendsTheBotToAVendor();
+    ARunOfRefusedQuestActionsPausesTheQuestEngine();
     HandInRefusalsBlockLessThanOtherRefusals();
     ParserReadsTheFormat();
     ParserDropsBadLines();

@@ -15,6 +15,7 @@
 #include "bot_presence.h"
 #include "auction_policy.h"
 #include "sell_policy.h"
+#include "move_gate.h"
 #include "errand_policy.h"
 #include "errand_trainers.h"
 #include "bot_store.h"
@@ -110,6 +111,13 @@ char const* ActionTypeName(std::uint8_t type)
         case forever_module::ActionType::kSkillUp: return "skillup";
         case forever_module::ActionType::kCraft: return "craft";
         case forever_module::ActionType::kGather: return "gather";
+        case forever_module::ActionType::kSummon: return "summon";
+        case forever_module::ActionType::kRevive: return "revive";
+        case forever_module::ActionType::kMount: return "mount";
+        case forever_module::ActionType::kPetCommand: return "pet";
+        case forever_module::ActionType::kTaxi: return "taxi";
+        case forever_module::ActionType::kUseObject: return "useobject";
+        case forever_module::ActionType::kSellToVendor: return "sell";
         default: break;
     }
     return "action";
@@ -366,7 +374,11 @@ struct SellBook
     std::unordered_map<std::uint64_t, std::vector<sell::Sale>> Pending;                     // bot -> sales of the visit under way
     std::unordered_map<std::uint64_t, std::uint64_t> LastVisitMs;                           // bot -> when it last visited a vendor to sell
     std::unordered_map<std::uint64_t, sell::InFlight> Flight;                               // bot -> the sale sent, waiting for the core's reply
+    std::unordered_map<std::uint64_t, std::uint64_t> WalkNextMs;                            // bot -> no walk to the vendor before this (it was sent every quiet tick)
+    std::unordered_map<std::uint64_t, std::uint32_t> WalkRefusedSeq;                        // bot -> the last "no route" answer that ended a visit
 };
+
+constexpr std::uint64_t kSellWalkRepeatMs = 3000;    // a walk to the vendor is repeated at most this often
 
 // The loot event as a sale candidate.
 sell::Item SellItemOf(forever_module::PlayerItemLootedEvent const& event)
@@ -437,6 +449,19 @@ void AppendSales(SellBook& book, BotSettings const& settings, forever_module::Wo
         float const dy = bot.pos_y - bot.vendor_y;
         if (dx * dx + dy * dy > kSellReachYards * kSellReachYards)
         {
+            // The core found no route to the vendor (it may be far, or across water): the visit is over, the items stay for the next one. The walk used to be sent on
+            // every tick without the policy's pause: 140 bots refused 5,000 times a minute.
+            if (bot.last_action_type == static_cast<std::uint8_t>(forever_module::ActionType::kMoveTo) &&
+                bot.last_action_status == forever_module::BotActionStatus::kNoRoute && bot.last_action_sequence != book.WalkRefusedSeq[bot.guid])
+            {
+                book.WalkRefusedSeq[bot.guid] = bot.last_action_sequence;
+                pending.clear();
+                continue;
+            }
+            std::uint64_t& next = book.WalkNextMs[bot.guid];
+            if (now < next)
+                continue;
+            next = now + kSellWalkRepeatMs;
             forever_module::BotAction walk;     // the vendor's position is on the bot's map, so the walk stays on it
             walk.bot_guid = bot.guid;
             walk.type = forever_module::ActionType::kMoveTo;
@@ -568,6 +593,7 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
     if (live.Enabled())
         std::cerr << "forever-bots: live picture to " << settings.LiveFile << " every " << settings.LiveEveryMs << " ms\n";
 
+    move_gate::MoveGate moveGate;
     while (running)
     {
         forever_module::WorldTickSnapshotView const& view = session.ReadLatestSnapshot();
@@ -797,6 +823,10 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
             decideMaxUs = std::max(decideMaxUs, decideUs);
             if (extras.Sell)
                 AppendSales(*extras.Sell, settings, view, actions, session.MaxActions(), nowMs(), extras.Alts);
+            // Every source's moves pass the gate: a move to a place the core just found no route to is not sent again before the pause is over.
+            for (forever_module::BotSnapshot const& bot : view.bots)
+                moveGate.Observe(bot.guid, bot.last_action_type, bot.last_action_status, bot.last_action_sequence, nowMs());
+            moveGate.Filter(actions, nowMs());
             actionsTotal += actions.size();
             lastBotCount = view.bots.size();
 

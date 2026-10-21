@@ -3382,6 +3382,39 @@ void TwoDruidsDoNotBothCastThePartyBuff()
     CHECK(onMember11 == 1); // and not one per druid
 }
 
+// An upkeep buff that keeps failing (Mark of the Wild, Thorns, Arcane Intellect and Power Word: Fortitude were refused 30,000 times in two hours) waits twice as long
+// after each answer in a row: 5 s, 10 s, 20 s.
+void AFailingBuffBacksOffLongerEachTime()
+{
+    std::istringstream file("class 11\nbuff 1126 duration 1800 party\n");
+    std::vector<std::string> drop;
+    PolicyOptions options = AggressiveOptions();
+    options.Rotations = std::make_shared<rotation::RotationData>(rotation::ParseRotationData(file, drop));
+    options.PartySize = 2;
+    options.PartyCount = 1;
+    options.ClassOf = [](std::uint64_t) { return 11; };
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = PartyView({ 10, 11 });
+    for (BotSnapshot& bot : view.bots)
+        bot.group_leader_guid = MakeUnitRef(2, 0, 10);
+    auto const casts = [&](std::uint64_t from, std::uint64_t to)
+    {
+        int count = 0;
+        for (std::uint64_t at = from; at < to; at += 500)
+            for (BotAction const& action : policy.Decide(view, at))
+                count += action.bot_guid == 10 && action.type == ActionType::kCastSpell && action.spell_id == 1126;
+        return count;
+    };
+    CHECK(casts(0, 1000) >= 1);                                        // the first try
+    view.bots[0].last_action_type = std::uint8_t(ActionType::kCastSpell);
+    view.bots[0].last_action_spell = 1126;
+    view.bots[0].last_action_status = BotActionStatus::kInvalidTarget;
+    view.bots[0].last_action_sequence = 1;
+    CHECK(casts(1000, 5500) == 0);                                     // waits 5 s
+    view.bots[0].last_action_sequence = 2;
+    CHECK(casts(5500, 14500) == 0);                                    // the second answer in a row: 10 s
+}
+
 // A hub walk that timed out is not worth a full idle interval: an unreachable hub (in rock, or in another zone) must not
 // cost the bot 30 seconds of standing every time it goes round the list.
 void HubTimeoutTriesTheNextHubSoonerThanAnArrival()
@@ -4224,6 +4257,7 @@ int main()
     TwoHealersDoNotHealTheSameMember();
     TankIsHealedBeforeTheLowestMember();
     TwoDruidsDoNotBothCastThePartyBuff();
+    AFailingBuffBacksOffLongerEachTime();
     HubTimeoutTriesTheNextHubSoonerThanAnArrival();
     DefaultBotsDoNotPullWhatIsInRange();
 
