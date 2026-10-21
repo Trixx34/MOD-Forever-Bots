@@ -2513,7 +2513,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             std::vector<dungeon_events::Event> const* routeEvents = nullptr;
             if (partyLeaderBot && !state.ChatStay)
             {
-                if (_routeActive)
+                if (_routeActive && (_options.RouteMap == 0 || bot.map_id == _options.RouteMap))
                 {
                     routePoints = &_options.Route;
                     routeBoss = &_options.RouteBossAt;

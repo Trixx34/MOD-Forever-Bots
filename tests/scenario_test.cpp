@@ -297,6 +297,33 @@ void LeaderWalksTheRouteWhileTheRouteIsActive()
     CHECK(toFirst);
 }
 
+void LeaderDoesNotWalkTheDungeonRouteOutsideTheDungeon()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 2;
+    options.PartyCount = 1;
+    options.ClassOf = [](std::uint64_t guid) { return guid == 12 ? 1u : 5u; };
+    options.Route = { { 0.0f, 100.0f, 0.0f }, { 0.0f, 200.0f, 0.0f } };
+    options.RouteMap = 36;
+    options.DungeonTeleport = true;
+    options.WanderWhenIdle = false;
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    // Revived at the graveyard on map 0: the route's points are coordinates of map 36, so there is nothing to walk to (and nothing to teleport to).
+    std::vector<BotSnapshot> outside = { Bot(12, 0, -10500, 1200, 2, 2), Bot(13, 0, -10500, 1203, 1, 2) };
+    int orders = 0;
+    for (std::uint64_t at = 1000; at < 90000; at += 500)
+        for (BotAction const& action : policy.Decide(View(at / 500, outside), at))
+            orders += (action.type == ActionType::kMoveTo || action.type == ActionType::kTeleport) && action.bot_guid == 12;
+    CHECK(orders == 0);
+    // Inside the dungeon it walks.
+    std::vector<BotSnapshot> inside = { Bot(12, 36, 0, 0, 2, 2), Bot(13, 36, 5, 0, 1, 2) };
+    bool toFirst = false;
+    for (BotAction const& action : policy.Decide(View(1000, inside), 100000))
+        toFirst = toFirst || (action.type == ActionType::kMoveTo && action.bot_guid == 12 && action.dest_y == 100.0f);
+    CHECK(toFirst);
+}
+
 void LeaderWaitsForAMemberWhoFellBehind()
 {
     BotPolicy policy = RoutePolicy();
@@ -595,6 +622,34 @@ void Up(BotSnapshot& bot)
     bot.health = 1000;
 }
 
+void RevivedPartyOutsideIsPutBackAtTheEntry()
+{
+    std::uint64_t t, tick;
+    std::vector<BotSnapshot> bots;
+    ScenarioDirector director = RunningDirector(t, tick, bots);
+    std::vector<BotAction> actions;
+    // After a wipe the leader and one member are up at the graveyard on map 0; one member is still a ghost there.
+    for (BotSnapshot& bot : bots)
+        bot.map_id = 0;
+    Down(bots[2], 2);
+    director.Decide(View(++tick, bots), t += 1000, actions);
+    CHECK(Count(actions, ActionType::kTeleport) == 0);                 // not at once: they get up first
+    actions.clear();
+    director.Decide(View(++tick, bots), t += kReenterDelayMs, actions);
+    CHECK(Count(actions, ActionType::kTeleport, 1) == 1 && Count(actions, ActionType::kTeleport, 2) == 1);
+    CHECK(Count(actions, ActionType::kTeleport, 3) == 0);              // the ghost is not teleported
+    for (BotAction const& action : actions)
+        CHECK(action.spell_id == 36 && action.dest_x == -14.0f);
+    actions.clear();
+    director.Decide(View(++tick, bots), t += 1000, actions);
+    CHECK(Count(actions, ActionType::kTeleport) == 0);                 // and not again before the retry time
+    bots[0].map_id = 36;
+    bots[1].map_id = 36;
+    actions.clear();
+    director.Decide(View(++tick, bots), t += kEnterRetryMs, actions);
+    CHECK(Count(actions, ActionType::kTeleport) == 0);                 // they are back inside
+}
+
 void GhostCountsAsNotAlive()
 {
     std::uint64_t t, tick;
@@ -796,6 +851,8 @@ int main()
     TimeoutEndsTheRun();
     EnteringTimesOut();
     PartyRestsAtStagingBeforeEntering();
+    LeaderDoesNotWalkTheDungeonRouteOutsideTheDungeon();
+    RevivedPartyOutsideIsPutBackAtTheEntry();
     PartyEntersAfterTheRestCapEvenWhenHurt();
     LeaderWalksTheRouteWhileTheRouteIsActive();
     LeaderWaitsForAMemberWhoFellBehind();

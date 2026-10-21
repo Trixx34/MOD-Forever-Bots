@@ -124,6 +124,8 @@ struct PolicyOptions
     bool AggressiveStart = false;
     // Dungeon route (doc 19): the waypoints the party leader walks, in order, while the route is active (SetRouteActive). Empty = none.
     std::vector<Point> Route;
+    // The map the Route is on (the scenario's dungeon). The leader walks the route only while it is on this map; 0 = any map (the policy tests).
+    std::uint32_t RouteMap = 0;
     // Which route points (0-based) are bosses, and the entry of the boss at each (ScenarioBossAt): the leader waits at such a point until that boss is dead.
     std::map<std::size_t, std::uint32_t> RouteBossAt;
     // The events of the scenario's dungeon (dungeon_events.h): the leader runs them along the route.

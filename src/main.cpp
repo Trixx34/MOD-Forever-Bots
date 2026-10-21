@@ -1783,6 +1783,7 @@ int main(int argc, char** argv)
         for (auto const& [point, entry] : settings.Scenario.BossAt)
             policyOptions.RouteBossAt[point] = entry;
         policyOptions.Events = dungeon_events::ForMap(allEvents, std::uint32_t(settings.Scenario.Entry[0]));
+        policyOptions.RouteMap = static_cast<std::uint32_t>(settings.Scenario.Entry[0]);
 
         ScenarioPlan plan;
         plan.Name = settings.Scenario.Name;

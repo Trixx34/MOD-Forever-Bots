@@ -315,6 +315,30 @@ void ScenarioDirector::Decide(forever_module::WorldTickSnapshotView const& view,
                             }
                     }
             }
+            // A wipe: the party was revived at the graveyard outside the dungeon. The leader is up and the route is not walkable from here: put the living back at the entry.
+            if (leader && leader->life_state == 0 && leader->map_id != _plan.EntryMap)
+            {
+                if (_outsideSinceMs == 0)
+                    _outsideSinceMs = nowMs;
+                if (nowMs - _outsideSinceMs >= kReenterDelayMs && (_lastReenterMs == 0 || nowMs - _lastReenterMs >= kEnterRetryMs))
+                {
+                    for (BotSnapshot const& bot : bots)
+                        if (bot.life_state == 0 && bot.map_id != _plan.EntryMap)
+                        {
+                            BotAction action;
+                            action.bot_guid = bot.guid;
+                            action.type = ActionType::kTeleport;
+                            action.spell_id = _plan.EntryMap;
+                            action.dest_x = _plan.Entry.X;
+                            action.dest_y = _plan.Entry.Y;
+                            action.dest_z = _plan.Entry.Z;
+                            actions.push_back(action);
+                        }
+                    _lastReenterMs = nowMs;
+                }
+            }
+            else
+                _outsideSinceMs = 0;
             std::uint32_t const alive = aliveCount();
             if (alive == 0)
             {
