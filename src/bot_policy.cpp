@@ -2357,6 +2357,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             state.StallTarget = 0;
 
         Decision wanted;
+        char const* moveWhy = ""; // which part of the policy chose a kMoveTo (logged for a party in a dungeon run, move_why)
         if (lowHealth)
         {
             // Below kDisengagePct health: get clear of whatever is close enough to still kill it. In combat that is the threat
@@ -2378,6 +2379,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                                 threat->pos_y + dy / dist * kFleeYards,
                                 bot.pos_z };
                     wanted = Decision{ ActionType::kMoveTo, 0, flee };
+                    moveWhy = "flee";
                 }
                 else
                     wanted = Decision{ ActionType::kStop, 0 };
@@ -2428,7 +2430,9 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 state.Approaching = false;
                 // Kite: a ranged bot backs off when a melee target gets inside kiting distance, then resumes attacking
                 // once it is back at range.
-                if (approach > kMeleeApproachYards + 0.5f && targetUnit && distance < kRangedKiteYards)
+                // Not in a party: a party's tank holds the target, and a caster that keeps backing off never gets a spell off (300-450 move orders a minute per caster in the
+                // Deadmines runs, and each step re-pulled the next pack).
+                if (partyLeader == 0 && approach > kMeleeApproachYards + 0.5f && targetUnit && distance < kRangedKiteYards)
                 {
                     float const dx = bot.pos_x - targetUnit->pos_x;
                     float const dy = bot.pos_y - targetUnit->pos_y;
@@ -2439,6 +2443,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                                     targetUnit->pos_y + dy / dist * kRangedKiteYards,
                                     bot.pos_z };
                         wanted = Decision{ ActionType::kMoveTo, 0, kite };
+                        moveWhy = "kite";
                     }
                     else
                         wanted = Decision{ ActionType::kAttackTarget, targetRef };
@@ -2643,6 +2648,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                             break;
                         case dungeon_events::Command::What::MoveTo:
                             wanted = Decision{ ActionType::kMoveTo, 0, Point{ command.X, command.Y, command.Z } };
+                            moveWhy = "event_move";
                             eventBusy = true;
                             break;
                         case dungeon_events::Command::What::Use:
@@ -2703,7 +2709,24 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 if (waypoint && together && strong)
                 {
                     wanted = Decision{ ActionType::kMoveTo, 0, *waypoint };
+                    moveWhy = "*waypoint";
                     routeBusy = true;
+                    // The leader's walk, at most every 5 s: which point it goes to, from where, and how many of its members are within the waiting distance.
+                    if (_options.OnEvent && nowMs - state.RouteWalkLoggedMs >= 5000)
+                    {
+                        state.RouteWalkLoggedMs = nowMs;
+                        std::uint32_t near = 0, all = 0;
+                        for (std::uint64_t member : membersOf[bot.guid])
+                            if (auto const at = indexOf.find(member); at != indexOf.end() && view.bots[at->second].life_state == 0)
+                            {
+                                ++all;
+                                near += Distance2d(bot, view.bots[at->second]) <= kRouteWaitYards;
+                            }
+                        _options.OnEvent("route_walk: bot=" + std::to_string(bot.guid) + " point=" + std::to_string(state.RouteIndex) + "/" + std::to_string(routePoints->size()) +
+                                         " to=" + std::to_string(int(waypoint->X)) + "," + std::to_string(int(waypoint->Y)) + "," + std::to_string(int(waypoint->Z)) + " from=" +
+                                         std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) + "," + std::to_string(int(bot.pos_z)) + " members_near=" +
+                                         std::to_string(near) + "/" + std::to_string(all) + " combat=" + std::to_string(bot.in_combat));
+                    }
                 }
             }
 
@@ -2760,13 +2783,19 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                         wanted = Decision{ ActionType::kStop, 0 };
                     }
                     else
+                    {
                         wanted = Decision{ ActionType::kMoveTo, 0, Point{ questStep.Dest.X, questStep.Dest.Y, questStep.Dest.Z } };
+                        moveWhy = "quest_walk";
+                    }
                     break;
                 }
                 case QuestStepKind::Hunt:
                     // Hunt with the target area equal to the bot's own place (no areas known): stand and wait for the creatures.
                     if (questStep.Dest.X != bot.pos_x || questStep.Dest.Y != bot.pos_y)
+                    {
                         wanted = Decision{ ActionType::kMoveTo, 0, Point{ questStep.Dest.X, questStep.Dest.Y, questStep.Dest.Z } };
+                        moveWhy = "quest_hunt";
+                    }
                     else
                         wanted = Decision{ ActionType::kStop, 0 };
                     break;
@@ -2820,6 +2849,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 else
                 {
                     wanted = Decision{ ActionType::kMoveTo, 0, state.GotoPoint };
+                    moveWhy = "state.GotoPoint";
                     routeBusy = true;
                 }
             }
@@ -2869,6 +2899,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             else
             {
                 wanted = Decision{ ActionType::kMoveTo, 0, order.Dest };
+                moveWhy = "order.Dest";
             }
             routeBusy = true;
             idle = false;
@@ -2954,6 +2985,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 if (nowMs - state.TravelStartMs <= kTravelTimeoutMs)
                 {
                     wanted = Decision{ ActionType::kMoveTo, 0, vendor };
+                    moveWhy = "vendor";
                     idle = false;
                 }
                 else
@@ -3091,6 +3123,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             else
             {
                 wanted = Decision{ ActionType::kMoveTo, 0, Point{ point.X, point.Y, point.Z } };
+                moveWhy = "point_walk";
                 idle = false;
             }
         }
@@ -3110,6 +3143,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 else
                 {
                     wanted = Decision{ ActionType::kMoveTo, 0, state.GrindTarget };
+                    moveWhy = "state.GrindTarget";
                     idle = false;
                 }
             }
@@ -3142,6 +3176,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     state.Wandering = true;
                     state.WanderStartMs = nowMs;
                     wanted = Decision{ ActionType::kMoveTo, 0, state.GrindTarget };
+                    moveWhy = "state.GrindTarget";
                     idle = false;
                     if (_options.OnEvent)
                         _options.OnEvent("grind_spot: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id) +
@@ -3179,6 +3214,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 else
                 {
                     wanted = Decision{ ActionType::kMoveTo, 0, hub };
+                    moveWhy = "hub";
                     idle = false;
                 }
             }
@@ -3189,6 +3225,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 state.Wandering = true;
                 state.WanderStartMs = nowMs;
                 wanted = Decision{ ActionType::kMoveTo, 0, list[state.NextHub % list.size()] };
+                moveWhy = "list[state.NextHub % list.size()]";
                 idle = false;
             }
         }
@@ -3212,6 +3249,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 else
                 {
                     wanted = Decision{ ActionType::kMoveTo, 0, state.ExploreTarget };
+                    moveWhy = "state.ExploreTarget";
                     idle = false;
                 }
             }
@@ -3228,6 +3266,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 state.Wandering = true;
                 state.WanderStartMs = nowMs;
                 wanted = Decision{ ActionType::kMoveTo, 0, state.ExploreTarget };
+                moveWhy = "state.ExploreTarget";
                 idle = false;
             }
         }
@@ -3548,6 +3587,15 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             }
         }
 
+        if (_options.OnEvent && _options.RouteMap != 0 && partyLeader != 0 && wanted.Type == ActionType::kMoveTo && nowMs - state.MoveWhyLoggedMs >= 5000 &&
+            std::hypot(wanted.Dest.X - state.MoveWhyDest.X, wanted.Dest.Y - state.MoveWhyDest.Y) > 8.0f)
+        {
+            state.MoveWhyLoggedMs = nowMs;
+            state.MoveWhyDest = wanted.Dest;
+            _options.OnEvent("move_why: bot=" + std::to_string(bot.guid) + " why=" + (*moveWhy ? moveWhy : "other") + " to=" + std::to_string(int(wanted.Dest.X)) + "," +
+                             std::to_string(int(wanted.Dest.Y)) + "," + std::to_string(int(wanted.Dest.Z)) + " from=" + std::to_string(int(bot.pos_x)) + "," +
+                             std::to_string(int(bot.pos_y)) + "," + std::to_string(int(bot.pos_z)) + " leader=" + (partyLeaderBot ? "1" : "0") + " combat=" + std::to_string(bot.in_combat));
+        }
         // A move to a place the core found no route to a moment ago is not sent again yet.
         bool const blockedMove = wanted.Type == ActionType::kMoveTo && nowMs < state.NoRouteUntilMs &&
                                  std::hypot(wanted.Dest.X - state.NoRouteDest.X, wanted.Dest.Y - state.NoRouteDest.Y) < kNoRouteSameYards;

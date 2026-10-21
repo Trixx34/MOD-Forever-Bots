@@ -366,6 +366,9 @@ private:
         std::uint64_t LostSinceMs = 0;                   // a member has been far from its leader since this time (0 = not lost)
         std::uint64_t NextRecoverMs = 0;                 // no teleport back to the leader before this
         std::uint64_t RouteBossSinceMs = 0;              // when the leader began to wait at a boss point (0 = not waiting)
+        std::uint64_t MoveWhyLoggedMs = 0;               // when the policy last logged why a party bot moves (move_why)
+        Point MoveWhyDest{};
+        std::uint64_t RouteWalkLoggedMs = 0;             // when the leader's walk along the route was last written to the log (route_walk)
         std::uint32_t RouteNoRoute = 0;                  // moves in a row to the current dungeon waypoint that the core found no route for
         std::uint64_t TaxiBlockedUntilMs = 0;            // the core refused a flight: walk until this
         std::uint64_t TaxiWaitUntilMs = 0;               // a flight was ordered: give it time to show

@@ -3147,6 +3147,37 @@ void RangedBotKitesACloseTarget()
         CHECK(action.type != ActionType::kAttackTarget);
 }
 
+// In a party the caster stands and casts: the tank holds the target, backing off would keep it moving and out of spells.
+void PartyCasterDoesNotKite()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 2;
+    options.PartyCount = 1;
+    options.WanderWhenIdle = false;
+    options.ClassOf = [](std::uint64_t guid) { return guid == 10 ? 1u : 8u; };   // 10 the warrior leads, 11 is a mage
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = PartyView({ 10, 11 });
+    NearbyUnit mob = Hostile(2, 5.0f, 100);
+    view.bots[1].threat_target_guid = MakeUnitRef(8, 1, 2);
+    view.bots[1].in_combat = 1;
+    view.bots[0].in_combat = 1;
+    view.bots[0].threat_target_guid = MakeUnitRef(8, 1, 2);
+    AddNearby(view, 0, mob);
+    AddNearby(view, 1, mob);
+    int kites = 0, casts = 0;
+    for (std::uint64_t at = 1000; at < 6000; at += 100)
+    {
+        view.tick_number = at / 100;
+        for (BotAction const& action : policy.Decide(view, at))
+        {
+            kites += action.bot_guid == 11 && action.type == ActionType::kMoveTo && action.target_guid == 0;
+            casts += action.bot_guid == 11 && action.type == ActionType::kCastSpell;
+        }
+    }
+    CHECK(kites == 0);
+    CHECK(casts > 0);
+}
+
 // A ranged bot at or beyond kiting distance attacks normally.
 void RangedBotAttacksWhenBackAtRange()
 {
@@ -4261,6 +4292,7 @@ int main()
     ManaRestIsCappedAndNotRepeatedAtOnce();
     FighterWithoutManaDoesNotDrink();
     RangedBotKitesACloseTarget();
+    PartyCasterDoesNotKite();
     RangedBotAttacksWhenBackAtRange();
     HurtBotFleesFromThreat();
     HurtBotDoesNotFleeWhenThreatIsFar();
