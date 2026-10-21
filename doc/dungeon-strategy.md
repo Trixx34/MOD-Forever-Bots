@@ -10,6 +10,13 @@ You can change a dungeon by editing its file, and you can keep your changes in a
 The old text files (`data/dungeons.txt`, `data/dungeon_events.txt`) are still read, but only for a map that has no JSON file. Their content has been converted, line for line
 (`tools/convert_dungeons.py`, and a unit test compares what the module reads from the JSON files with what it read from the text files).
 
+## Comments
+
+A dungeon file may hold comments: `// ...` to the end of the line and `/* ... */` anywhere between tokens (this is not standard JSON; the module's reader accepts it,
+and text inside a string is never a comment). The shipped files use them to explain each section, the bosses and the doors. Comments are ignored and are not kept when a file
+is written again by `tools/convert_dungeons.py --force`, which overwrites a hand-edited file: copy your edited file elsewhere (your `DungeonDir`) instead of regenerating it.
+A tool that reads these files as plain JSON (`python3 -m json.tool`) will refuse the comments; strip them first.
+
 ## File names and where files are read from
 
 The name is `<map id>-<name>.json`. The map id is the map of the dungeon's inside (36 for the Deadmines); the name after the dash is for people and can be anything

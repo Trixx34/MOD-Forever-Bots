@@ -1,16 +1,28 @@
 {
+  // ---------------------------------------------------------------------------------------------------------------------------------------------
+  // Blackfathom Deeps (map 48), levels 24-32.  Strategy file, schema 1.  Full field list and an example: doc/dungeon-strategy.md.
+  // These "//" and "/* */" comments are allowed in every dungeon file; the module ignores them. To change how bots run this dungeon, copy this file into your
+  // own folder (Module.forever-bots.DungeonDir = /path) and edit the copy: a file there for the same map REPLACES this one. A file with a mistake is logged
+  // (file, line, reason) and not used; the shipped one is used instead.
+  // Coordinates: x is north, y is west, z is up (the game's own axes). Boss numbers are creature entries (world database, creature_template).
+  // ---------------------------------------------------------------------------------------------------------------------------------------------
   "schema": 1,
   "id": "bfd",
   "map": 48,
   "name": "Blackfathom Deeps",
   "levels": [24, 32],
   "roster": "2:1,5:5,8:8,2:9,5:4",
+  // Where the party gathers and how it gets in. "staging" = the place outside where the party rests until it is ready (health and mana up) before it goes in;
+  // "portal" = the instance entrance on the outside map; "entry" = where the party stands inside right after it enters (a revived party is put back here).
   "entrance": {
     "staging": { "map": 1, "x": 1629, "y": -4373, "z": 31 },
     "portal": { "map": 1, "x": 4246.7, "y": 743.4, "z": -24.9 },
     "entry": { "map": 48, "x": -150.23, "y": 106.59, "z": -39.78 }
   },
+  // Limits of one run: "duration_sec" = the run is over after this long, "wipe_recovery_sec" = how long the party gets to recover after a wipe.
   "run": { "duration_sec": 1800, "wipe_recovery_sec": 300 },
+  // The path the leader walks, point after point (in order). A point with "boss": <entry> is where that boss is expected; the route waits there until that boss is
+  // seen dead, then goes on. Add, remove or move points to change the way; keep the first point near "entry" and every point reachable on foot.
   "route": [
     { "x": -170.7, "y": 77.9, "z": -44.6 },
     { "x": -179.5, "y": 67.5, "z": -48.3 },
@@ -28,7 +40,7 @@
     { "x": -405.3, "y": 170.7, "z": -55.8 },
     { "x": -418.4, "y": 182.4, "z": -53.6 },
     { "x": -426.7, "y": 192.0, "z": -52.6 },
-    { "x": -442.4, "y": 211.8, "z": -52.6, "boss": 4887 },
+    { "x": -442.4, "y": 211.8, "z": -52.6, "boss": 4887 },  // boss: Ghamoo-ra
     { "x": -542.7, "y": 210.9, "z": -56.0 },
     { "x": -577.3, "y": 217.3, "z": -51.7 },
     { "x": -613.1, "y": 216.3, "z": -50.1 },
@@ -42,7 +54,7 @@
     { "x": -566.9, "y": 18.1, "z": -46.9 },
     { "x": -530.4, "y": 1.6, "z": -40.3 },
     { "x": -497.6, "y": -2.7, "z": -44.8 },
-    { "x": -412.7, "y": 40.9, "z": -48.1, "boss": 6243 },
+    { "x": -412.7, "y": 40.9, "z": -48.1, "boss": 6243 },  // boss: Gelihast
     { "x": -448.0, "y": 21.3, "z": -47.8 },
     { "x": -501.3, "y": -12.0, "z": -45.3 },
     { "x": -518.4, "y": -29.3, "z": -41.6 },
@@ -61,29 +73,35 @@
     { "x": -813.6, "y": -97.6, "z": -25.6 },
     { "x": -804.8, "y": -112.5, "z": -25.6 },
     { "x": -810.7, "y": -128.0, "z": -25.6 },
-    { "x": -818.8, "y": -155.6, "z": -25.8, "boss": 4832 },
+    { "x": -818.8, "y": -155.6, "z": -25.8, "boss": 4832 },  // boss: Twilight Lord Kelris
     { "x": -821.9, "y": -202.1, "z": -25.6 },
     { "x": -832.0, "y": -256.0, "z": -26.1 },
     { "x": -845.9, "y": -421.1, "z": -33.0 },
-    { "x": -848.4, "y": -453.9, "z": -33.9, "boss": 4829 }
+    { "x": -848.4, "y": -453.9, "z": -33.9, "boss": 4829 }  // boss: Aku'mai
   ],
+  // The bosses, in the order the route meets them. "strategy" holds the tactics for each boss: pull, tank_position, interrupt, dispel, avoid, avoid_spells, kill_order,
+  // notes. Fields the bots act on today are listed in doc/dungeon-strategy.md ("what bots do today"); the others are kept but not used yet.
   "bosses": [
     {
+      // Ghamoo-ra (creature entry 4887)
       "entry": 4887,
       "name": "Ghamoo-ra",
       "strategy": {}
     },
     {
+      // Gelihast (creature entry 6243)
       "entry": 6243,
       "name": "Gelihast",
       "strategy": {}
     },
     {
+      // Twilight Lord Kelris (creature entry 4832)
       "entry": 4832,
       "name": "Twilight Lord Kelris",
       "strategy": {}
     },
     {
+      // Aku'mai (creature entry 4829)
       "entry": 4829,
       "name": "Aku'mai",
       "strategy": {}

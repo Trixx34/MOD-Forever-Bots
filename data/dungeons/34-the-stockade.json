@@ -1,68 +1,88 @@
 {
+  // ---------------------------------------------------------------------------------------------------------------------------------------------
+  // Stormwind Stockades (map 34), levels 24-32.  Strategy file, schema 1.  Full field list and an example: doc/dungeon-strategy.md.
+  // These "//" and "/* */" comments are allowed in every dungeon file; the module ignores them. To change how bots run this dungeon, copy this file into your
+  // own folder (Module.forever-bots.DungeonDir = /path) and edit the copy: a file there for the same map REPLACES this one. A file with a mistake is logged
+  // (file, line, reason) and not used; the shipped one is used instead.
+  // Coordinates: x is north, y is west, z is up (the game's own axes). Boss numbers are creature entries (world database, creature_template).
+  // ---------------------------------------------------------------------------------------------------------------------------------------------
   "schema": 1,
   "id": "stockade",
   "map": 34,
   "name": "Stormwind Stockades",
   "levels": [24, 32],
   "roster": "2:1,5:5,8:8,2:9,5:4",
+  // Where the party gathers and how it gets in. "staging" = the place outside where the party rests until it is ready (health and mana up) before it goes in;
+  // "portal" = the instance entrance on the outside map; "entry" = where the party stands inside right after it enters (a revived party is put back here).
   "entrance": {
     "staging": { "map": 1, "x": 1629, "y": -4373, "z": 31 },
     "portal": { "map": 0, "x": -8766.1, "y": 845.5, "z": 88 },
     "entry": { "map": 34, "x": 48.98, "y": 0.48, "z": -16.39 }
   },
+  // Limits of one run: "duration_sec" = the run is over after this long, "wipe_recovery_sec" = how long the party gets to recover after a wipe.
   "run": { "duration_sec": 1800, "wipe_recovery_sec": 300 },
+  // The path the leader walks, point after point (in order). A point with "boss": <entry> is where that boss is expected; the route waits there until that boss is
+  // seen dead, then goes on. Add, remove or move points to change the way; keep the first point near "entry" and every point reachable on foot.
   "route": [
-    { "x": 159.6, "y": 1.3, "z": -25.6, "boss": 1696 },
+    { "x": 159.6, "y": 1.3, "z": -25.6, "boss": 1696 },  // boss: Targorr the Dread
     { "x": 146.9, "y": 1.3, "z": -25.4 },
     { "x": 133.3, "y": 5.1, "z": -25.4 },
     { "x": 133.1, "y": 16.5, "z": -27.0 },
     { "x": 133.1, "y": 38.9, "z": -33.9 },
     { "x": 154.1, "y": 42.9, "z": -34.7 },
-    { "x": 160.1, "y": 45.7, "z": -34.8, "boss": 1720 },
+    { "x": 160.1, "y": 45.7, "z": -34.8, "boss": 1720 },  // boss: Bruegal Ironknuckle
     { "x": 134.9, "y": 45.1, "z": -34.7 },
     { "x": 137.1, "y": 62.7, "z": -33.9 },
     { "x": 145.1, "y": 91.7, "z": -33.9 },
     { "x": 149.3, "y": 106.7, "z": -35.0 },
     { "x": 160.0, "y": 121.9, "z": -33.9 },
-    { "x": 166.8, "y": 134.8, "z": -33.9, "boss": 1663 },
+    { "x": 166.8, "y": 134.8, "z": -33.9, "boss": 1663 },  // boss: Dextren Ward
     { "x": 145.1, "y": 91.7, "z": -33.9 },
     { "x": 137.1, "y": 62.7, "z": -33.9 },
     { "x": 134.4, "y": 50.1, "z": -33.9 },
     { "x": 133.1, "y": 38.9, "z": -33.9 },
     { "x": 128.0, "y": -64.5, "z": -33.9 },
-    { "x": 142.6, "y": -71.9, "z": -34.9, "boss": 1666 },
+    { "x": 142.6, "y": -71.9, "z": -34.9, "boss": 1666 },  // boss: Kam Deepfury
     { "x": 128.0, "y": -67.5, "z": -34.5 },
     { "x": 113.3, "y": -91.7, "z": -33.9 },
-    { "x": 105.5, "y": -105.8, "z": -35.1, "boss": 1717 },
-    { "x": 94.5, "y": -125.8, "z": -33.9, "boss": 1716 }
+    { "x": 105.5, "y": -105.8, "z": -35.1, "boss": 1717 },  // boss: Hamhock
+    { "x": 94.5, "y": -125.8, "z": -33.9, "boss": 1716 }  // boss: Bazil Thredd
   ],
+  // The bosses, in the order the route meets them. "strategy" holds the tactics for each boss: pull, tank_position, interrupt, dispel, avoid, avoid_spells, kill_order,
+  // notes. Fields the bots act on today are listed in doc/dungeon-strategy.md ("what bots do today"); the others are kept but not used yet.
   "bosses": [
     {
+      // Targorr the Dread (creature entry 1696)
       "entry": 1696,
       "name": "Targorr the Dread",
       "strategy": {}
     },
     {
+      // Bruegal Ironknuckle (creature entry 1720)
       "entry": 1720,
       "name": "Bruegal Ironknuckle",
       "strategy": {}
     },
     {
+      // Dextren Ward (creature entry 1663)
       "entry": 1663,
       "name": "Dextren Ward",
       "strategy": {}
     },
     {
+      // Kam Deepfury (creature entry 1666)
       "entry": 1666,
       "name": "Kam Deepfury",
       "strategy": {}
     },
     {
+      // Hamhock (creature entry 1717)
       "entry": 1717,
       "name": "Hamhock",
       "strategy": {}
     },
     {
+      // Bazil Thredd (creature entry 1716)
       "entry": 1716,
       "name": "Bazil Thredd",
       "strategy": {}

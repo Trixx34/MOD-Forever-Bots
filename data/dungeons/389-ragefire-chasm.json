@@ -1,16 +1,28 @@
 {
+  // ---------------------------------------------------------------------------------------------------------------------------------------------
+  // Ragefire Chasm (map 389), levels 13-18.  Strategy file, schema 1.  Full field list and an example: doc/dungeon-strategy.md.
+  // These "//" and "/* */" comments are allowed in every dungeon file; the module ignores them. To change how bots run this dungeon, copy this file into your
+  // own folder (Module.forever-bots.DungeonDir = /path) and edit the copy: a file there for the same map REPLACES this one. A file with a mistake is logged
+  // (file, line, reason) and not used; the shipped one is used instead.
+  // Coordinates: x is north, y is west, z is up (the game's own axes). Boss numbers are creature entries (world database, creature_template).
+  // ---------------------------------------------------------------------------------------------------------------------------------------------
   "schema": 1,
   "id": "rfc",
   "map": 389,
   "name": "Ragefire Chasm",
   "levels": [13, 18],
   "roster": "2:1,5:5,8:8,2:9,5:4",
+  // Where the party gathers and how it gets in. "staging" = the place outside where the party rests until it is ready (health and mana up) before it goes in;
+  // "portal" = the instance entrance on the outside map; "entry" = where the party stands inside right after it enters (a revived party is put back here).
   "entrance": {
     "staging": { "map": 1, "x": 1629, "y": -4373, "z": 31 },
     "portal": { "map": 1, "x": 1815, "y": -4419.2, "z": -18.8 },
     "entry": { "map": 389, "x": 0.8, "y": -8.23, "z": -15.53 }
   },
+  // Limits of one run: "duration_sec" = the run is over after this long, "wipe_recovery_sec" = how long the party gets to recover after a wipe.
   "run": { "duration_sec": 1800, "wipe_recovery_sec": 300 },
+  // The path the leader walks, point after point (in order). A point with "boss": <entry> is where that boss is expected; the route waits there until that boss is
+  // seen dead, then goes on. Add, remove or move points to change the way; keep the first point near "entry" and every point reachable on foot.
   "route": [
     { "x": -8.0, "y": -38.1, "z": -21.6 },
     { "x": -17.9, "y": -40.5, "z": -21.4 },
@@ -19,7 +31,7 @@
     { "x": -233.1, "y": -8.5, "z": -61.4 },
     { "x": -192.0, "y": 0.0, "z": -59.5 },
     { "x": -150.9, "y": 5.3, "z": -39.8 },
-    { "x": -147.5, "y": 38.7, "z": -38.8, "boss": 11517 },
+    { "x": -147.5, "y": 38.7, "z": -38.8, "boss": 11517 },  // boss: Oggleflint
     { "x": -150.4, "y": 8.5, "z": -39.2 },
     { "x": -192.0, "y": 0.0, "z": -59.5 },
     { "x": -233.1, "y": -8.5, "z": -61.4 },
@@ -37,13 +49,13 @@
     { "x": -194.4, "y": 110.9, "z": -23.8 },
     { "x": -195.5, "y": 144.5, "z": -24.0 },
     { "x": -211.2, "y": 151.7, "z": -21.6 },
-    { "x": -244.7, "y": 150.1, "z": -18.7, "boss": 11520 },
+    { "x": -244.7, "y": 150.1, "z": -18.7, "boss": 11520 },  // boss: Taragaman the Hungerer
     { "x": -283.2, "y": 152.5, "z": -25.4 },
     { "x": -292.0, "y": 162.7, "z": -23.8 },
     { "x": -298.7, "y": 188.3, "z": -24.0 },
     { "x": -308.3, "y": 210.7, "z": -24.6 },
     { "x": -341.3, "y": 213.3, "z": -21.1 },
-    { "x": -376.8, "y": 209.2, "z": -21.8, "boss": 11518 },
+    { "x": -376.8, "y": 209.2, "z": -21.8, "boss": 11518 },  // boss: Jergosh the Invoker
     { "x": -359.2, "y": 231.7, "z": -20.0 },
     { "x": -336.8, "y": 237.9, "z": -19.8 },
     { "x": -334.9, "y": 248.0, "z": -8.3 },
@@ -52,25 +64,31 @@
     { "x": -373.9, "y": 237.6, "z": -3.8 },
     { "x": -402.9, "y": 208.3, "z": 1.3 },
     { "x": -401.3, "y": 185.1, "z": 6.4 },
-    { "x": -384.9, "y": 146.0, "z": 7.8, "boss": 11519 }
+    { "x": -384.9, "y": 146.0, "z": 7.8, "boss": 11519 }  // boss: Bazzalan
   ],
+  // The bosses, in the order the route meets them. "strategy" holds the tactics for each boss: pull, tank_position, interrupt, dispel, avoid, avoid_spells, kill_order,
+  // notes. Fields the bots act on today are listed in doc/dungeon-strategy.md ("what bots do today"); the others are kept but not used yet.
   "bosses": [
     {
+      // Oggleflint (creature entry 11517)
       "entry": 11517,
       "name": "Oggleflint",
       "strategy": {}
     },
     {
+      // Taragaman the Hungerer (creature entry 11520)
       "entry": 11520,
       "name": "Taragaman the Hungerer",
       "strategy": {}
     },
     {
+      // Jergosh the Invoker (creature entry 11518)
       "entry": 11518,
       "name": "Jergosh the Invoker",
       "strategy": {}
     },
     {
+      // Bazzalan (creature entry 11519)
       "entry": 11519,
       "name": "Bazzalan",
       "strategy": {}

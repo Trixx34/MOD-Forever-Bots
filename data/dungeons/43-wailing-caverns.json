@@ -1,16 +1,28 @@
 {
+  // ---------------------------------------------------------------------------------------------------------------------------------------------
+  // Wailing Caverns (map 43), levels 15-25.  Strategy file, schema 1.  Full field list and an example: doc/dungeon-strategy.md.
+  // These "//" and "/* */" comments are allowed in every dungeon file; the module ignores them. To change how bots run this dungeon, copy this file into your
+  // own folder (Module.forever-bots.DungeonDir = /path) and edit the copy: a file there for the same map REPLACES this one. A file with a mistake is logged
+  // (file, line, reason) and not used; the shipped one is used instead.
+  // Coordinates: x is north, y is west, z is up (the game's own axes). Boss numbers are creature entries (world database, creature_template).
+  // ---------------------------------------------------------------------------------------------------------------------------------------------
   "schema": 1,
   "id": "wc",
   "map": 43,
   "name": "Wailing Caverns",
   "levels": [15, 25],
   "roster": "2:1,5:5,8:8,2:9,5:4",
+  // Where the party gathers and how it gets in. "staging" = the place outside where the party rests until it is ready (health and mana up) before it goes in;
+  // "portal" = the instance entrance on the outside map; "entry" = where the party stands inside right after it enters (a revived party is put back here).
   "entrance": {
     "staging": { "map": 1, "x": 1629, "y": -4373, "z": 31 },
     "portal": { "map": 1, "x": -738.5, "y": -2217.8, "z": 16.9 },
     "entry": { "map": 43, "x": -158.44, "y": 131.6, "z": -74.26 }
   },
+  // Limits of one run: "duration_sec" = the run is over after this long, "wipe_recovery_sec" = how long the party gets to recover after a wipe.
   "run": { "duration_sec": 1800, "wipe_recovery_sec": 300 },
+  // The path the leader walks, point after point (in order). A point with "boss": <entry> is where that boss is expected; the route waits there until that boss is
+  // seen dead, then goes on. Add, remove or move points to change the way; keep the first point near "entry" and every point reachable on foot.
   "route": [
     { "x": -122.1, "y": 144.3, "z": -78.4 },
     { "x": -106.7, "y": 170.7, "z": -78.9 },
@@ -21,16 +33,16 @@
     { "x": -40.5, "y": 226.4, "z": -94.6 },
     { "x": -37.3, "y": 237.3, "z": -93.0 },
     { "x": -52.5, "y": 267.2, "z": -92.8 },
-    { "x": -54.0, "y": 271.4, "z": -92.8, "boss": 3671 },
+    { "x": -54.0, "y": 271.4, "z": -92.8, "boss": 3671 },  // boss: Lady Anacondra
     { "x": -44.3, "y": 296.3, "z": -90.6 },
     { "x": -34.7, "y": 306.4, "z": -90.1 },
-    { "x": 15.3, "y": 297.2, "z": -87.7, "boss": 3671 },
+    { "x": 15.3, "y": 297.2, "z": -87.7, "boss": 3671 },  // boss: Lady Anacondra
     { "x": 21.3, "y": 277.3, "z": -87.2 },
     { "x": 42.7, "y": 234.7, "z": -87.4 },
-    { "x": 46.5, "y": 184.0, "z": -89.2, "boss": 3671 },
+    { "x": 46.5, "y": 184.0, "z": -89.2, "boss": 3671 },  // boss: Lady Anacondra
     { "x": -24.5, "y": 111.7, "z": -89.6 },
     { "x": -37.1, "y": 113.3, "z": -87.7 },
-    { "x": -67.8, "y": 122.6, "z": -89.9, "boss": 3671 },
+    { "x": -67.8, "y": 122.6, "z": -89.9, "boss": 3671 },  // boss: Lady Anacondra
     { "x": -64.0, "y": 149.3, "z": -93.3 },
     { "x": -50.1, "y": 149.9, "z": -94.6 },
     { "x": -42.7, "y": 170.7, "z": -96.2 },
@@ -39,7 +51,7 @@
     { "x": -22.4, "y": 237.6, "z": -104.0 },
     { "x": -29.6, "y": 277.3, "z": -104.8 },
     { "x": -41.3, "y": 298.7, "z": -105.8 },
-    { "x": -64.4, "y": 319.1, "z": -106.7, "boss": 3653 },
+    { "x": -64.4, "y": 319.1, "z": -106.7, "boss": 3653 },  // boss: Kresh
     { "x": -74.4, "y": 327.7, "z": -105.8 },
     { "x": -64.8, "y": 358.7, "z": -105.8 },
     { "x": -62.4, "y": 378.7, "z": -104.5 },
@@ -62,20 +74,25 @@
     { "x": -66.7, "y": 473.1, "z": -61.6 },
     { "x": -82.7, "y": 466.9, "z": -67.4 },
     { "x": -109.6, "y": 428.8, "z": -73.0 },
-    { "x": -151.1, "y": 414.4, "z": -72.6, "boss": 3669 }
+    { "x": -151.1, "y": 414.4, "z": -72.6, "boss": 3669 }  // boss: Lord Cobrahn
   ],
+  // The bosses, in the order the route meets them. "strategy" holds the tactics for each boss: pull, tank_position, interrupt, dispel, avoid, avoid_spells, kill_order,
+  // notes. Fields the bots act on today are listed in doc/dungeon-strategy.md ("what bots do today"); the others are kept but not used yet.
   "bosses": [
     {
+      // Lady Anacondra (creature entry 3671)
       "entry": 3671,
       "name": "Lady Anacondra",
       "strategy": {}
     },
     {
+      // Kresh (creature entry 3653)
       "entry": 3653,
       "name": "Kresh",
       "strategy": {}
     },
     {
+      // Lord Cobrahn (creature entry 3669)
       "entry": 3669,
       "name": "Lord Cobrahn",
       "strategy": {}

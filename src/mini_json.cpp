@@ -65,10 +65,28 @@ private:
         return false;
     }
 
+    // Spaces and comments between tokens. Comments are an extension for the strategy files, so that people can explain their edits: "// to the end of the
+    // line" and "/* ... */" (an unterminated block comment runs to the end of the text, and the reader then reports the missing value).
     void SkipSpace()
     {
-        while (_at < _text.size() && (_text[_at] == ' ' || _text[_at] == '\t' || _text[_at] == '\n' || _text[_at] == '\r'))
-            ++_at;
+        while (_at < _text.size())
+        {
+            char const c = _text[_at];
+            if (c == ' ' || c == '\t' || c == '\n' || c == '\r')
+                ++_at;
+            else if (c == '/' && _at + 1 < _text.size() && _text[_at + 1] == '/')
+            {
+                while (_at < _text.size() && _text[_at] != '\n')
+                    ++_at;
+            }
+            else if (c == '/' && _at + 1 < _text.size() && _text[_at + 1] == '*')
+            {
+                std::size_t const end = _text.find("*/", _at + 2);
+                _at = end == std::string_view::npos ? _text.size() : end + 2;
+            }
+            else
+                break;
+        }
     }
 
     bool Literal(char const* word, Value& out, Value::Kind kind, bool boolean)
