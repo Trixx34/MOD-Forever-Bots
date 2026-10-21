@@ -160,6 +160,9 @@ Module.forever-bots.TelemetrySummarySec = 60
 
 # A dungeon run (doc/dungeons.md): the scenario keys above come from a dungeon file; keys you set here win over the file.
 # DungeonFile = data/dungeons.txt
+# Per-dungeon JSON files (doc/dungeon-strategy.md): data/dungeons/<map id>-<name>.json, found beside DungeonFile without setting anything (or name the folder with
+# DungeonDataDir). Your own folder, with a file for a map replacing the shipped one, is DungeonDir (an absolute path). A changed file is read again on a config reload.
+# Module.forever-bots.DungeonDir = /srv/forever/sim/dungeons-mine
 # Dungeon = rfc
 # ScenarioRequireBosses = 1                      # complete when every boss of ScenarioBosses is seen dead (the dungeon file turns it on when it lists bosses)
 

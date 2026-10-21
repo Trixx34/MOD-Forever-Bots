@@ -362,6 +362,10 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
         settings.CraftingFociFile = it->second;
     if (auto const it = config.find("DungeonFile"); it != config.end())
         settings.DungeonFile = it->second;
+    if (auto const it = config.find("DungeonDataDir"); it != config.end())
+        settings.DungeonDataDir = it->second;
+    if (auto const it = config.find("DungeonDir"); it != config.end())
+        settings.DungeonDir = it->second;
     if (auto const it = config.find("DungeonEventsFile"); it != config.end())
         settings.DungeonEventsFile = it->second;
     ReadBool(config, "Presence", settings.Presence.Enabled, warnings);

@@ -189,6 +189,9 @@ public:
     // Decisions are sent only when they change; casts follow the rotation, the global cooldown and the retries.
     // Turns the dungeon route on or off (the scenario director does, once the party is inside).
     void SetRouteActive(bool active) { _routeActive = active; }
+    // The dungeons "tank lead" knows (routes, boss points, events), replaced between two Decide calls when the dungeon files are reloaded. A tank that is
+    // running a dungeon keeps the route it started with: its event runner has its own copy.
+    void SetDungeons(std::map<std::uint32_t, PolicyOptions::DungeonRoute> dungeons) { _options.DungeonsByMap = std::move(dungeons); }
     // The creature entries of the bosses seen dead so far (the scenario director's), for the route's boss points.
     void SetKilledBosses(std::set<std::uint32_t> const& entries) { _killedBosses = entries; }
 

@@ -18,6 +18,8 @@
 //   end
 #pragma once
 
+#include "dungeon_events.h"
+
 #include <array>
 #include <cstdint>
 #include <optional>
@@ -35,6 +37,35 @@ struct DungeonWaypoint
     std::string BossName;
 };
 
+// What a dungeon's boss block says about the fight (doc/dungeon-strategy.md, bosses[].strategy). The module does not act on any of these yet: they are
+// read, checked and kept, so a file written today keeps working when the code starts to use them.
+struct AvoidZone
+{
+    float X = 0.0f;
+    float Y = 0.0f;
+    float Z = 0.0f;
+    float Radius = 0.0f;
+    std::string Note;
+};
+
+struct BossStrategy
+{
+    std::string Pull;                                    // "" = not set
+    std::optional<std::array<float, 3>> TankPosition;
+    std::vector<std::uint32_t> Interrupt;                // spell ids to interrupt
+    std::vector<std::uint32_t> Dispel;                   // spell ids to dispel
+    std::vector<AvoidZone> Avoid;
+    std::uint32_t KillOrder = 0;                         // 0 = not set
+    std::string Notes;
+};
+
+struct DungeonBoss
+{
+    std::uint32_t Entry = 0;
+    std::string Name;
+    BossStrategy Strategy;
+};
+
 struct Dungeon
 {
     std::string Id;
@@ -50,7 +81,16 @@ struct Dungeon
     std::uint32_t MinAlive = 0;
     std::uint32_t LeaderDeadAbandonSec = 0;
     std::vector<DungeonWaypoint> Route;
+    // Filled by the JSON dungeon files (dungeon_files.h); empty for a block of the old text file.
+    std::vector<DungeonBoss> Bosses;
+    std::vector<dungeon_events::Event> Events;
+    std::string Source;                                  // the file the dungeon came from (for the log)
+
+    std::uint32_t MapId() const { return std::uint32_t(Entry[0]); }
 };
+
+// "race:class" pairs, 1 to 5, separated by commas.
+bool DungeonRosterOk(std::string const& roster);
 
 // Parses a dungeon file. A block with a problem (no entry, no route, a bad number, a roster that is not race:class) is dropped with a line
 // in `warnings`; the other blocks are kept. Unknown keys are warned about and ignored.
@@ -63,7 +103,12 @@ std::vector<Dungeon> ParseDungeons(std::string_view text, std::vector<std::strin
 std::unordered_map<std::string, std::string> MergeDungeon(std::unordered_map<std::string, std::string> const& config, std::string_view text,
                                                           std::vector<std::string>& warnings);
 
-// MergeDungeon with the text read from the file named by the config key DungeonFile (relative to the working directory). An unreadable file
-// is a warning and the config comes back unchanged. Both Dungeon and DungeonFile must be set, else nothing happens.
+// MergeDungeon for dungeons that are loaded already (from the text file, the JSON files, or both: dungeon_files.h).
+std::unordered_map<std::string, std::string> MergeDungeonSet(std::unordered_map<std::string, std::string> const& config, std::vector<Dungeon> const& dungeons,
+                                                             std::vector<std::string>& warnings);
+
+// MergeDungeonSet with the dungeons loaded from the places the config names: DungeonDir (your own JSON files), DungeonDataDir (the shipped JSON files) and
+// DungeonFile (the old text file); see LoadDungeonSet in dungeon_files.h. Unreadable places are warnings. Dungeon must be set and at least one
+// of the three places named, else nothing happens and the config comes back unchanged.
 std::unordered_map<std::string, std::string> MergeDungeonFile(std::unordered_map<std::string, std::string> const& config,
                                                               std::vector<std::string>& warnings);

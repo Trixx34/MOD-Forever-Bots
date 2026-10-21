@@ -1,5 +1,9 @@
 # Dungeon events and "tank lead"
 
+**Since bots 0.19.0 the events of a dungeon are in its JSON file** (`events[]` in `data/dungeons/<map id>-<name>.json`, format in `doc/dungeon-strategy.md`), next to its
+route, and can be overridden from your own folder (`DungeonDir`). The text format below is the old one: `data/dungeon_events.txt` is read only for a map that has no JSON
+file. The behaviour (triggers, steps, timeouts, the runner) is the same.
+
 Status: built and unit-tested (`src/dungeon_events.*`, `tests/dungeon_events_test.cpp`, the policy tests for tank lead). The core side is `ActionType::kUseObject`
 (layout 19 / protocol 14, `Bot.Actions.UseObject`). **Not run on a sim yet.**
 

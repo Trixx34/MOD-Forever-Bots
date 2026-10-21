@@ -25,8 +25,10 @@ target_include_directories(forever_bots_roster PUBLIC src)
 add_library(forever_bots_trade STATIC src/trade_policy.cpp)
 target_include_directories(forever_bots_trade PUBLIC src)
 
-add_library(forever_bots_settings STATIC src/bot_settings.cpp src/bot_ramp.cpp src/bot_pick.cpp src/dungeon_data.cpp src/bot_presence.cpp)
+add_library(forever_bots_settings STATIC src/bot_settings.cpp src/bot_ramp.cpp src/bot_pick.cpp src/dungeon_data.cpp src/mini_json.cpp src/dungeon_files.cpp src/bot_presence.cpp)
 target_include_directories(forever_bots_settings PUBLIC src)
+# the dungeon loader builds dungeon_events::Event values and reads the old events file (dungeon_events.cpp)
+target_link_libraries(forever_bots_settings PUBLIC forever_bots_policy)
 
 add_library(forever_bots_store STATIC src/bot_store.cpp)
 target_include_directories(forever_bots_store PUBLIC src)
@@ -136,6 +138,11 @@ add_test(NAME scenario COMMAND scenario_test)
 add_executable(dungeon_test tests/dungeon_test.cpp)
 target_link_libraries(dungeon_test PRIVATE forever_bots_policy forever_bots_settings)
 add_test(NAME dungeon COMMAND dungeon_test)
+
+add_executable(dungeon_files_test tests/dungeon_files_test.cpp)
+target_link_libraries(dungeon_files_test PRIVATE forever_bots_policy forever_bots_settings)
+target_compile_definitions(dungeon_files_test PRIVATE FOREVER_BOTS_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+add_test(NAME dungeon_files COMMAND dungeon_files_test)
 
 add_executable(settings_test tests/settings_test.cpp)
 target_link_libraries(settings_test PRIVATE forever_bots_settings)

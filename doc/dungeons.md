@@ -1,5 +1,11 @@
 # Dungeon runs (M9)
 
+**Since bots 0.19.0 a dungeon is one JSON file** (`data/dungeons/<map id>-<name>.json`): the entrance, the route, the events and a block per boss, with your own
+folder (`DungeonDir`) able to replace any of them. Everything in this document about *what* the file holds (roster, entry, staging, portal, duration, the route and
+its boss points) still applies; the file format is in `doc/dungeon-strategy.md`. The text format described below is the old one: it is still read, but only for a map
+that has no JSON file, and `tools/convert_dungeons.py` turns it into JSON. `Dungeon = <id>` and `DungeonFile` work as before (the JSON files beside `DungeonFile`, in
+`dungeons/`, are found without setting anything).
+
 See also `doc/dungeon-events.md`: the one events table for all dungeons (doors, levers, the Deadmines cannon), the `tank lead` chat command that runs a dungeon with the bots of a
 player's group, and the routes planned over the navmesh (the section below describes how the older generated routes were made).
 
