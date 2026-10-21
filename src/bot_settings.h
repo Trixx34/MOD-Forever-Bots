@@ -150,6 +150,9 @@ struct BotSettings
     // Crafting = 1 (default): a bot with nothing to fight makes bandages from its cloth and cooks its meat (kSkillUp, SDK 0.17; the core must have the action), which
     // raises First Aid and Cooking and uses up what fills its bags. 0 turns it off.
     bool Crafting = true;
+    // ActionStats = 1: every minute the module logs the ten (bot, action, spell) combinations it sent most often in that minute ("actions_top"), to find a bot that
+    // repeats an action every tick. Off by default.
+    bool ActionStats = false;
     // MountMinLevel (default 40): a bot asks to mount up for a long walk only from this level (classic riding is learned at 40). 0 = at any level.
     std::uint32_t MountMinLevel = 40;
     // Gathering = 1: a bot with Mining, Herbalism or Skinning asks the core to gather what is near it (kGather, SDK 0.18). Off by default.

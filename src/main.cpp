@@ -30,6 +30,8 @@
 #include "forever_module/tier2_session.h"
 
 #include <algorithm>
+#include <map>
+#include <tuple>
 #include <atomic>
 #include <chrono>
 #include <cstdint>
@@ -561,6 +563,8 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
     std::uint64_t decideTotalUs = 0;
     std::uint64_t decideMaxUs = 0;
     std::uint64_t actionsTotal = 0;
+    std::map<std::tuple<std::uint64_t, unsigned, std::uint32_t>, std::uint64_t> actionStats; // ActionStats: actions sent this minute, by bot, type and spell
+    std::uint64_t actionStatsAtMs = nowMs();
     std::size_t lastBotCount = 0;
 
     // The telemetry file is appended to, so a restart adds to the same record. It rotates at TelemetryMaxMB.
@@ -828,6 +832,23 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
                 moveGate.Observe(bot.guid, bot.last_action_type, bot.last_action_status, bot.last_action_sequence, nowMs());
             moveGate.Filter(actions, nowMs());
             actionsTotal += actions.size();
+            if (settings.ActionStats)
+            {
+                for (forever_module::BotAction const& action : actions)
+                    ++actionStats[std::make_tuple(action.bot_guid, static_cast<unsigned>(action.type), action.spell_id)];
+                if (nowMs() - actionStatsAtMs >= 60000)
+                {
+                    std::vector<std::pair<std::uint64_t, std::tuple<std::uint64_t, unsigned, std::uint32_t>>> top;
+                    for (auto const& [key, count] : actionStats)
+                        top.emplace_back(count, key);
+                    std::sort(top.begin(), top.end(), [](auto const& a, auto const& b) { return a.first > b.first; });
+                    for (std::size_t i = 0; i < top.size() && i < 10; ++i)
+                        std::cerr << "forever-bots: actions_top: bot=" << std::get<0>(top[i].second) << " type=" << std::get<1>(top[i].second)
+                                  << " spell=" << std::get<2>(top[i].second) << " count=" << top[i].first << "\n";
+                    actionStats.clear();
+                    actionStatsAtMs = nowMs();
+                }
+            }
             lastBotCount = view.bots.size();
 
             std::string error;
