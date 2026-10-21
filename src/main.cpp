@@ -513,6 +513,13 @@ std::map<std::uint32_t, PolicyOptions::DungeonRoute> DungeonRoutes(std::vector<D
                 route.BossAt[i] = dungeon.Route[i].BossEntry;
         }
         route.Events = dungeon.Events;
+        // The bosses' avoid lists (bosses[].strategy.avoid_spells and avoid): the spells to step out of and the fixed places to stay out of.
+        for (DungeonBoss const& boss : dungeon.Bosses)
+        {
+            route.AvoidSpells.insert(route.AvoidSpells.end(), boss.Strategy.AvoidSpells.begin(), boss.Strategy.AvoidSpells.end());
+            for (AvoidZone const& zone : boss.Strategy.Avoid)
+                route.AvoidZones.push_back(ground_avoid::Circle{ zone.X, zone.Y, zone.Radius });
+        }
         routes[dungeon.MapId()] = std::move(route);
     }
     return routes;
@@ -1428,6 +1435,27 @@ int main(int argc, char** argv)
         else
             std::cerr << "forever-bots: crafting foci: " << foci->size() << " object(s) from " << settings.CraftingFociFile << "\n";
         policyOptions.Foci = std::move(foci);
+    }
+    policyOptions.AvoidGroundEffects = settings.AvoidGroundEffects;
+    if (settings.AvoidGroundEffects)
+    {
+        auto avoidTable = std::make_shared<ground_avoid::AvoidTable>();
+        if (!settings.AvoidSpellsFile.empty())
+        {
+            std::ifstream avoidFile(settings.AvoidSpellsFile);
+            std::stringstream avoidText;
+            avoidText << avoidFile.rdbuf();
+            std::vector<std::string> avoidErrors;
+            *avoidTable = ground_avoid::ParseAvoidSpells(avoidText.str(), avoidErrors);
+            for (std::string const& error : avoidErrors)
+                std::cerr << "forever-bots: AvoidSpellsFile: " << error << "\n";
+            if (!avoidFile || avoidTable->Size() == 0)
+                std::cerr << "forever-bots: AvoidSpellsFile: cannot read '" << settings.AvoidSpellsFile << "' (or it holds no spell); only effects of hostile casters are avoided\n";
+            else
+                std::cerr << "forever-bots: avoid spells: " << avoidTable->Size() << " spell(s) from " << settings.AvoidSpellsFile << "\n";
+        }
+        policyOptions.AvoidSpells = std::move(avoidTable);
+        std::cerr << "forever-bots: bots step out of harmful ground effects (the core needs Bot.Snapshot.GroundEffects = 1)\n";
     }
     // Dungeon routes for "tank lead" (every dungeon, by the map of its entry) and the events table, shared by all dungeons. They come from the JSON files of
     // DungeonDir (yours) and DungeonDataDir (shipped), and from the old text files for maps without a JSON file (dungeon_files.h).

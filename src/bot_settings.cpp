@@ -359,6 +359,9 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadBool(config, "ActionStats", settings.ActionStats, warnings);
     ReadKey(config, "MountMinLevel", 0, 80, settings.MountMinLevel, warnings);
     ReadBool(config, "Gathering", settings.Gathering, warnings);
+    ReadBool(config, "AvoidGroundEffects", settings.AvoidGroundEffects, warnings);
+    if (auto const it = config.find("AvoidSpellsFile"); it != config.end())
+        settings.AvoidSpellsFile = it->second;
     if (auto const it = config.find("CraftingFociFile"); it != config.end())
         settings.CraftingFociFile = it->second;
     if (auto const it = config.find("DungeonFile"); it != config.end())

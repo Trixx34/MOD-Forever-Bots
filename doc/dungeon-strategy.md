@@ -90,9 +90,10 @@ Same behaviour as before (`doc/dungeon-events.md`): the leader runs an event as 
 
 Events with the same trigger run one after another in file order.
 
-### Boss strategy (`bosses[].strategy`): reserved, not used yet
+### Boss strategy (`bosses[].strategy`): `avoid` and `avoid_spells` are used, the rest is reserved
 
-The module **reads, checks and keeps** these fields, but **no bot behaviour uses them yet**. They exist so that you can write down how a fight is meant to go and so that a file written today keeps
+`avoid` and `avoid_spells` are acted on since bots 0.20.0 when `AvoidGroundEffects = 1` (see `doc/ground-effects.md`): a bot standing in one of those zones, or in the ground effect of one of
+those spells, walks out of it. The other fields below are **read, checked and kept**, but **no bot behaviour uses them yet**. They exist so that you can write down how a fight is meant to go and so that a file written today keeps
 working when the code starts to act on them. What the bots do in a boss fight today is: the tank leads and pulls pack by pack (and holds the pull until the party is healthy and together), the healer heals
 the member with the lowest health, the dps assist the tank, and every class follows its own rotation (`data/rotations.txt`).
 
@@ -102,7 +103,8 @@ the member with the lowest health, the dps assist the tank, and every class foll
 | `tank_position` | `{x,y,z}`: where the tank should hold the boss |
 | `interrupt` | list of spell ids to interrupt |
 | `dispel` | list of spell ids to dispel |
-| `avoid` | list of `{ "x","y","z","radius","note" }`: ground to stay out of (radius 0 to 500 yards) |
+| `avoid` | **used** (AvoidGroundEffects): list of `{ "x","y","z","radius","note" }`: ground to stay out of (radius 0 to 500 yards); a bot inside walks out |
+| `avoid_spells` | **used** (AvoidGroundEffects): list of spell ids whose ground effect (a dynamic object or area trigger of that spell) a bot steps out of, on top of `data/avoid_spells.txt` and the effects of hostile casters |
 | `kill_order` | number 1 to 50: when this boss is killed among the others, if the route allows a choice |
 | `notes` | free text, up to 500 characters |
 

@@ -206,6 +206,7 @@ constexpr std::uint64_t kTravelTimeoutMs = 180000; // a walk to the vendor longe
 constexpr float kTrainReachYards = 5.0f;          // a bot this close to its errand trainer sends the train order (the core allows about 5)
 constexpr std::uint64_t kErrandTrainRetryMs = 3000; // the next train order of an errand, while the core has not answered
 constexpr std::uint32_t kErrandTrainRefusalMax = 3; // train refusals in a row that end the errand as failed
+constexpr std::uint64_t kAvoidKeepMs = 3000;          // a walk out of a ground effect keeps its end point this long
 constexpr float kMountMinDistanceYards = 100.0f;   // a walk this long: mount up before it
 constexpr float kMountDismountDistanceYards = 15.0f; // arrived or close: dismount
 // A quest walk that keeps the bot within kQuestWalkStuckYards for kQuestWalkStuckMs has no route to its giver (seen on the sim: 11
@@ -1687,6 +1688,75 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         state.SeenPowerPct = bot.max_power ? std::uint32_t(std::uint64_t(bot.power) * 100 / bot.max_power) : 100;
         state.SeenLife = bot.life_state;
         state.SeenInCombat = bot.in_combat != 0;
+
+        // Ground effects (SDK 0.19): a bot inside a harmful area walks out of it before it does anything else (a healer in mid-heal included: standing in the fire costs
+        // more than the heal). The walk's end point is kept for kAvoidKeepMs so that it does not shift every tick (a move would be sent anew each time). Not for a bot on a
+        // flight, dead, or with no effect in view. A spell is harmful when its caster is hostile to the bot (the snapshot's flag), or when it is in the avoid table or the
+        // dungeon's list (AvoidSpells of the route).
+        if (_options.AvoidGroundEffects && bot.life_state == 0 && bot.in_flight == 0)
+        {
+            std::vector<ground_avoid::Circle> circles;
+            auto const dungeon = _options.DungeonsByMap.find(bot.map_id);
+            bool const hasDungeon = dungeon != _options.DungeonsByMap.end();
+            for (std::size_t i = 0; i < bot.ground_effect_count && i < forever_module::kMaxGroundEffects; ++i)
+            {
+                forever_module::GroundEffect const& effect = bot.ground_effects[i];
+                bool harmful = effect.hostile != 0;
+                float radius = effect.radius;
+                if (_options.AvoidSpells && _options.AvoidSpells->Contains(effect.spell_id))
+                {
+                    harmful = true;
+                    if (radius <= 0.0f)
+                        radius = _options.AvoidSpells->Radius(effect.spell_id);
+                }
+                if (!harmful && hasDungeon)
+                    harmful = std::find(dungeon->second.AvoidSpells.begin(), dungeon->second.AvoidSpells.end(), effect.spell_id) != dungeon->second.AvoidSpells.end();
+                if (!harmful)
+                    continue;
+                circles.push_back(ground_avoid::Circle{ effect.x, effect.y, radius > 0.0f ? radius : ground_avoid::kDefaultRadiusYards });
+            }
+            if (hasDungeon)
+                circles.insert(circles.end(), dungeon->second.AvoidZones.begin(), dungeon->second.AvoidZones.end());
+            bool walking = false;
+            if (!circles.empty())
+            {
+                bool const keep = state.AvoidSetMs != 0 && nowMs < state.AvoidSetMs + kAvoidKeepMs && !ground_avoid::InsideAny(state.AvoidDest.X, state.AvoidDest.Y, circles) &&
+                                  DistanceTo(bot, Point{ state.AvoidDest.X, state.AvoidDest.Y, bot.pos_z }) > 1.0f;
+                if (keep)
+                    walking = true;
+                else if (auto const escape = ground_avoid::EscapePoint(bot.pos_x, bot.pos_y, circles))
+                {
+                    state.AvoidDest = *escape;
+                    state.AvoidSetMs = nowMs;
+                    walking = true;
+                    if (_options.OnEvent && nowMs - state.AvoidLoggedMs >= 10000)
+                    {
+                        state.AvoidLoggedMs = nowMs;
+                        _options.OnEvent("avoid_effect: bot=" + std::to_string(bot.guid) + " map=" + std::to_string(bot.map_id) + " pos=" + std::to_string(int(bot.pos_x)) + "," +
+                                         std::to_string(int(bot.pos_y)) + " effects=" + std::to_string(circles.size()) + " to=" + std::to_string(int(escape->X)) + "," +
+                                         std::to_string(int(escape->Y)));
+                    }
+                }
+            }
+            if (walking)
+            {
+                Decision const out{ ActionType::kMoveTo, 0, Point{ state.AvoidDest.X, state.AvoidDest.Y, bot.pos_z } };
+                if (!state.Last || state.Last->Type != ActionType::kMoveTo || state.Last->Dest.X != out.Dest.X || state.Last->Dest.Y != out.Dest.Y)
+                {
+                    BotAction move;
+                    move.bot_guid = bot.guid;
+                    move.type = ActionType::kMoveTo;
+                    move.dest_x = out.Dest.X;
+                    move.dest_y = out.Dest.Y;
+                    move.dest_z = out.Dest.Z;
+                    actions.push_back(move);
+                    state.Last = out;
+                }
+                continue;
+            }
+            state.AvoidSetMs = 0;
+        }
+
 
         // Layout 13: the core says why the bot lost its last target (0 none, 1 killed, 2 leashed, 3 despawned, 4 another player).
         // A creature that leashed or despawned is not worth pulling again at once, so it is avoided like a refused one;
