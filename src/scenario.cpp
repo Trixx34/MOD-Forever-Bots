@@ -211,6 +211,24 @@ void ScenarioDirector::Decide(forever_module::WorldTickSnapshotView const& view,
 
         case ScenarioPhase::Entering:
         {
+            // Rest first (see kRecoverPct): nothing is sent, so the bots sit, eat and drink by themselves, and the healer tops the party up.
+            if (!_recovered)
+            {
+                bool ready = !bots.empty();
+                for (BotSnapshot const& bot : bots)
+                {
+                    if (bot.life_state != 0)
+                        continue;
+                    if (bot.max_health != 0 && std::uint64_t(bot.health) * 100 < std::uint64_t(bot.max_health) * kRecoverPct)
+                        ready = false;
+                    if (bot.power_type == 0 && bot.max_power != 0 && std::uint64_t(bot.power) * 100 < std::uint64_t(bot.max_power) * kRecoverPct)
+                        ready = false;
+                }
+                if (!ready && nowMs - _phaseSinceMs < kRecoverMaxMs)
+                    break;
+                _recovered = true;
+                _phaseSinceMs = nowMs; // the entering timeout counts from here
+            }
             BotSnapshot const* leader = LeaderOf(bots);
             if (!leader && !bots.empty())
                 leader = &bots.front(); // no party: the first bot leads

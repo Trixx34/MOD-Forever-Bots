@@ -89,6 +89,10 @@ constexpr std::uint64_t kGroupingTimeoutMs = 120000;
 constexpr std::uint64_t kMembersDelayMs = 3000;
 constexpr std::uint64_t kEnterRetryMs = 10000;
 constexpr std::uint64_t kEnterTimeoutMs = 90000;
+// Before the party enters it rests at its staging place until every living bot has this much health (and mana, for mana users), or this long has passed: the gear
+// the dressing phase puts on raises the maximum health to two or three times the current health, so a party that entered at once started at 35-45 %.
+constexpr std::uint32_t kRecoverPct = 90;
+constexpr std::uint64_t kRecoverMaxMs = 240000;
 constexpr std::uint64_t kUnderstrengthGraceMs = 180000; // fewer than MinAlive alive this long: the run is given up
 constexpr std::uint64_t kBossGraceMs = 120000;          // RequireBosses: time allowed after the last waypoint for the remaining bosses to die
 constexpr float kRoutePointReachYards = 15.0f; // the leader counts as having reached a waypoint this close to it
@@ -123,6 +127,7 @@ private:
     std::map<std::uint64_t, std::size_t> _nextGrant;   // bot -> index of the next gear item to grant
     std::map<std::uint64_t, std::size_t> _nextSupply;  // bot -> index of the next supply to grant
     bool _equipSent = false;
+    bool _recovered = false;               // the party has rested up at its staging place (Entering waits for it once)
     std::uint64_t _lastEnterMs = 0;
     std::uint64_t _leaderArrivedMs = 0;
     std::uint64_t _runStartMs = 0;

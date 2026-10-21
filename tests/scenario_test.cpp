@@ -137,6 +137,61 @@ void DressesThenGroupsThenEnters()
     CHECK(director.Phase() == ScenarioPhase::Running && director.RouteActive());
 }
 
+void PartyRestsAtStagingBeforeEntering()
+{
+    ScenarioDirector director(Plan());
+    std::vector<BotAction> actions;
+    std::uint64_t t = 1000, tick = 1;
+    auto step = [&](std::vector<BotSnapshot> const& bots, std::uint64_t advance = 100)
+    {
+        actions.clear();
+        t += advance;
+        director.Decide(View(++tick, bots), t, actions);
+    };
+    std::vector<BotSnapshot> bots = { Bot(1, 0, 0, 0, 2, 3), Bot(2, 0, 0, 0, 1, 3), Bot(3, 0, 0, 0, 1, 3) };
+    for (int i = 0; i < 4; ++i)
+        step(bots, 3000);                                  // waiting, dressing, equip
+    for (int i = 0; i < 6 && director.Phase() != ScenarioPhase::Entering; ++i)
+        step(bots, 3000);
+    CHECK(director.Phase() == ScenarioPhase::Entering);
+    // Gear raised the maximum health: the party stands at 40 %. Nothing is sent while it rests.
+    for (BotSnapshot& bot : bots)
+        bot.health = 400;
+    step(bots, 5000);
+    CHECK(Count(actions, ActionType::kTeleport) == 0);
+    bots[1].health = 1000;
+    bots[2].health = 1000;                                  // two are healed, the tank is not
+    step(bots, 5000);
+    CHECK(Count(actions, ActionType::kTeleport) == 0);
+    bots[0].health = 950;                                   // 95 %: ready
+    bots[0].max_power = 1000;
+    bots[0].power = 300;                                    // a mana user at 30 % mana still has to drink
+    step(bots, 5000);
+    CHECK(Count(actions, ActionType::kTeleport) == 0);
+    bots[0].power = 900;
+    step(bots, 5000);
+    CHECK(Count(actions, ActionType::kTeleport, 1) == 1);   // the leader enters
+}
+
+void PartyEntersAfterTheRestCapEvenWhenHurt()
+{
+    ScenarioDirector director(Plan());
+    std::vector<BotAction> actions;
+    std::uint64_t t = 1000, tick = 1;
+    std::vector<BotSnapshot> bots = { Bot(1, 0, 0, 0, 2, 3), Bot(2, 0, 0, 0, 1, 3), Bot(3, 0, 0, 0, 1, 3) };
+    for (BotSnapshot& bot : bots)
+        bot.health = 300;
+    for (int i = 0; i < 30 && director.Phase() != ScenarioPhase::Entering; ++i)
+        director.Decide(View(++tick, bots), t += 3000, actions);
+    CHECK(director.Phase() == ScenarioPhase::Entering);
+    std::uint64_t const enteredAt = t;
+    actions.clear();
+    director.Decide(View(++tick, bots), enteredAt + kRecoverMaxMs - 5000, actions);
+    CHECK(Count(actions, ActionType::kTeleport) == 0);       // still resting
+    director.Decide(View(++tick, bots), enteredAt + kRecoverMaxMs + 1000, actions);
+    CHECK(Count(actions, ActionType::kTeleport, 1) == 1);    // the cap is over: it goes
+}
+
 ScenarioDirector RunningDirector(std::uint64_t& t, std::uint64_t& tick, std::vector<BotSnapshot>& bots, ScenarioPlan plan = Plan())
 {
     ScenarioDirector director(plan);
@@ -740,6 +795,8 @@ int main()
     FormatShowsEventsRevivedWipes();
     TimeoutEndsTheRun();
     EnteringTimesOut();
+    PartyRestsAtStagingBeforeEntering();
+    PartyEntersAfterTheRestCapEvenWhenHurt();
     LeaderWalksTheRouteWhileTheRouteIsActive();
     LeaderWaitsForAMemberWhoFellBehind();
     LeaderMovesOnAfterTheFirstPoint();
