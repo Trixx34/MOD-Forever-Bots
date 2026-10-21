@@ -1,3 +1,5 @@
+# NOTE: these dungeons are also in data/dungeons/<map id>-<name>.json (doc/dungeon-strategy.md), which the module reads first. A block here is used only for a map
+# that has no JSON file. Edit the JSON file, not this block; the block stays for the converter (tools/convert_dungeons.py) and as the fallback.
 # Dungeon routes for the dungeon run (M9). Format: src/dungeon_data.h, doc/dungeons.md.
 #
 # Made by tools/make_dungeons_from_db.py from the world database: the doors, the spawns and the bosses are real; the ORDER of each route is a

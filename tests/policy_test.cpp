@@ -2092,6 +2092,38 @@ void TheTankLeadsTheGroupAlongTheRoute()
     }
 }
 
+// The dungeon files are read again when the config is reloaded: SetDungeons gives "tank lead" a dungeon it did not know, and one it knew with a new route.
+void DungeonFilesReloadedChangeWhatTankLeadKnows()
+{
+    PolicyOptions options = LeadOptions();
+    options.DungeonsByMap.clear();                                    // no dungeon known at the start
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = PlayerGroupView();
+    policy.Decide(view, 0);
+    auto const refusedBefore = policy.ApplyChat(view, FromPlayer(), TankLead(), 1000);
+    bool refused = false;
+    for (std::string const& line : refusedBefore)
+        refused = refused || line.find("not in a dungeon with a known route") != std::string::npos;
+    CHECK(refused);
+
+    std::map<std::uint32_t, PolicyOptions::DungeonRoute> routes;
+    routes[36] = RouteWithAnEvent();
+    policy.SetDungeons(routes);                                       // a reload brings the dungeon in
+    bool led = false;
+    for (std::string const& line : policy.ApplyChat(view, FromPlayer(), TankLead(), 2000))
+        led = led || line.rfind("lead: 12 leads from point 1 of 3", 0) == 0;
+    CHECK(led);
+
+    // and a new route replaces the old one for the next lead order
+    routes[36].Route = { Point{ 300.0f, 0.0f, 0.0f }, Point{ 340.0f, 0.0f, 0.0f } };
+    policy.SetDungeons(routes);
+    policy.ApplyChat(view, FromPlayer(), TankLead(true), 3000);
+    bool ledAgain = false;
+    for (std::string const& line : policy.ApplyChat(view, FromPlayer(), TankLead(), 4000))
+        ledAgain = ledAgain || line.find("of 2") != std::string::npos;
+    CHECK(ledAgain);
+}
+
 void TankLeadIsRefusedOutsideADungeonWithARoute()
 {
     BotPolicy policy(LeadOptions());
@@ -4184,6 +4216,7 @@ int main()
     AMemberThatLostItsLeaderIsPutNextToIt();
     TankLeadParsesAsAnOrderOfTheTank();
     TheTankLeadsTheGroupAlongTheRoute();
+    DungeonFilesReloadedChangeWhatTankLeadKnows();
     TankLeadIsRefusedOutsideADungeonWithARoute();
     TankLeadEndsWithLeadOffAndWhenTheDungeonIsLeft();
     TheTankWaitsForThePlayerToCatchUp();

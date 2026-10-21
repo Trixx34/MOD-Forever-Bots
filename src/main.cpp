@@ -24,6 +24,7 @@
 #include "rotating_file.h"
 #include "dungeon_data.h"
 #include "dungeon_events.h"
+#include "dungeon_files.h"
 #include "scenario.h"
 
 #include "forever_module/module_client.h"
@@ -41,6 +42,7 @@
 #include <iostream>
 #include <sstream>
 #include <memory>
+#include <map>
 #include <mutex>
 #include <optional>
 #include <stdexcept>
@@ -488,8 +490,37 @@ void AppendSales(SellBook& book, BotSettings const& settings, forever_module::Wo
 }
 
 // What the pump needs beyond the policy: the scenario (if one is configured) and the command queue.
+// The places the dungeon files are read from, handed from the config callback to the pump when the config is delivered again (a core reload): the pump then
+// reads the dungeons again and gives them to the policy, so a changed JSON file takes effect without a restart.
+struct DungeonReloadBox
+{
+    std::atomic<std::uint64_t> Generation{ 0 };
+    std::mutex Lock;
+    DungeonSources Sources;
+};
+
+// The routes "tank lead" can run, by map: from every dungeon of a loaded set.
+std::map<std::uint32_t, PolicyOptions::DungeonRoute> DungeonRoutes(std::vector<Dungeon> const& dungeons)
+{
+    std::map<std::uint32_t, PolicyOptions::DungeonRoute> routes;
+    for (Dungeon const& dungeon : dungeons)
+    {
+        PolicyOptions::DungeonRoute route;
+        for (std::size_t i = 0; i < dungeon.Route.size(); ++i)
+        {
+            route.Route.push_back({ dungeon.Route[i].X, dungeon.Route[i].Y, dungeon.Route[i].Z });
+            if (dungeon.Route[i].BossEntry != 0)
+                route.BossAt[i] = dungeon.Route[i].BossEntry;
+        }
+        route.Events = dungeon.Events;
+        routes[dungeon.MapId()] = std::move(route);
+    }
+    return routes;
+}
+
 struct PumpExtras
 {
+    std::shared_ptr<DungeonReloadBox> Dungeons; // set always; the pump reads the dungeon files again when its Generation moves
     std::shared_ptr<PresenceFeed> Presence;   // set when Presence is on
     std::shared_ptr<AuctionFeed> Auction;     // set when Auction is on
     std::shared_ptr<SellBook> Sell;           // set when vendor sales are on
@@ -544,6 +575,7 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
                std::string const& telemetryPath, BotSettings const& settings, PumpExtras extras)
 {
     BotPolicy policy(options);
+    std::uint64_t dungeonGeneration = extras.Dungeons ? extras.Dungeons->Generation.load() : 0;
     std::optional<ScenarioDirector> director;
     if (extras.Scenario)
         director.emplace(*extras.Scenario);
@@ -652,6 +684,24 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
 
             // One publish per snapshot tick: the core applies the newest action set it sees for each tick.
             auto const started = std::chrono::steady_clock::now();
+            // The config was delivered again (a core reload): read the dungeon files again, and let "tank lead" use the result.
+            if (extras.Dungeons && extras.Dungeons->Generation.load() != dungeonGeneration)
+            {
+                dungeonGeneration = extras.Dungeons->Generation.load();
+                DungeonSources sources;
+                {
+                    std::lock_guard<std::mutex> lock(extras.Dungeons->Lock);
+                    sources = extras.Dungeons->Sources;
+                }
+                std::vector<std::string> reloadWarnings;
+                DungeonSet const set = LoadDungeonSet(sources, reloadWarnings);
+                for (std::string const& warning : reloadWarnings)
+                    std::cerr << "forever-bots: dungeons: " << warning << "\n";
+                for (std::string const& line : set.Log)
+                    std::cerr << "forever-bots: " << line << "\n";
+                policy.SetDungeons(DungeonRoutes(set.Dungeons));
+                std::cerr << "forever-bots: dungeon files reloaded: tank lead knows " << set.Dungeons.size() << " dungeon(s)\n";
+            }
             // .autogear commands: the bots led by the player who typed it are dressed at this tick.
             if (extras.Commands)
             {
@@ -907,7 +957,8 @@ int main(int argc, char** argv)
     BotSettings settings;
     bool configured = false;
     BotRoster roster(0); // the cap is set once the settings are known
-    client.OnConfig([&settings, &configured, &roster, tier2Granted, grantedBots](
+    auto const dungeonBox = std::make_shared<DungeonReloadBox>();
+    client.OnConfig([&settings, &configured, &roster, tier2Granted, grantedBots, dungeonBox](
                         std::unordered_map<std::string, std::string> const& config)
     {
         std::vector<std::string> warnings;
@@ -923,6 +974,12 @@ int main(int argc, char** argv)
             return;
         }
 
+        {
+            // the dungeon files are read again by the pump (doc/dungeon-strategy.md, "Reloading")
+            std::lock_guard<std::mutex> lock(dungeonBox->Lock);
+            dungeonBox->Sources = SourcesFromConfig(config);
+        }
+        dungeonBox->Generation.fetch_add(1);
         settings.MaxBots = parsed.MaxBots;
         settings.Race = parsed.Race;
         settings.Class = parsed.Class;
@@ -1372,50 +1429,30 @@ int main(int argc, char** argv)
             std::cerr << "forever-bots: crafting foci: " << foci->size() << " object(s) from " << settings.CraftingFociFile << "\n";
         policyOptions.Foci = std::move(foci);
     }
-    // Dungeon routes for "tank lead" (every dungeon of DungeonFile, by the map of its entry) and the events table (DungeonEventsFile), shared by all dungeons.
-    std::vector<dungeon_events::Event> allEvents;
-    if (!settings.DungeonEventsFile.empty())
+    // Dungeon routes for "tank lead" (every dungeon, by the map of its entry) and the events table, shared by all dungeons. They come from the JSON files of
+    // DungeonDir (yours) and DungeonDataDir (shipped), and from the old text files for maps without a JSON file (dungeon_files.h).
+    DungeonSources dungeonSources;
+    dungeonSources.File = settings.DungeonFile;
+    dungeonSources.EventsFile = settings.DungeonEventsFile;
+    dungeonSources.DataDir = settings.DungeonDataDir;
+    dungeonSources.OverrideDir = settings.DungeonDir;
     {
-        std::ifstream in(settings.DungeonEventsFile);
-        if (!in)
-            std::cerr << "forever-bots: DungeonEventsFile: cannot read '" << settings.DungeonEventsFile << "'\n";
-        else
-        {
-            std::ostringstream text;
-            text << in.rdbuf();
-            std::vector<std::string> eventWarnings;
-            allEvents = dungeon_events::Parse(text.str(), eventWarnings);
-            for (std::string const& warning : eventWarnings)
-                std::cerr << "forever-bots: " << warning << "\n";
-            std::cerr << "forever-bots: dungeon events: " << allEvents.size() << " from " << settings.DungeonEventsFile << "\n";
-        }
+        std::lock_guard<std::mutex> lock(dungeonBox->Lock);
+        dungeonBox->Sources = dungeonSources;
     }
-    if (!settings.DungeonFile.empty())
+    std::vector<dungeon_events::Event> allEvents;
+    if (!dungeonSources.File.empty() || !dungeonSources.DataDir.empty() || !dungeonSources.OverrideDir.empty() || !dungeonSources.EventsFile.empty())
     {
-        std::ifstream in(settings.DungeonFile);
-        if (!in)
-            std::cerr << "forever-bots: DungeonFile: cannot read '" << settings.DungeonFile << "'\n";
-        else
-        {
-            std::ostringstream text;
-            text << in.rdbuf();
-            std::vector<std::string> dungeonWarnings;
-            for (Dungeon const& dungeon : ParseDungeons(text.str(), dungeonWarnings))
-            {
-                PolicyOptions::DungeonRoute route;
-                for (std::size_t i = 0; i < dungeon.Route.size(); ++i)
-                {
-                    route.Route.push_back({ dungeon.Route[i].X, dungeon.Route[i].Y, dungeon.Route[i].Z });
-                    if (dungeon.Route[i].BossEntry != 0)
-                        route.BossAt[i] = dungeon.Route[i].BossEntry;
-                }
-                route.Events = dungeon_events::ForMap(allEvents, std::uint32_t(dungeon.Entry[0]));
-                policyOptions.DungeonsByMap[std::uint32_t(dungeon.Entry[0])] = std::move(route);
-            }
-            for (std::string const& warning : dungeonWarnings)
-                std::cerr << "forever-bots: dungeons: " << warning << "\n";
-            std::cerr << "forever-bots: tank lead knows " << policyOptions.DungeonsByMap.size() << " dungeon(s) from " << settings.DungeonFile << "\n";
-        }
+        std::vector<std::string> dungeonWarnings;
+        DungeonSet const set = LoadDungeonSet(dungeonSources, dungeonWarnings);
+        for (std::string const& warning : dungeonWarnings)
+            std::cerr << "forever-bots: dungeons: " << warning << "\n";
+        for (std::string const& line : set.Log)
+            std::cerr << "forever-bots: " << line << "\n";
+        allEvents = set.Events;
+        policyOptions.DungeonsByMap = DungeonRoutes(set.Dungeons);
+        std::cerr << "forever-bots: dungeon events: " << allEvents.size() << "\n";
+        std::cerr << "forever-bots: tank lead knows " << policyOptions.DungeonsByMap.size() << " dungeon(s)\n";
     }
     policyOptions.Taxi = settings.Taxi;
     policyOptions.PartySize = settings.PartySize;
@@ -1481,6 +1518,7 @@ int main(int argc, char** argv)
     policyOptions.OnEvent = [](std::string const& line) { std::cerr << "forever-bots: event " << line << "\n"; };
     policyOptions.AutoGearEveryLevels = settings.AutoGearEveryLevels;
     PumpExtras extras;
+    extras.Dungeons = dungeonBox;
     extras.Commands = commands;
     extras.Alts = alts;
     if (settings.Presence.Enabled && !scenarioOn)

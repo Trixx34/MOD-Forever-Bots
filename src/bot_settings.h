@@ -162,6 +162,10 @@ struct BotSettings
     std::string CraftingFociFile;
     bool DungeonReviveOutOfCombat = false;  // DungeonReviveOutOfCombat = 1: a dead member of a dungeon party is revived by its leader out of combat (needs Bot.Chat.Orders.Enabled in the core)
     std::string DungeonFile;
+    // DungeonDataDir (default: the folder "dungeons" beside DungeonFile) holds the shipped per-dungeon JSON files; DungeonDir is your own folder of them, whose file for a map
+    // replaces the shipped one (doc/dungeon-strategy.md). Both are read again when the config is reloaded.
+    std::string DungeonDataDir;
+    std::string DungeonDir;
     std::string DungeonEventsFile;
     // Flight points (layout 17; config keys Taxi, TaxiMinWalkYards, TaxiMasterMaxYards, TaxiBlockedSec; off by default): a bot that is not in a party replaces a walk
     // of at least TaxiMinWalkYards with a flight from a flight master within TaxiMasterMaxYards that lies on the way. Needs Bot.Taxi.Enabled in the core (on by default).
