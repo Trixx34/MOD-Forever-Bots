@@ -499,6 +499,22 @@ void IdleBotsCraftTheirTwoSkillsInTurnAndWaitAfterARefusal()
     busy.bots[0].last_action_sequence = 1;
     CHECK(CraftsOf(second.Decide(busy, 1600)).size() <= 1);
 
+    // The core may report no spell in its answer: the answer still belongs to the skill that was sent (Cooking refused must not be retried at once).
+    BotPolicy blank(options);
+    WorldTickSnapshotView plain = View(1, 0, {});
+    std::uint32_t sequence = 0;
+    std::uint64_t at = 1000;
+    for (int round = 0; round < 2; ++round, at += 2000)
+    {
+        CHECK(CraftsOf(blank.Decide(plain, at)).size() == 1);
+        plain.bots[0].last_action_type = std::uint8_t(ActionType::kSkillUp);
+        plain.bots[0].last_action_spell = 0;
+        plain.bots[0].last_action_status = forever_module::BotActionStatus::kRefused;
+        plain.bots[0].last_action_sequence = ++sequence;
+    }
+    CHECK(CraftsOf(blank.Decide(plain, at)).empty());       // both skills wait
+    CHECK(CraftsOf(blank.Decide(plain, at + 60000)).empty());
+
     // Off by default, and never in a fight.
     BotPolicy off(AggressiveOptions());
     CHECK(CraftsOf(off.Decide(View(1, 0, {}), 1000)).empty());
@@ -1411,6 +1427,20 @@ void ArrivalMovesOnToTheNextHubAfterAnInterval()
     CHECK(WalkTo(policy.Decide(view, 60000), 10) < 0.0f);     // not a full interval yet
     // The bot is still mounted from the first walk, so this one starts walking at once: AfterMount would read a tick too late.
     CHECK(WalkTo(policy.Decide(view, 61000), 10) == 900.0f);  // next walk, to hub 2
+}
+
+void ANoRouteAnswerEndsTheWalkInsteadOfBeingSentEveryTick()
+{
+    BotPolicy policy = HubPolicy();
+    WorldTickSnapshotView view = OnMap(1);
+    policy.Decide(view, 0);
+    CHECK(WalkTo(AfterMount(policy, view, 30000), 10) == 500.0f);
+    view.bots[0].last_action_type = std::uint8_t(ActionType::kMoveTo);
+    view.bots[0].last_action_status = BotActionStatus::kNoRoute;
+    view.bots[0].last_action_sequence = 7;
+    CHECK(WalkTo(policy.Decide(view, 30100), 10) < 0.0f);      // the core found no route: the walk is over
+    CHECK(WalkTo(policy.Decide(view, 30150), 10) < 0.0f);      // and it is not sent again on the next tick
+    CHECK(WalkTo(policy.Decide(view, 80000), 10) == 900.0f);   // after the short pause for a walk that failed: the next hub
 }
 
 void NoHubsOnTheBotsMapMeansNoWalk()
@@ -3871,6 +3901,7 @@ int main()
     InvalidCastTargetIsNotCastAtAgain();
     IdleBotWandersToAHubAfterAWhile();
     ArrivalMovesOnToTheNextHubAfterAnInterval();
+    ANoRouteAnswerEndsTheWalkInsteadOfBeingSentEveryTick();
     NoHubsOnTheBotsMapMeansNoWalk();
     AnythingSeenStopsTheWalk();
     HurtBotRestsInsteadOfWalking();

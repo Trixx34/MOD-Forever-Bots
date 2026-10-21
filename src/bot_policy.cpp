@@ -729,6 +729,8 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
     if ((noRoute || teleportRefused) && bot.last_action_sequence != state.NoRouteSequence)
     {
         state.NoRouteSequence = bot.last_action_sequence;
+        if (noRoute)
+            state.WalkBlockedAtMs = nowMs;
         state.QuestTeleportSent = false;
         _quests.NoteNoRoute(state.Quest, nowMs);
         if (teleportRefused && _options.OnEvent)
@@ -814,7 +816,7 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
     // for the recipes it can make) means there is nothing to make now: that skill waits five minutes, varied per bot.
     if (bot.last_action_type == uint8_t(ActionType::kSkillUp))
     {
-        std::size_t const index = bot.last_action_spell == kSkillCooking ? 1 : 0;
+        std::size_t const index = state.CraftSent == 1 ? 1 : 0;
         if (bot.last_action_status == BotActionStatus::kApplied)
             state.CraftRetryAtMs[index] = nowMs + kSkillUpNextMs;
         else if (bot.last_action_status == BotActionStatus::kBusy || bot.last_action_status == BotActionStatus::kMoving)
@@ -2854,7 +2856,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             if (state.Wandering)
             {
                 bool const arrived = DistanceTo(bot, state.GrindTarget) <= kHubReachYards;
-                bool const timedOut = nowMs - state.WanderStartMs > kWanderTimeoutMs;
+                bool const timedOut = nowMs - state.WanderStartMs > kWanderTimeoutMs || (state.WalkBlockedAtMs != 0 && state.WalkBlockedAtMs >= state.WanderStartMs); // no route: the walk ends, not re-sent every tick
                 if (arrived || timedOut)
                 {
                     state.Wandering = false;
@@ -2918,7 +2920,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             {
                 Point const& hub = list[state.NextHub % list.size()];
                 bool const arrived = DistanceTo(bot, hub) <= kHubReachYards;
-                bool const timedOut = nowMs - state.WanderStartMs > kWanderTimeoutMs;
+                bool const timedOut = nowMs - state.WanderStartMs > kWanderTimeoutMs || (state.WalkBlockedAtMs != 0 && state.WalkBlockedAtMs >= state.WanderStartMs); // no route: the walk ends, not re-sent every tick
                 if (arrived || timedOut)
                 {
                     // Next time, the next hub. An arrival waits a full idle interval, as before. A timeout does not: a hub in rock or in
@@ -2954,7 +2956,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             if (state.Wandering)
             {
                 bool const arrived = DistanceTo(bot, state.ExploreTarget) <= kExploreReachYards;
-                bool const timedOut = nowMs - state.WanderStartMs > kExploreTimeoutMs;
+                bool const timedOut = nowMs - state.WanderStartMs > kExploreTimeoutMs || (state.WalkBlockedAtMs != 0 && state.WalkBlockedAtMs >= state.WanderStartMs);
                 if (arrived || timedOut)
                 {
                     state.Wandering = false;
@@ -3633,6 +3635,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 craft.spell_id = index == 0 ? kSkillFirstAid : kSkillCooking;
                 actions.push_back(craft);
                 state.CraftTurn = std::uint32_t(index + 1);
+                state.CraftSent = std::uint32_t(index);
                 state.CraftRetryAtMs[index] = nowMs + kSkillUpCastMs; // the answer decides the next try
                 state.NextCastMs = nowMs + kGlobalCooldownMs;
                 crafted = true;

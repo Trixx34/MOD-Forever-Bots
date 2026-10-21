@@ -285,6 +285,7 @@ private:
         std::uint64_t DiagAtMs = 0;                      // when the stuck check last ran
         std::uint64_t QuestDiagAtMs = 0;                 // when the quest line was last written (quest_state event)
         std::uint32_t TeleportLoggedSequence = 0;        // the last teleport result written to the log
+        std::uint64_t WalkBlockedAtMs = 0;               // when a move got the answer "no route": the walk (grind spot, hub, exploring) that began before it is over, and the bot picks another later
         std::uint64_t NoRouteLoggedMs = 0;               // when a no-route refusal of any action was last written to the log (diagnostics)
         std::uint32_t NoRouteSequence = 0;               // the last kNoRoute result read (last_action_sequence)
         std::uint64_t GrindRetryAtMs = 0;                // no grind spot on this map for this level: explore on foot until this time, then look again
@@ -292,6 +293,7 @@ private:
         std::uint32_t ExploreStep = 0;                   // random walks made, for the direction of the next
         std::uint64_t CraftRetryAtMs[2] = { 0, 0 };      // First Aid and Cooking: no kSkillUp for the skill before this time
         std::uint32_t CraftTurn = 0;                     // which skill is tried first next (they take turns)
+        std::uint32_t CraftSent = 0;                     // the skill of the last kSkillUp sent (0 index = First Aid, 1 = Cooking): its answer is for that skill, whatever spell the core reports
         std::uint32_t RestPct = 0;                       // the health below which this bot rests (a trait drawn once from the seed; 0 = not drawn yet)
         float LeaderYards = 0.0f;                        // how close to its leader this bot stays put (a trait, like RestPct)
         std::uint32_t WanderCycles = 0;                  // walks to a grind spot or hub begun, the counter of the random draws for the next one
