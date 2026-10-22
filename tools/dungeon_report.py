@@ -44,7 +44,8 @@ SCEN_BOT = re.compile(r"forever-bots: scenario bot (?P<guid>\d+) race (?P<race>\
 RESULT = re.compile(r"forever-bots: scenario (?P<name>[\w.-]+?)(?:#(?P<party>\d+))?: outcome=(?P<outcome>\S+) furthest=(?P<furthest>\d+)/(?P<route>\d+) deaths=(?P<deaths>\d+) "
                     r"alive=(?P<alive>\d+)/(?P<roster>\d+) events=(?P<events>\d+) revived=(?P<revived>\d+) wipes=(?P<wipes>\d+) ghosts=(?P<ghosts>\d+) run=(?P<run>\d+)s"
                     r"(?: party=(?P<party_formed>\w+))?(?: bosses=(?P<killed>\d+)/(?P<total>\d+) killed=(?P<names>.*))?")
-DIED = re.compile(r"forever-bots: event died: bot=(?P<bot>\d+) life=(?P<life>\d+) map=(?P<map>\d+)\s+last_decision=(?P<action>\S+).* killer_entry=(?P<killer>\S+)\s+in_combat=(?P<combat>\d)")
+DIED = re.compile(r"forever-bots: event died: bot=(?P<bot>\d+) life=(?P<life>\d+) map=(?P<map>\d+)\s+(?:pos=(?P<pos>[\d-]+,[\d-]+)\s+)?last_decision=(?P<action>\S+).* killer_entry=(?P<killer>\S+)\s+in_combat=(?P<combat>\d)")
+PULL = re.compile(r"forever-bots: event pull: bot=(?P<bot>\d+) map=(?P<map>\d+) pos=(?P<pos>[\d-]+,[\d-]+) hp=(?P<hp>\d+)/(?P<hpmax>\d+) power=(?P<power>\d+)/(?P<powermax>\d+) target=(?P<target>\d+)")
 GHOST = re.compile(r"forever-bots: event ghost: bot=(?P<bot>\d+)")
 REVIVED = re.compile(r"forever-bots: event revived: bot=(?P<bot>\d+)")
 TACTIC = re.compile(r"forever-bots: event (?P<kind>focus|interrupt_target|heal): (?:bot|healer)=(?P<bot>\d+)")
@@ -65,6 +66,7 @@ class Party:
         self.no_route = 0
         self.refusals = collections.Counter()
         self.tactics = collections.Counter()
+        self.pulls = []
         self.bots = []
 
 
@@ -102,9 +104,14 @@ def read(lines, since=None):
             elif rest.startswith("boss killed: "):
                 party.bosses.append((t, rest[len("boss killed: "):].strip()))
             continue
+        m = PULL.search(line)
+        if m:
+            events.append((t, "pull", (int(m["bot"]), int(m["map"]), m["pos"], int(m["hp"]), int(m["hpmax"]),
+                                       int(m["power"]), int(m["powermax"]), int(m["target"]))))
+            continue
         m = DIED.search(line)
         if m:
-            events.append((t, "died", (int(m["bot"]), m["killer"], int(m["map"]), m["action"], int(m["combat"]))))
+            events.append((t, "died", (int(m["bot"]), m["killer"], int(m["map"]), m["pos"], m["action"], int(m["combat"]))))
             continue
         if GHOST.search(line):
             events.append((t, "ghost", (int(GHOST.search(line)["bot"]),)))
@@ -140,13 +147,16 @@ def assign(parties, spawned, events, roster):
         party = parties[key]
         if kind == "died":
             if party.started is None or (t is not None and t >= party.started):
-                party.deaths.append((t, guid, data[1], data[2], data[3], data[4]))
+                party.deaths.append((t, guid, data[1], data[2], data[3], data[4], data[5]))
         elif kind == "ghost":
             party.ghosts += 1
         elif kind == "revived":
             party.revives += 1
         elif kind == "tactic":
             party.tactics[data[1]] += 1
+        elif kind == "pull":
+            if party.started is None or (t is not None and t >= party.started):
+                party.pulls.append((t, data))
         elif kind == "notdone":
             if "no route" in data[2]:
                 party.no_route += 1
@@ -191,10 +201,10 @@ def report(parties, names, total_bosses):
         for t, name in party.bosses:
             print(f"   boss killed  {name:<22} at {clock(t - start) if (t is not None and start is not None) else '?'}")
         for death in party.deaths:
-            t, bot, killer, place, action, combat = death
+            t, bot, killer, place, pos, action, combat = (death + ("?",))[:7] if len(death) == 6 else death
             who = names.get(killer, killer)
             when = clock(t - start) if (t is not None and start is not None) else '?'
-            print(f"   death        bot {bot:<6} at {when:<7} killed by {who:<22} map {place} action {action}{' in combat' if combat else ''}")
+            print(f"   death        bot {bot:<6} at {when:<7} killed by {who:<22} map {place} at {pos or '?'} action {action}{' in combat' if combat else ''}")
         r = party.result
         if r:
             print(f"   result       outcome={r['outcome']} furthest={r['furthest']}/{r['route']} deaths={r['deaths']} death_events={r['events']} revived={r['revived']} "
@@ -205,6 +215,11 @@ def report(parties, names, total_bosses):
         print(f"   no route {party.no_route}; other refusals: {refusals}")
         if party.tactics:
             print("   tactics      " + ", ".join(f"{count}x {kind}" for kind, count in sorted(party.tactics.items())))
+        if party.pulls:
+            health = [100 * data[3] / data[4] for _t, data in party.pulls if data[4]]
+            power = [100 * data[5] / data[6] for _t, data in party.pulls if data[6]]
+            print(f"   pulls        {len(party.pulls)}  the party's health at the pull {sum(health) / len(health):.0f} % (the lowest {min(health):.0f} %)" if health else
+                  f"   pulls        {len(party.pulls)}")
         killed = int(r["killed"]) if r and r["killed"] else len(party.bosses)
         rows.append({
             "key": key, "complete": bool(r and r["outcome"] == "complete"), "killed": killed, "deaths": int(r["events"]) if r else len(party.deaths),

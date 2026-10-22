@@ -1864,6 +1864,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 if (!killer)
                     killer = Closest(bot, nearby, IsLiveMob);
                 event("died: bot=" + std::to_string(bot.guid) + " life=" + std::to_string(bot.life_state) + " map=" + std::to_string(bot.map_id) +
+                      " pos=" + std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) +
                       " last_decision=" + (state.Last ? std::to_string(int(state.Last->Type)) : std::string("none")) +
                       " killer_entry=" + (killer ? std::to_string(forever_module::UnitRefEntry(killer->guid)) : std::string("none")) +
                       " in_combat=" + std::to_string(bot.in_combat));
@@ -2564,6 +2565,13 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             {
                 state.InFight = true;
                 state.FightStartMs = nowMs;
+                // The review's instrumentation (2026-10-22): the party's state at the start of a fight, so a run says
+                // whether the pulls happen with the party healthy and with mana, and where they are.
+                event("pull: bot=" + std::to_string(bot.guid) + " map=" + std::to_string(bot.map_id) +
+                      " pos=" + std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) +
+                      " hp=" + std::to_string(bot.health) + "/" + std::to_string(bot.max_health) +
+                      " power=" + std::to_string(bot.power) + "/" + std::to_string(bot.max_power) +
+                      " target=" + std::to_string(forever_module::UnitRefEntry(targetRef)));
                 // Layout 13: the pet is in the snapshot, so it can be sent at this fight's target. Once per fight, so a
                 // long one does not repeat the order. A core that reports no pet never gets this action.
                 if (PetOf(bot) == PetKnown::kOut)
