@@ -868,14 +868,11 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
             for (std::size_t k = 0; k < directors.size(); ++k)
             {
                 // The director of party k sees the bots of its party only.
-                forever_module::WorldTickSnapshotView partyView = view;
-                partyView.bots.clear();
-                for (forever_module::BotSnapshot const& bot : view.bots)
+                forever_module::WorldTickSnapshotView const partyView = SubsetView(view, [&partyOf, k](std::uint64_t guid)
                 {
-                    auto const at = partyOf.find(bot.guid);
-                    if (at != partyOf.end() && at->second == k)
-                        partyView.bots.push_back(bot);
-                }
+                    auto const at = partyOf.find(guid);
+                    return at != partyOf.end() && at->second == k;
+                });
                 ScenarioDirector& director = directors[k];
                 std::string const name = extras.Scenario->Name + (directors.size() > 1 ? "#" + std::to_string(k + 1) : std::string());
                 std::size_t const before = actions.size();

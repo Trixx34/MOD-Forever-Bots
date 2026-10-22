@@ -299,6 +299,27 @@ void LeaderWalksTheRouteWhileTheRouteIsActive()
 
 // Parallel parties (ScenarioParties): the route is on per party. Party 1 (bots 12, 13) is inside and running, party 2 (14, 15) is still at its staging place: only
 // the leader of party 1 walks, and a boss dead in one party's instance is not dead in the other's.
+// The director of one party sees its own bots with their own nearby units: the nearby slots are stored per bot position, so a subset must copy them along.
+void ASubsetViewKeepsTheNearbyUnitsOfItsBots()
+{
+    WorldTickSnapshotView view;
+    view.tick_number = 1;
+    view.max_nearby_units = 2;
+    view.bots = { Bot(10, 36, 0, 0), Bot(11, 36, 1, 0), Bot(12, 36, 2, 0) };
+    view.bots[0].nearby_count = 1;
+    view.bots[1].nearby_count = 1;
+    view.bots[2].nearby_count = 2;
+    view.nearby.resize(6);
+    view.nearby[0].guid = 100;                            // bot 10's unit
+    view.nearby[2].guid = 110;                            // bot 11's unit
+    view.nearby[4].guid = 120;
+    view.nearby[5].guid = 121;                            // bot 12's two units
+    WorldTickSnapshotView const part = SubsetView(view, [](std::uint64_t guid) { return guid == 11 || guid == 12; });
+    CHECK(part.bots.size() == 2);
+    CHECK(part.NearbyOf(0).size() == 1 && part.NearbyOf(0)[0].guid == 110);
+    CHECK(part.NearbyOf(1).size() == 2 && part.NearbyOf(1)[0].guid == 120 && part.NearbyOf(1)[1].guid == 121);
+}
+
 void TwoPartiesRunTheirRoutesApartFromEachOther()
 {
     PolicyOptions options = AggressiveOptions();
@@ -908,6 +929,7 @@ int main()
     TimeoutEndsTheRun();
     EnteringTimesOut();
     PartyRestsAtStagingBeforeEntering();
+    ASubsetViewKeepsTheNearbyUnitsOfItsBots();
     TwoPartiesRunTheirRoutesApartFromEachOther();
     LeaderDoesNotWalkTheDungeonRouteOutsideTheDungeon();
     LeaderDropsARoutePointItHasAlreadyPassed();

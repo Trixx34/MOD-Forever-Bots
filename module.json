@@ -1,6 +1,6 @@
 {
   "name": "forever-bots",
-  "version": "0.19.4",
+  "version": "0.19.5",
   "protocol_version": "15",
   "tier1": {
     "hooks": ["CommandScript", "PlayerScript.OnChat"]

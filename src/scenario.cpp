@@ -418,3 +418,20 @@ std::string FormatScenarioResult(ScenarioResult const& result)
     }
     return out.str();
 }
+
+forever_module::WorldTickSnapshotView SubsetView(forever_module::WorldTickSnapshotView const& view, std::function<bool(std::uint64_t)> const& keep)
+{
+    forever_module::WorldTickSnapshotView out = view;
+    out.bots.clear();
+    out.nearby.clear();
+    for (std::size_t i = 0; i < view.bots.size(); ++i)
+    {
+        if (!keep(view.bots[i].guid))
+            continue;
+        out.bots.push_back(view.bots[i]);
+        std::size_t const from = i * view.max_nearby_units;
+        for (std::uint32_t k = 0; k < view.max_nearby_units; ++k)
+            out.nearby.push_back(from + k < view.nearby.size() ? view.nearby[from + k] : forever_module::NearbyUnit{});
+    }
+    return out;
+}

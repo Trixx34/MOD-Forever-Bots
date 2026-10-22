@@ -100,6 +100,10 @@ constexpr std::uint64_t kUnderstrengthGraceMs = 180000; // fewer than MinAlive a
 constexpr std::uint64_t kBossGraceMs = 120000;          // RequireBosses: time allowed after the last waypoint for the remaining bosses to die
 constexpr float kRoutePointReachYards = 15.0f; // the leader counts as having reached a waypoint this close to it
 
+// The part of a snapshot that holds the bots in `keep` (guids), with their nearby slots: the director of one party of several sees only its own bots. The nearby units are
+// stored per bot position (max_nearby_units slots each), so they are copied along with the bots, else a director would read another party's creatures.
+forever_module::WorldTickSnapshotView SubsetView(forever_module::WorldTickSnapshotView const& view, std::function<bool(std::uint64_t)> const& keep);
+
 class ScenarioDirector
 {
 public:
