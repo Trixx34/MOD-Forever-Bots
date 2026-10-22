@@ -986,7 +986,8 @@ void RangedBotWithoutPowerWalksIn()
 }
 
 // Parties (M8). Bots on the origin with four nearby slots each; callers set positions and the party fields.
-WorldTickSnapshotView PartyView(std::vector<std::uint64_t> const& guids)
+// Mana users get power/max_power set so they can cast spells.
+WorldTickSnapshotView PartyView(std::vector<std::uint64_t> const& guids, std::function<std::uint32_t(std::uint64_t)> classOf = nullptr)
 {
     WorldTickSnapshotView view;
     view.tick_number = 1;
@@ -997,6 +998,25 @@ WorldTickSnapshotView PartyView(std::vector<std::uint64_t> const& guids)
         bot.guid = guid;
         bot.health = 1000;
         bot.max_health = 1000;
+        std::uint32_t cls = classOf ? classOf(guid) : 0;
+        if (cls == 5 || cls == 2 || cls == 7 || cls == 11) // priest, paladin, shaman, druid
+        {
+            bot.power_type = 0;
+            bot.power = 5000;
+            bot.max_power = 5000;
+        }
+        else if (cls == 4 || cls == 8 || cls == 9) // rogue, mage, warlock
+        {
+            bot.power_type = 0;
+            bot.power = 5000;
+            bot.max_power = 5000;
+        }
+        else // warrior, hunter
+        {
+            bot.power_type = 1; // rage
+            bot.power = 0;
+            bot.max_power = 100;
+        }
         view.bots.push_back(bot);
     }
     view.nearby.resize(guids.size() * view.max_nearby_units);
@@ -1006,7 +1026,7 @@ WorldTickSnapshotView PartyView(std::vector<std::uint64_t> const& guids)
 // A pre-formed dungeon party: bot 12 is the warrior leader, the rest follow.
 WorldTickSnapshotView DungeonView(std::vector<std::uint64_t> const& guids)
 {
-    WorldTickSnapshotView view = PartyView(guids);
+    WorldTickSnapshotView view = PartyView(guids, [](std::uint64_t guid) { return guid == 12 ? 1u : 5u; });
     // Pre-form the party: bot 12 leads (group_role 1, no group_leader_guid), the rest are members (group_role 2, leader is 12).
     for (BotSnapshot& bot : view.bots)
     {
@@ -2565,7 +2585,7 @@ void NoHealWhileEveryoneIsHealthy()
 
 void LeaderDoesNotPullWhileAMemberIsHurt()
 {
-    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    WorldTickSnapshotView view = DungeonView({ 10, 11, 12, 13, 14 });
     view.bots[0].health = 500; // 50%: the party is not ready
     AddNearby(view, 2, Unit(8, 7, 20.0f, true));
     auto const actions = DungeonPolicy().Decide(view, 0);
@@ -2575,7 +2595,7 @@ void LeaderDoesNotPullWhileAMemberIsHurt()
 
 void LeaderPullsWhenThePartyIsReady()
 {
-    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    WorldTickSnapshotView view = DungeonView({ 10, 11, 12, 13, 14 });
     AddNearby(view, 2, Unit(8, 7, 20.0f, true));
     auto const actions = DungeonPolicy().Decide(view, 0);
     CHECK(HasAction(actions, 12, ActionType::kFollow, MakeUnitRef(8, 1, 7)));
@@ -2584,7 +2604,7 @@ void LeaderPullsWhenThePartyIsReady()
 void LeaderPullsAfterWaitingTooLong()
 {
     BotPolicy policy = DungeonPolicy();
-    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    WorldTickSnapshotView view = DungeonView({ 10, 11, 12, 13, 14 });
     view.bots[0].health = 500;
     AddNearby(view, 2, Unit(8, 7, 20.0f, true));
     policy.Decide(view, 1000);
@@ -2594,7 +2614,7 @@ void LeaderPullsAfterWaitingTooLong()
 
 void MembersDoNotPullInADungeon()
 {
-    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    WorldTickSnapshotView view = DungeonView({ 10, 11, 12, 13, 14 });
     AddNearby(view, 0, Unit(8, 7, 20.0f, true));
     auto const actions = DungeonPolicy().Decide(view, 0);
     CHECK(!HasAction(actions, 10, ActionType::kFollow, MakeUnitRef(8, 1, 7)));
@@ -2603,7 +2623,7 @@ void MembersDoNotPullInADungeon()
 
 void MembersAttackedInADungeonDefendThemselves()
 {
-    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    WorldTickSnapshotView view = DungeonView({ 10, 11, 12, 13, 14 });
     view.bots[0].in_combat = 1;
     AddNearby(view, 0, Unit(8, 7, 20.0f, true));
     auto const actions = DungeonPolicy().Decide(view, 0);
@@ -2613,7 +2633,7 @@ void MembersAttackedInADungeonDefendThemselves()
 void MembersWaitForTheTankToHoldTheTarget()
 {
     BotPolicy policy = DungeonPolicy();
-    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    WorldTickSnapshotView view = DungeonView({ 10, 11, 12, 13, 14 });
     view.bots[2].threat_target_guid = MakeUnitRef(8, 1, 7);
     AddNearby(view, 2, Unit(8, 7, 20.0f, true));
     AddNearby(view, 0, Unit(8, 7, 20.0f, true));
@@ -2626,7 +2646,7 @@ void MembersWaitForTheTankToHoldTheTarget()
 void LineOfSightRefusalClosesTheDistance()
 {
     BotPolicy policy = DungeonPolicy();
-    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    WorldTickSnapshotView view = DungeonView({ 10, 11, 12, 13, 14 });
     view.bots[0].in_combat = 1;
     view.bots[0].threat_target_guid = MakeUnitRef(8, 1, 7);
     AddNearby(view, 0, Unit(8, 7, 15.0f, true));
@@ -3770,7 +3790,21 @@ void TwoHealersDoNotHealTheSameMember()
     options.PartyCount = 1;
     options.ClassOf = [](std::uint64_t) { return 5; }; // every bot a priest
     BotPolicy policy(options);
-    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 }, [](std::uint64_t) { return 5u; });
+    // Pre-form the party: bot 10 leads, all are members.
+    for (BotSnapshot& bot : view.bots)
+    {
+        if (bot.guid == 10)
+        {
+            bot.group_role = 1;
+            bot.group_leader_guid = 0;
+        }
+        else
+        {
+            bot.group_role = 2;
+            bot.group_leader_guid = 10;
+        }
+    }
     view.bots[3].health = 300; // bot 13 is hurt
     auto const actions = policy.Decide(view, 0);
     int heals = 0;
@@ -3793,7 +3827,21 @@ void TankIsHealedBeforeTheLowestMember()
     options.PartyCount = 1;
     options.ClassOf = WarriorLeads; // bot 12 is the warrior and leads
     BotPolicy policy(options);
-    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 }, WarriorLeads);
+    // Pre-form the party: bot 12 leads, others follow.
+    for (BotSnapshot& bot : view.bots)
+    {
+        if (bot.guid == 12)
+        {
+            bot.group_role = 1;
+            bot.group_leader_guid = 0;
+        }
+        else
+        {
+            bot.group_role = 2;
+            bot.group_leader_guid = 12;
+        }
+    }
     view.bots[2].health = 600; // the leader: 60%, holding a target
     view.bots[3].health = 300; // a member on 30%
     view.bots[2].threat_target_guid = Hostile(7, 3.0f, 100).guid; // the tank is fighting
