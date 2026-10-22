@@ -176,6 +176,14 @@ constexpr std::uint32_t kHealBelowPct = 60;
 constexpr std::uint32_t kDungeonHealBelowPct = 75;   // a healer of a dungeon party heals a member below this share (the pulls hit harder than the ones of a leveling party)
 // The tank (the party leader) is kept alive first while it holds a target, even a little below this.
 constexpr std::uint32_t kTankHealBelowPct = 90;
+// Emergency fast heal threshold: Flash Heal / Lesser Heal for someone in danger
+constexpr std::uint32_t kEmergencyHealBelowPct = 30;
+// Power Word: Shield preemptive threshold: shield a member that has taken damage recently and is under this
+constexpr std::uint32_t kShieldBelowPct = 50;
+// A healer of a dungeon party must drink at this mana level (out of combat).
+constexpr std::uint32_t kDungeonDrinkBelowPct = 30;
+// A healer of a dungeon party drinks up to this.
+constexpr std::uint32_t kDungeonDrinkUpToPct = 85;
 // How long a heal claim on a member lasts: one global cooldown and the cast, so a second healer looks elsewhere meanwhile.
 constexpr std::uint64_t kHealClaimMs = 2500;
 constexpr float kHealRangeYards = 30.0f;
@@ -224,6 +232,10 @@ constexpr float kQuestWalkStuckYards = 5.0f;
 constexpr std::uint32_t kResurrection = 2006;
 constexpr std::uint32_t kRedemption = 7328;
 constexpr std::uint32_t kAncestralSpirit = 2008;
+// Priest fast heals and shield (the core upranks these to the highest known rank).
+constexpr std::uint32_t kFlashHeal = 2061;       // rank 1, upranked by HighestKnownRank
+constexpr std::uint32_t kLesserHeal = 2050;      // rank 1, upranked
+constexpr std::uint32_t kPowerWordShield = 17;   // rank 1, upranked (30 s duration, self or ally)
 // A dungeon party's dead wait longer for a resurrect than a leveling party's: the healer needs the fight to end, to get within range, and a 10 s cast. A bot that releases too early
 // stands at the graveyard outside the instance (one tank was killed there seven times in a row by a wandering scout, with every re-entry refused for being in combat).
 constexpr std::uint64_t kDungeonReleaseDelayMs = 90000;
@@ -3519,12 +3531,20 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         bool const stillHurt = bot.max_health > 0 && bot.health < bot.max_health;
         // Waiting for the party (dungeon): sits to recover health, and mana for a mana user, even with creatures in view.
         bool const holdIdle = dungeonHold && !hasTarget && wanted.Type == ActionType::kStop && !routeBusy;
+        // Dungeon healer drink: a healer of a dungeon party that is holding for a pull drinks when under kDungeonDrinkBelowPct,
+        // and drinks up to kDungeonDrinkUpToPct. This overrides the normal rest share so the pull does not go out with the healer OOM.
+        bool const dungeonHealerDrink = holdIdle && manaUser && routeActiveOf(bot.guid) &&
+                                        std::uint64_t(bot.power) * 100 < std::uint64_t(bot.max_power) * kDungeonDrinkBelowPct;
         bool const manaLow = holdIdle && manaUser &&
                              std::uint64_t(bot.power) * 100 < std::uint64_t(bot.max_power) * (state.Sitting ? kPartyReadySitHealthPct : (_options.TacticRest ? kPartyReadyPowerPct : kPartyReadyPowerOldPct));
         // The Rest tactic: the party waits for every member to reach the pull share (90 %), so a member below it sits to get there (it only sat below its own rest share).
         bool const healthLow = holdIdle && _options.TacticRest && bot.max_health > 0 &&
                                std::uint64_t(bot.health) * 100 < std::uint64_t(bot.max_health) * kPartyReadyHealthPct;
-        bool const sitWanted = (idle || holdIdle) && (state.Sitting ? (stillHurt || manaLow || manaResting) : (hurtEnough || healthLow || manaLow || manaResting)) &&
+        // A dungeon healer drinks up to the dungeon drink cap; others use the normal manaLow threshold.
+        bool const drinkCap = dungeonHealerDrink ? kDungeonDrinkUpToPct : (state.Sitting ? kPartyReadySitHealthPct : (_options.TacticRest ? kPartyReadyPowerPct : kPartyReadyPowerOldPct));
+        bool const manaStillLow = state.Sitting && dungeonHealerDrink &&
+                                  std::uint64_t(bot.power) * 100 < std::uint64_t(bot.max_power) * drinkCap;
+        bool const sitWanted = (idle || holdIdle) && (state.Sitting ? (stillHurt || manaLow || manaStillLow || manaResting) : (hurtEnough || healthLow || manaLow || manaResting)) &&
                                nowMs >= state.RestRetryAtMs;
         if (sitWanted != state.Sitting)
         {
@@ -3868,7 +3888,9 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         }
 
         // Healing: a healer class in a party heals the party member (itself included) with the least health, below kHealBelowPct, in range.
-        if (partyLeader != 0 && nowMs >= state.NextCastMs && !(IsCasting(bot)))
+        // Dungeon priorities: emergency Flash Heal (< 30%) > shield preemptive (< 50% and took damage) > normal Heal (< 75%) > tank at 90%.
+        // Allow healing in a dungeon run even before the party is fully formed (the first tick sends invites).
+        if ((partyLeader != 0 || routeActiveOf(bot.guid)) && nowMs >= state.NextCastMs && !(IsCasting(bot)))
         {
             std::uint32_t const healSpell = state.Role_ == BotState::Role::Dps ? 0u : HealSpellFor(classId, bot.level);
             auto const retry = healSpell != 0 ? state.RetryAtMs.find(healSpell) : state.RetryAtMs.end();
@@ -3882,6 +3904,10 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 std::uint64_t hurtPct = (routeActiveOf(bot.guid) && _options.TacticHeal) ? kDungeonHealBelowPct : kHealBelowPct;
                 BotSnapshot const* leaderHurt = nullptr;   // the tank with a target: healed first, whatever its share
                 std::uint64_t leaderHurtPct = kTankHealBelowPct;
+                // Emergency target: anyone under kEmergencyHealBelowPct gets Flash Heal first.
+                BotSnapshot const* emergencyHurt = nullptr;
+                // Shield target: a member under kShieldBelowPct that took damage recently (health dropped since last tick).
+                BotSnapshot const* shieldHurt = nullptr;
                 auto const consider = [&](BotSnapshot const& member)
                 {
                     if (member.life_state != 0 || member.max_health == 0 || Distance2d(bot, member) > kHealRangeYards)
@@ -3900,7 +3926,22 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                         }
                         return;
                     }
-                    if (pct < hurtPct)
+                    if (pct < kEmergencyHealBelowPct)
+                    {
+                        // Emergency: Flash Heal is instant-ish (1.5 s) and we can afford it.
+                        if (!emergencyHurt || pct < std::uint64_t(emergencyHurt->health) * 100 / emergencyHurt->max_health)
+                            emergencyHurt = &member;
+                    }
+                    else if (pct < kShieldBelowPct)
+                    {
+                        // Shield preemptive: check if this member's health dropped since the last tick (took damage).
+                        // The module keeps a short history via state.StallBotHealth etc; here we approximate by checking
+                        // if the member is in combat (taking hits) or was the recent target of a hostile.
+                        bool tookDamage = member.in_combat != 0 || (state.FoughtAtMs.size() && state.FoughtAtMs.count(member.threat_target_guid));
+                        if (tookDamage && (!shieldHurt || pct < std::uint64_t(shieldHurt->health) * 100 / shieldHurt->max_health))
+                            shieldHurt = &member;
+                    }
+                    else if (pct < hurtPct)
                     {
                         hurtPct = pct;
                         hurt = &member;
@@ -3911,39 +3952,69 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 for (BotSnapshot const& other : view.bots)
                     if (other.guid != bot.guid && leaderOf.count(other.guid) && leaderOf[other.guid] == lead->second)
                         consider(other);
-                if (leaderHurt) // the tank is kept alive first while it holds a target
+                // Priority: emergency > tank holding aggro > shield > normal
+                std::uint32_t spellToCast = 0;
+                BotSnapshot const* target = nullptr;
+                std::string note;
+                if (emergencyHurt)
                 {
-                    hurt = leaderHurt;
-                    hurtPct = leaderHurtPct;
+                    spellToCast = kFlashHeal;
+                    target = emergencyHurt;
+                    note = "emergency";
                 }
-                if (hurt)
+                else if (leaderHurt)
                 {
-                    if (bot.moving != 0 && (KnownCastTimeSpell(healSpell) || state.CastTimeSpells.count(healSpell)))
+                    spellToCast = healSpell;
+                    target = leaderHurt;
+                    hurtPct = leaderHurtPct;
+                    note = "tank";
+                }
+                else if (shieldHurt)
+                {
+                    spellToCast = kPowerWordShield;
+                    target = shieldHurt;
+                    hurtPct = std::uint64_t(shieldHurt->health) * 100 / shieldHurt->max_health;
+                    note = "shield";
+                }
+                else if (hurt)
+                {
+                    spellToCast = healSpell;
+                    target = hurt;
+                    note = "";
+                }
+                if (target)
+                {
+                    // Check we can pay for the chosen spell (Flash Heal costs less mana than Heal at these ranks).
+                    auto const spellRetry = state.RetryAtMs.find(spellToCast);
+                    if ((spellRetry == state.RetryAtMs.end() || nowMs >= spellRetry->second) && CanPay(_options.SpellCosts.get(), spellToCast, bot))
                     {
-                        BotAction stop;
-                        stop.bot_guid = bot.guid;
-                        stop.type = ActionType::kStop;
-                        actions.push_back(stop);
-                        state.Last = Decision{ ActionType::kStop, 0 };
-                        state.Approaching = false;
+                        if (bot.moving != 0 && (KnownCastTimeSpell(spellToCast) || state.CastTimeSpells.count(spellToCast)))
+                        {
+                            BotAction stop;
+                            stop.bot_guid = bot.guid;
+                            stop.type = ActionType::kStop;
+                            actions.push_back(stop);
+                            state.Last = Decision{ ActionType::kStop, 0 };
+                            state.Approaching = false;
+                        }
+                        else
+                        {
+                            BotAction heal;
+                            heal.bot_guid = bot.guid;
+                            heal.type = ActionType::kCastSpell;
+                            heal.spell_id = spellToCast;
+                            heal.target_guid = target->guid == bot.guid ? 0 : PlayerRef(target->guid);
+                            actions.push_back(heal);
+                            state.CastTarget[spellToCast] = heal.target_guid;
+                            _healClaims[target->guid] = HealClaim{ healGroup, nowMs + kHealClaimMs };
+                            if (_options.OnEvent)
+                                _options.OnEvent("heal: healer=" + std::to_string(bot.guid) + " spell=" + std::to_string(spellToCast) +
+                                                 " target=" + std::to_string(target->guid) + " target_hp_pct=" + std::to_string(hurtPct) +
+                                                 (note.empty() ? "" : " " + note));
+                            state.NextCastMs = nowMs + kGlobalCooldownMs;
+                        }
+                        continue;
                     }
-                    else
-                    {
-                        BotAction heal;
-                        heal.bot_guid = bot.guid;
-                        heal.type = ActionType::kCastSpell;
-                        heal.spell_id = healSpell;
-                        heal.target_guid = hurt->guid == bot.guid ? 0 : PlayerRef(hurt->guid);
-                        actions.push_back(heal);
-                        state.CastTarget[healSpell] = heal.target_guid;
-                        _healClaims[hurt->guid] = HealClaim{ healGroup, nowMs + kHealClaimMs };
-                        if (_options.OnEvent)
-                            _options.OnEvent("heal: healer=" + std::to_string(bot.guid) + " spell=" + std::to_string(healSpell) +
-                                             " target=" + std::to_string(hurt->guid) + " target_hp_pct=" + std::to_string(hurtPct) +
-                                             (hurt->guid == partyLeader ? " tank" : ""));
-                        state.NextCastMs = nowMs + kGlobalCooldownMs;
-                    }
-                    continue;
                 }
             }
 

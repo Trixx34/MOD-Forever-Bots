@@ -1003,6 +1003,27 @@ WorldTickSnapshotView PartyView(std::vector<std::uint64_t> const& guids)
     return view;
 }
 
+// A pre-formed dungeon party: bot 12 is the warrior leader, the rest follow.
+WorldTickSnapshotView DungeonView(std::vector<std::uint64_t> const& guids)
+{
+    WorldTickSnapshotView view = PartyView(guids);
+    // Pre-form the party: bot 12 leads (group_role 1, no group_leader_guid), the rest are members (group_role 2, leader is 12).
+    for (BotSnapshot& bot : view.bots)
+    {
+        if (bot.guid == 12)
+        {
+            bot.group_role = 1;
+            bot.group_leader_guid = 0; // the leader has no group leader
+        }
+        else
+        {
+            bot.group_role = 2;
+            bot.group_leader_guid = 12;
+        }
+    }
+    return view;
+}
+
 // A walk longer than the mount threshold spends its first tick mounting up: kMount, then kStop instead of the walk. The walk to the
 // destination follows on the next tick. The tests below are about where the bot walks, so they read the tick after the mount;
 // BotMountsForALongWalk and its neighbours cover the mount itself.
@@ -2521,23 +2542,23 @@ void AFlippingPartyDoesNotHoldTheLeaderForever()
 
 void HealerHealsTheHurtMember()
 {
-    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    WorldTickSnapshotView view = DungeonView({ 10, 11, 12, 13, 14 });
     view.bots[3].health = 300; // bot 13
     auto const actions = DungeonPolicy().Decide(view, 0);
     CHECK(CastsSpell(actions, 10, 2050, PlayerOf(13)));
 }
-
+ 
 void HealerHealsItselfWithoutATarget()
 {
-    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    WorldTickSnapshotView view = DungeonView({ 10, 11, 12, 13, 14 });
     view.bots[0].health = 300;
     auto const actions = DungeonPolicy().Decide(view, 0);
     CHECK(CastsSpell(actions, 10, 2050, 0));
 }
-
+ 
 void NoHealWhileEveryoneIsHealthy()
 {
-    auto const actions = DungeonPolicy().Decide(PartyView({ 10, 11, 12, 13, 14 }), 0);
+    auto const actions = DungeonPolicy().Decide(DungeonView({ 10, 11, 12, 13, 14 }), 0);
     CHECK(!CastsSpell(actions, 10, 2050));
     CHECK(!CastsSpell(actions, 11, 2050));
 }
@@ -4487,7 +4508,10 @@ void FlightsAreOffByDefaultAndNotForPartyMembers()
     off.Decide(there, 0);
     CHECK(!FirstOf(off.Decide(there, 30000), ActionType::kTaxi).has_value());
 }
-
+ 
+// Debug test to see what heal spell is cast
+void DebugHealSpell();
+ 
 int main()
 {
     ShortOfAmmoWalksToTheAmmoVendor();
@@ -4702,6 +4726,7 @@ int main()
     ClosestBreaksTheTieBetweenEqualTargets();
     OnlyOneRogueInterruptsACastingTarget();
     RogueWithoutAPartyStillInterrupts();
+    DebugHealSpell();
     TwoHealersDoNotHealTheSameMember();
     TankIsHealedBeforeTheLowestMember();
     TwoDruidsDoNotBothCastThePartyBuff();
@@ -4712,4 +4737,19 @@ int main()
     if (failures == 0)
         std::printf("policy_test: all checks passed\n");
     return failures == 0 ? 0 : 1;
+}
+// Debug test to see what heal spell is cast
+void DebugHealSpell()
+{
+    WorldTickSnapshotView view = DungeonView({ 10, 11, 12, 13, 14 });
+    view.bots[3].health = 300; // bot 13 at 30%
+    auto const actions = DungeonPolicy().Decide(view, 0);
+    std::printf("DEBUG: total actions=%zu\n", actions.size());
+    for (BotAction const& action : actions) {
+        std::printf("DEBUG: action bot=%llu type=%d spell=%u target=%llu\n",
+                    (unsigned long long)action.bot_guid, (int)action.type, action.spell_id, (unsigned long long)action.target_guid);
+        if (action.type == ActionType::kCastSpell && action.bot_guid == 10) {
+            std::printf("DEBUG: heal spell=%u target=%llu\n", action.spell_id, (unsigned long long)action.target_guid);
+        }
+    }
 }
