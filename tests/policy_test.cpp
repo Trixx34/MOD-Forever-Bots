@@ -2855,7 +2855,9 @@ void ADeadMemberOnMapZeroIsTeleportedBackToItsCorpse()
     CHECK(!Logged(events, "corpse_run_failed:"));
 }
 
-void ADeadMemberIsRevivedByItsLeaderOutOfCombat()
+// A dead member is revived by its leader out of combat only in the dungeon it died in (the owner's rule of 2026-10-22: a ghost walks back to
+// the instance and is revived on entering it).
+void ADeadMemberIsRevivedByItsLeaderInsideTheDungeon()
 {
     std::vector<std::string> events;
     PolicyOptions options = DeadOptions(&events);
@@ -2865,7 +2867,7 @@ void ADeadMemberIsRevivedByItsLeaderOutOfCombat()
     policy.SetRouteActive(true);
     WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 });
     Ghost(v.bots[3], 0.0f, 36, 50.0f);
-    v.bots[3].map_id = 0;
+    v.bots[3].map_id = 36;                                                                // back inside, at its corpse's map
     std::vector<BotAction> first = policy.Decide(v, 1000);
     CHECK(HasAction(first, 13, ActionType::kRevive));                                     // the leader is up and quiet
     CHECK(!HasAction(first, 13, ActionType::kMoveTo));                                    // and the ghost waits for it, not walking off
@@ -2875,15 +2877,63 @@ void ADeadMemberIsRevivedByItsLeaderOutOfCombat()
     CHECK(HasAction(policy.Decide(v, 22000), 13, ActionType::kRevive));                   // third try
     std::vector<BotAction> given = policy.Decide(v, 33000);
     CHECK(!HasAction(given, 13, ActionType::kRevive));                                    // given up after three tries
-    CHECK(HasAction(given, 13, ActionType::kMoveTo));                                     // the corpse run goes on: to the portal
+    CHECK(HasAction(given, 13, ActionType::kMoveTo));                                     // the corpse run goes on
 
     BotPolicy busy(options);
     busy.SetRouteActive(true);
     WorldTickSnapshotView fighting = PartyView({ 10, 11, 12, 13, 14 });
     Ghost(fighting.bots[3], 0.0f, 36, 50.0f);
-    fighting.bots[3].map_id = 0;
+    fighting.bots[3].map_id = 36;
     fighting.bots[2].in_combat = 1;                                                       // the leader (bot 12) fights: no revive
     CHECK(!HasAction(busy.Decide(fighting, 1000), 13, ActionType::kRevive));
+}
+
+// A ghost of a dungeon party still on the outside map is not revived there (it stood up at the graveyard and died outside the dungeon);
+// it walks to the instance door, whatever the leader is doing.
+void AGhostOnTheOutsideMapIsNotRevivedBeforeItEnters()
+{
+    std::vector<std::string> events;
+    PolicyOptions options = DeadOptions(&events);
+    options.DungeonReviveOutOfCombat = true;
+    options.Route = { Point{ 100.0f, 0.0f, 0.0f } };
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 });
+    Ghost(v.bots[3], 0.0f, 36, 50.0f);
+    v.bots[3].map_id = 0;                                                                 // the graveyard outside
+    std::vector<BotAction> first = policy.Decide(v, 1000);
+    CHECK(!HasAction(first, 13, ActionType::kRevive));
+    CHECK(!Logged(events, "revive_out_of_combat:"));
+    bool towardPortal = false;
+    for (BotAction const& action : first)
+        towardPortal = towardPortal || (action.type == ActionType::kMoveTo && action.bot_guid == 13 && action.dest_x == 500.0f);
+    CHECK(towardPortal);                                                                 // to the instance door
+    CHECK(!HasAction(policy.Decide(v, 12000), 13, ActionType::kRevive));                 // still outside: still not revived
+}
+
+// A living member of a dungeon party left on the outside map (a wipe put it up at the graveyard) walks back to the instance door and starts
+// no fight on the way: it must not be able to die outside the dungeon (the owner's rule of 2026-10-22). A bot that stopped to clear the
+// road was killed by the stable master of Sentinel Hill and the rescue teleport was refused in combat behind it.
+void AnAliveMemberOutsideWalksBackToTheDungeon()
+{
+    std::vector<std::string> events;
+    PolicyOptions options = DeadOptions(&events);
+    options.Route = { Point{ 100.0f, 0.0f, 0.0f } };
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 });
+    for (BotSnapshot& bot : v.bots)
+        bot.map_id = 0;                                                                  // the whole party up at the graveyard outside
+    v.bots[3].pos_x = 10.0f;
+    AddNearby(v, 3, Hostile(7, 15.0f, 100));                                            // something worth a fight on the way
+    std::vector<BotAction> actions = policy.Decide(v, 1000);                            // this tick it mounts for the walk
+    std::vector<BotAction> more = policy.Decide(v, 2000);
+    actions.insert(actions.end(), more.begin(), more.end());
+    CHECK(!HasAction(actions, 13, ActionType::kAttackTarget));
+    bool towardPortal = false;
+    for (BotAction const& action : actions)
+        towardPortal = towardPortal || (action.type == ActionType::kMoveTo && action.bot_guid == 13 && action.dest_x == 500.0f);
+    CHECK(towardPortal);
 }
 
 // A ghost at its corpse with a live hostile within 30 yards waits (a ghost cannot be killed, the reclaimed body can); after two minutes it reclaims anyway.
@@ -4605,7 +4655,9 @@ int main()
     GhostWalksToItsCorpseAndIgnoresCombat();
     GhostOnTheOutsideMapWalksToThePortal();
     ADeadMemberOnMapZeroIsTeleportedBackToItsCorpse();
-    ADeadMemberIsRevivedByItsLeaderOutOfCombat();
+    ADeadMemberIsRevivedByItsLeaderInsideTheDungeon();
+    AGhostOnTheOutsideMapIsNotRevivedBeforeItEnters();
+    AnAliveMemberOutsideWalksBackToTheDungeon();
     AGhostDoesNotReclaimNextToAHostile();
     GhostReclaimsInRadiusAndRetries();
     GhostCorpseRunTimesOut();

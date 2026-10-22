@@ -1981,8 +1981,10 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             // Dungeon party, out of combat (DungeonReviveOutOfCombat): a ghost is revived by its leader instead of walking back to its corpse, once the
             // leader is alive and not fighting. The core's revive order puts the bot at the leader's side, or where it fell when the leader is on another
             // map. The ghost waits between tries and walks on only once they are used up (kOutOfCombatReviveTries), or when the leader is not up.
+            // Only in the dungeon (the owner's rule of 2026-10-22): a ghost still on the outside map walks to the instance door and is revived on
+            // entering it, whatever the leader is doing.
             if (_options.DungeonReviveOutOfCombat && deadParty != 0 && deadParty != bot.guid && bot.in_combat == 0 && state.ReviveAttempts < kOutOfCombatReviveTries &&
-                (routeActiveOf(bot.guid) || tankLed.count(deadParty) != 0))
+                (routeActiveOf(bot.guid) || tankLed.count(deadParty) != 0) && bot.corpse_valid != 0 && bot.map_id == bot.corpse_map)
             {
                 auto const leaderAt = indexOf.find(deadParty);
                 BotSnapshot const* const leader = leaderAt == indexOf.end() ? nullptr : &view.bots[leaderAt->second];
@@ -2193,6 +2195,11 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         bool const partyLeaderBot = partyLeader != 0 && partyLeader == bot.guid;
         bool const partyMember = partyLeader != 0 && !partyLeaderBot;
         bool const routeOn = routeActiveOf(bot.guid) || (partyLeader != 0 && tankLed.count(partyLeader) != 0);   // the dungeon party rules apply to this bot
+        // A dungeon party's bot on the outside map (a wipe left it at the graveyard, a rescue teleport was refused in combat): it goes back
+        // through the instance door and starts no fight on the way. The owner's rule of 2026-10-22: a bot of a dungeon party must not be
+        // able to die outside the dungeon; it comes back as a ghost would and is revived in the dungeon it died in.
+        bool const returningToDungeon = routeOn && _options.HasPortal && _options.PortalInsideMap != 0 &&
+                                       bot.map_id != _options.PortalInsideMap && bot.in_combat == 0;
         std::uint64_t const leaderRef = partyLeader != 0 ? PlayerRef(partyLeader) : 0;
         BotSnapshot const* leaderSnap = nullptr;
         if (partyMember)
@@ -2370,6 +2377,8 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 tankHeadStart = tank != _bots.end() && tank->second.InFight && nowMs - tank->second.FightStartMs < kTankHeadStartMs;
             }
         }
+        if (returningToDungeon)
+            dungeonHold = true; // walking back to the dungeon pulls nothing
 
         NearbyUnit const* targetUnit = nullptr;
         auto const avoided = [&state, nowMs](std::uint64_t ref)
@@ -2380,6 +2389,8 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         std::uint64_t targetRef = bot.threat_target_guid;
         if (targetRef != 0 && avoided(targetRef))
             targetRef = 0; // it refused us: the bot does not fight it for now
+        if (returningToDungeon)
+            targetRef = 0; // nothing on the way back is worth a fight: a bot that stopped to clear the road died outside the dungeon
         // Chat orders: a passive or staying bot starts no fight of its own; a pull order points the bot at the speaker's target.
         bool groupFighting = false;
         if (bot.group_leader_guid != 0)
@@ -3750,6 +3761,15 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         }
         else if (bot.in_flight != 0 && state.Last)
             wanted = *state.Last; // on a flight with nothing to walk to: the stop order would be a new order too
+
+        // Back to the dungeon: whatever the rest of the policy wanted, a bot of a dungeon party outside the instance walks to the instance
+        // door — the ghost's route, and the destination the scenario's rescue teleport uses (which the core refuses in combat, so the walk
+        // is also what makes the rescue possible).
+        if (returningToDungeon)
+        {
+            wanted = Decision{ ActionType::kMoveTo, 0, _options.PortalPoint };
+            moveWhy = "return_to_instance";
+        }
 
         // Mount for long travel, dismount when the walk is short, combat starts, or the bot arrives.
         if (bot.in_combat == 0 && bot.life_state == 0 && bot.casting_spell == 0 && nowMs >= state.MountRetryMs)
