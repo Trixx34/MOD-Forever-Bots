@@ -1,5 +1,6 @@
 // Unit tests for BotPolicy, on hand-built snapshots. No core needed.
 #include "bot_policy.h"
+#include <cmath>
 #include "grind_data.h"
 
 #include "combat_rotation.h"
@@ -521,6 +522,101 @@ void IdleBotsCraftTheirTwoSkillsInTurnAndWaitAfterARefusal()
     CHECK(CraftsOf(off.Decide(View(1, 0, {}), 1000)).empty());
     BotPolicy fight(options);
     CHECK(CraftsOf(fight.Decide(View(1, 0, { Hostile(2, 3.0f, 100) }), 1000)).empty());
+}
+
+// Ground effects (SDK 0.19, layout 21): a bot inside a harmful one walks out of it.
+std::vector<BotAction> GroundMoves(std::vector<BotAction> const& actions)
+{
+    std::vector<BotAction> out;
+    for (BotAction const& action : actions)
+        if (action.type == ActionType::kMoveTo && action.bot_guid == kBot)
+            out.push_back(action);
+    return out;
+}
+
+void SetGroundEffect(WorldTickSnapshotView& view, std::uint32_t spell, float x, float y, float radius, std::uint8_t hostile)
+{
+    view.bots[0].ground_effect_count = 1;
+    view.bots[0].ground_effects[0] = forever_module::GroundEffect{};
+    view.bots[0].ground_effects[0].spell_id = spell;
+    view.bots[0].ground_effects[0].x = x;
+    view.bots[0].ground_effects[0].y = y;
+    view.bots[0].ground_effects[0].radius = radius;
+    view.bots[0].ground_effects[0].kind = 1;
+    view.bots[0].ground_effects[0].hostile = hostile;
+}
+
+void BotInAGroundEffectWalksOut()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.AvoidGroundEffects = true;
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = View(1, 0, {});
+    SetGroundEffect(view, 11829, 2.0f, 0.0f, 5.0f, 1);               // a hostile Flamestrike 2 yards from the bot, 5 yards wide
+    auto const moves = GroundMoves(policy.Decide(view, 1000));
+    CHECK(moves.size() == 1);
+    if (moves.size() == 1)
+    {
+        float const dx = moves[0].dest_x - 2.0f, dy = moves[0].dest_y;
+        CHECK(std::sqrt(dx * dx + dy * dy) >= 8.0f - 0.01f);         // outside by the 3-yard margin
+        CHECK(moves[0].dest_x < 0.0f);                              // away from the center
+        // The end point is kept: the next ticks do not send a different one while the bot walks.
+        view.bots[0].pos_x = -1.0f;
+        CHECK(GroundMoves(policy.Decide(view, 1100)).empty());
+        CHECK(GroundMoves(policy.Decide(view, 2500)).empty());
+    }
+}
+
+void GroundEffectsAreIgnoredWhenOffOrNotHarmful()
+{
+    // Off (the default): no walk.
+    BotPolicy off(AggressiveOptions());
+    WorldTickSnapshotView view = View(1, 0, {});
+    SetGroundEffect(view, 11829, 2.0f, 0.0f, 5.0f, 1);
+    CHECK(GroundMoves(off.Decide(view, 1000)).empty());
+
+    PolicyOptions options = AggressiveOptions();
+    options.AvoidGroundEffects = true;
+    // On, but the caster is not hostile and the spell is in no list (a party member's own Blizzard): no walk.
+    BotPolicy friendly(options);
+    SetGroundEffect(view, 10, 2.0f, 0.0f, 5.0f, 0);
+    CHECK(GroundMoves(friendly.Decide(view, 1000)).empty());
+    // The same effect with its spell in the avoid table: a walk, even though the flag is off.
+    auto table = std::make_shared<ground_avoid::AvoidTable>();
+    table->Add(10, 5.0f);
+    options.AvoidSpells = table;
+    BotPolicy listed(options);
+    CHECK(GroundMoves(listed.Decide(view, 1000)).size() == 1);
+    // A hostile effect the bot is not in (20 yards off), and a dead bot: no walk.
+    BotPolicy far(options);
+    SetGroundEffect(view, 11829, 20.0f, 0.0f, 5.0f, 1);
+    CHECK(GroundMoves(far.Decide(view, 1000)).empty());
+    BotPolicy dead(options);
+    SetGroundEffect(view, 11829, 2.0f, 0.0f, 5.0f, 1);
+    view.bots[0].life_state = 1;
+    CHECK(GroundMoves(dead.Decide(view, 1000)).empty());
+}
+
+void DungeonFileZonesAndSpellsAreAvoided()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.AvoidGroundEffects = true;
+    PolicyOptions::DungeonRoute route;
+    route.AvoidZones.push_back(ground_avoid::Circle{ 0.0f, 3.0f, 6.0f });   // a fixed zone around the bot's place
+    route.AvoidSpells.push_back(777);
+    options.DungeonsByMap[0] = route;
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = View(1, 0, {});
+    CHECK(GroundMoves(policy.Decide(view, 1000)).size() == 1);             // inside the fixed zone
+    BotPolicy spells(options);
+    WorldTickSnapshotView clear = View(1, 0, {});
+    options.DungeonsByMap[0].AvoidZones.clear();
+    BotPolicy listedSpell(options);
+    SetGroundEffect(clear, 777, 1.0f, 0.0f, 4.0f, 0);                      // the dungeon file's avoid_spells names it
+    CHECK(GroundMoves(listedSpell.Decide(clear, 1000)).size() == 1);
+    SetGroundEffect(clear, 778, 1.0f, 0.0f, 4.0f, 0);
+    BotPolicy other(options);
+    CHECK(GroundMoves(other.Decide(clear, 1000)).empty());
 }
 
 void RefusedSitIsRetriedLater()
@@ -4471,6 +4567,9 @@ int main()
     RestsWhenHurtAndIdle();
     NoRestAtFullHealthOrWithAPlayerNear();
     StandsBeforeAFight();
+    BotInAGroundEffectWalksOut();
+    GroundEffectsAreIgnoredWhenOffOrNotHarmful();
+    DungeonFileZonesAndSpellsAreAvoided();
     RefusedSitIsRetriedLater();
     OverPullIsSkipped();
     SmallGroupIsPulled();

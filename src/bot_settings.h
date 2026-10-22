@@ -169,6 +169,11 @@ struct BotSettings
     // CraftingFociFile (data/crafting_foci.txt): the anvils, forges and cooking fires of the capitals. With it, a bot whose recipes need a focus (kNeedsFocus) walks to
     // the nearest one on its map; without it the skill just waits. Use an absolute path: the worldserver's working directory is not the module's.
     std::string CraftingFociFile;
+    // AvoidGroundEffects = 1 (off by default): a bot standing inside a harmful ground effect (SDK 0.19: the core must have Bot.Snapshot.GroundEffects = 1) walks out of it.
+    // AvoidSpellsFile (absolute path, data/avoid_spells.txt): the Classic dungeons' spells that leave one; a spell in it counts as harmful even if the caster is not
+    // known to be hostile. The dungeon files' bosses[].strategy.avoid_spells and avoid (fixed zones) add to it for their map.
+    bool AvoidGroundEffects = false;
+    std::string AvoidSpellsFile;
     bool DungeonReviveOutOfCombat = false;  // DungeonReviveOutOfCombat = 1: a dead member of a dungeon party is revived by its leader out of combat (needs Bot.Chat.Orders.Enabled in the core)
     std::string DungeonFile;
     // DungeonDataDir (default: the folder "dungeons" beside DungeonFile) holds the shipped per-dungeon JSON files; DungeonDir is your own folder of them, whose file for a map

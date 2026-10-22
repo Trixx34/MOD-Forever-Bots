@@ -38,7 +38,8 @@ struct DungeonWaypoint
 };
 
 // What a dungeon's boss block says about the fight (doc/dungeon-strategy.md, bosses[].strategy). The module does not act on any of these yet: they are
-// read, checked and kept, so a file written today keeps working when the code starts to use them.
+// read, checked and kept, so a file written today keeps working when the code starts to use them. (avoid and avoid_spells are acted on since bots 0.20: see
+// doc/dungeon-strategy.md.)
 struct AvoidZone
 {
     float X = 0.0f;
@@ -54,7 +55,8 @@ struct BossStrategy
     std::optional<std::array<float, 3>> TankPosition;
     std::vector<std::uint32_t> Interrupt;                // spell ids to interrupt
     std::vector<std::uint32_t> Dispel;                   // spell ids to dispel
-    std::vector<AvoidZone> Avoid;
+    std::vector<AvoidZone> Avoid;                        // fixed places to stay out of (acted on since bots 0.20, with AvoidGroundEffects)
+    std::vector<std::uint32_t> AvoidSpells;              // spells whose ground effect to step out of (bots 0.20)
     std::uint32_t KillOrder = 0;                         // 0 = not set
     std::string Notes;
 };

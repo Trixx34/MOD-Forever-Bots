@@ -29,6 +29,7 @@
 #include "chat_commands.h"
 #include "combat_rotation.h"
 #include "grind_data.h"
+#include "ground_avoid.h"
 #include "quest_planner.h"
 #include "spell_costs.h"
 #include "crafting_foci.h"
@@ -95,6 +96,10 @@ struct PolicyOptions
     // Crafting (SDK 0.17, kSkillUp): a bot with nothing to fight makes bandages from cloth and cooks meat, which raises First Aid and Cooking and uses up what fills its
     // bags. Off by default (the core must know the action); the module turns it on from its settings.
     bool Crafting = false;
+    // SDK 0.19 (layout 21): a bot standing inside a harmful ground effect (a dynamic object or area trigger of a hostile caster, or a spell of AvoidSpells) walks
+    // out of it. Off by default (the core must fill the snapshot: Bot.Snapshot.GroundEffects = 1). AvoidSpells: data/avoid_spells.txt.
+    bool AvoidGroundEffects = false;
+    std::shared_ptr<ground_avoid::AvoidTable const> AvoidSpells;
     // The level from which a bot asks to mount up for a long walk (riding is learned at 40 in classic). 0 = any level (the policy tests).
     std::uint32_t MountMinLevel = 0;
     // SDK 0.18: with Crafting, the bot also makes things for the crafting profession it has (Blacksmithing, Leatherworking, Alchemy, Tailoring, Engineering, Smelting),
@@ -136,6 +141,9 @@ struct PolicyOptions
         std::vector<Point> Route;
         std::map<std::size_t, std::uint32_t> BossAt;
         std::vector<dungeon_events::Event> Events;
+        // From the dungeon file's bosses[].strategy: spell ids to avoid (avoid_spells) and fixed zones to stay out of (avoid), the places of a fight a bot must not stand in.
+        std::vector<std::uint32_t> AvoidSpells;
+        std::vector<ground_avoid::Circle> AvoidZones;
     };
     std::map<std::uint32_t, DungeonRoute> DungeonsByMap;
     // Creature entry -> rank (0 first): the dungeon's kill priority. The damage dealers of a dungeon party fight the best-ranked live hostile next to the tank's target.
@@ -329,6 +337,9 @@ private:
         std::uint32_t NoRouteStreak = 0;                 // no-route answers in a row for that place: the pause doubles each time
         std::uint64_t ReclaimDangerSinceMs = 0;          // since when a live hostile has stood near the ghost at its corpse (0 = none)
         std::uint64_t FocusLoggedFor = 0;                // the unit a focus event was last written for (once per target)
+        ground_avoid::Point2 AvoidDest{};                // where the bot is walking to get out of a ground effect, kept for a few seconds so the point does not shift every tick
+        std::uint64_t AvoidSetMs = 0;                    // when AvoidDest was chosen (0 = none)
+        std::uint64_t AvoidLoggedMs = 0;                 // the last avoid_effect line for this bot (at most one per 10 s)
         std::uint64_t WalkBlockedAtMs = 0;               // when a move got the answer "no route": the walk (grind spot, hub, exploring) that began before it is over, and the bot picks another later
         std::uint64_t NoRouteLoggedMs = 0;               // when a no-route refusal of any action was last written to the log (diagnostics)
         std::uint32_t NoRouteSequence = 0;               // the last kNoRoute result read (last_action_sequence)

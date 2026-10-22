@@ -77,6 +77,7 @@ std::string Sample(std::string const& mapText = "7", std::string const& id = "ti
         "interrupt": [8984, 12345],
         "dispel": [700],
         "avoid": [ { "x": 5, "y": 6, "z": 7, "radius": 8, "note": "fire on the floor" } ],
+        "avoid_spells": [ 11829, 8364 ],
         "kill_order": 1,
         "notes": "pull to the door"
       } }
@@ -164,6 +165,7 @@ void ReadsAFileWithEverySection()
     CHECK(s.Pull == "tank" && s.TankPosition && (*s.TankPosition)[2] == 3.0f);
     CHECK((s.Interrupt == std::vector<std::uint32_t>{ 8984, 12345 }) && (s.Dispel == std::vector<std::uint32_t>{ 700 }));
     CHECK(s.Avoid.size() == 1 && s.Avoid[0].Radius == 8.0f && s.Avoid[0].Note == "fire on the floor");
+    CHECK((s.AvoidSpells == std::vector<std::uint32_t>{ 11829, 8364 }));
     CHECK(s.KillOrder == 1 && s.Notes == "pull to the door");
 
     CHECK(d.Events.size() == 3);

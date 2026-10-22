@@ -166,6 +166,11 @@ Module.forever-bots.TelemetrySummarySec = 60
 # Dungeon = rfc
 # ScenarioRequireBosses = 1                      # complete when every boss of ScenarioBosses is seen dead (the dungeon file turns it on when it lists bosses)
 
+# Ground effects (SDK 0.19): a bot standing in a harmful area (Flamestrike, Blizzard, a poison cloud) walks out of it. The core must have Bot.Snapshot.GroundEffects = 1. AvoidSpellsFile
+# (absolute path; data/avoid_spells.txt) lists the dungeon spells that leave one; the dungeon files' bosses[].strategy.avoid_spells and avoid add to it. Off by default. doc/ground-effects.md.
+# Module.forever-bots.AvoidGroundEffects = 1
+# Module.forever-bots.AvoidSpellsFile = /srv/forever/sim/modules_runtime/forever-bots/data/avoid_spells.txt
+
 # Mounts: a bot asks to mount up for a long walk only from MountMinLevel (default 40: classic riding is learned at 40; 0 = any level).
 # Module.forever-bots.MountMinLevel = 40
 

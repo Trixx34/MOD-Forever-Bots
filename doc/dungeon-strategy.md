@@ -106,7 +106,7 @@ nothing listed they assist the tank's target as before. The setting `ScenarioKil
 
 ### Dungeon tactics (`Module.forever-bots.DungeonTactics`)
 
-A comma list of `focus`, `interrupt`, `heal`, `rest`, or `all` (default) / `none`. Each is a rule of a dungeon party that can be measured on its own:
+A comma list of `focus`, `interrupt`, `heal`, `rest`, or `all` / `none` (default: none, until a sim run shows a gain). Each is a rule of a dungeon party that can be measured on its own:
 
 | Tactic | What it does |
 |---|---|
@@ -123,9 +123,10 @@ Always on, not a tactic: a dungeon party's dead wait 90 s for the healer before 
 result line (`scenario dm#2: ...`); the core makes one instance per group. The bots, in guid order, are cut into parties of the roster size, as the policy's party logic cuts them;
 `MaxBots` is set to N x the roster size by the scenario. `tools/dungeon_report.py` reads the log and prints per party and in aggregate.
 
-### Boss strategy (`bosses[].strategy`): reserved, not used yet
+### Boss strategy (`bosses[].strategy`): `avoid` and `avoid_spells` are used, the rest is reserved
 
-The module **reads, checks and keeps** these fields, but **no bot behaviour uses them yet**. They exist so that you can write down how a fight is meant to go and so that a file written today keeps
+`avoid` and `avoid_spells` are acted on since bots 0.20.0 when `AvoidGroundEffects = 1` (see `doc/ground-effects.md`): a bot standing in one of those zones, or in the ground effect of one of
+those spells, walks out of it. The other fields below are **read, checked and kept**, but **no bot behaviour uses them yet**. They exist so that you can write down how a fight is meant to go and so that a file written today keeps
 working when the code starts to act on them. What the bots do in a boss fight today is: the tank leads and pulls pack by pack (and holds the pull until the party is healthy and together), the healer heals
 the member with the lowest health, the dps assist the tank, and every class follows its own rotation (`data/rotations.txt`).
 
@@ -135,7 +136,8 @@ the member with the lowest health, the dps assist the tank, and every class foll
 | `tank_position` | `{x,y,z}`: where the tank should hold the boss |
 | `interrupt` | list of spell ids to interrupt |
 | `dispel` | list of spell ids to dispel |
-| `avoid` | list of `{ "x","y","z","radius","note" }`: ground to stay out of (radius 0 to 500 yards) |
+| `avoid` | **used** (AvoidGroundEffects): list of `{ "x","y","z","radius","note" }`: ground to stay out of (radius 0 to 500 yards); a bot inside walks out |
+| `avoid_spells` | **used** (AvoidGroundEffects): list of spell ids whose ground effect (a dynamic object or area trigger of that spell) a bot steps out of, on top of `data/avoid_spells.txt` and the effects of hostile casters |
 | `kill_order` | number 1 to 50: when this boss is killed among the others, if the route allows a choice |
 | `notes` | free text, up to 500 characters |
 

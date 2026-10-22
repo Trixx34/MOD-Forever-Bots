@@ -166,7 +166,7 @@ BossStrategy ReadStrategy(Reader const& r, Value const& value, std::string const
 {
     if (!value.IsObject())
         r.Fail(at, "must be an object { ... }");
-    r.CheckKeys(value, at, { "pull", "tank_position", "interrupt", "dispel", "avoid", "kill_order", "notes" });
+    r.CheckKeys(value, at, { "pull", "tank_position", "interrupt", "dispel", "avoid", "avoid_spells", "kill_order", "notes" });
     BossStrategy s;
     if (Value const* pull = value.Find("pull"))
     {
@@ -200,6 +200,8 @@ BossStrategy ReadStrategy(Reader const& r, Value const& value, std::string const
             s.Avoid.push_back(std::move(zone));
         }
     }
+    if (Value const* avoidSpells = value.Find("avoid_spells"))
+        s.AvoidSpells = r.UintList(*avoidSpells, at + ".avoid_spells", 32);
     if (Value const* order = value.Find("kill_order"))
         s.KillOrder = r.UintOf(*order, at + ".kill_order", 1, 50);
     if (Value const* notes = value.Find("notes"))
