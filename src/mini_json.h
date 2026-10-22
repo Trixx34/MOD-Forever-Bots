@@ -1,4 +1,4 @@
-// A small JSON reader for the dungeon files (doc/dungeon-strategy.md): objects, arrays, strings, numbers, true/false/null. No SDK dependency.
+// A small JSON reader for the dungeon files (doc/dungeon-strategy.md): objects, arrays, strings, numbers, true/false/null, plus comments ("// ..." and "/* ... */"). No SDK dependency.
 // Numbers keep their text, so a coordinate is turned into a float exactly as the old text files did (strtof of the same characters).
 // Limits: 1 MB of text, 32 levels of nesting. An error carries the line and column.
 #pragma once

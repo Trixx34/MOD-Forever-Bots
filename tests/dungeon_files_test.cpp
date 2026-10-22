@@ -126,6 +126,13 @@ void JsonReader()
     CHECK(!mini_json::Parse("{\"a\": 1} x").Ok);
     CHECK(!mini_json::Parse("{\"a\": \"unclosed}").Ok);
     CHECK(!mini_json::Parse("").Ok);
+    // comments: "// ..." to the end of the line and "/* ... */", anywhere between tokens; text inside a string is never a comment
+    auto const commented = mini_json::Parse("// header\n{ /* a */ \"a\": [1, // one\n 2], \"url\": \"http://x/*y*/\" /* tail */ }\n// end");
+    CHECK(commented.Ok && commented.Root.Find("a") && commented.Root.Find("a")->Items.size() == 2);
+    CHECK(commented.Root.Find("url") && commented.Root.Find("url")->Text == "http://x/*y*/");
+    CHECK(!mini_json::Parse("{\"a\": 1 /* never closed").Ok);
+    auto const lineAfterComment = mini_json::Parse("// one\n/* two\nthree */\n{ \"a\": ]");
+    CHECK(!lineAfterComment.Ok && lineAfterComment.Error.rfind("line 4", 0) == 0);   // lines are counted through comments
     CHECK(!mini_json::Parse("[1, 2").Ok);
     CHECK(mini_json::Parse("\xEF\xBB\xBF{\"a\": 1}").Ok);            // a byte order mark from an editor
     std::string deep(40, '[');

@@ -1,16 +1,28 @@
 {
+  // ---------------------------------------------------------------------------------------------------------------------------------------------
+  // Razorfen Kraul (map 47), levels 29-38.  Strategy file, schema 1.  Full field list and an example: doc/dungeon-strategy.md.
+  // These "//" and "/* */" comments are allowed in every dungeon file; the module ignores them. To change how bots run this dungeon, copy this file into your
+  // own folder (Module.forever-bots.DungeonDir = /path) and edit the copy: a file there for the same map REPLACES this one. A file with a mistake is logged
+  // (file, line, reason) and not used; the shipped one is used instead.
+  // Coordinates: x is north, y is west, z is up (the game's own axes). Boss numbers are creature entries (world database, creature_template).
+  // ---------------------------------------------------------------------------------------------------------------------------------------------
   "schema": 1,
   "id": "rfk",
   "map": 47,
   "name": "Razorfen Kraul",
   "levels": [29, 38],
   "roster": "2:1,5:5,8:8,2:9,5:4",
+  // Where the party gathers and how it gets in. "staging" = the place outside where the party rests until it is ready (health and mana up) before it goes in;
+  // "portal" = the instance entrance on the outside map; "entry" = where the party stands inside right after it enters (a revived party is put back here).
   "entrance": {
     "staging": { "map": 1, "x": 1629, "y": -4373, "z": 31 },
     "portal": { "map": 1, "x": -4463.3, "y": -1664.3, "z": 84 },
     "entry": { "map": 47, "x": 1942.27, "y": 1544.23, "z": 83.31 }
   },
+  // Limits of one run: "duration_sec" = the run is over after this long, "wipe_recovery_sec" = how long the party gets to recover after a wipe.
   "run": { "duration_sec": 1800, "wipe_recovery_sec": 300 },
+  // The path the leader walks, point after point (in order). A point with "boss": <entry> is where that boss is expected; the route waits there until that boss is
+  // seen dead, then goes on. Add, remove or move points to change the way; keep the first point near "entry" and every point reachable on foot.
   "route": [
     { "x": 1956.5, "y": 1589.3, "z": 82.1 },
     { "x": 1968.0, "y": 1596.5, "z": 82.4 },
@@ -26,7 +38,7 @@
     { "x": 2126.9, "y": 1438.4, "z": 81.1 },
     { "x": 2124.8, "y": 1417.3, "z": 79.2 },
     { "x": 2135.5, "y": 1417.6, "z": 75.7 },
-    { "x": 2146.4, "y": 1411.2, "z": 74.0, "boss": 4428 },
+    { "x": 2146.4, "y": 1411.2, "z": 74.0, "boss": 4428 },  // boss: Death Speaker Jargba
     { "x": 2152.8, "y": 1445.3, "z": 77.3 },
     { "x": 2171.7, "y": 1491.2, "z": 73.0 },
     { "x": 2170.9, "y": 1508.8, "z": 69.8 },
@@ -34,12 +46,12 @@
     { "x": 2154.7, "y": 1514.7, "z": 73.0 },
     { "x": 2142.1, "y": 1509.6, "z": 72.8 },
     { "x": 2100.5, "y": 1457.9, "z": 73.6 },
-    { "x": 2082.3, "y": 1463.5, "z": 73.2, "boss": 4424 },
+    { "x": 2082.3, "y": 1463.5, "z": 73.2, "boss": 4424 },  // boss: Aggem Thorncurse
     { "x": 2097.6, "y": 1458.1, "z": 73.6 },
     { "x": 2154.7, "y": 1536.0, "z": 73.6 },
     { "x": 2176.0, "y": 1557.3, "z": 72.2 },
     { "x": 2193.6, "y": 1621.3, "z": 83.2 },
-    { "x": 2203.1, "y": 1640.0, "z": 85.9, "boss": 4420 },
+    { "x": 2203.1, "y": 1640.0, "z": 85.9, "boss": 4420 },  // boss: Overlord Ramtusk
     { "x": 2193.3, "y": 1621.9, "z": 83.4 },
     { "x": 2170.9, "y": 1629.6, "z": 81.8 },
     { "x": 2150.1, "y": 1633.9, "z": 81.8 },
@@ -61,7 +73,7 @@
     { "x": 2045.6, "y": 2010.1, "z": 61.6 },
     { "x": 2031.5, "y": 2005.3, "z": 61.6 },
     { "x": 2008.3, "y": 1989.3, "z": 63.2 },
-    { "x": 1992.6, "y": 1975.0, "z": 63.4, "boss": 4422 },
+    { "x": 1992.6, "y": 1975.0, "z": 63.4, "boss": 4422 },  // boss: Agathelos the Raging
     { "x": 2006.7, "y": 1988.0, "z": 63.8 },
     { "x": 2029.6, "y": 2004.3, "z": 62.2 },
     { "x": 2045.6, "y": 2010.1, "z": 61.6 },
@@ -73,30 +85,37 @@
     { "x": 2179.2, "y": 1907.2, "z": 70.4 },
     { "x": 2193.1, "y": 1882.9, "z": 73.0 },
     { "x": 2190.9, "y": 1866.7, "z": 78.9 },
-    { "x": 2190.4, "y": 1864.3, "z": 79.1, "boss": 4421 }
+    { "x": 2190.4, "y": 1864.3, "z": 79.1, "boss": 4421 }  // boss: Charlga Razorflank
   ],
+  // The bosses, in the order the route meets them. "strategy" holds the tactics for each boss: pull, tank_position, interrupt, dispel, avoid, avoid_spells, kill_order,
+  // notes. Fields the bots act on today are listed in doc/dungeon-strategy.md ("what bots do today"); the others are kept but not used yet.
   "bosses": [
     {
+      // Death Speaker Jargba (creature entry 4428)
       "entry": 4428,
       "name": "Death Speaker Jargba",
       "strategy": {}
     },
     {
+      // Aggem Thorncurse (creature entry 4424)
       "entry": 4424,
       "name": "Aggem Thorncurse",
       "strategy": {}
     },
     {
+      // Overlord Ramtusk (creature entry 4420)
       "entry": 4420,
       "name": "Overlord Ramtusk",
       "strategy": {}
     },
     {
+      // Agathelos the Raging (creature entry 4422)
       "entry": 4422,
       "name": "Agathelos the Raging",
       "strategy": {}
     },
     {
+      // Charlga Razorflank (creature entry 4421)
       "entry": 4421,
       "name": "Charlga Razorflank",
       "strategy": {}
