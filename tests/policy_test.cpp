@@ -2790,6 +2790,27 @@ void ADeadMemberIsRevivedByItsLeaderOutOfCombat()
     CHECK(!HasAction(busy.Decide(fighting, 1000), 13, ActionType::kRevive));
 }
 
+// A ghost at its corpse with a live hostile within 30 yards waits (a ghost cannot be killed, the reclaimed body can); after two minutes it reclaims anyway.
+void AGhostDoesNotReclaimNextToAHostile()
+{
+    BotPolicy policy(DeadOptions(nullptr));
+    auto const build = [](bool hostile)
+    {
+        WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 });
+        Ghost(v.bots[3], 0.0f, 0, 10.0f);
+        v.bots[3].reclaim_wait_ms = 0;
+        if (hostile)
+            AddNearby(v, 3, Hostile(7, 12.0f, 100));
+        return v;
+    };
+    CHECK(!HasAction(policy.Decide(build(true), 1000), 13, ActionType::kReclaimCorpse));
+    CHECK(!HasAction(policy.Decide(build(true), 60000), 13, ActionType::kReclaimCorpse));
+    CHECK(HasAction(policy.Decide(build(false), 61000), 13, ActionType::kReclaimCorpse));   // the hostile left: back to life
+    BotPolicy stubborn(DeadOptions(nullptr));
+    CHECK(!HasAction(stubborn.Decide(build(true), 1000), 13, ActionType::kReclaimCorpse));
+    CHECK(HasAction(stubborn.Decide(build(true), 122000), 13, ActionType::kReclaimCorpse)); // two minutes: it waits no longer
+}
+
 void GhostReclaimsInRadiusAndRetries()
 {
     BotPolicy policy(DeadOptions(nullptr));
@@ -4486,6 +4507,7 @@ int main()
     GhostOnTheOutsideMapWalksToThePortal();
     ADeadMemberOnMapZeroIsTeleportedBackToItsCorpse();
     ADeadMemberIsRevivedByItsLeaderOutOfCombat();
+    AGhostDoesNotReclaimNextToAHostile();
     GhostReclaimsInRadiusAndRetries();
     GhostCorpseRunTimesOut();
     DeadBotAcceptsAResurrectOffer();

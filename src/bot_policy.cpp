@@ -241,6 +241,10 @@ constexpr std::uint64_t kCorpseTeleportRetryMs = 15000; // a ghost off its corps
 constexpr std::uint64_t kOutOfCombatReviveRetryMs = 10000; // a ghost of a dungeon party is revived by its leader out of combat, not again before this
 constexpr std::uint64_t kCorpseReviveDelayMs = 8000;       // the Recover tactic: a dead member of a dungeon party whose leader is up and quiet is revived by the leader this long after the fight ended
 constexpr std::uint32_t kOutOfCombatReviveTries = 3;       // and after this many tries the ghost walks back to its corpse as before
+// A ghost cannot be attacked; the body it reclaims can: it comes back alive at about half health, on the spot where it died, next to whatever killed it (on the sim a tank was
+// killed seven times in a row by the same scout, each time minutes after its reclaim). A ghost therefore waits, up to this long, while a live hostile stands this close to it.
+constexpr float kReclaimDangerYards = 30.0f;
+constexpr std::uint64_t kReclaimDangerWaitMs = 120000;
 constexpr float kReclaimYards = 35.0f;               // the core allows 39 yards; the ghost reclaims from this close
 
 // A cast or channel is in progress. cast_remaining_ms is no test: it is 0 while a spell is in flight (a Fireball after the cast, state
@@ -1996,7 +2000,18 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 if (dist <= kReclaimYards)
                 {
                     emit(Decision{ ActionType::kStop, 0 });
-                    if (bot.reclaim_wait_ms == 0 && nowMs >= state.ReclaimRetryMs)
+                    bool danger = false;
+                    for (NearbyUnit const& unit : nearby)
+                        danger = danger || (IsLiveMob(unit) && rotation::DistanceYards(bot, unit) <= kReclaimDangerYards);
+                    if (!danger)
+                        state.ReclaimDangerSinceMs = 0;
+                    else if (state.ReclaimDangerSinceMs == 0)
+                    {
+                        state.ReclaimDangerSinceMs = nowMs;
+                        event("reclaim_held: bot=" + std::to_string(bot.guid) + " reason=hostile_near_corpse dist=" + std::to_string(int(dist)));
+                    }
+                    bool const holdForDanger = danger && nowMs - state.ReclaimDangerSinceMs < kReclaimDangerWaitMs;
+                    if (bot.reclaim_wait_ms == 0 && nowMs >= state.ReclaimRetryMs && !holdForDanger)
                     {
                         BotAction reclaim;
                         reclaim.bot_guid = bot.guid;
