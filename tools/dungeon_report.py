@@ -44,7 +44,7 @@ SCEN_BOT = re.compile(r"forever-bots: scenario bot (?P<guid>\d+) race (?P<race>\
 RESULT = re.compile(r"forever-bots: scenario (?P<name>[\w.-]+?)(?:#(?P<party>\d+))?: outcome=(?P<outcome>\S+) furthest=(?P<furthest>\d+)/(?P<route>\d+) deaths=(?P<deaths>\d+) "
                     r"alive=(?P<alive>\d+)/(?P<roster>\d+) events=(?P<events>\d+) revived=(?P<revived>\d+) wipes=(?P<wipes>\d+) ghosts=(?P<ghosts>\d+) run=(?P<run>\d+)s"
                     r"(?: party=(?P<party_formed>\w+))?(?: bosses=(?P<killed>\d+)/(?P<total>\d+) killed=(?P<names>.*))?")
-DIED = re.compile(r"forever-bots: event died: bot=(?P<bot>\d+) life=(?P<life>\d+) map=(?P<map>\d+).* killer_entry=(?P<killer>\w+)")
+DIED = re.compile(r"forever-bots: event died: bot=(?P<bot>\d+) life=(?P<life>\d+) map=(?P<map>\d+)\s+last_decision=(?P<action>\S+).* killer_entry=(?P<killer>\S+)\s+in_combat=(?P<combat>\d)")
 GHOST = re.compile(r"forever-bots: event ghost: bot=(?P<bot>\d+)")
 REVIVED = re.compile(r"forever-bots: event revived: bot=(?P<bot>\d+)")
 TACTIC = re.compile(r"forever-bots: event (?P<kind>focus|interrupt_target|heal): (?:bot|healer)=(?P<bot>\d+)")
@@ -104,7 +104,7 @@ def read(lines, since=None):
             continue
         m = DIED.search(line)
         if m:
-            events.append((t, "died", (int(m["bot"]), m["killer"], int(m["map"]))))
+            events.append((t, "died", (int(m["bot"]), m["killer"], int(m["map"]), m["action"], int(m["combat"]))))
             continue
         if GHOST.search(line):
             events.append((t, "ghost", (int(GHOST.search(line)["bot"]),)))
@@ -140,7 +140,7 @@ def assign(parties, spawned, events, roster):
         party = parties[key]
         if kind == "died":
             if party.started is None or (t is not None and t >= party.started):
-                party.deaths.append((t, guid, data[1]))
+                party.deaths.append((t, guid, data[1], data[2], data[3], data[4]))
         elif kind == "ghost":
             party.ghosts += 1
         elif kind == "revived":
@@ -165,6 +165,20 @@ def load_names(path):
     return names
 
 
+# the boss names that make up one encounter: Sneed's Shredder and Sneed are counted once (the review's
+# decision of 2026-10-22), so the encounter is complete only when both are dead
+ENCOUNTERS = (("Sneed's Shredder", "Sneed"),)
+
+
+def encounters_of(killed):
+    """The names of the encounters that completed: a pair counts when both of its parts are dead."""
+    done = []
+    for parts in ENCOUNTERS:
+        if all(part in killed for part in parts):
+            done.append(" + ".join(parts))
+    return done
+
+
 def report(parties, names, total_bosses):
     rows = []
     for key, party in parties.items():
@@ -176,9 +190,11 @@ def report(parties, names, total_bosses):
             print(f"   running from {clock(start % 86400)} (clock time); times below are minutes:seconds into the run")
         for t, name in party.bosses:
             print(f"   boss killed  {name:<22} at {clock(t - start) if (t is not None and start is not None) else '?'}")
-        for t, bot, killer in party.deaths:
+        for death in party.deaths:
+            t, bot, killer, place, action, combat = death
             who = names.get(killer, killer)
-            print(f"   death        bot {bot:<6} at {clock(t - start) if (t is not None and start is not None) else '?':<7} killed by {who}")
+            when = clock(t - start) if (t is not None and start is not None) else '?'
+            print(f"   death        bot {bot:<6} at {when:<7} killed by {who:<22} map {place} action {action}{' in combat' if combat else ''}")
         r = party.result
         if r:
             print(f"   result       outcome={r['outcome']} furthest={r['furthest']}/{r['route']} deaths={r['deaths']} death_events={r['events']} revived={r['revived']} "
@@ -194,6 +210,7 @@ def report(parties, names, total_bosses):
             "key": key, "complete": bool(r and r["outcome"] == "complete"), "killed": killed, "deaths": int(r["events"]) if r else len(party.deaths),
             "wipes": int(r["wipes"]) if r else 0, "run": int(r["run"]) if r else 0, "ended": bool(r),
             "boss_times": [(t - start) for t, _ in party.bosses if t is not None and start is not None],
+            "encounters": encounters_of([name for _, name in party.bosses]),
         })
     print("== aggregate")
     n = len(rows)
@@ -207,7 +224,11 @@ def report(parties, names, total_bosses):
     times = [t for row in rows for t in row["boss_times"]]
     if times:
         print(f"   first-boss kill times: {[clock(min(row['boss_times'])) for row in rows if row['boss_times']]}")
-    killers = collections.Counter(k for party in parties.values() for _, _, k in party.deaths)
+    # the Shredder and Sneed are one encounter (the review's decision: complete only when both are dead)
+    encounters = [name for row in rows for name in row.get("encounters", [])]
+    if encounters:
+        print("   encounters: " + ", ".join(sorted(set(encounters))))
+    killers = collections.Counter(k for party in parties.values() for death in party.deaths for k in [death[2]])
     if killers:
         print("   killers: " + ", ".join(f"{names.get(k, k)} x{c}" for k, c in killers.most_common(6)))
 
