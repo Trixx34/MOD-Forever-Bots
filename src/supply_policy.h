@@ -31,8 +31,8 @@ struct Settings
     std::uint32_t ManaPotionLow = 1;
     std::uint32_t BandageLow = 3;
     std::uint32_t UseHealthPotionBelowPct = 35; // in a fight, a bot below this health drinks a health potion ...
-    std::uint32_t UseManaPotionBelowPct = 15;   // ... and one below this mana (a mana user) a mana potion
-    std::uint64_t PotionEveryMs = 120000;       // the game shares a two-minute cooldown between potions: not asked for sooner
+    std::uint32_t UseManaPotionBelowPct = 25;   // ... and one below this mana (a mana user) a mana potion
+    std::uint64_t PotionEveryMs = 60000;       // the game shares a two-minute cooldown between potions: not asked for sooner (reduced to 60 s for dungeons)
     std::uint32_t UseBandageBelowPct = 60;      // a resting bot below this health, with no food to eat, bandages itself ...
     std::uint64_t BandageEveryMs = 60000;       // ... and not again for the "Recently Bandaged" minute
 };
