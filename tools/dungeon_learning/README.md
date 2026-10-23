@@ -17,26 +17,23 @@ Each run uses one candidate across all parties. The runner supports up to eight 
 
 ## Run a candidate
 
-Build/deploy the bot module and test core first. Then run a bounded sim batch; parameters after the duration are seed, heal threshold, tank threshold, DPS mana threshold, and LoS move distance:
+Build/deploy the bot module and test core first. `experiment.sh` is the self-service entry point; it records a manifest and keeps run output outside the source tree. Its `start` arguments are name, parties, seed, heal threshold, tank threshold, DPS mana threshold, LoS move distance, and duration:
 
 ```bash
-RUN_DIR=/tmp/dm-learning/candidate-55-75-40-6 \
-  tools/sim_dungeon_run.sh start 8 none 2400 1 55 75 40 6
+tools/dungeon_learning/experiment.sh start baseline 8 1 55 75 40 6 2400
+tools/dungeon_learning/experiment.sh status baseline
+# Once all 8 parties have an outcome:
+tools/dungeon_learning/experiment.sh report baseline
 ```
 
-After the scenario parties finish:
+The script refuses to restart the sim while the current scenario has unfinished parties, so starting a new candidate cannot silently interrupt a run. Default output is `/tmp/dm-learning/baseline`; set `RUN_ROOT=/path` to move it. Use a new name for every run, including repeats with a different seed:
 
 ```bash
-RUN_DIR=/tmp/dm-learning/candidate-55-75-40-6 tools/sim_dungeon_run.sh report
-python3 -I tools/dungeon_learning/analyze.py analyze \
-  --summary /tmp/dm-learning/candidate-55-75-40-6/dm-run.log \
-  --trace /tmp/dm-learning/candidate-55-75-40-6/dm-run.telegraph.log \
-  --out /tmp/dm-learning/candidate-55-75-40-6/candidate-55-75-40-6 \
-  --candidate candidate-55-75-40-6 --seed 1 --parties 8 \
-  --heal 55 --tank-heal 75 --dps-mana 40 --los-yards 6
+tools/dungeon_learning/experiment.sh start baseline-seed-2 8 2 55 75 40 6 2400
+tools/dungeon_learning/experiment.sh report baseline-seed-2
 ```
 
-The analyzer writes `events.jsonl` in journal order (core sequence numbers are retained) plus `metrics.json` with party outcomes, bot cast results, effective damage/healing, and LoS refusals. The summary keeps the full per-party outcomes; the trace remains suitable for replay and later feature extraction.
+The analyzer writes `events.jsonl` in journal order (core sequence numbers are retained) plus `metrics.json` with party outcomes, bot cast results, effective damage/healing, and LoS refusals. It also preserves the raw summary and telegraph logs for replay and later feature extraction.
 
 ## Compare and choose the next experiment
 
@@ -49,8 +46,8 @@ Keep one metrics file per candidate and seed. Rank uses an explicit lexicographi
 5. LoS refusals (lower)
 
 ```bash
-python3 -I tools/dungeon_learning/analyze.py rank /tmp/dm-learning/*/candidate-*/metrics.json
-python3 -I tools/dungeon_learning/analyze.py propose /tmp/dm-learning/*/candidate-*/metrics.json
+tools/dungeon_learning/experiment.sh rank
+tools/dungeon_learning/experiment.sh propose
 ```
 
 `propose` suggests one-knob neighbors of the best candidate within the validated bounds. Re-run the top candidates on at least one held-out seed before adopting anything. Treat the result as a recommendation; review the trace and merge changes manually. Run output stays under `/tmp`, not in the source tree.

@@ -20,6 +20,14 @@ case "${1:-}" in
     fi
     MAXB=$((5*N))
     mkdir -p "${RUN_DIR:-/tmp}"
+    ACTIVE_SINCE=$(ssh forever-test "sudo -n systemctl show forever-sim -p ActiveEnterTimestamp --value")
+    COUNTS=$(ssh forever-test "sudo -n journalctl -u forever-sim --since '$ACTIVE_SINCE' --no-pager -q 2>/dev/null | awk '/forever-bots: scenario .*: phase running/ { started++ } /forever-bots: scenario .*: outcome=/ { finished++ } END { print started+0, finished+0 }'")
+    read -r STARTED FINISHED <<< "$COUNTS"
+    if (( STARTED > FINISHED )); then
+      echo "Refusing to restart forever-sim: current run is unfinished ($FINISHED/$STARTED parties complete). Use status/report first." >&2
+      exit 3
+    fi
+    date '+%F %T' > "$STAMP"
     ssh forever-test "sudo -n sh -c 'cat > $CONF <<EOT
 Module.forever-bots.DungeonFile = /srv/forever/sim/modules_runtime/forever-bots/data/dungeons.txt
 Module.forever-bots.DungeonEventsFile = /srv/forever/sim/modules_runtime/forever-bots/data/dungeon_events.txt
@@ -39,7 +47,7 @@ Module.forever-bots.HealerLosMoveYards = $LOS_YARDS
 Modules.Tier2.DungeonTelegraph = 1
 EOT
 systemctl restart forever-sim'" 
-    date '+%F %T' > $STAMP; cat $STAMP;;
+    cat "$STAMP";;
   report)
     ssh forever-test "sudo -n journalctl -u forever-sim --since '$(cat $STAMP)' --no-pager -q 2>/dev/null | grep -E 'forever-bots: (scenario|event (died|ghost|revived|focus|interrupt_target|heal)|bot [0-9]+ .* not done)'" > ${RUN_DIR:-/tmp}/dm-run.log
     # Full chronological trace for a dungeon encounter: core cast starts, effective damage/heals,
@@ -51,5 +59,7 @@ systemctl restart forever-sim'"
   leveling)
     ssh forever-test "sudo -n sh -c 'rm -f $CONF; systemctl restart forever-sim'"; echo restored;;
   status)
-    ssh forever-test "sudo -n journalctl -u forever-sim --since '-3min' --no-pager -q | grep -E 'forever-bots: scenario' | tail -12" | cut -c1-200;;
+    SINCE='-3min'
+    [[ -f "$STAMP" ]] && SINCE=$(cat "$STAMP")
+    ssh forever-test "sudo -n journalctl -u forever-sim --since '$SINCE' --no-pager -q | grep -E 'forever-bots: scenario .* (phase done|outcome=|boss killed:)' | tail -24 || true" | cut -c1-220;;
 esac
