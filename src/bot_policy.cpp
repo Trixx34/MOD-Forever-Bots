@@ -181,9 +181,9 @@ constexpr std::uint32_t kEmergencyHealBelowPct = 30;
 // Power Word: Shield preemptive threshold: shield a member that has taken damage recently and is under this
 constexpr std::uint32_t kShieldBelowPct = 50;
 // A healer of a dungeon party must drink at this mana level (out of combat).
-constexpr std::uint32_t kDungeonDrinkBelowPct = 30;
+constexpr std::uint32_t kDungeonDrinkBelowPct = 50;  // drink at 50% mana (was 30%)
 // A healer of a dungeon party drinks up to this.
-constexpr std::uint32_t kDungeonDrinkUpToPct = 85;
+constexpr std::uint32_t kDungeonDrinkUpToPct = 95;   // drink up to 95% (was 85%)
 // How long a heal claim on a member lasts: one global cooldown and the cast, so a second healer looks elsewhere meanwhile.
 constexpr std::uint64_t kHealClaimMs = 2500;
 constexpr float kHealRangeYards = 30.0f;
@@ -3531,18 +3531,19 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         bool const stillHurt = bot.max_health > 0 && bot.health < bot.max_health;
         // Waiting for the party (dungeon): sits to recover health, and mana for a mana user, even with creatures in view.
         bool const holdIdle = dungeonHold && !hasTarget && wanted.Type == ActionType::kStop && !routeBusy;
-        // Dungeon healer drink: a healer of a dungeon party that is holding for a pull drinks when under kDungeonDrinkBelowPct,
-        // and drinks up to kDungeonDrinkUpToPct. This overrides the normal rest share so the pull does not go out with the healer OOM.
-        bool const dungeonHealerDrink = holdIdle && manaUser && routeActiveOf(bot.guid) &&
-                                        std::uint64_t(bot.power) * 100 < std::uint64_t(bot.max_power) * kDungeonDrinkBelowPct;
+        // Dungeon drink: any mana user in a dungeon party drinks at kDungeonDrinkBelowPct and drinks up to kDungeonDrinkUpToPct.
+        // This overrides the normal rest share so the pull does not go out with anyone OOM. The owner's rule of 2026-10-23:
+        // a pull should not start with the healer (or any mana user) OOM.
+        bool const dungeonDrink = holdIdle && manaUser && routeActiveOf(bot.guid) &&
+                                  std::uint64_t(bot.power) * 100 < std::uint64_t(bot.max_power) * kDungeonDrinkBelowPct;
         bool const manaLow = holdIdle && manaUser &&
                              std::uint64_t(bot.power) * 100 < std::uint64_t(bot.max_power) * (state.Sitting ? kPartyReadySitHealthPct : (_options.TacticRest ? kPartyReadyPowerPct : kPartyReadyPowerOldPct));
         // The Rest tactic: the party waits for every member to reach the pull share (90 %), so a member below it sits to get there (it only sat below its own rest share).
         bool const healthLow = holdIdle && _options.TacticRest && bot.max_health > 0 &&
                                std::uint64_t(bot.health) * 100 < std::uint64_t(bot.max_health) * kPartyReadyHealthPct;
-        // A dungeon healer drinks up to the dungeon drink cap; others use the normal manaLow threshold.
-        bool const drinkCap = dungeonHealerDrink ? kDungeonDrinkUpToPct : (state.Sitting ? kPartyReadySitHealthPct : (_options.TacticRest ? kPartyReadyPowerPct : kPartyReadyPowerOldPct));
-        bool const manaStillLow = state.Sitting && dungeonHealerDrink &&
+        // A dungeon mana user drinks up to the dungeon drink cap; others use the normal manaLow threshold.
+        bool const drinkCap = dungeonDrink ? kDungeonDrinkUpToPct : (state.Sitting ? kPartyReadySitHealthPct : (_options.TacticRest ? kPartyReadyPowerPct : kPartyReadyPowerOldPct));
+        bool const manaStillLow = state.Sitting && dungeonDrink &&
                                   std::uint64_t(bot.power) * 100 < std::uint64_t(bot.max_power) * drinkCap;
         bool const sitWanted = (idle || holdIdle) && (state.Sitting ? (stillHurt || manaLow || manaStillLow || manaResting) : (hurtEnough || healthLow || manaLow || manaResting)) &&
                                nowMs >= state.RestRetryAtMs;
