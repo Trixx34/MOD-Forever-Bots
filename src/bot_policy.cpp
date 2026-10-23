@@ -173,11 +173,11 @@ constexpr std::uint64_t kPullHoldMaxMs = 120000;    // the party never waits lon
 constexpr std::uint64_t kTankHeadStartMs = 2500;    // the others join a fight this long after the tank started it, so the tank has the threat
 // Healing: a healer class heals the party member with the lowest health below this share, within this range.
 constexpr std::uint32_t kHealBelowPct = 60;
-constexpr std::uint32_t kDungeonHealBelowPct = 45;   // healer heals non-tank below 45% (review: others < 45%), not 75%
+constexpr std::uint32_t kDungeonHealBelowPct = 55;   // healer heals non-tank below 55% (buffer for burst), not 45%
 // The tank (the party leader) is kept alive first while it holds a target, even a little below this.
-constexpr std::uint32_t kTankHealBelowPct = 65;      // tank at 65% (review: tank < 65%), not 90%
+constexpr std::uint32_t kTankHealBelowPct = 75;      // tank at 75% (buffer for burst), not 65%
 // Emergency fast heal threshold: Flash Heal / Lesser Heal for someone in danger
-constexpr std::uint32_t kEmergencyHealBelowPct = 30;
+constexpr std::uint32_t kEmergencyHealBelowPct = 20;
 // Power Word: Shield preemptive threshold: shield a member that has taken damage recently and is under this
 constexpr std::uint32_t kShieldBelowPct = 50;
 // A healer of a dungeon party must drink at this mana level (out of combat).
