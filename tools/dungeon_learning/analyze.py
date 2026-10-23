@@ -41,6 +41,10 @@ def parse_trace_line(line, ordinal):
         ints(values, "seq", "time_ms", "instance", "caster", "caster_entry", "target", "target_entry",
              "attacker", "attacker_entry", "victim", "victim_entry", "healer", "healer_entry", "spell",
              "amount", "effective", "attempted", "victim_hp_before", "target_hp_before")
+        if "event" not in values:
+            # journalctl wraps long lines; keep the partial event out of metrics while retaining it in the trace.
+            values["event"] = None
+            values["_truncated"] = True
         return {"ordinal": ordinal, "source": "core", **values}
 
     marker = "forever-bots: event cast_result: "
@@ -91,7 +95,7 @@ def summarize_events(events, scenario_bots):
     los_refusals = 0
     for event in events:
         kind = event.get("event")
-        if event["source"] == "core":
+        if event["source"] == "core" and kind is not None:
             counts[kind] += 1
             if kind == "cast_start":
                 by_spell[str(event.get("spell", 0))] += 1
@@ -126,7 +130,7 @@ def analyze(summary_path, trace_path, out_dir, candidate, seed, expected_parties
     events = []
     for ordinal, line in enumerate(Path(trace_path).read_text(encoding="utf-8", errors="replace").splitlines()):
         event = parse_trace_line(line, ordinal)
-        if event:
+        if event and not event.get("_truncated"):
             stamp = STAMP.match(line)
             if stamp:
                 event["journal_time"] = stamp["stamp"]
@@ -148,8 +152,9 @@ def analyze(summary_path, trace_path, out_dir, candidate, seed, expected_parties
             "wipe_rate": sum(p["wipes"] > 0 or p["outcome"] == "wipe" for p in parties) / n if n else 0.0,
             "mean_run_sec": sum(p["run"] for p in parties) / n if n else 0.0,
         },
-        "combat": summarize_events(events, set(bots)),
+        "combat": summarize_events([e for e in events if e.get("source") == "module" or e.get("event") in ("cast_start", "damage", "heal")], set(bots)),
         "trace_events": len(events),
+        "truncated_trace_lines": 0,
         "warnings": [] if n == expected_parties else [f"expected {expected_parties} party outcomes, found {n}"],
     }
     out = Path(out_dir)
