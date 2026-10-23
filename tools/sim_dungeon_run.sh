@@ -61,5 +61,5 @@ systemctl restart forever-sim'"
   status)
     SINCE='-3min'
     [[ -f "$STAMP" ]] && SINCE=$(cat "$STAMP")
-    ssh forever-test "sudo -n journalctl -u forever-sim --since '$SINCE' --no-pager -q | grep -E 'forever-bots: scenario .* (phase done|outcome=|boss killed:)' | tail -24 || true" | cut -c1-220;;
+    ssh forever-test "sudo -n journalctl -u forever-sim --since '$SINCE' --no-pager -q | grep -E 'forever-bots: scenario .*: (phase done|outcome=|boss killed:)' | tail -24 || true" | cut -c1-220;;
 esac
