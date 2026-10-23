@@ -166,7 +166,7 @@ constexpr std::uint32_t kRouteMinHealthPct = 80; // and for its own health to be
 // Dungeon pull control: the tank (the party leader) pulls only when the party is ready, and the others wait for the tank to hold the target.
 constexpr std::uint32_t kPartyReadyHealthOldPct = 80, kPartyReadyPowerOldPct = 60; // with the Rest tactic off
 constexpr std::uint32_t kPartyReadyHealthPct = 90;  // every living member has at least this much health
-constexpr std::uint32_t kPartyReadyPowerPct = 80;   // and every mana user at least this much mana
+constexpr std::uint32_t kPartyReadyPowerPct = 95;   // and every mana user at least this much mana (matches drink cap)
 constexpr std::uint32_t kPartyReadySitHealthPct = 95; // a sitting member rests up to this much
 constexpr std::uint64_t kPullHoldClearMs = 10000;  // the party must be ready this long in a row before a pull hold ends
 constexpr std::uint64_t kPullHoldMaxMs = 120000;    // the party never waits longer than this for itself
