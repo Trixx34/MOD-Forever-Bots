@@ -44,6 +44,37 @@ class TraceParserTest(unittest.TestCase):
         self.assertTrue(all(30 <= p["params"]["heal"] <= 85 for p in proposals))
         self.assertTrue(all(40 <= p["params"]["tank_heal"] <= 95 for p in proposals))
 
+    def test_partial_event_name_is_treated_as_truncated(self):
+        line = ("Oct 23 14:00:00 forever-sim[12]: dungeon_telegraph seq=9 time_ms=1 event=dam instance=1 "
+                "attacker=1 attacker_name=X attacker_entry=0 victim=2 victim_name=Y victim_entry=0 spell=0 amount=5")
+        event = learning.parse_trace_line(line, 0)
+        self.assertTrue(event["_truncated"])
+
+    def test_timeline_orders_events_into_party_blocks(self):
+        def core(seq, stamp, event, body):
+            return (f"{stamp} forever-sim[12]: dungeon_telegraph seq={seq} time_ms=100 event={event} "
+                    f"instance=7 {body}")
+        trace = "\n".join([
+            core(1, "Oct 23 14:00:00", "cast_start",
+                 "caster=900 caster_name=Healer caster_entry=0 target=0 target_name=none target_entry=0 spell=2054 triggered=true"),
+            core(2, "Oct 23 14:00:01", "heal",
+                 "healer=900 healer_name=Healer healer_entry=0 target=901 target_name=Tank target_entry=0 spell=2054 attempted=50 effective=40 target_hp_before=100"),
+            core(3, "Oct 23 14:05:00", "damage",
+                 "attacker=901 attacker_name=Tank attacker_entry=0 victim=639 victim_name=Edwin VanCleef victim_entry=0 spell=0 amount=10 effective=10 victim_hp_before=500"),
+        ]) + "\n"
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "trace.log"
+            path.write_text(trace, encoding="utf-8")
+            events, truncated = learning.load_events(path)
+        self.assertEqual(truncated, 0)
+        lines = learning.build_timeline(events, 7, gap=30, kills=[(7, 50401, "Edwin VanCleef")],
+                                        known_bots={900, 901})
+        blocks = [line for line in lines if line.startswith("== party")]
+        self.assertEqual(len(blocks), 2)
+        self.assertIn("bots=900", blocks[0])
+        self.assertTrue(any("Heal (2054)" in line and "Tank(901)" in line for line in lines))
+        self.assertTrue(any("---- boss killed: Edwin VanCleef ----" in line for line in lines))
+
     def test_analyze_writes_party_metrics_and_ordered_trace(self):
         summary = ("Oct 23 14:00:00 forever-sim[12]: forever-bots: scenario bot 900 race 1 class 5\n"
                    "Oct 23 14:10:00 forever-sim[12]: forever-bots: scenario dm: outcome=timeout furthest=2/3 deaths=1 "

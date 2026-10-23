@@ -47,6 +47,17 @@ tools/dungeon_learning/experiment.sh report baseline-seed-2
 
 Each run folder contains `candidate.env`, `dm-run.start`, `dm-run.log`, `dm-run.telegraph.log`, `events.jsonl`, and `metrics.json`. The JSONL trace is in journal order (core sequence numbers are retained); metrics include party outcomes, bot cast results, effective damage/healing, and LoS refusals. Raw logs are kept for replay and later feature extraction.
 
+## Review a fight
+
+`timeline` prints one party's events in order, split into blocks when nothing happens for `--gap` seconds (default 30). Each block header lists the clock window, event count, party bots, NPCs seen, and any boss killed inside it; the kill is also marked inline. Cast starts, damage, and heals come from the core telegraph; `--results` adds the module's cast results (`applied`, `no line of sight`, `not enough power`, ...):
+
+```bash
+tools/dungeon_learning/experiment.sh timeline baseline 3 --results
+# -> /tmp/dm-learning/baseline/party3.timeline.txt
+```
+
+The capture is journal-based, so timestamps have one-second resolution and journald can split a small number of long lines; the analyzer drops those fragments from metrics (they stay in `events.jsonl` as `_truncated`) and `metrics.json` counts them under `truncated_trace_lines`. Ordering inside one second follows journal order.
+
 ## Compare and choose the next experiment
 
 Keep one metrics file per candidate and seed. Rank uses an explicit lexicographic objective—not an opaque weighted score:

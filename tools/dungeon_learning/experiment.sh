@@ -16,6 +16,7 @@ Usage:
   experiment.sh start NAME [PARTIES=8] [SEED=1] [HEAL=55] [TANK_HEAL=75] [DPS_MANA=40] [LOS_YARDS=6] [SECONDS=2400]
   experiment.sh status NAME
   experiment.sh report NAME
+  experiment.sh timeline NAME PARTY [--results] [--gap SECONDS]
   experiment.sh rank
   experiment.sh propose
 
@@ -95,17 +96,22 @@ EOF
     # This file is written by this script and contains only numeric parameters and the validated run name.
     # shellcheck disable=SC1090
     source "$DIR/candidate.env"
-    RUN_DIR="$DIR" "$SIM_HELPER" report
+    # Freeze the capture to the configured run window. The sim starts the next scenario
+    # automatically, so an unbounded report would keep appending later parties to these metrics.
+    RUN_UNTIL=$(date -d "$(cat "$DIR/dm-run.start") + $((DURATION + 300)) seconds" '+%F %T')
+    RUN_UNTIL="$RUN_UNTIL" RUN_DIR="$DIR" "$SIM_HELPER" report
     python3 -I "$ANALYZER" analyze --summary "$DIR/dm-run.log" --trace "$DIR/dm-run.telegraph.log" --out "$DIR" \
       --candidate "$NAME" --seed "$SEED" --parties "$PARTIES" --heal "$HEAL" --tank-heal "$TANK" --dps-mana "$DPS" --los-yards "$LOS"
-    if [[ -f "$ACTIVE" && "$(cat "$ACTIVE")" == "$NAME" ]] && python3 - "$DIR/metrics.json" <<'PY'
+    if python3 - "$DIR/metrics.json" <<'PY'
 import json, sys
 metrics = json.load(open(sys.argv[1], encoding="utf-8"))
 raise SystemExit(0 if not metrics.get("warnings") else 1)
 PY
     then
-      rm -f "$ACTIVE"
-      echo "Complete candidate stored: $DIR/metrics.json"
+      if [[ -f "$ACTIVE" && "$(cat "$ACTIVE")" == "$NAME" ]]; then
+        rm -f "$ACTIVE"
+      fi
+      echo "Complete candidate stored: $DIR/metrics.json (capture ended $RUN_UNTIL)"
     else
       echo "Candidate is incomplete; keep the active marker and use status/report again after all party outcomes arrive."
     fi
@@ -116,6 +122,18 @@ PY
     METRICS=("$RUN_ROOT"/*/metrics.json)
     ((${#METRICS[@]})) || { echo "No analyzed candidates under $RUN_ROOT" >&2; exit 2; }
     python3 -I "$ANALYZER" "$1" "${METRICS[@]}"
+    ;;
+
+  timeline)
+    # Ordered, block-per-pull fight trace for one party of a completed report.
+    NAME=${2:-}; PARTY=${3:-}
+    [[ "$NAME" =~ ^[A-Za-z0-9._-]+$ ]] || { usage >&2; exit 2; }
+    valid_int "$PARTY" 1 8 || { echo "PARTY must be 1..8 (five bots per party)." >&2; exit 2; }
+    DIR=$(run_dir "$NAME")
+    [[ -f "$DIR/dm-run.telegraph.log" ]] || { echo "No telegraph capture for $NAME in $DIR; run report first." >&2; exit 2; }
+    shift 3
+    python3 -I "$ANALYZER" timeline --trace "$DIR/dm-run.telegraph.log" --summary "$DIR/dm-run.log" \
+      --party "$PARTY" --out "$DIR/party$PARTY.timeline.txt" "$@"
     ;;
 
   help|-h|--help)

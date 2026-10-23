@@ -49,10 +49,16 @@ EOT
 systemctl restart forever-sim'" 
     cat "$STAMP";;
   report)
-    ssh forever-test "sudo -n journalctl -u forever-sim --since '$(cat $STAMP)' --no-pager -q 2>/dev/null | grep -E 'forever-bots: (scenario|event (died|ghost|revived|focus|interrupt_target|heal)|bot [0-9]+ .* not done)'" > ${RUN_DIR:-/tmp}/dm-run.log
+    SINCE=$(cat "$STAMP")
+    WINDOW="--since '$SINCE'"
+    if [[ -n "${RUN_UNTIL:-}" ]]; then
+      [[ "$RUN_UNTIL" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}\ [0-9]{2}:[0-9]{2}:[0-9]{2}$ ]] || { echo "RUN_UNTIL must be 'YYYY-MM-DD HH:MM:SS'." >&2; exit 2; }
+      WINDOW="$WINDOW --until '$RUN_UNTIL'"
+    fi
+    ssh forever-test "sudo -n journalctl -u forever-sim $WINDOW --no-pager -q 2>/dev/null | grep -E 'forever-bots: (scenario|event (died|ghost|revived|focus|interrupt_target|heal)|bot [0-9]+ .* not done)'" > ${RUN_DIR:-/tmp}/dm-run.log
     # Full chronological trace for a dungeon encounter: core cast starts, effective damage/heals,
     # and the module's cast-result/decision events. Keep separate from the compact party summary.
-    ssh forever-test "sudo -n journalctl -u forever-sim --since '$(cat $STAMP)' --no-pager -q 2>/dev/null | grep -E 'dungeon_telegraph|forever-bots: event cast_result:|forever-bots: event healer_dps_los'" > ${RUN_DIR:-/tmp}/dm-run.telegraph.log
+    ssh forever-test "sudo -n journalctl -u forever-sim $WINDOW --no-pager -q 2>/dev/null | grep -E 'dungeon_telegraph|forever-bots: event cast_result:|forever-bots: event healer_dps_los'" > ${RUN_DIR:-/tmp}/dm-run.telegraph.log
     echo "telegraph: ${RUN_DIR:-/tmp}/dm-run.telegraph.log ($(wc -l < "${RUN_DIR:-/tmp}/dm-run.telegraph.log") lines)"
     wc -l < ${RUN_DIR:-/tmp}/dm-run.log
     python3 -I $(dirname "$0")/dungeon_report.py ${RUN_DIR:-/tmp}/dm-run.log --names $(dirname "$0")/names-dm.tsv;;
