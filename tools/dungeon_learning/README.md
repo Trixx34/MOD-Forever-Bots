@@ -2,6 +2,16 @@
 
 This is a reproducible, offline policy-search loop, not live self-modification. It uses the sim's ordered combat trace and per-party outcomes to compare bounded policy candidates. A candidate changes one or more config knobs; it does not edit code or merge itself.
 
+## Scripts
+
+Run these from the bot repository root:
+
+- `tools/dungeon_learning/experiment.sh` — recommended entry point. Starts a named test run, checks status, collects/analyzes the report, and ranks or proposes candidates.
+- `tools/sim_dungeon_run.sh` — lower-level sim start/report helper. It SSHes to `forever-test`, writes the scenario config, and restarts the sim. Prefer `experiment.sh` because it records candidate settings and protects local run state.
+- `tools/dungeon_learning/analyze.py` — standard-library-only parser/ranker. Use directly only when analyzing logs collected another way; `experiment.sh report` calls it for you.
+
+The scripts require SSH access to `forever-test` and passwordless `sudo` there. They only target the test sim. The experiment output is local and defaults to `/tmp/dm-learning/`.
+
 ## What varies
 
 The module validates these candidate parameters and uses the current policy values as defaults:
@@ -17,7 +27,7 @@ Each run uses one candidate across all parties. The runner supports up to eight 
 
 ## Run a candidate
 
-Build/deploy the bot module and test core first. `experiment.sh` is the self-service entry point; it records a manifest and keeps run output outside the source tree. Its `start` arguments are name, parties, seed, heal threshold, tank threshold, DPS mana threshold, LoS move distance, and duration:
+Build/deploy the telegraph-enabled test core and bot module with tuning support first. Then run `start`; its positional arguments are **name, parties, seed, heal threshold, tank threshold, DPS mana threshold, LoS move distance, duration**:
 
 ```bash
 tools/dungeon_learning/experiment.sh start baseline 8 1 55 75 40 6 2400
@@ -33,7 +43,9 @@ tools/dungeon_learning/experiment.sh start baseline-seed-2 8 2 55 75 40 6 2400
 tools/dungeon_learning/experiment.sh report baseline-seed-2
 ```
 
-The analyzer writes `events.jsonl` in journal order (core sequence numbers are retained) plus `metrics.json` with party outcomes, bot cast results, effective damage/healing, and LoS refusals. It also preserves the raw summary and telegraph logs for replay and later feature extraction.
+`status` is a snapshot; run it again later to see progress. `report` may be run again after more parties finish. The launcher keeps the active-run marker until the expected number of party outcomes is present, then permits the next run.
+
+Each run folder contains `candidate.env`, `dm-run.start`, `dm-run.log`, `dm-run.telegraph.log`, `events.jsonl`, and `metrics.json`. The JSONL trace is in journal order (core sequence numbers are retained); metrics include party outcomes, bot cast results, effective damage/healing, and LoS refusals. Raw logs are kept for replay and later feature extraction.
 
 ## Compare and choose the next experiment
 
