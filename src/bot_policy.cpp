@@ -4019,6 +4019,73 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 }
             }
 
+            // Healer DPS window: when nobody needs healing and healer has mana, cast offensive spells.
+            // Only for priest (class 5): Smite, Mind Blast, Shadow Word: Pain. Only in a dungeon party,
+            // only out of combat or when the party is not taking damage, and only when healer mana > 40%.
+            if (partyLeader != 0 && classId == 5 && bot.in_combat == 0 && !hasTarget &&
+                std::uint64_t(bot.power) * 100 >= std::uint64_t(bot.max_power) * 40)
+            {
+                // Check if anyone in party needs healing
+                bool anyoneHurt = false;
+                forParty(partyLeader, [&](BotSnapshot const& member)
+                {
+                    if (member.life_state != 0 || member.max_health == 0)
+                        return;
+                    std::uint64_t const pct = std::uint64_t(member.health) * 100 / member.max_health;
+                    if (pct < (member.guid == partyLeader ? 80 : 60))
+                        anyoneHurt = true;
+                });
+                if (!anyoneHurt && nowMs >= state.NextCastMs && !(IsCasting(bot)))
+                {
+                    // Try Mind Blast first (high damage, cooldown), then Shadow Word: Pain (DoT), then Smite.
+                    static constexpr std::uint32_t kMindBlast = 8092;
+                    static constexpr std::uint32_t kSWP = 589;
+                    static constexpr std::uint32_t kSmite = 585;
+                    std::uint32_t dpsSpell = 0;
+                    if (CanPay(_options.SpellCosts.get(), kMindBlast, bot) &&
+                        (state.RetryAtMs.find(kMindBlast) == state.RetryAtMs.end() || nowMs >= state.RetryAtMs[kMindBlast]))
+                        dpsSpell = kMindBlast;
+                    else if (CanPay(_options.SpellCosts.get(), kSWP, bot) &&
+                             (state.RetryAtMs.find(kSWP) == state.RetryAtMs.end() || nowMs >= state.RetryAtMs[kSWP]))
+                        dpsSpell = kSWP;
+                    else if (CanPay(_options.SpellCosts.get(), kSmite, bot) &&
+                             (state.RetryAtMs.find(kSmite) == state.RetryAtMs.end() || nowMs >= state.RetryAtMs[kSmite]))
+                        dpsSpell = kSmite;
+                    if (dpsSpell != 0)
+                    {
+                        // Find a target: the tank's target if in combat, else the nearest hostile
+                        std::uint64_t targetGuid = 0;
+                        auto const lead = indexOf.find(partyLeader);
+                        if (lead != indexOf.end() && view.bots[lead->second].threat_target_guid != 0)
+                            targetGuid = view.bots[lead->second].threat_target_guid;
+                        if (targetGuid == 0)
+                        {
+                            for (NearbyUnit const& unit : nearby)
+                                if (unit.is_hostile && unit.health != 0 && forever_module::UnitRefType(unit.guid) == 8)
+                                {
+                                    targetGuid = unit.guid;
+                                    break;
+                                }
+                        }
+                        if (targetGuid != 0)
+                        {
+                            BotAction dps;
+                            dps.bot_guid = bot.guid;
+                            dps.type = ActionType::kCastSpell;
+                            dps.spell_id = dpsSpell;
+                            dps.target_guid = targetGuid;
+                            actions.push_back(dps);
+                            state.CastTarget[dpsSpell] = targetGuid;
+                            state.NextCastMs = nowMs + kGlobalCooldownMs;
+                            if (_options.OnEvent)
+                                _options.OnEvent("healer_dps: healer=" + std::to_string(bot.guid) + " spell=" + std::to_string(dpsSpell) +
+                                                 " target=" + std::to_string(forever_module::UnitRefEntry(targetGuid)));
+                            continue;
+                        }
+                    }
+                }
+            }
+
             // Resurrect (after the heals): a priest, paladin or shaman out of combat with the party quiet resurrects the dead member in range
             // that it is closest to (healers first, then the tank), once the 10 s cast is affordable. A refusal retries after a few seconds.
             std::uint32_t const rezSpell = ResurrectSpellFor(classId, bot.level);
