@@ -157,6 +157,11 @@ struct PolicyOptions
     bool TacticRest = true;
     // Recover: the leader of a dungeon party stands a dead member up at its side (the core's revive order) a few seconds after the fight, once it is up and quiet.
     bool TacticRecover = true;
+    // Bounded knobs for offline dungeon-policy experiments; defaults preserve current behavior.
+    std::uint32_t DungeonHealBelowPct = 55;
+    std::uint32_t DungeonTankHealBelowPct = 75;
+    std::uint32_t HealerDpsManaPct = 40;
+    std::uint32_t HealerLosMoveYards = 6;
     // Auto gear (AutoGearing setting): every bot is dressed for its level when it first appears, and again after AutoGearEveryLevels levels.
     bool AutoGearing = false;
     // Receives one line per notable decision (a heal cast, a pull held back or released), for the run logs. Unset = silent.
@@ -433,6 +438,7 @@ private:
         std::uint64_t RangeCloserUntilMs = 0;            // standing closer to the target after an out-of-range refusal, until this time
         std::uint32_t LosRefusals = 0;                   // line-of-sight refusals in a row
         std::uint64_t CloserUntilMs = 0;                 // closing to melee range after a line-of-sight refusal, until this time
+        std::uint64_t LosRepositionTarget = 0;            // target of a healer DPS cast refused for LoS; move to clear it before retrying
         std::uint64_t HoldLastNotReadyMs = 0;            // the last tick the party was not ready (the pull hold ends after kPullHoldClearMs of readiness)
         std::uint64_t HoldSinceMs = 0;                   // the party leader waits for the party to be ready since this time (0 = not waiting)
         std::uint32_t GearedAtLevel = 0;                 // the level at the last auto gear (0 = not yet)

@@ -1461,6 +1461,10 @@ int main(int argc, char** argv)
     policyOptions.TacticHeal = settings.TacticHeal;
     policyOptions.TacticRest = settings.TacticRest;
     policyOptions.TacticRecover = settings.TacticRecover;
+    policyOptions.DungeonHealBelowPct = settings.DungeonHealBelowPct;
+    policyOptions.DungeonTankHealBelowPct = settings.DungeonTankHealBelowPct;
+    policyOptions.HealerDpsManaPct = settings.HealerDpsManaPct;
+    policyOptions.HealerLosMoveYards = settings.HealerLosMoveYards;
     policyOptions.Gathering = settings.Gathering;
     if (!settings.CraftingFociFile.empty())
     {

@@ -368,6 +368,10 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     }
     ReadBool(config, "DungeonTeleport", settings.DungeonTeleport, warnings);
     ReadBool(config, "DungeonReviveOutOfCombat", settings.DungeonReviveOutOfCombat, warnings);
+    ReadKey(config, "DungeonHealBelowPct", 30, 85, settings.DungeonHealBelowPct, warnings);
+    ReadKey(config, "DungeonTankHealBelowPct", 40, 95, settings.DungeonTankHealBelowPct, warnings);
+    ReadKey(config, "HealerDpsManaPct", 10, 80, settings.HealerDpsManaPct, warnings);
+    ReadKey(config, "HealerLosMoveYards", 3, 12, settings.HealerLosMoveYards, warnings);
     ReadBool(config, "AggressiveStart", settings.AggressiveStart, warnings);
     if (auto const it = config.find("DungeonTactics"); it != config.end())
     {

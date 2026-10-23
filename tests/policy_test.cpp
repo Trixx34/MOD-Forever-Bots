@@ -1027,18 +1027,20 @@ WorldTickSnapshotView PartyView(std::vector<std::uint64_t> const& guids, std::fu
 WorldTickSnapshotView DungeonView(std::vector<std::uint64_t> const& guids)
 {
     WorldTickSnapshotView view = PartyView(guids, [](std::uint64_t guid) { return guid == 12 ? 1u : 5u; });
-    // Pre-form the party: bot 12 leads (group_role 1, no group_leader_guid), the rest are members (group_role 2, leader is 12).
+    // Pre-form the party: core layout group_role 2 is leader, 1 is member; leader reference is a Player unit ref.
+    // group_leader_guid must be a full unit reference (HighGuid::Player << 56 | counter).
+    constexpr std::uint64_t kLeaderRef = (std::uint64_t(2) << 56) | 12; // HighGuid::Player = 2
     for (BotSnapshot& bot : view.bots)
     {
         if (bot.guid == 12)
         {
-            bot.group_role = 1;
-            bot.group_leader_guid = 0; // the leader has no group leader
+            bot.group_role = 2;
+            bot.group_leader_guid = kLeaderRef; // leader's own GUID as unit reference
         }
         else
         {
-            bot.group_role = 2;
-            bot.group_leader_guid = 12;
+            bot.group_role = 1;
+            bot.group_leader_guid = kLeaderRef;
         }
     }
     return view;
@@ -1150,7 +1152,7 @@ void OldPartiesAreLeftBeforeTheNewOnesForm()
     for (BotSnapshot& bot : view.bots)
         if (bot.guid == 10 || bot.guid == 12)
         {
-            bot.group_role = 1;
+            bot.group_role = 2;
             bot.group_leader_guid = PlayerOf(20);
         }
     BotPolicy policy = PartyPolicy(5);
@@ -2575,7 +2577,57 @@ void HealerHealsItselfWithoutATarget()
     auto const actions = DungeonPolicy().Decide(view, 0);
     CHECK(CastsSpell(actions, 10, 2050, 0));
 }
- 
+
+bool Logged(std::vector<std::string> const& events, char const* prefix);
+
+void PriestWithNoLineOfSightRepositionsBeforeRetryingDps()
+{
+    std::vector<std::string> events;
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.PartyCount = 1;
+    options.ClassOf = WarriorLeads;
+    options.OnEvent = [&events](std::string const& event) { events.push_back(event); };
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    WorldTickSnapshotView view = DungeonView({ 10, 11, 12, 13, 14 });
+    NearbyUnit hostile = Hostile(7, 20.0f, 100);
+    hostile.pos_x = 20.0f;
+    view.bots[2].in_combat = 1; // tank is engaging this hostile
+    view.bots[2].threat_target_guid = hostile.guid;
+    AddNearby(view, 0, hostile);
+
+    std::vector<BotAction> first = policy.Decide(view, 1000);
+    std::uint32_t dpsSpell = 0;
+    for (BotAction const& action : first)
+        if (action.bot_guid == 10 && action.type == ActionType::kCastSpell)
+        {
+            dpsSpell = action.spell_id;
+            break;
+        }
+    CHECK(dpsSpell != 0);
+    if (dpsSpell == 0)
+        return;
+
+    // The core refused that cast for LoS; the next tick must move toward the same target,
+    // not retry the spell or issue a MoveTo with only a target GUID and zero coordinates.
+    view.bots[0].last_action_type = std::uint8_t(ActionType::kCastSpell);
+    view.bots[0].last_action_spell = dpsSpell;
+    view.bots[0].last_action_status = BotActionStatus::kNoLineOfSight;
+    view.bots[0].last_action_sequence = 1;
+    std::vector<BotAction> retry = policy.Decide(view, 1200);
+    bool moved = false;
+    for (BotAction const& action : retry)
+    {
+        if (action.bot_guid == 10 && action.type == ActionType::kMoveTo &&
+            (action.dest_x != 0.0f || action.dest_y != 0.0f || action.dest_z != 0.0f))
+            moved = true;
+    }
+    CHECK(moved);
+    CHECK(!CastsSpell(retry, 10, dpsSpell));
+    CHECK(Logged(events, "healer_dps_los:"));
+}
+
 void NoHealWhileEveryoneIsHealthy()
 {
     auto const actions = DungeonPolicy().Decide(DungeonView({ 10, 11, 12, 13, 14 }), 0);
@@ -3788,21 +3840,23 @@ void TwoHealersDoNotHealTheSameMember()
     PolicyOptions options = AggressiveOptions();
     options.PartySize = 5;
     options.PartyCount = 1;
-    options.ClassOf = [](std::uint64_t) { return 5; }; // every bot a priest
+    options.ClassOf = [](std::uint64_t guid) { return guid == 12 ? 1u : 5u; }; // warrior leads, rest priests
     BotPolicy policy(options);
-    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 }, [](std::uint64_t) { return 5u; });
-    // Pre-form the party: bot 10 leads, all are members.
+    policy.SetRouteActive(true);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 }, [](std::uint64_t guid) { return guid == 12 ? 1u : 5u; });
+    // Pre-form the party: bot 12 leads, all are members.
+    constexpr std::uint64_t kLeaderRef = (std::uint64_t(2) << 56) | 12; // HighGuid::Player = 2
     for (BotSnapshot& bot : view.bots)
     {
-        if (bot.guid == 10)
+        if (bot.guid == 12)
         {
-            bot.group_role = 1;
-            bot.group_leader_guid = 0;
+            bot.group_role = 2;
+            bot.group_leader_guid = kLeaderRef; // leader's own GUID as unit reference
         }
         else
         {
-            bot.group_role = 2;
-            bot.group_leader_guid = 10;
+            bot.group_role = 1;
+            bot.group_leader_guid = kLeaderRef;
         }
     }
     view.bots[3].health = 300; // bot 13 is hurt
@@ -3833,13 +3887,13 @@ void TankIsHealedBeforeTheLowestMember()
     {
         if (bot.guid == 12)
         {
-            bot.group_role = 1;
-            bot.group_leader_guid = 0;
+            bot.group_role = 2;
+            bot.group_leader_guid = (std::uint64_t(2) << 56) | 12; // full Player unit ref
         }
         else
         {
-            bot.group_role = 2;
-            bot.group_leader_guid = 12;
+            bot.group_role = 1;
+            bot.group_leader_guid = (std::uint64_t(2) << 56) | 12;
         }
     }
     view.bots[2].health = 600; // the leader: 60%, holding a target
@@ -4557,9 +4611,6 @@ void FlightsAreOffByDefaultAndNotForPartyMembers()
     CHECK(!FirstOf(off.Decide(there, 30000), ActionType::kTaxi).has_value());
 }
  
-// Debug test to see what heal spell is cast
-void DebugHealSpell();
- 
 int main()
 {
     ShortOfAmmoWalksToTheAmmoVendor();
@@ -4605,6 +4656,7 @@ int main()
     HunterMendsItsPetInALongFight();
     HealerHealsTheHurtMember();
     HealerHealsItselfWithoutATarget();
+    PriestWithNoLineOfSightRepositionsBeforeRetryingDps();
     NoHealWhileEveryoneIsHealthy();
     LeaderDoesNotPullWhileAMemberIsHurt();
     LeaderPullsWhenThePartyIsReady();
@@ -4774,7 +4826,6 @@ int main()
     ClosestBreaksTheTieBetweenEqualTargets();
     OnlyOneRogueInterruptsACastingTarget();
     RogueWithoutAPartyStillInterrupts();
-    DebugHealSpell();
     TwoHealersDoNotHealTheSameMember();
     TankIsHealedBeforeTheLowestMember();
     TwoDruidsDoNotBothCastThePartyBuff();
@@ -4785,19 +4836,4 @@ int main()
     if (failures == 0)
         std::printf("policy_test: all checks passed\n");
     return failures == 0 ? 0 : 1;
-}
-// Debug test to see what heal spell is cast
-void DebugHealSpell()
-{
-    WorldTickSnapshotView view = DungeonView({ 10, 11, 12, 13, 14 });
-    view.bots[3].health = 300; // bot 13 at 30%
-    auto const actions = DungeonPolicy().Decide(view, 0);
-    std::printf("DEBUG: total actions=%zu\n", actions.size());
-    for (BotAction const& action : actions) {
-        std::printf("DEBUG: action bot=%llu type=%d spell=%u target=%llu\n",
-                    (unsigned long long)action.bot_guid, (int)action.type, action.spell_id, (unsigned long long)action.target_guid);
-        if (action.type == ActionType::kCastSpell && action.bot_guid == 10) {
-            std::printf("DEBUG: heal spell=%u target=%llu\n", action.spell_id, (unsigned long long)action.target_guid);
-        }
-    }
 }
