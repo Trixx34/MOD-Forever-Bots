@@ -173,9 +173,7 @@ constexpr std::uint64_t kPullHoldMaxMs = 120000;    // the party never waits lon
 constexpr std::uint64_t kTankHeadStartMs = 2500;    // the others join a fight this long after the tank started it, so the tank has the threat
 // Healing: a healer class heals the party member with the lowest health below this share, within this range.
 constexpr std::uint32_t kHealBelowPct = 60;
-constexpr std::uint32_t kDungeonHealBelowPct = 55;   // healer heals non-tank below 55% (buffer for burst), not 45%
 // The tank (the party leader) is kept alive first while it holds a target, even a little below this.
-constexpr std::uint32_t kTankHealBelowPct = 75;      // tank at 75% (buffer for burst), not 65%
 // Emergency fast heal threshold: Flash Heal / Lesser Heal for someone in danger
 constexpr std::uint32_t kEmergencyHealBelowPct = 20;
 // Power Word: Shield preemptive threshold: shield a member that has taken damage recently and is under this
@@ -1731,7 +1729,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     if (leaderOf.count(member.guid) && leaderOf.at(member.guid) == recoveryParty &&
                         member.life_state == 0 && member.max_health != 0)
                     {
-                        std::uint32_t const threshold = member.guid == recoveryParty ? kTankHealBelowPct : kDungeonHealBelowPct;
+                        std::uint32_t const threshold = member.guid == recoveryParty ? _options.DungeonTankHealBelowPct : _options.DungeonHealBelowPct;
                         if (std::uint64_t(member.health) * 100 / member.max_health < threshold)
                             needsHeal = true;
                     }
@@ -1777,8 +1775,9 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                                 dx /= distance;
                                 dy /= distance;
                             }
-                            Point const dest{ losTarget->pos_x + dx * 6.0f,
-                                              losTarget->pos_y + dy * 6.0f,
+                            float const moveYards = float(_options.HealerLosMoveYards);
+                            Point const dest{ losTarget->pos_x + dx * moveYards,
+                                              losTarget->pos_y + dy * moveYards,
                                               losTarget->pos_z };
                             BotAction move;
                             move.bot_guid = bot.guid;
@@ -4013,9 +4012,9 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     for (auto it = _healClaims.begin(); it != _healClaims.end();)
                         it = nowMs >= it->second.UntilMs ? _healClaims.erase(it) : std::next(it);
                 BotSnapshot const* hurt = nullptr;
-                std::uint64_t hurtPct = (routeActiveOf(bot.guid) && _options.TacticHeal) ? kDungeonHealBelowPct : kHealBelowPct;
+                std::uint64_t hurtPct = (routeActiveOf(bot.guid) && _options.TacticHeal) ? _options.DungeonHealBelowPct : kHealBelowPct;
                 BotSnapshot const* leaderHurt = nullptr;   // the tank with a target: healed first, whatever its share
-                std::uint64_t leaderHurtPct = kTankHealBelowPct;
+                std::uint64_t leaderHurtPct = _options.DungeonTankHealBelowPct;
                 // Emergency target: anyone under kEmergencyHealBelowPct gets Flash Heal first.
                 BotSnapshot const* emergencyHurt = nullptr;
                 // Shield target: a member under kShieldBelowPct that took damage recently (health dropped since last tick).
@@ -4141,7 +4140,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             // only out of combat or when the party is not taking damage, and only when healer mana > 40%.
             if (partyLeader != 0 && classId == 5 && bot.in_combat == 0 && partyFighting(partyLeader) &&
                 (state.LosRepositionTarget != 0 ||
-                 std::uint64_t(bot.power) * 100 >= std::uint64_t(bot.max_power) * 40))
+                 std::uint64_t(bot.power) * 100 >= std::uint64_t(bot.max_power) * _options.HealerDpsManaPct))
             {
                 if (state.LosRepositionTarget != 0 && _options.OnEvent)
                     _options.OnEvent("healer_dps_los_pending: healer=" + std::to_string(bot.guid) +

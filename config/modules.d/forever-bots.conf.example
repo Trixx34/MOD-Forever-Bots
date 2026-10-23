@@ -152,6 +152,12 @@ Module.forever-bots.TelemetrySummarySec = 60
 # ScenarioRoute3 = -177.4 -574.5 19.3
 # ScenarioGear1 = 1234,5678                     # optional: items granted to a class instead of auto gear (needs Bot.Actions.Grant)
 # ScenarioResultFile = scenario-results.log
+# Offline policy lab: each candidate applies to all ScenarioParties in that run. Defaults preserve current behavior;
+# bounded parameter ranges are validated by the module. See tools/dungeon_learning/README.md.
+# DungeonHealBelowPct = 55
+# DungeonTankHealBelowPct = 75
+# HealerDpsManaPct = 40
+# HealerLosMoveYards = 6
 
 # Live picture for the dashboard's map: the bots' positions and the units near them, as one JSON file rewritten in place every
 # LiveEveryMs (250..10000). Use an absolute path the dashboard may read (for example in the server's log folder). Empty = off.

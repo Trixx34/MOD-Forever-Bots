@@ -157,6 +157,11 @@ struct PolicyOptions
     bool TacticRest = true;
     // Recover: the leader of a dungeon party stands a dead member up at its side (the core's revive order) a few seconds after the fight, once it is up and quiet.
     bool TacticRecover = true;
+    // Bounded knobs for offline dungeon-policy experiments; defaults preserve current behavior.
+    std::uint32_t DungeonHealBelowPct = 55;
+    std::uint32_t DungeonTankHealBelowPct = 75;
+    std::uint32_t HealerDpsManaPct = 40;
+    std::uint32_t HealerLosMoveYards = 6;
     // Auto gear (AutoGearing setting): every bot is dressed for its level when it first appears, and again after AutoGearEveryLevels levels.
     bool AutoGearing = false;
     // Receives one line per notable decision (a heal cast, a pull held back or released), for the run logs. Unset = silent.

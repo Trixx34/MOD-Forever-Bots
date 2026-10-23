@@ -159,6 +159,11 @@ struct BotSettings
     // runs (docs/99-deadmines-runs.md) all of them on did slightly worse than none (2.0 bosses and 36 deaths against 2.25 and 14), and no single tactic is proven yet, so they
     // are off until each has a run of its own that shows a gain.
     bool TacticFocus = false, TacticInterrupt = false, TacticHeal = false, TacticRest = false, TacticRecover = false;
+    // Bounded policy-lab knobs; defaults match the built-in dungeon policy.
+    std::uint32_t DungeonHealBelowPct = 55;
+    std::uint32_t DungeonTankHealBelowPct = 75;
+    std::uint32_t HealerDpsManaPct = 40;
+    std::uint32_t HealerLosMoveYards = 6;
     // ActionStats = 1: every minute the module logs the ten (bot, action, spell) combinations it sent most often in that minute ("actions_top"), to find a bot that
     // repeats an action every tick. Off by default.
     bool ActionStats = false;

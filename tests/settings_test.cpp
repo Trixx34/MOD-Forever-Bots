@@ -274,6 +274,24 @@ void TelemetrySettings()
     CHECK(!warnings.empty()); // the zero interval is refused with a warning
 }
 
+void DungeonLearningKnobsAreBounded()
+{
+    std::vector<std::string> warnings;
+    BotSettings const defaults = ParseBotSettings({}, warnings);
+    CHECK(defaults.DungeonHealBelowPct == 55 && defaults.DungeonTankHealBelowPct == 75);
+    CHECK(defaults.HealerDpsManaPct == 40 && defaults.HealerLosMoveYards == 6 && warnings.empty());
+
+    BotSettings const candidate = ParseBotSettings({ { "DungeonHealBelowPct", "60" }, { "DungeonTankHealBelowPct", "80" },
+                                                     { "HealerDpsManaPct", "50" }, { "HealerLosMoveYards", "8" } }, warnings);
+    CHECK(candidate.DungeonHealBelowPct == 60 && candidate.DungeonTankHealBelowPct == 80);
+    CHECK(candidate.HealerDpsManaPct == 50 && candidate.HealerLosMoveYards == 8 && warnings.empty());
+
+    BotSettings const refused = ParseBotSettings({ { "DungeonHealBelowPct", "99" }, { "DungeonTankHealBelowPct", "0" },
+                                                    { "HealerDpsManaPct", "0" }, { "HealerLosMoveYards", "99" } }, warnings);
+    CHECK(refused.DungeonHealBelowPct == 55 && refused.DungeonTankHealBelowPct == 75);
+    CHECK(refused.HealerDpsManaPct == 40 && refused.HealerLosMoveYards == 6 && warnings.size() == 4);
+}
+
 } // namespace
 
 void WipeRecoverySettings()
@@ -324,6 +342,7 @@ int main()
     RandomnessAndStanceSettings();
     HubSettings();
     WipeRecoverySettings();
+    DungeonLearningKnobsAreBounded();
 
     if (failures == 0)
         std::printf("settings_test: all checks passed\n");
