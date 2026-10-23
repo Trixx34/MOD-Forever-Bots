@@ -679,6 +679,17 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
         return;
     state.LastSequence = bot.last_action_sequence;
 
+    // A LoS recovery walk whose navmesh route failed cannot clear the wall; leave that target
+    // for a while instead of issuing the same impossible reposition every tick.
+    if (state.LosRepositionTarget != 0 && bot.last_action_type == uint8_t(ActionType::kMoveTo) &&
+        bot.last_action_status == BotActionStatus::kNoRoute)
+    {
+        AvoidUnit(state.AvoidUntilMs, state.AvoidCount, state.LosRepositionTarget, nowMs);
+        state.LosRepositionTarget = 0;
+        state.CloserUntilMs = 0;
+        state.Last.reset();
+    }
+
     // A town errand whose walk to the trainer has no route: the trip cannot be made, so it fails.
     if (state.Errand && bot.last_action_type == uint8_t(ActionType::kMoveTo) && bot.last_action_status == BotActionStatus::kNoRoute)
     {
@@ -1000,6 +1011,15 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
         return;
 
     std::uint32_t const spell = bot.last_action_spell;
+    if (_options.RouteMap == 36 && _options.OnEvent)
+    {
+        auto const cast = state.CastTarget.find(spell);
+        std::uint64_t const target = cast == state.CastTarget.end() ? 0 : cast->second;
+        _options.OnEvent("cast_result: time_ms=" + std::to_string(nowMs) + " bot=" + std::to_string(bot.guid) + " spell=" + std::to_string(spell) +
+                         " target=" + std::to_string(target) + " status=" + ActionStatusName(bot.last_action_status) +
+                         " hp=" + std::to_string(bot.health) + "/" + std::to_string(bot.max_health) +
+                         " power=" + std::to_string(bot.power) + "/" + std::to_string(bot.max_power));
+    }
     if (IsResurrectSpell(spell))
     {
         // A resurrect: the dead member is left alone while the cast runs, or after a refusal for a while; a run of refusals is logged.
@@ -1079,10 +1099,20 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
     {
         state.CloserUntilMs = nowMs + kCloserAfterLosMs; // walls between them: close in rather than cast through them
         auto const cast = state.CastTarget.find(spell);
+        if (cast != state.CastTarget.end() && cast->second != 0 &&
+            ClassFor(_options, bot.guid) == 5 && (spell == 585 || spell == 589 || spell == 8092))
+        {
+            state.LosRepositionTarget = cast->second;
+            state.Last.reset();
+            if (_options.OnEvent)
+                _options.OnEvent("healer_dps_los_refused: healer=" + std::to_string(bot.guid) + " spell=" +
+                                 std::to_string(spell) + " target=" + std::to_string(cast->second));
+        }
         if (++state.LosRefusals >= kLosRefusalsAvoid && cast != state.CastTarget.end() && cast->second != 0)
         {
             AvoidUnit(state.AvoidUntilMs, state.AvoidCount, cast->second, nowMs); // still no sight after closing in: another target
             state.LosRefusals = 0;
+            state.LosRepositionTarget = 0;
         }
     }
     else if (bot.last_action_status != BotActionStatus::kBusy && bot.last_action_status != BotActionStatus::kMoving)
@@ -1689,6 +1719,87 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         present.insert(bot.guid);
         BotState& state = StateOf(bot.guid);
         ReadResult(state, bot, nowMs);
+        if (state.LosRepositionTarget != 0 && bot.life_state == 0 && ClassFor(_options, bot.guid) == 5 && state.ForcedHeal == 0)
+        {
+            // LoS recovery must run before ordinary policy branches can continue early. Do not
+            // reposition instead of an active heal: leave recovery pending if a party member is
+            // still below the healing threshold.
+            std::uint64_t const recoveryParty = leaderOf.count(bot.guid) ? leaderOf.at(bot.guid) : 0;
+            bool needsHeal = false;
+            if (recoveryParty != 0)
+                for (BotSnapshot const& member : view.bots)
+                    if (leaderOf.count(member.guid) && leaderOf.at(member.guid) == recoveryParty &&
+                        member.life_state == 0 && member.max_health != 0)
+                    {
+                        std::uint32_t const threshold = member.guid == recoveryParty ? kTankHealBelowPct : kDungeonHealBelowPct;
+                        if (std::uint64_t(member.health) * 100 / member.max_health < threshold)
+                            needsHeal = true;
+                    }
+            if (!needsHeal)
+            {
+                NearbyUnit const* losTarget = nullptr;
+                for (NearbyUnit const& unit : view.NearbyOf(i))
+                    if (unit.guid == state.LosRepositionTarget && unit.health != 0)
+                    {
+                        losTarget = &unit;
+                        break;
+                    }
+                if (!losTarget)
+                {
+                    state.LosRepositionTarget = 0;
+                    state.CloserUntilMs = 0;
+                    state.Last.reset();
+                }
+                else
+                {
+                    bool const walking = state.Last && state.Last->Type == ActionType::kMoveTo &&
+                                         state.Last->Target == state.LosRepositionTarget;
+                    if (walking && DistanceTo(bot, state.Last->Dest) <= 3.0f)
+                    {
+                        state.LosRepositionTarget = 0;
+                        state.CloserUntilMs = 0;
+                        state.Last.reset();
+                    }
+                    else
+                    {
+                        if (!walking)
+                        {
+                            float dx = bot.pos_x - losTarget->pos_x;
+                            float dy = bot.pos_y - losTarget->pos_y;
+                            float const distance = std::hypot(dx, dy);
+                            if (distance < 0.1f)
+                            {
+                                dx = std::cos(bot.orientation);
+                                dy = std::sin(bot.orientation);
+                            }
+                            else
+                            {
+                                dx /= distance;
+                                dy /= distance;
+                            }
+                            Point const dest{ losTarget->pos_x + dx * 6.0f,
+                                              losTarget->pos_y + dy * 6.0f,
+                                              losTarget->pos_z };
+                            BotAction move;
+                            move.bot_guid = bot.guid;
+                            move.type = ActionType::kMoveTo;
+                            move.dest_x = dest.X;
+                            move.dest_y = dest.Y;
+                            move.dest_z = dest.Z;
+                            actions.push_back(move);
+                            state.Last = Decision{ ActionType::kMoveTo, state.LosRepositionTarget, dest };
+                            if (_options.OnEvent)
+                                _options.OnEvent("healer_dps_los: healer=" + std::to_string(bot.guid) +
+                                                 " moving_to=" + std::to_string(int(dest.X)) + "," +
+                                                 std::to_string(int(dest.Y)) + " target=" +
+                                                 std::to_string(state.LosRepositionTarget));
+                        }
+                        state.NextCastMs = nowMs + 1000;
+                        continue;
+                    }
+                }
+            }
+        }
         if (state.RestPct == 0)
         {
             // Traits, drawn once per bot from the seed: the health below which it rests, and how close to its leader it stays put. Without randomness
@@ -3989,6 +4100,12 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     auto const spellRetry = state.RetryAtMs.find(spellToCast);
                     if ((spellRetry == state.RetryAtMs.end() || nowMs >= spellRetry->second) && CanPay(_options.SpellCosts.get(), spellToCast, bot))
                     {
+                        // If we recently lost LoS to the target and are still moving to regain it, wait for movement instead of retrying the cast.
+                        if (state.CloserUntilMs > nowMs)
+                        {
+                            state.NextCastMs = nowMs + 1000;
+                            continue;
+                        }
                         if (bot.moving != 0 && (KnownCastTimeSpell(spellToCast) || state.CastTimeSpells.count(spellToCast)))
                         {
                             BotAction stop;
@@ -4022,9 +4139,13 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             // Healer DPS window: when nobody needs healing and healer has mana, cast offensive spells.
             // Only for priest (class 5): Smite, Mind Blast, Shadow Word: Pain. Only in a dungeon party,
             // only out of combat or when the party is not taking damage, and only when healer mana > 40%.
-            if (partyLeader != 0 && classId == 5 && bot.in_combat == 0 && !hasTarget &&
-                std::uint64_t(bot.power) * 100 >= std::uint64_t(bot.max_power) * 40)
+            if (partyLeader != 0 && classId == 5 && bot.in_combat == 0 && partyFighting(partyLeader) &&
+                (state.LosRepositionTarget != 0 ||
+                 std::uint64_t(bot.power) * 100 >= std::uint64_t(bot.max_power) * 40))
             {
+                if (state.LosRepositionTarget != 0 && _options.OnEvent)
+                    _options.OnEvent("healer_dps_los_pending: healer=" + std::to_string(bot.guid) +
+                                     " target=" + std::to_string(state.LosRepositionTarget));
                 // Check if anyone in party needs healing
                 bool anyoneHurt = false;
                 forParty(partyLeader, [&](BotSnapshot const& member)
@@ -4037,31 +4158,33 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 });
                 if (!anyoneHurt && nowMs >= state.NextCastMs && !(IsCasting(bot)))
                 {
-                    // Try Mind Blast first (high damage, cooldown), then Shadow Word: Pain (DoT), then Smite.
-                    static constexpr std::uint32_t kMindBlast = 8092;
-                    static constexpr std::uint32_t kSWP = 589;
+                    // Try Smite first (30 yd range, no cooldown), then SWP (DoT), then Mind Blast (high damage, cooldown, needs LoS).
+                    // Smite and SWP are safer when LoS is uncertain.
                     static constexpr std::uint32_t kSmite = 585;
+                    static constexpr std::uint32_t kSWP = 589;
+                    static constexpr std::uint32_t kMindBlast = 8092;
                     std::uint32_t dpsSpell = 0;
-                    if (CanPay(_options.SpellCosts.get(), kMindBlast, bot) &&
-                        (state.RetryAtMs.find(kMindBlast) == state.RetryAtMs.end() || nowMs >= state.RetryAtMs[kMindBlast]))
-                        dpsSpell = kMindBlast;
+                    // Prefer Smite (always works at 30 yd), then SWP, then Mind Blast (needs clear LoS).
+                    // If a previous priest DPS cast lost LoS, reposition to its target before retrying any spell.
+                    bool const losBlocked = state.CloserUntilMs > nowMs || state.LosRepositionTarget != 0;
+                    if (CanPay(_options.SpellCosts.get(), kSmite, bot) &&
+                        (state.RetryAtMs.find(kSmite) == state.RetryAtMs.end() || nowMs >= state.RetryAtMs[kSmite]))
+                        dpsSpell = kSmite;
                     else if (CanPay(_options.SpellCosts.get(), kSWP, bot) &&
                              (state.RetryAtMs.find(kSWP) == state.RetryAtMs.end() || nowMs >= state.RetryAtMs[kSWP]))
                         dpsSpell = kSWP;
-                    else if (CanPay(_options.SpellCosts.get(), kSmite, bot) &&
-                             (state.RetryAtMs.find(kSmite) == state.RetryAtMs.end() || nowMs >= state.RetryAtMs[kSmite]))
-                        dpsSpell = kSmite;
+                    else if (!losBlocked && CanPay(_options.SpellCosts.get(), kMindBlast, bot) &&
+                             (state.RetryAtMs.find(kMindBlast) == state.RetryAtMs.end() || nowMs >= state.RetryAtMs[kMindBlast]))
+                        dpsSpell = kMindBlast;
                     if (dpsSpell != 0)
                     {
-                        // Find a target: the tank's target if in combat, else the nearest hostile
+                        // Healer DPS is only on the tank's engaged target; never self-pull a nearby pack.
                         std::uint64_t targetGuid = 0;
                         auto const lead = indexOf.find(partyLeader);
                         if (lead != indexOf.end() && view.bots[lead->second].threat_target_guid != 0)
-                            targetGuid = view.bots[lead->second].threat_target_guid;
-                        if (targetGuid == 0)
                         {
                             for (NearbyUnit const& unit : nearby)
-                                if (unit.is_hostile && unit.health != 0 && forever_module::UnitRefType(unit.guid) == 8)
+                                if (unit.guid == view.bots[lead->second].threat_target_guid && unit.is_hostile && unit.health != 0)
                                 {
                                     targetGuid = unit.guid;
                                     break;
