@@ -139,11 +139,13 @@ void RetreatsBelowThirtyPercent()
 void RetreatWithNoThreatAndNoInviteStandsStill()
 {
     BotPolicy policy(AggressiveOptions());
-    // Nothing close by that can still kill it, and no invite to follow anyone: it stands down instead of flagging.
+    // Nothing close by that can still kill it, and no invite to follow anyone: it stands down instead of fleeing.
+    // (It is also hurt enough, and now idle, to sit and rest: that is a second action, kRest.)
     auto actions = policy.Decide(Hurt(250, { Unit(2, 7, 12.0f, false) }));
-    CHECK(actions.size() == 1);
-    if (actions.size() == 1)
-        CHECK(actions[0].type == ActionType::kStop);
+    bool stopped = false;
+    for (BotAction const& action : actions)
+        stopped = stopped || action.type == ActionType::kStop;
+    CHECK(stopped);
 }
 
 void RetreatWithNoPlayerStillFlees()
