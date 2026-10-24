@@ -3087,7 +3087,7 @@ void DeadBotAcceptsAResurrectOffer()
 
 WorldTickSnapshotView CorpseNextToPriest(float x = 10.0f)
 {
-    WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 });
+    WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 }, WarriorLeads);   // classOf: bot 12 warrior, the rest priests (mana users)
     Corpse(v.bots[3], x);
     for (std::size_t i : { 0, 1, 2, 4 })
     {

@@ -84,7 +84,9 @@ class Runner
 {
 public:
     Runner() = default;
-    explicit Runner(std::vector<Event> events) : _events(std::move(events)), _done(_events.size(), false) {}
+    explicit Runner(std::vector<Event> events)
+        : _events(std::move(events)), _done(_events.size(), false), _retryAfter(_events.size(), 0), _attempts(_events.size(), 0)
+    {}
 
     bool Empty() const { return _events.empty(); }
 
@@ -96,14 +98,16 @@ public:
 
     bool Active() const { return _active >= 0; }
 
-    // What happened since the last call, one line each (event_start / event_done / event_failed / event_timeout): for the log.
+    // What happened since the last call, one line each (event_start / event_done / event_failed_retry / event_timeout_retry / event_blocked): for the log.
     std::vector<std::string> TakeLog();
 
 private:
-    void Finish(std::string const& how);
+    void Finish(std::string const& how, std::uint64_t nowMs, bool success);
 
     std::vector<Event> _events;
     std::vector<bool> _done;
+    std::vector<std::uint64_t> _retryAfter;   // per-event: Next() skips it until nowMs reaches this (0 = may fire now)
+    std::vector<std::uint32_t> _attempts;     // per-event: how many failed/timed-out cycles so far; kMaxEventAttemptCycles gives up for good
     int _active = -1;                  // index of the running event
     std::size_t _step = 0;
     std::uint64_t _startedMs = 0;
@@ -119,5 +123,7 @@ constexpr float kApproachYards = 4.0f;
 constexpr float kCloseYards = 1.5f;
 constexpr std::uint64_t kAnswerWaitMs = 3000;
 constexpr std::uint32_t kMaxFailures = 3;
+constexpr std::uint32_t kMaxEventAttemptCycles = 5;   // full restarts of one event before it is given up for good (event_blocked)
+constexpr std::uint64_t kEventRetryBackoffMs = 20000; // wait this long before an event that failed or timed out may start again
 
 } // namespace dungeon_events
