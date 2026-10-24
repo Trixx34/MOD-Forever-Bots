@@ -2719,10 +2719,15 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     state.PetCommanded = true;
                 }
             }
+            // A party healer supports from range: it does not close to melee, and it does not auto-attack (below). A heal has a long range,
+            // so it stays where the party's casters stand even when its mana is spent: walking into the pack only puts it in the boss's
+            // cleave and gives it the tank's aggro (the 2026-10-23 Deadmines run: healers at 0 power meleed for 1-4k and took 2-9k).
+            bool const healerSupport = partyLeader != 0 && state.Role_ != BotState::Role::Dps &&
+                                       HealSpellFor(classId, bot.level) != 0;
             // A ranged bot that has run out of power closes to melee range: its spells are spent.
             bool const outOfPower = bot.max_power > 0 && std::uint64_t(bot.power) * 100 < std::uint64_t(bot.max_power) * kOutOfPowerPct;
             // A hunter with no ammunition cannot shoot (the core refuses every ranged attack): it closes to melee range as well.
-            float approach = outOfPower || NoAmmo(bot, classId) ? kMeleeApproachYards : rotation::ApproachYards(classId);
+            float approach = (outOfPower || NoAmmo(bot, classId)) && !healerSupport ? kMeleeApproachYards : rotation::ApproachYards(classId);
             if (nowMs < state.CloserUntilMs)
                 approach = std::min(approach, kMeleeApproachYards + 1.0f);
             if (nowMs < state.RangeCloserUntilMs)
@@ -2758,6 +2763,12 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     }
                     else
                         wanted = Decision{ ActionType::kAttackTarget, targetRef };
+                }
+                else if (healerSupport)
+                {
+                    // A healer does not auto-attack in a party: the core's attack order runs it into melee range, where it takes the
+                    // same hits as the tank and pulls aggro with its swings. It holds the ranged stand-off and works with spells.
+                    wanted = Decision{ ActionType::kStop, 0 };
                 }
                 else
                     wanted = Decision{ ActionType::kAttackTarget, targetRef };
@@ -4043,21 +4054,25 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                         if (!emergencyHurt || pct < std::uint64_t(emergencyHurt->health) * 100 / emergencyHurt->max_health)
                             emergencyHurt = &member;
                     }
-                    else if (pct < kShieldBelowPct &&
-                             (member.in_combat != 0 || (state.FoughtAtMs.size() && state.FoughtAtMs.count(member.threat_target_guid))))
+                    else
                     {
-                        // Shield preemptive: this member is below kShieldBelowPct AND took damage recently (in combat, or was
-                        // the recent target of a hostile). A member in this same health band who is NOT taking damage right
-                        // now (recovering outside combat, e.g. after a revive) falls through to the normal Heal case below
-                        // instead of being silently skipped (it used to match this band and then not qualify for the shield,
-                        // with nothing to catch it: HealerHealsTheHurtMember/HealBeatsResurrect/TwoHealersDoNotHealTheSameMember).
-                        if (!shieldHurt || pct < std::uint64_t(shieldHurt->health) * 100 / shieldHurt->max_health)
-                            shieldHurt = &member;
-                    }
-                    else if (pct < hurtPct)
-                    {
-                        hurtPct = pct;
-                        hurt = &member;
+                        if (pct < kShieldBelowPct)
+                        {
+                            // Shield preemptive: check if this member's health dropped since the last tick (took damage).
+                            // The module keeps a short history via state.StallBotHealth etc; here we approximate by checking
+                            // if the member is in combat (taking hits) or was the recent target of a hostile.
+                            bool tookDamage = member.in_combat != 0 || (state.FoughtAtMs.size() && state.FoughtAtMs.count(member.threat_target_guid));
+                            if (tookDamage && (!shieldHurt || pct < std::uint64_t(shieldHurt->health) * 100 / shieldHurt->max_health))
+                                shieldHurt = &member;
+                        }
+                        // A member between the emergency and the shield threshold is still a normal heal target when no shield
+                        // applies (it has not been hit yet): the old else-if chain left it with no heal at all, which the
+                        // 2026-10-23 run showed as a priest at 34 % never receiving a direct heal.
+                        if (pct < hurtPct)
+                        {
+                            hurtPct = pct;
+                            hurt = &member;
+                        }
                     }
                 };
                 consider(bot);

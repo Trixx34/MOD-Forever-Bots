@@ -1023,10 +1023,14 @@ WorldTickSnapshotView PartyView(std::vector<std::uint64_t> const& guids, std::fu
     return view;
 }
 
-// A pre-formed dungeon party: bot 12 is the warrior leader, the rest follow.
-WorldTickSnapshotView DungeonView(std::vector<std::uint64_t> const& guids)
+// A pre-formed dungeon party: bot 12 is the warrior leader, the rest follow. A test that needs another class
+// for a member (a rogue to show that a member defends itself, for instance) passes its own class map.
+WorldTickSnapshotView DungeonView(std::vector<std::uint64_t> const& guids,
+                                  std::function<std::uint32_t(std::uint64_t)> classOf = nullptr)
 {
-    WorldTickSnapshotView view = PartyView(guids, [](std::uint64_t guid) { return guid == 12 ? 1u : 5u; });
+    if (!classOf)
+        classOf = [](std::uint64_t guid) { return guid == 12 ? 1u : 5u; };
+    WorldTickSnapshotView view = PartyView(guids, classOf);
     // Pre-form the party: core layout group_role 2 is leader, 1 is member; leader reference is a Player unit ref.
     // group_leader_guid must be a full unit reference (HighGuid::Player << 56 | counter).
     constexpr std::uint64_t kLeaderRef = (std::uint64_t(2) << 56) | 12; // HighGuid::Player = 2
@@ -2071,9 +2075,13 @@ bool CastsSpell(std::vector<BotAction> const& actions, std::uint64_t bot, std::u
     return false;
 }
 
-BotPolicy DungeonPolicy()
+BotPolicy DungeonPolicy(std::function<std::uint32_t(std::uint64_t)> classOf = nullptr)
 {
-    BotPolicy policy = PartyPolicy(5);
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.PartyCount = 1;
+    options.ClassOf = classOf ? std::move(classOf) : WarriorLeads;
+    BotPolicy policy(options);
     policy.SetRouteActive(true);
     return policy;
 }
@@ -2673,19 +2681,25 @@ void MembersDoNotPullInADungeon()
     CHECK(!CastsSpell(actions, 10, 585));
 }
 
+// Members defend themselves: bot 10 is a rogue here, since the healer holds its range instead (HealerDoesNotMelee).
+std::uint32_t RogueTenLeadsTheRest(std::uint64_t guid)
+{
+    return guid == 12 ? 1u : guid == 10 ? 4u : 5u;
+}
+
 void MembersAttackedInADungeonDefendThemselves()
 {
-    WorldTickSnapshotView view = DungeonView({ 10, 11, 12, 13, 14 });
+    WorldTickSnapshotView view = DungeonView({ 10, 11, 12, 13, 14 }, RogueTenLeadsTheRest);
     view.bots[0].in_combat = 1;
     AddNearby(view, 0, Unit(8, 7, 20.0f, true));
-    auto const actions = DungeonPolicy().Decide(view, 0);
+    auto const actions = DungeonPolicy(RogueTenLeadsTheRest).Decide(view, 0);
     CHECK(HasAction(actions, 10, ActionType::kFollow, MakeUnitRef(8, 1, 7)) || HasAction(actions, 10, ActionType::kAttackTarget));
 }
 
 void MembersWaitForTheTankToHoldTheTarget()
 {
-    BotPolicy policy = DungeonPolicy();
-    WorldTickSnapshotView view = DungeonView({ 10, 11, 12, 13, 14 });
+    BotPolicy policy = DungeonPolicy(RogueTenLeadsTheRest);
+    WorldTickSnapshotView view = DungeonView({ 10, 11, 12, 13, 14 }, RogueTenLeadsTheRest);
     view.bots[2].threat_target_guid = MakeUnitRef(8, 1, 7);
     AddNearby(view, 2, Unit(8, 7, 20.0f, true));
     AddNearby(view, 0, Unit(8, 7, 20.0f, true));
@@ -2693,6 +2707,38 @@ void MembersWaitForTheTankToHoldTheTarget()
     CHECK(!HasAction(first, 10, ActionType::kFollow, MakeUnitRef(8, 1, 7)));
     auto later = policy.Decide(view, 1000 + 3000);           // a few seconds on, the others join
     CHECK(HasAction(later, 10, ActionType::kFollow, MakeUnitRef(8, 1, 7)) || HasAction(later, 10, ActionType::kAttackTarget));
+}
+
+void HealerDoesNotMelee()
+{
+    // The healer (bot 10) stands at its ranged stand-off while the tank holds the target: it must not attack, because the
+    // core's attack order runs a caster into melee, where it takes the tank's hits and pulls aggro (the 2026-10-23 run).
+    BotPolicy policy = DungeonPolicy();
+    WorldTickSnapshotView view = DungeonView({ 10, 11, 12, 13, 14 });
+    view.bots[2].threat_target_guid = MakeUnitRef(8, 1, 7);
+    view.bots[2].in_combat = 1;
+    AddNearby(view, 2, Unit(8, 7, 20.0f, true));
+    AddNearby(view, 0, Unit(8, 7, 20.0f, true));
+    policy.Decide(view, 1000); // the tank has the head start
+    auto const actions = policy.Decide(view, 4000);
+    CHECK(!HasAction(actions, 10, ActionType::kAttackTarget));
+    CHECK(!HasAction(actions, 10, ActionType::kFollow, MakeUnitRef(8, 1, 7))); // 20 yd is inside the 25 yd stand-off
+}
+
+void HealerWithoutPowerKeepsItsRange()
+{
+    // A healer at 0 power used to close to melee range like a spent mage, then swing at the boss for the rest of the fight.
+    BotPolicy policy = DungeonPolicy();
+    WorldTickSnapshotView view = DungeonView({ 10, 11, 12, 13, 14 });
+    view.bots[0].power = 0;
+    view.bots[2].threat_target_guid = MakeUnitRef(8, 1, 7);
+    view.bots[2].in_combat = 1;
+    AddNearby(view, 2, Unit(8, 7, 20.0f, true));
+    AddNearby(view, 0, Unit(8, 7, 20.0f, true));
+    policy.Decide(view, 1000);
+    auto const actions = policy.Decide(view, 4000);
+    CHECK(!HasAction(actions, 10, ActionType::kFollow, MakeUnitRef(8, 1, 7)));
+    CHECK(!HasAction(actions, 10, ActionType::kAttackTarget));
 }
 
 void LineOfSightRefusalClosesTheDistance()
@@ -4664,6 +4710,8 @@ int main()
     MembersDoNotPullInADungeon();
     MembersAttackedInADungeonDefendThemselves();
     MembersWaitForTheTankToHoldTheTarget();
+    HealerDoesNotMelee();
+    HealerWithoutPowerKeepsItsRange();
     LineOfSightRefusalClosesTheDistance();
     BotFightsBackAgainstAStrongAttacker();
     BotInCombatIgnoresThePackLimit();
