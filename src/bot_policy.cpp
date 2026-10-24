@@ -4043,13 +4043,15 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                         if (!emergencyHurt || pct < std::uint64_t(emergencyHurt->health) * 100 / emergencyHurt->max_health)
                             emergencyHurt = &member;
                     }
-                    else if (pct < kShieldBelowPct)
+                    else if (pct < kShieldBelowPct &&
+                             (member.in_combat != 0 || (state.FoughtAtMs.size() && state.FoughtAtMs.count(member.threat_target_guid))))
                     {
-                        // Shield preemptive: check if this member's health dropped since the last tick (took damage).
-                        // The module keeps a short history via state.StallBotHealth etc; here we approximate by checking
-                        // if the member is in combat (taking hits) or was the recent target of a hostile.
-                        bool tookDamage = member.in_combat != 0 || (state.FoughtAtMs.size() && state.FoughtAtMs.count(member.threat_target_guid));
-                        if (tookDamage && (!shieldHurt || pct < std::uint64_t(shieldHurt->health) * 100 / shieldHurt->max_health))
+                        // Shield preemptive: this member is below kShieldBelowPct AND took damage recently (in combat, or was
+                        // the recent target of a hostile). A member in this same health band who is NOT taking damage right
+                        // now (recovering outside combat, e.g. after a revive) falls through to the normal Heal case below
+                        // instead of being silently skipped (it used to match this band and then not qualify for the shield,
+                        // with nothing to catch it: HealerHealsTheHurtMember/HealBeatsResurrect/TwoHealersDoNotHealTheSameMember).
+                        if (!shieldHurt || pct < std::uint64_t(shieldHurt->health) * 100 / shieldHurt->max_health)
                             shieldHurt = &member;
                     }
                     else if (pct < hurtPct)
