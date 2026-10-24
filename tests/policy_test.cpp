@@ -91,16 +91,15 @@ void KeepsCurrentThreatTarget()
     CHECK(actions.size() == 1 && actions[0].target_guid == threat);
 }
 
-void FollowsPlayerWhenNoEnemy()
+void StandsStillWithNoEnemyAndNoInvite()
 {
+    // No party, no chat order: a nearby player is a stranger, not someone to follow (an ungrouped bot does not
+    // latch onto whoever walks past it).
     BotPolicy policy(AggressiveOptions());
     auto actions = policy.Decide(View(1, 0, { Unit(2, 7, 12.0f, false), Unit(8, 3, 4.0f, false) }));
     CHECK(actions.size() == 1);
     if (actions.size() == 1)
-    {
-        CHECK(actions[0].type == ActionType::kFollow);
-        CHECK(actions[0].target_guid == MakeUnitRef(2, 1, 7));
-    }
+        CHECK(actions[0].type == ActionType::kStop);
 }
 
 void StopsWhenNothingNearby()
@@ -137,17 +136,14 @@ void RetreatsBelowThirtyPercent()
         CHECK(actions[0].type == ActionType::kMoveTo);
 }
 
-void RetreatFollowsAPlayerWhenNothingNearToFlee()
+void RetreatWithNoThreatAndNoInviteStandsStill()
 {
     BotPolicy policy(AggressiveOptions());
-    // Nothing close by that can still kill it: it follows the player again, as before.
+    // Nothing close by that can still kill it, and no invite to follow anyone: it stands down instead of flagging.
     auto actions = policy.Decide(Hurt(250, { Unit(2, 7, 12.0f, false) }));
     CHECK(actions.size() == 1);
     if (actions.size() == 1)
-    {
-        CHECK(actions[0].type == ActionType::kFollow);
-        CHECK(actions[0].target_guid == MakeUnitRef(2, 1, 7));
-    }
+        CHECK(actions[0].type == ActionType::kStop);
 }
 
 void RetreatWithNoPlayerStillFlees()
@@ -431,14 +427,20 @@ void RestsWhenHurtAndIdle()
     CHECK(spell == 1); // sit down
 }
 
-void NoRestAtFullHealthOrWithAPlayerNear()
+void NoRestAtFullHealth()
 {
     BotPolicy policy(AggressiveOptions());
     std::uint32_t spell = 99;
     CHECK(RestAt(policy.Decide(View(1, 0, {}), 1000), spell) < 0); // full health
+}
 
+void RestsEvenWithAStrangerNear()
+{
+    // A nearby player is not a reason to stay up any more: an ungrouped bot does not follow it, so it is as idle
+    // as if nobody was there, and rests like any other hurt, idle bot.
     BotPolicy withPlayer(AggressiveOptions());
-    CHECK(RestAt(withPlayer.Decide(Hurt(600, { Unit(2, 7, 4.0f, false, 100) }), 1000), spell) < 0); // a player to follow
+    std::uint32_t spell = 99;
+    CHECK(RestAt(withPlayer.Decide(Hurt(600, { Unit(2, 7, 4.0f, false, 100) }), 1000), spell) >= 0);
 }
 
 void StandsBeforeAFight()
@@ -4205,7 +4207,8 @@ int main()
     ServicesWhenIdleOnTimerAndOnLevelUp();
     NoServicesInAFight();
     RestsWhenHurtAndIdle();
-    NoRestAtFullHealthOrWithAPlayerNear();
+    NoRestAtFullHealth();
+    RestsEvenWithAStrangerNear();
     StandsBeforeAFight();
     RefusedSitIsRetriedLater();
     OverPullIsSkipped();
@@ -4223,11 +4226,11 @@ int main()
     StatusNamesAreReadable();
     AttacksClosestHostile();
     KeepsCurrentThreatTarget();
-    FollowsPlayerWhenNoEnemy();
+    StandsStillWithNoEnemyAndNoInvite();
     StopsWhenNothingNearby();
     DeadUnitsAreNotAttacked();
     RetreatsBelowThirtyPercent();
-    RetreatFollowsAPlayerWhenNothingNearToFlee();
+    RetreatWithNoThreatAndNoInviteStandsStill();
     RetreatWithNoPlayerStillFlees();
     ThirtyPercentIsNotLow();
     LoneCorpseReleasesAndDoesNotFight();
