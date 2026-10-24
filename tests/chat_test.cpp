@@ -436,7 +436,10 @@ void HelpListsEveryVerbAndIsNotSaidOutLoud()
         CHECK(!HasLine(basic, verb));
 
     // Orders and control add their own verbs.
-    auto const everything = policy.ApplyChat(view, Ctx(), *ParseChatCommand("help", true, true), 1100);
+    BotPolicy::ChatContext everythingCtx = Ctx();
+    everythingCtx.Orders = true;
+    everythingCtx.Control = true;
+    auto const everything = policy.ApplyChat(view, everythingCtx, *ParseChatCommand("help", true, true), 1100);
     for (char const* verb : { "pull", "heal", "stop", "lead", "train", "mount", "role", "stance", "distance", "focus" })
         CHECK(HasLine(everything, verb));
 
