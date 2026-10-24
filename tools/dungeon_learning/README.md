@@ -22,12 +22,15 @@ The module validates these candidate parameters and uses the current policy valu
 | `DungeonTankHealBelowPct` | 75 | 40–95 | 5 |
 | `HealerDpsManaPct` | 40 | 10–80 | 10 |
 | `HealerLosMoveYards` | 6 | 3–12 | 1 |
+| `DungeonTactics` | none | `none`, `all`, or a comma list of `focus,interrupt,heal,rest` | (categorical, not swept by `propose`) |
+
+`DungeonTactics` is the party's combat tactics (`doc/dungeon-strategy.md`): `focus` makes the damage dealers take the pack's `kill_priority` unit first, `interrupt` turns a paladin/rogue/shaman/mage onto a casting unit in the tank's pack, and `heal`/`rest` switch on the dungeon-specific heal and pull-pacing thresholds instead of the non-dungeon defaults. It is a categorical knob: `propose` carries the best candidate's tactics forward unchanged and only searches neighbors of the four numeric knobs above. To compare tactics settings, run separate named candidates (for example `baseline` with `TACTICS=none` and `tactics-fi` with `TACTICS=focus,interrupt`) on the same seed and `rank` them together.
 
 Each run uses one candidate across all parties. The runner supports up to eight simultaneous five-bot parties, which gives repeated observations for that candidate. Per-party A/B variants are a later extension; don't compare different candidates in one batch until that is implemented.
 
 ## Run a candidate
 
-Build/deploy the telegraph-enabled test core and bot module with tuning support first. Then run `start`; its positional arguments are **name, parties, seed, heal threshold, tank threshold, DPS mana threshold, LoS move distance, duration**:
+Build/deploy the telegraph-enabled test core and bot module with tuning support first. Then run `start`; its positional arguments are **name, parties, seed, heal threshold, tank threshold, DPS mana threshold, LoS move distance, duration, tactics**:
 
 ```bash
 tools/dungeon_learning/experiment.sh start baseline 8 1 55 75 40 6 2400
@@ -41,6 +44,13 @@ The script refuses to restart the sim while the current scenario has unfinished 
 ```bash
 tools/dungeon_learning/experiment.sh start baseline-seed-2 8 2 55 75 40 6 2400
 tools/dungeon_learning/experiment.sh report baseline-seed-2
+```
+
+`TACTICS` defaults to `none` (the module's own default, matching every prior run of this harness) when omitted, so existing invocations and scripts keep working unchanged. To compare combat tactics on the same seed and thresholds:
+
+```bash
+tools/dungeon_learning/experiment.sh start tactics-fi 8 1 55 75 40 6 2400 focus,interrupt
+tools/dungeon_learning/experiment.sh report tactics-fi
 ```
 
 `status` is a snapshot; run it again later to see progress. `report` may be run again after more parties finish. The launcher keeps the active-run marker until the expected number of party outcomes is present, then permits the next run.
