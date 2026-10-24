@@ -404,6 +404,7 @@ def main():
     run.add_argument("--tank-heal", type=int, default=75)
     run.add_argument("--dps-mana", type=int, default=40)
     run.add_argument("--los-yards", type=int, default=6)
+    run.add_argument("--tactics", default="none", help="comma list of focus,interrupt,heal,rest, or all/none (default: none)")
     rank = commands.add_parser("rank", help="rank completed candidates lexicographically")
     rank.add_argument("metrics", nargs="+", help="candidate metrics.json files")
     suggest = commands.add_parser("propose", help="suggest bounded one-knob neighbors of the best candidate")
@@ -419,7 +420,8 @@ def main():
     args = parser.parse_args()
     if args.command == "analyze":
         metric = analyze(args.summary, args.trace, args.out, args.candidate, args.seed, args.parties,
-                         {"heal": args.heal, "tank_heal": args.tank_heal, "dps_mana": args.dps_mana, "los_yards": args.los_yards})
+                         {"heal": args.heal, "tank_heal": args.tank_heal, "dps_mana": args.dps_mana,
+                          "los_yards": args.los_yards, "tactics": args.tactics})
         print(json.dumps({"metrics": str(Path(args.out) / "metrics.json"), "events": str(Path(args.out) / "events.jsonl"),
                           "party_count": metric["party_count"], "warnings": metric["warnings"]}, indent=2))
     elif args.command == "rank":
