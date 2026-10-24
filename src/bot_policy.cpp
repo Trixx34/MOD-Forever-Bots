@@ -245,6 +245,9 @@ constexpr std::uint64_t kRezRetryMs = 5000;          // after a refusal, this lo
 constexpr std::uint32_t kRezRefusalsLogged = 3;      // refusals in a row before rez_refused is logged
 constexpr std::uint64_t kReleaseRetryMs = 3000;      // a release not yet seen to work is not sent again before this
 constexpr std::uint64_t kAcceptRetryMs = 2000;
+// Deadmines Foundry (Gilnid): entries checked against this fork's creature_template/smart_scripts (not hardcoded from memory).
+constexpr std::uint32_t kGoblinEngineerEntry = 622;           // casts Summon Remote-Controlled Golem (spell 3605, interruptible)
+constexpr std::uint32_t kRemoteControlledGolemEntry = 2520;   // the add it summons: immune to most abilities, despawns when its engineer dies
 constexpr std::uint64_t kReclaimRetryMs = 3000;
 constexpr std::uint64_t kDeathLoopMs = 120000;         // three deaths within this time are a death loop: the bot is moved to a grind spot for its level
 constexpr float kDeathLoopAwayYards = 400.0f;           // ... one at least this far from where it keeps dying
@@ -2556,7 +2559,21 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 // and healers of the pack first (the dungeon file's kill_priority), then any unit that is casting right now, then the weakest.
                 bool const canInterrupt = classId == 2 || classId == 4 || classId == 7 || classId == 8; // paladin, rogue, shaman, mage: an interrupt row in the rotation
                 bool const interruptNow = _options.TacticInterrupt && canInterrupt && !interruptTaken(bot, partyLeader);
-                if (routeOn && HealSpellFor(classId, bot.level) == 0 && ((_options.TacticFocus && !_options.KillPriority.empty()) || interruptNow))
+                // Deadmines Foundry (Gilnid): a Goblin Engineer (622) casts Summon Remote-Controlled Golem (3605), an add that is immune to most
+                // abilities and despawns only when its summoner dies (Wowhead's Deadmines guide: "kill the GOBLIN first"). The snapshot does not
+                // say which spell a nearby unit is casting (NearbyUnit::casting is a bool), so this cannot be limited to that one cast; instead,
+                // once a golem is up, every engineer nearby outranks everything else for every damage dealer, with or without a tactic switched
+                // on, the same way avoiding a ground effect is not optional. Without this, four engineers kept the pack resupplied with golems
+                // faster than a 5-bot party could add them to its kill order on its own (verified on the sim: deaths to entry 2520 did not stop
+                // with focus and interrupt alone).
+                bool golemNearby = false;
+                for (NearbyUnit const& unit : nearby)
+                    if (unit.is_hostile && unit.health != 0 && forever_module::UnitRefEntry(unit.guid) == kRemoteControlledGolemEntry)
+                    {
+                        golemNearby = true;
+                        break;
+                    }
+                if (routeOn && HealSpellFor(classId, bot.level) == 0 && ((_options.TacticFocus && !_options.KillPriority.empty()) || interruptNow || golemNearby))
                 {
                     auto const rankOf = [this](NearbyUnit const& unit)
                     {
@@ -2566,11 +2583,16 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                         return at == _options.KillPriority.end() ? std::uint32_t(1000) : at->second;
                     };
                     NearbyUnit const* best = assist;
-                    // A bot that can interrupt turns on a casting unit of the pack first (its rotation then fires the interrupt at its target); then the priority list, then the
-                    // casters, then the weakest.
-                    auto const keyOf = [&rankOf, interruptNow](NearbyUnit const& unit)
+                    // A bot that can interrupt turns on a casting unit of the pack first (its rotation then fires the interrupt at its target); then
+                    // an engineer with a golem already up (see above); then the priority list; then the casters; then the weakest.
+                    auto const keyOf = [&rankOf, interruptNow, golemNearby](NearbyUnit const& unit)
                     {
-                        return std::make_tuple(interruptNow && unit.casting != 0 ? 0 : 1, rankOf(unit), unit.casting != 0 ? 0 : 1, unit.health);
+                        int tier = 2;
+                        if (interruptNow && unit.casting != 0)
+                            tier = 0;
+                        else if (golemNearby && forever_module::UnitRefEntry(unit.guid) == kGoblinEngineerEntry)
+                            tier = 1;
+                        return std::make_tuple(tier, rankOf(unit), unit.casting != 0 ? 0 : 1, unit.health);
                     };
                     for (NearbyUnit const& unit : nearby)
                         if (unit.is_hostile && unit.health != 0 && IsLiveMob(unit) && !avoided(unit.guid) && unit.guid != assist->guid &&
@@ -2581,8 +2603,9 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                         targetRef = best->guid;
                         if (state.FocusLoggedFor != best->guid && _options.OnEvent)
                         {
+                            bool const engineerUnderGolemPressure = golemNearby && forever_module::UnitRefEntry(best->guid) == kGoblinEngineerEntry;
                             state.FocusLoggedFor = best->guid;
-                            _options.OnEvent(std::string(interruptNow && best->casting != 0 ? "interrupt_target: bot=" : "focus: bot=") + std::to_string(bot.guid) + " entry=" + std::to_string(forever_module::UnitRefEntry(best->guid)) + " instead_of=" +
+                            _options.OnEvent(std::string(interruptNow && best->casting != 0 ? "interrupt_target: bot=" : engineerUnderGolemPressure ? "golem_engineer: bot=" : "focus: bot=") + std::to_string(bot.guid) + " entry=" + std::to_string(forever_module::UnitRefEntry(best->guid)) + " instead_of=" +
                                              std::to_string(forever_module::UnitRefEntry(assist->guid)) + (best->casting != 0 ? " casting" : ""));
                         }
                     }
