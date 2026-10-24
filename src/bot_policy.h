@@ -213,6 +213,8 @@ public:
         std::uint64_t TargetRef = 0;
         bool Say = false;           // the bots that take the order answer out loud (ChatSay)
         std::uint32_t SayMax = 0;   // at most this many bots answer one order (a whispered bot always does)
+        bool Orders = false;        // ChatOrders: `help` lists the order verbs only when this is on
+        bool Control = false;       // ChatControl: `help` lists the control panel verbs only when this is on
     };
 
     // Applies a chat command (chat_commands.h) to the bots of the speaker's group that its selector names (a whisper: that one bot, when the

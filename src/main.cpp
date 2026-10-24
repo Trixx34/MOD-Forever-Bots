@@ -1105,13 +1105,19 @@ int main(int argc, char** argv)
                 set(false, "Bot commands are off (ChatCommands = 0 in the module's config).");
                 return reply;
             }
+            if (rest == "help")
+            {
+                std::string text = "Bot commands ([selector] verb [args], selector optional):";
+                for (std::string const& line : ChatHelpLines(settings.ChatOrders, settings.ChatControl))
+                    text += "\n" + line;
+                text += "\nAlso: .bots list | autogear | alt add|remove|list <name> | spawn <race> <class> [level].";
+                set(true, text);
+                return reply;
+            }
             auto const parsed = ParseChatCommand(rest, settings.ChatOrders, settings.ChatControl);
             if (!parsed)
             {
-                set(false, "Usage: .bots [all|tank|healer|dps|<class>] follow [off] | stay [off] | release | status | autogear" +
-                               std::string(settings.ChatOrders ? " | stop | passive | aggressive | summon | revive | mount | dismount" : "") +
-                               std::string(settings.ChatControl ? " | role <tank|healer|dps|auto> | stance <aggressive|defensive|passive> | distance <yards>|default" : "") +
-                               ". goto here, pull, heal and focus: say them in party chat.");
+                set(false, "Usage: .bots [all|tank|healer|dps|<class>] <verb> [args]. Type .bots help for the full list.");
                 return reply;
             }
             if (parsed->Verb == ChatVerb::GotoHere || parsed->Verb == ChatVerb::Pull || parsed->Verb == ChatVerb::Heal ||
@@ -1123,6 +1129,8 @@ int main(int argc, char** argv)
             CommandQueue::ChatItem item;
             item.Command = *parsed;
             item.Context.Issuer = request.command().issuer_guid() & forever_module::kUnitRefCounterMask;
+            item.Context.Orders = settings.ChatOrders;
+            item.Context.Control = settings.ChatControl;
             {
                 std::lock_guard<std::mutex> lock(commands->Lock);
                 if (commands->Chat.size() < 64)
@@ -1243,6 +1251,8 @@ int main(int argc, char** argv)
         item.Context.TargetRef = chat.target_ref();
         item.Context.Say = settings.ChatSay;
         item.Context.SayMax = settings.ChatSayMax;
+        item.Context.Orders = settings.ChatOrders;
+        item.Context.Control = settings.ChatControl;
         std::lock_guard<std::mutex> lock(commands->Lock);
         if (commands->Chat.size() < 64)
             commands->Chat.push_back(std::move(item));

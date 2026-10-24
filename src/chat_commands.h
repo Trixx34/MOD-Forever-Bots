@@ -4,7 +4,7 @@
 //
 // Selectors: all | tank | healer | dps | <class> (also the plural), joined by commas for a union (healer,rogue). No selector means all.
 //   tank = warrior; healer = priest, paladin, shaman, druid; dps = hunter, rogue, mage, warlock.
-// Basic verbs (ChatCommands = 1):  follow [off] | stay [off] | goto here | release | status
+// Basic verbs (ChatCommands = 1):  follow [off] | stay [off] | goto here | release | status | help
 // Orders (ChatOrders = 1):          stop | pull | heal | passive | aggressive | summon | revive | mount | dismount | train | lead [off]
 //   lead: "tank lead" - in a dungeon the module knows a route for, the tank bot walks the group through it, boss by boss, and the other bots follow the
 //   tank instead of the speaker (the dungeon party rules apply: the tank pulls when the group is ready, the others join). "tank lead off" or stop ends it.
@@ -20,12 +20,15 @@
 //   what attacks the bot. focus: the speaker's selected target is attacked first in a fight. distance: how far from the speaker a following
 //   bot stops (3 to 40 yards).
 // Anything else is ordinary chat: ParseChatCommand returns nothing.
+// help: lists every verb above (gated the same way: an order or control verb is left out when its setting is off).
+// Works both as a party/raid chat verb and as the ".bots help" dot command; needs no selector, position or target.
 #pragma once
 
 #include <cstdint>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 enum class ChatVerb : std::uint8_t
 {
@@ -54,12 +57,17 @@ enum class ChatVerb : std::uint8_t
     Lead,
     LeadOff,
     Train,
+    Help,
 };
 
 // Orders need ChatOrders = 1, the control panel ChatControl = 1 (the basic verbs only need ChatCommands = 1).
 bool IsOrderVerb(ChatVerb verb);
 bool IsControlVerb(ChatVerb verb);
 char const* ChatVerbName(ChatVerb verb);
+
+// Every command ParseChatCommand accepts, one line each, for `help` (party chat or whispered to a bot) and
+// `.bots help` (the dot command). `orders` and `control` list only what the module's settings turn on.
+std::vector<std::string> ChatHelpLines(bool orders, bool control);
 
 struct ChatSelector
 {
