@@ -1436,6 +1436,55 @@ void ADamageDealerFightsThePriorityCasterOfThePack()
     CHECK(plainOnMiner);
 }
 
+// Deadmines Foundry: once a Remote-Controlled Golem (2520) is up, every damage dealer takes the Goblin Engineer (622) that summoned
+// it over the tank's own target, with no tactic switched on (this is not optional: the golem is immune to most abilities and only
+// despawns when its engineer dies - Wowhead's Deadmines guide). Without a golem up it assists the tank's target as usual.
+void ADamageDealerFocusesTheEngineerWhenAGolemIsUp()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.PartyCount = 1;
+    options.ClassOf = [](std::uint64_t guid) { return guid == 12 ? 1u : guid == 11 ? 8u : 5u; }; // bot 11 is the mage, 12 the warrior, the rest priests
+    options.TacticFocus = false;
+    options.TacticInterrupt = false;
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    NearbyUnit tankTarget = Hostile(7, 2.0f, 100);
+    tankTarget.guid = MakeUnitRef(8, 598, 7);         // a miner, the tank's own target
+    NearbyUnit golem = Hostile(8, 5.0f, 100);
+    golem.guid = MakeUnitRef(8, 2520, 8);             // a Remote-Controlled Golem is already up
+    NearbyUnit engineer = Hostile(9, 6.0f, 100);
+    engineer.guid = MakeUnitRef(8, 622, 9);           // the Goblin Engineer that summoned it
+    view.bots[2].threat_target_guid = tankTarget.guid;
+    AddNearby(view, 1, tankTarget);
+    AddNearby(view, 1, golem);
+    AddNearby(view, 1, engineer);
+    bool onEngineer = false, onMiner = false;
+    for (std::uint64_t at = 0; at < 6000; at += 500)
+        for (BotAction const& action : policy.Decide(view, at))
+            if (action.bot_guid == 11)
+            {
+                onEngineer = onEngineer || action.target_guid == engineer.guid;
+                onMiner = onMiner || action.target_guid == tankTarget.guid;
+            }
+    CHECK(onEngineer);
+    CHECK(!onMiner);
+
+    // No golem nearby: no special case, it assists the tank's target as usual.
+    WorldTickSnapshotView noGolem = PartyView({ 10, 11, 12, 13, 14 });
+    noGolem.bots[2].threat_target_guid = tankTarget.guid;
+    AddNearby(noGolem, 1, tankTarget);
+    AddNearby(noGolem, 1, engineer);
+    BotPolicy noGolemPolicy(options);
+    noGolemPolicy.SetRouteActive(true);
+    bool onMinerNow = false;
+    for (std::uint64_t at = 0; at < 6000; at += 500)
+        for (BotAction const& action : noGolemPolicy.Decide(noGolem, at))
+            onMinerNow = onMinerNow || (action.bot_guid == 11 && action.target_guid == tankTarget.guid);
+    CHECK(onMinerNow);
+}
+
 // Interrupt: a mage (Counterspell in its rotation) turns on a unit of the tank's pack that is casting; with the tactic off it keeps to the tank's target.
 void ACasterOfThePackIsTargetedForAnInterrupt()
 {
@@ -4766,6 +4815,7 @@ int main()
     MemberFollowsItsLeaderUntilClose();
     MemberFightsItsLeadersTarget();
     ADamageDealerFightsThePriorityCasterOfThePack();
+    ADamageDealerFocusesTheEngineerWhenAGolemIsUp();
     ACasterOfThePackIsTargetedForAnInterrupt();
     NoPartyActionsInCombat();
     SealIsNotRecastWhileUp();
