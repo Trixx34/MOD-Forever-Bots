@@ -180,12 +180,37 @@ std::vector<Event> ForMap(std::vector<Event> const& all, std::uint32_t map)
     return out;
 }
 
-void Runner::Finish(std::string const& how)
+void Runner::Finish(std::string const& how, std::uint64_t nowMs, bool success)
 {
     if (_active < 0)
         return;
-    _log.push_back(how + ": event=" + _events[_active].Id + " name=" + _events[_active].Name);
-    _done[_active] = true;
+    std::size_t const idx = std::size_t(_active);
+    if (success)
+    {
+        _log.push_back(how + ": event=" + _events[idx].Id + " name=" + _events[idx].Name);
+        _done[idx] = true;
+    }
+    else
+    {
+        ++_attempts[idx];
+        if (_attempts[idx] >= kMaxEventAttemptCycles)
+        {
+            // Given up for good: do NOT let the leader treat this as done and walk past a door that is
+            // still closed. This is a terminal, loud state meant to be grepped/alerted on; it needs a
+            // human to look at the dungeon file (wrong object entry, wrong radius, a GO state issue, ...).
+            _log.push_back("event_blocked: event=" + _events[idx].Id + " name=" + _events[idx].Name
+                + " attempts=" + std::to_string(_attempts[idx]));
+            _done[idx] = true;
+        }
+        else
+        {
+            _log.push_back(how + "_retry: event=" + _events[idx].Id + " name=" + _events[idx].Name
+                + " attempt=" + std::to_string(_attempts[idx]) + "/" + std::to_string(kMaxEventAttemptCycles));
+            _retryAfter[idx] = nowMs + kEventRetryBackoffMs;
+            // _done[idx] stays false: Next() will consider this event again once its trigger holds and
+            // the backoff has passed, instead of silently letting the route continue past a shut door.
+        }
+    }
     _active = -1;
     _step = 0;
     _sent = false;
@@ -211,7 +236,7 @@ void Runner::OnUseResult(UseResult result, std::uint64_t nowMs)
             break;
         case UseResult::Failed:
             if (++_failures >= kMaxFailures)
-                Finish("event_failed");
+                Finish("event_failed", nowMs, /*success=*/false);
             break;
     }
 }
@@ -237,6 +262,8 @@ Command Runner::Next(Facts const& facts, std::uint64_t nowMs)
         {
             if (_done[i])
                 continue;
+            if (nowMs < _retryAfter[i])
+                continue;   // failed or timed out recently; back off before trying this door/lever again
             Event const& event = _events[i];
             bool fires = false;
             switch (event.When)
@@ -264,12 +291,12 @@ Command Runner::Next(Facts const& facts, std::uint64_t nowMs)
     Event const& event = _events[_active];
     if (nowMs - _startedMs >= std::uint64_t(event.TimeoutSec) * 1000)
     {
-        Finish("event_timeout");
+        Finish("event_timeout", nowMs, /*success=*/false);
         return {};
     }
     if (_step >= event.Steps.size())
     {
-        Finish("event_done");
+        Finish("event_done", nowMs, /*success=*/true);
         return {};
     }
     if (!facts.Alive)
@@ -307,7 +334,7 @@ Command Runner::Next(Facts const& facts, std::uint64_t nowMs)
         _sent = false;      // no answer came: try again (counted as a failure)
         if (++_failures >= kMaxFailures)
         {
-            Finish("event_failed");
+            Finish("event_failed", nowMs, /*success=*/false);
             return {};
         }
     }

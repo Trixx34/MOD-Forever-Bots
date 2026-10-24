@@ -136,7 +136,7 @@ void OutOfRangeBringsTheLeaderCloserNotToFailure()
     }
 }
 
-void ThreeRefusalsGiveTheEventUp()
+void AFailedEventRetriesWithBackoffThenGivesUpForGood()
 {
     std::vector<std::string> warnings;
     Runner runner(ForMap(Parse(kFile, warnings), 36));
@@ -145,19 +145,41 @@ void ThreeRefusalsGiveTheEventUp()
     f.X = -107;
     f.Y = -659;
     f.KilledBosses = &killed;
-    for (int attempt = 0; attempt < 3; ++attempt)
+
+    std::uint64_t now = 0;
+    for (unsigned cycle = 1; cycle <= kMaxEventAttemptCycles; ++cycle)
     {
-        CHECK(runner.Next(f, 1000 * attempt).Do == Command::What::Use);
-        runner.OnUseResult(UseResult::Failed, 1000 * attempt + 10);
+        Command const started = runner.Next(f, now);
+        CHECK(started.Do == Command::What::Use);   // each cycle restarts the event from its first step
+        for (int attempt = 0; attempt < 3; ++attempt)
+        {
+            runner.OnUseResult(UseResult::Failed, now + 10);
+            now += 10;
+            if (attempt < 2)
+                CHECK(runner.Next(f, now).Do == Command::What::Use);
+        }
+        CHECK(!runner.Active());                   // the attempt cycle ends: 3 refusals in a row give it up for now
+        if (cycle < kMaxEventAttemptCycles)
+        {
+            CHECK(runner.Next(f, now).Do == Command::What::Nothing);   // too soon: still backing off
+            now += kEventRetryBackoffMs;
+        }
     }
-    CHECK(!runner.Active());
-    bool failed = false;
+    // The last cycle gave up for good: waiting out another backoff does not restart it again.
+    now += kEventRetryBackoffMs;
+    CHECK(runner.Next(f, now).Do == Command::What::Nothing && !runner.Active());
+
+    bool sawRetry = false, sawBlocked = false;
     for (std::string const& line : runner.TakeLog())
-        failed = failed || line.rfind("event_failed: event=cannon", 0) == 0;
-    CHECK(failed);
+    {
+        sawRetry = sawRetry || line.rfind("event_failed_retry: event=cannon", 0) == 0;
+        sawBlocked = sawBlocked || (line.rfind("event_blocked: event=cannon", 0) == 0 && line.find("attempts=5") != std::string::npos);
+    }
+    CHECK(sawRetry);
+    CHECK(sawBlocked);
 }
 
-void AnEventIsGivenUpAfterItsTimeout()
+void ATimedOutEventRetriesThenCanSucceed()
 {
     std::vector<std::string> warnings;
     Runner runner(ForMap(Parse(kFile, warnings), 36));
@@ -166,9 +188,20 @@ void AnEventIsGivenUpAfterItsTimeout()
     f.X = -50;
     f.Y = -600;
     f.KilledBosses = &killed;
+
     CHECK(runner.Next(f, 0).Do == Command::What::MoveTo);
     CHECK(runner.Next(f, 89000).Do == Command::What::MoveTo);
-    CHECK(runner.Next(f, 90000).Do == Command::What::Nothing && !runner.Active());      // timeout 90 s
+    CHECK(runner.Next(f, 90000).Do == Command::What::Nothing && !runner.Active());      // timeout 90 s: the cycle ends but is retryable
+
+    CHECK(runner.Next(f, 90001).Do == Command::What::Nothing && !runner.Active());      // too soon: still backing off
+
+    std::uint64_t const retryNow = 90000 + kEventRetryBackoffMs;
+    CHECK(runner.Next(f, retryNow).Do == Command::What::MoveTo && runner.Active());     // backoff elapsed: another chance at the door
+
+    bool sawRetry = false;
+    for (std::string const& line : runner.TakeLog())
+        sawRetry = sawRetry || line.rfind("event_timeout_retry: event=cannon", 0) == 0;
+    CHECK(sawRetry);
 }
 
 void TheLeaderFightsFirst()
@@ -199,8 +232,8 @@ int main()
     TheTriggersFire();
     AnEventWalksUsesAndWaits();
     OutOfRangeBringsTheLeaderCloserNotToFailure();
-    ThreeRefusalsGiveTheEventUp();
-    AnEventIsGivenUpAfterItsTimeout();
+    AFailedEventRetriesWithBackoffThenGivesUpForGood();
+    ATimedOutEventRetriesThenCanSucceed();
     TheLeaderFightsFirst();
     if (failures == 0)
         std::printf("dungeon_events_test: all passed\n");
