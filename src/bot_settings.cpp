@@ -158,7 +158,7 @@ void ReadScenario(std::unordered_map<std::string, std::string> const& config, Sc
                 warnings.push_back("Module.forever-bots.ScenarioKillPriority: '" + item + "' is not a creature entry; ignored.");
         }
     }
-    ReadKey(config, "ScenarioParties", 1, 8, scenario.Parties, warnings);
+    ReadKey(config, "ScenarioParties", 1, 20, scenario.Parties, warnings);
     ReadKey(config, "ScenarioDurationSec", 30, 86400, scenario.DurationSec, warnings);
     if (auto const it = config.find("ScenarioStaging"); it != config.end())
         scenario.HasStaging = ParseNumbers(it->second, scenario.Staging.data(), 4);

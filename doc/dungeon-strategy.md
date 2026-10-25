@@ -119,7 +119,7 @@ Always on, not a tactic: a dungeon party's dead wait 90 s for the healer before 
 
 ### Parallel parties (`ScenarioParties`)
 
-`Module.forever-bots.ScenarioParties = N` (1 to 8, default 1) runs N parties of the dungeon's roster at once for a scenario. Each has its own director, so its own phases, boss kills and
+`Module.forever-bots.ScenarioParties = N` (1 to 20, default 1; 8 or fewer before 0.27.0) runs N parties of the dungeon's roster at once for a scenario. Each has its own director, so its own phases, boss kills and
 result line (`scenario dm#2: ...`); the core makes one instance per group. The bots, in guid order, are cut into parties of the roster size, as the policy's party logic cuts them;
 `MaxBots` is set to N x the roster size by the scenario. `tools/dungeon_report.py` reads the log and prints per party and in aggregate.
 
