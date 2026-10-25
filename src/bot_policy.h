@@ -197,6 +197,10 @@ struct PolicyOptions
     std::uint64_t ReleaseDelayMs = 20000;       // a corpse with a rezzer up waits this long before it releases
     std::uint64_t ReleaseCombatHoldMs = 60000;  // and a release is held back while the party fights, but never longer than this after death
     std::uint64_t CorpseRunTimeoutMs = 240000;  // a ghost that has not reached its corpse by then gives up
+    // A corpse run that takes longer than this (config CorpseRunReviveSec, 0 = off) ends in the core's revive order: a living party member out of combat on the ghost's
+    // map stands it up at its side (needs Bot.Chat.Orders.Enabled in the core). With no such member (a wipe), or once kOutOfCombatReviveTries orders were not applied,
+    // the ghost is put at its corpse (the CorpseRunTimeoutMs teleport, brought forward).
+    std::uint64_t CorpseRunReviveMs = 60000;
     std::uint64_t WaitForRezMs = 90000;         // the party waits this long for a corpse to be resurrected
     std::uint64_t WaitForGhostMs = 180000;      // and this long after the ghost entered the corpse's map
     // Supplies (layout 15): a bot short of ammunition, food or drink walks to a vendor that sells it and buys, and eats or drinks while resting.
@@ -491,6 +495,7 @@ private:
         std::uint64_t RunStartMs = 0;                    // the corpse run began (0 = not yet)
         std::uint64_t InsideSinceMs = 0;                 // the ghost is on the corpse's map since
         bool RunFailed = false;
+        std::uint32_t RunReviveAttempts = 0;             // revive orders sent because the corpse run took longer than CorpseRunReviveMs
         bool RunTimeoutTeleported = false;               // the ghost was put at its corpse once after a run that took too long (a corpse far away, or a route that goes nowhere)
         std::uint64_t DeathTimesMs[3] = { 0, 0, 0 };     // when this bot last died (newest last): two deaths close together mean it dies where it stands up (DeathLoopMs)
         std::uint64_t EscapeUntilMs = 0;                 // after a death loop the bot is put at a suitable grind spot; not again before this

@@ -368,6 +368,10 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     }
     ReadBool(config, "DungeonTeleport", settings.DungeonTeleport, warnings);
     ReadBool(config, "DungeonReviveOutOfCombat", settings.DungeonReviveOutOfCombat, warnings);
+    if (auto const revive = config.find("CorpseRunReviveSec"); revive != config.end() && revive->second == "0")
+        settings.CorpseRunReviveSec = 0; // explicitly off: the ghost walks, and is put at its corpse after CorpseRunTimeoutMs as before
+    else
+        ReadKey(config, "CorpseRunReviveSec", 10, 3600, settings.CorpseRunReviveSec, warnings);
     ReadKey(config, "DungeonHealBelowPct", 30, 85, settings.DungeonHealBelowPct, warnings);
     ReadKey(config, "DungeonTankHealBelowPct", 40, 95, settings.DungeonTankHealBelowPct, warnings);
     ReadKey(config, "HealerDpsManaPct", 10, 80, settings.HealerDpsManaPct, warnings);

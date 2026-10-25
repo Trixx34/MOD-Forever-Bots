@@ -321,8 +321,21 @@ void ErrandSettings()
     CHECK(warnings.size() == 2);
 }
 
+// CorpseRunReviveSec: 60 by default, 0 turns it off, 10..3600 otherwise (a value below keeps the default, with a warning).
+void CorpseRunReviveSettings()
+{
+    std::vector<std::string> warnings;
+    CHECK(ParseBotSettings({}, warnings).CorpseRunReviveSec == 60);
+    CHECK(ParseBotSettings({ { "CorpseRunReviveSec", "0" } }, warnings).CorpseRunReviveSec == 0);
+    CHECK(ParseBotSettings({ { "CorpseRunReviveSec", "120" } }, warnings).CorpseRunReviveSec == 120);
+    CHECK(warnings.empty());
+    CHECK(ParseBotSettings({ { "CorpseRunReviveSec", "5" } }, warnings).CorpseRunReviveSec == 60);
+    CHECK(warnings.size() == 1);
+}
+
 int main()
 {
+    CorpseRunReviveSettings();
     ErrandSettings();
     ChatSettings();
     SayAndSupplySettings();

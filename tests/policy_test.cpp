@@ -2931,6 +2931,92 @@ void GhostThatCannotReachItsCorpseIsPutThereOnce()
     CHECK(Logged(events, "corpse_run_failed:"));
 }
 
+// A corpse run that takes longer than CorpseRunReviveMs (60 s, the owner's rule of 2026-10-25) ends in the core's revive order from the living leader on the
+// ghost's map; when the orders do not take (three tries), the ghost is put at its corpse.
+void ALongCorpseRunEndsInAReviveFromTheLeader()
+{
+    std::vector<std::string> events;
+    PolicyOptions options = DeadOptions(&events);
+    BotPolicy policy(options);
+    WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 });
+    Ghost(v.bots[3], 0.0f, 0, 3000.0f);                                                  // the corpse is far away on the same map
+    auto const reviveOf = [](std::vector<BotAction> const& actions) -> std::optional<BotAction>
+    {
+        for (BotAction const& action : actions)
+            if (action.type == ActionType::kRevive && action.bot_guid == 13)
+                return action;
+        return std::nullopt;
+    };
+    CHECK(HasAction(policy.Decide(v, 1000), 13, ActionType::kMoveTo));                   // the run starts on foot
+    CHECK(!reviveOf(policy.Decide(v, 30000)).has_value());
+    CHECK(!reviveOf(policy.Decide(v, 60500)).has_value());                               // not before 60 s
+    std::optional<BotAction> const revive = reviveOf(policy.Decide(v, 61500));
+    CHECK(revive.has_value() && (revive->target_guid & 0xFFFFFFFFull) == 12);              // the leader (bot 12) is the speaker
+    CHECK(Logged(events, "corpse_run_revive:"));
+    CHECK(!reviveOf(policy.Decide(v, 62000)).has_value());                               // not again before the retry
+    CHECK(reviveOf(policy.Decide(v, 72000)).has_value());
+    CHECK(reviveOf(policy.Decide(v, 82000)).has_value());                                // third try
+    std::vector<BotAction> const given = policy.Decide(v, 92500);
+    CHECK(!reviveOf(given).has_value());
+    std::optional<BotAction> const teleport = TeleportOf(given, 13);
+    CHECK(teleport.has_value() && teleport->dest_x == 3000.0f);                           // the orders did not take: to the corpse
+    CHECK(Logged(events, "corpse_run_teleport:"));
+
+    // A leader in a fight is no speaker; another living member out of combat is.
+    BotPolicy other(DeadOptions(nullptr));
+    WorldTickSnapshotView busy = PartyView({ 10, 11, 12, 13, 14 });
+    Ghost(busy.bots[3], 0.0f, 0, 3000.0f);
+    busy.bots[2].in_combat = 1;
+    other.Decide(busy, 1000);
+    std::optional<BotAction> const byMember = reviveOf(other.Decide(busy, 61500));
+    CHECK(byMember.has_value() && (byMember->target_guid & 0xFFFFFFFFull) != 12 && (byMember->target_guid & 0xFFFFFFFFull) != 13);
+
+    // A ghost at its corpse past 60 s (the core's reclaim delay) is not on a run: no revive, no teleport.
+    BotPolicy waiting(DeadOptions(nullptr));
+    WorldTickSnapshotView there = PartyView({ 10, 11, 12, 13, 14 });
+    Ghost(there.bots[3], 0.0f, 0, 10.0f);
+    there.bots[3].reclaim_wait_ms = 90000;
+    waiting.Decide(there, 1000);
+    std::vector<BotAction> const atCorpse = waiting.Decide(there, 61500);
+    CHECK(!reviveOf(atCorpse).has_value() && !TeleportOf(atCorpse, 13).has_value());
+
+    // CorpseRunReviveMs = 0: the rule is off, the ghost walks on.
+    PolicyOptions off = DeadOptions(nullptr);
+    off.CorpseRunReviveMs = 0;
+    BotPolicy plain(off);
+    plain.Decide(v, 1000);
+    std::vector<BotAction> const later = plain.Decide(v, 61500);
+    CHECK(!reviveOf(later).has_value() && !TeleportOf(later, 13).has_value());
+}
+
+// A wiped party (the sim's Deadmines run: five ghosts at the Sentinel Hill graveyard, the walk to the door refused for "no route") has no one to give the
+// revive order: after 60 s each ghost is put at its corpse inside, not after the four-minute timeout.
+void AWipedPartysGhostsArePutAtTheirCorpsesAfterAMinute()
+{
+    std::vector<std::string> events;
+    BotPolicy policy(DeadOptions(&events));
+    policy.SetRouteActive(true);
+    WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 });
+    for (BotSnapshot& bot : v.bots)
+        Ghost(bot, 0.0f, 36, 50.0f);                                                     // all outside on map 0, corpses in the dungeon
+    std::vector<BotAction> const first = policy.Decide(v, 1000);
+    CHECK(HasAction(first, 13, ActionType::kMoveTo) && !TeleportOf(first, 13).has_value()); // to the door first
+    CHECK(!TeleportOf(policy.Decide(v, 50000), 13).has_value());
+    std::vector<BotAction> const later = policy.Decide(v, 61500);
+    for (std::uint64_t guid : { 10, 11, 12, 13, 14 })
+    {
+        std::optional<BotAction> const teleport = TeleportOf(later, guid);
+        CHECK(teleport.has_value() && teleport->spell_id == 36 && teleport->dest_x == 50.0f);
+        CHECK(!HasAction(later, guid, ActionType::kRevive));                              // nobody alive to give the order
+    }
+    CHECK(Logged(events, "corpse_run_teleport:"));
+    bool reason = false;
+    for (std::string const& text : events)
+        reason = reason || text.find("reason=revive_no_speaker") != std::string::npos;
+    CHECK(reason);
+    CHECK(!TeleportOf(policy.Decide(v, 70000), 13).has_value());                         // once
+}
+
 // A bot that stands up among what killed it and dies again three times within two minutes is put at a grind spot for its level, away from the corpse.
 void DeathLoopMovesTheBotToAGrindSpot()
 {
@@ -3162,7 +3248,9 @@ void GhostReclaimsInRadiusAndRetries()
 void GhostCorpseRunTimesOut()
 {
     std::vector<std::string> events;
-    BotPolicy policy(DeadOptions(&events));
+    PolicyOptions options = DeadOptions(&events);
+    options.CorpseRunReviveMs = 0;                           // the 60 s revive off: the four-minute timeout alone (ALongCorpseRunEndsInAReviveFromTheLeader has the rule)
+    BotPolicy policy(options);
     auto const build = [] { WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 }); Ghost(v.bots[3], 5000.0f, 0, 0.0f); return v; };
     policy.Decide(build(), 1000);
     policy.Decide(build(), 250000);                          // the first timeout puts the ghost at its corpse and starts the run over
@@ -4872,6 +4960,8 @@ int main()
     ThirtyPercentIsNotLow();
     LoneCorpseReleasesAndDoesNotFight();
     GhostThatCannotReachItsCorpseIsPutThereOnce();
+    ALongCorpseRunEndsInAReviveFromTheLeader();
+    AWipedPartysGhostsArePutAtTheirCorpsesAfterAMinute();
     DeathLoopMovesTheBotToAGrindSpot();
     CorpseWaitsForARezzerThenReleases();
     ADungeonCorpseWaitsLongerForARezzer();

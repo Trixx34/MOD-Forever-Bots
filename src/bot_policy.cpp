@@ -1987,6 +1987,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 state.Inside = false;
                 state.RunFailed = false;
                 state.RunTimeoutTeleported = false;
+                state.RunReviveAttempts = 0;
                 state.DeathTimesMs[0] = state.DeathTimesMs[1];
                 state.DeathTimesMs[1] = state.DeathTimesMs[2];
                 state.DeathTimesMs[2] = nowMs;
@@ -2175,6 +2176,57 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 state.RunStartMs = nowMs;
                 event("corpse_run_start: bot=" + std::to_string(bot.guid) + " map=" + std::to_string(bot.map_id) + " corpse_map=" +
                       std::to_string(bot.corpse_map) + " dist=" + (bot.map_id == bot.corpse_map ? std::to_string(int(DistanceTo(bot, Point{ bot.corpse_x, bot.corpse_y, bot.corpse_z }))) : std::string("other_map")));
+            }
+            // A corpse run that takes longer than CorpseRunReviveMs (the owner's rule of 2026-10-25: 60 s; the sim's wiped Deadmines party stood four minutes at the
+            // Sentinel Hill graveyard, its walk to the door refused for "no route"). The ghost gets the core's revive order from a living member out of combat on the
+            // same map (the leader first), when the ghost is on its corpse's map: a ghost still outside a dungeon is not stood up there (the rule of 2026-10-22). With no
+            // such member (a wipe), or once kOutOfCombatReviveTries orders did not take, the ghost is put at its corpse: the CorpseRunTimeoutMs teleport, brought forward.
+            // A ghost already at its corpse (waiting out the core's reclaim delay, or a hostile beside it) is not on a run any more: the rule leaves it alone.
+            bool const atCorpse = bot.map_id == bot.corpse_map && DistanceTo(bot, Point{ bot.corpse_x, bot.corpse_y, bot.corpse_z }) <= kReclaimYards;
+            if (_options.CorpseRunReviveMs != 0 && !state.RunTimeoutTeleported && !atCorpse && nowMs - state.RunStartMs > _options.CorpseRunReviveMs)
+            {
+                BotSnapshot const* speaker = nullptr;
+                if (deadParty != 0 && bot.map_id == bot.corpse_map)
+                    forParty(deadParty, [&](BotSnapshot const& member)
+                    {
+                        if (member.guid == bot.guid || member.life_state != 0 || member.in_combat != 0 || member.map_id != bot.map_id)
+                            return;
+                        if (!speaker || member.guid == deadParty)
+                            speaker = &member;
+                    });
+                if (speaker && state.RunReviveAttempts < kOutOfCombatReviveTries)
+                {
+                    if (nowMs >= state.ReviveRetryMs)
+                    {
+                        BotAction revive;
+                        revive.bot_guid = bot.guid;
+                        revive.type = ActionType::kRevive;
+                        revive.target_guid = PlayerRef(speaker->guid);
+                        revive.dest_x = 0.0f;
+                        actions.push_back(revive);
+                        state.RunReviveAttempts += 1;
+                        state.ReviveRetryMs = nowMs + kOutOfCombatReviveRetryMs;
+                        event("corpse_run_revive: bot=" + std::to_string(bot.guid) + " speaker=" + std::to_string(speaker->guid) + " attempt=" +
+                              std::to_string(state.RunReviveAttempts) + " map=" + std::to_string(bot.map_id) + " run_ms=" + std::to_string(nowMs - state.RunStartMs));
+                    }
+                    continue;
+                }
+                if (!speaker || nowMs >= state.ReviveRetryMs)
+                {
+                    state.RunTimeoutTeleported = true;
+                    state.RunStartMs = nowMs;
+                    BotAction back;
+                    back.bot_guid = bot.guid;
+                    back.type = ActionType::kTeleport;
+                    back.spell_id = bot.corpse_map;
+                    back.dest_x = bot.corpse_x;
+                    back.dest_y = bot.corpse_y;
+                    back.dest_z = bot.corpse_z;
+                    actions.push_back(back);
+                    event("corpse_run_teleport: bot=" + std::to_string(bot.guid) + " map=" + std::to_string(bot.map_id) + " corpse_map=" + std::to_string(bot.corpse_map) +
+                          " reason=" + (speaker ? "revive_refused" : "revive_no_speaker"));
+                    continue;
+                }
             }
             if (nowMs - state.RunStartMs > _options.CorpseRunTimeoutMs)
             {
