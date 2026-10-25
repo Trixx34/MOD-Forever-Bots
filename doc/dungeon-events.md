@@ -23,8 +23,9 @@ The leader of a dungeon party (the scenario's, or the tank under "tank lead") ru
 it does only what the event asks and the route waits; an event is paused while the party fights. A click on a door or lever that is open already does nothing (the core checks), so
 `near` events can fire whenever the leader comes by. Three refusals in a row, or the timeout, end an event with a log line (`event_failed`, `event_timeout`).
 
-The Deadmines are in the file: five doors with their levers (read from the world database) and the Defias Cannon that opens the Iron Clad Door (a charge of Defias Gunpowder,
-item 5397, used on the cannon; the core gives the bot one). Other dungeons need their lines added; the doors and levers of a map can be listed from `gameobject` and
+The Deadmines are in the file: the Factory, Mast Room and two Heavy Doors with their levers or click (read from the world database), and the Iron Clad Door, which the same party member
+opens by clicking the Defias Gunpowder chest in the room before it and then firing the Defias Cannon with a charge of Defias Gunpowder (item 5397; the core gives the bot one).
+The Foundry Door needs no event: it opens on its own. Other dungeons need their lines added; the doors and levers of a map can be listed from `gameobject` and
 `gameobject_template` (types 0, 1 and 10), as was done for the Deadmines.
 
 Core: `ActionType::kUseObject` (spell_id = the object's entry, target_guid = an item entry to use on it or 0, dest = where it stands). The nearest object of that entry within 30 yards is

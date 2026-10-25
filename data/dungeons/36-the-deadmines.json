@@ -177,15 +177,6 @@
       ]
     },
     {
-      // Foundry Door 16399 at (-168.5, -579.9, 19.3): opened by this lever (object 101834). Gilnid's foundry is behind it.
-      "id": "foundry-lever",
-      "name": "Foundry Door (lever)",
-      "trigger": { "type": "near", "x": -165.4, "y": -576.9, "z": 19.3, "radius": 30 },
-      "steps": [
-        { "type": "use", "object": 101834, "x": -165.4, "y": -576.9, "z": 19.3 }
-      ]
-    },
-    {
       // Mast Room Door 16400 at (-290.3, -537.0, 49.4): opened by this lever (object 101832).
       "id": "mast-lever",
       "name": "Mast Room Door (lever)",
@@ -195,16 +186,18 @@
       ]
     },
     {
-      // Iron Clad Door 16397 at (-100.5, -668.8, 7.4): opened by firing the Defias Cannon (object 16398) with Defias Gunpowder (item 5397, the core gives the bot one).
+      // Iron Clad Door 16397 at (-100.5, -668.8, 7.4): opened by firing the Defias Cannon (object 16398) with Defias Gunpowder (item 5397).
+      // The same party member first clicks the Defias Gunpowder chest (object 17155) in the room before the cannon, then fires the cannon.
       // Firing it also summons two Defias Squallshapers, which the party then fights. 'timeout_sec' = give up on this event after that long.
       "id": "iron-clad",
-      "name": "Iron Clad Door (Defias Cannon)",
-      "trigger": { "type": "near", "x": -107.6, "y": -659.7, "z": 7.2, "radius": 40 },
+      "name": "Iron Clad Door (Defias Gunpowder, then Defias Cannon)",
+      "trigger": { "type": "near", "x": -106.4, "y": -617.3, "z": 13.8, "radius": 30 },
       "steps": [
+        { "type": "use", "object": 17155, "x": -106.4, "y": -617.3, "z": 13.8 },
         { "type": "use", "object": 16398, "x": -107.6, "y": -659.7, "z": 7.2, "item": 5397 },
         { "type": "wait", "seconds": 4 }
       ],
-      "timeout_sec": 90
+      "timeout_sec": 150
     }
   ]
 }
