@@ -97,7 +97,7 @@ Each tick the policy (`src/bot_policy.cpp`) reads the bot's snapshot and sends a
   back to its corpse (through the instance door when the corpse is inside) and reclaims it. A run longer than `CorpseRunTeleportSec` (60 s) puts the ghost
   at its corpse; a run still not done four minutes after that is given up.
   A ghost still outside a dungeon is never stood up there. Since 0.22.0.
-- **Dungeon death.** A dead member of a dungeon party does not walk back to its corpse. It is teleported to the instance entrance (the dungeon file's `entry`) and revived there by its leader, once the leader is up and out of combat. If no revive comes within three minutes it walks to its corpse as before. Since 0.24.0.
+- **Dungeon death.** A dead member of a dungeon party does not walk back to its corpse. It is teleported to the instance entrance (the dungeon file's `entry`) and revived there by its leader, once the leader is up and out of combat. If no revive comes within 90 seconds it walks to its corpse as before. Since 0.24.0 (90 seconds since 0.26.0).
 - **Healing.** A priest casts Flash Heal in an emergency and Power Word: Shield on a member that took damage; a paladin, shaman or druid
   answers an emergency with its own heal spell and never casts a priest spell. Each spell is cast only when the healer can pay for it, so a
   cheaper heal is used when the mana is low. Since 0.23.0.

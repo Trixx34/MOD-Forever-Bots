@@ -25,7 +25,7 @@ scenario director and the party policy already do the work; this slice adds the 
 | The healer prioritises the tank | a healer class heals the party member below 60% health; the tank is who loses health first. There is no explicit "tank first" ordering when several members are hurt (the lowest-health member is healed) |
 | Dps assist the tank's target | members do not pull and join a fight 2.5 s after the tank, on the leader's target |
 | Loot | the bot loots creatures it fought (core loot rules) |
-| Wipe and corpse run | dead bots release; a ghost of a dungeon party is teleported to the instance `entry` and revived there by its leader (since 0.24.0), and walks back to its corpse only when no revive comes within three minutes; `wipe_recovery` keeps the run going while a bot may come back |
+| Wipe and corpse run | dead bots release; a ghost of a dungeon party is teleported to the instance `entry` and revived there by its leader (since 0.24.0), and walks back to its corpse only when no revive comes within 90 seconds (since 0.26.0; 180 before); `wipe_recovery` keeps the run going while a bot may come back |
 | Give up | `duration` (timeout), `min_alive` (understrength), `leader_dead_abandon`, and the new `bosses_missing` |
 
 New in this slice: **`ScenarioRequireBosses`**. With it on, the run is `complete` when every listed boss has been seen dead (a creature of that

@@ -255,7 +255,7 @@ constexpr std::uint64_t kCorpseTeleportRetryMs = 15000; // a ghost off its corps
 constexpr std::uint64_t kOutOfCombatReviveRetryMs = 10000; // a ghost of a dungeon party is revived by its leader out of combat, not again before this
 constexpr std::uint64_t kCorpseReviveDelayMs = 8000;       // the Recover tactic: a dead member of a dungeon party whose leader is up and quiet is revived by the leader this long after the fight ended
 constexpr std::uint32_t kOutOfCombatReviveTries = 3;       // and after this many tries the ghost walks back to its corpse as before
-constexpr std::uint64_t kDungeonEntryWaitMs = 180000;      // a ghost of a dungeon party waits this long at the instance entrance for its revive, then walks to its corpse as before
+constexpr std::uint64_t kDungeonEntryWaitMs = 90000;       // a ghost of a dungeon party waits this long at the instance entrance for its revive, then walks to its corpse as before
 constexpr std::uint64_t kEntryTeleportRetryMs = 5000;      // the next try of the teleport to the entrance, while it is refused or the ghost is not there yet
 constexpr float kEntryYards = 15.0f;                        // a ghost this close to the entrance is at it
 // A ghost cannot be attacked; the body it reclaims can: it comes back alive at about half health, on the spot where it died, next to whatever killed it (on the sim a tank was
