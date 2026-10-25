@@ -1244,6 +1244,10 @@ int main(int argc, char** argv)
             CommandQueue::ChatItem item;
             item.Command = *parsed;
             item.Context.Issuer = request.command().issuer_guid() & forever_module::kUnitRefCounterMask;
+            // The party-chat path below (OnNotify, PlayerChatEvent) sets these from the same settings; the dot
+            // command skipped them, so a bot that took a ".bots" order never spoke its ChatSay confirmation line.
+            item.Context.Say = settings.ChatSay;
+            item.Context.SayMax = settings.ChatSayMax;
             {
                 std::lock_guard<std::mutex> lock(commands->Lock);
                 if (commands->Chat.size() < 64)
