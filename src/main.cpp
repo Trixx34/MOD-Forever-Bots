@@ -1494,7 +1494,7 @@ int main(int argc, char** argv)
     policyOptions.Supplies = settings.Supplies;
     policyOptions.DungeonTeleport = settings.DungeonTeleport;
     policyOptions.DungeonReviveOutOfCombat = settings.DungeonReviveOutOfCombat;
-    policyOptions.CorpseRunReviveMs = std::uint64_t(settings.CorpseRunReviveSec) * 1000;
+    policyOptions.CorpseRunTeleportMs = std::uint64_t(settings.CorpseRunTeleportSec) * 1000;
     policyOptions.AggressiveStart = settings.AggressiveStart;
     policyOptions.Crafting = settings.Crafting;
     policyOptions.MountMinLevel = settings.MountMinLevel;

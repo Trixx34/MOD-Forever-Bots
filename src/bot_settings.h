@@ -179,9 +179,8 @@ struct BotSettings
     // known to be hostile. The dungeon files' bosses[].strategy.avoid_spells and avoid (fixed zones) add to it for their map.
     bool AvoidGroundEffects = false;
     std::string AvoidSpellsFile;
-    // CorpseRunReviveSec (0 = off, else 10..3600): a ghost whose corpse run takes longer is revived by a living party member out of combat on its map (the core's revive
-    // order, needs Bot.Chat.Orders.Enabled), or, with none (a wipe), put at its corpse (needs Bot.Actions.Teleport).
-    std::uint32_t CorpseRunReviveSec = 60;
+    // CorpseRunTeleportSec (0 = off, else 10..3600): a ghost whose corpse run takes longer is put at its corpse (needs Bot.Actions.Teleport).
+    std::uint32_t CorpseRunTeleportSec = 60;
     bool DungeonReviveOutOfCombat = false;  // DungeonReviveOutOfCombat = 1: a dead member of a dungeon party is revived by its leader out of combat (needs Bot.Chat.Orders.Enabled in the core)
     std::string DungeonFile;
     // DungeonDataDir (default: the folder "dungeons" beside DungeonFile) holds the shipped per-dungeon JSON files; DungeonDir is your own folder of them, whose file for a map

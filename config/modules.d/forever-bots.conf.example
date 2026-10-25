@@ -154,7 +154,7 @@ Module.forever-bots.TelemetrySummarySec = 60
 # ScenarioResultFile = scenario-results.log
 # Offline policy lab: each candidate applies to all ScenarioParties in that run. Defaults preserve current behavior;
 # bounded parameter ranges are validated by the module. See tools/dungeon_learning/README.md.
-# CorpseRunReviveSec = 60   (a corpse run longer than this ends in a revive from a living party member on the ghost's map, needs Bot.Chat.Orders.Enabled in the
+# CorpseRunTeleportSec = 60   (a corpse run longer than this puts the ghost at its corpse, the four-minute teleport brought forward; 0 = off, 10 to 3600)
 #                            core; in a wipe the ghost is put at its corpse, needs Bot.Actions.Teleport. 0 = off, else 10..3600)
 # DungeonHealBelowPct = 55
 # DungeonTankHealBelowPct = 75

@@ -52,7 +52,7 @@ line to the module's stderr. A config reload updates the ramp, the random picks 
 | `SupplyAmmoLow`, `SupplyAmmoTarget` | 100, 400 | A bot with fewer pieces of ammunition goes shopping, and buys up to the target |
 | `SupplyFoodLow`, `SupplyFoodTarget`, `SupplyDrinkLow`, `SupplyDrinkTarget` | 3, 10, 3, 10 | The same for food, and for drink (bots with mana) |
 | `SupplyTripSec` | 120 | A bot that needs supplies makes a trip at most this often (30 to 3600); a trip that bought nothing waits 10 minutes, doubling each time (an hour at most) |
-| `CorpseRunReviveSec` | 60 | A ghost whose corpse run takes longer is revived by a living party member out of combat on its map (the revive order, needs `Bot.Chat.Orders.Enabled` in the core); with no such member (a wipe), or when three orders do not take, it is put at its corpse (needs `Bot.Actions.Teleport`). 0 is off (10 to 3600); a ghost already at its corpse is left alone |
+| `CorpseRunTeleportSec` | 60 | A ghost whose corpse run takes longer is put at its corpse (the teleport needs `Bot.Actions.Teleport`); the four-minute teleport is brought forward to this. 0 is off (10 to 3600); a ghost already at its corpse is left alone |
 | `QuestTeleport` | 0 | A quest walk stuck for two minutes teleports to its giver (needs `Bot.Actions.Teleport = 1`); 0 drops the start and grinds instead |
 | `TrainEverySec` | 0 (off) | Seconds between trainer checks, also after a level-up (0, or 60 to 86400) |
 | `PartySize`, `PartyCount` | 0 (off), 1 | Bots per party (at most 5) and number of parties |
@@ -94,8 +94,8 @@ Each tick the policy (`src/bot_policy.cpp`) reads the bot's snapshot and sends a
   its greedy allocator. A refusal (in combat) is asked again after 5 s. Points already spent are not taken back, so a role change affects
   only new points (no respec yet). Protocol 17.
 - **Death and corpse run.** A dead bot waits for a resurrect while a healer of its party is up (20 s, 90 s in a dungeon), then releases and walks
-  back to its corpse (through the instance door when the corpse is inside) and reclaims it. A run longer than `CorpseRunReviveSec` (60 s) ends in a
-  revive from a living party member on the ghost's map, or, in a wipe, with the ghost put at its corpse; a run still not done four minutes after that is given up.
+  back to its corpse (through the instance door when the corpse is inside) and reclaims it. A run longer than `CorpseRunTeleportSec` (60 s) puts the ghost
+  at its corpse; a run still not done four minutes after that is given up.
   A ghost still outside a dungeon is never stood up there. Since 0.22.0.
 - **Loot.** A creature the bot fought, once dead and within 25 yards, is looted once when the bot is out of combat. The core runs the
   bot's own loot handlers, so loot rights, group rules and bag space are the core's. The item-looted event fires, so
