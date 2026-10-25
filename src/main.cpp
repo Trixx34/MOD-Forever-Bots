@@ -1232,11 +1232,11 @@ int main(int argc, char** argv)
                 set(false, "Usage: .bots [all|tank|healer|dps|<class>] follow [off] | stay [off] | release | status | autogear" +
                                std::string(settings.ChatOrders ? " | stop | passive | aggressive | summon | revive | mount | dismount" : "") +
                                std::string(settings.ChatControl ? " | role <tank|healer|dps|auto> | stance <aggressive|defensive|passive> | distance <yards>|default" : "") +
-                               ". goto here, pull, heal and focus: say them in party chat.");
+                               ". goto here, pull, heal, focus and train: say them in party chat.");
                 return reply;
             }
             if (parsed->Verb == ChatVerb::GotoHere || parsed->Verb == ChatVerb::Pull || parsed->Verb == ChatVerb::Heal ||
-                parsed->Verb == ChatVerb::Focus)
+                parsed->Verb == ChatVerb::Focus || parsed->Verb == ChatVerb::Train)
             {
                 set(false, std::string(ChatVerbName(parsed->Verb)) + " needs your position or target: say it in party chat.");
                 return reply;
