@@ -1226,6 +1226,15 @@ int main(int argc, char** argv)
                 set(false, "Bot commands are off (ChatCommands = 0 in the module's config).");
                 return reply;
             }
+            if (rest == "help")
+            {
+                std::string text = "Bot commands ([selector] verb [args], selector optional):";
+                for (std::string const& line : ChatHelpLines(settings.ChatOrders, settings.ChatControl))
+                    text += "\n" + line;
+                text += "\nAlso: .bots list | autogear | alt add|remove|list <name> | spawn <race> <class> [level].";
+                set(true, text);
+                return reply;
+            }
             auto const parsed = ParseChatCommand(rest, settings.ChatOrders, settings.ChatControl);
             if (!parsed)
             {
@@ -1244,6 +1253,8 @@ int main(int argc, char** argv)
             CommandQueue::ChatItem item;
             item.Command = *parsed;
             item.Context.Issuer = request.command().issuer_guid() & forever_module::kUnitRefCounterMask;
+            item.Context.Orders = settings.ChatOrders;
+            item.Context.Control = settings.ChatControl;
             // The party-chat path below (OnNotify, PlayerChatEvent) sets these from the same settings; the dot
             // command skipped them, so a bot that took a ".bots" order never spoke its ChatSay confirmation line.
             item.Context.Say = settings.ChatSay;
@@ -1368,6 +1379,8 @@ int main(int argc, char** argv)
         item.Context.TargetRef = chat.target_ref();
         item.Context.Say = settings.ChatSay;
         item.Context.SayMax = settings.ChatSayMax;
+        item.Context.Orders = settings.ChatOrders;
+        item.Context.Control = settings.ChatControl;
         std::lock_guard<std::mutex> lock(commands->Lock);
         if (commands->Chat.size() < 64)
             commands->Chat.push_back(std::move(item));

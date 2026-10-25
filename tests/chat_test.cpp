@@ -35,6 +35,7 @@ void ParsesBasicVerbs()
     CHECK(ParseChatCommand("goto here", false)->Verb == ChatVerb::GotoHere);
     CHECK(ParseChatCommand("release", false)->Verb == ChatVerb::Release);
     CHECK(ParseChatCommand("status", false)->Verb == ChatVerb::Status);
+    CHECK(ParseChatCommand("help", false)->Verb == ChatVerb::Help); // help is a basic verb: no ChatOrders/ChatControl needed
 }
 
 void OrdersNeedTheSwitch()
@@ -141,6 +142,15 @@ BotPolicy::ChatContext Ctx()
     ctx.Issuer = kPlayer;
     ctx.Pos = Point{ 100.0f, 200.0f, 5.0f };
     return ctx;
+}
+
+// Whether some line of `help`'s output starts with this verb (so "stay" does not also match "stay off").
+bool HasLine(std::vector<std::string> const& lines, std::string const& verb)
+{
+    for (std::string const& line : lines)
+        if (line.rfind(verb, 0) == 0)
+            return true;
+    return false;
 }
 
 void FollowMakesTheBotsFollowTheSpeaker()
@@ -409,6 +419,35 @@ void StatusGivesALinePerBot()
     auto const lines = policy.ApplyChat(view, Ctx(), *ParseChatCommand("status", false), 1100);
     CHECK(lines.size() == 5);
     CHECK(lines[0].find("Bot 10") == 0 && lines[0].find("hp 100%") != std::string::npos);
+}
+
+void HelpListsEveryVerbAndIsNotSaidOutLoud()
+{
+    // Basic-only: no order or control verb is listed, and none of chat_commands.h's basic verbs is missing.
+    BotPolicy policy = Policy();
+    WorldTickSnapshotView view = Group();
+    policy.Decide(view, 1000);
+    std::vector<ChatAck> acks;
+    auto const basic = policy.ApplyChat(view, Ctx(), *ParseChatCommand("help", false), 1100, &acks);
+    CHECK(acks.empty()); // help is never said out loud, even with ChatSay on
+    for (char const* verb : { "follow", "stay", "goto here", "release", "status", "help" })
+        CHECK(HasLine(basic, verb));
+    for (char const* verb : { "pull", "heal", "stop", "lead", "train", "mount", "role", "stance", "distance" })
+        CHECK(!HasLine(basic, verb));
+
+    // Orders and control add their own verbs.
+    BotPolicy::ChatContext everythingCtx = Ctx();
+    everythingCtx.Orders = true;
+    everythingCtx.Control = true;
+    auto const everything = policy.ApplyChat(view, everythingCtx, *ParseChatCommand("help", true, true), 1100);
+    for (char const* verb : { "pull", "heal", "stop", "lead", "train", "mount", "role", "stance", "distance", "focus" })
+        CHECK(HasLine(everything, verb));
+
+    // help needs no bot: a speaker with none in their group still gets the list, not "No bot of your group matched."
+    BotPolicy::ChatContext lonely = Ctx();
+    lonely.Issuer = 123456;
+    auto const alone = policy.ApplyChat(view, lonely, *ParseChatCommand("help", false), 1100);
+    CHECK(!alone.empty() && HasLine(alone, "follow"));
 }
 
 void PassiveBotsDoNotAssist()
@@ -802,6 +841,7 @@ int main()
     HealCastsOnTheSelectedFriend();
     ReleaseOnlyForTheDead();
     StatusGivesALinePerBot();
+    HelpListsEveryVerbAndIsNotSaidOutLoud();
     PassiveBotsDoNotAssist();
     AcceptsAPlayersInvite();
     AltsAreNotAutoGeared();

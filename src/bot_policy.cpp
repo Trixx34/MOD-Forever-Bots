@@ -1226,6 +1226,10 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
 std::vector<std::string> BotPolicy::ApplyChat(WorldTickSnapshotView const& view, ChatContext const& chat, ChatCommand const& command,
                                                std::uint64_t nowMs, std::vector<ChatAck>* acks)
 {
+    // help needs no bot (any party member can ask for it, led bots or not), and is never said out loud.
+    if (command.Verb == ChatVerb::Help)
+        return ChatHelpLines(chat.Orders, chat.Control);
+
     std::vector<std::string> lines;
     std::vector<std::uint64_t> accepted; // the bots that took the order, for the say-back
     std::uint64_t const issuerRef = PlayerRef(chat.Issuer);
@@ -1475,6 +1479,7 @@ std::vector<std::string> BotPolicy::ApplyChat(WorldTickSnapshotView const& view,
                 }
                 break;
             case ChatVerb::None:
+            case ChatVerb::Help: // handled above, before this loop
                 break;
         }
         if (refused == refusedBefore)

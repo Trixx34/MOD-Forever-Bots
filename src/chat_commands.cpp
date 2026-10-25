@@ -130,9 +130,43 @@ char const* ChatVerbName(ChatVerb verb)
         case ChatVerb::Lead: return "lead";
         case ChatVerb::LeadOff: return "lead off";
         case ChatVerb::Distance: return "distance";
+        case ChatVerb::Help: return "help";
         case ChatVerb::None: break;
     }
     return "none";
+}
+
+std::vector<std::string> ChatHelpLines(bool orders, bool control)
+{
+    std::vector<std::string> lines;
+    lines.push_back("Selector (optional, first word): all | tank | healer | dps | <class> (also plural), comma-joined for a union. Default: all.");
+    lines.push_back("follow [off] - walk after the speaker, or stop.");
+    lines.push_back("stay [off] - hold position (fights only what attacks it), or stop holding.");
+    lines.push_back("goto here - walk to where the speaker stands (party chat only: needs the speaker's position).");
+    lines.push_back("release - a dead bot releases its spirit now.");
+    lines.push_back("status - one line per bot, whispered back.");
+    lines.push_back("help - this list.");
+    if (orders)
+    {
+        lines.push_back("stop - drop follow, goto and stay.");
+        lines.push_back("pull - the tank attacks the speaker's selected target (party chat only: needs a target).");
+        lines.push_back("heal - a healer casts its heal on the speaker's selected friend (party chat only: needs a target).");
+        lines.push_back("passive - fights only what attacks the bot.");
+        lines.push_back("aggressive - back to normal (fights what the group fights or meets).");
+        lines.push_back("summon - the bots walk (teleport) next to the speaker.");
+        lines.push_back("revive - a dead bot is resurrected at 35% health next to the speaker.");
+        lines.push_back("mount / dismount - the fastest ground mount the bot knows.");
+        lines.push_back("train - walk to the speaker, who stands at a class or profession trainer, and learn what it teaches (party chat only: needs the speaker's position).");
+        lines.push_back("lead [off] - \"tank lead\": in a known dungeon the tank bot walks the group through it and the rest follow it instead of the speaker. \"lead off\" or stop ends it.");
+    }
+    if (control)
+    {
+        lines.push_back("role tank|healer|dps|auto - overrides what the class gives.");
+        lines.push_back("stance aggressive|defensive|passive - aggressive pulls, defensive only fights what attacks it or the group, passive only what attacks the bot.");
+        lines.push_back("focus [off] - the speaker's selected target is attacked first in a fight (party chat only: needs a target).");
+        lines.push_back("distance <yards>|default - how far from the speaker a following bot stops (3 to 40 yards).");
+    }
+    return lines;
 }
 
 bool ParseChatSelector(std::string_view token, ChatSelector& out)
@@ -248,6 +282,7 @@ std::optional<ChatCommand> ParseChatCommand(std::string_view text, bool orders, 
     if (verb == "mount") return finish(ChatVerb::Mount);
     if (verb == "dismount") return finish(ChatVerb::Dismount);
     if (verb == "train") return finish(ChatVerb::Train);
+    if (verb == "help") return finish(ChatVerb::Help);
     return std::nullopt;
 }
 
