@@ -4,5 +4,12 @@
   "protocol_version": "17",
   "tier1": {
     "hooks": ["CommandScript", "PlayerScript.OnChat"]
+  },
+  "tier2": {
+    "participates": true,
+    "requested_max_bots": 2500,
+    "requested_max_nearby_units": 16,
+    "requested_max_actions": 5000,
+    "requested_tick_interval": 1
   }
 }
