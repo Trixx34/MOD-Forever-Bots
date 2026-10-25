@@ -97,6 +97,9 @@ Each tick the policy (`src/bot_policy.cpp`) reads the bot's snapshot and sends a
   back to its corpse (through the instance door when the corpse is inside) and reclaims it. A run longer than `CorpseRunTeleportSec` (60 s) puts the ghost
   at its corpse; a run still not done four minutes after that is given up.
   A ghost still outside a dungeon is never stood up there. Since 0.22.0.
+- **Healing.** A priest casts Flash Heal in an emergency and Power Word: Shield on a member that took damage; a paladin, shaman or druid
+  answers an emergency with its own heal spell and never casts a priest spell. Each spell is cast only when the healer can pay for it, so a
+  cheaper heal is used when the mana is low. Since 0.23.0.
 - **Loot.** A creature the bot fought, once dead and within 25 yards, is looted once when the bot is out of combat. The core runs the
   bot's own loot handlers, so loot rights, group rules and bag space are the core's. The item-looted event fires, so
   auto-vendor-trash sells a bot's grey drops.

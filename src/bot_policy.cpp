@@ -4082,7 +4082,8 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         {
             std::uint32_t const healSpell = state.Role_ == BotState::Role::Dps ? 0u : HealSpellFor(classId, bot.level);
             auto const retry = healSpell != 0 ? state.RetryAtMs.find(healSpell) : state.RetryAtMs.end();
-            if (healSpell != 0 && (retry == state.RetryAtMs.end() || nowMs >= retry->second) && CanPay(_options.SpellCosts.get(), healSpell, bot))
+            // Payment is checked per spell below, so a cheaper heal is not held back by the one this healer cannot afford yet.
+            if (healSpell != 0 && (retry == state.RetryAtMs.end() || nowMs >= retry->second))
             {
                 std::uint64_t const healGroup = partyLeader != 0 ? partyLeader : bot.guid;
                 if (_healClaims.size() > 64)
@@ -4122,7 +4123,8 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     }
                     else
                     {
-                        if (pct < kShieldBelowPct)
+                        // Power Word: Shield is a priest spell; the other healers have no shield to cast.
+                        if (pct < kShieldBelowPct && classId == 5)
                         {
                             // Shield preemptive: check if this member's health dropped since the last tick (took damage).
                             // The module keeps a short history via state.StallBotHealth etc; here we approximate by checking
@@ -4152,7 +4154,8 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 std::string note;
                 if (emergencyHurt)
                 {
-                    spellToCast = kFlashHeal;
+                    // Flash Heal is a priest spell; the other healers answer an emergency with their own heal.
+                    spellToCast = classId == 5 ? kFlashHeal : healSpell;
                     target = emergencyHurt;
                     note = "emergency";
                 }
@@ -4178,7 +4181,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 }
                 if (target)
                 {
-                    // Check we can pay for the chosen spell (Flash Heal costs less mana than Heal at these ranks).
+                    // Check we can pay for the chosen spell, so a cheaper heal is used when the healer is low on mana.
                     auto const spellRetry = state.RetryAtMs.find(spellToCast);
                     if ((spellRetry == state.RetryAtMs.end() || nowMs >= spellRetry->second) && CanPay(_options.SpellCosts.get(), spellToCast, bot))
                     {
