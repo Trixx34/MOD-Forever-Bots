@@ -143,6 +143,9 @@ struct PolicyOptions
         std::vector<Point> Route;
         std::map<std::size_t, std::uint32_t> BossAt;
         std::vector<dungeon_events::Event> Events;
+        // The instance entrance (the dungeon file's entry). A ghost of a dungeon party goes back there and is revived there, not walked back to its corpse (0.24.0).
+        bool HasEntry = false;
+        Point Entry{};
         // From the dungeon file's bosses[].strategy: spell ids to avoid (avoid_spells) and fixed zones to stay out of (avoid), the places of a fight a bot must not stand in.
         std::vector<std::uint32_t> AvoidSpells;
         std::vector<ground_avoid::Circle> AvoidZones;
@@ -485,6 +488,7 @@ private:
         std::uint64_t CorpseTeleportRetryMs = 0;         // the next teleport of a ghost to its corpse (no portal route)
         std::uint64_t ReviveRetryMs = 0;                 // the next out-of-combat revive order of this ghost by its leader
         std::uint32_t ReviveAttempts = 0;                // revive orders sent in this death
+        std::uint64_t EntrySinceMs = 0;                  // when this ghost of a dungeon party began its way back to the entrance (0 = not yet)
         bool Reclaimed = false;                          // a reclaim was sent in this death
         std::optional<ErrandOrder> Errand;               // the town errand this bot is on (none = not on one)
         std::uint64_t ErrandTrainSentMs = 0;             // the next train order of the errand (0 = send now)

@@ -255,6 +255,9 @@ constexpr std::uint64_t kCorpseTeleportRetryMs = 15000; // a ghost off its corps
 constexpr std::uint64_t kOutOfCombatReviveRetryMs = 10000; // a ghost of a dungeon party is revived by its leader out of combat, not again before this
 constexpr std::uint64_t kCorpseReviveDelayMs = 8000;       // the Recover tactic: a dead member of a dungeon party whose leader is up and quiet is revived by the leader this long after the fight ended
 constexpr std::uint32_t kOutOfCombatReviveTries = 3;       // and after this many tries the ghost walks back to its corpse as before
+constexpr std::uint64_t kDungeonEntryWaitMs = 180000;      // a ghost of a dungeon party waits this long at the instance entrance for its revive, then walks to its corpse as before
+constexpr std::uint64_t kEntryTeleportRetryMs = 5000;      // the next try of the teleport to the entrance, while it is refused or the ghost is not there yet
+constexpr float kEntryYards = 15.0f;                        // a ghost this close to the entrance is at it
 // A ghost cannot be attacked; the body it reclaims can: it comes back alive at about half health, on the spot where it died, next to whatever killed it (on the sim a tank was
 // killed seven times in a row by the same scout, each time minutes after its reclaim). A ghost therefore waits, up to this long, while a live hostile stands this close to it.
 constexpr float kReclaimDangerYards = 30.0f;
@@ -1983,6 +1986,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 state.Reclaimed = false;
                 state.ReviveRetryMs = 0;
                 state.ReviveAttempts = 0;
+                state.EntrySinceMs = 0;
                 state.RunStarted = false;
                 state.Inside = false;
                 state.RunFailed = false;
@@ -2169,6 +2173,35 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 fail("no_corpse");
                 continue;
             }
+            // A ghost of a dungeon party goes back to the instance entrance and is revived there (the owner's rule of 2026-10-25), not walked back to its corpse.
+            // Outside the instance it is teleported in, and inside it is put at the entrance when it is further off. It waits there for the leader's revive
+            // (the revive above). Only when no revive comes within kDungeonEntryWaitMs does the ghost fall back to its corpse run.
+            auto const entryOf = _options.DungeonsByMap.find(bot.corpse_map);
+            bool const instanceParty = routeActiveOf(bot.guid) || (deadParty != 0 && tankLed.count(deadParty) != 0);
+            if (instanceParty && entryOf != _options.DungeonsByMap.end() && entryOf->second.HasEntry && state.EntrySinceMs == 0)
+                state.EntrySinceMs = nowMs;
+            bool const atEntry = bot.map_id == bot.corpse_map && entryOf != _options.DungeonsByMap.end() && entryOf->second.HasEntry &&
+                                 DistanceTo(bot, entryOf->second.Entry) <= kEntryYards;
+            if (instanceParty && entryOf != _options.DungeonsByMap.end() && entryOf->second.HasEntry && nowMs - state.EntrySinceMs < kDungeonEntryWaitMs)
+            {
+                if (!atEntry && nowMs >= state.CorpseTeleportRetryMs)
+                {
+                    state.CorpseTeleportRetryMs = nowMs + kEntryTeleportRetryMs;
+                    BotAction entry;
+                    entry.bot_guid = bot.guid;
+                    entry.type = ActionType::kTeleport;
+                    entry.spell_id = bot.corpse_map;
+                    entry.dest_x = entryOf->second.Entry.X;
+                    entry.dest_y = entryOf->second.Entry.Y;
+                    entry.dest_z = entryOf->second.Entry.Z;
+                    actions.push_back(entry);
+                    event("dungeon_entry_teleport: bot=" + std::to_string(bot.guid) + " map=" + std::to_string(bot.map_id) + " corpse_map=" + std::to_string(bot.corpse_map) +
+                          " waited_ms=" + std::to_string(nowMs - state.EntrySinceMs));
+                }
+                continue; // at the entrance it waits for the leader's revive (the revive above); the corpse run is not walked
+            }
+            if (instanceParty && entryOf != _options.DungeonsByMap.end() && entryOf->second.HasEntry && !state.RunStarted)
+                event("dungeon_entry_wait_expired: bot=" + std::to_string(bot.guid) + " map=" + std::to_string(bot.map_id) + " waited_ms=" + std::to_string(nowMs - state.EntrySinceMs));
             if (!state.RunStarted)
             {
                 state.RunStarted = true;

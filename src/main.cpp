@@ -515,6 +515,9 @@ std::map<std::uint32_t, PolicyOptions::DungeonRoute> DungeonRoutes(std::vector<D
                 route.BossAt[i] = dungeon.Route[i].BossEntry;
         }
         route.Events = dungeon.Events;
+        // The instance entrance (the dungeon file's entry: map x y z), where a ghost of the party is revived.
+        route.HasEntry = true;
+        route.Entry = { dungeon.Entry[1], dungeon.Entry[2], dungeon.Entry[3] };
         // The bosses' avoid lists (bosses[].strategy.avoid_spells and avoid): the spells to step out of and the fixed places to stay out of.
         for (DungeonBoss const& boss : dungeon.Bosses)
         {
