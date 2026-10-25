@@ -107,6 +107,15 @@ QuestData ParseQuestData(std::istream& in, std::vector<std::string>& warnings)
             else
                 drop("area needs <quest> <x> <y> <z>, for a quest defined above");
         }
+        else if (keyword == "reward")
+        {
+            std::uint32_t id = 0;
+            QuestDef* quest = nullptr;
+            if (line >> id && (quest = FindQuest(start, id)))
+                quest->Reward = true;
+            else
+                drop("reward needs <quest>, for a quest defined above");
+        }
         else if (keyword == "req")
         {
             std::uint32_t id = 0;

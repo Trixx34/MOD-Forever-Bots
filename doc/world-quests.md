@@ -1,7 +1,8 @@
 # Whole-world quests: leveling 1 to 60 by quests
 
-Status: planner and data format built and unit-tested. The data file `data/world_quests.txt` is made (1256 quests in 263 starts, levels 1 to 60, from the
-test world database) with `tools/make_world_quests.py`. **No bot has levelled by it on the sim yet.**
+Status: planner and data format built and unit-tested. The data file `data/world_quests.txt` is made (1917 quests in 288 starts, levels 1 to 60, from the
+test world database) with `tools/make_world_quests.py`. Of those, 684 are class quests (`reward` records, since 0.25.0): the bot completes them with
+their reward (see README, Class quests). **No bot has levelled by it on the sim yet.**
 
 ## Making the data without a MySQL server
 
@@ -36,6 +37,8 @@ The M5 planner worked one starter zone: the bot's start was the nearest anchor, 
 - **Quests from another start in the log** are still worked: the bot hands in and hunts them wherever they came from.
 - **The log has room for 5 accepted quests** at most; the bot hands in and finishes before it takes more.
 - Group quests, elite quests, exploration, escort, talk-to and use-object quests are left out of the data (the planner can only kill and collect).
+  Class quests are the exception (since 0.25.0): a quest restricted to some classes is kept with its giver and ender and marked `reward`, so the bot
+  completes it with its reward and does no objectives. The export keeps them although their quest sort is negative (the class sort IDs are -61 to -344).
 
 Travel is by walking on one map. A bot never changes continent by itself (boats, zeppelins and portals are not part of this), and the server's pathing
 decides whether a long walk works.

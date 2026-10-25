@@ -2497,7 +2497,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         if (_options.OnEvent && nowMs - state.QuestDiagAtMs >= 300000)
         {
             state.QuestDiagAtMs = nowMs;
-            static constexpr char const* kinds[] = { "none", "walk_to", "accept", "hand_in", "hunt", "abandon", "wait" };
+            static constexpr char const* kinds[] = { "none", "walk_to", "accept", "hand_in", "hunt", "abandon", "reward", "wait" };
             _options.OnEvent("quest_state: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id) +
                              " allowed=" + std::to_string(questsAllowed) + " enabled=" + std::to_string(_quests.Enabled()) +
                              " party=" + std::to_string(partyMember) + " low_health=" + std::to_string(lowHealth) + " in_combat=" + std::to_string(bot.in_combat) +
@@ -3246,12 +3246,15 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 case QuestStepKind::Accept:
                 case QuestStepKind::HandIn:
                 case QuestStepKind::Abandon:
+                case QuestStepKind::Reward:
                 {
                     BotAction quest;
                     quest.bot_guid = bot.guid;
                     quest.type = ActionType::kQuest;
                     std::uint32_t const operation = questStep.Kind == QuestStepKind::Accept ? kQuestAccept
-                                                    : questStep.Kind == QuestStepKind::HandIn ? kQuestHandIn : kQuestAbandon;
+                                                    : questStep.Kind == QuestStepKind::HandIn  ? kQuestHandIn
+                                                    : questStep.Kind == QuestStepKind::Reward ? kQuestReward
+                                                                                              : kQuestAbandon;
                     quest.spell_id = QuestCode(operation, questStep.Quest);
                     // A stop first when the bot was walking, so the quest action is the last one applied and its answer is the one the policy reads.
                     if (!(state.Last && state.Last->Type == ActionType::kStop))

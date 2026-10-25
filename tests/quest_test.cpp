@@ -253,6 +253,27 @@ void ReqRecordsAreParsed()
     CHECK(warnings.size() == 3);
 }
 
+void ClassQuestInLogIsRewardedFromAnywhere()
+{
+    // A class quest (a reward record) is completed with its reward where the bot stands, no walk and no objectives.
+    std::istringstream in("start A\nanchor 0 0 0 0\nquest 500 giver 0 0 0 ender 0 0 0\nreq 500 classes 8\nreward 500\n");
+    std::vector<std::string> warnings;
+    auto data = std::make_shared<QuestData>(ParseQuestData(in, warnings));
+    CHECK(warnings.empty() && data->Starts[0].Quests[0].Reward);
+    QuestPlanner planner(data);
+    QuestMemory memory;
+    BotSnapshot bot = Bot(-9000.0f, -100.0f);
+    LogQuest(bot, 500, 1);
+    QuestStep step = planner.Next(bot, memory, 1000);
+    CHECK(step.Kind == QuestStepKind::Reward && step.Quest == 500);
+    planner.NoteSent(memory, kQuestReward, 500, 1000);
+    step = planner.Next(bot, memory, 1001); // the log has not caught up
+    CHECK(step.Kind == QuestStepKind::Wait);
+    BotSnapshot after = Bot(-9000.0f, -100.0f); // the reward left the log
+    planner.Next(after, memory, 2000);
+    CHECK(memory.Done.count(500) == 1);
+}
+
 void LevelLimitsDecideWhichQuestsAreTaken()
 {
     QuestPlanner planner(World());
@@ -709,6 +730,7 @@ int main()
     RefusalBlocksTheQuestForAWhile();
     NoStartOnAnotherMapMeansNoQuests();
     ReqRecordsAreParsed();
+    ClassQuestInLogIsRewardedFromAnywhere();
     LevelLimitsDecideWhichQuestsAreTaken();
     ClassAndRaceLimitsApply();
     PrerequisiteQuestsComeAfterTheirPredecessors();

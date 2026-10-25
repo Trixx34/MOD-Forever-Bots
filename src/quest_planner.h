@@ -32,6 +32,7 @@ enum class QuestStepKind
     HandIn,    // at the ender: send the hand-in for Quest
     Hunt,      // fight only Entries; walk to Dest when none is near
     Abandon,   // send the abandon for Quest
+    Reward,    // send the reward for Quest: a class quest completed with its reward, no objectives, from anywhere (no walk)
     Wait,      // stand still: an action was just sent and the log has not caught up
 };
 
@@ -91,6 +92,7 @@ constexpr float kStartRadiusYards = 1500.0f;            // a bot farther than th
 constexpr std::uint32_t kQuestAccept = 1;
 constexpr std::uint32_t kQuestHandIn = 2;
 constexpr std::uint32_t kQuestAbandon = 3;
+constexpr std::uint32_t kQuestReward = 4;
 constexpr std::uint32_t QuestCode(std::uint32_t operation, std::uint32_t quest) { return (operation << 24) | (quest & 0xFFFFFF); }
 
 class QuestPlanner

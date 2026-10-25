@@ -17,8 +17,8 @@ req 630 level 51 prev 594
 hunt 630 0 1 1559
 area 630 -14737.8 -392.2 8.3
 
-start W0_-29_0   # 23 quests, levels 30-60
-anchor 0 -14427.7 461.8 19.6
+start W0_-29_0   # 24 quests, levels 30-60
+anchor 0 -14428.2 458.8 20.1
 quest 1041 giver -14320.3 474.4 8.6 ender -10560.3 -1125.2 30.1
 req 1041 level 30 prev 1040
 quest 575 giver -14469.6 415.4 25.5 ender -14469.6 415.4 25.5
@@ -53,6 +53,9 @@ hunt 577 0 5 1152
 area 577 -12556.7 -194.9 17.4
 area 577 -12524.8 -278.7 14.1
 area 577 -12477.2 -324.2 13.6
+quest 4785 giver -14439.6 388.9 32.4 ender -14439.6 388.9 32.4
+req 4785 level 37 classes 256
+reward 4785
 quest 578 giver -14439.0 483.5 28.9 ender -14439.0 483.5 28.9
 req 578 level 37 prev 616 races 77
 quest 601 giver -14439.0 483.5 28.9 ender -14439.0 483.5 28.9
@@ -257,6 +260,18 @@ req 591 level 46 prev 589
 hunt 591 0 1 818
 area 591 -12342.7 -1156.7 2.7
 
+start W0_-24_-5   # 3 quests, levels 60-60
+anchor 0 -11686.4 -2384.9 -0.2
+quest 7581 giver -11686.4 -2384.9 -0.2 ender -11686.4 -2384.9 -0.2
+req 7581 level 60 classes 256
+reward 7581
+quest 7582 giver -11686.4 -2384.9 -0.2 ender -11686.4 -2384.9 -0.2
+req 7582 level 60 classes 256
+reward 7582
+quest 7583 giver -11686.4 -2384.9 -0.2 ender -11686.4 -2384.9 -0.2
+req 7583 level 60 classes 256
+reward 7583
+
 start W0_-24_-1   # 18 quests, levels 30-43
 anchor 0 -11621.0 -52.6 11.1
 quest 583 giver -11616.7 -54.8 11.1 ender -11628.6 -54.6 11.0
@@ -369,28 +384,160 @@ area 197 -13017.2 193.1 22.8
 area 197 -12978.6 411.8 21.7
 area 197 -13076.6 387.2 15.4
 
-start W0_-24_2   # 10 quests, levels 60-60
-anchor 0 -11817.6 1264.3 9.2
+start W0_-24_2   # 51 quests, levels 60-60
+anchor 0 -11815.3 1262.9 10.5
 quest 8041 giver -11782.7 1244.0 3.1 ender -11782.7 1244.0 3.1
 req 8041 level 60 classes 1
+reward 8041
 quest 8045 giver -11782.7 1244.0 3.1 ender -11782.7 1244.0 3.1
 req 8045 level 60 classes 2
+reward 8045
 quest 8049 giver -11854.5 1242.1 21.8 ender -11854.5 1242.1 21.8
 req 8049 level 60 classes 16
+reward 8049
+quest 8066 giver -11752.3 1322.1 5.2 ender -11752.3 1322.1 5.2
+req 8066 level 60 classes 4
+reward 8066
+quest 8067 giver -11752.3 1322.1 5.2 ender -11752.3 1322.1 5.2
+req 8067 level 60 classes 4
+reward 8067
+quest 8068 giver -11854.5 1242.1 21.8 ender -11854.5 1242.1 21.8
+req 8068 level 60 classes 128
+reward 8068
+quest 8069 giver -11854.5 1242.1 21.8 ender -11854.5 1242.1 21.8
+req 8069 level 60 classes 128
+reward 8069
+quest 8070 giver -11854.5 1242.1 21.8 ender -11854.5 1242.1 21.8
+req 8070 level 60 classes 16
+reward 8070
+quest 8071 giver -11854.5 1242.1 21.8 ender -11854.5 1242.1 21.8
+req 8071 level 60 classes 16
+reward 8071
+quest 8072 giver -11752.3 1322.1 5.2 ender -11752.3 1322.1 5.2
+req 8072 level 60 classes 8
+reward 8072
+quest 8073 giver -11752.3 1322.1 5.2 ender -11752.3 1322.1 5.2
+req 8073 level 60 classes 8
+reward 8073
+quest 8074 giver -11850.2 1244.7 4.7 ender -11850.2 1244.7 4.7
+req 8074 level 60 classes 64
+reward 8074
+quest 8075 giver -11850.2 1244.7 4.7 ender -11850.2 1244.7 4.7
+req 8075 level 60 classes 64
+reward 8075
+quest 8076 giver -11854.5 1242.1 21.8 ender -11854.5 1242.1 21.8
+req 8076 level 60 classes 256
+reward 8076
+quest 8077 giver -11854.5 1242.1 21.8 ender -11854.5 1242.1 21.8
+req 8077 level 60 classes 256
+reward 8077
+quest 8078 giver -11782.7 1244.0 3.1 ender -11782.7 1244.0 3.1
+req 8078 level 60 classes 1
+reward 8078
+quest 8079 giver -11782.7 1244.0 3.1 ender -11782.7 1244.0 3.1
+req 8079 level 60 classes 1
+reward 8079
 quest 8101 giver -11854.5 1242.1 21.8 ender -11854.5 1242.1 21.8
 req 8101 level 60 classes 128
+reward 8101
 quest 8106 giver -11854.5 1242.1 21.8 ender -11854.5 1242.1 21.8
 req 8106 level 60 classes 256
+reward 8106
 quest 8110 giver -11850.2 1244.7 4.7 ender -11850.2 1244.7 4.7
 req 8110 level 60 classes 1024
+reward 8110
 quest 8116 giver -11850.2 1244.7 4.7 ender -11850.2 1244.7 4.7
 req 8116 level 60 classes 64
+reward 8116
 quest 8141 giver -11752.3 1322.1 5.2 ender -11752.3 1322.1 5.2
 req 8141 level 60 classes 8
+reward 8141
 quest 8145 giver -11752.3 1322.1 5.2 ender -11752.3 1322.1 5.2
 req 8145 level 60 classes 4
+reward 8145
 quest 8240 giver -11842.3 1295.5 0.8 ender -11842.3 1295.5 0.8
 req 8240 level 60
+quest 8042 giver -11782.7 1244.0 3.1 ender -11782.7 1244.0 3.1
+req 8042 level 60 prev 8041 classes 1
+reward 8042
+quest 8046 giver -11782.7 1244.0 3.1 ender -11782.7 1244.0 3.1
+req 8046 level 60 prev 8045 classes 2
+reward 8046
+quest 8050 giver -11854.5 1242.1 21.8 ender -11854.5 1242.1 21.8
+req 8050 level 60 prev 8049 classes 16
+reward 8050
+quest 8102 giver -11854.5 1242.1 21.8 ender -11854.5 1242.1 21.8
+req 8102 level 60 prev 8101 classes 128
+reward 8102
+quest 8107 giver -11854.5 1242.1 21.8 ender -11854.5 1242.1 21.8
+req 8107 level 60 prev 8106 classes 256
+reward 8107
+quest 8111 giver -11850.2 1244.7 4.7 ender -11850.2 1244.7 4.7
+req 8111 level 60 prev 8110 classes 1024
+reward 8111
+quest 8117 giver -11850.2 1244.7 4.7 ender -11850.2 1244.7 4.7
+req 8117 level 60 prev 8116 classes 64
+reward 8117
+quest 8142 giver -11752.3 1322.1 5.2 ender -11752.3 1322.1 5.2
+req 8142 level 60 prev 8141 classes 8
+reward 8142
+quest 8146 giver -11752.3 1322.1 5.2 ender -11752.3 1322.1 5.2
+req 8146 level 60 prev 8145 classes 4
+reward 8146
+quest 8043 giver -11782.7 1244.0 3.1 ender -11782.7 1244.0 3.1
+req 8043 level 60 prev 8042 classes 1
+reward 8043
+quest 8047 giver -11782.7 1244.0 3.1 ender -11782.7 1244.0 3.1
+req 8047 level 60 prev 8046 classes 2
+reward 8047
+quest 8051 giver -11854.5 1242.1 21.8 ender -11854.5 1242.1 21.8
+req 8051 level 60 prev 8050 classes 16
+reward 8051
+quest 8103 giver -11854.5 1242.1 21.8 ender -11854.5 1242.1 21.8
+req 8103 level 60 prev 8102 classes 128
+reward 8103
+quest 8108 giver -11854.5 1242.1 21.8 ender -11854.5 1242.1 21.8
+req 8108 level 60 prev 8107 classes 256
+reward 8108
+quest 8112 giver -11850.2 1244.7 4.7 ender -11850.2 1244.7 4.7
+req 8112 level 60 prev 8111 classes 1024
+reward 8112
+quest 8118 giver -11850.2 1244.7 4.7 ender -11850.2 1244.7 4.7
+req 8118 level 60 prev 8117 classes 64
+reward 8118
+quest 8143 giver -11752.3 1322.1 5.2 ender -11752.3 1322.1 5.2
+req 8143 level 60 prev 8142 classes 8
+reward 8143
+quest 8147 giver -11752.3 1322.1 5.2 ender -11752.3 1322.1 5.2
+req 8147 level 60 prev 8146 classes 4
+reward 8147
+quest 8044 giver -11782.7 1244.0 3.1 ender -11782.7 1244.0 3.1
+req 8044 level 60 prev 8043 classes 1
+reward 8044
+quest 8048 giver -11782.7 1244.0 3.1 ender -11782.7 1244.0 3.1
+req 8048 level 60 prev 8047 classes 2
+reward 8048
+quest 8052 giver -11854.5 1242.1 21.8 ender -11854.5 1242.1 21.8
+req 8052 level 60 prev 8051 classes 16
+reward 8052
+quest 8104 giver -11854.5 1242.1 21.8 ender -11854.5 1242.1 21.8
+req 8104 level 60 prev 8103 classes 128
+reward 8104
+quest 8109 giver -11854.5 1242.1 21.8 ender -11854.5 1242.1 21.8
+req 8109 level 60 prev 8108 classes 256
+reward 8109
+quest 8113 giver -11850.2 1244.7 4.7 ender -11850.2 1244.7 4.7
+req 8113 level 60 prev 8112 classes 1024
+reward 8113
+quest 8119 giver -11850.2 1244.7 4.7 ender -11850.2 1244.7 4.7
+req 8119 level 60 prev 8118 classes 64
+reward 8119
+quest 8144 giver -11752.3 1322.1 5.2 ender -11752.3 1322.1 5.2
+req 8144 level 60 prev 8143 classes 8
+reward 8144
+quest 8148 giver -11752.3 1322.1 5.2 ender -11752.3 1322.1 5.2
+req 8148 level 60 prev 8147 classes 4
+reward 8148
 
 start W0_-23_-7   # 3 quests, levels 47-55
 anchor 0 -11010.1 -3446.3 90.5
@@ -468,6 +615,12 @@ req 206 level 46 prev 205
 hunt 206 0 1 818
 area 206 -12342.7 -1156.7 2.7
 
+start W0_-23_1   # 1 quests, levels 24-24
+anchor 0 -11035.2 619.4 35.4
+quest 2359 giver -11035.2 619.4 35.4 ender -8815.3 362.3 109.6
+req 2359 level 24 prev 2360 classes 8
+reward 2359
+
 start W0_-23_2   # 1 quests, levels 15-15
 anchor 0 -11272.6 1455.0 89.6
 quest 117 giver -11272.6 1455.0 89.6 ender -11272.6 1455.0 89.6
@@ -477,8 +630,8 @@ area 117 -11011.3 1386.7 46.1
 area 117 -10951.6 1357.6 44.7
 area 117 -10683.1 1651.1 42.3
 
-start W0_-23_3   # 3 quests, levels 16-20
-anchor 0 -11407.1 1966.2 10.5
+start W0_-23_3   # 5 quests, levels 16-25
+anchor 0 -11437.2 1802.7 25.8
 quest 103 giver -11407.1 1966.2 10.5 ender -11407.1 1966.2 10.5
 req 103 level 16
 hunt 103 0 5 36,114,115,480,573,1030,1031,1032,1033,1731,3286,3992,3993,5836,9336,14433,276061
@@ -498,6 +651,12 @@ quest 104 giver -11407.1 1966.2 10.5 ender -11407.1 1966.2 10.5
 req 104 level 20
 hunt 104 0 1 391
 area 104 -11172.1 1992.3 11.4
+quest 1651 giver -11482.3 1557.4 48.7 ender -11482.3 1557.4 48.7
+req 1651 level 25 prev 1650 classes 2
+reward 1651
+quest 1652 giver -11482.3 1557.4 48.7 ender -8545.8 845.8 106.6
+req 1652 level 25 prev 1651 classes 2
+reward 1652
 
 start W0_-22_-9   # 5 quests, levels 42-45
 anchor 0 -10853.9 -4121.7 22.0
@@ -533,12 +692,21 @@ anchor 0 -10997.5 -3505.2 103.2
 quest 2783 giver -10997.5 -3505.2 103.2 ender -10632.3 -3009.4 29.3
 req 2783 level 57 races 77
 
-start W0_-22_-7   # 5 quests, levels 50-60
+start W0_-22_-7   # 8 quests, levels 50-60
 anchor 0 -10632.3 -3009.4 29.3
 quest 2784 giver -10632.3 -3009.4 29.3 ender -10632.3 -3009.4 29.3
 req 2784 level 50 races 178
 quest 2621 giver -10632.3 -3009.4 29.3 ender -10460.9 -3319.1 39.9
 req 2621 level 50 prev 2784 races 178
+quest 8423 giver -10632.3 -3009.4 29.3 ender -10632.3 -3009.4 29.3
+req 8423 level 52 prev 8417 classes 1
+reward 8423
+quest 8424 giver -10632.3 -3009.4 29.3 ender -10632.3 -3009.4 29.3
+req 8424 level 52 prev 8423 classes 1
+reward 8424
+quest 8425 giver -10632.3 -3009.4 29.3 ender -10632.3 -3009.4 29.3
+req 8425 level 52 prev 8424 classes 1
+reward 8425
 quest 2801 giver -10632.3 -3009.4 29.3 ender -10632.3 -3009.4 29.3
 req 2801 level 57
 quest 2681 giver -10632.3 -3009.4 29.3 ender -10632.3 -3009.4 29.3
@@ -914,8 +1082,8 @@ req 130 level 15 prev 129
 quest 244 giver -9609.6 -1902.4 59.9 ender -9443.7 -2238.0 70.7
 req 244 level 16
 
-start W0_-20_-3   # 4 quests, levels 9-10
-anchor 0 -9590.6 -1079.6 42.9
+start W0_-20_-3   # 5 quests, levels 9-10
+anchor 0 -9581.6 -1143.9 45.2
 quest 83 giver -9531.8 -1222.4 47.8 ender -9531.8 -1222.4 47.8
 req 83 level 9
 hunt 83 0 6 116,473,474,583,880,881,6846,6866,6927
@@ -937,6 +1105,9 @@ hunt 52 1 5 822
 area 52 -9659.2 -1084.5 43.1
 area 52 -9502.8 -1095.2 51.5
 area 52 -9663.0 -1150.9 40.3
+quest 1667 giver -9545.3 -1401.1 54.1 ender -9545.3 -1401.1 54.1
+req 1667 level 10 prev 1666 classes 1
+reward 1667
 
 start W0_-20_-2   # 1 quests, levels 27-27
 anchor 0 -9553.1 -728.2 99.3
@@ -981,8 +1152,8 @@ area 11 -9784.2 583.3 37.7
 area 11 -9849.5 585.0 40.5
 area 11 -9906.7 623.4 40.3
 
-start W0_-19_-5   # 17 quests, levels 15-54
-anchor 0 -9277.5 -2222.9 67.7
+start W0_-19_-5   # 21 quests, levels 15-54
+anchor 0 -9277.3 -2211.7 66.9
 quest 1097 giver -9259.4 -2243.2 64.0 ender -8387.1 685.2 95.4
 req 1097 level 15
 quest 246 giver -9443.7 -2238.0 70.7 ender -9443.7 -2238.0 70.7
@@ -1026,6 +1197,9 @@ hunt 150 0 8 46,126,127,171,285,422,456,458,513,515,517,544,545,548,578,732,735,
 area 150 -9252.5 -2419.5 54.1
 area 150 -9322.5 -2419.9 52.0
 area 150 -9390.0 -2410.7 45.9
+quest 2282 giver -9328.5 -2180.0 64.0 ender -9328.5 -2180.0 64.0
+req 2282 level 20 prev 2281 classes 8
+reward 2282
 quest 20 giver -9284.0 -2298.2 67.6 ender -9284.0 -2298.2 67.6
 req 20 level 21
 hunt 20 0 10 435,436,437,440,485,615,4064,4065,4462,4463,4464
@@ -1038,6 +1212,15 @@ hunt 127 0 10 422,544,545,548,578,1083,14270
 area 127 -9252.5 -2419.5 54.1
 area 127 -9322.5 -2419.9 52.0
 area 127 -9390.0 -2410.7 45.9
+quest 1699 giver -9222.6 -2147.9 63.8 ender -9222.6 -2147.9 63.8
+req 1699 level 22 classes 1
+reward 1699
+quest 1702 giver -9222.6 -2147.9 63.8 ender -8427.1 600.1 94.7
+req 1702 level 22 prev 1699 classes 1
+reward 1702
+quest 2358 giver -9332.6 -2180.1 62.1 ender -9332.6 -2180.1 62.1
+req 2358 level 22 prev 2282 races 77 classes 8
+reward 2358
 quest 91 giver -9215.9 -2215.9 66.5 ender -9215.9 -2215.9 66.5
 req 91 level 23
 hunt 91 0 10 429,431,432,433,434,568,579,703,947
@@ -1077,8 +1260,14 @@ area 126 -8884.6 -2171.1 132.6
 quest 4223 giver -9218.6 -2221.8 67.6 ender -8378.5 -2748.9 186.7
 req 4223 level 54 prev 4186
 
-start W0_-19_-1   # 2 quests, levels 5-7
-anchor 0 -9211.7 -79.0 73.7
+start W0_-19_-2   # 1 quests, levels 13-13
+anchor 0 -9129.6 -984.3 76.2
+quest 1787 giver -9129.6 -984.3 76.2 ender -8516.9 862.3 109.9
+req 1787 level 13 prev 1786 races 1 classes 2
+reward 1787
+
+start W0_-19_-1   # 3 quests, levels 5-10
+anchor 0 -9299.0 -55.5 65.8
 quest 2158 giver -9044.6 -46.0 88.4 ender -9462.7 16.2 57.0
 req 2158 level 5
 quest 99128 giver -9378.9 -111.9 59.0 ender -9378.9 -111.9 59.0
@@ -1088,9 +1277,15 @@ hunt 99128 1 7 285
 area 99128 -9382.0 -215.8 63.1
 area 99128 -9476.7 -194.1 56.7
 area 99128 -9449.0 -253.2 62.5
+quest 1685 giver -9473.4 -8.6 49.9 ender -8983.3 1041.5 101.5
+req 1685 level 10 classes 256
+reward 1685
 
-start W0_-19_0   # 9 quests, levels 7-10
-anchor 0 -9471.2 64.4 56.8
+start W0_-19_0   # 17 quests, levels 4-16
+anchor 0 -9468.7 56.4 59.4
+quest 5624 giver -9460.8 33.1 63.9 ender -9460.8 33.1 63.9
+req 5624 level 4 races 1 classes 16
+reward 5624
 quest 47 giver -9496.3 72.8 56.6 ender -9496.3 72.8 56.6
 req 47 level 7
 hunt 47 0 10 40,327,475,476
@@ -1117,15 +1312,42 @@ quest 147 giver -9465.5 74.0 56.8 ender -9465.5 74.0 56.8
 req 147 level 10 prev 123
 hunt 147 0 1 473
 area 147 -9806.2 -932.1 39.9
+quest 1638 giver -9461.9 109.4 57.9 ender -8612.8 382.8 103.0
+req 1638 level 10 classes 1
+reward 1638
+quest 1860 giver -9471.7 34.5 63.9 ender -8989.7 861.9 29.7
+req 1860 level 10 classes 128
+reward 1860
+quest 2205 giver -9465.8 12.6 63.9 ender -8815.3 362.3 109.6
+req 2205 level 10 races 77 classes 8
+reward 2205
+quest 5635 giver -9460.8 33.1 63.9 ender -8512.4 862.4 109.9
+req 5635 level 10 races 5 classes 16
+reward 5635
 quest 35 giver -9465.5 74.0 56.8 ender -9610.2 -1032.0 41.3
 req 35 level 10 prev 40
 quest 76 giver -9465.5 74.0 56.8 ender -9465.5 74.0 56.8
 req 76 level 10 prev 62
 quest 239 giver -9465.5 74.0 56.8 ender -9662.8 694.3 36.9
 req 239 level 10 prev 76
+quest 2998 giver -9468.1 109.0 57.7 ender -8545.8 845.8 106.6
+req 2998 level 12 races 1 classes 2
+reward 2998
+quest 1919 giver -9471.7 34.5 63.9 ender -8989.7 861.9 29.7
+req 1919 level 15 classes 128
+reward 1919
+quest 2300 giver -9465.8 12.6 63.9 ender -8819.9 362.5 109.6
+req 2300 level 16 classes 8
+reward 2300
 
-start W0_-19_1   # 5 quests, levels 32-45
-anchor 0 -9056.5 840.6 115.4
+start W0_-19_1   # 7 quests, levels 26-45
+anchor 0 -9043.4 850.9 124.9
+quest 1940 giver -9010.8 876.6 148.7 ender -8963.2 822.1 109.6
+req 1940 level 26 prev 1938 classes 128
+reward 1940
+quest 1938 giver -9010.8 876.6 148.7 ender -9010.8 876.6 148.7
+req 1938 level 28 classes 128
+reward 1938
 quest 690 giver -9009.0 845.4 105.9 ender -1261.6 -2546.1 21.7
 req 690 level 32
 quest 1301 giver -9102.3 834.8 105.2 ender -3812.6 -837.4 9.7
@@ -1146,10 +1368,31 @@ anchor 0 -8756.8 -2187.1 140.0
 quest 219 giver -8756.8 -2187.1 140.0 ender -9284.0 -2298.2 67.6
 req 219 level 25
 
-start W0_-18_-1   # 15 quests, levels 1-24
-anchor 0 -8888.8 -156.3 82.9
+start W0_-18_-1   # 24 quests, levels 1-24
+anchor 0 -8892.9 -161.3 82.5
 quest 783 giver -8933.5 -136.5 83.4 ender -8902.6 -162.6 82.0
 req 783 level 1
+quest 3100 giver -8902.6 -162.6 82.0 ender -8918.4 -208.4 82.3
+req 3100 level 1 prev 7 races 1 classes 1
+reward 3100
+quest 3101 giver -8902.6 -162.6 82.0 ender -8914.6 -215.0 82.3
+req 3101 level 1 prev 7 races 1 classes 2
+reward 3101
+quest 3102 giver -8902.6 -162.6 82.0 ender -8863.5 -210.9 80.8
+req 3102 level 1 prev 7 races 1 classes 8
+reward 3102
+quest 3103 giver -8902.6 -162.6 82.0 ender -8853.6 -193.3 82.1
+req 3103 level 1 prev 7 races 1 classes 16
+reward 3103
+quest 3104 giver -8902.6 -162.6 82.0 ender -8851.6 -188.2 89.5
+req 3104 level 1 prev 7 races 1 classes 128
+reward 3104
+quest 3105 giver -8902.6 -162.6 82.0 ender -8926.7 -195.6 80.8
+req 3105 level 1 prev 7 races 1 classes 256
+reward 3105
+quest 92479 giver -8902.6 -162.6 82.0 ender -8884.2 -242.1 81.0
+req 92479 level 1 prev 7 races 1 classes 1
+reward 92479
 quest 91743 giver -8874.9 -186.3 82.1 ender -8874.9 -186.3 82.1
 req 91743 level 2 prev 91741
 hunt 91743 0 8 6,80,257
@@ -1184,8 +1427,14 @@ quest 91752 giver -8684.5 -102.3 89.3 ender -8902.6 -162.6 82.0
 req 91752 level 3 prev 91745
 hunt 91752 0 1 248362
 area 91752 -8603.2 -141.7 88.6
+quest 1598 giver -8926.7 -195.6 80.8 ender -8926.7 -195.6 80.8
+req 1598 level 4 races 77 classes 256
+reward 1598
 quest 3903 giver -8933.5 -136.5 83.4 ender -8850.3 -224.0 81.8
 req 3903 level 4
+quest 5623 giver -8853.6 -193.3 82.1 ender -9460.8 33.1 63.9
+req 5623 level 4 races 1 classes 16
+reward 5623
 quest 18 giver -8933.5 -136.5 83.4 ender -8933.5 -136.5 83.4
 req 18 level 4 prev 783
 hunt 18 0 12 38
@@ -1207,8 +1456,41 @@ area 21 -8565.2 -204.4 84.4
 quest 345 giver -8874.9 -186.3 82.1 ender -9279.2 -2268.5 67.6
 req 345 level 24 prev 344
 
-start W0_-18_0   # 8 quests, levels 31-60
-anchor 0 -8715.4 385.8 106.7
+start W0_-18_0   # 20 quests, levels 10-60
+anchor 0 -8723.8 372.2 105.3
+quest 1639 giver -8612.8 382.8 103.0 ender -8604.5 389.1 102.9
+req 1639 level 10 classes 1
+reward 1639
+quest 2206 giver -8815.3 362.3 109.6 ender -8815.3 362.3 109.6
+req 2206 level 10 races 77 classes 8
+reward 2206
+quest 1640 giver -8604.5 389.1 102.9 ender -8604.5 389.1 102.9
+req 1640 level 10 prev 1639 classes 1
+reward 1640
+quest 1665 giver -8604.5 389.1 102.9 ender -8612.8 382.8 103.0
+req 1665 level 10 prev 1640 classes 1
+reward 1665
+quest 1666 giver -8612.8 382.8 103.0 ender -9545.3 -1401.1 54.1
+req 1666 level 10 prev 1665 classes 1
+reward 1666
+quest 2281 giver -8819.9 362.5 109.6 ender -9328.5 -2180.0 64.0
+req 2281 level 16 classes 8
+reward 2281
+quest 1698 giver -8689.3 323.2 109.5 ender -9222.6 -2147.9 63.8
+req 1698 level 20 classes 1
+reward 1698
+quest 2360 giver -8815.3 362.3 109.6 ender -11035.2 619.4 35.4
+req 2360 level 20 classes 8
+reward 2360
+quest 2607 giver -8815.3 362.3 109.6 ender -8805.6 332.0 95.1
+req 2607 level 20 prev 2359 classes 8
+reward 2607
+quest 2608 giver -8805.6 332.0 95.1 ender -8805.6 332.0 95.1
+req 2608 level 20 prev 2607 classes 8
+reward 2608
+quest 2609 giver -8805.6 332.0 95.1 ender -8805.6 332.0 95.1
+req 2609 level 20 prev 2608 classes 8
+reward 2609
 quest 350 giver -8815.3 362.3 109.6 ender -8854.1 575.7 101.2
 req 350 level 31 prev 393
 quest 395 giver -8815.3 362.3 109.6 ender -8550.2 719.7 101.8
@@ -1221,6 +1503,9 @@ quest 543 giver -8549.9 386.1 108.5 ender -8549.9 386.1 108.5
 req 543 level 40
 hunt 543 0 1 2417
 area 543 488.7 -202.6 145.7
+quest 8233 giver -8752.3 377.6 101.1 ender 27.6 -1625.3 204.0
+req 8233 level 52 classes 8
+reward 8233
 quest 4766 giver -8549.9 386.1 108.5 ender -8380.6 -2751.9 187.1
 req 4766 level 60
 quest 6183 giver -8815.3 362.3 109.6 ender -8815.3 362.3 109.6
@@ -1228,20 +1513,80 @@ req 6183 level 60 prev 6182
 quest 6184 giver -8815.3 362.3 109.6 ender 944.2 -1458.5 62.6
 req 6184 level 60 prev 6183
 
-start W0_-18_1   # 19 quests, levels 21-60
-anchor 0 -8812.8 738.1 100.9
+start W0_-18_1   # 48 quests, levels 10-60
+anchor 0 -8710.4 800.7 99.5
+quest 1861 giver -8989.7 861.9 29.7 ender -8989.7 861.9 29.7
+req 1861 level 10 classes 128
+reward 1861
+quest 5634 giver -8512.4 862.4 109.9 ender -8512.4 862.4 109.9
+req 5634 level 10 races 5 classes 16
+reward 5634
+quest 1641 giver -8545.8 845.8 106.6 ender -8545.8 845.8 106.6
+req 1641 level 12 races 1 classes 2
+reward 1641
+quest 1643 giver -8545.8 845.8 106.6 ender -8832.3 613.7 94.3
+req 1643 level 12 prev 1642 races 1 classes 2
+reward 1643
+quest 1790 giver -8545.8 845.8 106.6 ender -8545.8 845.8 106.6
+req 1790 level 12 races 1 classes 2
+reward 1790
+quest 3000 giver -8577.5 881.5 106.6 ender -4633.5 -932.0 524.8
+req 3000 level 12 races 4 classes 2
+reward 3000
+quest 1644 giver -8832.3 613.7 94.3 ender -8832.3 613.7 94.3
+req 1644 level 13 prev 1643 races 1 classes 2
+reward 1644
+quest 1780 giver -8832.3 613.7 94.3 ender -8545.8 845.8 106.6
+req 1780 level 13 prev 1644 races 1 classes 2
+reward 1780
+quest 1781 giver -8545.8 845.8 106.6 ender -8516.9 862.3 109.9
+req 1781 level 13 prev 1780 races 1 classes 2
+reward 1781
+quest 1786 giver -8516.9 862.3 109.9 ender -9129.6 -984.3 76.2
+req 1786 level 13 prev 1781 races 1 classes 2
+reward 1786
+quest 1788 giver -8516.9 862.3 109.9 ender -8545.8 845.8 106.6
+req 1788 level 13 prev 1787 races 1 classes 2
+reward 1788
+quest 1921 giver -8989.7 861.9 29.7 ender -8963.2 822.1 109.6
+req 1921 level 15 prev 1920 classes 128
+reward 1921
+quest 1941 giver -8963.2 822.1 109.6 ender -8963.2 822.1 109.6
+req 1941 level 15 prev 1921 classes 128
+reward 1941
+quest 1920 giver -8989.7 861.9 29.7 ender -8989.7 861.9 29.7
+req 1920 level 16 classes 128
+reward 1920
+quest 1793 giver -8545.8 845.8 106.6 ender -8545.8 845.8 106.6
+req 1793 level 20 classes 2
+reward 1793
+quest 5645 giver -8512.4 862.4 109.9 ender -4612.3 -909.1 501.1
+req 5645 level 20 races 4 classes 16
+reward 5645
+quest 5676 giver -8512.4 862.4 109.9 ender -8512.4 862.4 109.9
+req 5676 level 20 races 1 classes 16
+reward 5676
 quest 1076 giver -8999.5 801.7 105.5 ender -8999.5 801.7 105.5
 req 1076 level 21 prev 1075
 hunt 1076 0 1 832
 area 1076 -10189.2 901.4 39.7
 area 1076 -9916.7 1612.1 40.0
 area 1076 -10350.8 1115.0 37.0
+quest 1653 giver -8545.8 845.8 106.6 ender -5089.3 -783.0 495.3
+req 1653 level 21 prev 1652 classes 2
+reward 1653
 quest 389 giver -8550.2 719.7 101.8 ender -8799.6 828.4 97.6
 req 389 level 22 prev 373
+quest 1650 giver -8545.8 845.8 106.6 ender -11482.3 1557.4 48.7
+req 1650 level 23 prev 1649 classes 2
+reward 1650
 quest 343 giver -8623.2 766.7 97.4 ender -8345.7 383.8 122.4
 req 343 level 24
 quest 2923 giver -8556.4 835.9 106.6 ender -4834.8 -1263.5 502.0
 req 2923 level 26
+quest 1942 giver -8963.2 822.1 109.6 ender -8963.2 822.1 109.6
+req 1942 level 26 prev 1940 classes 128
+reward 1942
 quest 1274 giver -8511.0 860.5 109.8 ender -8506.4 328.7 120.9
 req 1274 level 28
 quest 270 giver -8528.5 855.3 106.7 ender -3818.1 -827.3 9.7
@@ -1254,6 +1599,12 @@ quest 2745 giver -8854.1 575.7 101.2 ender -8407.9 450.7 123.8
 req 2745 level 31 prev 350
 quest 1248 giver -8854.1 575.7 101.2 ender -3822.9 -827.9 10.3
 req 1248 level 33 prev 1247
+quest 1661 giver -8545.8 845.8 106.6 ender -8545.8 845.8 106.6
+req 1661 level 40 classes 2
+reward 1661
+quest 4485 giver -8573.1 861.1 106.6 ender -8545.8 845.8 106.6
+req 4485 level 40 classes 2
+reward 4485
 quest 1363 giver -8855.7 822.8 98.4 ender -8850.8 829.8 104.8
 req 1363 level 41
 quest 1364 giver -8850.8 829.8 104.8 ender -10994.7 -3507.9 103.2
@@ -1264,6 +1615,24 @@ area 1364 -10084.5 -2419.2 27.0
 area 1364 -10148.0 -2416.2 27.6
 quest 5066 giver -8854.0 743.1 100.8 ender 957.7 -1419.5 66.3
 req 5066 level 50
+quest 8415 giver -8577.5 881.5 106.6 ender 957.7 -1419.5 66.3
+req 8415 level 52 classes 2
+reward 8415
+quest 7637 giver -8577.5 881.5 106.6 ender -4612.3 -909.1 501.1
+req 7637 level 60 classes 2
+reward 7637
+quest 7638 giver -8545.8 845.8 106.6 ender -8577.5 881.5 106.6
+req 7638 level 60 classes 2
+reward 7638
+quest 7641 giver -8577.5 881.5 106.6 ender -8387.1 685.2 95.4
+req 7641 level 60 classes 2
+reward 7641
+quest 7646 giver -8577.5 881.5 106.6 ender -8577.5 881.5 106.6
+req 7646 level 60 prev 7644 classes 2
+reward 7646
+quest 7666 giver -8577.5 881.5 106.6 ender -8577.5 881.5 106.6
+req 7666 level 60 prev 7647 classes 2
+reward 7666
 quest 7791 giver -8942.0 785.8 97.4 ender -8942.0 785.8 97.4
 req 7791 level 60
 hunt 7791 0 60 3,48,98,122,125,127,202,203,205,206,210,212,213,215,217,218,232,300,314,315,334,335,397,412,423,424,426,429,430,431,432,433,434,435,436,437,440,445,446,449,450,452,453,485,486,503,506,511,518,522,531,533,544,545,548,565,568,570,572,579,580,584,587,588,594,595,596,598,599,604,615,619,622,623,624,625,626,628,634,636,639,641,642,643,644,645,646,647,657,694,697,699,701,702,703,711,712,754,771,775,785,787,814,815,819,824,873,874,875,889,891,892,898,909,910,921,930,937,938,940,941,943,947,948,977,1007,1008,1009,1010,1011,1012,1013,1014,1024,1025,1026,1027,1028,1034,1035,1036,1037,1038,1051,1052,1053,1054,1057,1083,1094,1096,1097,1110,1111,1157,1158,1159,1160,1165,1167,1169,1178,1179,1180,1181,1183,1200,1205,1206,1207,1210,1222,1251,1258,1259,1270,1276,1278,1280,1281,1283,1364,1393,1398,1399,1421,1477,1481,1483,1487,1663,1666,1696,1706,1707,1708,1711,1715,1716,1717,1720,1725,1726,1727,1729,1731,1732,1754,1755,1763,1888,1889,1908,1909,1913,1914,1915,1920,1939,1940,1942,1943,1944,1947,1948,1957,1958,1973,1974,2044,2053,2054,2090,2091,2099,2102,2103,2105,2108,2112,2120,2153,2158,2159,2160,2168,2169,2170,2171,2181,2183,2184,2186,2192,2240,2241,2242,2244,2248,2249,2252,2253,2255,2260,2261,2264,2265,2266,2267,2268,2269,2270,2271,2272,2283,2304,2305,2318,2319,2332,2335,2336,2337,2338,2339,2344,2345,2346,2358,2359,2360,2363,2372,2373,2374,2375,2376,2377,2378,2379,2387,2392,2395,2396,2398,2400,2402,2403,2404,2411,2412,2413,2414,2421,2427,2428,2431,2440,2448,2449,2450,2451,2466,2468,2469,2477,2478,2503,2511,2514,2529,2552,2553,2554,2555,2556,2557,2562,2564,2566,2572,2575,2577,2581,2582,2586,2587,2589,2590,2600,2618,2619,2628,2673,2676,2714,2721,3258,3260,3261,3263,3278,3279,3280,3283,3286,3374,3375,3376,3377,3378,3385,3386,3392,3393,3394,3395,3396,3414,3434,3435,3436,3445,3452,3454,3455,3456,3457,3458,3459,3467,3471,3586,3640,3655,3660,3662,3664,3667,3669,3670,3671,3672,3673,3696,3713,3715,3725,3727,3728,3730,3732,3733,3734,3735,3736,3743,3745,3746,3748,3749,3750,3752,3754,3755,3757,3758,3759,3762,3763,3765,3767,3770,3771,3772,3773,3774,3797,3799,3801,3802,3803,3804,3806,3807,3808,3819,3823,3833,3840,3849,3850,3853,3855,3859,3862,3863,3872,3873,3875,3877,3879,3887,3893,3898,3899,3900,3921,3922,3923,3924,3925,3926,3928,3932,3940,3941,3942,3947,3984,3985,3986,3987,3988,3989,3991,3992,3993,3998,3999,4001,4002,4003,4004,4022,4023,4024,4025,4026,4027,4040,4050,4051,4052,4053,4054,4056,4057,4061,4062,4064,4065,4070,4073,4074,4093,4094,4095,4096,4097,4099,4100,4101,4104,4107,4109,4111,4112,4113,4114,4116,4133,4202,4273,4275,4278,4280,4281,4282,4283,4284,4285,4286,4287,4288,4291,4293,4296,4297,4299,4306,4308,4409,4416,4417,4418,4420,4421,4424,4427,4428,4435,4436,4437,4438,4440,4442,4462,4463,4464,4479,4481,4490,4515,4516,4517,4518,4519,4520,4522,4523,4525,4530,4531,4532,4540,4619,4623,4632,4633,4634,4635,4636,4637,4638,4639,4640,4641,4642,4643,4644,4645,4646,4647,4648,4649,4651,4652,4653,4663,4664,4665,4666,4667,4670,4671,4672,4673,4674,4675,4787,4788,4789,4798,4799,4807,4809,4810,4811,4812,4813,4814,4823,4832,4842,4969,5048,5055,5085,5086,5600,5643,5682,5683,5755,5761,5797,5798,5799,5800,5830,5835,5836,5838,5847,5848,5849,5851,5859,5863,5864,5915,5916,5930,5931,5932,5933,6035,6068,6072,6115,6132,6168,6206,6207,6208,6209,6210,6211,6212,6213,6221,6222,6223,6224,6225,6226,6227,6228,6233,6234,6235,6238,6329,6391,6392,6407,6426,6427,6523,6547,6570,6575,6606,6668,7053,7068,7069,7070,7071,7072,7073,7074,7075,7170,7327,7332,7335,7360,7361,7404,7603,7843,7872,7873,7874,8518,9336,9456,9524,10037,10373,10617,10639,10640,10647,10758,10759,10760,10761,10896,11656,11680,11681,11682,11683,11684,11697,11714,11858,11914,11915,11917,11918,11979,11994,12579,12657,12658,12676,12856,12860,12896,12897,12902,12918,12976,12977,13019,14225,14267,14271,14275,14278,14281,14425,14426,14427,14682,250629,265701
@@ -1296,11 +1665,30 @@ hunt 7796 0 20 466,603,866,867,868,1494,1756,1783,1784,1785,1787,1788,1789,1791,
 area 7796 -8954.0 521.0 96.5
 area 7796 -8541.2 450.2 105.1
 area 7796 -8532.8 389.9 108.6
+quest 7640 giver -8577.5 881.5 106.6 ender -8577.5 881.5 106.6
+req 7640 level 60 prev 7639 classes 2
+reward 7640
 
-start W0_-18_2   # 1 quests, levels 30-30
-anchor 0 -8983.6 1025.5 101.6
+start W0_-18_2   # 6 quests, levels 10-58
+anchor 0 -8939.4 1048.2 100.0
+quest 1688 giver -8983.3 1041.5 101.5 ender -8983.3 1041.5 101.5
+req 1688 level 10 classes 256
+reward 1688
+quest 5638 giver -8727.7 1103.0 92.6 ender -8512.4 862.4 109.9
+req 5638 level 10 races 5 classes 16
+reward 5638
+quest 1689 giver -8983.3 1041.5 101.5 ender -8983.3 1041.5 101.5
+req 1689 level 10 prev 1688 classes 256
+reward 1689
+quest 1739 giver -8983.3 1041.5 101.5 ender -8983.3 1041.5 101.5
+req 1739 level 20 prev 1738 classes 256
+reward 1739
 quest 397 giver -8983.6 1025.5 101.6 ender -8983.9 1024.3 101.6
 req 397 level 30 prev 336 classes 256
+reward 397
+quest 7562 giver -8974.9 1036.0 101.5 ender -7648.9 -638.3 201.0
+req 7562 level 58 classes 256
+reward 7562
 
 start W0_-17_-6   # 7 quests, levels 52-56
 anchor 0 -8377.5 -2753.1 188.6
@@ -1365,8 +1753,11 @@ req 6187 level 60 prev 6186
 hunt 6187 0 1 11878
 area 6187 1871.0 -3212.7 125.3
 
-start W0_-17_1   # 6 quests, levels 18-43
-anchor 0 -8447.2 545.0 98.5
+start W0_-17_1   # 14 quests, levels 10-60
+anchor 0 -8423.5 597.4 96.6
+quest 6076 giver -8415.8 552.7 95.5 ender -5618.5 -454.1 407.8
+req 6076 level 10 races 4 classes 4
+reward 6076
 quest 168 giver -8468.6 501.3 99.9 ender -8468.6 501.3 99.9
 req 168 level 18
 hunt 168 0 4 623,624,625
@@ -1376,6 +1767,18 @@ quest 167 giver -8468.6 501.3 99.9 ender -8468.6 501.3 99.9
 req 167 level 20
 hunt 167 0 1 626
 area 167 -11326.8 1539.0 28.6
+quest 1705 giver -8387.1 685.2 95.4 ender -8387.1 685.2 95.4
+req 1705 level 28 classes 1
+reward 1705
+quest 1701 giver -8427.1 600.1 94.7 ender -8427.1 600.1 94.7
+req 1701 level 28 prev 1702 classes 1
+reward 1701
+quest 1700 giver -8427.1 600.1 94.7 ender -8387.1 685.2 95.4
+req 1700 level 28 prev 1701 races 1 classes 1
+reward 1700
+quest 1704 giver -8427.1 600.1 94.7 ender -4812.5 -1250.6 502.0
+req 1704 level 28 prev 1701 races 68 classes 1
+reward 1704
 quest 1782 giver -8427.1 600.1 94.7 ender -8427.1 600.1 94.7
 req 1782 level 28 prev 1701
 quest 2928 giver -8391.0 634.8 94.9 ender -8391.0 634.8 94.9
@@ -1384,10 +1787,19 @@ hunt 2928 0 24 6206,6207,6208,6211,6212,6213,6214,6218,6219,6220,6222,6223,6224,
 area 2928 -5165.8 910.6 257.2
 area 2928 -5151.0 850.7 255.1
 area 2928 -5082.4 832.8 257.2
+quest 1706 giver -8387.1 685.2 95.4 ender -8387.1 685.2 95.4
+req 1706 level 30 prev 1705 classes 1
+reward 1706
 quest 1448 giver -8463.8 516.2 100.6 ender -8463.8 516.2 100.6
 req 1448 level 43
 quest 1449 giver -8463.8 516.2 100.6 ender 266.6 -2029.5 171.9
 req 1449 level 43 prev 1448
+quest 7642 giver -8387.1 685.2 95.4 ender -8387.1 685.2 95.4
+req 7642 level 60 prev 7641 classes 2
+reward 7642
+quest 7648 giver -8387.1 685.2 95.4 ender -8577.5 881.5 106.6
+req 7648 level 60 prev 7642 classes 2
+reward 7648
 
 start W0_-16_-7   # 2 quests, levels 54-54
 anchor 0 -7647.3 -3051.9 131.2
@@ -1404,36 +1816,84 @@ area 4023 -6986.0 -1482.5 241.9
 area 4023 -6724.1 -1617.3 194.1
 area 4023 -7050.6 -1318.3 250.2
 
-start W0_-16_-3   # 6 quests, levels 52-60
-anchor 0 -7545.8 -1195.1 280.1
+start W0_-16_-3   # 18 quests, levels 52-60
+anchor 0 -7539.1 -1205.8 283.7
 quest 3801 giver -7595.8 -1115.4 252.8 ender -7595.8 -1115.4 252.8
 req 3801 level 52
+quest 8962 giver -7535.8 -1211.1 285.6 ender -7535.8 -1211.1 285.6
+req 8962 level 60 prev 8961 races 255 classes 129
+reward 8962
+quest 8963 giver -7535.8 -1211.1 285.6 ender -7535.8 -1211.1 285.6
+req 8963 level 60 prev 8961 classes 1280
+reward 8963
 quest 8964 giver -7535.8 -1211.1 285.6 ender -7535.8 -1211.1 285.6
 req 8964 level 60 prev 8961 races 255 classes 12
-hunt 8964 0 1 9448
-area 8964 1537.2 -5474.6 99.7
-area 8964 1547.6 -5561.8 100.9
-area 8964 1613.4 -5442.6 97.8
+reward 8964
 quest 8965 giver -7535.8 -1211.1 285.6 ender -7535.8 -1211.1 285.6
 req 8965 level 60 prev 8961 races 255 classes 82
-hunt 8965 0 1 7068,7069,7070,7071,7072,7075
-area 8965 -1412.1 548.5 80.6
-area 8965 -1393.8 619.6 53.6
-area 8965 -1319.1 457.1 37.6
+reward 8965
+quest 8985 giver -7535.8 -1211.1 285.6 ender -7535.8 -1211.1 285.6
+req 8985 level 60 prev 8970 races 255 classes 9
+reward 8985
+quest 8986 giver -7535.8 -1211.1 285.6 ender -7535.8 -1211.1 285.6
+req 8986 level 60 prev 8970 classes 1090
+reward 8986
 quest 8987 giver -7535.8 -1211.1 285.6 ender -7535.8 -1211.1 285.6
 req 8987 level 60 prev 8970 classes 144
-hunt 8987 0 1 9448
-area 8987 1537.2 -5474.6 99.7
-area 8987 1547.6 -5561.8 100.9
-area 8987 1613.4 -5442.6 97.8
+reward 8987
 quest 8988 giver -7535.8 -1211.1 285.6 ender -7535.8 -1211.1 285.6
 req 8988 level 60 prev 8970 races 255 classes 260
-hunt 8988 0 1 7068,7069,7070,7071,7072,7075
-area 8988 -1412.1 548.5 80.6
-area 8988 -1393.8 619.6 53.6
-area 8988 -1319.1 457.1 37.6
+reward 8988
 quest 8997 giver -7535.8 -1211.1 285.6 ender -4847.0 -1057.8 502.2
 req 8997 level 60 prev 8996 races 77
+quest 8966 giver -7535.8 -1211.1 285.6 ender -7535.8 -1211.1 285.6
+req 8966 level 60 prev 8962 races 255 classes 129
+reward 8966
+quest 8967 giver -7535.8 -1211.1 285.6 ender -7535.8 -1211.1 285.6
+req 8967 level 60 prev 8963 races 255 classes 1280
+reward 8967
+quest 8968 giver -7535.8 -1211.1 285.6 ender -7535.8 -1211.1 285.6
+req 8968 level 60 prev 8964 races 255 classes 12
+reward 8968
+quest 8969 giver -7535.8 -1211.1 285.6 ender -7535.8 -1211.1 285.6
+req 8969 level 60 prev 8965 races 255 classes 82
+reward 8969
+quest 8989 giver -7535.8 -1211.1 285.6 ender -7535.8 -1211.1 285.6
+req 8989 level 60 prev 8986 races 255 classes 1090
+reward 8989
+quest 8990 giver -7535.8 -1211.1 285.6 ender -7535.8 -1211.1 285.6
+req 8990 level 60 prev 8985 races 255 classes 9
+reward 8990
+quest 8991 giver -7535.8 -1211.1 285.6 ender -7535.8 -1211.1 285.6
+req 8991 level 60 prev 8987 races 255 classes 144
+reward 8991
+quest 8992 giver -7535.8 -1211.1 285.6 ender -7535.8 -1211.1 285.6
+req 8992 level 60 prev 8988 races 255 classes 260
+reward 8992
+
+start W0_-16_-2   # 7 quests, levels 58-60
+anchor 0 -7648.9 -636.2 200.9
+quest 7563 giver -7648.9 -638.3 201.0 ender -7648.9 -638.3 201.0
+req 7563 level 58 prev 7562 classes 256
+reward 7563
+quest 7564 giver -7648.9 -638.3 201.0 ender -7648.8 -630.9 200.6
+req 7564 level 58 prev 7563 classes 256
+reward 7564
+quest 7629 giver -7648.8 -630.9 200.6 ender -7648.8 -630.9 200.6
+req 7629 level 60 classes 256
+reward 7629
+quest 7630 giver -7648.8 -630.9 200.6 ender -7648.8 -630.9 200.6
+req 7630 level 60 classes 256
+reward 7630
+quest 7626 giver -7648.9 -638.3 201.0 ender -7648.8 -630.9 200.6
+req 7626 level 60 prev 7564 classes 256
+reward 7626
+quest 7627 giver -7648.9 -638.3 201.0 ender -7648.8 -630.9 200.6
+req 7627 level 60 prev 7564 classes 256
+reward 7627
+quest 7628 giver -7648.9 -638.3 201.0 ender -7648.8 -630.9 200.6
+req 7628 level 60 prev 7564 classes 256
+reward 7628
 
 start W0_-15_-7   # 1 quests, levels 41-41
 anchor 0 -7164.4 -3357.4 244.9
@@ -1659,14 +2119,44 @@ anchor 0 -6491.1 -982.7 335.6
 quest 3377 giver -6491.1 -982.7 335.6 ender -6491.1 -982.7 335.6
 req 3377 level 50
 
-start W0_-13_0   # 2 quests, levels 1-2
-anchor 0 -6215.7 333.6 383.6
+start W0_-13_0   # 17 quests, levels 1-4
+anchor 0 -6166.8 346.2 387.8
 quest 179 giver -6214.9 328.2 383.7 ender -6214.9 328.2 383.7
 req 179 level 1
 hunt 179 0 8 69,299,704,705,1979,1980
 area 179 -6252.8 387.1 383.3
 area 179 -6272.1 285.6 382.6
 area 179 -6181.8 249.5 386.4
+quest 3106 giver -6214.9 328.2 383.7 ender -6084.8 382.1 395.6
+req 3106 level 1 prev 179 races 4 classes 1
+reward 3106
+quest 3107 giver -6214.9 328.2 383.7 ender -6120.7 382.1 395.6
+req 3107 level 1 prev 179 races 4 classes 2
+reward 3107
+quest 3108 giver -6214.9 328.2 383.7 ender -6091.8 365.1 395.6
+req 3108 level 1 prev 179 races 4 classes 4
+reward 3108
+quest 3109 giver -6214.9 328.2 383.7 ender -6093.8 404.9 395.6
+req 3109 level 1 prev 179 races 4 classes 8
+reward 3109
+quest 3110 giver -6214.9 328.2 383.7 ender -6056.7 393.5 392.8
+req 3110 level 1 prev 179 races 4 classes 16
+reward 3110
+quest 3112 giver -6214.9 328.2 383.7 ender -6084.8 382.1 395.6
+req 3112 level 1 prev 179 races 64 classes 1
+reward 3112
+quest 3113 giver -6214.9 328.2 383.7 ender -6093.8 404.9 395.6
+req 3113 level 1 prev 179 races 64 classes 8
+reward 3113
+quest 3114 giver -6214.9 328.2 383.7 ender -6056.1 388.2 392.9
+req 3114 level 1 prev 179 races 64 classes 128
+reward 3114
+quest 3115 giver -6214.9 328.2 383.7 ender -6048.8 391.1 399.0
+req 3115 level 1 prev 179 races 64 classes 256
+reward 3115
+quest 98581 giver -6214.9 328.2 383.7 ender -6050.3 384.0 399.0
+req 98581 level 1 prev 179 races 4 classes 64
+reward 98581
 quest 170 giver -6216.5 339.0 383.5 ender -6216.5 339.0 383.5
 req 170 level 2 prev 179
 hunt 170 0 6 707
@@ -1674,6 +2164,21 @@ hunt 170 1 6 724
 area 170 -6323.3 322.4 378.4
 area 170 -6298.9 243.3 390.9
 area 170 -6246.5 463.6 385.9
+quest 1599 giver -6048.8 391.1 399.0 ender -6048.8 391.1 399.0
+req 1599 level 4 races 77 classes 256
+reward 1599
+quest 5626 giver -6056.7 393.5 392.8 ender -5590.6 -529.7 399.7
+req 5626 level 4 races 4 classes 16
+reward 5626
+quest 94472 giver -6050.3 384.0 399.0 ender -6050.3 384.0 399.0
+req 94472 level 4 classes 64
+reward 94472
+quest 94373 giver -6050.3 384.0 399.0 ender -6050.3 384.0 399.0
+req 94373 level 4 prev 98581 classes 64
+reward 94373
+quest 94374 giver -6050.3 384.0 399.0 ender -5908.1 576.5 500.6
+req 94374 level 4 prev 94373 classes 64
+reward 94374
 
 start W0_-13_1   # 3 quests, levels 3-5
 anchor 0 -6316.2 607.7 385.6
@@ -1776,6 +2281,12 @@ hunt 217 1 1 1206
 hunt 217 2 1 1207
 area 217 -6153.3 -2949.1 412.0
 
+start W0_-12_-5   # 1 quests, levels 13-13
+anchor 0 -5784.3 -2055.2 408.2
+quest 1784 giver -5784.3 -2055.2 408.2 ender -4613.0 -899.7 524.8
+req 1784 level 13 prev 1783 races 4 classes 2
+reward 1784
+
 start W0_-12_-4   # 2 quests, levels 9-11
 anchor 0 -5720.6 -1590.1 384.7
 quest 432 giver -5726.6 -1600.3 386.1 ender -5726.6 -1600.3 386.1
@@ -1798,8 +2309,32 @@ req 314 level 12
 hunt 314 0 1 1388
 area 314 -5389.0 -1282.0 445.9
 
-start W0_-12_-1   # 2 quests, levels 8-9
-anchor 0 -5644.4 -499.2 396.8
+start W0_-12_-2   # 7 quests, levels 4-16
+anchor 0 -5595.6 -535.7 400.7
+quest 5625 giver -5590.6 -529.7 399.7 ender -5590.6 -529.7 399.7
+req 5625 level 4 races 4 classes 16
+reward 5625
+quest 1679 giver -5605.7 -530.4 399.7 ender -5045.5 -1273.1 510.4
+req 1679 level 10 classes 1
+reward 1679
+quest 1879 giver -5586.9 -537.2 403.6 ender -4613.0 -929.0 501.2
+req 1879 level 10 classes 128
+reward 1879
+quest 2218 giver -5604.4 -540.3 399.2 ender -4647.6 -1124.4 502.0
+req 2218 level 10 races 77 classes 8
+reward 2218
+quest 5637 giver -5590.6 -529.7 399.7 ender -8512.4 862.4 109.9
+req 5637 level 10 races 5 classes 16
+reward 5637
+quest 2997 giver -5586.8 -542.2 403.6 ender -4633.5 -932.0 524.8
+req 2997 level 12 races 4 classes 2
+reward 2997
+quest 2299 giver -5604.4 -540.3 399.2 ender -4647.6 -1124.4 502.0
+req 2299 level 16 classes 8
+reward 2299
+
+start W0_-12_-1   # 6 quests, levels 8-10
+anchor 0 -5627.2 -469.1 404.1
 quest 98322 giver -5644.4 -499.2 396.8 ender -5750.8 -369.9 365.8
 req 98322 level 8 prev 420
 quest 287 giver -5644.4 -499.2 396.8 ender -5644.4 -499.2 396.8
@@ -1808,6 +2343,18 @@ hunt 287 0 5 1123
 area 287 -5316.4 -214.4 441.0
 area 287 -5054.9 -135.6 428.5
 area 287 -5566.4 514.2 381.9
+quest 6064 giver -5618.5 -454.1 407.8 ender -5618.5 -454.1 407.8
+req 6064 level 10 races 4 classes 4
+reward 6064
+quest 6084 giver -5618.5 -454.1 407.8 ender -5618.5 -454.1 407.8
+req 6084 level 10 prev 6064 races 4 classes 4
+reward 6084
+quest 6085 giver -5618.5 -454.1 407.8 ender -5618.5 -454.1 407.8
+req 6085 level 10 prev 6084 classes 4
+reward 6085
+quest 6086 giver -5618.5 -454.1 407.8 ender -5022.1 -1273.8 507.8
+req 6086 level 10 prev 6085 races 4 classes 4
+reward 6086
 
 start W0_-11_-7   # 3 quests, levels 15-39
 anchor 0 -5371.4 -3019.3 322.3
@@ -1824,8 +2371,8 @@ area 2500 -6132.1 -3394.2 258.8
 area 2500 -6230.4 -3380.8 239.9
 area 2500 -6299.0 -3382.2 243.6
 
-start W0_-11_-6   # 6 quests, levels 11-23
-anchor 0 -5384.8 -2913.7 337.1
+start W0_-11_-6   # 7 quests, levels 11-23
+anchor 0 -5374.6 -2924.0 334.9
 quest 416 giver -5402.2 -2895.0 341.5 ender -5402.2 -2895.0 341.5
 req 416 level 11
 hunt 416 0 12 1172,1173,1174,1175,1176,1177,1202
@@ -1852,11 +2399,23 @@ area 255 -4880.8 -3747.4 312.5
 area 255 -5080.0 -3825.6 317.0
 quest 468 giver -5402.2 -2895.0 341.5 ender -4678.5 -2695.4 319.6
 req 468 level 21
+quest 1655 giver -5313.6 -2985.5 322.2 ender -5313.6 -2985.5 322.2
+req 1655 level 22 classes 2
+reward 1655
 quest 467 giver -5402.2 -2895.0 341.5 ender -5473.2 -641.8 393.3
 req 467 level 23
 
-start W0_-11_-3   # 3 quests, levels 31-52
-anchor 0 -5056.7 -1190.0 504.3
+start W0_-11_-3   # 6 quests, levels 10-52
+anchor 0 -5045.3 -1231.7 506.9
+quest 6074 giver -5010.4 -1274.0 507.8 ender -5618.5 -454.1 407.8
+req 6074 level 10 races 4 classes 4
+reward 6074
+quest 1678 giver -5045.5 -1273.1 510.4 ender -5045.5 -1273.1 510.4
+req 1678 level 11 classes 1
+reward 1678
+quest 1680 giver -5045.5 -1273.1 510.4 ender -4793.4 -1098.2 498.9
+req 1680 level 11 prev 1678 classes 1
+reward 1680
 quest 700 giver -5033.8 -1022.2 508.9 ender -4865.7 -1022.7 505.8
 req 700 level 31 prev 689
 quest 3451 giver -5068.2 -1273.9 502.0 ender -5068.2 -1273.9 502.0
@@ -1864,8 +2423,8 @@ req 3451 level 52 prev 3450
 quest 3483 giver -5068.2 -1273.9 502.0 ender -5068.2 -1273.9 502.0
 req 3483 level 52 prev 3451
 
-start W0_-11_-2   # 5 quests, levels 6-22
-anchor 0 -5469.2 -636.0 393.7
+start W0_-11_-2   # 7 quests, levels 6-22
+anchor 0 -5360.6 -678.0 422.7
 quest 317 giver -5466.5 -632.1 393.9 ender -5466.5 -632.1 393.9
 req 317 level 6
 hunt 317 0 4 113,119,157,330,390,454,524,547,708,1125,1126,1127,1190,1191,1192,1689,1985,3098,3099,3100,3225
@@ -1889,6 +2448,12 @@ hunt 466 0 6 1111,1112,4040
 area 466 -3907.3 -2320.0 23.7
 area 466 -3835.9 -2278.7 36.4
 area 466 -3843.4 -2338.6 44.1
+quest 1654 giver -5089.3 -783.0 495.3 ender -5089.3 -783.0 495.3
+req 1654 level 22 prev 1653 classes 2
+reward 1654
+quest 1806 giver -5089.3 -783.0 495.3 ender -5089.3 -783.0 495.3
+req 1806 level 22 prev 1654 classes 2
+reward 1806
 
 start W0_-11_-1   # 1 quests, levels 10-10
 anchor 0 -5497.9 -455.8 395.4
@@ -1900,8 +2465,8 @@ area 412 -5288.0 461.6 383.6
 area 412 -5081.6 420.6 416.0
 area 412 -5313.9 518.1 385.0
 
-start W0_-11_0   # 2 quests, levels 8-9
-anchor 0 -5378.4 315.3 394.3
+start W0_-11_0   # 3 quests, levels 8-10
+anchor 0 -5374.7 305.4 394.3
 quest 319 giver -5378.4 315.3 394.3 ender -5378.4 315.3 394.3
 req 319 level 8 prev 318
 hunt 319 0 6 1196
@@ -1916,6 +2481,15 @@ hunt 315 0 6 1397
 area 315 -5284.2 -184.5 440.7
 area 315 -5349.8 -221.2 444.0
 area 315 -5025.7 -200.8 445.2
+quest 6075 giver -5367.3 285.6 394.2 ender -5618.5 -454.1 407.8
+req 6075 level 10 races 4 classes 4
+reward 6075
+
+start W0_-11_1   # 1 quests, levels 10-10
+anchor 0 -5336.7 562.8 395.9
+quest 2239 giver -5336.7 562.8 395.9 ender -4647.6 -1124.4 502.0
+req 2239 level 10 prev 2238 races 77 classes 8
+reward 2239
 
 start W0_-10_-7   # 1 quests, levels 18-18
 anchor 0 -4737.9 -3263.9 310.3
@@ -1938,8 +2512,20 @@ area 455 -4425.6 -2427.1 252.7
 area 455 -4339.7 -2507.0 252.2
 area 455 -4356.1 -2422.4 228.4
 
-start W0_-10_-3   # 30 quests, levels 15-60
-anchor 0 -4747.8 -1190.3 502.9
+start W0_-10_-3   # 63 quests, levels 10-60
+anchor 0 -4779.7 -1135.3 502.4
+quest 1715 giver -4618.1 -1090.1 501.5 ender -8983.3 1041.5 101.5
+req 1715 level 10 classes 256
+reward 1715
+quest 2238 giver -4647.6 -1124.4 502.0 ender -5336.7 562.8 395.9
+req 2238 level 10 classes 8
+reward 2238
+quest 1682 giver -4793.4 -1098.2 498.9 ender -4793.4 -1098.2 498.9
+req 1682 level 10 prev 1681 classes 1
+reward 1682
+quest 1681 giver -4793.4 -1098.2 498.9 ender -4793.4 -1098.2 498.9
+req 1681 level 11 prev 1680 classes 1
+reward 1681
 quest 302 giver -4631.2 -1303.7 503.5 ender -5359.1 -3020.9 319.6
 req 302 level 15 prev 301
 quest 2039 giver -4836.0 -1260.6 502.0 ender -5369.0 -3747.0 304.8
@@ -1952,20 +2538,35 @@ hunt 7802 0 60 3,48,98,122,125,127,202,203,205,206,210,212,213,215,217,218,232,3
 area 7802 -5132.1 -1674.8 498.0
 area 7802 -3858.5 -812.5 8.1
 area 7802 -3915.3 -627.7 4.8
+quest 2298 giver -4647.6 -1124.4 502.0 ender -8819.9 362.5 109.6
+req 2298 level 16 classes 8
+reward 2298
+quest 1717 giver -4618.1 -1090.1 501.5 ender -8983.3 1041.5 101.5
+req 1717 level 20 classes 256
+reward 1717
 quest 2922 giver -4834.8 -1263.5 502.0 ender -4834.8 -1263.5 502.0
 req 2922 level 26
 hunt 2922 0 1 6231
 area 2922 -4925.5 824.9 247.5
 quest 2927 giver -4836.0 -1260.6 502.0 ender -5498.3 -457.9 395.6
 req 2927 level 27
+quest 1708 giver -4812.5 -1250.6 502.0 ender -4812.5 -1250.6 502.0
+req 1708 level 29 classes 1
+reward 1708
 quest 686 giver -4865.7 -1022.7 505.8 ender -5033.8 -1022.2 508.9
 req 686 level 30 prev 683
+quest 1802 giver -4618.8 -1300.1 503.5 ender -4618.8 -1300.1 503.5
+req 1802 level 30 prev 1758 classes 256
+reward 1802
 quest 7803 giver -4735.8 -1055.3 502.3 ender -4735.8 -1055.3 502.3
 req 7803 level 30
 hunt 7803 0 60 3,48,202,203,206,210,212,215,218,232,300,314,315,334,397,412,429,431,432,433,434,435,436,437,445,468,486,503,511,518,522,531,533,568,570,579,584,587,588,595,597,604,615,660,667,669,670,671,672,674,675,676,677,678,679,680,686,694,696,697,699,701,702,703,709,710,711,723,750,751,754,755,757,759,760,761,762,763,771,775,780,781,782,783,784,785,787,813,814,815,818,861,862,871,874,889,891,892,898,909,910,921,922,937,938,939,940,941,942,943,947,948,978,979,1007,1008,1009,1010,1011,1012,1013,1014,1018,1034,1035,1036,1037,1038,1051,1052,1053,1054,1057,1059,1060,1061,1062,1081,1088,1094,1095,1096,1097,1106,1110,1114,1142,1144,1157,1158,1159,1160,1200,1251,1270,1276,1278,1280,1281,1283,1364,1421,1487,1488,1489,1490,1492,1494,1551,1561,1562,1563,1564,1565,1653,1663,1666,1696,1706,1707,1708,1711,1715,1716,1717,1720,1754,1755,1784,1787,1789,1794,1795,1804,1834,1836,1837,1907,1947,2044,2090,2091,2102,2103,2105,2108,2153,2240,2241,2242,2243,2244,2245,2246,2247,2248,2249,2252,2253,2254,2255,2256,2257,2260,2261,2264,2265,2266,2267,2268,2269,2270,2271,2272,2287,2304,2305,2306,2318,2319,2320,2335,2337,2344,2345,2346,2358,2360,2363,2372,2373,2375,2376,2377,2378,2379,2387,2392,2395,2396,2398,2400,2402,2403,2404,2411,2412,2413,2414,2415,2416,2417,2420,2421,2422,2423,2427,2428,2431,2433,2434,2440,2448,2449,2450,2451,2453,2466,2468,2469,2503,2511,2514,2524,2530,2534,2535,2536,2537,2545,2546,2547,2548,2549,2550,2552,2553,2554,2555,2556,2557,2558,2562,2564,2566,2567,2569,2570,2571,2572,2573,2574,2575,2577,2581,2582,2583,2584,2585,2586,2587,2588,2589,2590,2591,2597,2598,2599,2600,2601,2602,2603,2604,2605,2606,2607,2612,2618,2619,2624,2628,2636,2639,2640,2643,2645,2646,2649,2650,2651,2652,2653,2654,2655,2691,2692,2693,2701,2714,2715,2716,2717,2718,2719,2720,2721,2723,2727,2733,2738,2739,2740,2742,2743,2744,2745,2748,2764,2765,2773,2780,2781,2782,2783,2793,2892,2893,2894,2906,2907,2932,2944,2945,3374,3375,3376,3377,3378,3392,3414,3434,3435,3436,3457,3458,3459,3660,3664,3696,3715,3725,3727,3728,3730,3732,3733,3734,3735,3736,3743,3745,3746,3748,3749,3750,3752,3754,3755,3757,3758,3759,3762,3763,3765,3767,3770,3771,3772,3773,3797,3799,3801,3802,3803,3804,3806,3807,3808,3819,3823,3833,3849,3850,3873,3875,3877,3879,3893,3898,3899,3900,3921,3922,3923,3924,3925,3926,3928,3932,3940,3941,3942,3974,3975,3976,3977,3983,3984,3985,3986,3987,3993,3998,3999,4002,4004,4022,4023,4024,4025,4026,4027,4050,4051,4052,4053,4054,4056,4057,4061,4062,4063,4064,4065,4073,4074,4093,4094,4095,4096,4097,4099,4100,4101,4104,4107,4111,4112,4113,4114,4116,4130,4131,4202,4260,4273,4280,4281,4282,4283,4284,4285,4286,4287,4288,4289,4290,4291,4292,4293,4294,4295,4296,4297,4298,4299,4300,4301,4302,4303,4306,4308,4409,4420,4421,4424,4427,4428,4435,4436,4437,4438,4440,4442,4462,4463,4464,4466,4467,4472,4474,4479,4480,4481,4490,4494,4505,4506,4515,4516,4517,4518,4519,4520,4522,4523,4525,4530,4531,4532,4539,4540,4542,4543,4619,4623,4632,4633,4634,4635,4636,4637,4638,4639,4640,4641,4642,4643,4644,4645,4646,4647,4648,4649,4651,4652,4653,4654,4655,4656,4657,4658,4659,4663,4664,4665,4666,4667,4668,4670,4671,4672,4673,4674,4675,4677,4679,4680,4682,4684,4686,4687,4705,4723,4788,4789,4798,4799,4809,4810,4811,4812,4813,4814,4832,4834,4842,4844,4845,4846,4847,4848,4849,4850,4851,4852,4853,4854,4855,4856,4969,5044,5045,5046,5057,5085,5086,5184,5229,5232,5234,5236,5237,5238,5239,5240,5249,5251,5253,5254,5255,5258,5402,5471,5472,5474,5477,5600,5601,5602,5615,5616,5617,5618,5622,5623,5643,5645,5646,5647,5648,5649,5650,5683,5760,5771,5797,5798,5799,5800,5839,5840,5843,5844,5846,5847,5848,5849,5851,5854,5859,5861,5862,5864,5915,5916,5930,5931,5932,5933,5975,5976,6035,6068,6069,6070,6072,6115,6117,6129,6132,6138,6168,6185,6189,6190,6195,6196,6202,6206,6207,6208,6209,6210,6211,6212,6213,6221,6222,6223,6224,6225,6226,6227,6228,6233,6234,6235,6238,6329,6371,6391,6392,6407,6426,6427,6487,6488,6489,6490,6523,6547,6575,6668,6733,6910,7011,7012,7025,7026,7027,7028,7030,7033,7040,7041,7042,7053,7055,7057,7068,7069,7070,7071,7072,7073,7074,7075,7076,7077,7078,7091,7175,7228,7246,7247,7269,7272,7276,7286,7290,7291,7309,7320,7321,7327,7328,7329,7332,7335,7337,7341,7342,7344,7345,7346,7347,7348,7352,7353,7354,7356,7357,7358,7360,7361,7396,7397,7404,7438,7439,7440,7441,7442,7523,7524,7603,7604,7605,7606,7608,7665,7725,7726,7727,7789,7796,7805,7843,7847,7855,7856,7857,7858,7872,7873,7874,7883,7885,7886,7895,7899,7901,7902,8055,8199,8200,8218,8219,8337,8504,8518,8529,8539,8542,8544,8546,8548,8550,8551,8553,8555,8558,8560,8562,8567,8637,9045,9096,9097,9098,9176,9197,9201,9216,9240,9241,9259,9261,9263,9264,9266,9268,9269,9416,9447,9452,9520,9583,9693,9716,9817,9818,9819,10037,10080,10081,10082,10083,10317,10381,10382,10390,10398,10399,10400,10405,10406,10407,10408,10412,10413,10414,10463,10464,10608,10617,10639,10640,10647,10681,10758,10759,10760,10761,10896,11290,11448,11454,11458,11473,11476,11477,11559,11561,11656,11680,11681,11682,11683,11684,11685,11686,11687,11688,11697,11790,11791,11792,11793,11858,11979,11994,12046,12216,12217,12250,12579,12676,12856,12860,12865,12896,12897,12902,12918,12976,12977,13019,13718,13740,13741,13742,14221,14224,14225,14226,14267,14275,14278,14281,14303,14425,14426,14427,14488,14492,14686,14693,15685
 area 7803 -5132.1 -1674.8 498.0
 area 7803 -4272.1 -2340.1 219.5
 area 7803 -4425.6 -2427.1 252.7
+quest 1709 giver -4812.5 -1250.6 502.0 ender -4812.5 -1250.6 502.0
+req 1709 level 30 prev 1708 classes 1
+reward 1709
 quest 707 giver -4631.2 -1303.7 503.5 ender -5694.6 -3812.4 321.7
 req 707 level 37
 quest 687 giver -4598.9 -1115.5 505.0 ender -7164.4 -3357.4 244.9
@@ -2034,8 +2635,56 @@ hunt 7811 0 60 466,603,866,867,868,1494,1756,1783,1784,1785,1787,1788,1789,1791,
 area 7811 -4489.0 -1581.8 509.1
 area 7811 -4868.1 -666.7 624.3
 area 7811 -7218.0 -886.0 165.7
+quest 8905 giver -4847.0 -1057.8 502.2 ender -4847.0 -1057.8 502.2
+req 8905 level 60 races 255 classes 1024
+reward 8905
+quest 8906 giver -4847.0 -1057.8 502.2 ender -4847.0 -1057.8 502.2
+req 8906 level 60 races 255 classes 4
+reward 8906
+quest 8907 giver -4847.0 -1057.8 502.2 ender -4847.0 -1057.8 502.2
+req 8907 level 60 classes 128
+reward 8907
+quest 8908 giver -4847.0 -1057.8 502.2 ender -4847.0 -1057.8 502.2
+req 8908 level 60 classes 2
+reward 8908
+quest 8909 giver -4847.0 -1057.8 502.2 ender -4847.0 -1057.8 502.2
+req 8909 level 60 races 255 classes 16
+reward 8909
+quest 8910 giver -4847.0 -1057.8 502.2 ender -4847.0 -1057.8 502.2
+req 8910 level 60 races 255 classes 8
+reward 8910
+quest 8911 giver -4847.0 -1057.8 502.2 ender -4847.0 -1057.8 502.2
+req 8911 level 60 races 255 classes 256
+reward 8911
+quest 8912 giver -4847.0 -1057.8 502.2 ender -4847.0 -1057.8 502.2
+req 8912 level 60 races 255 classes 1
+reward 8912
+quest 8926 giver -4847.0 -1057.8 502.2 ender -4847.0 -1057.8 502.2
+req 8926 level 60 prev 8977 classes 1024
+reward 8926
 quest 8929 giver -4847.0 -1057.8 502.2 ender 3357.5 -3379.7 144.9
 req 8929 level 60 races 77
+quest 8931 giver -4847.0 -1057.8 502.2 ender -4847.0 -1057.8 502.2
+req 8931 level 60 prev 8977 races 255 classes 4
+reward 8931
+quest 8932 giver -4847.0 -1057.8 502.2 ender -4847.0 -1057.8 502.2
+req 8932 level 60 prev 8977 races 255 classes 128
+reward 8932
+quest 8933 giver -4847.0 -1057.8 502.2 ender -4847.0 -1057.8 502.2
+req 8933 level 60 prev 8977 races 255 classes 2
+reward 8933
+quest 8934 giver -4847.0 -1057.8 502.2 ender -4847.0 -1057.8 502.2
+req 8934 level 60 prev 8977 races 255 classes 16
+reward 8934
+quest 8935 giver -4847.0 -1057.8 502.2 ender -4847.0 -1057.8 502.2
+req 8935 level 60 prev 8977 races 255 classes 8
+reward 8935
+quest 8936 giver -4847.0 -1057.8 502.2 ender -4847.0 -1057.8 502.2
+req 8936 level 60 prev 8977 classes 256
+reward 8936
+quest 8937 giver -4847.0 -1057.8 502.2 ender -4847.0 -1057.8 502.2
+req 8937 level 60 prev 8977 races 255 classes 1
+reward 8937
 quest 8960 giver -4847.0 -1057.8 502.2 ender -7535.8 -1211.1 285.6
 req 8960 level 60
 quest 7806 giver -4735.8 -1055.3 502.3 ender -4735.8 -1055.3 502.3
@@ -2050,13 +2699,94 @@ hunt 7812 0 20 466,603,866,867,868,1494,1756,1783,1784,1785,1787,1788,1789,1791,
 area 7812 -4489.0 -1581.8 509.1
 area 7812 -4868.1 -666.7 624.3
 area 7812 -7218.0 -886.0 165.7
+quest 8999 giver -4847.0 -1057.8 502.2 ender -4847.0 -1057.8 502.2
+req 8999 level 60 prev 8997 races 77 classes 1024
+reward 8999
+quest 9000 giver -4847.0 -1057.8 502.2 ender -4847.0 -1057.8 502.2
+req 9000 level 60 prev 8997 races 255 classes 4
+reward 9000
+quest 9001 giver -4847.0 -1057.8 502.2 ender -4847.0 -1057.8 502.2
+req 9001 level 60 prev 8997 races 255 classes 128
+reward 9001
+quest 9002 giver -4847.0 -1057.8 502.2 ender -4847.0 -1057.8 502.2
+req 9002 level 60 prev 8997 races 77 classes 2
+reward 9002
+quest 9003 giver -4847.0 -1057.8 502.2 ender -4847.0 -1057.8 502.2
+req 9003 level 60 prev 8997 races 77 classes 16
+reward 9003
+quest 9004 giver -4847.0 -1057.8 502.2 ender -4847.0 -1057.8 502.2
+req 9004 level 60 prev 8997 races 255 classes 8
+reward 9004
+quest 9005 giver -4847.0 -1057.8 502.2 ender -4847.0 -1057.8 502.2
+req 9005 level 60 prev 8997 races 77 classes 256
+reward 9005
+quest 9006 giver -4847.0 -1057.8 502.2 ender -4847.0 -1057.8 502.2
+req 9006 level 60 prev 8997 races 255 classes 1
+reward 9006
 
-start W0_-10_-2   # 2 quests, levels 52-60
-anchor 0 -4748.9 -963.3 505.2
+start W0_-10_-2   # 21 quests, levels 10-60
+anchor 0 -4655.4 -917.3 509.8
+quest 1880 giver -4613.0 -929.0 501.2 ender -4613.0 -929.0 501.2
+req 1880 level 10 classes 128
+reward 1880
+quest 5639 giver -4612.3 -909.1 501.1 ender -8512.4 862.4 109.9
+req 5639 level 10 races 5 classes 16
+reward 5639
+quest 1645 giver -4633.5 -932.0 524.8 ender -4633.5 -932.0 524.8
+req 1645 level 12 races 4 classes 2
+reward 1645
+quest 1647 giver -4633.5 -932.0 524.8 ender -4895.6 -898.1 501.7
+req 1647 level 12 prev 1646 races 4 classes 2
+reward 1647
+quest 1789 giver -4633.5 -932.0 524.8 ender -4633.5 -932.0 524.8
+req 1789 level 12 races 4 classes 2
+reward 1789
+quest 2999 giver -4601.6 -896.5 502.9 ender -4633.5 -932.0 524.8
+req 2999 level 12 races 4 classes 2
+reward 2999
+quest 3681 giver -4601.6 -896.5 502.9 ender -8545.8 845.8 106.6
+req 3681 level 12 races 1 classes 2
+reward 3681
+quest 1648 giver -4895.6 -898.1 501.7 ender -4895.6 -898.1 501.7
+req 1648 level 13 prev 1647 races 4 classes 2
+reward 1648
+quest 1778 giver -4895.6 -898.1 501.7 ender -4633.5 -932.0 524.8
+req 1778 level 13 prev 1648 races 4 classes 2
+reward 1778
+quest 1779 giver -4633.5 -932.0 524.8 ender -4613.0 -899.7 524.8
+req 1779 level 13 prev 1778 races 4 classes 2
+reward 1779
+quest 1783 giver -4613.0 -899.7 524.8 ender -5784.3 -2055.2 408.2
+req 1783 level 13 prev 1779 races 4 classes 2
+reward 1783
+quest 1785 giver -4613.0 -899.7 524.8 ender -4633.5 -932.0 524.8
+req 1785 level 13 prev 1784 races 4 classes 2
+reward 1785
+quest 1794 giver -4633.5 -932.0 524.8 ender -4633.5 -932.0 524.8
+req 1794 level 20 classes 2
+reward 1794
+quest 5641 giver -4612.3 -909.1 501.1 ender -4612.3 -909.1 501.1
+req 5641 level 20 races 4 classes 16
+reward 5641
+quest 5677 giver -4612.3 -909.1 501.1 ender -8512.4 862.4 109.9
+req 5677 level 20 races 1 classes 16
+reward 5677
+quest 1939 giver -4613.0 -929.0 501.2 ender -9010.8 876.6 148.7
+req 1939 level 26 classes 128
+reward 1939
+quest 4486 giver -4601.6 -896.5 502.9 ender -8545.8 845.8 106.6
+req 4486 level 40 classes 2
+reward 4486
 quest 3450 giver -4594.7 -958.4 509.0 ender -5068.2 -1273.9 502.0
 req 3450 level 52 prev 3448
 quest 7261 giver -4903.0 -968.2 501.5 ender -16.3 -321.6 131.3
 req 7261 level 60
+quest 7670 giver -4601.6 -896.5 502.9 ender -8577.5 881.5 106.6
+req 7670 level 60 classes 2
+reward 7670
+quest 7639 giver -4612.3 -909.1 501.1 ender -8577.5 881.5 106.6
+req 7639 level 60 prev 7637 classes 2
+reward 7639
 
 start W0_-8_-4   # 3 quests, levels 24-29
 anchor 0 -3550.6 -1968.4 114.9
@@ -2410,8 +3140,8 @@ req 675 level 34 prev 674 races 178
 quest 847 giver -947.6 -3481.6 51.4 ender -1004.3 -3556.5 57.3
 req 847 level 37 prev 702
 
-start W0_-2_-2   # 8 quests, levels 30-40
-anchor 0 -843.6 -555.6 12.1
+start W0_-2_-2   # 9 quests, levels 30-60
+anchor 0 -837.0 -560.9 12.4
 quest 536 giver -845.6 -580.2 11.7 ender -845.6 -580.2 11.7
 req 536 level 30
 hunt 536 0 10 2377
@@ -2455,6 +3185,9 @@ hunt 504 0 15 2287
 area 504 388.3 -315.3 165.1
 area 504 417.0 -245.7 157.3
 area 504 482.7 -313.2 156.2
+quest 7645 giver -783.6 -603.3 15.2 ender -783.6 -603.3 15.2
+req 7645 level 60 classes 2
+reward 7645
 
 start W0_-2_-1   # 4 quests, levels 33-40
 anchor 0 -861.0 -473.7 13.4
@@ -2495,8 +3228,11 @@ anchor 0 -463.7 -2874.4 96.9
 quest 1444 giver -463.7 -2874.4 96.9 ender -10458.5 -3322.3 40.0
 req 1444 level 44 prev 1429
 
-start W0_-1_-2   # 23 quests, levels 22-45
-anchor 0 -31.1 -925.9 55.9
+start W0_-1_-2   # 24 quests, levels 20-45
+anchor 0 -30.2 -925.0 56.0
+quest 2480 giver -9.3 -905.5 57.6 ender -9.3 -905.5 57.6
+req 2480 level 20 prev 2479 classes 8
+reward 2480
 quest 496 giver -6.6 -899.4 57.6 ender -6.6 -899.4 57.6
 req 496 level 22
 hunt 496 0 10 2351,2354,2356,14280
@@ -2682,15 +3418,39 @@ area 2877 332.5 -3335.4 115.8
 quest 4298 giver 347.1 -2120.0 104.7 ender 347.1 -2120.0 104.7
 req 4298 level 48 prev 4297
 
-start W0_0_-4   # 2 quests, levels 43-48
-anchor 0 325.2 -1950.5 197.7
+start W0_0_-4   # 3 quests, levels 43-60
+anchor 0 217.0 -1827.4 199.8
 quest 1451 giver 325.2 -1950.5 197.7 ender 219.6 -2612.2 160.4
 req 1451 level 43 prev 1450
 quest 2989 giver 325.2 -1950.5 197.7 ender 325.2 -1950.5 197.7
 req 2989 level 48 prev 2988
+quest 8249 giver 0.7 -1581.2 203.9 ender 0.7 -1581.2 203.9
+req 8249 level 60 classes 8
+reward 8249
 
-start W0_0_-3   # 2 quests, levels 60-60
-anchor 0 371.2 -1004.1 109.3
+start W0_0_-3   # 9 quests, levels 40-60
+anchor 0 257.0 -1369.9 80.6
+quest 1712 giver 250.8 -1470.6 55.4 ender 250.8 -1470.6 55.4
+req 1712 level 40 prev 1791 classes 1
+reward 1712
+quest 1713 giver 250.8 -1470.6 55.4 ender 250.8 -1470.6 55.4
+req 1713 level 40 prev 1712 classes 1
+reward 1713
+quest 1792 giver 250.8 -1470.6 55.4 ender 250.8 -1470.6 55.4
+req 1792 level 40 prev 1713 classes 1
+reward 1792
+quest 8411 giver 250.8 -1470.6 55.4 ender 250.8 -1470.6 55.4
+req 8411 level 52 classes 64
+reward 8411
+quest 8412 giver 250.8 -1470.6 55.4 ender 250.8 -1470.6 55.4
+req 8412 level 52 prev 8410 classes 64
+reward 8412
+quest 8413 giver 250.8 -1470.6 55.4 ender 250.8 -1470.6 55.4
+req 8413 level 52 prev 8412 classes 64
+reward 8413
+quest 6701 giver 65.3 -1497.2 174.1 ender 65.3 -1497.2 174.1
+req 6701 level 60 prev 6681 classes 8
+reward 6701
 quest 7142 giver 371.2 -1004.1 109.3 ender 371.2 -1004.1 109.3
 req 7142 level 60
 quest 8272 giver 371.2 -1004.1 109.3 ender 371.2 -1004.1 109.3
@@ -2715,13 +3475,25 @@ anchor 0 34.9 255.9 42.0
 quest 603 giver 34.9 255.9 42.0 ender -14467.0 479.8 20.5
 req 603 level 37 prev 602 races 77
 
+start W0_0_3   # 1 quests, levels 23-23
+anchor 0 430.4 1881.9 15.4
+quest 1103 giver 430.4 1881.9 15.4 ender 430.4 1881.9 15.4
+req 1103 level 23 prev 63 classes 64
+reward 1103
+
 start W0_1_-7   # 1 quests, levels 48-48
 anchor 0 500.2 -3475.1 116.5
 quest 836 giver 500.2 -3475.1 116.5 ender -14417.0 411.3 22.8
 req 836 level 48 prev 485
 
-start W0_1_-3   # 13 quests, levels 52-60
-anchor 0 962.8 -1428.2 65.5
+start W0_1_-4   # 1 quests, levels 52-52
+anchor 0 979.7 -1821.6 80.5
+quest 8416 giver 979.7 -1821.6 80.5 ender 957.7 -1419.5 66.3
+req 8416 level 52 prev 8414 classes 2
+reward 8416
+
+start W0_1_-3   # 15 quests, levels 52-60
+anchor 0 962.1 -1427.1 65.6
 quest 5092 giver 957.7 -1419.5 66.3 ender 957.7 -1419.5 66.3
 req 5092 level 52
 hunt 5092 0 10 1783
@@ -2729,6 +3501,12 @@ hunt 5092 1 10 1791
 area 5092 950.1 -1620.2 67.6
 area 5092 1017.0 -1617.8 64.1
 area 5092 1072.0 -1665.5 63.4
+quest 8414 giver 957.7 -1419.5 66.3 ender 979.7 -1821.6 80.5
+req 8414 level 52 classes 2
+reward 8414
+quest 8418 giver 957.7 -1419.5 66.3 ender 957.7 -1419.5 66.3
+req 8418 level 52 prev 8416 classes 2
+reward 8418
 quest 5215 giver 957.7 -1419.5 66.3 ender 944.3 -1431.1 64.0
 req 5215 level 53 prev 5092
 quest 5401 giver 971.7 -1430.9 65.2 ender 971.7 -1430.9 65.2
@@ -2872,8 +3650,26 @@ anchor 0 1114.2 -1697.4 67.6
 quest 5142 giver 1114.2 -1697.4 67.6 ender 1456.3 -3596.4 87.0
 req 5142 level 55
 
-start W0_2_0   # 9 quests, levels 21-60
-anchor 0 1393.2 368.6 -72.4
+start W0_2_0   # 15 quests, levels 13-60
+anchor 0 1407.1 268.3 -68.6
+quest 1886 giver 1435.6 72.0 -62.2 ender 1435.6 72.0 -62.2
+req 1886 level 13 races 16 classes 8
+reward 1886
+quest 1898 giver 1435.6 72.0 -62.2 ender 1389.3 347.3 -66.0
+req 1898 level 13 prev 1886 races 16 classes 8
+reward 1898
+quest 1899 giver 1389.3 347.3 -66.0 ender 1435.6 72.0 -62.2
+req 1899 level 13 prev 1898 races 16 classes 8
+reward 1899
+quest 1978 giver 1435.6 72.0 -62.2 ender 1287.8 333.5 -60.0
+req 1978 level 13 prev 1899 races 16 classes 8
+reward 1978
+quest 1998 giver 1435.6 72.0 -62.2 ender 1435.6 72.0 -62.2
+req 1998 level 16 races 16 classes 8
+reward 1998
+quest 1999 giver 1435.6 72.0 -62.2 ender 1435.6 72.0 -62.2
+req 1999 level 20 prev 1998 races 16 classes 8
+reward 1999
 quest 97290 giver 1482.7 433.3 -83.5 ender 1434.5 404.9 -85.2
 req 97290 level 21 prev 97289
 quest 6628 giver 1459.2 318.7 -50.8 ender 1459.2 318.7 -50.8
@@ -3006,14 +3802,56 @@ area 5342 966.4 -1451.7 63.8
 quest 5511 giver 1751.8 -730.0 60.2 ender 1751.8 -730.0 60.2
 req 5511 level 60 prev 5804
 
-start W0_3_0   # 10 quests, levels 16-60
-anchor 0 1638.6 216.6 -59.2
+start W0_3_0   # 24 quests, levels 10-60
+anchor 0 1689.6 180.1 -57.0
+quest 1473 giver 1711.6 57.2 -62.2 ender 1711.6 57.2 -62.2
+req 1473 level 10 classes 256
+reward 1473
+quest 1882 giver 1813.7 56.4 -47.3 ender 1813.7 56.4 -47.3
+req 1882 level 10 classes 128
+reward 1882
+quest 5658 giver 1760.7 403.1 -57.1 ender 1760.7 403.1 -57.1
+req 5658 level 10 races 16 classes 16
+reward 5658
+quest 1471 giver 1711.6 57.2 -62.2 ender 1711.6 57.2 -62.2
+req 1471 level 10 prev 1473 classes 256
+reward 1471
+quest 1961 giver 1813.7 56.4 -47.3 ender 1681.5 194.4 -62.1
+req 1961 level 15 prev 1960 classes 128
+reward 1961
+quest 1962 giver 1681.5 194.4 -62.1 ender 1681.5 194.4 -62.1
+req 1962 level 15 prev 1961 classes 128
+reward 1962
+quest 1960 giver 1813.7 56.4 -47.3 ender 1813.7 56.4 -47.3
+req 1960 level 16 classes 128
+reward 1960
 quest 97891 giver 1527.9 310.9 -62.1 ender 1403.7 426.1 -80.3
 req 97891 level 16
 quest 530 giver 1604.3 278.3 -55.3 ender 1604.3 278.3 -55.3
 req 530 level 20 prev 441
 hunt 530 0 1 2332
 area 530 -704.9 1574.8 17.2
+quest 1472 giver 1711.6 57.2 -62.2 ender 1783.0 59.5 -61.4
+req 1472 level 20 classes 256
+reward 1472
+quest 5679 giver 1760.7 403.1 -57.1 ender 1760.7 403.1 -57.1
+req 5679 level 20 races 16 classes 16
+reward 5679
+quest 1476 giver 1783.0 59.5 -61.4 ender 1711.6 57.2 -62.2
+req 1476 level 20 prev 1472 classes 256
+reward 1476
+quest 1474 giver 1711.6 57.2 -62.2 ender 1711.6 57.2 -62.2
+req 1474 level 20 prev 1476 classes 256
+reward 1474
+quest 1803 giver 1635.4 144.9 -62.1 ender 1635.4 144.9 -62.1
+req 1803 level 30 prev 1801 classes 256
+reward 1803
+quest 1846 giver 1627.4 277.1 -43.0 ender 1627.4 277.1 -43.0
+req 1846 level 30 classes 1
+reward 1846
+quest 1847 giver 1627.4 277.1 -43.0 ender 1627.4 277.1 -43.0
+req 1847 level 30 prev 1846 classes 1
+reward 1847
 quest 1164 giver 1561.4 260.8 -43.0 ender 1561.4 260.8 -43.0
 req 1164 level 36
 hunt 1164 0 1 4480
@@ -3057,10 +3895,28 @@ area 7819 1745.9 -1112.0 63.3
 area 7819 1688.5 -1134.9 62.8
 area 7819 1795.8 -1153.6 60.6
 
-start W0_3_3   # 9 quests, levels 1-5
-anchor 0 1827.3 1615.2 100.5
+start W0_3_3   # 20 quests, levels 1-5
+anchor 0 1835.2 1626.1 98.8
 quest 363 giver 1679.0 1667.9 135.9 ender 1843.3 1639.9 97.8
 req 363 level 1 races 16
+quest 3095 giver 1843.3 1639.9 97.8 ender 1862.5 1556.3 94.9
+req 3095 level 1 prev 364 races 16 classes 1
+reward 3095
+quest 3096 giver 1843.3 1639.9 97.8 ender 1859.7 1563.3 94.4
+req 3096 level 1 prev 364 races 16 classes 8
+reward 3096
+quest 3097 giver 1843.3 1639.9 97.8 ender 1848.3 1627.6 97.0
+req 3097 level 1 prev 364 races 16 classes 16
+reward 3097
+quest 3098 giver 1843.3 1639.9 97.8 ender 1847.4 1635.5 97.0
+req 3098 level 1 prev 364 races 16 classes 128
+reward 3098
+quest 3099 giver 1843.3 1639.9 97.8 ender 1839.0 1636.5 97.0
+req 3099 level 1 prev 364 races 16 classes 256
+reward 3099
+quest 98601 giver 1843.3 1639.9 97.8 ender 1837.3 1628.4 97.0
+req 98601 level 1 prev 364 races 16 classes 2
+reward 98601
 quest 364 giver 1843.3 1639.9 97.8 ender 1843.3 1639.9 97.8
 req 364 level 2
 hunt 364 0 8 1501
@@ -3075,12 +3931,24 @@ hunt 376 1 6 1512,1513,10716
 area 376 1867.0 1672.4 92.6
 area 376 1812.2 1703.9 105.5
 area 376 1750.2 1646.8 118.7
+quest 90902 giver 1837.3 1628.4 97.0 ender 1837.3 1628.4 97.0
+req 90902 level 2 prev 98601 races 16 classes 2
+reward 90902
+quest 1470 giver 1836.9 1633.4 97.0 ender 1836.9 1633.4 97.0
+req 1470 level 3 races 18 classes 256
+reward 1470
 quest 3901 giver 1843.3 1639.9 97.8 ender 1843.3 1639.9 97.8
 req 3901 level 3 prev 364
 hunt 3901 0 12 1890
 area 3901 1939.1 1543.0 90.1
 area 3901 1984.8 1591.6 82.7
 area 3901 1887.0 1486.6 87.8
+quest 5651 giver 1848.3 1627.6 97.0 ender 2265.2 251.1 41.2
+req 5651 level 4 races 16 classes 16
+reward 5651
+quest 91208 giver 1837.3 1628.4 97.0 ender 1837.3 1628.4 97.0
+req 91208 level 4 races 16 classes 2
+reward 91208
 quest 98389 giver 1837.3 1628.4 97.0 ender 1837.3 1628.4 97.0
 req 98389 level 4
 hunt 98389 0 6 271961
@@ -3094,6 +3962,9 @@ hunt 380 1 8 1505
 area 380 2048.1 1709.8 76.4
 area 380 2016.2 1773.7 106.9
 area 380 2107.6 1680.3 71.6
+quest 91209 giver 1837.3 1628.4 97.0 ender 2250.8 311.8 35.2
+req 91209 level 4 prev 91208 races 16 classes 2
+reward 91209
 quest 381 giver 1848.8 1580.5 94.7 ender 1848.8 1580.5 94.7
 req 381 level 4 prev 380
 hunt 381 0 12 1506,1507,1667
@@ -3109,8 +3980,8 @@ req 383 level 5 prev 382
 hunt 383 0 1 1667
 area 383 1764.1 1384.3 92.6
 
-start W0_4_-11   # 19 quests, levels 55-60
-anchor 0 2269.4 -5327.4 89.2
+start W0_4_-11   # 91 quests, levels 55-60
+anchor 0 2286.9 -5335.7 90.2
 quest 5503 giver 2255.9 -5337.7 86.3 ender 2255.9 -5337.7 86.3
 req 5503 level 55
 quest 5508 giver 2255.9 -5337.7 86.3 ender 2255.9 -5337.7 86.3
@@ -3145,6 +4016,222 @@ quest 5264 giver 2255.9 -5337.7 86.3 ender 2303.8 -5349.5 91.7
 req 5264 level 60 prev 5263
 quest 5281 giver 2151.7 -5264.5 95.9 ender 2929.1 -2744.7 109.7
 req 5281 level 60
+quest 9034 giver 2300.9 -5351.6 91.7 ender 2300.9 -5351.6 91.7
+req 9034 level 60 prev 9033 classes 1
+reward 9034
+quest 9036 giver 2300.9 -5351.6 91.7 ender 2300.9 -5351.6 91.7
+req 9036 level 60 prev 9033 classes 1
+reward 9036
+quest 9037 giver 2300.9 -5351.6 91.7 ender 2300.9 -5351.6 91.7
+req 9037 level 60 prev 9033 classes 1
+reward 9037
+quest 9038 giver 2300.9 -5351.6 91.7 ender 2300.9 -5351.6 91.7
+req 9038 level 60 prev 9033 classes 1
+reward 9038
+quest 9039 giver 2300.9 -5351.6 91.7 ender 2300.9 -5351.6 91.7
+req 9039 level 60 prev 9033 classes 1
+reward 9039
+quest 9040 giver 2300.9 -5351.6 91.7 ender 2300.9 -5351.6 91.7
+req 9040 level 60 prev 9033 classes 1
+reward 9040
+quest 9041 giver 2300.9 -5351.6 91.7 ender 2300.9 -5351.6 91.7
+req 9041 level 60 prev 9033 classes 1
+reward 9041
+quest 9042 giver 2300.9 -5351.6 91.7 ender 2300.9 -5351.6 91.7
+req 9042 level 60 prev 9033 classes 1
+reward 9042
+quest 9043 giver 2298.9 -5341.8 90.9 ender 2298.9 -5341.8 90.9
+req 9043 level 60 prev 9033 classes 2
+reward 9043
+quest 9044 giver 2298.9 -5341.8 90.9 ender 2298.9 -5341.8 90.9
+req 9044 level 60 prev 9033 classes 2
+reward 9044
+quest 9045 giver 2298.9 -5341.8 90.9 ender 2298.9 -5341.8 90.9
+req 9045 level 60 prev 9033 classes 2
+reward 9045
+quest 9046 giver 2298.9 -5341.8 90.9 ender 2298.9 -5341.8 90.9
+req 9046 level 60 prev 9033 classes 2
+reward 9046
+quest 9047 giver 2298.9 -5341.8 90.9 ender 2298.9 -5341.8 90.9
+req 9047 level 60 prev 9033 classes 2
+reward 9047
+quest 9048 giver 2298.9 -5341.8 90.9 ender 2298.9 -5341.8 90.9
+req 9048 level 60 prev 9033 classes 2
+reward 9048
+quest 9049 giver 2298.9 -5341.8 90.9 ender 2298.9 -5341.8 90.9
+req 9049 level 60 prev 9033 classes 2
+reward 9049
+quest 9050 giver 2298.9 -5341.8 90.9 ender 2298.9 -5341.8 90.9
+req 9050 level 60 prev 9033 classes 2
+reward 9050
+quest 9054 giver 2288.6 -5340.4 91.0 ender 2288.6 -5340.4 91.0
+req 9054 level 60 prev 9033 classes 4
+reward 9054
+quest 9055 giver 2288.6 -5340.4 91.0 ender 2288.6 -5340.4 91.0
+req 9055 level 60 prev 9033 classes 4
+reward 9055
+quest 9056 giver 2288.6 -5340.4 91.0 ender 2288.6 -5340.4 91.0
+req 9056 level 60 prev 9033 classes 4
+reward 9056
+quest 9057 giver 2288.6 -5340.4 91.0 ender 2288.6 -5340.4 91.0
+req 9057 level 60 prev 9033 classes 4
+reward 9057
+quest 9058 giver 2288.6 -5340.4 91.0 ender 2288.6 -5340.4 91.0
+req 9058 level 60 prev 9033 classes 4
+reward 9058
+quest 9059 giver 2288.6 -5340.4 91.0 ender 2288.6 -5340.4 91.0
+req 9059 level 60 prev 9033 classes 4
+reward 9059
+quest 9060 giver 2288.6 -5340.4 91.0 ender 2288.6 -5340.4 91.0
+req 9060 level 60 prev 9033 classes 4
+reward 9060
+quest 9061 giver 2288.6 -5340.4 91.0 ender 2288.6 -5340.4 91.0
+req 9061 level 60 prev 9033 classes 4
+reward 9061
+quest 9068 giver 2276.7 -5325.3 88.8 ender 2276.7 -5325.3 88.8
+req 9068 level 60 prev 9033 classes 64
+reward 9068
+quest 9069 giver 2276.7 -5325.3 88.8 ender 2276.7 -5325.3 88.8
+req 9069 level 60 prev 9033 classes 64
+reward 9069
+quest 9070 giver 2276.7 -5325.3 88.8 ender 2276.7 -5325.3 88.8
+req 9070 level 60 prev 9033 classes 64
+reward 9070
+quest 9071 giver 2276.7 -5325.3 88.8 ender 2276.7 -5325.3 88.8
+req 9071 level 60 prev 9033 classes 64
+reward 9071
+quest 9072 giver 2276.7 -5325.3 88.8 ender 2276.7 -5325.3 88.8
+req 9072 level 60 prev 9033 classes 64
+reward 9072
+quest 9073 giver 2276.7 -5325.3 88.8 ender 2276.7 -5325.3 88.8
+req 9073 level 60 prev 9033 classes 64
+reward 9073
+quest 9074 giver 2276.7 -5325.3 88.8 ender 2276.7 -5325.3 88.8
+req 9074 level 60 prev 9033 classes 64
+reward 9074
+quest 9075 giver 2276.7 -5325.3 88.8 ender 2276.7 -5325.3 88.8
+req 9075 level 60 prev 9033 classes 64
+reward 9075
+quest 9077 giver 2289.7 -5337.3 91.0 ender 2289.7 -5337.3 91.0
+req 9077 level 60 prev 9033 classes 8
+reward 9077
+quest 9078 giver 2289.7 -5337.3 91.0 ender 2289.7 -5337.3 91.0
+req 9078 level 60 prev 9033 classes 8
+reward 9078
+quest 9079 giver 2289.7 -5337.3 91.0 ender 2289.7 -5337.3 91.0
+req 9079 level 60 prev 9033 classes 8
+reward 9079
+quest 9080 giver 2289.7 -5337.3 91.0 ender 2289.7 -5337.3 91.0
+req 9080 level 60 prev 9033 classes 8
+reward 9080
+quest 9081 giver 2289.7 -5337.3 91.0 ender 2289.7 -5337.3 91.0
+req 9081 level 60 prev 9033 classes 8
+reward 9081
+quest 9082 giver 2289.7 -5337.3 91.0 ender 2289.7 -5337.3 91.0
+req 9082 level 60 prev 9033 classes 8
+reward 9082
+quest 9083 giver 2289.7 -5337.3 91.0 ender 2289.7 -5337.3 91.0
+req 9083 level 60 prev 9033 classes 8
+reward 9083
+quest 9084 giver 2289.7 -5337.3 91.0 ender 2289.7 -5337.3 91.0
+req 9084 level 60 prev 9033 classes 8
+reward 9084
+quest 9086 giver 2277.1 -5328.6 88.8 ender 2277.1 -5328.6 88.8
+req 9086 level 60 prev 9033 classes 1024
+reward 9086
+quest 9087 giver 2277.1 -5328.6 88.8 ender 2277.1 -5328.6 88.8
+req 9087 level 60 prev 9033 classes 1024
+reward 9087
+quest 9088 giver 2277.1 -5328.6 88.8 ender 2277.1 -5328.6 88.8
+req 9088 level 60 prev 9033 classes 1024
+reward 9088
+quest 9089 giver 2277.1 -5328.6 88.8 ender 2277.1 -5328.6 88.8
+req 9089 level 60 prev 9033 classes 1024
+reward 9089
+quest 9090 giver 2277.1 -5328.6 88.8 ender 2277.1 -5328.6 88.8
+req 9090 level 60 prev 9033 classes 1024
+reward 9090
+quest 9091 giver 2277.1 -5328.6 88.8 ender 2277.1 -5328.6 88.8
+req 9091 level 60 prev 9033 classes 1024
+reward 9091
+quest 9092 giver 2277.1 -5328.6 88.8 ender 2277.1 -5328.6 88.8
+req 9092 level 60 prev 9033 classes 1024
+reward 9092
+quest 9093 giver 2277.1 -5328.6 88.8 ender 2277.1 -5328.6 88.8
+req 9093 level 60 prev 9033 classes 1024
+reward 9093
+quest 9095 giver 2296.0 -5341.0 90.9 ender 2296.0 -5341.0 90.9
+req 9095 level 60 prev 9033 classes 128
+reward 9095
+quest 9096 giver 2296.0 -5341.0 90.9 ender 2296.0 -5341.0 90.9
+req 9096 level 60 prev 9033 classes 128
+reward 9096
+quest 9097 giver 2296.0 -5341.0 90.9 ender 2296.0 -5341.0 90.9
+req 9097 level 60 prev 9033 classes 128
+reward 9097
+quest 9098 giver 2296.0 -5341.0 90.9 ender 2296.0 -5341.0 90.9
+req 9098 level 60 prev 9033 classes 128
+reward 9098
+quest 9099 giver 2296.0 -5341.0 90.9 ender 2296.0 -5341.0 90.9
+req 9099 level 60 prev 9033 classes 128
+reward 9099
+quest 9100 giver 2296.0 -5341.0 90.9 ender 2296.0 -5341.0 90.9
+req 9100 level 60 prev 9033 classes 128
+reward 9100
+quest 9101 giver 2296.0 -5341.0 90.9 ender 2296.0 -5341.0 90.9
+req 9101 level 60 prev 9033 classes 128
+reward 9101
+quest 9102 giver 2296.0 -5341.0 90.9 ender 2296.0 -5341.0 90.9
+req 9102 level 60 prev 9033 classes 128
+reward 9102
+quest 9103 giver 2297.0 -5335.9 91.0 ender 2297.0 -5335.9 91.0
+req 9103 level 60 prev 9033 classes 256
+reward 9103
+quest 9104 giver 2297.0 -5335.9 91.0 ender 2297.0 -5335.9 91.0
+req 9104 level 60 prev 9033 classes 256
+reward 9104
+quest 9105 giver 2297.0 -5335.9 91.0 ender 2297.0 -5335.9 91.0
+req 9105 level 60 prev 9033 classes 256
+reward 9105
+quest 9106 giver 2297.0 -5335.9 91.0 ender 2297.0 -5335.9 91.0
+req 9106 level 60 prev 9033 classes 256
+reward 9106
+quest 9107 giver 2297.0 -5335.9 91.0 ender 2297.0 -5335.9 91.0
+req 9107 level 60 prev 9033 classes 256
+reward 9107
+quest 9108 giver 2297.0 -5335.9 91.0 ender 2297.0 -5335.9 91.0
+req 9108 level 60 prev 9033 classes 256
+reward 9108
+quest 9109 giver 2297.0 -5335.9 91.0 ender 2297.0 -5335.9 91.0
+req 9109 level 60 prev 9033 classes 256
+reward 9109
+quest 9110 giver 2297.0 -5335.9 91.0 ender 2297.0 -5335.9 91.0
+req 9110 level 60 prev 9033 classes 256
+reward 9110
+quest 9111 giver 2298.9 -5339.0 90.9 ender 2298.9 -5339.0 90.9
+req 9111 level 60 prev 9033 classes 16
+reward 9111
+quest 9112 giver 2298.9 -5339.0 90.9 ender 2298.9 -5339.0 90.9
+req 9112 level 60 prev 9033 classes 16
+reward 9112
+quest 9113 giver 2298.9 -5339.0 90.9 ender 2298.9 -5339.0 90.9
+req 9113 level 60 prev 9033 classes 16
+reward 9113
+quest 9114 giver 2298.9 -5339.0 90.9 ender 2298.9 -5339.0 90.9
+req 9114 level 60 prev 9033 classes 16
+reward 9114
+quest 9115 giver 2298.9 -5339.0 90.9 ender 2298.9 -5339.0 90.9
+req 9115 level 60 prev 9033 classes 16
+reward 9115
+quest 9116 giver 2298.9 -5339.0 90.9 ender 2298.9 -5339.0 90.9
+req 9116 level 60 prev 9033 classes 16
+reward 9116
+quest 9117 giver 2298.9 -5339.0 90.9 ender 2298.9 -5339.0 90.9
+req 9117 level 60 prev 9033 classes 16
+reward 9117
+quest 9118 giver 2298.9 -5339.0 90.9 ender 2298.9 -5339.0 90.9
+req 9118 level 60 prev 9033 classes 16
+reward 9118
 quest 9123 giver 2296.0 -5341.0 90.9 ender 2296.0 -5341.0 90.9
 req 9123 level 60
 quest 9124 giver 2288.6 -5340.4 91.0 ender 2288.6 -5340.4 91.0
@@ -3214,8 +4301,11 @@ area 9132 -6475.9 -1360.2 212.2
 area 9132 -6457.3 -1286.4 181.0
 area 9132 -6517.2 -1293.2 200.7
 
-start W0_4_0   # 21 quests, levels 6-13
-anchor 0 2229.1 258.7 36.2
+start W0_4_0   # 31 quests, levels 4-13
+anchor 0 2240.7 266.3 36.4
+quest 5650 giver 2265.2 251.1 41.2 ender 2265.2 251.1 41.2
+req 5650 level 4 races 16 classes 16
+reward 5650
 quest 367 giver 2259.0 347.0 36.1 ender 2259.0 347.0 36.1
 req 367 level 6
 hunt 367 0 5 1547,1548,1549
@@ -3281,8 +4371,26 @@ quest 362 giver 2262.3 244.3 33.7 ender 2262.3 244.3 33.7
 req 362 level 10
 hunt 362 0 1 1657
 area 362 2609.1 894.0 107.8
+quest 1478 giver 2250.6 249.0 41.2 ender 1711.6 57.2 -62.2
+req 1478 level 10 classes 256
+reward 1478
+quest 1818 giver 2254.8 238.4 33.7 ender 2287.7 403.4 34.0
+req 1818 level 10 classes 1
+reward 1818
+quest 1819 giver 2287.7 403.4 34.0 ender 2287.7 403.4 34.0
+req 1819 level 10 classes 1
+reward 1819
+quest 1881 giver 2256.8 233.2 41.2 ender 1813.7 56.4 -47.3
+req 1881 level 10 classes 128
+reward 1881
+quest 1885 giver 2271.0 243.0 41.2 ender 1435.6 72.0 -62.2
+req 1885 level 10 races 16 classes 8
+reward 1885
 quest 355 giver 2262.3 244.3 33.7 ender 2305.9 265.2 38.8
 req 355 level 10 prev 354
+quest 1820 giver 2287.7 403.4 34.0 ender 2262.3 244.3 33.7
+req 1820 level 10 prev 1819 classes 1
+reward 1820
 quest 371 giver 2278.1 295.6 36.8 ender 2278.1 295.6 36.8
 req 371 level 10 prev 370
 hunt 371 0 1 1664
@@ -3305,6 +4413,9 @@ hunt 356 1 8 1532
 area 356 1985.6 -320.7 36.9
 area 356 2044.9 -336.6 35.6
 area 356 1985.4 -384.1 35.5
+quest 91282 giver 2250.8 311.8 35.2 ender 2475.4 2045.8 136.9
+req 91282 level 11 races 16 classes 2
+reward 91282
 quest 97558 giver 2026.3 76.8 35.5 ender 2026.3 76.8 35.5
 req 97558 level 11
 hunt 97558 0 8 1553,1554
@@ -3319,6 +4430,12 @@ hunt 369 0 4 1555
 area 369 2187.5 -691.3 67.1
 area 369 2258.8 -747.7 66.9
 area 369 2169.2 -752.2 73.7
+quest 1821 giver 2262.3 244.3 33.7 ender 2262.3 244.3 33.7
+req 1821 level 11 prev 1820 classes 1
+reward 1821
+quest 1822 giver 2262.3 244.3 33.7 ender 2262.3 244.3 33.7
+req 1822 level 11 prev 1821 classes 1
+reward 1822
 quest 372 giver 2278.1 295.6 36.8 ender 2278.1 295.6 36.8
 req 372 level 12 prev 371
 hunt 372 0 1 1665
@@ -3346,6 +4463,21 @@ start W0_4_3   # 1 quests, levels 7-7
 anchor 0 2406.1 1569.4 31.7
 quest 99144 giver 2406.1 1569.4 31.7 ender 2250.8 311.8 35.2
 req 99144 level 7
+
+start W0_4_4   # 4 quests, levels 11-12
+anchor 0 2483.5 2033.6 141.7
+quest 91285 giver 2475.4 2045.8 136.9 ender 2475.4 2045.8 136.9
+req 91285 level 11 races 16 classes 2
+reward 91285
+quest 91316 giver 2491.2 2007.8 137.4 ender 2491.2 2007.8 137.4
+req 91316 level 11 races 16 classes 2
+reward 91316
+quest 91294 giver 2475.4 2045.8 136.9 ender 2492.1 2035.0 155.7
+req 91294 level 11 prev 91285 races 16 classes 2
+reward 91294
+quest 91317 giver 2492.1 2035.0 155.7 ender 2492.1 2035.0 155.7
+req 91317 level 12 prev 91294 races 16 classes 2
+reward 91317
 
 start W0_5_-5   # 5 quests, levels 56-58
 anchor 0 2672.0 -2478.3 72.7
@@ -3394,12 +4526,48 @@ area 6023 2331.9 -2070.1 168.5
 quest 6025 giver 2562.3 -1815.9 33.5 ender 2562.3 -1815.9 33.5
 req 6025 level 58 prev 6023
 
+start W0_6_-7   # 8 quests, levels 60-60
+anchor 0 3357.5 -3379.7 144.9
+quest 8951 giver 3357.5 -3379.7 144.9 ender -4847.0 -1057.8 502.2
+req 8951 level 60 prev 9015 races 77 classes 1024
+reward 8951
+quest 8952 giver 3357.5 -3379.7 144.9 ender -4847.0 -1057.8 502.2
+req 8952 level 60 prev 9015 races 77 classes 4
+reward 8952
+quest 8953 giver 3357.5 -3379.7 144.9 ender -4847.0 -1057.8 502.2
+req 8953 level 60 prev 9015 races 77 classes 128
+reward 8953
+quest 8954 giver 3357.5 -3379.7 144.9 ender -4847.0 -1057.8 502.2
+req 8954 level 60 prev 9015 races 77 classes 2
+reward 8954
+quest 8955 giver 3357.5 -3379.7 144.9 ender -4847.0 -1057.8 502.2
+req 8955 level 60 prev 9015 races 77 classes 16
+reward 8955
+quest 8956 giver 3357.5 -3379.7 144.9 ender -4847.0 -1057.8 502.2
+req 8956 level 60 prev 9015 races 77 classes 8
+reward 8956
+quest 8958 giver 3357.5 -3379.7 144.9 ender -4847.0 -1057.8 502.2
+req 8958 level 60 prev 9015 races 77 classes 256
+reward 8958
+quest 8959 giver 3357.5 -3379.7 144.9 ender -4847.0 -1057.8 502.2
+req 8959 level 60 prev 9015 races 77 classes 1
+reward 8959
+
+start W0_6_-6   # 2 quests, levels 60-60
+anchor 0 3325.6 -2996.3 164.4
+quest 7621 giver 3325.6 -2996.3 164.4 ender 3325.6 -2996.3 164.4
+req 7621 level 60 classes 16
+reward 7621
+quest 7622 giver 3325.6 -2996.3 164.4 ender 3325.6 -2996.3 164.4
+req 7622 level 60 prev 7621 classes 16
+reward 7622
+
 start W1_-19_-5   # 1 quests, levels 50-50
 anchor 1 -9285.7 -2412.9 9.0
 quest 1560 giver -9285.7 -2412.9 9.0 ender -7056.0 -4812.8 0.8
 req 1560 level 50
 
-start W1_-17_-10   # 5 quests, levels 60-60
+start W1_-17_-10   # 9 quests, levels 60-60
 anchor 1 -8175.7 -4718.3 26.3
 quest 8555 giver -8175.7 -4718.3 26.3 ender -8175.7 -4718.3 26.3
 req 8555 level 60 prev 8519
@@ -3411,6 +4579,18 @@ quest 8752 giver -8175.7 -4718.3 26.3 ender -8175.7 -4718.3 26.3
 req 8752 level 60
 quest 8757 giver -8175.7 -4718.3 26.3 ender -8175.7 -4718.3 26.3
 req 8757 level 60
+quest 9257 giver -8175.7 -4718.3 26.3 ender -8175.7 -4718.3 26.3
+req 9257 level 60 prev 9251 classes 16
+reward 9257
+quest 9269 giver -8175.7 -4718.3 26.3 ender -8175.7 -4718.3 26.3
+req 9269 level 60 prev 9251 classes 1024
+reward 9269
+quest 9270 giver -8175.7 -4718.3 26.3 ender -8175.7 -4718.3 26.3
+req 9270 level 60 prev 9251 classes 128
+reward 9270
+quest 9271 giver -8175.7 -4718.3 26.3 ender -8175.7 -4718.3 26.3
+req 9271 level 60 prev 9251 classes 256
+reward 9271
 
 start W1_-17_2   # 1 quests, levels 60-60
 anchor 1 -8022.5 1115.8 2.8
@@ -3423,8 +4603,17 @@ area 8310 -8021.7 801.3 3.4
 area 8310 -7880.2 820.0 -5.5
 area 8310 -8113.5 770.7 -85.1
 
-start W1_-16_-5   # 3 quests, levels 53-55
+start W1_-16_-5   # 6 quests, levels 52-55
 anchor 1 -7840.3 -2117.3 -254.3
+quest 9052 giver -7840.3 -2117.3 -254.3 ender -7840.3 -2117.3 -254.3
+req 9052 level 52 classes 1024
+reward 9052
+quest 9051 giver -7840.3 -2117.3 -254.3 ender -7840.3 -2117.3 -254.3
+req 9051 level 52 prev 9052 classes 1024
+reward 9051
+quest 9053 giver -7840.3 -2117.3 -254.3 ender -7840.3 -2117.3 -254.3
+req 9053 level 52 prev 9051 classes 1024
+reward 9053
 quest 4291 giver -7840.3 -2117.3 -254.3 ender -7840.3 -2117.3 -254.3
 req 4291 level 53 prev 4290
 hunt 4291 0 2 9683
@@ -3606,8 +4795,8 @@ req 8576 level 60 prev 8575
 quest 8584 giver -6729.7 -4720.5 21.7 ender -7168.3 -3850.3 8.8
 req 8584 level 60 prev 8576
 
-start W1_-14_1   # 30 quests, levels 55-60
-anchor 1 -6821.8 802.8 51.8
+start W1_-14_1   # 57 quests, levels 55-60
+anchor 1 -6840.6 772.3 47.9
 quest 8277 giver -6855.6 739.6 55.1 ender -6855.6 739.6 55.1
 req 8277 level 55
 hunt 8277 0 8 11735
@@ -3656,6 +4845,7 @@ hunt 8304 1 1 15222
 area 8304 -8021.6 1099.5 4.8
 quest 8316 giver -6825.8 807.3 51.9 ender -6825.8 807.3 51.9
 req 8316 level 60 prev 8315 classes 1
+reward 8316
 quest 8318 giver -6836.0 845.5 49.1 ender -6836.0 845.5 49.1
 req 8318 level 60
 hunt 8318 0 10 11804,11880,11881,11882,11883,14479,15201,15213,15308,15541,15542
@@ -3678,18 +4868,106 @@ quest 8351 giver -6844.7 727.6 42.6 ender -6836.0 845.5 49.1
 req 8351 level 60 prev 8341
 quest 8376 giver -6825.8 807.3 51.9 ender -6825.8 807.3 51.9
 req 8376 level 60 prev 8315 classes 2
+reward 8376
 quest 8377 giver -6825.8 807.3 51.9 ender -6825.8 807.3 51.9
 req 8377 level 60 prev 8315 classes 4
+reward 8377
 quest 8378 giver -6825.8 807.3 51.9 ender -6825.8 807.3 51.9
 req 8378 level 60 prev 8315 classes 8
+reward 8378
 quest 8379 giver -6825.8 807.3 51.9 ender -6825.8 807.3 51.9
 req 8379 level 60 prev 8315 classes 16
+reward 8379
 quest 8380 giver -6825.8 807.3 51.9 ender -6825.8 807.3 51.9
 req 8380 level 60 prev 8315 classes 64
+reward 8380
 quest 8381 giver -6825.8 807.3 51.9 ender -6825.8 807.3 51.9
 req 8381 level 60 prev 8315 classes 384
+reward 8381
 quest 8382 giver -6825.8 807.3 51.9 ender -6825.8 807.3 51.9
 req 8382 level 60 prev 8315 classes 1024
+reward 8382
+quest 8556 giver -6844.8 724.5 42.6 ender -6844.8 724.5 42.6
+req 8556 level 60 classes 1
+reward 8556
+quest 8557 giver -6876.7 734.6 45.7 ender -6876.7 734.6 45.7
+req 8557 level 60 classes 1
+reward 8557
+quest 8558 giver -6863.0 756.1 42.6 ender -6863.0 756.1 42.6
+req 8558 level 60 classes 1
+reward 8558
+quest 8689 giver -6876.7 734.6 45.7 ender -6876.7 734.6 45.7
+req 8689 level 60 classes 16
+reward 8689
+quest 8690 giver -6876.7 734.6 45.7 ender -6876.7 734.6 45.7
+req 8690 level 60 classes 64
+reward 8690
+quest 8691 giver -6876.7 734.6 45.7 ender -6876.7 734.6 45.7
+req 8691 level 60 classes 128
+reward 8691
+quest 8692 giver -6876.7 734.6 45.7 ender -6876.7 734.6 45.7
+req 8692 level 60 classes 1024
+reward 8692
+quest 8693 giver -6876.7 734.6 45.7 ender -6876.7 734.6 45.7
+req 8693 level 60 classes 8
+reward 8693
+quest 8694 giver -6876.7 734.6 45.7 ender -6876.7 734.6 45.7
+req 8694 level 60 classes 256
+reward 8694
+quest 8695 giver -6876.7 734.6 45.7 ender -6876.7 734.6 45.7
+req 8695 level 60 classes 2
+reward 8695
+quest 8696 giver -6876.7 734.6 45.7 ender -6876.7 734.6 45.7
+req 8696 level 60 classes 4
+reward 8696
+quest 8697 giver -6844.8 724.5 42.6 ender -6844.8 724.5 42.6
+req 8697 level 60 classes 16
+reward 8697
+quest 8698 giver -6844.8 724.5 42.6 ender -6844.8 724.5 42.6
+req 8698 level 60 classes 64
+reward 8698
+quest 8699 giver -6844.8 724.5 42.6 ender -6844.8 724.5 42.6
+req 8699 level 60 classes 128
+reward 8699
+quest 8700 giver -6844.8 724.5 42.6 ender -6844.8 724.5 42.6
+req 8700 level 60 classes 1024
+reward 8700
+quest 8701 giver -6844.8 724.5 42.6 ender -6844.8 724.5 42.6
+req 8701 level 60 classes 8
+reward 8701
+quest 8702 giver -6844.8 724.5 42.6 ender -6844.8 724.5 42.6
+req 8702 level 60 classes 256
+reward 8702
+quest 8703 giver -6844.8 724.5 42.6 ender -6844.8 724.5 42.6
+req 8703 level 60 classes 2
+reward 8703
+quest 8704 giver -6844.8 724.5 42.6 ender -6844.8 724.5 42.6
+req 8704 level 60 classes 4
+reward 8704
+quest 8705 giver -6863.0 756.1 42.6 ender -6863.0 756.1 42.6
+req 8705 level 60 classes 16
+reward 8705
+quest 8706 giver -6863.0 756.1 42.6 ender -6863.0 756.1 42.6
+req 8706 level 60 classes 64
+reward 8706
+quest 8707 giver -6863.0 756.1 42.6 ender -6863.0 756.1 42.6
+req 8707 level 60 classes 128
+reward 8707
+quest 8708 giver -6863.0 756.1 42.6 ender -6863.0 756.1 42.6
+req 8708 level 60 classes 1024
+reward 8708
+quest 8709 giver -6863.0 756.1 42.6 ender -6863.0 756.1 42.6
+req 8709 level 60 classes 8
+reward 8709
+quest 8710 giver -6863.0 756.1 42.6 ender -6863.0 756.1 42.6
+req 8710 level 60 classes 256
+reward 8710
+quest 8711 giver -6863.0 756.1 42.6 ender -6863.0 756.1 42.6
+req 8711 level 60 classes 2
+reward 8711
+quest 8712 giver -6863.0 756.1 42.6 ender -6863.0 756.1 42.6
+req 8712 level 60 classes 4
+reward 8712
 quest 8800 giver -6802.8 796.5 51.4 ender -6860.9 753.0 42.6
 req 8800 level 60
 quest 9415 giver -6764.5 772.2 89.7 ender -7144.3 1377.8 3.3
@@ -3730,8 +5008,8 @@ area 1175 -6277.3 -4106.3 -58.6
 area 1175 -6034.5 -3953.8 -58.6
 area 1175 -6478.7 -4089.5 -58.6
 
-start W1_-13_-8   # 6 quests, levels 30-41
-anchor 1 -6210.3 -3928.0 -58.7
+start W1_-13_-8   # 8 quests, levels 30-41
+anchor 1 -6204.5 -3915.6 -58.7
 quest 1104 giver -6229.0 -3868.2 -58.7 ender -6229.0 -3868.2 -58.7
 req 1104 level 30
 hunt 1104 0 6 4139,4140,5937
@@ -3750,10 +5028,16 @@ hunt 1176 0 10 4154,4158
 area 1176 -6115.6 -4092.8 -58.6
 area 1176 -6236.8 -4138.1 -58.6
 area 1176 -6041.3 -4138.4 -58.6
+quest 1950 giver -6187.2 -3878.2 -58.7 ender -6187.2 -3878.2 -58.7
+req 1950 level 30 prev 1949 classes 128
+reward 1950
 quest 1186 giver -6192.6 -3961.2 -58.7 ender -6198.8 -3967.8 -58.7
 req 1186 level 37 prev 1183
 quest 1178 giver -6192.6 -3961.2 -58.7 ender -835.6 -3728.7 26.4
 req 1178 level 37 prev 1176
+quest 1951 giver -6187.2 -3878.2 -58.7 ender -4031.6 -3393.0 39.0
+req 1951 level 40 prev 1950 classes 128
+reward 1951
 quest 1191 giver -6226.1 -3944.9 -58.6 ender -6226.1 -3944.9 -58.6
 req 1191 level 41
 
@@ -3923,6 +5207,39 @@ quest 2871 giver -4505.9 3330.3 14.1 ender -4454.4 3351.3 14.9
 req 2871 level 45 prev 2870
 hunt 2871 0 1 8136
 area 2871 -5631.4 3461.0 2.6
+
+start W1_-9_-7   # 10 quests, levels 38-40
+anchor 1 -4031.6 -3393.0 39.0
+quest 1949 giver -4031.6 -3393.0 39.0 ender -6187.2 -3878.2 -58.7
+req 1949 level 38 prev 1947 classes 128
+reward 1949
+quest 1948 giver -4031.6 -3393.0 39.0 ender -4031.6 -3393.0 39.0
+req 1948 level 40 prev 1947 classes 128
+reward 1948
+quest 1954 giver -4031.6 -3393.0 39.0 ender -4031.6 -3393.0 39.0
+req 1954 level 40 prev 1953 classes 128
+reward 1954
+quest 4961 giver -4031.6 -3393.0 39.0 ender -4031.6 -3393.0 39.0
+req 4961 level 40 prev 1799 classes 256
+reward 4961
+quest 1955 giver -4031.6 -3393.0 39.0 ender -4031.6 -3393.0 39.0
+req 1955 level 40 prev 1954 classes 128
+reward 1955
+quest 4976 giver -4031.6 -3393.0 39.0 ender -782.5 -3711.3 41.4
+req 4976 level 40 prev 4961 classes 256
+reward 4976
+quest 1956 giver -4031.6 -3393.0 39.0 ender -4031.6 -3393.0 39.0
+req 1956 level 40 prev 1955 classes 128
+reward 1956
+quest 1952 giver -4031.6 -3393.0 39.0 ender -4031.6 -3393.0 39.0
+req 1952 level 40 prev 1951 classes 128
+reward 1952
+quest 1957 giver -4031.6 -3393.0 39.0 ender -4031.6 -3393.0 39.0
+req 1957 level 40 prev 1956 classes 128
+reward 1957
+quest 1958 giver -4031.6 -3393.0 39.0 ender -4031.6 -3393.0 39.0
+req 1958 level 40 prev 1957 classes 128
+reward 1958
 
 start W1_-9_0   # 18 quests, levels 42-60
 anchor 1 -4359.9 212.9 28.5
@@ -4161,6 +5478,21 @@ area 846 -4046.9 -2287.1 119.3
 area 846 -4053.2 -2355.0 126.2
 area 846 -4117.0 -2312.2 127.7
 
+start W1_-8_-4   # 4 quests, levels 22-23
+anchor 1 -3617.5 -1776.8 135.7
+quest 1535 giver -3617.5 -1776.8 135.7 ender -3617.5 -1776.8 135.7
+req 1535 level 22 prev 1530 classes 64
+reward 1535
+quest 1536 giver -3617.5 -1776.8 135.7 ender -3617.5 -1776.8 135.7
+req 1536 level 22 prev 1535 classes 64
+reward 1536
+quest 1534 giver -3617.5 -1776.8 135.7 ender -3617.5 -1776.8 135.7
+req 1534 level 23 prev 1536 classes 64
+reward 1534
+quest 220 giver -3617.5 -1776.8 135.7 ender -1345.1 -4047.6 6.0
+req 220 level 23 prev 1534 classes 64
+reward 220
+
 start W1_-7_-7   # 1 quests, levels 37-37
 anchor 1 -3317.6 -3125.4 33.0
 quest 1273 giver -3317.6 -3125.4 33.0 ender -3149.2 -2887.0 34.2
@@ -4250,8 +5582,20 @@ req 1270 level 37 races 178
 quest 1324 giver -2896.2 -3349.9 31.4 ender -3757.5 -4462.3 65.1
 req 1324 level 38 prev 1266
 
-start W1_-6_-1   # 6 quests, levels 2-5
-anchor 1 -2897.9 -242.6 53.8
+start W1_-6_-1   # 14 quests, levels 1-10
+anchor 1 -2896.4 -247.3 53.7
+quest 3091 giver -2912.7 -257.5 53.0 ender -2880.4 -213.0 54.9
+req 3091 level 1 prev 747 races 32 classes 1
+reward 3091
+quest 3092 giver -2912.7 -257.5 53.0 ender -2865.4 -225.7 55.0
+req 3092 level 1 prev 747 races 32 classes 4
+reward 3092
+quest 3093 giver -2912.7 -257.5 53.0 ender -2873.9 -264.7 54.0
+req 3093 level 1 prev 747 races 32 classes 64
+reward 3093
+quest 3094 giver -2912.7 -257.5 53.0 ender -2873.6 -268.6 54.1
+req 3094 level 1 prev 747 races 32 classes 1024
+reward 3094
 quest 747 giver -2912.7 -257.5 53.0 ender -2912.7 -257.5 53.0
 req 747 level 2
 hunt 747 0 7 2955
@@ -4269,6 +5613,15 @@ hunt 750 0 10 2961
 area 750 -3137.2 -151.0 44.4
 area 750 -3083.4 -50.6 65.6
 area 750 -3157.2 -85.1 49.5
+quest 1462 giver -2882.3 -250.2 54.0 ender -2882.3 -250.2 54.0
+req 1462 level 4 classes 64
+reward 1462
+quest 1519 giver -2882.3 -250.2 54.0 ender -2882.3 -250.2 54.0
+req 1519 level 4 classes 64
+reward 1519
+quest 1520 giver -2882.3 -250.2 54.0 ender -877.8 -4290.4 72.7
+req 1520 level 4 prev 1519 classes 64
+reward 1520
 quest 780 giver -2912.7 -257.5 53.0 ender -2912.7 -257.5 53.0
 req 780 level 4 prev 750
 hunt 780 0 8 2954,2966
@@ -4280,14 +5633,23 @@ quest 3376 giver -2893.2 -239.6 53.6 ender -2893.2 -239.6 53.6
 req 3376 level 5
 hunt 3376 0 1 8554
 area 3376 -2932.9 -1276.2 72.3
+quest 6066 giver -2865.4 -225.7 55.0 ender -2180.2 -408.8 -4.5
+req 6066 level 10 races 32 classes 4
+reward 6066
 
 start W1_-5_-8   # 1 quests, levels 20-20
 anchor 1 -2101.0 -3656.2 61.8
 quest 898 giver -2101.0 -3656.2 61.8 ender -1024.6 -3688.9 23.2
 req 898 level 20 races 178
 
-start W1_-5_-4   # 18 quests, levels 12-30
-anchor 1 -2374.8 -1908.0 95.8
+start W1_-5_-5   # 1 quests, levels 25-25
+anchor 1 -2252.5 -2373.7 91.8
+quest 1740 giver -2252.5 -2373.7 91.8 ender -2252.5 -2373.7 91.8
+req 1740 level 25 classes 256
+reward 1740
+
+start W1_-5_-4   # 21 quests, levels 12-30
+anchor 1 -2378.3 -1907.2 95.9
 quest 854 giver -2347.4 -1925.3 95.9 ender -473.2 -2595.7 103.8
 req 854 level 12 races 32
 quest 907 giver -2382.8 -1922.7 95.9 ender -2382.8 -1922.7 95.9
@@ -4296,6 +5658,9 @@ hunt 907 0 3 3238,3239,3240
 area 907 -2484.6 -1816.2 93.8
 area 907 -2243.7 -2015.8 92.6
 area 907 -2189.8 -1969.9 92.4
+quest 1824 giver -2402.3 -1904.1 96.8 ender -2402.3 -1904.1 96.8
+req 1824 level 20 classes 1
+reward 1824
 quest 6382 giver -2382.8 -1922.7 95.9 ender 2310.5 -2554.7 101.9
 req 6382 level 20
 quest 913 giver -2382.8 -1922.7 95.9 ender -2382.8 -1922.7 95.9
@@ -4304,6 +5669,9 @@ hunt 913 0 1 3247,3249,3424
 area 913 -2542.1 -2108.5 91.8
 area 913 -2647.5 -1913.9 97.3
 area 913 -2444.3 -2254.6 95.1
+quest 1825 giver -2402.3 -1904.1 96.8 ender -437.6 -3176.3 211.4
+req 1825 level 20 prev 1824 classes 1
+reward 1825
 quest 889 giver -2391.6 -1891.1 95.8 ender -2391.6 -1891.1 95.8
 req 889 level 20 prev 5052
 hunt 889 0 10 3258,3260,3261,3263
@@ -4340,6 +5708,9 @@ hunt 5046 0 4 3258,3260,3261,3263
 area 5046 -2120.7 -1945.9 93.6
 area 5046 -2150.8 -1751.9 91.8
 area 5046 -2102.1 -1791.9 91.8
+quest 1515 giver -2392.2 -1898.8 96.0 ender -1622.8 -1765.3 91.8
+req 1515 level 20 prev 1511 classes 256
+reward 1515
 quest 878 giver -2391.6 -1891.1 95.8 ender -2391.6 -1891.1 95.8
 req 878 level 21
 hunt 878 0 6 3260
@@ -4399,8 +5770,8 @@ req 765 level 12 prev 751
 hunt 765 0 1 3051
 area 765 -1756.3 -1286.4 113.4
 
-start W1_-5_-1   # 14 quests, levels 5-10
-anchor 1 -2325.5 -415.5 -6.9
+start W1_-5_-1   # 22 quests, levels 5-10
+anchor 1 -2296.8 -417.9 -6.6
 quest 748 giver -2341.4 -445.4 -6.4 ender -2341.4 -445.4 -6.4
 req 748 level 5 races 32
 hunt 748 0 6 2958,2959,2960
@@ -4466,6 +5837,30 @@ hunt 861 0 4 3566
 area 861 -2274.7 -1178.5 -2.2
 area 861 -1417.4 -263.7 -7.5
 area 861 -1444.1 -794.4 -22.0
+quest 1505 giver -2348.0 -495.9 -9.0 ender 185.7 -3597.2 27.3
+req 1505 level 10 classes 1
+reward 1505
+quest 2984 giver -2299.0 -437.7 -5.4 ender 265.2 -3037.1 96.9
+req 2984 level 10 classes 64
+reward 2984
+quest 5655 giver -2287.6 -364.4 -9.3 ender 1452.4 -4179.8 44.1
+req 5655 level 10 races 128 classes 16
+reward 5655
+quest 5928 giver -2315.8 -442.6 -5.4 ender -1039.4 -281.6 159.1
+req 5928 level 10 races 32 classes 1024
+reward 5928
+quest 6061 giver -2180.2 -408.8 -4.5 ender -2180.2 -408.8 -4.5
+req 6061 level 10 races 32 classes 4
+reward 6061
+quest 6087 giver -2180.2 -408.8 -4.5 ender -2180.2 -408.8 -4.5
+req 6087 level 10 prev 6061 races 32 classes 4
+reward 6087
+quest 6088 giver -2180.2 -408.8 -4.5 ender -2180.2 -408.8 -4.5
+req 6088 level 10 prev 6087 races 32 classes 4
+reward 6088
+quest 6089 giver -2180.2 -408.8 -4.5 ender -1474.8 -81.4 161.2
+req 6089 level 10 prev 6088 races 32 classes 4
+reward 6089
 quest 759 giver -2341.4 -445.4 -6.4 ender -2341.4 -445.4 -6.4
 req 759 level 10 prev 758 races 32
 hunt 759 0 8 2960
@@ -4474,6 +5869,18 @@ area 759 -2248.1 -1116.2 -3.4
 area 759 -2593.4 -1113.4 -8.9
 quest 760 giver -2341.4 -445.4 -6.4 ender -2341.4 -445.4 -6.4
 req 760 level 10 prev 759
+
+start W1_-4_-9   # 1 quests, levels 30-30
+anchor 1 -1709.1 -4330.1 4.3
+quest 1719 giver -1709.1 -4330.1 4.3 ender -1709.1 -4330.1 4.3
+req 1719 level 30 prev 1718 classes 1
+reward 1719
+
+start W1_-4_-4   # 1 quests, levels 20-20
+anchor 1 -1622.8 -1765.3 91.8
+quest 1512 giver -1622.8 -1765.3 91.8 ender 1850.3 -4357.3 -14.8
+req 1512 level 20 prev 1515 classes 256
+reward 1512
 
 start W1_-4_0   # 1 quests, levels 10-10
 anchor 1 -1508.9 367.2 62.8
@@ -4530,8 +5937,14 @@ area 6143 -415.1 2619.8 -6.5
 area 6143 -346.1 2647.0 -19.8
 area 6143 -265.1 2761.6 -5.2
 
-start W1_-3_-9   # 1 quests, levels 27-27
-anchor 1 -1350.7 -4048.4 6.2
+start W1_-3_-9   # 3 quests, levels 20-27
+anchor 1 -1347.0 -4047.9 6.1
+quest 972 giver -1345.1 -4047.6 6.0 ender -1345.1 -4047.6 6.0
+req 972 level 20 prev 220 classes 64
+reward 972
+quest 1530 giver -1345.1 -4047.6 6.0 ender -3617.5 -1776.8 135.7
+req 1530 level 22 classes 64
+reward 1530
 quest 873 giver -1350.7 -4048.4 6.2 ender -1350.7 -4048.4 6.2
 req 873 level 27 prev 874
 hunt 873 0 1 3476
@@ -4566,24 +5979,51 @@ area 833 -1054.6 -1094.3 30.6
 area 833 -1013.7 -1043.8 17.7
 area 833 -986.0 -1103.2 44.5
 
-start W1_-3_-1   # 10 quests, levels 10-55
-anchor 1 -1177.9 -219.1 159.6
+start W1_-3_-1   # 21 quests, levels 10-55
+anchor 1 -1206.4 -205.3 159.4
 quest 886 giver -1048.7 -304.0 159.1 ender -545.0 -2672.8 95.9
 req 886 level 10
+quest 5922 giver -1039.4 -281.6 159.1 ender 8020.0 -2678.7 524.5
+req 5922 level 10 races 32 classes 1024
+reward 5922
+quest 6065 giver -1464.6 -93.8 159.1 ender -2180.2 -408.8 -4.5
+req 6065 level 10 races 32 classes 4
+reward 6065
+quest 6070 giver -1464.6 -93.8 159.1 ender 275.3 -4704.0 11.7
+req 6070 level 10 races 130 classes 4
+reward 6070
 quest 860 giver -1413.1 -125.6 159.0 ender -482.5 -2670.2 97.5
 req 860 level 10 prev 861
+quest 94913 giver -1039.4 -281.6 159.1 ender 8020.0 -2678.7 524.5
+req 94913 level 10 prev 94911 classes 1024
+reward 94913
+quest 6002 giver -1039.4 -281.6 159.1 ender -1039.4 -281.6 159.1
+req 6002 level 10 prev 5932 races 32 classes 1024
+reward 6002
+quest 6126 giver -1039.4 -281.6 159.1 ender 8020.0 -2678.7 524.5
+req 6126 level 14 races 32 classes 1024
+reward 6126
 quest 776 giver -1209.6 -112.7 163.9 ender -1209.6 -112.7 163.9
 req 776 level 14 prev 775
 hunt 776 0 1 3058
 area 776 -751.4 -674.7 -19.2
+quest 27 giver -1039.4 -281.6 159.1 ender 8020.0 -2678.7 524.5
+req 27 level 16 races 32 classes 1024
+reward 27
 quest 1490 giver -1048.7 -304.0 159.1 ender -1070.0 -272.9 159.1
 req 1490 level 16 prev 1489
 quest 1064 giver -1065.1 -212.4 159.1 ender -995.4 278.6 112.0
 req 1064 level 18 prev 1063
+quest 1823 giver -1458.0 -80.8 159.1 ender -2402.3 -1904.1 96.8
+req 1823 level 20 classes 1
+reward 1823
 quest 1131 giver -1413.1 -125.6 159.0 ender -1413.1 -125.6 159.0
 req 1131 level 30
 hunt 1131 0 1 4548
 area 1131 -4547.2 -1216.3 -56.2
+quest 1718 giver -1458.0 -80.8 159.1 ender -1709.1 -4330.1 4.3
+req 1718 level 30 classes 1
+reward 1718
 quest 1205 giver -1413.1 -125.6 159.0 ender -1413.1 -125.6 159.0
 req 1205 level 45
 hunt 1205 0 1 4841
@@ -4596,11 +6036,20 @@ hunt 3761 0 20 6498,6499,6500,6501,6502,6503,6504,6505,6506,6507,6508,6509,6510,
 area 3761 -6149.9 -1584.6 -198.6
 area 3761 -6217.1 -1321.4 -212.7
 area 3761 -6214.5 -1584.2 -212.2
+quest 8151 giver -1474.8 -81.4 161.2 ender 3900.6 -5427.1 154.5
+req 8151 level 52 classes 4
+reward 8151
+quest 9063 giver -1039.4 -281.6 159.1 ender -7840.3 -2117.3 -254.3
+req 9063 level 52 classes 1024
+reward 9063
 quest 1123 giver -1048.7 -304.0 159.1 ender 7797.4 -2574.3 488.6
 req 1123 level 55
 
-start W1_-3_0   # 10 quests, levels 11-60
-anchor 1 -1199.5 76.4 138.0
+start W1_-3_0   # 13 quests, levels 10-60
+anchor 1 -1213.5 78.7 136.0
+quest 5926 giver -1300.3 38.5 129.3 ender -1039.4 -281.6 159.1
+req 5926 level 10 races 32 classes 1024
+reward 5926
 quest 744 giver -1264.4 123.3 131.7 ender -1264.4 123.3 131.7
 req 744 level 11
 hunt 744 0 6 2964
@@ -4610,6 +6059,12 @@ area 744 -1117.1 350.4 24.1
 area 744 -1247.4 450.7 22.6
 quest 742 giver -1258.9 54.0 127.0 ender 2310.5 -2554.7 101.9
 req 742 level 20
+quest 1844 giver -1239.8 110.6 129.7 ender -1239.8 110.6 129.7
+req 1844 level 30 classes 1
+reward 1844
+quest 1845 giver -1239.8 110.6 129.7 ender -1239.8 110.6 129.7
+req 1845 level 30 prev 1844 classes 1
+reward 1845
 quest 2965 giver -1176.1 157.6 134.8 ender -1070.0 -272.9 159.1
 req 2965 level 50 prev 2440
 quest 3762 giver -1300.3 38.5 129.3 ender -1048.7 -304.0 159.1
@@ -4701,8 +6156,8 @@ anchor 1 -1151.8 2707.1 111.2
 quest 6132 giver -1151.8 2707.1 111.2 ender -1401.4 2083.0 61.9
 req 6132 level 39
 
-start W1_-2_-10   # 5 quests, levels 7-45
-anchor 1 -817.7 -4920.8 20.3
+start W1_-2_-10   # 9 quests, levels 7-45
+anchor 1 -817.8 -4928.3 20.8
 quest 818 giver -814.0 -4920.6 19.4 ender -814.0 -4920.6 19.4
 req 818 level 7
 hunt 818 0 4 3103,3104,3105,3141,6020
@@ -4726,13 +6181,58 @@ hunt 826 2 1 3205
 area 826 -1112.4 -5445.9 10.2
 area 826 -1102.4 -5524.3 11.9
 area 826 -1250.1 -5450.3 5.4
+quest 1884 giver -839.3 -4939.8 21.1 ender -839.3 -4939.8 21.1
+req 1884 level 10 classes 128
+reward 1884
+quest 6069 giver -808.6 -4930.1 23.1 ender 275.3 -4704.0 11.7
+req 6069 level 10 races 130 classes 4
+reward 6069
+quest 1842 giver -811.9 -4940.1 20.6 ender -811.9 -4940.1 20.6
+req 1842 level 30 classes 1
+reward 1842
+quest 1843 giver -811.9 -4940.1 20.6 ender -811.9 -4940.1 20.6
+req 1843 level 30 prev 1842 classes 1
+reward 1843
 quest 2936 giver -825.6 -4920.8 19.7 ender -825.6 -4920.8 19.7
 req 2936 level 45 prev 2935
 
-start W1_-2_-9   # 6 quests, levels 1-5
-anchor 1 -615.8 -4218.0 39.4
+start W1_-2_-9   # 25 quests, levels 1-5
+anchor 1 -632.3 -4207.3 42.6
 quest 4641 giver -607.4 -4251.3 39.0 ender -600.1 -4186.2 41.3
 req 4641 level 1
+quest 2383 giver -600.1 -4186.2 41.3 ender -639.3 -4230.2 38.6
+req 2383 level 1 prev 788 races 2 classes 1
+reward 2383
+quest 3065 giver -600.1 -4186.2 41.3 ender -639.3 -4230.2 38.6
+req 3065 level 1 prev 788 races 128 classes 1
+reward 3065
+quest 3082 giver -600.1 -4186.2 41.3 ender -635.5 -4227.5 38.4
+req 3082 level 1 prev 788 races 128 classes 4
+reward 3082
+quest 3083 giver -600.1 -4186.2 41.3 ender -588.7 -4144.9 41.1
+req 3083 level 1 prev 788 races 128 classes 8
+reward 3083
+quest 3084 giver -600.1 -4186.2 41.3 ender -623.9 -4203.9 38.4
+req 3084 level 1 prev 788 races 128 classes 64
+reward 3084
+quest 3085 giver -600.1 -4186.2 41.3 ender -617.4 -4202.4 38.3
+req 3085 level 1 prev 788 races 128 classes 16
+reward 3085
+quest 3086 giver -600.1 -4186.2 41.3 ender -625.3 -4210.2 38.3
+req 3086 level 1 prev 788 races 128 classes 128
+reward 3086
+quest 3087 giver -600.1 -4186.2 41.3 ender -635.5 -4227.5 38.4
+req 3087 level 1 prev 788 races 2 classes 4
+reward 3087
+quest 3088 giver -600.1 -4186.2 41.3 ender -588.7 -4144.9 41.1
+req 3088 level 1 prev 788 races 2 classes 8
+reward 3088
+quest 3089 giver -600.1 -4186.2 41.3 ender -623.9 -4203.9 38.4
+req 3089 level 1 prev 788 races 2 classes 64
+reward 3089
+quest 3090 giver -600.1 -4186.2 41.3 ender -606.9 -4111.9 43.0
+req 3090 level 1 prev 788 races 2 classes 256
+reward 3090
 quest 788 giver -600.1 -4186.2 41.3 ender -600.1 -4186.2 41.3
 req 788 level 2
 hunt 788 0 10 3098
@@ -4747,10 +6247,31 @@ area 789 -514.9 -4178.2 77.1
 area 789 -680.3 -4145.7 36.1
 quest 792 giver -629.1 -4228.1 38.2 ender -629.1 -4228.1 38.2
 req 792 level 4 classes 1245
-hunt 792 0 12 3101
-area 792 -253.8 -4283.3 59.9
-area 792 -244.7 -4342.8 62.7
-area 792 -218.0 -4417.5 63.5
+reward 792
+quest 1463 giver -630.0 -4204.6 38.2 ender -630.0 -4204.6 38.2
+req 1463 level 4 classes 64
+reward 1463
+quest 1485 giver -624.0 -4214.4 38.2 ender -624.0 -4214.4 38.2
+req 1485 level 4 races 18 classes 256
+reward 1485
+quest 1516 giver -630.0 -4204.6 38.2 ender -630.0 -4204.6 38.2
+req 1516 level 4 classes 64
+reward 1516
+quest 5649 giver -617.4 -4202.4 38.3 ender 294.9 -4831.5 10.6
+req 5649 level 4 races 128 classes 16
+reward 5649
+quest 1499 giver -624.0 -4214.4 38.2 ender -629.1 -4228.1 38.2
+req 1499 level 4 prev 1485 races 18 classes 256
+reward 1499
+quest 1517 giver -630.0 -4204.6 38.2 ender -877.8 -4290.4 72.7
+req 1517 level 4 prev 1516 classes 64
+reward 1517
+quest 1518 giver -877.8 -4290.4 72.7 ender -630.0 -4204.6 38.2
+req 1518 level 4 prev 1517 classes 64
+reward 1518
+quest 1521 giver -877.8 -4290.4 72.7 ender -2882.3 -250.2 54.0
+req 1521 level 4 prev 1520 classes 64
+reward 1521
 quest 794 giver -629.1 -4228.1 38.2 ender -629.1 -4228.1 38.2
 req 794 level 5
 hunt 794 0 1 3183
@@ -4758,8 +6279,8 @@ area 794 -58.4 -4220.2 62.4
 quest 805 giver -629.1 -4228.1 38.2 ender -825.6 -4920.8 19.7
 req 805 level 5 prev 794
 
-start W1_-2_-8   # 9 quests, levels 14-27
-anchor 1 -930.4 -3731.3 10.7
+start W1_-2_-8   # 21 quests, levels 14-40
+anchor 1 -847.9 -3724.6 27.1
 quest 887 giver -835.6 -3728.7 26.4 ender -835.6 -3728.7 26.4
 req 887 level 14
 hunt 887 0 12 3381
@@ -4797,6 +6318,9 @@ hunt 1491 0 6 3638,3640,5763
 area 1491 -674.5 -2371.8 24.1
 area 1491 -556.1 -2315.6 29.8
 area 1491 -682.4 -2232.4 17.4
+quest 2381 giver -841.1 -3767.8 18.0 ender -841.1 -3767.8 18.0
+req 2381 level 18 prev 2382 races 178 classes 8
+reward 2381
 quest 1483 giver -902.0 -3759.4 11.6 ender 878.3 365.2 23.3
 req 1483 level 21
 quest 822 giver -981.2 -3686.5 9.5 ender -981.2 -3686.5 9.5
@@ -4809,11 +6333,50 @@ area 822 -1178.7 -3469.6 92.1
 area 822 -1084.8 -3037.2 93.3
 quest 1095 giver -902.0 -3759.4 11.6 ender 878.3 365.2 23.3
 req 1095 level 27 prev 1094
+quest 1795 giver -785.9 -3723.3 40.5 ender -785.9 -3723.3 40.5
+req 1795 level 30 prev 1805 classes 256
+reward 1795
+quest 1796 giver -782.5 -3711.3 41.4 ender -782.5 -3711.3 41.4
+req 1796 level 31 classes 256
+reward 1796
+quest 4783 giver -782.5 -3711.3 41.4 ender -782.5 -3711.3 41.4
+req 4783 level 37 prev 4782 classes 256
+reward 4783
+quest 4784 giver -782.5 -3711.3 41.4 ender -782.5 -3711.3 41.4
+req 4784 level 37 prev 4783 classes 256
+reward 4784
+quest 4786 giver -782.5 -3711.3 41.4 ender -782.5 -3711.3 41.4
+req 4786 level 38 prev 4784 classes 256
+reward 4786
+quest 1799 giver -782.5 -3711.3 41.4 ender -4031.6 -3393.0 39.0
+req 1799 level 40 classes 256
+reward 1799
+quest 4490 giver -785.9 -3723.3 40.5 ender -785.9 -3723.3 40.5
+req 4490 level 40 classes 256
+reward 4490
+quest 4962 giver -772.7 -3724.9 42.6 ender -782.5 -3711.3 41.4
+req 4962 level 40 classes 256
+reward 4962
+quest 4963 giver -767.7 -3716.6 42.5 ender -782.5 -3711.3 41.4
+req 4963 level 40 classes 256
+reward 4963
+quest 4964 giver -782.5 -3711.3 41.4 ender -782.5 -3711.3 41.4
+req 4964 level 40 prev 4962 classes 256
+reward 4964
+quest 4975 giver -782.5 -3711.3 41.4 ender -782.5 -3711.3 41.4
+req 4975 level 40 prev 4963 classes 256
+reward 4975
 
-start W1_-2_-6   # 5 quests, levels 13-20
-anchor 1 -535.4 -2660.2 95.9
+start W1_-2_-6   # 8 quests, levels 13-26
+anchor 1 -537.0 -2664.2 95.9
 quest 870 giver -545.0 -2672.8 95.9 ender -545.0 -2672.8 95.9
 req 870 level 13
+quest 6128 giver -545.0 -2672.8 95.9 ender -545.0 -2672.8 95.9
+req 6128 level 14 prev 6127 races 32 classes 1024
+reward 6128
+quest 6129 giver -545.0 -2672.8 95.9 ender 8020.0 -2678.7 524.5
+req 6129 level 14 prev 6128 races 32 classes 1024
+reward 6129
 quest 880 giver -545.0 -2672.8 95.9 ender -545.0 -2672.8 95.9
 req 880 level 16 prev 877
 hunt 880 0 8 3461
@@ -4832,6 +6395,9 @@ quest 4921 giver -521.0 -2641.4 95.9 ender -521.0 -2641.4 95.9
 req 4921 level 20
 hunt 4921 0 1 10668
 area 4921 -1787.2 -2375.8 91.8
+quest 1946 giver -529.4 -2667.1 95.9 ender -529.4 -2667.1 95.9
+req 1946 level 26 prev 1945 classes 128
+reward 1946
 
 start W1_-2_-5   # 1 quests, levels 17-17
 anchor 1 -796.8 -2037.1 96.8
@@ -4847,12 +6413,39 @@ anchor 1 -992.7 -1109.1 44.5
 quest 775 giver -992.7 -1109.1 44.5 ender -1209.6 -112.7 163.9
 req 775 level 10 prev 773
 
-start W1_-2_0   # 3 quests, levels 13-46
-anchor 1 -867.4 317.9 132.1
+start W1_-2_0   # 12 quests, levels 10-46
+anchor 1 -920.5 282.9 124.2
+quest 1523 giver -992.7 254.1 138.1 ender 265.2 -3037.1 96.9
+req 1523 level 10 classes 64
+reward 1523
+quest 1883 giver -995.9 253.9 101.8 ender -839.3 -4939.8 21.1
+req 1883 level 10 classes 128
+reward 1883
+quest 5656 giver -956.2 252.4 97.9 ender 1452.4 -4179.8 44.1
+req 5656 level 10 races 128 classes 16
+reward 5656
+quest 94911 giver -659.4 423.4 187.2 ender -1039.4 -281.6 159.1
+req 94911 level 10 classes 1024
+reward 94911
 quest 95350 giver -658.0 426.6 187.2 ender 1920.1 -4125.7 43.0
 req 95350 level 13 prev 95349
+quest 1529 giver -992.7 254.1 138.1 ender -1345.1 -4047.6 6.0
+req 1529 level 20 classes 64
+reward 1529
+quest 5642 giver -956.2 252.4 97.9 ender 1452.4 -4179.8 44.1
+req 5642 level 20 races 128 classes 16
+reward 5642
 quest 1086 giver -995.4 278.6 112.0 ender -995.4 278.6 112.0
 req 1086 level 23 prev 1067
+quest 1532 giver -992.7 254.1 138.1 ender -5217.6 -2789.0 -7.4
+req 1532 level 30 classes 64
+reward 1532
+quest 1947 giver -948.7 248.4 97.2 ender -4031.6 -3393.0 39.0
+req 1947 level 38 classes 128
+reward 1947
+quest 1953 giver -948.7 248.4 97.2 ender -4031.6 -3393.0 39.0
+req 1953 level 40 classes 128
+reward 1953
 quest 2861 giver -948.7 248.4 97.2 ender -4031.6 -3393.0 39.0
 req 2861 level 46
 
@@ -4865,17 +6458,41 @@ area 7028 -1359.6 2624.1 79.3
 area 7028 -1367.5 2863.5 77.0
 area 7028 -1254.5 2910.1 73.3
 
-start W1_-1_-9   # 2 quests, levels 5-5
-anchor 1 -397.8 -4109.0 50.3
+start W1_-1_-9   # 4 quests, levels 5-13
+anchor 1 -333.9 -4054.9 109.3
 quest 790 giver -397.8 -4109.0 50.3 ender -397.8 -4109.0 50.3
 req 790 level 5
 hunt 790 0 1 3281
 area 790 -547.3 -4103.9 70.1
 quest 804 giver -397.8 -4109.0 50.3 ender -600.1 -4186.2 41.3
 req 804 level 5 prev 790
+quest 1525 giver -270.0 -4000.9 168.2 ender -270.0 -4000.9 168.2
+req 1525 level 12 prev 1524 classes 64
+reward 1525
+quest 1464 giver -270.0 -4000.9 168.2 ender -270.0 -4000.9 168.2
+req 1464 level 13 classes 64
+reward 1464
 
-start W1_-1_-6   # 12 quests, levels 12-35
-anchor 1 -466.6 -2623.5 106.7
+start W1_-1_-7   # 5 quests, levels 10-30
+anchor 1 -437.6 -3176.3 211.4
+quest 1503 giver -437.6 -3176.3 211.4 ender -437.6 -3176.3 211.4
+req 1503 level 10 prev 1502 classes 1
+reward 1503
+quest 1838 giver -437.6 -3176.3 211.4 ender -437.6 -3176.3 211.4
+req 1838 level 30 prev 1825 classes 1
+reward 1838
+quest 1839 giver -437.6 -3176.3 211.4 ender -811.9 -4940.1 20.6
+req 1839 level 30 prev 1838 classes 1
+reward 1839
+quest 1840 giver -437.6 -3176.3 211.4 ender -1239.8 110.6 129.7
+req 1840 level 30 prev 1838 classes 1
+reward 1840
+quest 1848 giver -437.6 -3176.3 211.4 ender -437.6 -3176.3 211.4
+req 1848 level 30 prev 1838 classes 1
+reward 1848
+
+start W1_-1_-6   # 13 quests, levels 12-35
+anchor 1 -464.3 -2624.7 105.9
 quest 844 giver -482.5 -2670.2 97.5 ender -482.5 -2670.2 97.5
 req 844 level 12
 hunt 844 0 7 3244,3245,3246
@@ -4936,6 +6553,9 @@ quest 876 giver -474.9 -2607.7 127.9 ender -474.9 -2607.7 127.9
 req 876 level 20 prev 875
 hunt 876 0 1 3452
 area 876 790.4 -1345.8 90.6
+quest 1510 giver -436.0 -2639.2 96.4 ender -180.9 -331.1 9.8
+req 1510 level 20 prev 1509 classes 256
+reward 1510
 quest 1184 giver -389.3 -2552.1 99.0 ender 1953.6 -4735.8 48.5
 req 1184 level 35 prev 1148
 
@@ -4991,8 +6611,8 @@ hunt 1068 1 1 4074
 area 1068 1222.3 199.1 5.5
 area 1068 1406.6 113.6 16.3
 
-start W1_-1_-1   # 3 quests, levels 19-26
-anchor 1 -207.8 -319.5 12.0
+start W1_-1_-1   # 4 quests, levels 19-26
+anchor 1 -201.0 -322.4 11.4
 quest 6461 giver -177.6 -233.3 8.9 ender -177.6 -233.3 8.9
 req 6461 level 19
 hunt 6461 0 10 4005
@@ -5002,6 +6622,9 @@ area 6461 -88.2 54.3 49.4
 area 6461 59.8 -41.8 24.6
 quest 6542 giver -173.3 -331.2 9.8 ender 1246.3 -2253.3 108.4
 req 6542 level 19
+quest 1511 giver -180.9 -331.1 9.8 ender -2392.2 -1898.8 96.0
+req 1511 level 20 prev 1510 classes 256
+reward 1511
 quest 1058 giver -272.5 -394.1 17.2 ender -272.5 -394.1 17.2
 req 1058 level 26
 hunt 1058 0 5 4020
@@ -5028,8 +6651,11 @@ req 5741 level 33
 hunt 5741 0 1 13019
 area 5741 -451.8 1753.1 153.6
 
-start W1_0_-10   # 5 quests, levels 7-12
-anchor 1 301.8 -4693.7 27.5
+start W1_0_-10   # 17 quests, levels 4-20
+anchor 1 292.9 -4740.6 16.8
+quest 5648 giver 294.9 -4831.5 10.6 ender 294.9 -4831.5 10.6
+req 5648 level 4 races 128 classes 16
+reward 5648
 quest 784 giver 275.0 -4709.3 17.6 ender 275.0 -4709.3 17.6
 req 784 level 7
 hunt 784 0 10 3128
@@ -5053,12 +6679,60 @@ hunt 837 3 4 3114
 area 837 128.8 -4583.5 63.6
 area 837 83.0 -4643.3 37.5
 area 837 18.2 -4617.2 44.7
+quest 1506 giver 352.9 -4837.4 10.9 ender 1850.3 -4357.3 -14.8
+req 1506 level 10 classes 256
+reward 1506
+quest 1859 giver 268.1 -4710.9 17.6 ender 1772.9 -4279.9 8.0
+req 1859 level 10 races 130 classes 8
+reward 1859
+quest 2983 giver 307.1 -4839.9 10.6 ender 265.2 -3037.1 96.9
+req 2983 level 10 classes 64
+reward 2983
+quest 5654 giver 294.9 -4831.5 10.6 ender 1452.4 -4179.8 44.1
+req 5654 level 10 races 128 classes 16
+reward 5654
+quest 6062 giver 275.3 -4704.0 11.7 ender 275.3 -4704.0 11.7
+req 6062 level 10 races 130 classes 4
+reward 6062
+quest 6067 giver 275.3 -4704.0 11.7 ender -2180.2 -408.8 -4.5
+req 6067 level 10 races 32 classes 4
+reward 6067
+quest 6083 giver 275.3 -4704.0 11.7 ender 275.3 -4704.0 11.7
+req 6083 level 10 prev 6062 races 130 classes 4
+reward 6083
+quest 6082 giver 275.3 -4704.0 11.7 ender 275.3 -4704.0 11.7
+req 6082 level 10 prev 6083 races 130 classes 4
+reward 6082
+quest 6081 giver 275.3 -4704.0 11.7 ender 2100.6 -4607.0 58.8
+req 6081 level 10 prev 6082 races 130 classes 4
+reward 6081
 quest 806 giver 287.3 -4724.9 13.2 ender 287.3 -4724.9 13.2
 req 806 level 12 prev 823
 hunt 806 0 1 3203
 area 806 868.7 -4189.3 -14.0
 quest 828 giver 287.3 -4724.9 13.2 ender 1102.1 -4945.4 15.7
 req 828 level 12 prev 806
+quest 2380 giver 268.1 -4710.9 17.6 ender 1771.2 -4284.4 7.8
+req 2380 level 16 classes 8
+reward 2380
+quest 2985 giver 307.1 -4839.9 10.6 ender -1345.1 -4047.6 6.0
+req 2985 level 20 classes 64
+reward 2985
+
+start W1_0_-8   # 2 quests, levels 10-10
+anchor 1 185.7 -3597.2 27.3
+quest 1498 giver 185.7 -3597.2 27.3 ender 185.7 -3597.2 27.3
+req 1498 level 10 classes 1
+reward 1498
+quest 1502 giver 185.7 -3597.2 27.3 ender -437.6 -3176.3 211.4
+req 1502 level 10 prev 1498 classes 1
+reward 1502
+
+start W1_0_-7   # 1 quests, levels 11-11
+anchor 1 265.2 -3037.1 96.9
+quest 1524 giver 265.2 -3037.1 96.9 ender -270.0 -4000.9 168.2
+req 1524 level 11 classes 64
+reward 1524
 
 start W1_0_-1   # 1 quests, levels 18-18
 anchor 1 129.7 -342.5 3.7
@@ -5220,8 +6894,20 @@ area 827 927.6 -4745.3 20.7
 area 827 858.9 -4786.1 37.0
 area 827 881.0 -4705.7 28.9
 
-start W1_2_-9   # 6 quests, levels 42-60
-anchor 1 1454.2 -4212.8 43.5
+start W1_2_-9   # 10 quests, levels 10-60
+anchor 1 1456.6 -4207.6 43.6
+quest 5652 giver 1452.4 -4179.8 44.1 ender 1452.4 -4179.8 44.1
+req 5652 level 10 races 128 classes 16
+reward 5652
+quest 5680 giver 1452.4 -4179.8 44.1 ender 1452.4 -4179.8 44.1
+req 5680 level 20 races 128 classes 16
+reward 5680
+quest 1944 giver 1468.2 -4219.9 43.0 ender 1468.2 -4219.9 43.0
+req 1944 level 26 classes 128
+reward 1944
+quest 1945 giver 1468.2 -4219.9 43.0 ender -529.4 -2667.1 95.9
+req 1945 level 26 prev 1944 classes 128
+reward 1945
 quest 7068 giver 1466.9 -4229.9 43.0 ender 1466.9 -4229.9 43.0
 req 7068 level 42
 hunt 7068 0 10 11777,11778,11779
@@ -5267,6 +6953,12 @@ hunt 858 0 1 3445
 area 858 1032.8 -3078.8 105.1
 quest 863 giver 1109.2 -3104.1 82.4 ender -902.0 -3759.4 11.6
 req 863 level 18 prev 858
+
+start W1_2_-6   # 1 quests, levels 24-24
+anchor 1 1236.8 -2994.6 91.8
+quest 2478 giver 1236.8 -2994.6 91.8 ender 1771.2 -4284.4 7.8
+req 2478 level 24 prev 2458 classes 8
+reward 2478
 
 start W1_2_-5   # 4 quests, levels 29-60
 anchor 1 1096.5 -2141.6 119.4
@@ -5332,8 +7024,8 @@ area 7832 3295.0 -6018.0 -9.4
 area 7832 3421.2 -6003.9 -14.7
 area 7832 3155.4 -6293.9 -16.9
 
-start W1_3_-9   # 24 quests, levels 1-60
-anchor 1 1817.7 -4259.8 31.4
+start W1_3_-9   # 73 quests, levels 1-60
+anchor 1 1858.6 -4241.5 28.2
 quest 787 giver 1905.8 -4161.4 41.0 ender -600.1 -4186.2 41.3
 req 787 level 1
 quest 813 giver 1772.7 -4343.2 -7.8 ender 1772.7 -4343.2 -7.8
@@ -5342,6 +7034,18 @@ hunt 813 0 4 3127,3226,5823
 area 813 1218.2 -4293.1 21.4
 area 813 1310.7 -4679.1 21.7
 area 813 1390.5 -4783.1 26.5
+quest 1522 giver 1921.0 -4213.0 42.2 ender 265.2 -3037.1 96.9
+req 1522 level 10 classes 64
+reward 1522
+quest 5927 giver 1634.0 -4439.4 15.5 ender -1039.4 -281.6 159.1
+req 5927 level 10 races 32 classes 1024
+reward 5927
+quest 1501 giver 1850.3 -4357.3 -14.8 ender 1850.3 -4357.3 -14.8
+req 1501 level 11 classes 256
+reward 1501
+quest 1504 giver 1850.3 -4357.3 -14.8 ender 1850.3 -4357.3 -14.8
+req 1504 level 11 prev 1501 classes 256
+reward 1504
 quest 5726 giver 1920.1 -4125.7 43.0 ender 1920.1 -4125.7 43.0
 req 5726 level 12
 hunt 5726 0 1 3197,3198
@@ -5352,20 +7056,68 @@ quest 5727 giver 1920.1 -4125.7 43.0 ender 1920.1 -4125.7 43.0
 req 5727 level 12 prev 5726
 quest 809 giver 1800.7 -4374.5 -17.3 ender 256.3 -3693.9 26.5
 req 809 level 13 prev 829
+quest 1963 giver 1772.9 -4279.9 8.0 ender 1772.9 -4279.9 8.0
+req 1963 level 13 races 130 classes 8
+reward 1963
+quest 1858 giver 1772.9 -4279.9 8.0 ender 1772.9 -4279.9 8.0
+req 1858 level 13 prev 1963 races 130 classes 8
+reward 1858
 quest 98024 giver 1920.1 -4125.7 43.0 ender -473.2 -2595.7 103.8
 req 98024 level 13 prev 95350
 quest 5729 giver 1920.1 -4125.7 43.0 ender 1800.7 -4374.5 -17.3
 req 5729 level 15 prev 5728
 quest 97246 giver 1598.6 -4460.2 36.7 ender 1775.1 -4482.9 45.5
 req 97246 level 15
+quest 2379 giver 1771.2 -4284.4 7.8 ender 1778.5 -4279.9 7.6
+req 2379 level 16 classes 8
+reward 2379
+quest 2382 giver 1778.5 -4279.9 7.6 ender -841.1 -3767.8 18.0
+req 2382 level 16 prev 2379 classes 8
+reward 2382
 quest 5730 giver 1800.7 -4374.5 -17.3 ender 1920.1 -4125.7 43.0
 req 5730 level 16 prev 5729
 quest 1061 giver 1914.7 -4226.6 42.2 ender -270.9 -950.3 14.3
 req 1061 level 17
 quest 235 giver 1569.0 -4207.4 43.4 ender 2310.5 -2554.7 101.9
 req 235 level 20
+quest 1507 giver 1850.3 -4357.3 -14.8 ender 1839.5 -4340.7 -15.4
+req 1507 level 20 classes 256
+reward 1507
+quest 1528 giver 1921.0 -4213.0 42.2 ender -1345.1 -4047.6 6.0
+req 1528 level 20 classes 64
+reward 1528
+quest 2460 giver 1771.2 -4284.4 7.8 ender 1771.2 -4284.4 7.8
+req 2460 level 20 classes 8
+reward 2460
+quest 1508 giver 1839.5 -4340.7 -15.4 ender 1717.8 -4200.1 51.7
+req 1508 level 20 prev 1507 classes 256
+reward 1508
+quest 2458 giver 1771.2 -4284.4 7.8 ender 1236.8 -2994.6 91.8
+req 2458 level 20 prev 2460 classes 8
+reward 2458
+quest 1509 giver 1717.8 -4200.1 51.7 ender -436.0 -2639.2 96.4
+req 1509 level 20 prev 1508 classes 256
+reward 1509
+quest 1513 giver 1850.3 -4357.3 -14.8 ender 1850.3 -4357.3 -14.8
+req 1513 level 20 prev 1512 classes 256
+reward 1513
 quest 1431 giver 1844.5 -4400.1 4.7 ender 1781.5 -3997.1 53.2
 req 1431 level 30
+quest 1531 giver 1921.0 -4213.0 42.2 ender -5217.6 -2789.0 -7.4
+req 1531 level 30 classes 64
+reward 1531
+quest 2996 giver 1850.3 -4357.3 -14.8 ender -785.9 -3723.3 40.5
+req 2996 level 30 classes 256
+reward 2996
+quest 4737 giver 1849.0 -4360.4 -14.8 ender -782.5 -3711.3 41.4
+req 4737 level 31 classes 256
+reward 4737
+quest 4967 giver 1849.0 -4360.4 -14.8 ender -782.5 -3711.3 41.4
+req 4967 level 35 classes 256
+reward 4967
+quest 3631 giver 1849.0 -4360.4 -14.8 ender -785.9 -3723.3 40.5
+req 3631 level 40 classes 256
+reward 3631
 quest 7541 giver 1914.7 -4226.6 42.2 ender 1914.7 -4226.6 42.2
 req 7541 level 40 prev 1262
 quest 936 giver 1634.0 -4439.4 15.5 ender -1048.7 -304.0 159.1
@@ -5388,12 +7140,99 @@ quest 6566 giver 1920.1 -4125.7 43.0 ender 1920.1 -4125.7 43.0
 req 6566 level 60 prev 4974
 quest 7491 giver 1920.1 -4125.7 43.0 ender 1568.0 -4405.9 8.1
 req 7491 level 60 prev 7490
+quest 7667 giver 1937.8 -4222.8 42.2 ender 1937.8 -4222.8 42.2
+req 7667 level 60 classes 64
+reward 7667
+quest 7668 giver 1937.8 -4222.8 42.2 ender 1937.8 -4222.8 42.2
+req 7668 level 60 classes 64
+reward 7668
 quest 7784 giver 1920.1 -4125.7 43.0 ender 1565.8 -4395.3 7.0
 req 7784 level 60 prev 7783
+quest 8913 giver 1915.7 -4170.8 41.0 ender 1915.7 -4170.8 41.0
+req 8913 level 60 races 178 classes 1024
+reward 8913
+quest 8914 giver 1915.7 -4170.8 41.0 ender 1915.7 -4170.8 41.0
+req 8914 level 60 races 178 classes 4
+reward 8914
+quest 8915 giver 1915.7 -4170.8 41.0 ender 1915.7 -4170.8 41.0
+req 8915 level 60 races 178 classes 128
+reward 8915
+quest 8916 giver 1915.7 -4170.8 41.0 ender 1915.7 -4170.8 41.0
+req 8916 level 60 races 178 classes 16
+reward 8916
+quest 8917 giver 1915.7 -4170.8 41.0 ender 1915.7 -4170.8 41.0
+req 8917 level 60 races 178 classes 8
+reward 8917
+quest 8918 giver 1915.7 -4170.8 41.0 ender 1915.7 -4170.8 41.0
+req 8918 level 60 races 178 classes 64
+reward 8918
+quest 8919 giver 1915.7 -4170.8 41.0 ender 1915.7 -4170.8 41.0
+req 8919 level 60 races 178 classes 256
+reward 8919
+quest 8920 giver 1915.7 -4170.8 41.0 ender 1915.7 -4170.8 41.0
+req 8920 level 60 races 178 classes 1
+reward 8920
+quest 8927 giver 1915.7 -4170.8 41.0 ender 1915.7 -4170.8 41.0
+req 8927 level 60 prev 8978 classes 1024
+reward 8927
+quest 8938 giver 1915.7 -4170.8 41.0 ender 1915.7 -4170.8 41.0
+req 8938 level 60 prev 8978 races 255 classes 4
+reward 8938
+quest 8939 giver 1915.7 -4170.8 41.0 ender 1915.7 -4170.8 41.0
+req 8939 level 60 prev 8978 classes 128
+reward 8939
+quest 8940 giver 1915.7 -4170.8 41.0 ender 1915.7 -4170.8 41.0
+req 8940 level 60 prev 8978 races 255 classes 16
+reward 8940
+quest 8941 giver 1915.7 -4170.8 41.0 ender 1915.7 -4170.8 41.0
+req 8941 level 60 prev 8978 races 255 classes 8
+reward 8941
+quest 8942 giver 1915.7 -4170.8 41.0 ender 1915.7 -4170.8 41.0
+req 8942 level 60 prev 8978 races 178 classes 64
+reward 8942
+quest 8943 giver 1915.7 -4170.8 41.0 ender 1915.7 -4170.8 41.0
+req 8943 level 60 prev 8978 classes 256
+reward 8943
+quest 8944 giver 1915.7 -4170.8 41.0 ender 1915.7 -4170.8 41.0
+req 8944 level 60 prev 8978 races 255 classes 1
+reward 8944
+quest 9007 giver 1915.7 -4170.8 41.0 ender 1915.7 -4170.8 41.0
+req 9007 level 60 prev 8998 races 178 classes 1024
+reward 9007
+quest 9008 giver 1915.7 -4170.8 41.0 ender 1915.7 -4170.8 41.0
+req 9008 level 60 prev 8998 races 255 classes 4
+reward 9008
+quest 9009 giver 1915.7 -4170.8 41.0 ender 1915.7 -4170.8 41.0
+req 9009 level 60 prev 8998 races 178 classes 16
+reward 9009
+quest 9010 giver 1915.7 -4170.8 41.0 ender 1915.7 -4170.8 41.0
+req 9010 level 60 prev 8998 races 255 classes 8
+reward 9010
+quest 9011 giver 1915.7 -4170.8 41.0 ender 1915.7 -4170.8 41.0
+req 9011 level 60 prev 8998 races 255 classes 64
+reward 9011
+quest 9012 giver 1915.7 -4170.8 41.0 ender 1915.7 -4170.8 41.0
+req 9012 level 60 prev 8998 races 255 classes 256
+reward 9012
+quest 9013 giver 1915.7 -4170.8 41.0 ender 1915.7 -4170.8 41.0
+req 9013 level 60 prev 8998 races 255 classes 1
+reward 9013
+quest 9014 giver 1915.7 -4170.8 41.0 ender 1915.7 -4170.8 41.0
+req 9014 level 60 prev 8998 races 178 classes 128
+reward 9014
 quest 6567 giver 1920.1 -4125.7 43.0 ender 248.3 1834.8 86.2
 req 6567 level 60 prev 6566
 quest 7493 giver 1568.0 -4405.9 8.1 ender 1568.0 -4405.9 8.1
 req 7493 level 60 prev 7491
+quest 8258 giver 1937.8 -4222.8 42.2 ender 1937.8 -4222.8 42.2
+req 8258 level 60 prev 7667 classes 64
+reward 8258
+quest 8259 giver 1937.8 -4222.8 42.2 ender 1937.8 -4222.8 42.2
+req 8259 level 60 prev 7668 classes 64
+reward 8259
+quest 7669 giver 1937.8 -4222.8 42.2 ender 1937.8 -4222.8 42.2
+req 7669 level 60 prev 8258 classes 64
+reward 7669
 
 start W1_3_-8   # 1 quests, levels 30-30
 anchor 1 1781.5 -3997.1 53.2
@@ -5419,6 +7258,12 @@ start W1_4_-12   # 1 quests, levels 57-57
 anchor 1 2373.6 -5968.0 10.5
 quest 3382 giver 2373.6 -5968.0 10.5 ender 2373.6 -5968.0 10.5
 req 3382 level 57
+
+start W1_4_-10   # 1 quests, levels 10-10
+anchor 1 2107.3 -4633.8 58.7
+quest 6068 giver 2107.3 -4633.8 58.7 ender 275.3 -4704.0 11.7
+req 6068 level 10 races 130 classes 4
+reward 6068
 
 start W1_4_-6   # 5 quests, levels 20-30
 anchor 1 2332.8 -2543.8 103.2
@@ -5659,18 +7504,57 @@ hunt 3510 1 1 6140
 hunt 3510 2 1 6140
 area 3510 3827.2 -6153.9 4.5
 
-start W1_7_-10   # 3 quests, levels 48-55
-anchor 1 3691.0 -4674.9 156.5
+start W1_7_-11   # 6 quests, levels 52-52
+anchor 1 3900.6 -5427.1 154.5
+quest 8255 giver 3900.6 -5427.1 154.5 ender 3900.6 -5427.1 154.5
+req 8255 level 52 prev 8254 classes 16
+reward 8255
+quest 8153 giver 3900.6 -5427.1 154.5 ender 3900.6 -5427.1 154.5
+req 8153 level 52 prev 8151 classes 4
+reward 8153
+quest 8256 giver 3900.6 -5427.1 154.5 ender 3900.6 -5427.1 154.5
+req 8256 level 52 prev 8255 classes 16
+reward 8256
+quest 8231 giver 3900.6 -5427.1 154.5 ender 3900.6 -5427.1 154.5
+req 8231 level 52 prev 8153 classes 4
+reward 8231
+quest 8257 giver 3900.6 -5427.1 154.5 ender 3985.8 -1303.0 251.2
+req 8257 level 52 prev 8256 classes 16
+reward 8257
+quest 8232 giver 3900.6 -5427.1 154.5 ender 3900.6 -5427.1 154.5
+req 8232 level 52 prev 8231 classes 4
+reward 8232
+
+start W1_7_-10   # 9 quests, levels 48-60
+anchor 1 3885.1 -4731.8 255.4
 quest 3381 giver 3648.0 -4702.7 121.1 ender 3648.0 -4702.7 121.1
 req 3381 level 48
 hunt 3381 0 2 6375,6377,6378,6379,6380
 area 3381 3509.8 -4347.6 126.1
 area 3381 3850.8 -5053.9 132.0
 area 3381 3409.1 -4350.1 115.1
+quest 8235 giver 3982.1 -4760.2 304.8 ender 3982.1 -4760.2 304.8
+req 8235 level 52 prev 8234 classes 8
+reward 8235
+quest 8251 giver 3982.1 -4760.2 304.8 ender 3982.1 -4760.2 304.8
+req 8251 level 52 prev 8250 classes 128
+reward 8251
+quest 8252 giver 3982.1 -4760.2 304.8 ender 3982.1 -4760.2 304.8
+req 8252 level 52 prev 8251 classes 128
+reward 8252
+quest 8253 giver 3982.1 -4760.2 304.8 ender 3982.1 -4760.2 304.8
+req 8253 level 52 prev 8252 classes 128
+reward 8253
 quest 3421 giver 3777.1 -4619.2 227.4 ender 3777.1 -4619.2 227.4
 req 3421 level 55
 quest 3503 giver 3648.0 -4702.7 121.1 ender 3648.0 -4702.7 121.1
 req 3503 level 55
+quest 9362 giver 3982.1 -4760.2 304.8 ender 3982.1 -4760.2 304.8
+req 9362 level 60 classes 128
+reward 9362
+quest 9364 giver 3982.1 -4760.2 304.8 ender 3982.1 -4760.2 304.8
+req 9364 level 60 prev 9362 classes 128
+reward 9364
 
 start W1_7_-3   # 12 quests, levels 48-58
 anchor 1 3903.3 -1277.6 232.2
@@ -5821,8 +7705,29 @@ anchor 1 5041.9 -4851.2 870.6
 quest 5126 giver 5041.9 -4851.2 870.6 ender 5041.9 -4851.2 870.6
 req 5126 level 60
 
-start W1_10_-1   # 7 quests, levels 51-59
-anchor 1 5097.8 -363.6 352.1
+start W1_10_-2   # 6 quests, levels 50-55
+anchor 1 5408.6 -736.8 344.3
+quest 7601 giver 5413.9 -737.7 344.6 ender 5407.6 -736.6 344.2
+req 7601 level 50 classes 256
+reward 7601
+quest 8420 giver 5407.6 -736.6 344.2 ender 5407.6 -736.6 344.2
+req 8420 level 52 classes 256
+reward 8420
+quest 8421 giver 5407.6 -736.6 344.2 ender 5407.6 -736.6 344.2
+req 8421 level 52 classes 256
+reward 8421
+quest 8422 giver 5407.6 -736.6 344.2 ender 5407.6 -736.6 344.2
+req 8422 level 52 prev 8421 classes 256
+reward 8422
+quest 7602 giver 5407.6 -736.6 344.2 ender 5407.6 -736.6 344.2
+req 7602 level 55 prev 7601 classes 256
+reward 7602
+quest 7603 giver 5407.6 -736.6 344.2 ender 5413.9 -737.7 344.6
+req 7603 level 55 prev 7602 classes 256
+reward 7603
+
+start W1_10_-1   # 8 quests, levels 51-59
+anchor 1 5139.4 -371.2 342.1
 quest 6162 giver 5112.2 -359.3 357.6 ender 5112.2 -359.3 357.6
 req 6162 level 51
 hunt 6162 0 1 9464
@@ -5838,6 +7743,9 @@ hunt 4521 1 15 7450
 area 4521 6248.0 -2345.1 575.2
 area 4521 6401.8 -2375.2 573.8
 area 4521 6671.8 -2661.3 533.0
+quest 7624 giver 5430.7 -424.1 272.6 ender 5430.7 -424.1 272.6
+req 7624 level 58 prev 7623 classes 256
+reward 7624
 quest 4741 giver 5109.6 -355.2 357.2 ender 5109.6 -355.2 357.2
 req 4741 level 58 prev 4521
 hunt 4741 0 13 7453
@@ -6094,8 +8002,8 @@ area 8464 6783.3 -2418.2 552.7
 area 8464 6813.9 -2470.6 557.5
 area 8464 6750.0 -2616.4 546.5
 
-start W1_13_0   # 5 quests, levels 12-20
-anchor 1 6633.1 314.2 24.2
+start W1_13_0   # 8 quests, levels 12-22
+anchor 1 6607.8 376.2 18.4
 quest 954 giver 6581.0 492.3 8.3 ender 6748.6 48.6 48.7
 req 954 level 12
 quest 958 giver 6581.0 492.3 8.3 ender 6581.0 492.3 8.3
@@ -6116,8 +8024,17 @@ hunt 956 0 1 2212
 area 956 6737.5 -33.6 43.0
 area 956 6599.9 -33.7 34.4
 area 956 6622.1 -113.4 33.3
+quest 6123 giver 6557.9 473.0 9.1 ender 6557.9 473.0 9.1
+req 6123 level 14 prev 6122 races 8 classes 1024
+reward 6123
+quest 6124 giver 6557.9 473.0 9.1 ender 8020.0 -2678.7 524.5
+req 6124 level 14 prev 6123 classes 1024
+reward 6124
 quest 729 giver 6506.4 489.3 6.8 ender 4678.6 601.6 18.5
 req 729 level 20
+quest 1442 giver 6581.0 492.3 8.3 ender 6581.0 492.3 8.3
+req 1442 level 22 classes 2
+reward 1442
 
 start W1_14_-9   # 1 quests, levels 56-56
 anchor 1 7094.9 -4006.7 744.9
@@ -6148,8 +8065,14 @@ area 1143 7183.5 -727.6 94.1
 quest 981 giver 7246.6 -659.0 34.6 ender 3185.5 189.4 4.8
 req 981 level 31 prev 1143
 
-start W1_15_-5   # 3 quests, levels 57-60
-anchor 1 7911.8 -2350.3 486.3
+start W1_15_-5   # 5 quests, levels 16-60
+anchor 1 7896.8 -2299.8 479.5
+quest 30 giver 7874.2 -2224.2 469.2 ender 8020.0 -2678.7 524.5
+req 30 level 16 prev 28 classes 1024
+reward 30
+quest 272 giver 7874.2 -2224.2 469.2 ender 8020.0 -2678.7 524.5
+req 272 level 16 prev 29 races 8 classes 1024
+reward 272
 quest 6845 giver 7943.6 -2417.2 494.1 ender 7797.4 -2574.3 488.6
 req 6845 level 57 prev 6844
 quest 1185 giver 7943.6 -2417.2 494.1 ender 7943.6 -2417.2 494.1
@@ -6196,6 +8119,45 @@ area 5981 5444.5 -4563.6 815.1
 area 5981 5345.4 -4448.1 841.2
 area 5981 5349.1 -4584.7 692.4
 
+start W1_16_-6   # 12 quests, levels 10-16
+anchor 1 8020.0 -2678.7 524.5
+quest 5929 giver 8020.0 -2678.7 524.5 ender 8020.0 -2678.7 524.5
+req 5929 level 10 prev 5921 races 8 classes 1024
+reward 5929
+quest 5930 giver 8020.0 -2678.7 524.5 ender 8020.0 -2678.7 524.5
+req 5930 level 10 prev 5922 races 32 classes 1024
+reward 5930
+quest 5931 giver 8020.0 -2678.7 524.5 ender 10179.0 2564.0 1340.1
+req 5931 level 10 prev 5929 races 8 classes 1024
+reward 5931
+quest 5932 giver 8020.0 -2678.7 524.5 ender -1039.4 -281.6 159.1
+req 5932 level 10 prev 5930 races 32 classes 1024
+reward 5932
+quest 6122 giver 8020.0 -2678.7 524.5 ender 6557.9 473.0 9.1
+req 6122 level 14 prev 6121 races 8 classes 1024
+reward 6122
+quest 6127 giver 8020.0 -2678.7 524.5 ender -545.0 -2672.8 95.9
+req 6127 level 14 prev 6126 races 32 classes 1024
+reward 6127
+quest 6125 giver 8020.0 -2678.7 524.5 ender 10179.0 2564.0 1340.1
+req 6125 level 14 prev 6124 races 8 classes 1024
+reward 6125
+quest 6130 giver 8020.0 -2678.7 524.5 ender -1039.4 -281.6 159.1
+req 6130 level 14 prev 6129 races 32 classes 1024
+reward 6130
+quest 28 giver 8020.0 -2678.7 524.5 ender 7874.2 -2224.2 469.2
+req 28 level 16 prev 27 races 32 classes 1024
+reward 28
+quest 29 giver 8020.0 -2678.7 524.5 ender 7874.2 -2224.2 469.2
+req 29 level 16 prev 26 races 8 classes 1024
+reward 29
+quest 31 giver 8020.0 -2678.7 524.5 ender -1039.4 -281.6 159.1
+req 31 level 16 prev 30 races 32 classes 1024
+reward 31
+quest 5061 giver 8020.0 -2678.7 524.5 ender 10179.0 2564.0 1340.1
+req 5061 level 16 prev 272 races 8 classes 1024
+reward 5061
+
 start W1_17_1   # 3 quests, levels 56-57
 anchor 1 8705.4 990.3 17.3
 quest 5250 giver 8701.2 993.1 23.6 ender 7094.9 -4006.7 744.9
@@ -6210,8 +8172,11 @@ anchor 1 9845.1 440.9 1317.3
 quest 476 giver 9845.1 440.9 1317.3 ender 9887.5 965.5 1313.9
 req 476 level 6 prev 475
 
-start W1_19_1   # 9 quests, levels 5-12
-anchor 1 9743.8 857.4 1296.5
+start W1_19_1   # 20 quests, levels 4-20
+anchor 1 9791.0 910.4 1303.2
+quest 5621 giver 9905.4 985.4 1313.9 ender 9905.4 985.4 1313.9
+req 5621 level 4 races 8 classes 16
+reward 5621
 quest 488 giver 9925.7 737.1 1315.8 ender 9925.7 737.1 1315.8
 req 488 level 5
 hunt 488 0 3 2033,2034,2042,2043,14430
@@ -6249,12 +8214,42 @@ quest 2499 giver 9506.9 713.8 1255.9 ender 9506.9 713.8 1255.9
 req 2499 level 9 prev 2498
 hunt 2499 0 1 2166
 area 2499 9282.0 1077.3 1253.3
+quest 1684 giver 9837.4 966.2 1308.4 ender 9994.1 2331.9 1330.9
+req 1684 level 10 classes 1
+reward 1684
+quest 2241 giver 9790.3 943.9 1308.9 ender 10083.7 2546.9 1295.1
+req 2241 level 10 races 77 classes 8
+reward 2241
+quest 5629 giver 9905.4 985.4 1313.9 ender 9665.3 2520.1 1360.1
+req 5629 level 10 races 8 classes 16
+reward 5629
+quest 5925 giver 9741.9 966.0 1293.8 ender 10179.0 2564.0 1340.1
+req 5925 level 10 races 8 classes 1024
+reward 5925
+quest 6063 giver 9812.3 928.8 1308.2 ender 9812.3 928.8 1308.2
+req 6063 level 10 races 8 classes 4
+reward 6063
+quest 6101 giver 9812.3 928.8 1308.2 ender 9812.3 928.8 1308.2
+req 6101 level 10 prev 6063 races 8 classes 4
+reward 6101
+quest 6102 giver 9812.3 928.8 1308.2 ender 9812.3 928.8 1308.2
+req 6102 level 10 prev 6101 races 8 classes 4
+reward 6102
+quest 6103 giver 9812.3 928.8 1308.2 ender 10178.0 2511.0 1343.2
+req 6103 level 10 prev 6102 races 8 classes 4
+reward 6103
 quest 934 giver 9736.9 956.1 1294.2 ender 9736.9 956.1 1294.2
 req 934 level 11
 quest 486 giver 9887.5 965.5 1313.9 ender 9887.5 965.5 1313.9
 req 486 level 12 prev 483
 hunt 486 0 1 2039
 area 486 9122.8 1837.6 1328.1
+quest 2259 giver 9790.3 943.9 1308.9 ender 10055.3 2573.0 1282.5
+req 2259 level 16 classes 8
+reward 2259
+quest 5674 giver 9905.4 985.4 1313.9 ender 9665.3 2520.1 1360.1
+req 5674 level 20 races 8 classes 16
+reward 5674
 
 start W1_19_3   # 2 quests, levels 8-10
 anchor 1 9741.0 1526.2 1280.4
@@ -6267,21 +8262,42 @@ area 2541 9815.9 1565.2 1295.0
 quest 2561 giver 9741.0 1526.2 1280.4 ender 9741.0 1526.2 1280.4
 req 2561 level 10 prev 2541
 
-start W1_19_4   # 4 quests, levels 10-55
-anchor 1 9793.4 2350.7 1340.1
+start W1_19_4   # 10 quests, levels 10-55
+anchor 1 9891.0 2332.4 1334.6
+quest 1683 giver 9994.1 2331.9 1330.9 ender 9994.1 2331.9 1330.9
+req 1683 level 10 classes 1
+reward 1683
 quest 6344 giver 9918.1 2190.3 1328.3 ender 8694.0 950.3 12.9
 req 6344 level 10 races 8
+quest 1686 giver 9994.1 2331.9 1330.9 ender 9994.1 2331.9 1330.9
+req 1686 level 10 prev 1683 classes 1
+reward 1686
+quest 1692 giver 9994.1 2331.9 1330.9 ender 9918.0 2308.6 1330.9
+req 1692 level 10 prev 1686 classes 1
+reward 1692
+quest 1693 giver 9918.0 2308.6 1330.9 ender 9918.0 2308.6 1330.9
+req 1693 level 10 prev 1692 classes 1
+reward 1693
 quest 1039 giver 9961.8 2284.6 1341.5 ender -985.6 -3796.7 5.2
 req 1039 level 30 prev 1038
+quest 1710 giver 9918.0 2308.6 1330.9 ender 9918.0 2308.6 1330.9
+req 1710 level 30 classes 1
+reward 1710
+quest 1711 giver 9918.0 2308.6 1330.9 ender 9918.0 2308.6 1330.9
+req 1711 level 30 prev 1710 classes 1
+reward 1711
 quest 4493 giver 9634.1 2495.6 1354.9 ender -7115.3 -3729.9 8.9
 req 4493 level 53
 quest 1047 giver 9659.8 2432.4 1335.7 ender 10173.0 2569.9 1367.0
 req 1047 level 55
 
-start W1_19_5   # 4 quests, levels 10-14
-anchor 1 9705.2 2585.2 1341.0
+start W1_19_5   # 6 quests, levels 10-20
+anchor 1 9691.9 2563.5 1347.4
 quest 2519 giver 9915.1 2632.1 1316.9 ender 9631.9 2550.4 1354.9
 req 2519 level 10
+quest 5627 giver 9665.3 2520.1 1360.1 ender 9665.3 2520.1 1360.1
+req 5627 level 10 races 8 classes 16
+reward 5627
 quest 2518 giver 9631.9 2550.4 1354.9 ender 9631.9 2550.4 1354.9
 req 2518 level 12
 hunt 2518 0 1 7319
@@ -6291,11 +8307,29 @@ quest 2520 giver 9631.9 2550.4 1354.9 ender 9631.9 2550.4 1354.9
 req 2520 level 12 prev 2518
 quest 730 giver 9641.9 2607.7 1337.4 ender 6506.4 489.3 6.8
 req 730 level 14
+quest 5672 giver 9665.3 2520.1 1360.1 ender 9665.3 2520.1 1360.1
+req 5672 level 20 races 8 classes 16
+reward 5672
 
-start W1_20_1   # 7 quests, levels 1-5
-anchor 1 10369.6 820.3 1324.3
+start W1_20_1   # 14 quests, levels 1-10
+anchor 1 10367.8 821.6 1330.7
 quest 458 giver 10389.8 763.5 1320.3 ender 10296.9 870.2 1335.9
 req 458 level 1
+quest 3116 giver 10328.9 826.1 1326.5 ender 10526.6 778.1 1329.7
+req 3116 level 1 prev 456 races 8 classes 1
+reward 3116
+quest 3117 giver 10328.9 826.1 1326.5 ender 10458.5 827.9 1381.0
+req 3117 level 1 prev 456 races 8 classes 4
+reward 3117
+quest 3118 giver 10328.9 826.1 1326.5 ender 10519.1 778.0 1329.7
+req 3118 level 1 prev 456 races 8 classes 8
+reward 3118
+quest 3119 giver 10328.9 826.1 1326.5 ender 10458.8 801.6 1346.8
+req 3119 level 1 prev 456 races 8 classes 16
+reward 3119
+quest 3120 giver 10328.9 826.1 1326.5 ender 10464.0 829.5 1381.0
+req 3120 level 1 prev 456 races 8 classes 1024
+reward 3120
 quest 456 giver 10328.9 826.1 1326.5 ender 10328.9 826.1 1326.5
 req 456 level 2
 hunt 456 0 7 2031
@@ -6324,8 +8358,14 @@ area 916 10715.1 849.4 1325.8
 area 916 10731.8 950.6 1333.2
 quest 4495 giver 10407.2 713.8 1321.7 ender 10711.6 1034.9 1347.3
 req 4495 level 4
+quest 5622 giver 10458.8 801.6 1346.8 ender 9905.4 985.4 1313.9
+req 5622 level 4 races 8 classes 16
+reward 5622
 quest 920 giver 10417.7 871.2 1319.5 ender 10492.5 807.3 1397.3
 req 920 level 5 prev 917
+quest 6072 giver 10458.5 827.9 1381.0 ender 9812.3 928.8 1308.2
+req 6072 level 10 races 8 classes 4
+reward 6072
 
 start W1_20_3   # 1 quests, levels 60-60
 anchor 1 10205.0 1902.6 1333.2
@@ -6367,8 +8407,8 @@ area 7801 7543.7 -1521.1 175.0
 area 7801 7474.0 -1527.0 158.0
 area 7801 6577.3 -798.2 475.0
 
-start W1_20_5   # 5 quests, levels 9-55
-anchor 1 10139.2 2554.5 1341.9
+start W1_20_5   # 12 quests, levels 9-55
+anchor 1 10155.0 2554.7 1336.2
 quest 923 giver 10085.6 2534.2 1317.6 ender 10085.6 2534.2 1317.6
 req 923 level 9 prev 922
 hunt 923 0 5 2027,2029,2030
@@ -6377,6 +8417,27 @@ area 923 10546.6 1687.6 1295.4
 area 923 10382.6 1578.8 1292.2
 quest 2498 giver 10085.6 2534.2 1317.6 ender 9506.9 713.8 1255.9
 req 2498 level 9 prev 923
+quest 2242 giver 10083.7 2546.9 1295.1 ender 10083.7 2546.9 1295.1
+req 2242 level 10 races 77 classes 8
+reward 2242
+quest 5921 giver 10179.0 2564.0 1340.1 ender 8020.0 -2678.7 524.5
+req 5921 level 10 races 8 classes 1024
+reward 5921
+quest 5923 giver 10186.3 2570.4 1326.0 ender 10179.0 2564.0 1340.1
+req 5923 level 10 races 8 classes 1024
+reward 5923
+quest 6071 giver 10178.0 2511.0 1343.2 ender 9812.3 928.8 1308.2
+req 6071 level 10 races 8 classes 4
+reward 6071
+quest 6001 giver 10179.0 2564.0 1340.1 ender 10179.0 2564.0 1340.1
+req 6001 level 10 prev 5931 races 8 classes 1024
+reward 6001
+quest 6121 giver 10179.0 2564.0 1340.1 ender 8020.0 -2678.7 524.5
+req 6121 level 14 races 8 classes 1024
+reward 6121
+quest 26 giver 10179.0 2564.0 1340.1 ender 8020.0 -2678.7 524.5
+req 26 level 16 races 8 classes 1024
+reward 26
 quest 3764 giver 10173.0 2569.9 1367.0 ender 10180.2 2605.1 1322.2
 req 3764 level 50
 hunt 3764 0 20 6498,6499,6500,6501,6502,6503,6504,6505,6506,6507,6508,6509,6510,6511,6512,6513,6514,6516,6517,6518,6519,6520,6521,6527,6551,6552,6553,6554,6555,6556,6557,6559,6560,6581,6582,6583,6584,6585,9162,9163,9164,9165,9166,9167,9376,9477,9621,9683,9684,10040,10041,14460

@@ -43,7 +43,7 @@ def main(argv):
         FROM quest_template q
         LEFT JOIN quest_template_addon a ON a.ID = q.ID
         JOIN quest_template_classic_level c ON c.ID = q.ID
-        WHERE c.QuestLevel BETWEEN 1 AND 60 AND q.QuestSortID >= 0""")
+        WHERE c.QuestLevel BETWEEN 1 AND 60 AND (q.QuestSortID >= 0 OR a.AllowableClasses <> 0)""")
     write(db, f"{out}/objectives.tsv", """
         SELECT o.QuestID, o.`Order`, o.Type, o.ObjectID, o.Amount
         FROM quest_objectives o

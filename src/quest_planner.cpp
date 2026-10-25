@@ -149,6 +149,18 @@ QuestStep QuestPlanner::Next(BotSnapshot const& bot, QuestMemory& memory, std::u
             return WalkOrAct(bot, memory, quest->Ender, QuestStepKind::HandIn, quest->Id, nowMs);
     }
 
+    // 1b. A class quest in the log: complete it with its reward and no objectives, wherever the bot is (the GM command `.quest reward`).
+    for (QuestDef const* quest : logged)
+    {
+        if (!quest->Reward || Blocked(memory, quest->Id, nowMs))
+            continue;
+        QuestStep step;
+        step.Quest = quest->Id;
+        step.Dest = QuestPoint{ bot.pos_x, bot.pos_y, bot.pos_z };
+        step.Kind = nowMs >= memory.NextActionMs ? QuestStepKind::Reward : QuestStepKind::Wait;
+        return step;
+    }
+
     // 2. A quest in the log with a target short: hunt it, or give it up when nothing has moved for a long time.
     for (QuestDef const* quest : logged)
     {
@@ -257,7 +269,7 @@ void QuestPlanner::NoteSent(QuestMemory& memory, std::uint32_t operation, std::u
 {
     memory.NextActionMs = nowMs + kQuestActionGapMs;
     memory.LastActionQuest = quest;
-    if (operation == kQuestHandIn)
+    if (operation == kQuestHandIn || operation == kQuestReward)
         memory.PendingHandIn = quest;
     if (operation == kQuestAbandon)
     {

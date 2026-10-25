@@ -101,7 +101,10 @@ def main():
         skipped[reason] += 1
         explained.append((qid, quests[qid]["level"], reason, detail))
     for qid, info in quests.items():
-        if info["group"] > 1:
+        # A class quest (restricted to some classes) is completed with its reward, not by its objectives (the planner's reward step), so its
+        # objectives do not decide whether it is kept, only its giver and ender do.
+        reward = info["classes"] != 0
+        if info["group"] > 1 and not reward:
             skip(qid, "group", f"suggestedGroup={info['group']}")
             continue
         if not (args.min_level <= info["level"] <= args.max_level):
@@ -115,6 +118,9 @@ def main():
         ender = next(((m, x, y, z) for m, x, y, z in npcs[qid]["end"] if m == giver[0]), None)
         if not ender:
             skip(qid, "no ender on the giver's map", f"enders on maps {sorted({m for m, *_ in npcs[qid]['end']})}")
+            continue
+        if reward:
+            built[qid] = dict(info=info, giver=giver, ender=ender, hunts=[], areas=[], reward=True)
             continue
         objs = sorted(objectives.get(qid, []))
         if any(kind not in (0, 1) for _, kind, _, _ in objs):
@@ -150,7 +156,7 @@ def main():
                 picked.append(a)
             if len(picked) >= args.areas:
                 break
-        built[qid] = dict(info=info, giver=giver, ender=ender, hunts=hunts, areas=picked)
+        built[qid] = dict(info=info, giver=giver, ender=ender, hunts=hunts, areas=picked, reward=False)
 
     # Starts: cells of givers per map.
     cells = defaultdict(list)
@@ -187,6 +193,8 @@ def main():
             if info["classes"]:
                 req += f" classes {info['classes']}"
             out.append(req)
+            if q["reward"]:
+                out.append(f"reward {qid}")
             for position, amount, creatures in q["hunts"]:
                 out.append(f"hunt {qid} {position} {amount} {','.join(str(c) for c in creatures)}")
             for ax, ay, az in q["areas"]:
