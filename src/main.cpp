@@ -24,12 +24,15 @@
 #include "rotating_file.h"
 #include "dungeon_data.h"
 #include "dungeon_events.h"
+#include "dungeon_files.h"
 #include "scenario.h"
 
 #include "forever_module/module_client.h"
 #include "forever_module/tier2_session.h"
 
 #include <algorithm>
+#include <map>
+#include <tuple>
 #include <atomic>
 #include <chrono>
 #include <cstdint>
@@ -39,6 +42,7 @@
 #include <iostream>
 #include <sstream>
 #include <memory>
+#include <map>
 #include <mutex>
 #include <optional>
 #include <stdexcept>
@@ -486,14 +490,51 @@ void AppendSales(SellBook& book, BotSettings const& settings, forever_module::Wo
 }
 
 // What the pump needs beyond the policy: the scenario (if one is configured) and the command queue.
+// The places the dungeon files are read from, handed from the config callback to the pump when the config is delivered again (a core reload): the pump then
+// reads the dungeons again and gives them to the policy, so a changed JSON file takes effect without a restart.
+struct DungeonReloadBox
+{
+    std::atomic<std::uint64_t> Generation{ 0 };
+    std::mutex Lock;
+    DungeonSources Sources;
+};
+
+// The routes "tank lead" can run, by map: from every dungeon of a loaded set.
+std::map<std::uint32_t, PolicyOptions::DungeonRoute> DungeonRoutes(std::vector<Dungeon> const& dungeons)
+{
+    std::map<std::uint32_t, PolicyOptions::DungeonRoute> routes;
+    for (Dungeon const& dungeon : dungeons)
+    {
+        PolicyOptions::DungeonRoute route;
+        for (std::size_t i = 0; i < dungeon.Route.size(); ++i)
+        {
+            route.Route.push_back({ dungeon.Route[i].X, dungeon.Route[i].Y, dungeon.Route[i].Z });
+            if (dungeon.Route[i].BossEntry != 0)
+                route.BossAt[i] = dungeon.Route[i].BossEntry;
+        }
+        route.Events = dungeon.Events;
+        // The bosses' avoid lists (bosses[].strategy.avoid_spells and avoid): the spells to step out of and the fixed places to stay out of.
+        for (DungeonBoss const& boss : dungeon.Bosses)
+        {
+            route.AvoidSpells.insert(route.AvoidSpells.end(), boss.Strategy.AvoidSpells.begin(), boss.Strategy.AvoidSpells.end());
+            for (AvoidZone const& zone : boss.Strategy.Avoid)
+                route.AvoidZones.push_back(ground_avoid::Circle{ zone.X, zone.Y, zone.Radius });
+        }
+        routes[dungeon.MapId()] = std::move(route);
+    }
+    return routes;
+}
+
 struct PumpExtras
 {
+    std::shared_ptr<DungeonReloadBox> Dungeons; // set always; the pump reads the dungeon files again when its Generation moves
     std::shared_ptr<PresenceFeed> Presence;   // set when Presence is on
     std::shared_ptr<AuctionFeed> Auction;     // set when Auction is on
     std::shared_ptr<SellBook> Sell;           // set when vendor sales are on
     std::shared_ptr<ErrandFeed> Errand;       // set when Errands is on
     std::shared_ptr<AltRegistry> Alts;
     std::optional<ScenarioPlan> Scenario;
+    std::uint32_t ScenarioParties = 1; // parallel parties of the scenario's roster, each with its own director
     std::string ScenarioResultFile;
     std::shared_ptr<CommandQueue> Commands;
 };
@@ -502,10 +543,10 @@ struct PumpExtras
 void ScenarioSpawnTick(RunContext& run, std::size_t& spawned)
 {
     ScenarioSettings const& scenario = run.Settings.Scenario;
-    if (spawned >= scenario.Roster.size() || !run.Roster.CanRequest() || nowMs() < run.BackoffUntilMs)
+    if (spawned >= scenario.Roster.size() * scenario.Parties || !run.Roster.CanRequest() || nowMs() < run.BackoffUntilMs)
         return;
 
-    RaceClass const combo{ scenario.Roster[spawned][0], scenario.Roster[spawned][1] };
+    RaceClass const combo{ scenario.Roster[spawned % scenario.Roster.size()][0], scenario.Roster[spawned % scenario.Roster.size()][1] };
     forever_module::SpawnParams params = ParamsFor(combo);
     params.set_level(scenario.Level);
     if (scenario.HasStaging)
@@ -542,9 +583,23 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
                std::string const& telemetryPath, BotSettings const& settings, PumpExtras extras)
 {
     BotPolicy policy(options);
-    std::optional<ScenarioDirector> director;
+    std::uint64_t dungeonGeneration = extras.Dungeons ? extras.Dungeons->Generation.load() : 0;
+    // One director per party of the scenario (ScenarioParties): the bots, in guid order, are cut into parties of the roster's size, the same cut the policy makes, and a
+    // director sees only its own party's bots. With several parties each result and log line carries the party number ("dm#2").
+    std::vector<ScenarioDirector> directors;
+    std::vector<ScenarioPhase> lastPhases;
+    std::unordered_map<std::uint64_t, std::size_t> partyOf; // bot guid -> party index (recomputed each tick)
+    std::size_t const partySize = extras.Scenario ? std::max<std::size_t>(1, extras.Scenario->RosterSize) : 1;
     if (extras.Scenario)
-        director.emplace(*extras.Scenario);
+        for (std::uint32_t k = 0; k < std::max<std::uint32_t>(1, extras.ScenarioParties); ++k)
+        {
+            ScenarioPlan plan = *extras.Scenario;
+            if (extras.ScenarioParties > 1)
+                plan.Name += "#" + std::to_string(k + 1);
+            directors.emplace_back(std::move(plan));
+            lastPhases.push_back(ScenarioPhase::Done);
+        }
+    std::vector<bool> phaseLogged(directors.size(), false);
     bool sawSnapshot = false;
     std::uint64_t lastTick = 0;
     std::uint64_t presenceFedMs = 0;
@@ -561,6 +616,8 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
     std::uint64_t decideTotalUs = 0;
     std::uint64_t decideMaxUs = 0;
     std::uint64_t actionsTotal = 0;
+    std::map<std::tuple<std::uint64_t, unsigned, std::uint32_t>, std::uint64_t> actionStats; // ActionStats: actions sent this minute, by bot, type and spell
+    std::uint64_t actionStatsAtMs = nowMs();
     std::size_t lastBotCount = 0;
 
     // The telemetry file is appended to, so a restart adds to the same record. It rotates at TelemetryMaxMB.
@@ -648,6 +705,24 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
 
             // One publish per snapshot tick: the core applies the newest action set it sees for each tick.
             auto const started = std::chrono::steady_clock::now();
+            // The config was delivered again (a core reload): read the dungeon files again, and let "tank lead" use the result.
+            if (extras.Dungeons && extras.Dungeons->Generation.load() != dungeonGeneration)
+            {
+                dungeonGeneration = extras.Dungeons->Generation.load();
+                DungeonSources sources;
+                {
+                    std::lock_guard<std::mutex> lock(extras.Dungeons->Lock);
+                    sources = extras.Dungeons->Sources;
+                }
+                std::vector<std::string> reloadWarnings;
+                DungeonSet const set = LoadDungeonSet(sources, reloadWarnings);
+                for (std::string const& warning : reloadWarnings)
+                    std::cerr << "forever-bots: dungeons: " << warning << "\n";
+                for (std::string const& line : set.Log)
+                    std::cerr << "forever-bots: " << line << "\n";
+                policy.SetDungeons(DungeonRoutes(set.Dungeons));
+                std::cerr << "forever-bots: dungeon files reloaded: tank lead knows " << set.Dungeons.size() << " dungeon(s)\n";
+            }
             // .autogear commands: the bots led by the player who typed it are dressed at this tick.
             if (extras.Commands)
             {
@@ -706,10 +781,27 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
                             extras.Commands->Says.push_back(std::move(ack));
                 }
             }
-            if (director)
+            if (!directors.empty())
             {
-                policy.SetRouteActive(director->RouteActive());
-                policy.SetKilledBosses(director->KilledBossEntries());
+                std::vector<std::uint64_t> guids;
+                guids.reserve(view.bots.size());
+                for (forever_module::BotSnapshot const& bot : view.bots)
+                    guids.push_back(bot.guid);
+                std::sort(guids.begin(), guids.end());
+                partyOf.clear();
+                for (std::size_t i = 0; i < guids.size(); ++i)
+                    partyOf[guids[i]] = std::min(i / partySize, directors.size() - 1);
+                policy.SetRouteActiveFor([&directors, &partyOf](std::uint64_t guid)
+                {
+                    auto const at = partyOf.find(guid);
+                    return at != partyOf.end() && directors[at->second].RouteActive();
+                });
+                policy.SetKilledBossesFor([&directors, &partyOf](std::uint64_t guid) -> std::set<std::uint32_t> const&
+                {
+                    static std::set<std::uint32_t> const none;
+                    auto const at = partyOf.find(guid);
+                    return at == partyOf.end() ? none : directors[at->second].KilledBossEntries();
+                });
             }
             std::vector<forever_module::BotAction> actions = policy.Decide(view, nowMs());
             if (extras.Presence && nowMs() - presenceFedMs >= kPresenceFeedMs)
@@ -780,30 +872,35 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
                 extras.Auction->Bots.swap(list);
                 extras.Auction->AtMs = auctionFedMs;
             }
-            if (director)
+            for (std::size_t k = 0; k < directors.size(); ++k)
             {
+                // The director of party k sees the bots of its party only.
+                forever_module::WorldTickSnapshotView const partyView = SubsetView(view, [&partyOf, k](std::uint64_t guid)
+                {
+                    auto const at = partyOf.find(guid);
+                    return at != partyOf.end() && at->second == k;
+                });
+                ScenarioDirector& director = directors[k];
+                std::string const name = extras.Scenario->Name + (directors.size() > 1 ? "#" + std::to_string(k + 1) : std::string());
                 std::size_t const before = actions.size();
-                director->Decide(view, nowMs(), actions);
-                policy.SetRouteActive(director->RouteActive());
+                director.Decide(partyView, nowMs(), actions);
 
                 // The scenario's progress, in the module's log: each phase as it starts, and every teleport the director sends.
-                static ScenarioPhase lastPhase = ScenarioPhase::Done;
-                static bool phaseLogged = false;
-                if (!phaseLogged || director->Phase() != lastPhase)
+                if (!phaseLogged[k] || director.Phase() != lastPhases[k])
                 {
                     static char const* const names[] = { "waiting for the roster", "dressing", "grouping", "entering", "running", "done" };
-                    std::cerr << "forever-bots: scenario " << extras.Scenario->Name << ": phase " << names[int(director->Phase())] << " ("
-                              << view.bots.size() << " bots in view)\n";
-                    lastPhase = director->Phase();
-                    phaseLogged = true;
+                    std::cerr << "forever-bots: scenario " << name << ": phase " << names[int(director.Phase())] << " ("
+                              << partyView.bots.size() << " bots in view)\n";
+                    lastPhases[k] = director.Phase();
+                    phaseLogged[k] = true;
                 }
                 for (std::size_t i = before; i < actions.size(); ++i)
                     if (actions[i].type == forever_module::ActionType::kTeleport)
-                        std::cerr << "forever-bots: scenario " << extras.Scenario->Name << ": teleport bot " << actions[i].bot_guid << " to map "
+                        std::cerr << "forever-bots: scenario " << name << ": teleport bot " << actions[i].bot_guid << " to map "
                                   << actions[i].spell_id << " (" << actions[i].dest_x << ", " << actions[i].dest_y << ", " << actions[i].dest_z << ")\n";
-                for (std::string const& boss : director->TakeNewBossKills())
-                    std::cerr << "forever-bots: scenario " << extras.Scenario->Name << ": boss killed: " << boss << "\n";
-                if (auto const result = director->TakeResult())
+                for (std::string const& boss : director.TakeNewBossKills())
+                    std::cerr << "forever-bots: scenario " << name << ": boss killed: " << boss << "\n";
+                if (auto const result = director.TakeResult())
                 {
                     std::string const line = FormatScenarioResult(*result);
                     std::cerr << "forever-bots: " << line << "\n";
@@ -828,6 +925,23 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
                 moveGate.Observe(bot.guid, bot.last_action_type, bot.last_action_status, bot.last_action_sequence, nowMs());
             moveGate.Filter(actions, nowMs());
             actionsTotal += actions.size();
+            if (settings.ActionStats)
+            {
+                for (forever_module::BotAction const& action : actions)
+                    ++actionStats[std::make_tuple(action.bot_guid, static_cast<unsigned>(action.type), action.spell_id)];
+                if (nowMs() - actionStatsAtMs >= 60000)
+                {
+                    std::vector<std::pair<std::uint64_t, std::tuple<std::uint64_t, unsigned, std::uint32_t>>> top;
+                    for (auto const& [key, count] : actionStats)
+                        top.emplace_back(count, key);
+                    std::sort(top.begin(), top.end(), [](auto const& a, auto const& b) { return a.first > b.first; });
+                    for (std::size_t i = 0; i < top.size() && i < 10; ++i)
+                        std::cerr << "forever-bots: actions_top: bot=" << std::get<0>(top[i].second) << " type=" << std::get<1>(top[i].second)
+                                  << " spell=" << std::get<2>(top[i].second) << " count=" << top[i].first << "\n";
+                    actionStats.clear();
+                    actionStatsAtMs = nowMs();
+                }
+            }
             lastBotCount = view.bots.size();
 
             std::string error;
@@ -886,7 +1000,8 @@ int main(int argc, char** argv)
     BotSettings settings;
     bool configured = false;
     BotRoster roster(0); // the cap is set once the settings are known
-    client.OnConfig([&settings, &configured, &roster, tier2Granted, grantedBots](
+    auto const dungeonBox = std::make_shared<DungeonReloadBox>();
+    client.OnConfig([&settings, &configured, &roster, tier2Granted, grantedBots, dungeonBox](
                         std::unordered_map<std::string, std::string> const& config)
     {
         std::vector<std::string> warnings;
@@ -902,6 +1017,12 @@ int main(int argc, char** argv)
             return;
         }
 
+        {
+            // the dungeon files are read again by the pump (doc/dungeon-strategy.md, "Reloading")
+            std::lock_guard<std::mutex> lock(dungeonBox->Lock);
+            dungeonBox->Sources = SourcesFromConfig(config);
+        }
+        dungeonBox->Generation.fetch_add(1);
         settings.MaxBots = parsed.MaxBots;
         settings.Race = parsed.Race;
         settings.Class = parsed.Class;
@@ -1117,11 +1238,14 @@ int main(int argc, char** argv)
             auto const parsed = ParseChatCommand(rest, settings.ChatOrders, settings.ChatControl);
             if (!parsed)
             {
-                set(false, "Usage: .bots [all|tank|healer|dps|<class>] <verb> [args]. Type .bots help for the full list.");
+                set(false, "Usage: .bots [all|tank|healer|dps|<class>] follow [off] | stay [off] | release | status | autogear" +
+                               std::string(settings.ChatOrders ? " | stop | passive | aggressive | summon | revive | mount | dismount" : "") +
+                               std::string(settings.ChatControl ? " | role <tank|healer|dps|auto> | stance <aggressive|defensive|passive> | distance <yards>|default" : "") +
+                               ". goto here, pull, heal, focus and train: say them in party chat.");
                 return reply;
             }
             if (parsed->Verb == ChatVerb::GotoHere || parsed->Verb == ChatVerb::Pull || parsed->Verb == ChatVerb::Heal ||
-                parsed->Verb == ChatVerb::Focus)
+                parsed->Verb == ChatVerb::Focus || parsed->Verb == ChatVerb::Train)
             {
                 set(false, std::string(ChatVerbName(parsed->Verb)) + " needs your position or target: say it in party chat.");
                 return reply;
@@ -1131,6 +1255,10 @@ int main(int argc, char** argv)
             item.Context.Issuer = request.command().issuer_guid() & forever_module::kUnitRefCounterMask;
             item.Context.Orders = settings.ChatOrders;
             item.Context.Control = settings.ChatControl;
+            // The party-chat path below (OnNotify, PlayerChatEvent) sets these from the same settings; the dot
+            // command skipped them, so a bot that took a ".bots" order never spoke its ChatSay confirmation line.
+            item.Context.Say = settings.ChatSay;
+            item.Context.SayMax = settings.ChatSayMax;
             {
                 std::lock_guard<std::mutex> lock(commands->Lock);
                 if (commands->Chat.size() < 64)
@@ -1307,8 +1435,8 @@ int main(int argc, char** argv)
     std::size_t scenarioSpawned = 0;
     if (scenarioOn)
     {
-        roster.SetMaxBots(std::min<std::uint32_t>(std::uint32_t(settings.Scenario.Roster.size()), maxBots));
-        std::cerr << "forever-bots: scenario " << settings.Scenario.Name << ": " << settings.Scenario.Roster.size() << " bots at level "
+        roster.SetMaxBots(std::min<std::uint32_t>(std::uint32_t(settings.Scenario.Roster.size() * settings.Scenario.Parties), maxBots));
+        std::cerr << "forever-bots: scenario " << settings.Scenario.Name << ": " << settings.Scenario.Parties << " part" << (settings.Scenario.Parties == 1 ? "y" : "ies") << " of " << settings.Scenario.Roster.size() << " bots at level "
                   << settings.Scenario.Level << ", route of " << settings.Scenario.Route.size() << " point(s), "
                   << settings.Scenario.DurationSec << " s\n";
         client.AddTimer(std::chrono::milliseconds(3000), [&run, &scenarioSpawned] { ScenarioSpawnTick(run, scenarioSpawned); });
@@ -1345,6 +1473,15 @@ int main(int argc, char** argv)
     policyOptions.AggressiveStart = settings.AggressiveStart;
     policyOptions.Crafting = settings.Crafting;
     policyOptions.MountMinLevel = settings.MountMinLevel;
+    policyOptions.TacticFocus = settings.TacticFocus;
+    policyOptions.TacticInterrupt = settings.TacticInterrupt;
+    policyOptions.TacticHeal = settings.TacticHeal;
+    policyOptions.TacticRest = settings.TacticRest;
+    policyOptions.TacticRecover = settings.TacticRecover;
+    policyOptions.DungeonHealBelowPct = settings.DungeonHealBelowPct;
+    policyOptions.DungeonTankHealBelowPct = settings.DungeonTankHealBelowPct;
+    policyOptions.HealerDpsManaPct = settings.HealerDpsManaPct;
+    policyOptions.HealerLosMoveYards = settings.HealerLosMoveYards;
     policyOptions.Gathering = settings.Gathering;
     if (!settings.CraftingFociFile.empty())
     {
@@ -1361,50 +1498,51 @@ int main(int argc, char** argv)
             std::cerr << "forever-bots: crafting foci: " << foci->size() << " object(s) from " << settings.CraftingFociFile << "\n";
         policyOptions.Foci = std::move(foci);
     }
-    // Dungeon routes for "tank lead" (every dungeon of DungeonFile, by the map of its entry) and the events table (DungeonEventsFile), shared by all dungeons.
-    std::vector<dungeon_events::Event> allEvents;
-    if (!settings.DungeonEventsFile.empty())
+    policyOptions.AvoidGroundEffects = settings.AvoidGroundEffects;
+    if (settings.AvoidGroundEffects)
     {
-        std::ifstream in(settings.DungeonEventsFile);
-        if (!in)
-            std::cerr << "forever-bots: DungeonEventsFile: cannot read '" << settings.DungeonEventsFile << "'\n";
-        else
+        auto avoidTable = std::make_shared<ground_avoid::AvoidTable>();
+        if (!settings.AvoidSpellsFile.empty())
         {
-            std::ostringstream text;
-            text << in.rdbuf();
-            std::vector<std::string> eventWarnings;
-            allEvents = dungeon_events::Parse(text.str(), eventWarnings);
-            for (std::string const& warning : eventWarnings)
-                std::cerr << "forever-bots: " << warning << "\n";
-            std::cerr << "forever-bots: dungeon events: " << allEvents.size() << " from " << settings.DungeonEventsFile << "\n";
+            std::ifstream avoidFile(settings.AvoidSpellsFile);
+            std::stringstream avoidText;
+            avoidText << avoidFile.rdbuf();
+            std::vector<std::string> avoidErrors;
+            *avoidTable = ground_avoid::ParseAvoidSpells(avoidText.str(), avoidErrors);
+            for (std::string const& error : avoidErrors)
+                std::cerr << "forever-bots: AvoidSpellsFile: " << error << "\n";
+            if (!avoidFile || avoidTable->Size() == 0)
+                std::cerr << "forever-bots: AvoidSpellsFile: cannot read '" << settings.AvoidSpellsFile << "' (or it holds no spell); only effects of hostile casters are avoided\n";
+            else
+                std::cerr << "forever-bots: avoid spells: " << avoidTable->Size() << " spell(s) from " << settings.AvoidSpellsFile << "\n";
         }
+        policyOptions.AvoidSpells = std::move(avoidTable);
+        std::cerr << "forever-bots: bots step out of harmful ground effects (the core needs Bot.Snapshot.GroundEffects = 1)\n";
     }
-    if (!settings.DungeonFile.empty())
+    // Dungeon routes for "tank lead" (every dungeon, by the map of its entry) and the events table, shared by all dungeons. They come from the JSON files of
+    // DungeonDir (yours) and DungeonDataDir (shipped), and from the old text files for maps without a JSON file (dungeon_files.h).
+    DungeonSources dungeonSources;
+    dungeonSources.File = settings.DungeonFile;
+    dungeonSources.EventsFile = settings.DungeonEventsFile;
+    dungeonSources.DataDir = settings.DungeonDataDir;
+    dungeonSources.OverrideDir = settings.DungeonDir;
     {
-        std::ifstream in(settings.DungeonFile);
-        if (!in)
-            std::cerr << "forever-bots: DungeonFile: cannot read '" << settings.DungeonFile << "'\n";
-        else
-        {
-            std::ostringstream text;
-            text << in.rdbuf();
-            std::vector<std::string> dungeonWarnings;
-            for (Dungeon const& dungeon : ParseDungeons(text.str(), dungeonWarnings))
-            {
-                PolicyOptions::DungeonRoute route;
-                for (std::size_t i = 0; i < dungeon.Route.size(); ++i)
-                {
-                    route.Route.push_back({ dungeon.Route[i].X, dungeon.Route[i].Y, dungeon.Route[i].Z });
-                    if (dungeon.Route[i].BossEntry != 0)
-                        route.BossAt[i] = dungeon.Route[i].BossEntry;
-                }
-                route.Events = dungeon_events::ForMap(allEvents, std::uint32_t(dungeon.Entry[0]));
-                policyOptions.DungeonsByMap[std::uint32_t(dungeon.Entry[0])] = std::move(route);
-            }
-            for (std::string const& warning : dungeonWarnings)
-                std::cerr << "forever-bots: dungeons: " << warning << "\n";
-            std::cerr << "forever-bots: tank lead knows " << policyOptions.DungeonsByMap.size() << " dungeon(s) from " << settings.DungeonFile << "\n";
-        }
+        std::lock_guard<std::mutex> lock(dungeonBox->Lock);
+        dungeonBox->Sources = dungeonSources;
+    }
+    std::vector<dungeon_events::Event> allEvents;
+    if (!dungeonSources.File.empty() || !dungeonSources.DataDir.empty() || !dungeonSources.OverrideDir.empty() || !dungeonSources.EventsFile.empty())
+    {
+        std::vector<std::string> dungeonWarnings;
+        DungeonSet const set = LoadDungeonSet(dungeonSources, dungeonWarnings);
+        for (std::string const& warning : dungeonWarnings)
+            std::cerr << "forever-bots: dungeons: " << warning << "\n";
+        for (std::string const& line : set.Log)
+            std::cerr << "forever-bots: " << line << "\n";
+        allEvents = set.Events;
+        policyOptions.DungeonsByMap = DungeonRoutes(set.Dungeons);
+        std::cerr << "forever-bots: dungeon events: " << allEvents.size() << "\n";
+        std::cerr << "forever-bots: tank lead knows " << policyOptions.DungeonsByMap.size() << " dungeon(s)\n";
     }
     policyOptions.Taxi = settings.Taxi;
     policyOptions.PartySize = settings.PartySize;
@@ -1470,6 +1608,7 @@ int main(int argc, char** argv)
     policyOptions.OnEvent = [](std::string const& line) { std::cerr << "forever-bots: event " << line << "\n"; };
     policyOptions.AutoGearEveryLevels = settings.AutoGearEveryLevels;
     PumpExtras extras;
+    extras.Dungeons = dungeonBox;
     extras.Commands = commands;
     extras.Alts = alts;
     if (settings.Presence.Enabled && !scenarioOn)
@@ -1761,8 +1900,8 @@ int main(int argc, char** argv)
     {
         // The scenario takes over the party, the route and the dressing: no vendor walks, no ramp, one party of the whole roster.
         policyOptions.PartySize = std::uint32_t(settings.Scenario.Roster.size());
-        policyOptions.PartyCount = 1;
-        policyOptions.PartyPercent = 100; // every bot of the roster is in the one party
+        policyOptions.PartyCount = settings.Scenario.Parties;
+        policyOptions.PartyPercent = 100; // every bot of the roster is in its party
         policyOptions.RandomPct = 0;      // and a scenario is a test run: it is not varied
         policyOptions.Crafting = false;
         policyOptions.ServiceEveryMs = 0;
@@ -1772,6 +1911,9 @@ int main(int argc, char** argv)
         for (auto const& [point, entry] : settings.Scenario.BossAt)
             policyOptions.RouteBossAt[point] = entry;
         policyOptions.Events = dungeon_events::ForMap(allEvents, std::uint32_t(settings.Scenario.Entry[0]));
+        policyOptions.RouteMap = static_cast<std::uint32_t>(settings.Scenario.Entry[0]);
+        for (std::size_t i = 0; i < settings.Scenario.KillPriority.size(); ++i)
+            policyOptions.KillPriority.emplace(settings.Scenario.KillPriority[i], std::uint32_t(i));
 
         ScenarioPlan plan;
         plan.Name = settings.Scenario.Name;
@@ -1798,6 +1940,7 @@ int main(int argc, char** argv)
             policyOptions.PortalInsideMap = plan.EntryMap;
         }
         extras.Scenario = std::move(plan);
+        extras.ScenarioParties = settings.Scenario.Parties;
         extras.ScenarioResultFile = settings.Scenario.ResultFile;
     }
 

@@ -211,6 +211,24 @@ void ScenarioDirector::Decide(forever_module::WorldTickSnapshotView const& view,
 
         case ScenarioPhase::Entering:
         {
+            // Rest first (see kRecoverPct): nothing is sent, so the bots sit, eat and drink by themselves, and the healer tops the party up.
+            if (!_recovered)
+            {
+                bool ready = !bots.empty();
+                for (BotSnapshot const& bot : bots)
+                {
+                    if (bot.life_state != 0)
+                        continue;
+                    if (bot.max_health != 0 && std::uint64_t(bot.health) * 100 < std::uint64_t(bot.max_health) * kRecoverPct)
+                        ready = false;
+                    if (bot.power_type == 0 && bot.max_power != 0 && std::uint64_t(bot.power) * 100 < std::uint64_t(bot.max_power) * kRecoverPct)
+                        ready = false;
+                }
+                if (!ready && nowMs - _phaseSinceMs < kRecoverMaxMs)
+                    break;
+                _recovered = true;
+                _phaseSinceMs = nowMs; // the entering timeout counts from here
+            }
             BotSnapshot const* leader = LeaderOf(bots);
             if (!leader && !bots.empty())
                 leader = &bots.front(); // no party: the first bot leads
@@ -297,6 +315,30 @@ void ScenarioDirector::Decide(forever_module::WorldTickSnapshotView const& view,
                             }
                     }
             }
+            // A wipe: the party was revived at the graveyard outside the dungeon. The leader is up and the route is not walkable from here: put the living back at the entry.
+            if (leader && leader->life_state == 0 && leader->map_id != _plan.EntryMap)
+            {
+                if (_outsideSinceMs == 0)
+                    _outsideSinceMs = nowMs;
+                if (nowMs - _outsideSinceMs >= kReenterDelayMs && (_lastReenterMs == 0 || nowMs - _lastReenterMs >= kEnterRetryMs))
+                {
+                    for (BotSnapshot const& bot : bots)
+                        if (bot.life_state == 0 && bot.map_id != _plan.EntryMap)
+                        {
+                            BotAction action;
+                            action.bot_guid = bot.guid;
+                            action.type = ActionType::kTeleport;
+                            action.spell_id = _plan.EntryMap;
+                            action.dest_x = _plan.Entry.X;
+                            action.dest_y = _plan.Entry.Y;
+                            action.dest_z = _plan.Entry.Z;
+                            actions.push_back(action);
+                        }
+                    _lastReenterMs = nowMs;
+                }
+            }
+            else
+                _outsideSinceMs = 0;
             std::uint32_t const alive = aliveCount();
             if (alive == 0)
             {
@@ -375,4 +417,21 @@ std::string FormatScenarioResult(ScenarioResult const& result)
             out << "none";
     }
     return out.str();
+}
+
+forever_module::WorldTickSnapshotView SubsetView(forever_module::WorldTickSnapshotView const& view, std::function<bool(std::uint64_t)> const& keep)
+{
+    forever_module::WorldTickSnapshotView out = view;
+    out.bots.clear();
+    out.nearby.clear();
+    for (std::size_t i = 0; i < view.bots.size(); ++i)
+    {
+        if (!keep(view.bots[i].guid))
+            continue;
+        out.bots.push_back(view.bots[i]);
+        std::size_t const from = i * view.max_nearby_units;
+        for (std::uint32_t k = 0; k < view.max_nearby_units; ++k)
+            out.nearby.push_back(from + k < view.nearby.size() ? view.nearby[from + k] : forever_module::NearbyUnit{});
+    }
+    return out;
 }

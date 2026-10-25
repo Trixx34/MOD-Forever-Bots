@@ -1,0 +1,99 @@
+{
+  // ---------------------------------------------------------------------------------------------------------------------------------------------
+  // Shadowfang Keep (map 33), levels 22-30.  Strategy file, schema 1.  Full field list and an example: doc/dungeon-strategy.md.
+  // These "//" and "/* */" comments are allowed in every dungeon file; the module ignores them. To change how bots run this dungeon, copy this file into your
+  // own folder (Module.forever-bots.DungeonDir = /path) and edit the copy: a file there for the same map REPLACES this one. A file with a mistake is logged
+  // (file, line, reason) and not used; the shipped one is used instead.
+  // Coordinates: x is north, y is west, z is up (the game's own axes). Boss numbers are creature entries (world database, creature_template).
+  // ---------------------------------------------------------------------------------------------------------------------------------------------
+  "schema": 1,
+  "id": "sfk",
+  "map": 33,
+  "name": "Shadowfang Keep",
+  "levels": [22, 30],
+  "roster": "2:1,5:5,8:8,2:9,5:4",
+  // Where the party gathers and how it gets in. "staging" = the place outside where the party rests until it is ready (health and mana up) before it goes in;
+  // "portal" = the instance entrance on the outside map; "entry" = where the party stands inside right after it enters (a revived party is put back here).
+  "entrance": {
+    "staging": { "map": 1, "x": 1629, "y": -4373, "z": 31 },
+    "portal": { "map": 0, "x": -233, "y": 1567.5, "z": 76.9 },
+    "entry": { "map": 33, "x": -228.19, "y": 2111.41, "z": 76.89 }
+  },
+  // Limits of one run: "duration_sec" = the run is over after this long, "wipe_recovery_sec" = how long the party gets to recover after a wipe.
+  "run": { "duration_sec": 1800, "wipe_recovery_sec": 300 },
+  // The path the leader walks, point after point (in order). A point with "boss": <entry> is where that boss is expected; the route waits there until that boss is
+  // seen dead, then goes on. Add, remove or move points to change the way; keep the first point near "entry" and every point reachable on foot.
+  "route": [
+    { "x": -204.0, "y": 2102.1, "z": 77.0 },
+    { "x": -192.0, "y": 2133.3, "z": 81.5 },
+    { "x": -200.5, "y": 2144.3, "z": 87.6 },
+    { "x": -210.7, "y": 2144.3, "z": 91.6 },
+    { "x": -233.1, "y": 2148.8, "z": 90.8 },
+    { "x": -242.1, "y": 2142.1, "z": 87.3 },
+    { "x": -252.3, "y": 2133.3, "z": 82.8 },
+    { "x": -253.3, "y": 2121.5, "z": 81.3, "boss": 3914 },  // boss: Rethilgore
+    { "x": -252.3, "y": 2133.3, "z": 82.6 },
+    { "x": -247.7, "y": 2143.2, "z": 87.0 },
+    { "x": -238.1, "y": 2152.8, "z": 90.8 },
+    { "x": -238.4, "y": 2163.7, "z": 90.2 },
+    { "x": -230.4, "y": 2179.5, "z": 81.4 },
+    { "x": -217.6, "y": 2194.4, "z": 80.9 },
+    { "x": -177.9, "y": 2222.4, "z": 79.8 },
+    { "x": -183.2, "y": 2243.2, "z": 76.4 },
+    { "x": -202.6, "y": 2258.0, "z": 76.3, "boss": 3886 },  // boss: Razorclaw the Butcher
+    { "x": -272.3, "y": 2293.1, "z": 77.4 },
+    { "x": -275.3, "y": 2297.3, "z": 76.2, "boss": 3887 },  // boss: Baron Silverlaine
+    { "x": -268.5, "y": 2289.6, "z": 76.4 },
+    { "x": -282.1, "y": 2292.3, "z": 83.6 },
+    { "x": -289.3, "y": 2300.5, "z": 90.8 },
+    { "x": -297.1, "y": 2287.7, "z": 96.6 },
+    { "x": -248.5, "y": 2262.4, "z": 100.9 },
+    { "x": -234.7, "y": 2261.3, "z": 102.5 },
+    { "x": -222.6, "y": 2259.4, "z": 102.8, "boss": 4278 },  // boss: Commander Springvale
+    { "x": -248.0, "y": 2243.7, "z": 101.4 },
+    { "x": -244.0, "y": 2232.3, "z": 97.2 },
+    { "x": -233.1, "y": 2227.2, "z": 93.7 },
+    { "x": -234.7, "y": 2216.5, "z": 97.4 },
+    { "x": -241.6, "y": 2189.3, "z": 97.4 },
+    { "x": -250.9, "y": 2162.1, "z": 95.6 },
+    { "x": -258.9, "y": 2149.3, "z": 92.6 },
+    { "x": -267.7, "y": 2144.3, "z": 96.1 },
+    { "x": -257.1, "y": 2139.5, "z": 100.1 },
+    { "x": -244.8, "y": 2142.4, "z": 100.1 },
+    { "x": -236.7, "y": 2146.1, "z": 100.1, "boss": 4279 }  // boss: Odo the Blindwatcher
+  ],
+  // The bosses, in the order the route meets them. "strategy" holds the tactics for each boss: pull, tank_position, interrupt, dispel, avoid, avoid_spells, kill_order,
+  // notes. Fields the bots act on today are listed in doc/dungeon-strategy.md ("what bots do today"); the others are kept but not used yet.
+  "bosses": [
+    {
+      // Rethilgore (creature entry 3914)
+      "entry": 3914,
+      "name": "Rethilgore",
+      "strategy": {}
+    },
+    {
+      // Razorclaw the Butcher (creature entry 3886)
+      "entry": 3886,
+      "name": "Razorclaw the Butcher",
+      "strategy": {}
+    },
+    {
+      // Baron Silverlaine (creature entry 3887)
+      "entry": 3887,
+      "name": "Baron Silverlaine",
+      "strategy": {}
+    },
+    {
+      // Commander Springvale (creature entry 4278)
+      "entry": 4278,
+      "name": "Commander Springvale",
+      "strategy": {}
+    },
+    {
+      // Odo the Blindwatcher (creature entry 4279)
+      "entry": 4279,
+      "name": "Odo the Blindwatcher",
+      "strategy": {}
+    }
+  ]
+}

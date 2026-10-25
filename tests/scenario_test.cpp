@@ -137,6 +137,61 @@ void DressesThenGroupsThenEnters()
     CHECK(director.Phase() == ScenarioPhase::Running && director.RouteActive());
 }
 
+void PartyRestsAtStagingBeforeEntering()
+{
+    ScenarioDirector director(Plan());
+    std::vector<BotAction> actions;
+    std::uint64_t t = 1000, tick = 1;
+    auto step = [&](std::vector<BotSnapshot> const& bots, std::uint64_t advance = 100)
+    {
+        actions.clear();
+        t += advance;
+        director.Decide(View(++tick, bots), t, actions);
+    };
+    std::vector<BotSnapshot> bots = { Bot(1, 0, 0, 0, 2, 3), Bot(2, 0, 0, 0, 1, 3), Bot(3, 0, 0, 0, 1, 3) };
+    for (int i = 0; i < 4; ++i)
+        step(bots, 3000);                                  // waiting, dressing, equip
+    for (int i = 0; i < 6 && director.Phase() != ScenarioPhase::Entering; ++i)
+        step(bots, 3000);
+    CHECK(director.Phase() == ScenarioPhase::Entering);
+    // Gear raised the maximum health: the party stands at 40 %. Nothing is sent while it rests.
+    for (BotSnapshot& bot : bots)
+        bot.health = 400;
+    step(bots, 5000);
+    CHECK(Count(actions, ActionType::kTeleport) == 0);
+    bots[1].health = 1000;
+    bots[2].health = 1000;                                  // two are healed, the tank is not
+    step(bots, 5000);
+    CHECK(Count(actions, ActionType::kTeleport) == 0);
+    bots[0].health = 950;                                   // 95 %: ready
+    bots[0].max_power = 1000;
+    bots[0].power = 300;                                    // a mana user at 30 % mana still has to drink
+    step(bots, 5000);
+    CHECK(Count(actions, ActionType::kTeleport) == 0);
+    bots[0].power = 900;
+    step(bots, 5000);
+    CHECK(Count(actions, ActionType::kTeleport, 1) == 1);   // the leader enters
+}
+
+void PartyEntersAfterTheRestCapEvenWhenHurt()
+{
+    ScenarioDirector director(Plan());
+    std::vector<BotAction> actions;
+    std::uint64_t t = 1000, tick = 1;
+    std::vector<BotSnapshot> bots = { Bot(1, 0, 0, 0, 2, 3), Bot(2, 0, 0, 0, 1, 3), Bot(3, 0, 0, 0, 1, 3) };
+    for (BotSnapshot& bot : bots)
+        bot.health = 300;
+    for (int i = 0; i < 30 && director.Phase() != ScenarioPhase::Entering; ++i)
+        director.Decide(View(++tick, bots), t += 3000, actions);
+    CHECK(director.Phase() == ScenarioPhase::Entering);
+    std::uint64_t const enteredAt = t;
+    actions.clear();
+    director.Decide(View(++tick, bots), enteredAt + kRecoverMaxMs - 5000, actions);
+    CHECK(Count(actions, ActionType::kTeleport) == 0);       // still resting
+    director.Decide(View(++tick, bots), enteredAt + kRecoverMaxMs + 1000, actions);
+    CHECK(Count(actions, ActionType::kTeleport, 1) == 1);    // the cap is over: it goes
+}
+
 ScenarioDirector RunningDirector(std::uint64_t& t, std::uint64_t& tick, std::vector<BotSnapshot>& bots, ScenarioPlan plan = Plan())
 {
     ScenarioDirector director(plan);
@@ -240,6 +295,111 @@ void LeaderWalksTheRouteWhileTheRouteIsActive()
         if (action.type == ActionType::kMoveTo && action.bot_guid == 12)
             toFirst = action.dest_y == 100.0f;
     CHECK(toFirst);
+}
+
+// Parallel parties (ScenarioParties): the route is on per party. Party 1 (bots 12, 13) is inside and running, party 2 (14, 15) is still at its staging place: only
+// the leader of party 1 walks, and a boss dead in one party's instance is not dead in the other's.
+// The director of one party sees its own bots with their own nearby units: the nearby slots are stored per bot position, so a subset must copy them along.
+void ASubsetViewKeepsTheNearbyUnitsOfItsBots()
+{
+    WorldTickSnapshotView view;
+    view.tick_number = 1;
+    view.max_nearby_units = 2;
+    view.bots = { Bot(10, 36, 0, 0), Bot(11, 36, 1, 0), Bot(12, 36, 2, 0) };
+    view.bots[0].nearby_count = 1;
+    view.bots[1].nearby_count = 1;
+    view.bots[2].nearby_count = 2;
+    view.nearby.resize(6);
+    view.nearby[0].guid = 100;                            // bot 10's unit
+    view.nearby[2].guid = 110;                            // bot 11's unit
+    view.nearby[4].guid = 120;
+    view.nearby[5].guid = 121;                            // bot 12's two units
+    WorldTickSnapshotView const part = SubsetView(view, [](std::uint64_t guid) { return guid == 11 || guid == 12; });
+    CHECK(part.bots.size() == 2);
+    CHECK(part.NearbyOf(0).size() == 1 && part.NearbyOf(0)[0].guid == 110);
+    CHECK(part.NearbyOf(1).size() == 2 && part.NearbyOf(1)[0].guid == 120 && part.NearbyOf(1)[1].guid == 121);
+}
+
+void TwoPartiesRunTheirRoutesApartFromEachOther()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 2;
+    options.PartyCount = 2;
+    options.ClassOf = [](std::uint64_t guid) { return (guid == 12 || guid == 14) ? 1u : 5u; };
+    options.Route = { { 0.0f, 100.0f, 0.0f }, { 0.0f, 200.0f, 0.0f } };
+    options.RouteBossAt[1] = 4242;
+    BotPolicy policy(options);
+    bool partyOneRuns = true;
+    std::set<std::uint32_t> const killed = { 4242 };
+    std::set<std::uint32_t> const none;
+    policy.SetRouteActiveFor([&partyOneRuns](std::uint64_t guid) { return partyOneRuns && (guid == 12 || guid == 13); });
+    policy.SetKilledBossesFor([&killed, &none](std::uint64_t guid) -> std::set<std::uint32_t> const& { return (guid == 12 || guid == 13) ? killed : none; });
+    std::vector<BotSnapshot> bots = { Bot(12, 36, 0, 0, 2, 2), Bot(13, 36, 5, 0, 1, 2), Bot(14, 0, 0, 0, 2, 2), Bot(15, 0, 5, 0, 1, 2) };
+    bool oneWalks = false;
+    int twoWalks = 0;
+    for (std::uint64_t at = 1000; at < 4000; at += 500)
+        for (BotAction const& action : policy.Decide(View(at / 500, bots), at))
+        {
+            oneWalks = oneWalks || (action.type == ActionType::kMoveTo && action.bot_guid == 12 && action.dest_y == 100.0f);
+            twoWalks += action.type == ActionType::kMoveTo && action.bot_guid == 14 && action.dest_y == 100.0f;
+        }
+    CHECK(oneWalks);
+    CHECK(twoWalks == 0);
+}
+
+void LeaderDoesNotWalkTheDungeonRouteOutsideTheDungeon()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 2;
+    options.PartyCount = 1;
+    options.ClassOf = [](std::uint64_t guid) { return guid == 12 ? 1u : 5u; };
+    options.Route = { { 0.0f, 100.0f, 0.0f }, { 0.0f, 200.0f, 0.0f } };
+    options.RouteMap = 36;
+    options.DungeonTeleport = true;
+    options.WanderWhenIdle = false;
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    // Revived at the graveyard on map 0: the route's points are coordinates of map 36, so there is nothing to walk to (and nothing to teleport to).
+    std::vector<BotSnapshot> outside = { Bot(12, 0, -10500, 1200, 2, 2), Bot(13, 0, -10500, 1203, 1, 2) };
+    int orders = 0;
+    for (std::uint64_t at = 1000; at < 90000; at += 500)
+        for (BotAction const& action : policy.Decide(View(at / 500, outside), at))
+            orders += (action.type == ActionType::kMoveTo || action.type == ActionType::kTeleport) && action.bot_guid == 12;
+    CHECK(orders == 0);
+    // Inside the dungeon it walks.
+    std::vector<BotSnapshot> inside = { Bot(12, 36, 0, 0, 2, 2), Bot(13, 36, 5, 0, 1, 2) };
+    bool toFirst = false;
+    for (BotAction const& action : policy.Decide(View(1000, inside), 100000))
+        toFirst = toFirst || (action.type == ActionType::kMoveTo && action.bot_guid == 12 && action.dest_y == 100.0f);
+    CHECK(toFirst);
+}
+
+void LeaderDropsARoutePointItHasAlreadyPassed()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 2;
+    options.PartyCount = 1;
+    options.ClassOf = [](std::uint64_t guid) { return guid == 12 ? 1u : 5u; };
+    options.Route = { { 0.0f, 100.0f, 0.0f }, { 0.0f, 200.0f, 0.0f }, { 0.0f, 300.0f, 0.0f } };
+    options.WanderWhenIdle = false;
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    // The fights drew the leader to y = 185: the first point (100 yards behind) is dropped, it walks to the second.
+    std::vector<BotSnapshot> bots = { Bot(12, 36, 0, 185, 2, 2), Bot(13, 36, 5, 185, 1, 2) };
+    float to = -1.0f;
+    for (BotAction const& action : policy.Decide(View(1, bots), 1000))
+        if (action.type == ActionType::kMoveTo && action.bot_guid == 12)
+            to = action.dest_y;
+    CHECK(to == 200.0f);
+    // A leader that is farther than the skip distance from the next point still goes to the first one.
+    BotPolicy slow(options);
+    slow.SetRouteActive(true);
+    std::vector<BotSnapshot> start = { Bot(12, 36, 0, 40, 2, 2), Bot(13, 36, 5, 40, 1, 2) };
+    to = -1.0f;
+    for (BotAction const& action : slow.Decide(View(1, start), 1000))
+        if (action.type == ActionType::kMoveTo && action.bot_guid == 12)
+            to = action.dest_y;
+    CHECK(to == 100.0f);
 }
 
 void LeaderWaitsForAMemberWhoFellBehind()
@@ -540,6 +700,34 @@ void Up(BotSnapshot& bot)
     bot.health = 1000;
 }
 
+void RevivedPartyOutsideIsPutBackAtTheEntry()
+{
+    std::uint64_t t, tick;
+    std::vector<BotSnapshot> bots;
+    ScenarioDirector director = RunningDirector(t, tick, bots);
+    std::vector<BotAction> actions;
+    // After a wipe the leader and one member are up at the graveyard on map 0; one member is still a ghost there.
+    for (BotSnapshot& bot : bots)
+        bot.map_id = 0;
+    Down(bots[2], 2);
+    director.Decide(View(++tick, bots), t += 1000, actions);
+    CHECK(Count(actions, ActionType::kTeleport) == 0);                 // not at once: they get up first
+    actions.clear();
+    director.Decide(View(++tick, bots), t += kReenterDelayMs, actions);
+    CHECK(Count(actions, ActionType::kTeleport, 1) == 1 && Count(actions, ActionType::kTeleport, 2) == 1);
+    CHECK(Count(actions, ActionType::kTeleport, 3) == 0);              // the ghost is not teleported
+    for (BotAction const& action : actions)
+        CHECK(action.spell_id == 36 && action.dest_x == -14.0f);
+    actions.clear();
+    director.Decide(View(++tick, bots), t += 1000, actions);
+    CHECK(Count(actions, ActionType::kTeleport) == 0);                 // and not again before the retry time
+    bots[0].map_id = 36;
+    bots[1].map_id = 36;
+    actions.clear();
+    director.Decide(View(++tick, bots), t += kEnterRetryMs, actions);
+    CHECK(Count(actions, ActionType::kTeleport) == 0);                 // they are back inside
+}
+
 void GhostCountsAsNotAlive()
 {
     std::uint64_t t, tick;
@@ -740,6 +928,13 @@ int main()
     FormatShowsEventsRevivedWipes();
     TimeoutEndsTheRun();
     EnteringTimesOut();
+    PartyRestsAtStagingBeforeEntering();
+    ASubsetViewKeepsTheNearbyUnitsOfItsBots();
+    TwoPartiesRunTheirRoutesApartFromEachOther();
+    LeaderDoesNotWalkTheDungeonRouteOutsideTheDungeon();
+    LeaderDropsARoutePointItHasAlreadyPassed();
+    RevivedPartyOutsideIsPutBackAtTheEntry();
+    PartyEntersAfterTheRestCapEvenWhenHurt();
     LeaderWalksTheRouteWhileTheRouteIsActive();
     LeaderWaitsForAMemberWhoFellBehind();
     LeaderMovesOnAfterTheFirstPoint();

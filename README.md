@@ -157,7 +157,8 @@ Without `FOREVER_MODULE_SDK_SOURCE`, CMake fetches `Trixx34/forever-module-sdk` 
 - `src/bot_settings.{h,cpp}`: the module's config. `src/bot_pick.{h,cpp}`: valid race/class combinations and the seeded pick.
 - `src/bot_ramp.{h,cpp}`: the ramp schedule. `src/bot_store.{h,cpp}`: the store row keys.
 - `src/bot_telemetry.{h,cpp}`, `src/rotating_file.{h,cpp}`: the telemetry CSV and its rotating file.
-- `src/dungeon_data.{h,cpp}`: the dungeon file (routes, bosses, entry) and its merge into the scenario config. `data/dungeons.txt`, `tools/make_dungeon.py`, `doc/dungeons.md`.
+- `src/dungeon_data.{h,cpp}`: the dungeon structures, the old text file (routes, bosses, entry) and its merge into the scenario config. `data/dungeons.txt`, `tools/make_dungeon.py`, `doc/dungeons.md`.
+- `src/dungeon_files.{h,cpp}`, `src/mini_json.{h,cpp}`: the per-dungeon JSON files (`data/dungeons/<map id>-<name>.json`: entrance, route, events, a block per boss), the override folder `DungeonDir` and the reload. `tools/convert_dungeons.py`, `doc/dungeon-strategy.md`.
 - `src/main.cpp`: handshake, config, control requests, revocations, the ramp timer and the Tier 2 pump thread.
 - `tests/*_test.cpp`: unit tests for each library.
 
@@ -227,4 +228,4 @@ lets the leader walk the route (it waits for members more than 30 yards behind a
 written when it ends: `scenario <name>: outcome=<complete|wipe|timeout|enter_failed> furthest=3/7 deaths=2 alive=3/5 run=412s`.
 `tests/scenario_test.cpp` covers the director, the route and the settings.
 
-**Dungeon runs (M9).** `DungeonFile = data/dungeons.txt` and `Dungeon = rfc` run a dungeon as a scenario: the file gives the roster (tank first, healer, three dps), the door and the entry, the boss list and the route, and `ScenarioRequireBosses` makes the run complete when every boss has been seen dead (`bosses_missing` if the leader reaches the end without). Keys you set yourself win over the file. The tank leads and pulls pack by pack, the healer heals, rest and corpse runs are the existing party and scenario logic. First slice, unit-tested only; the Ragefire Chasm route in the sample file is approximate. See `doc/dungeons.md`.
+**Dungeon runs (M9).** `DungeonFile = data/dungeons.txt` and `Dungeon = rfc` run a dungeon as a scenario: the file gives the roster (tank first, healer, three dps), the door and the entry, the boss list and the route, and `ScenarioRequireBosses` makes the run complete when every boss has been seen dead (`bosses_missing` if the leader reaches the end without). Keys you set yourself win over the file. The tank leads and pulls pack by pack, the healer heals, rest and corpse runs are the existing party and scenario logic. First slice, unit-tested only; the Ragefire Chasm route in the sample file is approximate. See `doc/dungeons.md`. **Since 0.19.0 each dungeon is one JSON file** (`data/dungeons/<map id>-<name>.json`) that you can edit, or replace from your own folder (`DungeonDir`) without touching the shipped files; a file with a mistake is logged and not used, and a config reload reads the files again. Format: `doc/dungeon-strategy.md`.

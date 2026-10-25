@@ -1,10 +1,12 @@
 // BotPolicy: decides what each controlled bot should do, from Tier 2 snapshots. Pure logic: it reads snapshots and returns
 // actions, so it is unit-tested with hand-built snapshots (tests/policy_test.cpp).
 //
-// Behaviour, in order: below 30% health disengage (follow the closest player, or stand still); with a target, approach it
+// Behaviour, in order: below 30% health disengage (follow its party leader if it has one, or stand still); with a target, approach it
 // when it is more than 5 yards away, otherwise attack it, and cast the class rotation (combat_rotation.h) once per global
 // cooldown; with no target, pull the closest hostile unless it is part of a group of more than three (over-pull control),
-// else follow the closest player or stand still. A threat target is always fought. The default stance is defensive: a bot
+// else follow its party leader or stand still. A bot nobody has invited into a group never follows a nearby player just
+// because it is close; it only follows a player when told to in chat (ChatFollow) or when it is that player's party member.
+// A threat target is always fought. The default stance is defensive: a bot
 // pulls only when it is aggressive (chat "aggressive") and otherwise joins a fight that its group or it is in. Decisions are sent when they change.
 // A refused cast is retried after a while, and its spell is not used again before then. A spell the snapshot reports as on
 // cooldown is skipped. Rend's bleed is tracked per target from accepted casts (layout 13 puts the bot's own auras in the
@@ -29,6 +31,7 @@
 #include "chat_commands.h"
 #include "combat_rotation.h"
 #include "grind_data.h"
+#include "ground_avoid.h"
 #include "quest_planner.h"
 #include "spell_costs.h"
 #include "crafting_foci.h"
@@ -95,6 +98,10 @@ struct PolicyOptions
     // Crafting (SDK 0.17, kSkillUp): a bot with nothing to fight makes bandages from cloth and cooks meat, which raises First Aid and Cooking and uses up what fills its
     // bags. Off by default (the core must know the action); the module turns it on from its settings.
     bool Crafting = false;
+    // SDK 0.19 (layout 21): a bot standing inside a harmful ground effect (a dynamic object or area trigger of a hostile caster, or a spell of AvoidSpells) walks
+    // out of it. Off by default (the core must fill the snapshot: Bot.Snapshot.GroundEffects = 1). AvoidSpells: data/avoid_spells.txt.
+    bool AvoidGroundEffects = false;
+    std::shared_ptr<ground_avoid::AvoidTable const> AvoidSpells;
     // The level from which a bot asks to mount up for a long walk (riding is learned at 40 in classic). 0 = any level (the policy tests).
     std::uint32_t MountMinLevel = 0;
     // SDK 0.18: with Crafting, the bot also makes things for the crafting profession it has (Blacksmithing, Leatherworking, Alchemy, Tailoring, Engineering, Smelting),
@@ -124,6 +131,8 @@ struct PolicyOptions
     bool AggressiveStart = false;
     // Dungeon route (doc 19): the waypoints the party leader walks, in order, while the route is active (SetRouteActive). Empty = none.
     std::vector<Point> Route;
+    // The map the Route is on (the scenario's dungeon). The leader walks the route only while it is on this map; 0 = any map (the policy tests).
+    std::uint32_t RouteMap = 0;
     // Which route points (0-based) are bosses, and the entry of the boss at each (ScenarioBossAt): the leader waits at such a point until that boss is dead.
     std::map<std::size_t, std::uint32_t> RouteBossAt;
     // The events of the scenario's dungeon (dungeon_events.h): the leader runs them along the route.
@@ -134,8 +143,27 @@ struct PolicyOptions
         std::vector<Point> Route;
         std::map<std::size_t, std::uint32_t> BossAt;
         std::vector<dungeon_events::Event> Events;
+        // From the dungeon file's bosses[].strategy: spell ids to avoid (avoid_spells) and fixed zones to stay out of (avoid), the places of a fight a bot must not stand in.
+        std::vector<std::uint32_t> AvoidSpells;
+        std::vector<ground_avoid::Circle> AvoidZones;
     };
     std::map<std::uint32_t, DungeonRoute> DungeonsByMap;
+    // Creature entry -> rank (0 first): the dungeon's kill priority. The damage dealers of a dungeon party fight the best-ranked live hostile next to the tank's target.
+    std::map<std::uint32_t, std::uint32_t> KillPriority;
+    // Dungeon tactics (the DungeonTactics setting), each on its own so a run can show what it is worth. Focus: the damage dealers take the pack's priority caster first
+    // (KillPriority). Interrupt: a bot with an interrupt in its rotation turns on a casting hostile of the tank's pack, one bot at a time. Heal: a healer heals a member
+    // below 75 % (not 60). Rest: the party holds a pull until every member has 90 % health and 80 % mana (not 80 and 60).
+    bool TacticFocus = true;
+    bool TacticInterrupt = true;
+    bool TacticHeal = true;
+    bool TacticRest = true;
+    // Recover: the leader of a dungeon party stands a dead member up at its side (the core's revive order) a few seconds after the fight, once it is up and quiet.
+    bool TacticRecover = true;
+    // Bounded knobs for offline dungeon-policy experiments; defaults preserve current behavior.
+    std::uint32_t DungeonHealBelowPct = 55;
+    std::uint32_t DungeonTankHealBelowPct = 75;
+    std::uint32_t HealerDpsManaPct = 40;
+    std::uint32_t HealerLosMoveYards = 6;
     // Auto gear (AutoGearing setting): every bot is dressed for its level when it first appears, and again after AutoGearEveryLevels levels.
     bool AutoGearing = false;
     // Receives one line per notable decision (a heal cast, a pull held back or released), for the run logs. Unset = silent.
@@ -188,7 +216,14 @@ public:
     // Actions for the bots in `view`. nowMs is a monotonic clock in milliseconds (cooldowns, retries, fight time).
     // Decisions are sent only when they change; casts follow the rotation, the global cooldown and the retries.
     // Turns the dungeon route on or off (the scenario director does, once the party is inside).
-    void SetRouteActive(bool active) { _routeActive = active; }
+    void SetRouteActive(bool active) { _routeActive = active; _routeActiveFn = nullptr; }
+    // Parallel parties: the route is active per bot (the director of the bot's own party says), and each party has its own killed bosses (a boss dead in one instance is
+    // alive in the next). With these set, SetRouteActive and SetKilledBosses are not used.
+    void SetRouteActiveFor(std::function<bool(std::uint64_t)> fn) { _routeActiveFn = std::move(fn); }
+    void SetKilledBossesFor(std::function<std::set<std::uint32_t> const&(std::uint64_t)> fn) { _killedBossesFn = std::move(fn); }
+    // The dungeons "tank lead" knows (routes, boss points, events), replaced between two Decide calls when the dungeon files are reloaded. A tank that is
+    // running a dungeon keeps the route it started with: its event runner has its own copy.
+    void SetDungeons(std::map<std::uint32_t, PolicyOptions::DungeonRoute> dungeons) { _options.DungeonsByMap = std::move(dungeons); }
     // The creature entries of the bosses seen dead so far (the scenario director's), for the route's boss points.
     void SetKilledBosses(std::set<std::uint32_t> const& entries) { _killedBosses = entries; }
 
@@ -309,6 +344,11 @@ private:
         Point NoRouteDest{};                             // the destination of the last move the core found no route to
         std::uint64_t NoRouteUntilMs = 0;                // a move to (about) that place is not sent before this time
         std::uint32_t NoRouteStreak = 0;                 // no-route answers in a row for that place: the pause doubles each time
+        std::uint64_t ReclaimDangerSinceMs = 0;          // since when a live hostile has stood near the ghost at its corpse (0 = none)
+        std::uint64_t FocusLoggedFor = 0;                // the unit a focus event was last written for (once per target)
+        ground_avoid::Point2 AvoidDest{};                // where the bot is walking to get out of a ground effect, kept for a few seconds so the point does not shift every tick
+        std::uint64_t AvoidSetMs = 0;                    // when AvoidDest was chosen (0 = none)
+        std::uint64_t AvoidLoggedMs = 0;                 // the last avoid_effect line for this bot (at most one per 10 s)
         std::uint64_t WalkBlockedAtMs = 0;               // when a move got the answer "no route": the walk (grind spot, hub, exploring) that began before it is over, and the bot picks another later
         std::uint64_t NoRouteLoggedMs = 0;               // when a no-route refusal of any action was last written to the log (diagnostics)
         std::uint32_t NoRouteSequence = 0;               // the last kNoRoute result read (last_action_sequence)
@@ -366,6 +406,9 @@ private:
         std::uint64_t LostSinceMs = 0;                   // a member has been far from its leader since this time (0 = not lost)
         std::uint64_t NextRecoverMs = 0;                 // no teleport back to the leader before this
         std::uint64_t RouteBossSinceMs = 0;              // when the leader began to wait at a boss point (0 = not waiting)
+        std::uint64_t MoveWhyLoggedMs = 0;               // when the policy last logged why a party bot moves (move_why)
+        Point MoveWhyDest{};
+        std::uint64_t RouteWalkLoggedMs = 0;             // when the leader's walk along the route was last written to the log (route_walk)
         std::uint32_t RouteNoRoute = 0;                  // moves in a row to the current dungeon waypoint that the core found no route for
         std::uint64_t TaxiBlockedUntilMs = 0;            // the core refused a flight: walk until this
         std::uint64_t TaxiWaitUntilMs = 0;               // a flight was ordered: give it time to show
@@ -399,6 +442,7 @@ private:
         std::uint64_t RangeCloserUntilMs = 0;            // standing closer to the target after an out-of-range refusal, until this time
         std::uint32_t LosRefusals = 0;                   // line-of-sight refusals in a row
         std::uint64_t CloserUntilMs = 0;                 // closing to melee range after a line-of-sight refusal, until this time
+        std::uint64_t LosRepositionTarget = 0;            // target of a healer DPS cast refused for LoS; move to clear it before retrying
         std::uint64_t HoldLastNotReadyMs = 0;            // the last tick the party was not ready (the pull hold ends after kPullHoldClearMs of readiness)
         std::uint64_t HoldSinceMs = 0;                   // the party leader waits for the party to be ready since this time (0 = not waiting)
         std::uint32_t GearedAtLevel = 0;                 // the level at the last auto gear (0 = not yet)
@@ -485,6 +529,8 @@ private:
     PolicyOptions _options;
     QuestPlanner _quests;
     bool _routeActive = false;
+    std::function<bool(std::uint64_t)> _routeActiveFn;
+    std::function<std::set<std::uint32_t> const&(std::uint64_t)> _killedBossesFn;
     std::map<std::uint32_t, std::set<std::uint32_t>> _tankKilled;   // map -> bosses seen dead during a "tank lead" run
     std::set<std::uint32_t> _killedBosses;
 };

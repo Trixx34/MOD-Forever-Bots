@@ -1,0 +1,132 @@
+{
+  // ---------------------------------------------------------------------------------------------------------------------------------------------
+  // Gnomeregan (map 90), levels 29-38.  Strategy file, schema 1.  Full field list and an example: doc/dungeon-strategy.md.
+  // These "//" and "/* */" comments are allowed in every dungeon file; the module ignores them. To change how bots run this dungeon, copy this file into your
+  // own folder (Module.forever-bots.DungeonDir = /path) and edit the copy: a file there for the same map REPLACES this one. A file with a mistake is logged
+  // (file, line, reason) and not used; the shipped one is used instead.
+  // Coordinates: x is north, y is west, z is up (the game's own axes). Boss numbers are creature entries (world database, creature_template).
+  // ---------------------------------------------------------------------------------------------------------------------------------------------
+  "schema": 1,
+  "id": "gnomer",
+  "map": 90,
+  "name": "Gnomeregan",
+  "levels": [29, 38],
+  "roster": "2:1,5:5,8:8,2:9,5:4",
+  // Where the party gathers and how it gets in. "staging" = the place outside where the party rests until it is ready (health and mana up) before it goes in;
+  // "portal" = the instance entrance on the outside map; "entry" = where the party stands inside right after it enters (a revived party is put back here).
+  "entrance": {
+    "staging": { "map": 1, "x": 1629, "y": -4373, "z": 31 },
+    "portal": { "map": 0, "x": -5162.6, "y": 927.8, "z": 257.2 },
+    "entry": { "map": 90, "x": -329.1, "y": -3.21, "z": -152.85 }
+  },
+  // Limits of one run: "duration_sec" = the run is over after this long, "wipe_recovery_sec" = how long the party gets to recover after a wipe.
+  "run": { "duration_sec": 1800, "wipe_recovery_sec": 300 },
+  // The path the leader walks, point after point (in order). A point with "boss": <entry> is where that boss is expected; the route waits there until that boss is
+  // seen dead, then goes on. Add, remove or move points to change the way; keep the first point near "entry" and every point reachable on foot.
+  "route": [
+    { "x": -356.3, "y": 9.9, "z": -152.6 },
+    { "x": -392.3, "y": 41.6, "z": -154.7 },
+    { "x": -405.3, "y": 42.7, "z": -154.7 },
+    { "x": -464.5, "y": 44.3, "z": -154.7 },
+    { "x": -474.4, "y": 52.5, "z": -154.5 },
+    { "x": -489.1, "y": 66.7, "z": -155.0 },
+    { "x": -502.1, "y": 81.9, "z": -154.7 },
+    { "x": -502.1, "y": 136.0, "z": -154.7 },
+    { "x": -490.7, "y": 149.3, "z": -154.5 },
+    { "x": -490.7, "y": 170.7, "z": -154.5 },
+    { "x": -498.4, "y": 178.9, "z": -154.5 },
+    { "x": -492.0, "y": 205.6, "z": -161.4 },
+    { "x": -498.7, "y": 222.1, "z": -172.6 },
+    { "x": -521.1, "y": 201.1, "z": -191.8 },
+    { "x": -543.2, "y": 161.3, "z": -193.7 },
+    { "x": -548.3, "y": 149.3, "z": -201.9 },
+    { "x": -530.1, "y": 115.5, "z": -204.3 },
+    { "x": -430.2, "y": 42.5, "z": -208.7, "boss": 7079 },  // boss: Viscous Fallout
+    { "x": -455.7, "y": 62.4, "z": -210.7 },
+    { "x": -448.3, "y": 193.9, "z": -207.8 },
+    { "x": -448.3, "y": 239.5, "z": -207.8 },
+    { "x": -454.4, "y": 254.1, "z": -207.8 },
+    { "x": -496.0, "y": 272.3, "z": -210.5 },
+    { "x": -512.0, "y": 277.3, "z": -211.5 },
+    { "x": -533.3, "y": 298.7, "z": -212.1 },
+    { "x": -538.7, "y": 312.0, "z": -216.9 },
+    { "x": -551.5, "y": 360.0, "z": -231.5 },
+    { "x": -568.0, "y": 408.0, "z": -230.5 },
+    { "x": -597.3, "y": 426.7, "z": -230.5 },
+    { "x": -611.7, "y": 429.1, "z": -230.5 },
+    { "x": -628.5, "y": 431.2, "z": -230.5 },
+    { "x": -640.0, "y": 426.7, "z": -230.5 },
+    { "x": -640.0, "y": 405.3, "z": -231.3 },
+    { "x": -627.2, "y": 373.9, "z": -247.0 },
+    { "x": -637.6, "y": 363.7, "z": -255.0 },
+    { "x": -709.9, "y": 427.7, "z": -271.3 },
+    { "x": -717.9, "y": 434.7, "z": -272.9 },
+    { "x": -746.7, "y": 426.7, "z": -272.9 },
+    { "x": -756.5, "y": 420.5, "z": -272.3 },
+    { "x": -877.3, "y": 427.5, "z": -272.3 },
+    { "x": -886.4, "y": 422.1, "z": -272.3 },
+    { "x": -892.5, "y": 387.7, "z": -272.3 },
+    { "x": -889.1, "y": 360.7, "z": -272.5, "boss": 6229 },  // boss: Crowd Pummeler 9-60
+    { "x": -893.1, "y": 378.1, "z": -272.3 },
+    { "x": -888.3, "y": 417.6, "z": -272.3 },
+    { "x": -881.1, "y": 426.4, "z": -272.3 },
+    { "x": -764.5, "y": 418.4, "z": -272.3 },
+    { "x": -746.7, "y": 426.7, "z": -272.9 },
+    { "x": -723.7, "y": 433.9, "z": -272.9 },
+    { "x": -711.7, "y": 436.8, "z": -272.9 },
+    { "x": -678.1, "y": 415.5, "z": -272.9 },
+    { "x": -618.7, "y": 459.2, "z": -272.9 },
+    { "x": -606.1, "y": 469.3, "z": -272.9 },
+    { "x": -603.7, "y": 484.5, "z": -272.9 },
+    { "x": -618.7, "y": 512.0, "z": -272.9 },
+    { "x": -640.0, "y": 533.3, "z": -273.0 },
+    { "x": -704.0, "y": 554.7, "z": -294.6 },
+    { "x": -737.6, "y": 564.5, "z": -303.7 },
+    { "x": -746.7, "y": 575.5, "z": -303.7 },
+    { "x": -746.7, "y": 593.3, "z": -303.7 },
+    { "x": -740.3, "y": 618.7, "z": -312.8 },
+    { "x": -725.3, "y": 677.6, "z": -330.6 },
+    { "x": -722.1, "y": 690.1, "z": -330.6 },
+    { "x": -706.7, "y": 700.3, "z": -330.6 },
+    { "x": -671.5, "y": 694.9, "z": -331.4 },
+    { "x": -597.3, "y": 682.7, "z": -326.9 },
+    { "x": -531.3, "y": 670.2, "z": -325.2, "boss": 7800 },  // boss: Mekgineer Thermaplugg
+    { "x": -623.5, "y": 682.7, "z": -326.9 },
+    { "x": -650.7, "y": 684.3, "z": -326.4 },
+    { "x": -661.3, "y": 685.3, "z": -326.9 },
+    { "x": -704.0, "y": 692.8, "z": -317.3 },
+    { "x": -714.9, "y": 687.2, "z": -317.3 },
+    { "x": -735.7, "y": 617.9, "z": -300.0 },
+    { "x": -741.9, "y": 583.5, "z": -290.4 },
+    { "x": -735.7, "y": 571.2, "z": -290.4 },
+    { "x": -698.4, "y": 559.9, "z": -282.1, "boss": 6228 }  // boss: Dark Iron Ambassador
+  ],
+  // The bosses, in the order the route meets them. "strategy" holds the tactics for each boss: pull, tank_position, interrupt, dispel, avoid, avoid_spells, kill_order,
+  // notes. Fields the bots act on today are listed in doc/dungeon-strategy.md ("what bots do today"); the others are kept but not used yet.
+  "bosses": [
+    {
+      // Viscous Fallout (creature entry 7079)
+      "entry": 7079,
+      "name": "Viscous Fallout",
+      "strategy": {}
+    },
+    {
+      // Crowd Pummeler 9-60 (creature entry 6229)
+      "entry": 6229,
+      "name": "Crowd Pummeler 9-60",
+      "strategy": {}
+    },
+    {
+      // Mekgineer Thermaplugg (creature entry 7800)
+      "entry": 7800,
+      "name": "Mekgineer Thermaplugg",
+      "strategy": {}
+    },
+    {
+      // Dark Iron Ambassador (creature entry 6228)
+      "entry": 6228,
+      "name": "Dark Iron Ambassador",
+      "strategy": {}
+    }
+  ]
+}

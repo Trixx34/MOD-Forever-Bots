@@ -1,4 +1,5 @@
 #include "dungeon_data.h"
+#include "dungeon_files.h"
 
 #include <charconv>
 #include <fstream>
@@ -27,7 +28,7 @@ bool ReadUint(std::istringstream& in, std::uint32_t& out)
     return true;
 }
 
-bool RosterOk(std::string const& roster)
+bool RosterOkImpl(std::string const& roster)
 {
     std::istringstream list(roster);
     std::string item;
@@ -68,6 +69,11 @@ std::string Trim(std::string text)
 }
 
 } // namespace
+
+bool DungeonRosterOk(std::string const& roster)
+{
+    return RosterOkImpl(roster);
+}
 
 std::vector<Dungeon> ParseDungeons(std::string_view text, std::vector<std::string>& warnings)
 {
@@ -145,7 +151,7 @@ std::vector<Dungeon> ParseDungeons(std::string_view text, std::vector<std::strin
         else if (key == "roster")
         {
             in >> d.Roster;
-            if (!RosterOk(d.Roster))
+            if (!RosterOkImpl(d.Roster))
                 fail("'roster' is not 1 to 5 race:class pairs separated by commas");
         }
         else if (key == "staging" || key == "portal" || key == "entry")
@@ -223,7 +229,15 @@ std::unordered_map<std::string, std::string> MergeDungeon(std::unordered_map<std
     auto const wanted = config.find("Dungeon");
     if (wanted == config.end() || wanted->second.empty())
         return config;
-    std::vector<Dungeon> const dungeons = ParseDungeons(text, warnings);
+    return MergeDungeonSet(config, ParseDungeons(text, warnings), warnings);
+}
+
+std::unordered_map<std::string, std::string> MergeDungeonSet(std::unordered_map<std::string, std::string> const& config, std::vector<Dungeon> const& dungeons,
+                                                             std::vector<std::string>& warnings)
+{
+    auto const wanted = config.find("Dungeon");
+    if (wanted == config.end() || wanted->second.empty())
+        return config;
     Dungeon const* found = nullptr;
     for (Dungeon const& d : dungeons)
         if (d.Id == wanted->second)
@@ -255,6 +269,14 @@ std::unordered_map<std::string, std::string> MergeDungeon(std::unordered_map<std
         set("ScenarioMinAlive", std::to_string(d.MinAlive));
     if (d.LeaderDeadAbandonSec != 0)
         set("ScenarioLeaderDeadAbandonSec", std::to_string(d.LeaderDeadAbandonSec));
+
+    if (!d.KillPriority.empty())
+    {
+        std::string order;
+        for (std::uint32_t entry : d.KillPriority)
+            order += (order.empty() ? "" : ",") + std::to_string(entry);
+        set("ScenarioKillPriority", order);
+    }
 
     std::string bosses;
     for (DungeonWaypoint const& point : d.Route)
@@ -289,16 +311,14 @@ std::unordered_map<std::string, std::string> MergeDungeonFile(std::unordered_map
                                                               std::vector<std::string>& warnings)
 {
     auto const wanted = config.find("Dungeon");
-    auto const file = config.find("DungeonFile");
-    if (wanted == config.end() || wanted->second.empty() || file == config.end() || file->second.empty())
+    if (wanted == config.end() || wanted->second.empty())
         return config;
-    std::ifstream in(file->second);
-    if (!in)
-    {
-        warnings.push_back("Module.forever-bots.DungeonFile: cannot read '" + file->second + "'; no dungeon run.");
+    DungeonSources const sources = SourcesFromConfig(config);
+    if (sources.File.empty() && sources.DataDir.empty() && sources.OverrideDir.empty())
         return config;
-    }
-    std::ostringstream text;
-    text << in.rdbuf();
-    return MergeDungeon(config, text.str(), warnings);
+    std::size_t const before = warnings.size();
+    DungeonSet const set = LoadDungeonSet(sources, warnings);
+    if (set.Dungeons.empty() && warnings.size() > before)
+        return config; // nothing could be read: the warnings above say why, and there is no dungeon run
+    return MergeDungeonSet(config, set.Dungeons, warnings);
 }

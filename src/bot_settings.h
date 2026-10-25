@@ -59,6 +59,11 @@ struct ScenarioSettings
     std::uint32_t MinAlive = 0;                          // 0 = the understrength stop is off
     std::uint32_t LeaderDeadAbandonSec = 0;              // 0 = off
     bool RequireBosses = false;
+    // ScenarioParties (1 to 8, default 1): this many parties of the roster run at the same time, each with its own director and its own dungeon instance (the core makes an
+    // instance per group). Bot guids in order are cut into parties of the roster's size, as the policy's party logic does. MaxBots must cover Parties x roster.
+    std::uint32_t Parties = 1;
+    // ScenarioKillPriority = "entry,entry,..": creature entries in the order the party kills them (the dungeon file's kill_priority).
+    std::vector<std::uint32_t> KillPriority;
     bool HasPortal = false;
     std::array<float, 4> Portal{};                       // map, x, y, z: the instance door, outside
 };
@@ -150,6 +155,18 @@ struct BotSettings
     // Crafting = 1 (default): a bot with nothing to fight makes bandages from its cloth and cooks its meat (kSkillUp, SDK 0.17; the core must have the action), which
     // raises First Aid and Cooking and uses up what fills its bags. 0 turns it off.
     bool Crafting = true;
+    // DungeonTactics = "focus,interrupt,heal,rest,recover" or "all" or "none" (default: none): which of the dungeon party's tactics are on (bot_policy.h). In the first sim
+    // runs (docs/99-deadmines-runs.md) all of them on did slightly worse than none (2.0 bosses and 36 deaths against 2.25 and 14), and no single tactic is proven yet, so they
+    // are off until each has a run of its own that shows a gain.
+    bool TacticFocus = false, TacticInterrupt = false, TacticHeal = false, TacticRest = false, TacticRecover = false;
+    // Bounded policy-lab knobs; defaults match the built-in dungeon policy.
+    std::uint32_t DungeonHealBelowPct = 55;
+    std::uint32_t DungeonTankHealBelowPct = 75;
+    std::uint32_t HealerDpsManaPct = 40;
+    std::uint32_t HealerLosMoveYards = 6;
+    // ActionStats = 1: every minute the module logs the ten (bot, action, spell) combinations it sent most often in that minute ("actions_top"), to find a bot that
+    // repeats an action every tick. Off by default.
+    bool ActionStats = false;
     // MountMinLevel (default 40): a bot asks to mount up for a long walk only from this level (classic riding is learned at 40). 0 = at any level.
     std::uint32_t MountMinLevel = 40;
     // Gathering = 1: a bot with Mining, Herbalism or Skinning asks the core to gather what is near it (kGather, SDK 0.18). Off by default.
@@ -157,8 +174,17 @@ struct BotSettings
     // CraftingFociFile (data/crafting_foci.txt): the anvils, forges and cooking fires of the capitals. With it, a bot whose recipes need a focus (kNeedsFocus) walks to
     // the nearest one on its map; without it the skill just waits. Use an absolute path: the worldserver's working directory is not the module's.
     std::string CraftingFociFile;
+    // AvoidGroundEffects = 1 (off by default): a bot standing inside a harmful ground effect (SDK 0.19: the core must have Bot.Snapshot.GroundEffects = 1) walks out of it.
+    // AvoidSpellsFile (absolute path, data/avoid_spells.txt): the Classic dungeons' spells that leave one; a spell in it counts as harmful even if the caster is not
+    // known to be hostile. The dungeon files' bosses[].strategy.avoid_spells and avoid (fixed zones) add to it for their map.
+    bool AvoidGroundEffects = false;
+    std::string AvoidSpellsFile;
     bool DungeonReviveOutOfCombat = false;  // DungeonReviveOutOfCombat = 1: a dead member of a dungeon party is revived by its leader out of combat (needs Bot.Chat.Orders.Enabled in the core)
     std::string DungeonFile;
+    // DungeonDataDir (default: the folder "dungeons" beside DungeonFile) holds the shipped per-dungeon JSON files; DungeonDir is your own folder of them, whose file for a map
+    // replaces the shipped one (doc/dungeon-strategy.md). Both are read again when the config is reloaded.
+    std::string DungeonDataDir;
+    std::string DungeonDir;
     std::string DungeonEventsFile;
     // Flight points (layout 17; config keys Taxi, TaxiMinWalkYards, TaxiMasterMaxYards, TaxiBlockedSec; off by default): a bot that is not in a party replaces a walk
     // of at least TaxiMinWalkYards with a flight from a flight master within TaxiMasterMaxYards that lies on the way. Needs Bot.Taxi.Enabled in the core (on by default).

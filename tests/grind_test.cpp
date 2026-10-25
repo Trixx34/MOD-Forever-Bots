@@ -281,7 +281,8 @@ void UnpullableCreaturesDoNotKeepTheBotFromWalking()
 }
 
 // Bots standing together (a start zone) used to follow the nearest of each other forever, in circles. Another bot is not a player to follow: the
-// bot walks to a grind spot. A real player (not one of the controlled bots) is still followed.
+// bot walks to a grind spot. A real player (not one of the controlled bots, and not an invite) is not followed either: it walks to the grind
+// spot just the same (fix/random-bot-no-auto-follow).
 void BotsDoNotFollowEachOther()
 {
     std::vector<std::string> warnings;
@@ -315,7 +316,7 @@ void BotsDoNotFollowEachOther()
     CHECK(!followed);
     CHECK(walked);
 
-    // A real player (not controlled by the module) in view is followed.
+    // A real player (not controlled by the module, and not an invite) in view is not followed either.
     WorldTickSnapshotView withPlayer = OneBot(1, 0);
     withPlayer.max_nearby_units = 2;
     withPlayer.nearby.assign(2, forever_module::NearbyUnit{});
@@ -328,7 +329,7 @@ void BotsDoNotFollowEachOther()
     for (std::uint64_t now = 1000; now <= 5000; now += 1000)
         for (BotAction const& action : other.Decide(withPlayer, now))
             followsPlayer = followsPlayer || action.type == ActionType::kFollow;
-    CHECK(followsPlayer);
+    CHECK(!followsPlayer);
 }
 
 } // namespace

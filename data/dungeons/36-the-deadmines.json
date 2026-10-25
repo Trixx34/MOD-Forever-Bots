@@ -1,0 +1,210 @@
+{
+  // ---------------------------------------------------------------------------------------------------------------------------------------------
+  // Deadmines (map 36), levels 18-23.  Strategy file, schema 1.  Full field list and an example: doc/dungeon-strategy.md.
+  // These "//" and "/* */" comments are allowed in every dungeon file; the module ignores them. To change how bots run this dungeon, copy this file into your
+  // own folder (Module.forever-bots.DungeonDir = /path) and edit the copy: a file there for the same map REPLACES this one. A file with a mistake is logged
+  // (file, line, reason) and not used; the shipped one is used instead.
+  // Coordinates: x is north, y is west, z is up (the game's own axes). Boss numbers are creature entries (world database, creature_template).
+  // ---------------------------------------------------------------------------------------------------------------------------------------------
+  "schema": 1,
+  "id": "dm",
+  "map": 36,
+  "name": "Deadmines",
+  "levels": [18, 23],
+  "roster": "2:1,5:5,8:8,2:9,5:4",
+  // Where the party gathers and how it gets in. "staging" = the place outside where the party rests until it is ready (health and mana up) before it goes in;
+  // "portal" = the instance entrance on the outside map; "entry" = where the party stands inside right after it enters (a revived party is put back here).
+  "entrance": {
+    "staging": { "map": 1, "x": 1629, "y": -4373, "z": 31 },
+    "portal": { "map": 0, "x": -11208.7, "y": 1675.9, "z": 24.6 },
+    "entry": { "map": 36, "x": -14.57, "y": -385.48, "z": 62.46 }
+  },
+  // Limits of one run: "duration_sec" = the run is over after this long, "wipe_recovery_sec" = how long the party gets to recover after a wipe.
+  "run": { "duration_sec": 1800, "wipe_recovery_sec": 300 },
+  // The path the leader walks, point after point (in order). A point with "boss": <entry> is where that boss is expected; the route waits there until that boss is
+  // seen dead, then goes on. Add, remove or move points to change the way; keep the first point near "entry" and every point reachable on foot.
+  "route": [
+    { "x": -25.3, "y": -378.9, "z": 61.1 },
+    { "x": -67.7, "y": -379.2, "z": 55.0 },
+    { "x": -88.3, "y": -378.7, "z": 58.5 },
+    { "x": -106.7, "y": -384.0, "z": 57.1 },
+    { "x": -137.9, "y": -397.6, "z": 60.6 },
+    { "x": -163.5, "y": -404.3, "z": 59.3 },
+    { "x": -174.1, "y": -413.3, "z": 56.9 },
+    { "x": -192.0, "y": -448.0, "z": 54.5 },
+    { "x": -191.7, "y": -453.2, "z": 54.6, "boss": 644 },  // boss: Rhahk'Zor
+    { "x": -191.5, "y": -471.5, "z": 54.2 },
+    { "x": -194.4, "y": -492.8, "z": 53.7 },
+    { "x": -204.5, "y": -501.1, "z": 52.6 },
+    { "x": -234.7, "y": -490.7, "z": 50.7 },
+    { "x": -259.5, "y": -485.9, "z": 49.7 },
+    { "x": -286.7, "y": -505.1, "z": 50.2 },
+    { "x": -289.5, "y": -513.0, "z": 49.7, "boss": 642 },  // boss: Sneed's Shredder
+    { "x": -298.4, "y": -588.8, "z": 48.4 },
+    { "x": -289.6, "y": -593.6, "z": 50.0 },
+    { "x": -256.0, "y": -576.0, "z": 51.3 },
+    { "x": -241.9, "y": -575.7, "z": 51.3 },
+    { "x": -213.3, "y": -561.1, "z": 52.4 },
+    { "x": -200.3, "y": -560.0, "z": 52.4 },
+    { "x": -188.5, "y": -569.3, "z": 52.7 },
+    { "x": -185.9, "y": -580.0, "z": 47.1 },
+    { "x": -192.0, "y": -597.3, "z": 36.4 },
+    { "x": -206.1, "y": -598.7, "z": 30.5 },
+    { "x": -218.7, "y": -593.3, "z": 23.1 },
+    { "x": -177.4, "y": -574.5, "z": 19.3, "boss": 1763 },  // boss: Gilnid
+    { "x": -141.3, "y": -583.7, "z": 18.8 },
+    { "x": -128.0, "y": -618.7, "z": 13.2 },
+    { "x": -95.7, "y": -674.1, "z": 7.6 },
+    { "x": -85.3, "y": -678.9, "z": 4.1 },
+    { "x": -60.5, "y": -734.7, "z": 0.1 },
+    { "x": -42.7, "y": -746.7, "z": 0.1 },
+    { "x": -20.5, "y": -760.8, "z": 1.7 },
+    { "x": -13.9, "y": -769.9, "z": 5.2 },
+    { "x": -5.6, "y": -778.9, "z": 9.7 },
+    { "x": -22.8, "y": -797.3, "z": 20.4, "boss": 646 },  // boss: Mr. Smite
+    { "x": -21.3, "y": -810.7, "z": 19.6 },
+    { "x": -18.9, "y": -820.5, "z": 19.9 },
+    { "x": -25.9, "y": -833.9, "z": 19.6 },
+    { "x": -33.1, "y": -842.1, "z": 19.1 },
+    { "x": -43.7, "y": -849.6, "z": 18.8 },
+    { "x": -59.5, "y": -853.9, "z": 17.5 },
+    { "x": -85.3, "y": -853.3, "z": 17.5 },
+    { "x": -110.0, "y": -844.9, "z": 16.9, "boss": 645 },  // boss: Cookie
+    { "x": -85.3, "y": -853.3, "z": 17.5 },
+    { "x": -59.5, "y": -853.9, "z": 17.5 },
+    { "x": -43.7, "y": -849.6, "z": 18.8 },
+    { "x": -33.1, "y": -842.1, "z": 19.1 },
+    { "x": -21.3, "y": -832.0, "z": 19.9 },
+    { "x": -18.9, "y": -820.5, "z": 19.9 },
+    { "x": -23.2, "y": -807.5, "z": 19.6 },
+    { "x": -45.6, "y": -787.7, "z": 18.5 },
+    { "x": -80.5, "y": -786.9, "z": 17.5 },
+    { "x": -106.7, "y": -787.7, "z": 17.5 },
+    { "x": -96.0, "y": -781.1, "z": 22.3 },
+    { "x": -100.5, "y": -794.4, "z": 28.1 },
+    { "x": -64.0, "y": -789.3, "z": 39.6 },
+    { "x": -53.1, "y": -794.1, "z": 38.5 },
+    { "x": -48.5, "y": -804.0, "z": 42.8 },
+    { "x": -69.0, "y": -808.0, "z": 40.8, "boss": 647 },  // boss: Captain Greenskin
+    { "x": -75.2, "y": -818.1, "z": 40.4 },
+    { "x": -87.4, "y": -819.9, "z": 39.3, "boss": 639 }  // boss: Edwin VanCleef
+  ],
+  // Kill order when the party fights a pack (used with the focus tactic, Module.forever-bots.DungeonTactics): creature entries, first = killed first
+  // (Defias Evoker, Wizard, Squallshaper, Goblin Craftsman, Engineer, Overseer). Off by default until a sim run shows it helps.
+  "kill_priority": [1729, 4418, 1731, 1732, 622, 634],
+  // The bosses, in the order the route meets them. "strategy" holds the tactics for each boss: pull, tank_position, interrupt, dispel, avoid, avoid_spells, kill_order,
+  // notes. Fields the bots act on today are listed in doc/dungeon-strategy.md ("what bots do today"); the others are kept but not used yet.
+  "bosses": [
+    {
+      // Rhahk'Zor (creature entry 644)
+      // first boss, in the Factory; a hard hitter for this level: the tank takes it alone and the party stays together (killed in test runs).
+      "entry": 644,
+      "name": "Rhahk'Zor",
+      "strategy": {}
+    },
+    {
+      // Sneed's Shredder (creature entry 642)
+      // Sneed's Shredder: kill the Shredder, Sneed then comes out of it as a second fight (general classic knowledge). The room before it (Defias Evokers and Goblin Engineers) wiped 4 of 5 bots in test run 6 (2026-10-21): casters first, interrupt their casts, step out of the Evoker's Flamestrike (spell 11829).
+      "entry": 642,
+      "name": "Sneed's Shredder",
+      "strategy": {}
+    },
+    {
+      // Gilnid (creature entry 1763)
+      // Gilnid, in the Foundry; the Foundry Door lever opens the way (see events).
+      "entry": 1763,
+      "name": "Gilnid",
+      "strategy": {}
+    },
+    {
+      // Mr. Smite (creature entry 646)
+      // Mr. Smite: in classic he stuns the party and speeds up as his health falls (general knowledge, not checked on this server): keep the healer alive and do not spread out.
+      "entry": 646,
+      "name": "Mr. Smite",
+      "strategy": {}
+    },
+    {
+      // Cookie (creature entry 645)
+      // Cookie, in the ship's galley.
+      "entry": 645,
+      "name": "Cookie",
+      "strategy": {}
+    },
+    {
+      // Captain Greenskin (creature entry 647)
+      // Captain Greenskin, on the ship.
+      "entry": 647,
+      "name": "Captain Greenskin",
+      "strategy": {}
+    },
+    {
+      // Edwin VanCleef (creature entry 639)
+      // Edwin VanCleef, the last boss, on the ship (the Defias Cannon event opens the way).
+      "entry": 639,
+      "name": "Edwin VanCleef",
+      "strategy": {}
+    }
+  ],
+  // Things the party must do to get on: doors, levers and the like. "trigger" says when it runs (near a place, after a boss dies, or at the start), "steps" what to
+  // do (use an object or item at a place, wait N seconds). An event that is already done (a door already open) does nothing; one that fails three times or runs
+  // too long is given up with a log line (event_failed / event_timeout).
+  "events": [
+    {
+      // Factory Door 13965 at (-191.4, -457.4, 54.4): opened by this lever (object 101831). Rhahk'Zor's room is behind it.
+      "id": "factory-lever",
+      "name": "Factory Door (lever)",
+      "trigger": { "type": "near", "x": -188.1, "y": -460.3, "z": 54.6, "radius": 35 },
+      "steps": [
+        { "type": "use", "object": 101831, "x": -188.1, "y": -460.3, "z": 54.6 }
+      ]
+    },
+    {
+      // Heavy Door 17153 (north): opened by a click on the door itself.
+      "id": "heavy-door-1",
+      "name": "Heavy Door (north)",
+      "trigger": { "type": "near", "x": -262.7, "y": -482.4, "z": 49.4, "radius": 30 },
+      "steps": [
+        { "type": "use", "object": 17153, "x": -262.7, "y": -482.4, "z": 49.4 }
+      ]
+    },
+    {
+      // Heavy Door 17154 (south): opened by a click on the door itself.
+      "id": "heavy-door-2",
+      "name": "Heavy Door (south)",
+      "trigger": { "type": "near", "x": -243.0, "y": -578.6, "z": 51.1, "radius": 30 },
+      "steps": [
+        { "type": "use", "object": 17154, "x": -243.0, "y": -578.6, "z": 51.1 }
+      ]
+    },
+    {
+      // Foundry Door 16399 at (-168.5, -579.9, 19.3): opened by this lever (object 101834). Gilnid's foundry is behind it.
+      "id": "foundry-lever",
+      "name": "Foundry Door (lever)",
+      "trigger": { "type": "near", "x": -165.4, "y": -576.9, "z": 19.3, "radius": 30 },
+      "steps": [
+        { "type": "use", "object": 101834, "x": -165.4, "y": -576.9, "z": 19.3 }
+      ]
+    },
+    {
+      // Mast Room Door 16400 at (-290.3, -537.0, 49.4): opened by this lever (object 101832).
+      "id": "mast-lever",
+      "name": "Mast Room Door (lever)",
+      "trigger": { "type": "near", "x": -287.3, "y": -539.9, "z": 49.4, "radius": 30 },
+      "steps": [
+        { "type": "use", "object": 101832, "x": -287.3, "y": -539.9, "z": 49.4 }
+      ]
+    },
+    {
+      // Iron Clad Door 16397 at (-100.5, -668.8, 7.4): opened by firing the Defias Cannon (object 16398) with Defias Gunpowder (item 5397, the core gives the bot one).
+      // Firing it also summons two Defias Squallshapers, which the party then fights. 'timeout_sec' = give up on this event after that long.
+      "id": "iron-clad",
+      "name": "Iron Clad Door (Defias Cannon)",
+      "trigger": { "type": "near", "x": -107.6, "y": -659.7, "z": 7.2, "radius": 40 },
+      "steps": [
+        { "type": "use", "object": 16398, "x": -107.6, "y": -659.7, "z": 7.2, "item": 5397 },
+        { "type": "wait", "seconds": 4 }
+      ],
+      "timeout_sec": 90
+    }
+  ]
+}

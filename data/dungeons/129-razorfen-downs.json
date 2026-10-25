@@ -1,0 +1,149 @@
+{
+  // ---------------------------------------------------------------------------------------------------------------------------------------------
+  // Razorfen Downs (map 129), levels 37-46.  Strategy file, schema 1.  Full field list and an example: doc/dungeon-strategy.md.
+  // These "//" and "/* */" comments are allowed in every dungeon file; the module ignores them. To change how bots run this dungeon, copy this file into your
+  // own folder (Module.forever-bots.DungeonDir = /path) and edit the copy: a file there for the same map REPLACES this one. A file with a mistake is logged
+  // (file, line, reason) and not used; the shipped one is used instead.
+  // Coordinates: x is north, y is west, z is up (the game's own axes). Boss numbers are creature entries (world database, creature_template).
+  // ---------------------------------------------------------------------------------------------------------------------------------------------
+  "schema": 1,
+  "id": "rfd",
+  "map": 129,
+  "name": "Razorfen Downs",
+  "levels": [37, 46],
+  "roster": "2:1,5:5,8:8,2:9,5:4",
+  // Where the party gathers and how it gets in. "staging" = the place outside where the party rests until it is ready (health and mana up) before it goes in;
+  // "portal" = the instance entrance on the outside map; "entry" = where the party stands inside right after it enters (a revived party is put back here).
+  "entrance": {
+    "staging": { "map": 1, "x": 1629, "y": -4373, "z": 31 },
+    "portal": { "map": 1, "x": -4659.6, "y": -2524.2, "z": 81.4 },
+    "entry": { "map": 129, "x": 2593.68, "y": 1111.23, "z": 50.95 }
+  },
+  // Limits of one run: "duration_sec" = the run is over after this long, "wipe_recovery_sec" = how long the party gets to recover after a wipe.
+  "run": { "duration_sec": 1800, "wipe_recovery_sec": 300 },
+  // The path the leader walks, point after point (in order). A point with "boss": <entry> is where that boss is expected; the route waits there until that boss is
+  // seen dead, then goes on. Add, remove or move points to change the way; keep the first point near "entry" and every point reachable on foot.
+  "route": [
+    { "x": 2587.7, "y": 1096.8, "z": 53.3 },
+    { "x": 2578.9, "y": 1090.9, "z": 51.4 },
+    { "x": 2558.1, "y": 1055.5, "z": 52.0 },
+    { "x": 2538.7, "y": 1045.3, "z": 46.6 },
+    { "x": 2517.3, "y": 1045.3, "z": 47.4 },
+    { "x": 2474.7, "y": 1066.7, "z": 47.7 },
+    { "x": 2444.5, "y": 1078.4, "z": 42.9 },
+    { "x": 2432.0, "y": 1082.7, "z": 38.4 },
+    { "x": 2421.6, "y": 1085.1, "z": 34.9 },
+    { "x": 2410.1, "y": 1085.9, "z": 31.7 },
+    { "x": 2396.5, "y": 1075.7, "z": 30.1 },
+    { "x": 2389.3, "y": 1066.7, "z": 27.7 },
+    { "x": 2380.8, "y": 1047.5, "z": 25.0 },
+    { "x": 2416.3, "y": 1039.5, "z": 25.8 },
+    { "x": 2426.7, "y": 1037.6, "z": 25.8 },
+    { "x": 2468.7, "y": 1006.8, "z": 23.8, "boss": 8567 },  // boss: Glutton
+    { "x": 2453.3, "y": 1024.0, "z": 25.6 },
+    { "x": 2426.7, "y": 1037.6, "z": 25.8 },
+    { "x": 2416.3, "y": 1039.5, "z": 25.8 },
+    { "x": 2401.9, "y": 1040.8, "z": 25.8 },
+    { "x": 2368.0, "y": 1028.5, "z": 25.8 },
+    { "x": 2338.9, "y": 987.2, "z": 28.2 },
+    { "x": 2333.1, "y": 975.2, "z": 29.0 },
+    { "x": 2336.0, "y": 960.0, "z": 29.6 },
+    { "x": 2341.3, "y": 950.4, "z": 29.8 },
+    { "x": 2368.0, "y": 927.7, "z": 30.1 },
+    { "x": 2380.0, "y": 918.1, "z": 30.6 },
+    { "x": 2394.9, "y": 913.6, "z": 32.8 },
+    { "x": 2410.7, "y": 913.1, "z": 33.6 },
+    { "x": 2453.3, "y": 947.5, "z": 36.0, "boss": 7354 },  // boss: Ragglesnout
+    { "x": 2446.9, "y": 991.5, "z": 37.8 },
+    { "x": 2442.7, "y": 1001.9, "z": 38.9 },
+    { "x": 2431.2, "y": 1011.5, "z": 37.3 },
+    { "x": 2377.9, "y": 1008.0, "z": 40.0 },
+    { "x": 2368.0, "y": 1002.7, "z": 39.2 },
+    { "x": 2353.3, "y": 974.1, "z": 40.0 },
+    { "x": 2358.7, "y": 962.7, "z": 45.0 },
+    { "x": 2370.9, "y": 941.3, "z": 42.4 },
+    { "x": 2382.7, "y": 937.9, "z": 44.2 },
+    { "x": 2405.9, "y": 936.0, "z": 44.5 },
+    { "x": 2421.1, "y": 949.3, "z": 46.6 },
+    { "x": 2423.7, "y": 964.8, "z": 47.2 },
+    { "x": 2423.7, "y": 975.5, "z": 49.6 },
+    { "x": 2422.4, "y": 989.9, "z": 49.8 },
+    { "x": 2396.5, "y": 989.6, "z": 53.3 },
+    { "x": 2403.4, "y": 960.9, "z": 55.1, "boss": 7358 },  // boss: Amnennar the Coldbringer
+    { "x": 2392.8, "y": 988.0, "z": 54.6 },
+    { "x": 2419.2, "y": 990.4, "z": 50.1 },
+    { "x": 2423.7, "y": 975.5, "z": 49.6 },
+    { "x": 2423.7, "y": 964.8, "z": 47.2 },
+    { "x": 2421.9, "y": 950.7, "z": 46.1 },
+    { "x": 2412.0, "y": 934.7, "z": 44.8 },
+    { "x": 2368.0, "y": 938.7, "z": 42.4 },
+    { "x": 2346.7, "y": 960.0, "z": 43.4 },
+    { "x": 2346.7, "y": 981.3, "z": 40.2 },
+    { "x": 2368.0, "y": 1002.7, "z": 39.2 },
+    { "x": 2377.9, "y": 1008.0, "z": 40.0 },
+    { "x": 2389.3, "y": 1008.3, "z": 38.9 },
+    { "x": 2404.3, "y": 1007.2, "z": 38.4 },
+    { "x": 2427.5, "y": 1012.5, "z": 37.3 },
+    { "x": 2436.5, "y": 1007.7, "z": 37.8 },
+    { "x": 2445.3, "y": 996.0, "z": 38.1 },
+    { "x": 2446.7, "y": 983.7, "z": 37.3 },
+    { "x": 2432.0, "y": 917.3, "z": 33.0 },
+    { "x": 2410.7, "y": 913.1, "z": 33.6 },
+    { "x": 2394.9, "y": 913.6, "z": 32.8 },
+    { "x": 2368.0, "y": 917.3, "z": 29.3 },
+    { "x": 2346.7, "y": 938.7, "z": 28.5 },
+    { "x": 2337.1, "y": 957.1, "z": 29.3 },
+    { "x": 2333.3, "y": 967.7, "z": 29.3 },
+    { "x": 2346.7, "y": 1024.0, "z": 25.6 },
+    { "x": 2394.4, "y": 1040.8, "z": 25.6 },
+    { "x": 2416.3, "y": 1039.5, "z": 25.8 },
+    { "x": 2426.7, "y": 1037.6, "z": 25.8 },
+    { "x": 2437.1, "y": 1029.1, "z": 26.1 },
+    { "x": 2453.3, "y": 1010.7, "z": 27.2 },
+    { "x": 2463.2, "y": 986.9, "z": 27.2 },
+    { "x": 2468.5, "y": 969.6, "z": 26.6 },
+    { "x": 2469.1, "y": 956.0, "z": 25.6 },
+    { "x": 2464.5, "y": 903.5, "z": 28.0 },
+    { "x": 2462.4, "y": 889.9, "z": 29.3 },
+    { "x": 2450.7, "y": 838.7, "z": 44.8 },
+    { "x": 2447.7, "y": 824.0, "z": 44.5 },
+    { "x": 2447.5, "y": 809.6, "z": 45.0 },
+    { "x": 2448.8, "y": 798.1, "z": 45.3 },
+    { "x": 2453.3, "y": 786.9, "z": 45.3 },
+    { "x": 2486.1, "y": 749.6, "z": 46.6 },
+    { "x": 2501.6, "y": 749.1, "z": 41.6 },
+    { "x": 2512.8, "y": 746.7, "z": 41.8 },
+    { "x": 2518.1, "y": 737.3, "z": 40.8 },
+    { "x": 2515.2, "y": 726.7, "z": 41.6 },
+    { "x": 2502.4, "y": 697.1, "z": 52.0 },
+    { "x": 2466.6, "y": 671.4, "z": 63.5, "boss": 7357 }  // boss: Mordresh Fire Eye
+  ],
+  // The bosses, in the order the route meets them. "strategy" holds the tactics for each boss: pull, tank_position, interrupt, dispel, avoid, avoid_spells, kill_order,
+  // notes. Fields the bots act on today are listed in doc/dungeon-strategy.md ("what bots do today"); the others are kept but not used yet.
+  "bosses": [
+    {
+      // Glutton (creature entry 8567)
+      "entry": 8567,
+      "name": "Glutton",
+      "strategy": {}
+    },
+    {
+      // Ragglesnout (creature entry 7354)
+      "entry": 7354,
+      "name": "Ragglesnout",
+      "strategy": {}
+    },
+    {
+      // Amnennar the Coldbringer (creature entry 7358)
+      "entry": 7358,
+      "name": "Amnennar the Coldbringer",
+      "strategy": {}
+    },
+    {
+      // Mordresh Fire Eye (creature entry 7357)
+      "entry": 7357,
+      "name": "Mordresh Fire Eye",
+      "strategy": {}
+    }
+  ]
+}

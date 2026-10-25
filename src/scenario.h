@@ -89,9 +89,20 @@ constexpr std::uint64_t kGroupingTimeoutMs = 120000;
 constexpr std::uint64_t kMembersDelayMs = 3000;
 constexpr std::uint64_t kEnterRetryMs = 10000;
 constexpr std::uint64_t kEnterTimeoutMs = 90000;
+// Before the party enters it rests at its staging place until every living bot has this much health (and mana, for mana users), or this long has passed: the gear
+// the dressing phase puts on raises the maximum health to two or three times the current health, so a party that entered at once started at 35-45 %.
+constexpr std::uint32_t kRecoverPct = 90;
+constexpr std::uint64_t kRecoverMaxMs = 240000;
+// After a wipe the revived party stands outside at the graveyard: this long after the leader is up there, the living members are put back at the entry (a corpse run
+// through the portal does the same on foot), and again every kEnterRetryMs while some are still outside.
+constexpr std::uint64_t kReenterDelayMs = 20000;
 constexpr std::uint64_t kUnderstrengthGraceMs = 180000; // fewer than MinAlive alive this long: the run is given up
 constexpr std::uint64_t kBossGraceMs = 120000;          // RequireBosses: time allowed after the last waypoint for the remaining bosses to die
 constexpr float kRoutePointReachYards = 15.0f; // the leader counts as having reached a waypoint this close to it
+
+// The part of a snapshot that holds the bots in `keep` (guids), with their nearby slots: the director of one party of several sees only its own bots. The nearby units are
+// stored per bot position (max_nearby_units slots each), so they are copied along with the bots, else a director would read another party's creatures.
+forever_module::WorldTickSnapshotView SubsetView(forever_module::WorldTickSnapshotView const& view, std::function<bool(std::uint64_t)> const& keep);
 
 class ScenarioDirector
 {
@@ -123,6 +134,9 @@ private:
     std::map<std::uint64_t, std::size_t> _nextGrant;   // bot -> index of the next gear item to grant
     std::map<std::uint64_t, std::size_t> _nextSupply;  // bot -> index of the next supply to grant
     bool _equipSent = false;
+    std::uint64_t _outsideSinceMs = 0;     // since when the living leader has been outside the dungeon map in the Running phase (0 = not outside)
+    std::uint64_t _lastReenterMs = 0;
+    bool _recovered = false;               // the party has rested up at its staging place (Entering waits for it once)
     std::uint64_t _lastEnterMs = 0;
     std::uint64_t _leaderArrivedMs = 0;
     std::uint64_t _runStartMs = 0;
