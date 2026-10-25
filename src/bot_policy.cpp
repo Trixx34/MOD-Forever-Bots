@@ -2290,24 +2290,6 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             }
         }
 
-        // The closest friendly player an idle bot follows. A player is someone else: another bot this module controls is not one. Bots standing
-        // together at a start zone each followed the nearest of the others, in circles, and never left (the Undead, Tauren and Night Elf bots of
-        // the soak, which stand on the same few spots by race).
-        NearbyUnit const* player = nullptr;
-        {
-            float bestPlayerDist = std::numeric_limits<float>::max();
-            for (NearbyUnit const& unit : nearby)
-            {
-                if (!IsPlayer(unit) || indexOf.count(unit.guid & forever_module::kUnitRefCounterMask) != 0)
-                    continue;
-                float const dist = rotation::DistanceYards(bot, unit);
-                if (dist < bestPlayerDist)
-                {
-                    bestPlayerDist = dist;
-                    player = &unit;
-                }
-            }
-        }
         bool const lowHealth = bot.max_health > 0 && std::uint64_t(bot.health) * 100 < std::uint64_t(bot.max_health) * kDisengagePct;
 
         // The bot's class: its own (from the class table) or the configured one. Ranged classes approach to range.
@@ -2334,8 +2316,10 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         }
         bool const atLeader = leaderSnap && Distance2d(bot, *leaderSnap) <= (state.FollowYards > 0.0f ? state.FollowYards : state.LeaderYards);
 
-        // Who an idle bot follows: a member its leader (and stays put once close), else the closest player.
-        std::uint64_t followRef = player ? player->guid : 0;
+        // Who an idle bot follows: a member its leader (and stays put once close). A bot nobody has invited into a
+        // group does not follow a nearby player just because it is close (that made every uncontrolled bot latch
+        // onto whichever real player walked past it); it only follows when told to (ChatFollow, below) or led.
+        std::uint64_t followRef = 0;
         if (partyMember && leaderSnap)
             followRef = atLeader ? 0 : leaderRef;
         if (state.ChatFollow != 0)

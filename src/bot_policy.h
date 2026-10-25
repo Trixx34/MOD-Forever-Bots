@@ -1,10 +1,12 @@
 // BotPolicy: decides what each controlled bot should do, from Tier 2 snapshots. Pure logic: it reads snapshots and returns
 // actions, so it is unit-tested with hand-built snapshots (tests/policy_test.cpp).
 //
-// Behaviour, in order: below 30% health disengage (follow the closest player, or stand still); with a target, approach it
+// Behaviour, in order: below 30% health disengage (follow its party leader if it has one, or stand still); with a target, approach it
 // when it is more than 5 yards away, otherwise attack it, and cast the class rotation (combat_rotation.h) once per global
 // cooldown; with no target, pull the closest hostile unless it is part of a group of more than three (over-pull control),
-// else follow the closest player or stand still. A threat target is always fought. The default stance is defensive: a bot
+// else follow its party leader or stand still. A bot nobody has invited into a group never follows a nearby player just
+// because it is close; it only follows a player when told to in chat (ChatFollow) or when it is that player's party member.
+// A threat target is always fought. The default stance is defensive: a bot
 // pulls only when it is aggressive (chat "aggressive") and otherwise joins a fight that its group or it is in. Decisions are sent when they change.
 // A refused cast is retried after a while, and its spell is not used again before then. A spell the snapshot reports as on
 // cooldown is skipped. Rend's bleed is tracked per target from accepted casts (layout 13 puts the bot's own auras in the
