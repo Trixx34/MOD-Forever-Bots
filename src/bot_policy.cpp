@@ -1513,6 +1513,23 @@ std::vector<std::string> BotPolicy::ApplyChat(WorldTickSnapshotView const& view,
     return lines;
 }
 
+std::vector<BotPolicy::TalentOrder> BotPolicy::TakeTalentOrders()
+{
+    std::vector<TalentOrder> orders;
+    orders.swap(_talentOrders);
+    return orders;
+}
+
+// The core refused the order (the bot was in combat): forget that it was sent and look again in a few seconds.
+void BotPolicy::TalentOrderFailed(std::uint64_t bot, std::uint64_t nowMs)
+{
+    auto const known = _bots.find(bot);
+    if (known == _bots.end())
+        return;
+    known->second.TalentLevel = 0;
+    known->second.TalentRetryMs = nowMs + 5000;
+}
+
 std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std::uint64_t nowMs)
 {
     std::vector<BotAction> actions;
@@ -2363,6 +2380,23 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             if (state.DeadWaitKind == 0)
                 state.DeadWaitSinceMs = nowMs;
             state.DeadWaitKind = deadWaitKind;
+        }
+
+        // Talent order: the core spends the bot's points by the profile for its (class, role). Once at level 10 or more, again at each level and
+        // when the role changes; out of combat. What Auto means is the same as in the rest of the policy: a warrior in a party tanks, a class
+        // with a heal spell heals unless told dps, the rest deal damage. (No respec: a role change after points were spent only affects new points.)
+        if (bot.level >= 10 && bot.in_combat == 0 && nowMs >= state.TalentRetryMs && !(_options.IsAlt && _options.IsAlt(bot.guid)))
+        {
+            std::uint32_t const role = state.Role_ == BotState::Role::Tank ? 1u : state.Role_ == BotState::Role::Healer ? 2u
+                                       : state.Role_ == BotState::Role::Dps ? 3u
+                                       : (classId == kWarriorClass && _options.PartySize != 0) ? 1u : HealSpellFor(classId, bot.level) != 0 ? 2u : 3u;
+            if (state.TalentLevel != bot.level || state.TalentRole != role)
+            {
+                state.TalentLevel = bot.level;
+                state.TalentRole = role;
+                if (_talentOrders.size() < 256)
+                    _talentOrders.push_back({ bot.guid, role });
+            }
         }
 
         // Auto gear: out of combat, once when the bot first appears (if AutoGearing) and after it has gained some levels, or when asked.

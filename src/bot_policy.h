@@ -264,6 +264,17 @@ public:
 
     std::vector<forever_module::BotAction> Decide(forever_module::WorldTickSnapshotView const& view, std::uint64_t nowMs = 0);
 
+    // Talent orders: a bot that is due to spend talent points by its role's profile (core setting Bot.Talents.Profiles). `Role` is what the
+    // core's SpendBotTalentsAction takes: 1 tank, 2 healer, 3 dps. Decide queues them (once per level and per role change, out of combat,
+    // never for an alt); the caller takes them and sends the actions. If the core refuses (in combat), TalentOrderFailed asks again later.
+    struct TalentOrder
+    {
+        std::uint64_t Bot = 0;
+        std::uint32_t Role = 0;
+    };
+    std::vector<TalentOrder> TakeTalentOrders();
+    void TalentOrderFailed(std::uint64_t bot, std::uint64_t nowMs);
+
 private:
     struct Decision
     {
@@ -445,6 +456,9 @@ private:
         std::uint64_t LosRepositionTarget = 0;            // target of a healer DPS cast refused for LoS; move to clear it before retrying
         std::uint64_t HoldLastNotReadyMs = 0;            // the last tick the party was not ready (the pull hold ends after kPullHoldClearMs of readiness)
         std::uint64_t HoldSinceMs = 0;                   // the party leader waits for the party to be ready since this time (0 = not waiting)
+        std::uint32_t TalentLevel = 0;                   // the level and role (1 to 3) of the last talent order sent for this bot (0 = none yet)
+        std::uint32_t TalentRole = 0;
+        std::uint64_t TalentRetryMs = 0;                 // no talent order before this time (after a refusal)
         std::uint32_t GearedAtLevel = 0;                 // the level at the last auto gear (0 = not yet)
         bool GearRequested = false;                      // the .autogear command asked for it
         bool BagGearRequested = false;                   // a bag-only pass is wanted now (a trade finished)
@@ -503,6 +517,7 @@ private:
     }
 
     std::unordered_map<std::uint64_t, BotState> _bots; // bot guid -> state
+    std::vector<TalentOrder> _talentOrders;            // queued by Decide, taken by TakeTalentOrders
     // Corpses a bot has sent a loot for -> the looter's group (its leader's reference, else its own guid) and when the claim ends. The
     // core loots a whole corpse for a group at once, so a second member's loot is refused ("no right to loot": already looted).
     struct LootClaim

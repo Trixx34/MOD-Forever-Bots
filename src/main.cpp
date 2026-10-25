@@ -268,6 +268,8 @@ struct CommandQueue
     };
     std::vector<ErrandItem> Errands;
     std::vector<ChatAck> Says;                                  // lines a bot says out loud for an order it took (ChatSay)
+    std::vector<BotPolicy::TalentOrder> Talents;                // talent orders for the Run() thread to send (SpendBotTalents)
+    std::vector<std::uint64_t> TalentRefused;                   // bots the core refused a talent order, for the pump thread to retry
 };
 
 // The words from index `from` on, joined with single spaces: a character name can have a last name ("Tinky Winky").
@@ -804,6 +806,17 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
                 });
             }
             std::vector<forever_module::BotAction> actions = policy.Decide(view, nowMs());
+            if (extras.Commands)
+            {
+                std::vector<BotPolicy::TalentOrder> talentOrders = policy.TakeTalentOrders();
+                std::lock_guard<std::mutex> lock(extras.Commands->Lock);
+                for (std::uint64_t const bot : extras.Commands->TalentRefused)
+                    policy.TalentOrderFailed(bot, nowMs());
+                extras.Commands->TalentRefused.clear();
+                for (BotPolicy::TalentOrder const& order : talentOrders)
+                    if (extras.Commands->Talents.size() < 256)
+                        extras.Commands->Talents.push_back(order);
+            }
             if (extras.Presence && nowMs() - presenceFedMs >= kPresenceFeedMs)
             {
                 // Ordinary bots only: alts and party members are never logged off and are not in the list.
@@ -1390,11 +1403,22 @@ int main(int argc, char** argv)
     {
         std::vector<std::pair<std::uint64_t, std::string>> replies;
         std::vector<ChatAck> says;
+        std::vector<BotPolicy::TalentOrder> talents;
         {
             std::lock_guard<std::mutex> lock(commands->Lock);
             replies.swap(commands->Replies);
             says.swap(commands->Says);
+            talents.swap(commands->Talents);
         }
+        for (BotPolicy::TalentOrder const& order : talents)
+            client.SpendBotTalents(order.Bot, static_cast<forever_module::ModuleClient::TalentRole>(order.Role), [commands, bot = order.Bot](forever_module::ActionReply const& reply)
+            {
+                if (!reply.success())
+                {
+                    std::lock_guard<std::mutex> lock(commands->Lock);
+                    commands->TalentRefused.push_back(bot);
+                }
+            });
         for (auto const& [player, text] : replies)
             client.SendPlayerMessage(player, text);
         for (ChatAck const& say : says)

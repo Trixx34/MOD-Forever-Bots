@@ -87,6 +87,11 @@ Each tick the policy (`src/bot_policy.cpp`) reads the bot's snapshot and sends a
 - **Vendor and travel.** An idle bot due a visit walks to the nearest vendor on its map (found by the core, since a bot sees only 40
   yards) and visits within 4 yards: sell grey items, repair, equip the best gear. A walk over 3 minutes is dropped until the next interval.
 - **Hubs.** A bot idle for 30 s with nothing in view walks to the next hub of its map and waits a full interval there before walking on.
+- **Talents.** At level 10 and up, out of combat, and again at each level and on a role change, the module sends `SpendBotTalents` with the
+  bot's role (`Auto` gives a warrior in a party the tank role, a class with a heal spell the healer role, the rest dps). The core spends the
+  points by its profile for the (class, role), when `Bot.Talents.Profiles` names a profile file; otherwise, or for a class with no profile,
+  its greedy allocator. A refusal (in combat) is asked again after 5 s. Points already spent are not taken back, so a role change affects
+  only new points (no respec yet). Protocol 17.
 - **Loot.** A creature the bot fought, once dead and within 25 yards, is looted once when the bot is out of combat. The core runs the
   bot's own loot handlers, so loot rights, group rules and bag space are the core's. The item-looted event fires, so
   auto-vendor-trash sells a bot's grey drops.
