@@ -165,6 +165,11 @@ constexpr float kRoutePointReachYards = 6.0f;    // the leader has arrived at a 
 constexpr float kFocusPackYards = 12.0f;         // a unit this close to the tank's target is of the same pack: the damage dealers may take it first
 constexpr float kRouteWaitYards = 30.0f;         // the leader waits for a member farther behind than this
 constexpr std::uint32_t kRouteMinHealthPct = 80; // and for its own health to be at least this
+// A leader walking the route that has not moved this far in this long, out of combat, has a move that went nowhere (sent once, no answer; dm#6 of 2026-10-26 stood
+// 53 minutes so): the move is sent again and counted as a refusal (kRouteNoRouteSkip), so the point is recovered or skipped as for a "no route".
+constexpr std::uint64_t kRouteStallMs = 30000;
+constexpr float kRouteStallYards = 3.0f;
+constexpr std::uint64_t kRouteHoldLogMs = 30000; // a leader that does not walk on says why (route_hold), at most this often
 // Dungeon pull control: the tank (the party leader) pulls only when the party is ready, and the others wait for the tank to hold the target.
 constexpr std::uint32_t kPartyReadyHealthOldPct = 80, kPartyReadyPowerOldPct = 60; // with the Rest tactic off
 constexpr std::uint32_t kPartyReadyHealthPct = 90;  // every living member has at least this much health
@@ -2927,7 +2932,12 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             wanted = followRef ? Decision{ ActionType::kFollow, followRef } : Decision{ ActionType::kStop, 0 };
             // A member that has lost its leader in a dungeon (far away, or on another level of the instance, so that it has no way to follow) is put next to it after a while
             // (DungeonTeleport; the core's Bot.Actions.Teleport). Not in a fight, and not again for 30 seconds.
-            if (_options.DungeonTeleport && routeOn && partyMember && leaderSnap && bot.life_state == 0 && bot.in_combat == 0 && leaderSnap->life_state == 0)
+            // A leader just revived at the instance entrance is not followed there: it comes back to the party (leader_recover, in the route below).
+            bool leaderAtEntry = false;
+            if (leaderSnap)
+                if (auto const dungeon = _options.DungeonsByMap.find(bot.map_id); dungeon != _options.DungeonsByMap.end() && dungeon->second.HasEntry)
+                    leaderAtEntry = DistanceTo(*leaderSnap, dungeon->second.Entry) <= kEntryYards && DistanceTo(bot, dungeon->second.Entry) > kLostLeaderYards;
+            if (_options.DungeonTeleport && routeOn && partyMember && leaderSnap && bot.life_state == 0 && bot.in_combat == 0 && leaderSnap->life_state == 0 && !leaderAtEntry)
             {
                 bool const lost = Distance2d(bot, *leaderSnap) > kLostLeaderYards || std::fabs(bot.pos_z - leaderSnap->pos_z) > kLostLeaderHeight;
                 if (!lost)
@@ -3055,6 +3065,33 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     ++state.RouteIndex;
                     state.RouteNoRoute = 0;
                 }
+                // The leader revived at the instance entrance (a ghost of a dungeon party is put there) while a living member stands further in: the leader is put
+                // next to that member, and the party goes on from where it was. Before, the members were put next to the leader at the entrance and the party walked
+                // the cleared way again (60 of the 141 member teleports of the 2026-10-26 Deadmines run).
+                if (!recovering && _options.DungeonTeleport && bot.life_state == 0 && bot.in_combat == 0 && nowMs >= state.NextRecoverMs)
+                    if (auto const dungeon = _options.DungeonsByMap.find(bot.map_id);
+                        dungeon != _options.DungeonsByMap.end() && dungeon->second.HasEntry && DistanceTo(bot, dungeon->second.Entry) <= kEntryYards)
+                        for (std::uint64_t member : membersOf[bot.guid])
+                        {
+                            auto const at = indexOf.find(member);
+                            if (at == indexOf.end())
+                                continue;
+                            BotSnapshot const& other = view.bots[at->second];
+                            if (other.life_state != 0 || other.in_combat != 0 || other.map_id != bot.map_id || DistanceTo(other, dungeon->second.Entry) <= kLostLeaderYards)
+                                continue;
+                            if (_options.OnEvent)
+                                _options.OnEvent("leader_recover: bot=" + std::to_string(bot.guid) + " member=" + std::to_string(other.guid) + " from=" + std::to_string(int(bot.pos_x)) +
+                                                 "," + std::to_string(int(bot.pos_y)) + "," + std::to_string(int(bot.pos_z)) + " member_at=" + std::to_string(int(other.pos_x)) + "," +
+                                                 std::to_string(int(other.pos_y)) + "," + std::to_string(int(other.pos_z)) + " point=" + std::to_string(state.RouteIndex));
+                            wanted = Decision{ ActionType::kTeleport, 0, Point{ other.pos_x - 3.0f, other.pos_y, other.pos_z }, bot.map_id };
+                            routeBusy = true;
+                            recovering = true;
+                            state.NextRecoverMs = nowMs + 30000;
+                            state.RouteNoRoute = 0;
+                            state.RouteStallSinceMs = 0;
+                            state.Last.reset();
+                            break;
+                        }
                 // Events (dungeon_events.h): a door to open, a charge to fire. While one runs the leader does only what it asks.
                 bool eventBusy = false;
                 if (routeEvents && !routeEvents->empty())
@@ -3157,6 +3194,24 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     wanted = Decision{ ActionType::kMoveTo, 0, *waypoint };
                     moveWhy = "*waypoint";
                     routeBusy = true;
+                    // A walk that does not move (kRouteStallMs): sent again, and counted as a refusal of this point.
+                    if (state.RouteStallSinceMs == 0 || bot.in_combat != 0 ||
+                        std::hypot(bot.pos_x - state.RouteStallAt.X, bot.pos_y - state.RouteStallAt.Y) > kRouteStallYards)
+                    {
+                        state.RouteStallSinceMs = nowMs;
+                        state.RouteStallAt = Point{ bot.pos_x, bot.pos_y, bot.pos_z };
+                    }
+                    else if (nowMs - state.RouteStallSinceMs >= kRouteStallMs)
+                    {
+                        ++state.RouteNoRoute;
+                        state.RouteStallSinceMs = nowMs;
+                        state.Last.reset();
+                        if (_options.OnEvent)
+                            _options.OnEvent("route_stall: bot=" + std::to_string(bot.guid) + " point=" + std::to_string(state.RouteIndex) + "/" + std::to_string(routePoints->size()) +
+                                             " pos=" + std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) + "," + std::to_string(int(bot.pos_z)) + " to=" +
+                                             std::to_string(int(waypoint->X)) + "," + std::to_string(int(waypoint->Y)) + "," + std::to_string(int(waypoint->Z)) +
+                                             " refusals=" + std::to_string(state.RouteNoRoute));
+                    }
                     // The leader's walk, at most every 5 s: which point it goes to, from where, and how many of its members are within the waiting distance.
                     if (_options.OnEvent && nowMs - state.RouteWalkLoggedMs >= 5000)
                     {
@@ -3172,6 +3227,30 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                                          " to=" + std::to_string(int(waypoint->X)) + "," + std::to_string(int(waypoint->Y)) + "," + std::to_string(int(waypoint->Z)) + " from=" +
                                          std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) + "," + std::to_string(int(bot.pos_z)) + " members_near=" +
                                          std::to_string(near) + "/" + std::to_string(all) + " combat=" + std::to_string(bot.in_combat));
+                    }
+                }
+                else
+                {
+                    state.RouteStallSinceMs = 0;
+                    // Why the leader does not walk on, out of combat, at most every kRouteHoldLogMs: its health, a dead member, or the member farthest behind.
+                    if (waypoint && bot.in_combat == 0 && _options.OnEvent && nowMs - state.RouteHoldLoggedMs >= kRouteHoldLogMs)
+                    {
+                        state.RouteHoldLoggedMs = nowMs;
+                        std::uint64_t farthest = 0;
+                        float farthestYards = 0.0f;
+                        for (std::uint64_t member : membersOf[bot.guid])
+                            if (auto const at = indexOf.find(member); at != indexOf.end() && view.bots[at->second].life_state == 0)
+                                if (float const yards = Distance2d(bot, view.bots[at->second]); yards > farthestYards)
+                                {
+                                    farthestYards = yards;
+                                    farthest = member;
+                                }
+                        char const* why = !strong ? "health" : deadWaitKind != 0 ? "dead_member" : farthestYards > kRouteWaitYards ? "member_far" : "player_far";
+                        _options.OnEvent(std::string("route_hold: bot=") + std::to_string(bot.guid) + " point=" + std::to_string(state.RouteIndex) + "/" +
+                                         std::to_string(routePoints->size()) + " why=" + why + " hp_pct=" +
+                                         std::to_string(bot.max_health ? std::uint64_t(bot.health) * 100 / bot.max_health : 100) + " farthest=" + std::to_string(farthest) +
+                                         " farthest_yards=" + std::to_string(int(farthestYards)) + " pos=" + std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) +
+                                         "," + std::to_string(int(bot.pos_z)));
                     }
                 }
             }

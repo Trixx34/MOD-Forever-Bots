@@ -64,5 +64,10 @@ Bots that wander onto another level of an instance (a ledge above the route, a p
 scenarios, never in normal play):
 
 - A leader whose move to a route point is refused three times for lack of a route is put back on the route once, on the point before (`route_recover` in the log). If the same point fails
-  again, it is skipped (a boss point is never skipped: `route_blocked`).
+  again, it is skipped (a boss point is never skipped: `route_blocked`). Since 0.28.0 a walk that does not move the leader 3 yards in 30 seconds, out of combat, is sent again and counts as
+  one of those refusals (`route_stall`).
+- A leader revived at the instance entrance while a living member is more than 30 yards further in is put next to that member (`leader_recover`, since 0.28.0), and the members are not
+  put back at the entrance. Before, the members were teleported to the leader and the party walked the cleared way again.
+- A leader that does not walk on, out of combat, says why every 30 seconds (`route_hold`, since 0.28.0): `why=health` (below 80%), `dead_member`, `member_far` (with the member farthest
+  behind and how far) or `player_far`. These three need no `DungeonTeleport` for the log lines; the teleport needs it.
 - A member more than 30 yards from its leader (the distance the leader waits at; 60 before 0.27.1), or more than 25 yards above or below it, for 20 seconds is put next to the leader (`member_recover`), and not again for 30 seconds.

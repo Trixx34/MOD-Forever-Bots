@@ -2598,6 +2598,80 @@ void AMemberThatLostItsLeaderIsPutNextToIt()
     CHECK(!TeleportOf(quiet.Decide(view, 30000), 10).has_value());
 }
 
+// A leader revived at the instance entrance goes to its party; the party is not put back at the entrance.
+void ALeaderRevivedAtTheEntranceGoesToItsParty()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.ClassOf = WarriorLeads;
+    options.DungeonTeleport = true;
+    options.Route = { Point{ 220.0f, 0.0f, 0.0f }, Point{ 260.0f, 0.0f, 0.0f } };
+    PolicyOptions::DungeonRoute dungeon;
+    dungeon.HasEntry = true;
+    dungeon.Entry = Point{ 0.0f, 0.0f, 0.0f };
+    options.DungeonsByMap[36] = dungeon;
+    std::vector<std::string> events;
+    options.OnEvent = [&events](std::string const& line) { events.push_back(line); };
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    for (BotSnapshot& bot : view.bots)
+    {
+        bot.map_id = 36;
+        bot.pos_x = 200.0f;                                           // the party, deep in
+    }
+    view.bots[2].pos_x = 2.0f;                                        // the leader (12), just revived at the entrance
+    std::optional<BotAction> leader = TeleportOf(policy.Decide(view, 1000), 12);
+    CHECK(leader.has_value() && leader->dest_x == 197.0f);           // next to a member
+    bool logged = false;
+    for (std::string const& line : events)
+        logged = logged || line.rfind("leader_recover: bot=12", 0) == 0;
+    CHECK(logged);
+    std::optional<BotAction> member;
+    for (std::uint64_t now : { 10000ull, 22000ull, 25000ull })
+        if (auto const found = TeleportOf(policy.Decide(view, now), 10))
+            member = found;
+    CHECK(!member.has_value());                                       // the members are not sent to the entrance
+}
+
+// A leader whose walk along the route goes nowhere sends it again and counts the point as refused (route_stall); a leader that waits says why (route_hold).
+void ALeaderThatDoesNotMoveIsNoticed()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.ClassOf = WarriorLeads;
+    options.Route = { Point{ 100.0f, 0.0f, 0.0f }, Point{ 140.0f, 0.0f, 0.0f } };
+    std::vector<std::string> events;
+    options.OnEvent = [&events](std::string const& line) { events.push_back(line); };
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    for (BotSnapshot& bot : view.bots)
+        bot.pos_x = 50.0f;                                            // together, and nobody moves
+    std::uint32_t walks = 0;                                          // the leader's walk orders sent
+    for (std::uint64_t now = 0; now <= 32000; now += 1000)
+        walks += LeaderWalk(policy.Decide(view, now)) == 100.0f;
+    auto const has = [&events](std::string const& prefix)
+    {
+        for (std::string const& line : events)
+            if (line.rfind(prefix, 0) == 0)
+                return true;
+        return false;
+    };
+    CHECK(has("route_stall: bot=12 point=0/2"));
+    CHECK(walks >= 2);                                                // the first walk, and the same walk sent again
+    // A member far behind: the leader waits, and says for whom.
+    events.clear();
+    view.bots[0].pos_x = 0.0f;                                        // bot 10, 50 yards behind
+    for (std::uint64_t now = 40000; now <= 75000; now += 1000)
+        policy.Decide(view, now);
+    CHECK(has("route_hold: bot=12 point=0/2 why=member_far"));
+    bool named = false;
+    for (std::string const& line : events)
+        named = named || (line.rfind("route_hold: bot=12", 0) == 0 && line.find(" farthest=10 ") != std::string::npos);
+    CHECK(named);
+}
+
 // The default stance is defensive: a bot does not pull what is in range on its own, and it fights what attacks it.
 void DefaultBotsDoNotPullWhatIsInRange()
 {
@@ -4796,6 +4870,8 @@ int main()
     AFlippingPartyDoesNotHoldTheLeaderForever();
     ALeaderWithNoRouteIsPutBackOnTheRouteOnce();
     AMemberThatLostItsLeaderIsPutNextToIt();
+    ALeaderRevivedAtTheEntranceGoesToItsParty();
+    ALeaderThatDoesNotMoveIsNoticed();
     TankLeadParsesAsAnOrderOfTheTank();
     TheTankLeadsTheGroupAlongTheRoute();
     DungeonFilesReloadedChangeWhatTankLeadKnows();
