@@ -197,6 +197,20 @@ struct PolicyOptions
     std::uint32_t PortalMap = 0;
     Point PortalPoint;
     std::uint32_t PortalInsideMap = 0;
+    // A scenario of several dungeons (Scenario = "dm:10,rfc:10"): what the fields above give for one dungeon (Route, RouteMap, RouteBossAt, Events, KillPriority and the
+    // portal), once per dungeon, so each party walks, fights and goes back in by its own dungeon's. BotPolicy::SetScenarioRouteFor says which one is a bot's.
+    struct ScenarioRoute
+    {
+        std::vector<Point> Route;
+        std::uint32_t RouteMap = 0;
+        std::map<std::size_t, std::uint32_t> RouteBossAt;
+        std::vector<dungeon_events::Event> Events;
+        std::map<std::uint32_t, std::uint32_t> KillPriority;
+        bool HasPortal = false;
+        std::uint32_t PortalMap = 0;
+        Point PortalPoint;
+        std::uint32_t PortalInsideMap = 0;
+    };
     std::uint64_t ReleaseDelayMs = 20000;       // a corpse with a rezzer up waits this long before it releases
     std::uint64_t ReleaseCombatHoldMs = 60000;  // and a release is held back while the party fights, but never longer than this after death
     std::uint64_t CorpseRunTimeoutMs = 240000;  // a ghost that has not reached its corpse by then gives up
@@ -216,7 +230,7 @@ char const* ActionStatusName(forever_module::BotActionStatus status);
 class BotPolicy
 {
 public:
-    explicit BotPolicy(PolicyOptions options = {}) : _options(options), _quests(options.Quests) {}
+    explicit BotPolicy(PolicyOptions options = {}) : _options(options), _quests(options.Quests), _scenarioRoute(ScenarioRouteOf(options)) {}
 
     // Actions for the bots in `view`. nowMs is a monotonic clock in milliseconds (cooldowns, retries, fight time).
     // Decisions are sent only when they change; casts follow the rotation, the global cooldown and the retries.
@@ -226,6 +240,9 @@ public:
     // alive in the next). With these set, SetRouteActive and SetKilledBosses are not used.
     void SetRouteActiveFor(std::function<bool(std::uint64_t)> fn) { _routeActiveFn = std::move(fn); }
     void SetKilledBossesFor(std::function<std::set<std::uint32_t> const&(std::uint64_t)> fn) { _killedBossesFn = std::move(fn); }
+    // Several dungeons: the route, events, kill priority and portal of the bot's own party's dungeon. A bot it returns nullptr for (or without it) uses the
+    // options' own Route, Events, KillPriority and portal, as a single-dungeon scenario does.
+    void SetScenarioRouteFor(std::function<PolicyOptions::ScenarioRoute const*(std::uint64_t)> fn) { _scenarioRouteFn = std::move(fn); }
     // The dungeons "tank lead" knows (routes, boss points, events), replaced between two Decide calls when the dungeon files are reloaded. A tank that is
     // running a dungeon keeps the route it started with: its event runner has its own copy.
     void SetDungeons(std::map<std::uint32_t, PolicyOptions::DungeonRoute> dungeons) { _options.DungeonsByMap = std::move(dungeons); }
@@ -552,6 +569,11 @@ private:
     std::unordered_map<std::uint64_t, HealClaim> _healClaims; // member bot guid -> claim
     PolicyOptions _options;
     QuestPlanner _quests;
+    // The single-dungeon route of the options, and the per-bot one when several dungeons run (SetScenarioRouteFor).
+    static PolicyOptions::ScenarioRoute ScenarioRouteOf(PolicyOptions const& options);
+    PolicyOptions::ScenarioRoute const& ScenarioOf(std::uint64_t guid) const;
+    PolicyOptions::ScenarioRoute _scenarioRoute;
+    std::function<PolicyOptions::ScenarioRoute const*(std::uint64_t)> _scenarioRouteFn;
     bool _routeActive = false;
     std::function<bool(std::uint64_t)> _routeActiveFn;
     std::function<std::set<std::uint32_t> const&(std::uint64_t)> _killedBossesFn;

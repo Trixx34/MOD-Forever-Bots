@@ -37,6 +37,14 @@
 //   ScenarioBossAt = "6:644,11:643"   (route point number from 1 : boss entry) the leader holds at such a point until that boss is dead
 //   ScenarioRequireBosses = 0         1: the run is complete when every boss of ScenarioBosses has been seen dead (not when the last waypoint is reached)
 // A dungeon file (doc/dungeons.md) fills most of these keys: DungeonFile = "data/dungeons.txt" and Dungeon = "rfc" (see dungeon_data.h).
+// Several dungeons in one run (bots 0.29.0): Scenario = "dm:10,rfc:10" lists dungeon ids of the dungeon files, each with its number of parties, in order (the
+// first one's parties are spawned first); at most 20 parties in all. Each listed dungeon takes all its scenario keys from its dungeon file entry; a key with
+// ".<id>" after it changes one key for that dungeon only: ScenarioRoster.dm = "1:1,1:5,1:8,3:3,7:9", ScenarioLevel.dm = 18, ScenarioStaging.dm = "0 -8913 554 94".
+// In the list form the plain dungeon keys (ScenarioRoster, ScenarioLevel, ScenarioStaging, ScenarioEntry, ScenarioPortal, ScenarioRoute<n>, ScenarioBosses,
+// ScenarioBossAt, ScenarioKillPriority, ScenarioParties and Dungeon) are ignored, with a warning: they belong to one dungeon. The other keys (ScenarioDurationSec,
+// ScenarioGear<class>, ScenarioSupplies, ScenarioWipeRecovery*, ScenarioMinAlive, ScenarioResultFile, ...) apply to every dungeon of the list. A single name
+// without ":n" is the single form, as before, with ScenarioParties. A roster is one faction (a party cannot mix the sides): a roster with both Alliance and Horde
+// races is refused with a warning, and in the list form every roster must have the size of the first one's (the parties are cut by one size).
 struct ScenarioSettings
 {
     std::string Name;                                    // empty: no scenario
@@ -202,8 +210,51 @@ struct BotSettings
     errand::Settings Errand;
     std::string ErrandTrainerFile = "data/errand_trainers.txt"; // the trainer table (ErrandTrainerFile)
     std::uint32_t AutoGearEveryLevels = 5;
+    // The scenario's dungeons, in order: one for the single form, one per listed dungeon for Scenario = "dm:10,rfc:10". Scenario is the first of them (or the empty
+    // one when the scenario is off), for the code that only knows one.
     ScenarioSettings Scenario;
+    std::vector<ScenarioSettings> Scenarios;
 };
+
+// The most parties a scenario runs at once, over all its dungeons.
+constexpr std::uint32_t kMaxScenarioParties = 20;
+
+// One entry of a Scenario list ("dm:10").
+struct ScenarioListItem
+{
+    std::string Name;
+    std::uint32_t Parties = 1;
+};
+
+// Whether a Scenario value is the list form ("dm:10,rfc:10", or one "dm:10") rather than one plain name.
+bool IsScenarioList(std::string const& value);
+
+// The entries of a Scenario list, in order. A bad entry or a repeated name is dropped with a warning; the parties are cut at kMaxScenarioParties in all (the
+// entry that crosses it is shortened, the ones after it dropped).
+std::vector<ScenarioListItem> ParseScenarioList(std::string const& value, std::vector<std::string>& warnings);
+
+// The config one dungeon of a Scenario list reads its scenario from: `config` without the plain dungeon keys and without every "<key>.<id>" override, then
+// the overrides of `name` as plain keys, and Scenario = name, ScenarioParties = parties, Dungeon = name. The dungeon file merge (dungeon_data.h) and the
+// settings both use it, so they see the same keys.
+std::unordered_map<std::string, std::string> ScenarioConfigFor(std::unordered_map<std::string, std::string> const& config, std::string const& name,
+                                                               std::uint32_t parties);
+
+// Where the bot of spawn slot `slot` (0-based, in spawn order) belongs: the dungeon (index in the list), the party over all dungeons (the first dungeon's parties
+// first), and the race and class of its place in that dungeon's roster. Valid is false for a slot past the last party.
+struct ScenarioSlot
+{
+    bool Valid = false;
+    std::size_t Dungeon = 0;
+    std::size_t Party = 0;
+    std::uint32_t Race = 0;
+    std::uint32_t Class = 0;
+};
+ScenarioSlot ScenarioSlotOf(std::vector<ScenarioSettings> const& scenarios, std::size_t slot);
+
+// The bots and the parties of all the scenario's dungeons, and the dungeon of party `party` (counted over all of them; the last dungeon for a party past the end).
+std::uint32_t ScenarioBotCount(std::vector<ScenarioSettings> const& scenarios);
+std::uint32_t ScenarioPartyCount(std::vector<ScenarioSettings> const& scenarios);
+std::size_t ScenarioDungeonOfParty(std::vector<ScenarioSettings> const& scenarios, std::size_t party);
 
 // The most bots any configuration may ask for; also the Tier 2 bot bound requested at handshake.
 constexpr std::uint32_t kMaxBotsCeiling = 2500;

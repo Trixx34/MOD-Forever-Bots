@@ -123,6 +123,35 @@ Always on, not a tactic: a dungeon party's dead wait 90 s for the healer before 
 result line (`scenario dm#2: ...`); the core makes one instance per group. The bots, in guid order, are cut into parties of the roster size, as the policy's party logic cuts them;
 `MaxBots` is set to N x the roster size by the scenario. `tools/dungeon_report.py` reads the log and prints per party and in aggregate.
 
+### Several dungeons in one run (`Scenario = dm:10,rfc:10`, bots 0.29.0)
+
+`Module.forever-bots.Scenario` takes a list of dungeon ids with their number of parties: `Scenario = dm:10,rfc:10` runs 10 parties in the Deadmines and 10 in
+Ragefire Chasm in the same hour. At most 20 parties in all: the entry that goes past 20 is shortened (a warning says so) and the ones after it are dropped. Each
+listed dungeon takes its roster, level, staging, portal, entry, route, bosses, events and kill priority from its own dungeon file; `Dungeon` is not needed (and
+is ignored). One key for one dungeon of the list is set with the dungeon's id after a dot:
+
+    Module.forever-bots.Scenario = dm:10,rfc:10
+    Module.forever-bots.ScenarioRoster.dm = 1:1,1:5,1:8,3:3,7:9      # an Alliance roster for the Deadmines
+    Module.forever-bots.ScenarioLevel.dm = 18
+    Module.forever-bots.ScenarioStaging.dm = 0 -8913 554 94          # Stormwind: the shipped files stage in Orgrimmar
+    Module.forever-bots.ScenarioLevel.rfc = 17
+    Module.forever-bots.ScenarioDurationSec = 3600                   # a plain shared key: every dungeon of the list
+
+- Any `Scenario*` key works with `.<id>` (`ScenarioEntry.dm`, `ScenarioRoute3.rfc`, `ScenarioKillPriority.dm`, ...) and wins over that dungeon's file.
+- The plain dungeon keys (`ScenarioRoster`, `ScenarioLevel`, `ScenarioStaging`, `ScenarioEntry`, `ScenarioPortal`, `ScenarioRoute<n>`, `ScenarioBosses`,
+  `ScenarioBossAt`, `ScenarioKillPriority`, `ScenarioParties`) belong to the single form: with a list they are ignored, one warning each.
+- The other plain keys (`ScenarioDurationSec`, `ScenarioGear<class>`, `ScenarioSupplies`, `ScenarioWipeRecovery*`, `ScenarioMinAlive`,
+  `ScenarioLeaderDeadAbandonSec`, `ScenarioRequireBosses`, `ScenarioResultFile`) apply to every dungeon of the list.
+- A roster is one faction (Alliance races 1, 3, 4, 7; Horde 2, 5, 6, 8): a roster with both is refused with a warning and that dungeon does not run (also in
+  the single form, where it could never form its party). Every roster of the list must have the size of the first one's: the bots, in guid order, are cut into
+  parties of one size; a dungeon with another size is dropped with a warning.
+- The bots are spawned in party order, the first dungeon's parties first, each with the race, class, level and staging place of its own dungeon. Each party's
+  leader walks its own dungeon's route, and a bot of a party that is outside walks back to its own dungeon's door.
+- The result lines are numbered per dungeon: `scenario dm#1` .. `dm#10`, `scenario rfc#1` .. `rfc#10`. At start the module logs one line per dungeon (parties,
+  bots, level, route length, duration) and the totals. `MaxBots` is set to the sum of roster size x parties.
+
+`Scenario = rfc` (one name, no `:n`) is the single form, as before: `Dungeon`, the plain keys and `ScenarioParties` apply.
+
 ### Boss strategy (`bosses[].strategy`): `avoid` and `avoid_spells` are used, the rest is reserved
 
 `avoid` and `avoid_spells` are acted on since bots 0.20.0 when `AvoidGroundEffects = 1` (see `doc/ground-effects.md`): a bot standing in one of those zones, or in the ground effect of one of

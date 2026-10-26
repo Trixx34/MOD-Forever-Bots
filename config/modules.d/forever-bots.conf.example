@@ -152,6 +152,13 @@ Module.forever-bots.TelemetrySummarySec = 60
 # ScenarioRoute3 = -177.4 -574.5 19.3
 # ScenarioGear1 = 1234,5678                     # optional: items granted to a class instead of auto gear (needs Bot.Actions.Grant)
 # ScenarioResultFile = scenario-results.log
+# Several dungeons in one run (0.29.0): a list of dungeon ids of the dungeon files, each with its parties (20 in all); "<key>.<id>" sets a key for one dungeon.
+# The plain dungeon keys above (roster, level, staging, entry, portal, route, bosses, parties) are ignored with a list; the others apply to every dungeon.
+# Scenario = dm:10,rfc:10
+# ScenarioRoster.dm = 1:1,1:5,1:8,3:3,7:9
+# ScenarioLevel.dm = 18
+# ScenarioStaging.dm = 0 -8913 554 94
+# ScenarioLevel.rfc = 17
 # Offline policy lab: each candidate applies to all ScenarioParties in that run. Defaults preserve current behavior;
 # bounded parameter ranges are validated by the module. See tools/dungeon_learning/README.md.
 # CorpseRunTeleportSec = 60   (a corpse run longer than this puts the ghost at its corpse, the four-minute teleport brought forward; 0 = off, 10 to 3600)

@@ -117,6 +117,77 @@ void ExplicitConfigWins()
     CHECK(s.Scenario.Bosses.size() == 2);                                  // the rest still comes from the file
 }
 
+char const* kTwo = R"(dungeon rfc
+levels 13 18
+roster 2:1,5:5,8:8,2:9,5:4
+staging 1 1629 -4373 31
+portal 1 1811 -4410 -18
+entry 389 3.81 -14.82 -17.84
+go 0 100 0
+boss 11517 0 200 0 Oggleflint
+end
+
+dungeon dm
+levels 18 23
+roster 2:1,5:5,8:8,2:9,5:4
+staging 1 1629 -4373 31
+portal 0 -11208.7 1675.9 24.6
+entry 36 -14.57 -385.48 62.46
+duration 1800
+go 1 1 1
+go 2 2 2
+boss 644 3 3 3 Rhahk'Zor
+end
+)";
+
+// Scenario = "dm:10,rfc:10": each listed dungeon is filled from its own block, under "<key>.<id>"; the dungeon's own overrides and the shared keys win.
+void MergeFillsEachListedDungeon()
+{
+    std::vector<std::string> warnings;
+    auto const merged = MergeDungeon({ { "Scenario", "dm:10,rfc:10" }, { "ScenarioRoster.dm", "1:1,1:5,1:8,3:3,7:9" }, { "ScenarioLevel.dm", "18" },
+                                       { "ScenarioStaging.dm", "0 -8913 554 94" }, { "ScenarioLevel.rfc", "17" }, { "ScenarioDurationSec", "3600" },
+                                       { "Dungeon", "rfc" }, { "ScenarioRoster", "2:1,5:5,8:8,2:9,5:4" } },
+                                     kTwo, warnings);
+    CHECK(merged.count("ScenarioEntry.dm") == 1 && merged.count("ScenarioRoute3.dm") == 1 && merged.count("ScenarioRoute2.rfc") == 1);
+    CHECK(merged.at("ScenarioRoster.dm") == "1:1,1:5,1:8,3:3,7:9");     // the override is kept
+    CHECK(merged.count("ScenarioDurationSec.dm") == 0);                   // the shared key wins over the file's duration
+    CHECK(merged.count("ScenarioEntry") == 0);                            // nothing plain is added in the list form
+    BotSettings const s = ParseBotSettings(merged, warnings);
+    CHECK(s.Scenarios.size() == 2);
+    ScenarioSettings const& dm = s.Scenarios[0];
+    ScenarioSettings const& rfc = s.Scenarios[1];
+    CHECK(dm.Name == "dm" && dm.Parties == 10 && dm.Level == 18 && dm.Roster[0][0] == 1 && dm.Entry[0] == 36.0f && dm.Staging[0] == 0.0f);
+    CHECK(dm.HasPortal && dm.Portal[0] == 0.0f && dm.Route.size() == 3 && dm.Bosses.size() == 1 && dm.Bosses[0].first == 644 && dm.BossAt[0].first == 2);
+    CHECK(rfc.Name == "rfc" && rfc.Parties == 10 && rfc.Level == 17 && rfc.Roster[0][0] == 2 && rfc.Entry[0] == 389.0f && rfc.Staging[0] == 1.0f);
+    CHECK(rfc.Route.size() == 2 && rfc.Bosses.size() == 1 && rfc.Bosses[0].first == 11517 && rfc.HasPortal && rfc.Portal[0] == 1.0f);
+    CHECK(dm.DurationSec == 3600 && rfc.DurationSec == 3600 && dm.RequireBosses && rfc.RequireBosses);
+
+    // A listed dungeon the file does not have is left out; the others still run.
+    warnings.clear();
+    BotSettings const partly = ParseBotSettings(MergeDungeon({ { "Scenario", "nope:5,rfc:2" } }, kTwo, warnings), warnings);
+    CHECK(partly.Scenarios.size() == 1 && partly.Scenarios[0].Name == "rfc" && partly.Scenarios[0].Parties == 2);
+    bool missing = false;
+    for (std::string const& w : warnings)
+        missing = missing || w.find("'nope' is not in the dungeon file") != std::string::npos;
+    CHECK(missing);
+}
+
+// The sim's single-dungeon config through the file: one dungeon, as before the list form.
+void SingleDungeonMergeIsUnchanged()
+{
+    std::vector<std::string> warnings;
+    auto const merged = MergeDungeon({ { "Scenario", "rfc" }, { "Dungeon", "rfc" }, { "ScenarioParties", "20" }, { "ScenarioLevel", "17" },
+                                       { "ScenarioRoster", "2:1,5:5,8:8,2:9,5:4" }, { "ScenarioDurationSec", "3600" }, { "DungeonTeleport", "1" } },
+                                     kFile, warnings);
+    BotSettings const s = ParseBotSettings(merged, warnings);
+    CHECK(s.Scenarios.size() == 1 && s.Scenario.Name == "rfc" && s.Scenario.Parties == 20 && s.Scenario.Level == 17 && s.Scenario.DurationSec == 3600);
+    CHECK(s.Scenario.Entry[0] == 389.0f && s.Scenario.Route.size() == 3 && s.Scenario.Bosses.size() == 2 && s.Scenario.HasPortal);
+    bool settingsWarning = false;
+    for (std::string const& w : warnings)
+        settingsWarning = settingsWarning || w.find("Module.forever-bots") != std::string::npos;
+    CHECK(!settingsWarning);
+}
+
 void UnknownDungeonOrNoDungeonChangesNothing()
 {
     std::vector<std::string> warnings;
@@ -270,6 +341,8 @@ int main()
     MergeFillsTheScenarioKeys();
     ExplicitConfigWins();
     UnknownDungeonOrNoDungeonChangesNothing();
+    MergeFillsEachListedDungeon();
+    SingleDungeonMergeIsUnchanged();
     ReadsTheFileFromDisk();
     ClearNeedsEveryBoss();
     BossesAreEnoughEvenBeforeTheRouteEnds();

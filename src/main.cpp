@@ -538,20 +538,29 @@ struct PumpExtras
     std::shared_ptr<SellBook> Sell;           // set when vendor sales are on
     std::shared_ptr<ErrandFeed> Errand;       // set when Errands is on
     std::shared_ptr<AltRegistry> Alts;
-    std::optional<ScenarioPlan> Scenario;
-    std::uint32_t ScenarioParties = 1; // parallel parties of the scenario's roster, each with its own director
+    // The scenario's dungeons, in order (one for the single form, several for Scenario = "dm:10,rfc:10"): each with its plan, its number of parallel parties (each
+    // with its own director) and the route, events, kill priority and portal its parties use.
+    struct ScenarioDungeon
+    {
+        ScenarioPlan Plan;
+        std::uint32_t Parties = 1;
+        PolicyOptions::ScenarioRoute Route;
+    };
+    std::vector<ScenarioDungeon> Scenarios;
     std::string ScenarioResultFile;
     std::shared_ptr<CommandQueue> Commands;
 };
 
-// The scenario's bot to spawn next, one per tick of the spawn timer, with its level and its staging place.
+// The scenario's bot to spawn next, one per tick of the spawn timer, with its level and its staging place. The slots go in party order, the first dungeon's
+// parties first, so the bots' guids cut into parties in order (as the policy and the directors cut them) give each party the roster of its own dungeon.
 void ScenarioSpawnTick(RunContext& run, std::size_t& spawned)
 {
-    ScenarioSettings const& scenario = run.Settings.Scenario;
-    if (spawned >= scenario.Roster.size() * scenario.Parties || !run.Roster.CanRequest() || nowMs() < run.BackoffUntilMs)
+    ScenarioSlot const slot = ScenarioSlotOf(run.Settings.Scenarios, spawned);
+    if (!slot.Valid || !run.Roster.CanRequest() || nowMs() < run.BackoffUntilMs)
         return;
 
-    RaceClass const combo{ scenario.Roster[spawned % scenario.Roster.size()][0], scenario.Roster[spawned % scenario.Roster.size()][1] };
+    ScenarioSettings const& scenario = run.Settings.Scenarios[slot.Dungeon];
+    RaceClass const combo{ slot.Race, slot.Class };
     forever_module::SpawnParams params = ParamsFor(combo);
     params.set_level(scenario.Level);
     if (scenario.HasStaging)
@@ -591,16 +600,24 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
     std::uint64_t dungeonGeneration = extras.Dungeons ? extras.Dungeons->Generation.load() : 0;
     // One director per party of the scenario (ScenarioParties): the bots, in guid order, are cut into parties of the roster's size, the same cut the policy makes, and a
     // director sees only its own party's bots. With several parties each result and log line carries the party number ("dm#2").
+    // With several dungeons the parties go in list order (the first dungeon's first) and are numbered per dungeon: "dm#1".."dm#10", "rfc#1".."rfc#10".
     std::vector<ScenarioDirector> directors;
+    std::vector<std::string> directorNames;
+    std::vector<std::size_t> dungeonOf;                     // director (party) index -> index in extras.Scenarios
     std::vector<ScenarioPhase> lastPhases;
     std::unordered_map<std::uint64_t, std::size_t> partyOf; // bot guid -> party index (recomputed each tick)
-    std::size_t const partySize = extras.Scenario ? std::max<std::size_t>(1, extras.Scenario->RosterSize) : 1;
-    if (extras.Scenario)
-        for (std::uint32_t k = 0; k < std::max<std::uint32_t>(1, extras.ScenarioParties); ++k)
+    std::size_t const partySize = extras.Scenarios.empty() ? 1 : std::max<std::size_t>(1, extras.Scenarios.front().Plan.RosterSize);
+    std::uint32_t scenarioParties = 0;
+    for (PumpExtras::ScenarioDungeon const& dungeon : extras.Scenarios)
+        scenarioParties += std::max<std::uint32_t>(1, dungeon.Parties);
+    for (std::size_t d = 0; d < extras.Scenarios.size(); ++d)
+        for (std::uint32_t k = 0; k < std::max<std::uint32_t>(1, extras.Scenarios[d].Parties); ++k)
         {
-            ScenarioPlan plan = *extras.Scenario;
-            if (extras.ScenarioParties > 1)
+            ScenarioPlan plan = extras.Scenarios[d].Plan;
+            if (scenarioParties > 1)
                 plan.Name += "#" + std::to_string(k + 1);
+            directorNames.push_back(plan.Name);
+            dungeonOf.push_back(d);
             directors.emplace_back(std::move(plan));
             lastPhases.push_back(ScenarioPhase::Done);
         }
@@ -807,6 +824,14 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
                     auto const at = partyOf.find(guid);
                     return at == partyOf.end() ? none : directors[at->second].KilledBossEntries();
                 });
+                // Several dungeons: a bot walks, fights and goes back in by the route of its own party's dungeon, from the staging place on (the portal it walks
+                // back to is that dungeon's, not the first one's).
+                if (extras.Scenarios.size() > 1)
+                    policy.SetScenarioRouteFor([&extras, &dungeonOf, &partyOf](std::uint64_t guid) -> PolicyOptions::ScenarioRoute const*
+                    {
+                        auto const at = partyOf.find(guid);
+                        return at == partyOf.end() ? nullptr : &extras.Scenarios[dungeonOf[at->second]].Route;
+                    });
             }
             std::vector<forever_module::BotAction> actions = policy.Decide(view, nowMs());
             if (extras.Commands)
@@ -897,7 +922,7 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
                     return at != partyOf.end() && at->second == k;
                 });
                 ScenarioDirector& director = directors[k];
-                std::string const name = extras.Scenario->Name + (directors.size() > 1 ? "#" + std::to_string(k + 1) : std::string());
+                std::string const& name = directorNames[k];
                 std::size_t const before = actions.size();
                 director.Decide(partyView, nowMs(), actions);
 
@@ -1458,14 +1483,17 @@ int main(int argc, char** argv)
         });
     };
 
-    bool const scenarioOn = !settings.Scenario.Name.empty();
+    bool const scenarioOn = !settings.Scenarios.empty();
     std::size_t scenarioSpawned = 0;
     if (scenarioOn)
     {
-        roster.SetMaxBots(std::min<std::uint32_t>(std::uint32_t(settings.Scenario.Roster.size() * settings.Scenario.Parties), maxBots));
-        std::cerr << "forever-bots: scenario " << settings.Scenario.Name << ": " << settings.Scenario.Parties << " part" << (settings.Scenario.Parties == 1 ? "y" : "ies") << " of " << settings.Scenario.Roster.size() << " bots at level "
-                  << settings.Scenario.Level << ", route of " << settings.Scenario.Route.size() << " point(s), "
-                  << settings.Scenario.DurationSec << " s\n";
+        roster.SetMaxBots(std::min<std::uint32_t>(ScenarioBotCount(settings.Scenarios), maxBots));
+        for (ScenarioSettings const& scenario : settings.Scenarios)
+            std::cerr << "forever-bots: scenario " << scenario.Name << ": " << scenario.Parties << " part" << (scenario.Parties == 1 ? "y" : "ies") << " of " << scenario.Roster.size() << " bots at level "
+                      << scenario.Level << ", route of " << scenario.Route.size() << " point(s), " << scenario.DurationSec << " s\n";
+        if (settings.Scenarios.size() > 1)
+            std::cerr << "forever-bots: scenario of " << settings.Scenarios.size() << " dungeons: " << ScenarioPartyCount(settings.Scenarios) << " parties, "
+                      << ScenarioBotCount(settings.Scenarios) << " bots\n";
         client.AddTimer(std::chrono::milliseconds(3000), [&run, &scenarioSpawned] { ScenarioSpawnTick(run, scenarioSpawned); });
     }
 
@@ -1926,49 +1954,64 @@ int main(int argc, char** argv)
     }
     if (scenarioOn)
     {
-        // The scenario takes over the party, the route and the dressing: no vendor walks, no ramp, one party of the whole roster.
+        // The scenario takes over the party, the route and the dressing: no vendor walks, no ramp, one party of each roster. Every dungeon's roster has one size
+        // (bot_settings.h), so the bots in guid order cut into parties of that size, the first dungeon's parties first.
         policyOptions.PartySize = std::uint32_t(settings.Scenario.Roster.size());
-        policyOptions.PartyCount = settings.Scenario.Parties;
+        policyOptions.PartyCount = ScenarioPartyCount(settings.Scenarios);
         policyOptions.PartyPercent = 100; // every bot of the roster is in its party
         policyOptions.RandomPct = 0;      // and a scenario is a test run: it is not varied
         policyOptions.Crafting = false;
         policyOptions.ServiceEveryMs = 0;
         policyOptions.AutoGearing = false;
-        for (auto const& point : settings.Scenario.Route)
-            policyOptions.Route.push_back({ point[0], point[1], point[2] });
-        for (auto const& [point, entry] : settings.Scenario.BossAt)
-            policyOptions.RouteBossAt[point] = entry;
-        policyOptions.Events = dungeon_events::ForMap(allEvents, std::uint32_t(settings.Scenario.Entry[0]));
-        policyOptions.RouteMap = static_cast<std::uint32_t>(settings.Scenario.Entry[0]);
-        for (std::size_t i = 0; i < settings.Scenario.KillPriority.size(); ++i)
-            policyOptions.KillPriority.emplace(settings.Scenario.KillPriority[i], std::uint32_t(i));
-
-        ScenarioPlan plan;
-        plan.Name = settings.Scenario.Name;
-        plan.RosterSize = std::uint32_t(settings.Scenario.Roster.size());
-        plan.EntryMap = static_cast<std::uint32_t>(settings.Scenario.Entry[0]);
-        plan.Entry = { settings.Scenario.Entry[1], settings.Scenario.Entry[2], settings.Scenario.Entry[3] };
-        for (auto const& point : settings.Scenario.Route)
-            plan.Route.push_back({ point[0], point[1], point[2] });
-        plan.DurationMs = std::uint64_t(settings.Scenario.DurationSec) * 1000;
-        plan.Gear = settings.Scenario.Gear;
-        plan.Supplies = settings.Scenario.Supplies;
-        plan.Bosses = settings.Scenario.Bosses;
-        plan.ClassOf = policyOptions.ClassOf;
-        plan.WipeRecovery = settings.Scenario.WipeRecovery;
-        plan.WipeRecoveryMs = std::uint64_t(settings.Scenario.WipeRecoverySec) * 1000;
-        plan.RequireBosses = settings.Scenario.RequireBosses;
-        plan.MinAlive = settings.Scenario.MinAlive;
-        plan.LeaderDeadAbandonMs = std::uint64_t(settings.Scenario.LeaderDeadAbandonSec) * 1000;
-        if (settings.Scenario.HasPortal)
+        for (ScenarioSettings const& scenario : settings.Scenarios)
         {
-            policyOptions.HasPortal = true;
-            policyOptions.PortalMap = static_cast<std::uint32_t>(settings.Scenario.Portal[0]);
-            policyOptions.PortalPoint = { settings.Scenario.Portal[1], settings.Scenario.Portal[2], settings.Scenario.Portal[3] };
-            policyOptions.PortalInsideMap = plan.EntryMap;
+            PolicyOptions::ScenarioRoute route;
+            for (auto const& point : scenario.Route)
+                route.Route.push_back({ point[0], point[1], point[2] });
+            for (auto const& [point, entry] : scenario.BossAt)
+                route.RouteBossAt[point] = entry;
+            route.Events = dungeon_events::ForMap(allEvents, std::uint32_t(scenario.Entry[0]));
+            route.RouteMap = static_cast<std::uint32_t>(scenario.Entry[0]);
+            for (std::size_t i = 0; i < scenario.KillPriority.size(); ++i)
+                route.KillPriority.emplace(scenario.KillPriority[i], std::uint32_t(i));
+
+            ScenarioPlan plan;
+            plan.Name = scenario.Name;
+            plan.RosterSize = std::uint32_t(scenario.Roster.size());
+            plan.EntryMap = static_cast<std::uint32_t>(scenario.Entry[0]);
+            plan.Entry = { scenario.Entry[1], scenario.Entry[2], scenario.Entry[3] };
+            for (auto const& point : scenario.Route)
+                plan.Route.push_back({ point[0], point[1], point[2] });
+            plan.DurationMs = std::uint64_t(scenario.DurationSec) * 1000;
+            plan.Gear = scenario.Gear;
+            plan.Supplies = scenario.Supplies;
+            plan.Bosses = scenario.Bosses;
+            plan.ClassOf = policyOptions.ClassOf;
+            plan.WipeRecovery = scenario.WipeRecovery;
+            plan.WipeRecoveryMs = std::uint64_t(scenario.WipeRecoverySec) * 1000;
+            plan.RequireBosses = scenario.RequireBosses;
+            plan.MinAlive = scenario.MinAlive;
+            plan.LeaderDeadAbandonMs = std::uint64_t(scenario.LeaderDeadAbandonSec) * 1000;
+            if (scenario.HasPortal)
+            {
+                route.HasPortal = true;
+                route.PortalMap = static_cast<std::uint32_t>(scenario.Portal[0]);
+                route.PortalPoint = { scenario.Portal[1], scenario.Portal[2], scenario.Portal[3] };
+                route.PortalInsideMap = plan.EntryMap;
+            }
+            extras.Scenarios.push_back(PumpExtras::ScenarioDungeon{ std::move(plan), scenario.Parties, std::move(route) });
         }
-        extras.Scenario = std::move(plan);
-        extras.ScenarioParties = settings.Scenario.Parties;
+        // The single-dungeon fields are the first dungeon's: with one dungeon they are the scenario's, with several each party's own comes from SetScenarioRouteFor.
+        PolicyOptions::ScenarioRoute const& first = extras.Scenarios.front().Route;
+        policyOptions.Route = first.Route;
+        policyOptions.RouteBossAt = first.RouteBossAt;
+        policyOptions.Events = first.Events;
+        policyOptions.RouteMap = first.RouteMap;
+        policyOptions.KillPriority = first.KillPriority;
+        policyOptions.HasPortal = first.HasPortal;
+        policyOptions.PortalMap = first.PortalMap;
+        policyOptions.PortalPoint = first.PortalPoint;
+        policyOptions.PortalInsideMap = first.PortalInsideMap;
         extras.ScenarioResultFile = settings.Scenario.ResultFile;
     }
 

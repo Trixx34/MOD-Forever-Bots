@@ -2139,6 +2139,63 @@ BotPolicy DungeonPolicy(std::function<std::uint32_t(std::uint64_t)> classOf = nu
     return policy;
 }
 
+// Several dungeons in one run (Scenario = "dm:10,rfc:10"): each party's leader walks the route of its own party's dungeon, and a bot of a party that is outside
+// walks back to its own dungeon's door, not the first dungeon's. Without the per-party lookup every leader walks the options' one route.
+void EachPartyWalksItsOwnDungeonsRoute()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.PartyCount = 2;
+    options.ClassOf = [](std::uint64_t guid) { return guid == 12 || guid == 22 ? 1u : 5u; };
+    options.Route = { Point{ 500.0f, 0.0f, 0.0f } };
+    PolicyOptions::ScenarioRoute deadmines;
+    deadmines.Route = { Point{ 100.0f, 0.0f, 0.0f }, Point{ 140.0f, 0.0f, 0.0f } };
+    deadmines.RouteMap = 36;
+    deadmines.HasPortal = true;
+    deadmines.PortalMap = 0;
+    deadmines.PortalPoint = Point{ -11208.7f, 1675.9f, 24.6f };
+    deadmines.PortalInsideMap = 36;
+    PolicyOptions::ScenarioRoute ragefire;
+    ragefire.Route = { Point{ -100.0f, 0.0f, 0.0f }, Point{ -140.0f, 0.0f, 0.0f } };
+    ragefire.RouteMap = 389;
+    ragefire.HasPortal = true;
+    ragefire.PortalMap = 1;
+    ragefire.PortalPoint = Point{ 1815.0f, -4419.2f, -18.8f };
+    ragefire.PortalInsideMap = 389;
+
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14, 20, 21, 22, 23, 24 }, options.ClassOf);
+    for (BotSnapshot& bot : view.bots)
+        bot.map_id = bot.guid < 20 ? 36 : 389;
+    auto const walkOf = [](std::vector<BotAction> const& actions, std::uint64_t guid)
+    {
+        for (BotAction const& action : actions)
+            if (action.type == ActionType::kMoveTo && action.bot_guid == guid)
+                return action.dest_x;
+        return -1.0f;
+    };
+
+    BotPolicy policy(options);
+    policy.SetRouteActiveFor([](std::uint64_t) { return true; });
+    policy.SetScenarioRouteFor([&](std::uint64_t guid) -> PolicyOptions::ScenarioRoute const* { return guid < 20 ? &deadmines : &ragefire; });
+    auto const actions = policy.Decide(view, 0);   // 100 yards: no mount first
+    CHECK(walkOf(actions, 12) == 100.0f);    // the Deadmines party's leader: the Deadmines route
+    CHECK(walkOf(actions, 22) == -100.0f);   // the Ragefire party's leader: the Ragefire route
+
+    // A member of each party left on the outside map walks to its own dungeon's door.
+    WorldTickSnapshotView outside = view;
+    outside.bots[3].map_id = 0;    // bot 13, Deadmines party, in Westfall
+    outside.bots[8].map_id = 1;    // bot 23, Ragefire party, in Orgrimmar
+    std::vector<BotAction> const back = AfterMount(policy, outside, 5000);
+    CHECK(walkOf(back, 13) == -11208.7f);
+    CHECK(walkOf(back, 23) == 1815.0f);
+
+    // Without the per-party lookup (the single-dungeon form) both leaders walk the one route of the options.
+    BotPolicy single(options);
+    single.SetRouteActive(true);
+    auto const one = AfterMount(single, PartyView({ 10, 11, 12, 13, 14, 20, 21, 22, 23, 24 }, options.ClassOf), 0);
+    CHECK(walkOf(one, 12) == 500.0f && walkOf(one, 22) == 500.0f);
+}
+
 // A dungeon waypoint the core finds no route to is given up after three refusals in a row; the leader goes on to the next point.
 void ALeaderSkipsAWaypointWithNoRoute()
 {
@@ -4883,6 +4940,7 @@ int main()
     TheLeaderWaitsAtABossPointUntilTheBossIsDead();
     ABossPointIsNeverSkippedForNoRoute();
     ALeaderSkipsAWaypointWithNoRoute();
+    EachPartyWalksItsOwnDungeonsRoute();
     ALongWalkGoesToTheFlightMasterThenFlies();
     ARefusedFlightMakesTheBotWalk();
     FlightsAreOffByDefaultAndNotForPartyMembers();

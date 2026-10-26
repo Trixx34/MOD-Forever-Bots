@@ -292,6 +292,109 @@ void DungeonLearningKnobsAreBounded()
     CHECK(refused.HealerDpsManaPct == 40 && refused.HealerLosMoveYards == 6 && warnings.size() == 4);
 }
 
+bool HasWarning(std::vector<std::string> const& warnings, std::string const& part)
+{
+    for (std::string const& w : warnings)
+        if (w.find(part) != std::string::npos)
+            return true;
+    return false;
+}
+
+// Scenario = "dm:10,rfc:10": the list, in order, with at most 20 parties in all.
+void ScenarioListParsing()
+{
+    CHECK(!IsScenarioList("rfc") && IsScenarioList("rfc:3") && IsScenarioList("dm,rfc"));
+    std::vector<std::string> warnings;
+    auto const two = ParseScenarioList("dm:10, rfc:10", warnings);
+    CHECK(two.size() == 2 && two[0].Name == "dm" && two[0].Parties == 10 && two[1].Name == "rfc" && two[1].Parties == 10 && warnings.empty());
+    auto const plain = ParseScenarioList("dm,rfc:2", warnings);
+    CHECK(plain.size() == 2 && plain[0].Parties == 1 && plain[1].Parties == 2);
+
+    auto const over = ParseScenarioList("dm:15,rfc:10,wc:2", warnings);    // 20 in all: rfc is cut to 5, wc dropped
+    CHECK(over.size() == 2 && over[0].Parties == 15 && over[1].Parties == 5 && HasWarning(warnings, "more than 20 parties"));
+    warnings.clear();
+    auto const bad = ParseScenarioList("dm:0,rfc:x,:3,wc:21,sfk:2,sfk:3", warnings);
+    CHECK(bad.size() == 1 && bad[0].Name == "sfk" && bad[0].Parties == 2);
+    CHECK(HasWarning(warnings, "'dm:0' is not dungeon:parties") && HasWarning(warnings, "'wc:21'") && HasWarning(warnings, "'sfk' is listed twice"));
+}
+
+// Each listed dungeon reads its own keys ("<key>.<id>") over the shared ones; the plain dungeon keys are for the single form and are ignored here.
+void ScenarioListReadsEachDungeon()
+{
+    std::vector<std::string> warnings;
+    BotSettings const s = ParseBotSettings({ { "Scenario", "dm:10,rfc:10" }, { "ScenarioDurationSec", "3600" }, { "ScenarioRoster", "2:1" }, { "ScenarioLevel", "30" },
+                                             { "ScenarioRoster.dm", "1:1,1:5,1:8,3:3,7:9" }, { "ScenarioLevel.dm", "18" }, { "ScenarioEntry.dm", "36 -14.57 -385.48 62.46" },
+                                             { "ScenarioStaging.dm", "0 -8913 554 94" }, { "ScenarioRoute1.dm", "1 2 3" }, { "ScenarioPortal.dm", "0 -11208.7 1675.9 24.6" },
+                                             { "ScenarioRoster.rfc", "2:1,5:5,8:8,2:9,5:4" }, { "ScenarioLevel.rfc", "17" }, { "ScenarioEntry.rfc", "389 0.8 -8.23 -15.53" },
+                                             { "ScenarioRoute1.rfc", "4 5 6" }, { "ScenarioRoute2.rfc", "7 8 9" }, { "ScenarioKillPriority.rfc", "11320" } },
+                                           warnings);
+    CHECK(s.Scenarios.size() == 2);
+    ScenarioSettings const& dm = s.Scenarios[0];
+    ScenarioSettings const& rfc = s.Scenarios[1];
+    CHECK(dm.Name == "dm" && dm.Parties == 10 && dm.Level == 18 && dm.Roster.size() == 5 && dm.Roster[0][0] == 1 && dm.Roster[4][0] == 7 && dm.Roster[4][1] == 9);
+    CHECK(dm.HasEntry && dm.Entry[0] == 36.0f && dm.HasStaging && dm.Staging[0] == 0.0f && dm.HasPortal && dm.Route.size() == 1 && dm.KillPriority.empty());
+    CHECK(rfc.Name == "rfc" && rfc.Parties == 10 && rfc.Level == 17 && rfc.Roster[0][0] == 2 && rfc.Entry[0] == 389.0f && !rfc.HasPortal);
+    CHECK(rfc.Route.size() == 2 && rfc.Route[1][0] == 7.0f && rfc.KillPriority.size() == 1);
+    CHECK(dm.DurationSec == 3600 && rfc.DurationSec == 3600);            // a shared key applies to every dungeon
+    CHECK(s.Scenario.Name == "dm");                                       // the first one, for the code that knows one
+    CHECK(HasWarning(warnings, "ScenarioRoster: ignored with a list") && HasWarning(warnings, "ScenarioLevel: ignored with a list"));
+
+    // The bots in spawn order: the first dungeon's ten parties first, each slot with the race and class of its place in its own dungeon's roster.
+    CHECK(ScenarioBotCount(s.Scenarios) == 100 && ScenarioPartyCount(s.Scenarios) == 20);
+    ScenarioSlot const first = ScenarioSlotOf(s.Scenarios, 0);
+    CHECK(first.Valid && first.Dungeon == 0 && first.Party == 0 && first.Race == 1 && first.Class == 1);
+    ScenarioSlot const lastDm = ScenarioSlotOf(s.Scenarios, 49);
+    CHECK(lastDm.Valid && lastDm.Dungeon == 0 && lastDm.Party == 9 && lastDm.Race == 7 && lastDm.Class == 9);
+    ScenarioSlot const firstRfc = ScenarioSlotOf(s.Scenarios, 50);
+    CHECK(firstRfc.Valid && firstRfc.Dungeon == 1 && firstRfc.Party == 10 && firstRfc.Race == 2 && firstRfc.Class == 1);
+    ScenarioSlot const lastRfc = ScenarioSlotOf(s.Scenarios, 99);
+    CHECK(lastRfc.Valid && lastRfc.Dungeon == 1 && lastRfc.Party == 19 && lastRfc.Race == 5 && lastRfc.Class == 4);
+    CHECK(!ScenarioSlotOf(s.Scenarios, 100).Valid);
+    CHECK(ScenarioDungeonOfParty(s.Scenarios, 9) == 0 && ScenarioDungeonOfParty(s.Scenarios, 10) == 1 && ScenarioDungeonOfParty(s.Scenarios, 19) == 1);
+}
+
+// A roster with Alliance and Horde races cannot be one party: refused, in both forms. In the list form a roster of another size than the first is dropped too.
+void MixedFactionRosterIsRefused()
+{
+    std::vector<std::string> warnings;
+    BotSettings const list = ParseBotSettings({ { "Scenario", "dm:2,rfc:3" }, { "ScenarioRoster.dm", "1:1,2:5,1:8" }, { "ScenarioEntry.dm", "36 1 2 3" },
+                                                { "ScenarioRoster.rfc", "2:1,5:5,8:8" }, { "ScenarioEntry.rfc", "389 1 2 3" } },
+                                              warnings);
+    CHECK(list.Scenarios.size() == 1 && list.Scenarios[0].Name == "rfc" && list.Scenario.Name == "rfc" && ScenarioPartyCount(list.Scenarios) == 3);
+    CHECK(HasWarning(warnings, "ScenarioRoster.dm: the roster mixes Alliance and Horde"));
+
+    warnings.clear();
+    BotSettings const single = ParseBotSettings({ { "Scenario", "x" }, { "ScenarioRoster", "1:1,5:5" }, { "ScenarioEntry", "36 1 2 3" } }, warnings);
+    CHECK(single.Scenario.Name.empty() && single.Scenarios.empty() && HasWarning(warnings, "mixes Alliance and Horde"));
+
+    warnings.clear();
+    BotSettings const sizes = ParseBotSettings({ { "Scenario", "dm:1,rfc:1" }, { "ScenarioRoster.dm", "1:1,1:5,1:8" }, { "ScenarioEntry.dm", "36 1 2 3" },
+                                                 { "ScenarioRoster.rfc", "2:1,5:5" }, { "ScenarioEntry.rfc", "389 1 2 3" } },
+                                               warnings);
+    CHECK(sizes.Scenarios.size() == 1 && sizes.Scenarios[0].Name == "dm" && HasWarning(warnings, "ScenarioRoster.rfc: 2 bots, not 3"));
+
+    warnings.clear();
+    BotSettings const none = ParseBotSettings({ { "Scenario", "dm:1" } }, warnings);    // no roster for it: nothing runs
+    CHECK(none.Scenarios.empty() && none.Scenario.Name.empty() && HasWarning(warnings, "(dungeon dm)") && HasWarning(warnings, "the scenario is off"));
+}
+
+// The sim's single-dungeon config reads as before: one dungeon, its parties from ScenarioParties.
+void SingleDungeonScenarioIsUnchanged()
+{
+    std::vector<std::string> warnings;
+    BotSettings const s = ParseBotSettings({ { "Scenario", "rfc" }, { "Dungeon", "rfc" }, { "ScenarioParties", "20" }, { "ScenarioLevel", "17" },
+                                             { "ScenarioRoster", "2:1,5:5,8:8,2:9,5:4" }, { "ScenarioDurationSec", "3600" }, { "DungeonTeleport", "1" },
+                                             { "ScenarioEntry", "389 0.8 -8.23 -15.53" } },
+                                           warnings);
+    CHECK(warnings.empty());
+    CHECK(s.Scenario.Name == "rfc" && s.Scenario.Parties == 20 && s.Scenario.Level == 17 && s.Scenario.Roster.size() == 5 && s.Scenario.DurationSec == 3600);
+    CHECK(s.Scenarios.size() == 1 && s.Scenarios[0].Name == "rfc" && s.Scenarios[0].Parties == 20 && s.DungeonTeleport);
+    CHECK(ScenarioBotCount(s.Scenarios) == 100 && ScenarioPartyCount(s.Scenarios) == 20);
+    ScenarioSlot const slot = ScenarioSlotOf(s.Scenarios, 57);           // the same roster cycle as before: slot % 5
+    CHECK(slot.Valid && slot.Dungeon == 0 && slot.Party == 11 && slot.Race == 8 && slot.Class == 8);
+    CHECK(ParseBotSettings({ { "Scenario", "rfc" }, { "ScenarioParties", "21" }, { "ScenarioRoster", "2:1" } }, warnings).Scenario.Parties == 1);
+}
+
 } // namespace
 
 void WipeRecoverySettings()
@@ -356,6 +459,10 @@ int main()
     HubSettings();
     WipeRecoverySettings();
     DungeonLearningKnobsAreBounded();
+    ScenarioListParsing();
+    ScenarioListReadsEachDungeon();
+    MixedFactionRosterIsRefused();
+    SingleDungeonScenarioIsUnchanged();
 
     if (failures == 0)
         std::printf("settings_test: all checks passed\n");

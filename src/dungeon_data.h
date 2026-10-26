@@ -105,6 +105,8 @@ std::vector<Dungeon> ParseDungeons(std::string_view text, std::vector<std::strin
 // ScenarioRoster, ScenarioLevel, ScenarioStaging, ScenarioPortal, ScenarioEntry, ScenarioDurationSec, ScenarioWipeRecovery*, ScenarioMinAlive,
 // ScenarioLeaderDeadAbandonSec, ScenarioBosses, ScenarioRequireBosses and ScenarioRoute<n>) and returns the new config. The route keys are
 // added only when the config has no ScenarioRoute<n> of its own. Explicit config always wins. Without a match the config comes back unchanged.
+// With a list in Scenario ("dm:10,rfc:10", bot_settings.h) each listed dungeon is merged the same way into the keys it reads (ScenarioConfigFor), and the keys the
+// file adds are stored as "<key>.<id>" (ScenarioEntry.dm, ScenarioRoute3.rfc); Dungeon is not needed then.
 std::unordered_map<std::string, std::string> MergeDungeon(std::unordered_map<std::string, std::string> const& config, std::string_view text,
                                                           std::vector<std::string>& warnings);
 
@@ -113,7 +115,7 @@ std::unordered_map<std::string, std::string> MergeDungeonSet(std::unordered_map<
                                                              std::vector<std::string>& warnings);
 
 // MergeDungeonSet with the dungeons loaded from the places the config names: DungeonDir (your own JSON files), DungeonDataDir (the shipped JSON files) and
-// DungeonFile (the old text file); see LoadDungeonSet in dungeon_files.h. Unreadable places are warnings. Dungeon must be set and at least one
+// DungeonFile (the old text file); see LoadDungeonSet in dungeon_files.h. Unreadable places are warnings. Dungeon (or a list in Scenario) must be set and at least one
 // of the three places named, else nothing happens and the config comes back unchanged.
 std::unordered_map<std::string, std::string> MergeDungeonFile(std::unordered_map<std::string, std::string> const& config,
                                                               std::vector<std::string>& warnings);

@@ -1022,7 +1022,7 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
         return;
 
     std::uint32_t const spell = bot.last_action_spell;
-    if (_options.RouteMap == 36 && _options.OnEvent)
+    if (ScenarioOf(bot.guid).RouteMap == 36 && _options.OnEvent)
     {
         auto const cast = state.CastTarget.find(spell);
         std::uint64_t const target = cast == state.CastTarget.end() ? 0 : cast->second;
@@ -1538,6 +1538,29 @@ void BotPolicy::TalentOrderFailed(std::uint64_t bot, std::uint64_t nowMs)
         return;
     known->second.TalentLevel = 0;
     known->second.TalentRetryMs = nowMs + 5000;
+}
+
+PolicyOptions::ScenarioRoute BotPolicy::ScenarioRouteOf(PolicyOptions const& options)
+{
+    PolicyOptions::ScenarioRoute route;
+    route.Route = options.Route;
+    route.RouteMap = options.RouteMap;
+    route.RouteBossAt = options.RouteBossAt;
+    route.Events = options.Events;
+    route.KillPriority = options.KillPriority;
+    route.HasPortal = options.HasPortal;
+    route.PortalMap = options.PortalMap;
+    route.PortalPoint = options.PortalPoint;
+    route.PortalInsideMap = options.PortalInsideMap;
+    return route;
+}
+
+PolicyOptions::ScenarioRoute const& BotPolicy::ScenarioOf(std::uint64_t guid) const
+{
+    if (_scenarioRouteFn)
+        if (PolicyOptions::ScenarioRoute const* own = _scenarioRouteFn(guid))
+            return *own;
+    return _scenarioRoute;
 }
 
 std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std::uint64_t nowMs)
@@ -2304,8 +2327,8 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 else
                     emit(Decision{ ActionType::kMoveTo, 0, corpse });
             }
-            else if (_options.HasPortal && bot.map_id == _options.PortalMap && bot.corpse_map == _options.PortalInsideMap)
-                emit(Decision{ ActionType::kMoveTo, 0, _options.PortalPoint });
+            else if (PolicyOptions::ScenarioRoute const& own = ScenarioOf(bot.guid); own.HasPortal && bot.map_id == own.PortalMap && bot.corpse_map == own.PortalInsideMap)
+                emit(Decision{ ActionType::kMoveTo, 0, own.PortalPoint });
             else if (nowMs >= state.CorpseTeleportRetryMs)
             {
                 // No way on foot to the corpse's map (run 9: a member that died in the dungeon was left on the outside map and idled for 45 minutes
@@ -2387,8 +2410,10 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         // A dungeon party's bot on the outside map (a wipe left it at the graveyard, a rescue teleport was refused in combat): it goes back
         // through the instance door and starts no fight on the way. The owner's rule of 2026-10-22: a bot of a dungeon party must not be
         // able to die outside the dungeon; it comes back as a ghost would and is revived in the dungeon it died in.
-        bool const returningToDungeon = routeOn && _options.HasPortal && _options.PortalInsideMap != 0 &&
-                                       bot.map_id != _options.PortalInsideMap && bot.in_combat == 0;
+        // The route, events, kill priority and portal of the bot's own party's dungeon (one of several, or the scenario's only one).
+        PolicyOptions::ScenarioRoute const& scenario = ScenarioOf(bot.guid);
+        bool const returningToDungeon = routeOn && scenario.HasPortal && scenario.PortalInsideMap != 0 &&
+                                       bot.map_id != scenario.PortalInsideMap && bot.in_combat == 0;
         std::uint64_t const leaderRef = partyLeader != 0 ? PlayerRef(partyLeader) : 0;
         BotSnapshot const* leaderSnap = nullptr;
         if (partyMember)
@@ -2496,7 +2521,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         // leaves quests alone until it is done.
         QuestStep questStep;
         bool routeBusy = false;
-        bool const questsAllowed = _quests.Enabled() && !partyMember && !(routeActiveOf(bot.guid) && _options.RouteMap != 0) /* a dungeon run: the leader walks the route, not to a quest giver */ && !lowHealth && bot.in_combat == 0 && !state.ChatStay && state.ChatFollow == 0 && nowMs >= state.QuestPausedUntilMs;
+        bool const questsAllowed = _quests.Enabled() && !partyMember && !(routeActiveOf(bot.guid) && scenario.RouteMap != 0) /* a dungeon run: the leader walks the route, not to a quest giver */ && !lowHealth && bot.in_combat == 0 && !state.ChatStay && state.ChatFollow == 0 && nowMs >= state.QuestPausedUntilMs;
         if (questsAllowed)
             questStep = _quests.Next(bot, state.Quest, nowMs, QuestBotInfo{ classId, _options.RaceOf ? _options.RaceOf(bot.guid) : 0u });
         // Every five minutes, what the quest planner is doing for this bot and what keeps it from doing more (the events are the only record,
@@ -2656,14 +2681,14 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                         golemNearby = true;
                         break;
                     }
-                if (routeOn && HealSpellFor(classId, bot.level) == 0 && ((_options.TacticFocus && !_options.KillPriority.empty()) || interruptNow || golemNearby))
+                if (routeOn && HealSpellFor(classId, bot.level) == 0 && ((_options.TacticFocus && !scenario.KillPriority.empty()) || interruptNow || golemNearby))
                 {
-                    auto const rankOf = [this](NearbyUnit const& unit)
+                    auto const rankOf = [this, &scenario](NearbyUnit const& unit)
                     {
                         if (!_options.TacticFocus)
                             return std::uint32_t(1000);
-                        auto const at = _options.KillPriority.find(forever_module::UnitRefEntry(unit.guid));
-                        return at == _options.KillPriority.end() ? std::uint32_t(1000) : at->second;
+                        auto const at = scenario.KillPriority.find(forever_module::UnitRefEntry(unit.guid));
+                        return at == scenario.KillPriority.end() ? std::uint32_t(1000) : at->second;
                     };
                     NearbyUnit const* best = assist;
                     // A bot that can interrupt turns on a casting unit of the pack first (its rotation then fires the interrupt at its target); then
@@ -2964,11 +2989,11 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             std::vector<dungeon_events::Event> const* routeEvents = nullptr;
             if (partyLeaderBot && !state.ChatStay)
             {
-                if (routeActiveOf(bot.guid) && (_options.RouteMap == 0 || bot.map_id == _options.RouteMap))
+                if (routeActiveOf(bot.guid) && (scenario.RouteMap == 0 || bot.map_id == scenario.RouteMap))
                 {
-                    routePoints = &_options.Route;
-                    routeBoss = &_options.RouteBossAt;
-                    routeEvents = &_options.Events;
+                    routePoints = &scenario.Route;
+                    routeBoss = &scenario.RouteBossAt;
+                    routeEvents = &scenario.Events;
                 }
                 else if (state.TankLead)
                 {
@@ -4092,7 +4117,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         // is also what makes the rescue possible).
         if (returningToDungeon)
         {
-            wanted = Decision{ ActionType::kMoveTo, 0, _options.PortalPoint };
+            wanted = Decision{ ActionType::kMoveTo, 0, scenario.PortalPoint };
             moveWhy = "return_to_instance";
         }
 
@@ -4136,7 +4161,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             }
         }
 
-        if (_options.OnEvent && _options.RouteMap != 0 && partyLeader != 0 && (wanted.Type == ActionType::kMoveTo || (wanted.Type == ActionType::kFollow && partyLeaderBot)) &&
+        if (_options.OnEvent && scenario.RouteMap != 0 && partyLeader != 0 && (wanted.Type == ActionType::kMoveTo || (wanted.Type == ActionType::kFollow && partyLeaderBot)) &&
             nowMs - state.MoveWhyLoggedMs >= 5000 && (wanted.Type == ActionType::kFollow || std::hypot(wanted.Dest.X - state.MoveWhyDest.X, wanted.Dest.Y - state.MoveWhyDest.Y) > 8.0f))
         {
             state.MoveWhyLoggedMs = nowMs;

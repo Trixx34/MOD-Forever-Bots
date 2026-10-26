@@ -45,6 +45,9 @@ itself (`Scenario`, `ScenarioRoster`, `ScenarioLevel` = the dungeon's top level,
 unreadable file) is a line on the module's stderr and no dungeon run. Then the usual scenario rules apply (one result line in `ScenarioResultFile`,
 `MaxBots >= 5`, the ramp and saved bots unused, `Bot.Actions.Teleport = 1` in the core). A config reload does not restart a run.
 
+Several dungeons at once (bots 0.29.0): `Scenario = dm:10,rfc:10` runs each listed dungeon from its own block, with `<key>.<id>` for one dungeon's own keys
+(`ScenarioRoster.dm = 1:1,1:5,1:8,3:3,7:9`, `ScenarioLevel.dm = 18`); `Dungeon` is then not used. See `doc/dungeon-strategy.md`, "Several dungeons in one run".
+
 ## File format
 
 Line based. `#` starts a comment. A dungeon is a block from `dungeon <id>` to `end`:

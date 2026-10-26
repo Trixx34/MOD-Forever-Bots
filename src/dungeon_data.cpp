@@ -1,5 +1,6 @@
 #include "dungeon_data.h"
 #include "dungeon_files.h"
+#include "bot_settings.h"
 
 #include <charconv>
 #include <fstream>
@@ -223,32 +224,12 @@ std::vector<Dungeon> ParseDungeons(std::string_view text, std::vector<std::strin
     return dungeons;
 }
 
-std::unordered_map<std::string, std::string> MergeDungeon(std::unordered_map<std::string, std::string> const& config, std::string_view text,
-                                                          std::vector<std::string>& warnings)
+namespace
 {
-    auto const wanted = config.find("Dungeon");
-    if (wanted == config.end() || wanted->second.empty())
-        return config;
-    return MergeDungeonSet(config, ParseDungeons(text, warnings), warnings);
-}
 
-std::unordered_map<std::string, std::string> MergeDungeonSet(std::unordered_map<std::string, std::string> const& config, std::vector<Dungeon> const& dungeons,
-                                                             std::vector<std::string>& warnings)
+// The scenario keys of dungeon `d` that `config` does not set already, added to it.
+std::unordered_map<std::string, std::string> MergeOne(std::unordered_map<std::string, std::string> const& config, Dungeon const& d)
 {
-    auto const wanted = config.find("Dungeon");
-    if (wanted == config.end() || wanted->second.empty())
-        return config;
-    Dungeon const* found = nullptr;
-    for (Dungeon const& d : dungeons)
-        if (d.Id == wanted->second)
-            found = &d;
-    if (!found)
-    {
-        warnings.push_back("Module.forever-bots.Dungeon: '" + wanted->second + "' is not in the dungeon file; no dungeon run.");
-        return config;
-    }
-
-    Dungeon const& d = *found;
     auto merged = config;
     auto const set = [&merged](std::string const& key, std::string value) { merged.emplace(key, std::move(value)); };
     set("Scenario", d.Id);
@@ -307,11 +288,74 @@ std::unordered_map<std::string, std::string> MergeDungeonSet(std::unordered_map<
     return merged;
 }
 
+Dungeon const* FindDungeon(std::vector<Dungeon> const& dungeons, std::string const& id)
+{
+    Dungeon const* found = nullptr;
+    for (Dungeon const& d : dungeons)
+        if (d.Id == id)
+            found = &d;
+    return found;
+}
+
+// Whether the config asks for a dungeon run: Dungeon = <id>, or a list of dungeons in Scenario (bot_settings.h).
+bool WantsDungeon(std::unordered_map<std::string, std::string> const& config)
+{
+    auto const wanted = config.find("Dungeon");
+    auto const scenario = config.find("Scenario");
+    return (wanted != config.end() && !wanted->second.empty()) || (scenario != config.end() && IsScenarioList(scenario->second));
+}
+
+} // namespace
+
+std::unordered_map<std::string, std::string> MergeDungeon(std::unordered_map<std::string, std::string> const& config, std::string_view text,
+                                                          std::vector<std::string>& warnings)
+{
+    if (!WantsDungeon(config))
+        return config;
+    return MergeDungeonSet(config, ParseDungeons(text, warnings), warnings);
+}
+
+std::unordered_map<std::string, std::string> MergeDungeonSet(std::unordered_map<std::string, std::string> const& config, std::vector<Dungeon> const& dungeons,
+                                                             std::vector<std::string>& warnings)
+{
+    // Several dungeons (Scenario = "dm:10,rfc:10"): each listed one is merged into the keys it reads (ScenarioConfigFor), and what the file adds is stored as
+    // "<key>.<id>", where the settings read that dungeon's keys from. Keys the config sets for that dungeon, or for all of them, still win.
+    if (auto const scenario = config.find("Scenario"); scenario != config.end() && IsScenarioList(scenario->second))
+    {
+        auto merged = config;
+        std::vector<std::string> listWarnings; // the settings report the list's own mistakes
+        for (ScenarioListItem const& item : ParseScenarioList(scenario->second, listWarnings))
+        {
+            Dungeon const* found = FindDungeon(dungeons, item.Name);
+            if (!found)
+            {
+                warnings.push_back("Module.forever-bots.Scenario: '" + item.Name + "' is not in the dungeon file; that dungeon does not run.");
+                continue;
+            }
+            auto const own = ScenarioConfigFor(config, item.Name, item.Parties);
+            for (auto const& [key, value] : MergeOne(own, *found))
+                if (own.count(key) == 0)
+                    merged.emplace(key + "." + item.Name, value);
+        }
+        return merged;
+    }
+
+    auto const wanted = config.find("Dungeon");
+    if (wanted == config.end() || wanted->second.empty())
+        return config;
+    Dungeon const* found = FindDungeon(dungeons, wanted->second);
+    if (!found)
+    {
+        warnings.push_back("Module.forever-bots.Dungeon: '" + wanted->second + "' is not in the dungeon file; no dungeon run.");
+        return config;
+    }
+    return MergeOne(config, *found);
+}
+
 std::unordered_map<std::string, std::string> MergeDungeonFile(std::unordered_map<std::string, std::string> const& config,
                                                               std::vector<std::string>& warnings)
 {
-    auto const wanted = config.find("Dungeon");
-    if (wanted == config.end() || wanted->second.empty())
+    if (!WantsDungeon(config))
         return config;
     DungeonSources const sources = SourcesFromConfig(config);
     if (sources.File.empty() && sources.DataDir.empty() && sources.OverrideDir.empty())

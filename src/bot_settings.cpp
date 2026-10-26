@@ -113,7 +113,8 @@ bool ParseNumbers(std::string const& text, float* out, std::size_t count)
     return !(in >> trailing);
 }
 
-void ReadScenario(std::unordered_map<std::string, std::string> const& config, ScenarioSettings& scenario, std::vector<std::string>& warnings)
+// One dungeon's scenario: the single form, or one entry of a list read from its ScenarioConfigFor config.
+void ReadOneScenario(std::unordered_map<std::string, std::string> const& config, ScenarioSettings& scenario, std::vector<std::string>& warnings)
 {
     auto const name = config.find("Scenario");
     if (name == config.end() || name->second.empty())
@@ -265,6 +266,82 @@ void ReadScenario(std::unordered_map<std::string, std::string> const& config, Sc
         scenario.Route.push_back(point);
 }
 
+// A party is one faction: the server refuses an invite across the sides, so a roster with races of both could never form its party.
+bool OneFaction(ScenarioSettings const& scenario)
+{
+    bool alliance = false, horde = false;
+    for (auto const& [race, cls] : scenario.Roster)
+    {
+        alliance = alliance || pick::IsAllianceRace(race);
+        horde = horde || pick::IsHordeRace(race);
+    }
+    return !(alliance && horde);
+}
+
+// The keys that describe one dungeon: in the list form they are only read as "<key>.<id>".
+bool IsPlainDungeonKey(std::string const& key)
+{
+    static char const* const keys[] = { "Dungeon", "ScenarioRoster", "ScenarioLevel", "ScenarioStaging", "ScenarioEntry", "ScenarioPortal",
+                                        "ScenarioBosses", "ScenarioBossAt", "ScenarioKillPriority", "ScenarioParties" };
+    if (key.find('.') != std::string::npos)
+        return false;
+    for (char const* plain : keys)
+        if (key == plain)
+            return true;
+    return key.rfind("ScenarioRoute", 0) == 0;
+}
+
+void ReadScenarios(std::unordered_map<std::string, std::string> const& config, BotSettings& settings, std::vector<std::string>& warnings)
+{
+    auto const name = config.find("Scenario");
+    if (name == config.end() || name->second.empty())
+        return;
+    if (!IsScenarioList(name->second))
+    {
+        ReadOneScenario(config, settings.Scenario, warnings);
+        if (!settings.Scenario.Name.empty() && !OneFaction(settings.Scenario))
+        {
+            warnings.push_back("Module.forever-bots.ScenarioRoster: the roster mixes Alliance and Horde races, which cannot be one party; the scenario is off.");
+            settings.Scenario = ScenarioSettings{};
+        }
+        if (!settings.Scenario.Name.empty())
+            settings.Scenarios.push_back(settings.Scenario);
+        return;
+    }
+
+    for (auto const& [key, value] : config)
+        if (IsPlainDungeonKey(key) && key != "Dungeon")
+            warnings.push_back("Module.forever-bots." + key + ": ignored with a list in Scenario; set " + key + ".<dungeon> for one dungeon of the list.");
+    for (ScenarioListItem const& item : ParseScenarioList(name->second, warnings))
+    {
+        std::size_t const before = warnings.size();
+        ScenarioSettings scenario;
+        ReadOneScenario(ScenarioConfigFor(config, item.Name, item.Parties), scenario, warnings);
+        for (std::size_t i = before; i < warnings.size(); ++i)
+            warnings[i] += " (dungeon " + item.Name + ")";
+        if (scenario.Name.empty())
+            continue;
+        if (!OneFaction(scenario))
+        {
+            warnings.push_back("Module.forever-bots.ScenarioRoster." + item.Name + ": the roster mixes Alliance and Horde races, which cannot be one party; " +
+                               item.Name + " is dropped from the run.");
+            continue;
+        }
+        // The module and the policy cut the bots, in guid order, into parties of one size: a dungeon with another roster size would shift every party after it.
+        if (!settings.Scenarios.empty() && scenario.Roster.size() != settings.Scenarios.front().Roster.size())
+        {
+            warnings.push_back("Module.forever-bots.ScenarioRoster." + item.Name + ": " + std::to_string(scenario.Roster.size()) + " bots, not " +
+                               std::to_string(settings.Scenarios.front().Roster.size()) + " as the first dungeon's roster; " + item.Name + " is dropped from the run.");
+            continue;
+        }
+        settings.Scenarios.push_back(std::move(scenario));
+    }
+    if (!settings.Scenarios.empty())
+        settings.Scenario = settings.Scenarios.front();
+    else
+        warnings.push_back("Module.forever-bots.Scenario: no dungeon of '" + name->second + "' can run; the scenario is off.");
+}
+
 // Reads a race or class id. The word "random" means pick (0); otherwise a valid id.
 void ReadIdOrRandom(std::unordered_map<std::string, std::string> const& config, char const* key, std::uint32_t& value,
                     std::vector<std::string>& warnings)
@@ -297,6 +374,124 @@ void ReadStopTime(std::unordered_map<std::string, std::string> const& config, st
 }
 
 } // namespace
+
+bool IsScenarioList(std::string const& value)
+{
+    return value.find(':') != std::string::npos || value.find(',') != std::string::npos;
+}
+
+std::vector<ScenarioListItem> ParseScenarioList(std::string const& value, std::vector<std::string>& warnings)
+{
+    std::vector<ScenarioListItem> items;
+    std::uint32_t total = 0;
+    std::istringstream list(value);
+    std::string entry;
+    while (std::getline(list, entry, ','))
+    {
+        while (!entry.empty() && entry.front() == ' ')
+            entry.erase(entry.begin());
+        while (!entry.empty() && entry.back() == ' ')
+            entry.pop_back();
+        ScenarioListItem item;
+        std::size_t const colon = entry.find(':');
+        item.Name = entry.substr(0, colon);
+        std::string reason;
+        if (item.Name.empty() || (colon != std::string::npos && !ParseBounded(entry.substr(colon + 1), 1, kMaxScenarioParties, item.Parties, reason)))
+        {
+            warnings.push_back("Module.forever-bots.Scenario: '" + entry + "' is not dungeon:parties (1.." + std::to_string(kMaxScenarioParties) + "); ignored.");
+            continue;
+        }
+        bool repeated = false;
+        for (ScenarioListItem const& seen : items)
+            repeated = repeated || seen.Name == item.Name;
+        if (repeated)
+        {
+            warnings.push_back("Module.forever-bots.Scenario: '" + item.Name + "' is listed twice; the second one is ignored (give the first more parties).");
+            continue;
+        }
+        if (total + item.Parties > kMaxScenarioParties)
+        {
+            warnings.push_back("Module.forever-bots.Scenario: more than " + std::to_string(kMaxScenarioParties) + " parties in all; " + item.Name + " gets " +
+                               std::to_string(kMaxScenarioParties - total) + " instead of " + std::to_string(item.Parties) + ".");
+            item.Parties = kMaxScenarioParties - total;
+            if (item.Parties == 0)
+                continue;
+        }
+        total += item.Parties;
+        items.push_back(std::move(item));
+    }
+    return items;
+}
+
+std::unordered_map<std::string, std::string> ScenarioConfigFor(std::unordered_map<std::string, std::string> const& config, std::string const& name,
+                                                               std::uint32_t parties)
+{
+    std::unordered_map<std::string, std::string> out;
+    std::string const suffix = "." + name;
+    for (auto const& [key, value] : config)
+    {
+        bool const isOverride = key.rfind("Scenario", 0) == 0 && key.find('.') != std::string::npos;
+        if (!isOverride && !IsPlainDungeonKey(key) && key != "Scenario")
+            out.emplace(key, value);
+    }
+    for (auto const& [key, value] : config)
+        if (key.rfind("Scenario", 0) == 0 && key.size() > suffix.size() && key.compare(key.size() - suffix.size(), suffix.size(), suffix) == 0)
+            out[key.substr(0, key.size() - suffix.size())] = value;
+    out["Scenario"] = name;
+    out["ScenarioParties"] = std::to_string(parties);
+    out["Dungeon"] = name;
+    return out;
+}
+
+ScenarioSlot ScenarioSlotOf(std::vector<ScenarioSettings> const& scenarios, std::size_t slot)
+{
+    ScenarioSlot where;
+    std::size_t party = 0;
+    for (std::size_t d = 0; d < scenarios.size(); ++d)
+    {
+        std::size_t const size = scenarios[d].Roster.size();
+        std::size_t const bots = size * scenarios[d].Parties;
+        if (size != 0 && slot < bots)
+        {
+            where.Valid = true;
+            where.Dungeon = d;
+            where.Party = party + slot / size;
+            where.Race = scenarios[d].Roster[slot % size][0];
+            where.Class = scenarios[d].Roster[slot % size][1];
+            return where;
+        }
+        slot -= bots;
+        party += scenarios[d].Parties;
+    }
+    return where;
+}
+
+std::uint32_t ScenarioBotCount(std::vector<ScenarioSettings> const& scenarios)
+{
+    std::uint32_t bots = 0;
+    for (ScenarioSettings const& scenario : scenarios)
+        bots += std::uint32_t(scenario.Roster.size()) * scenario.Parties;
+    return bots;
+}
+
+std::uint32_t ScenarioPartyCount(std::vector<ScenarioSettings> const& scenarios)
+{
+    std::uint32_t parties = 0;
+    for (ScenarioSettings const& scenario : scenarios)
+        parties += scenario.Parties;
+    return parties;
+}
+
+std::size_t ScenarioDungeonOfParty(std::vector<ScenarioSettings> const& scenarios, std::size_t party)
+{
+    for (std::size_t d = 0; d < scenarios.size(); ++d)
+    {
+        if (party < scenarios[d].Parties)
+            return d;
+        party -= scenarios[d].Parties;
+    }
+    return scenarios.empty() ? 0 : scenarios.size() - 1;
+}
 
 std::uint32_t EffectiveMaxBots(std::uint32_t configured, std::uint32_t grantedMaxBots, bool tier2Granted)
 {
@@ -515,7 +710,7 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     settings.Supplies.FoodTarget = std::max(settings.Supplies.FoodTarget, settings.Supplies.FoodLow);
     settings.Supplies.DrinkTarget = std::max(settings.Supplies.DrinkTarget, settings.Supplies.DrinkLow);
     ReadKey(config, "AutoGearEveryLevels", 1, 60, settings.AutoGearEveryLevels, warnings);
-    ReadScenario(config, settings.Scenario, warnings);
+    ReadScenarios(config, settings, warnings);
     if (auto const it = config.find("RotationFile"); it != config.end())
         settings.RotationFile = it->second;
     if (auto const it = config.find("SpellCostFile"); it != config.end())
