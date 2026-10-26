@@ -3295,7 +3295,7 @@ void ADeadMemberIsRevivedByItsLeaderInsideTheDungeon()
     CHECK(HasAction(policy.Decide(v, 22000), 13, ActionType::kRevive));                   // third try
     std::vector<BotAction> given = policy.Decide(v, 33000);
     CHECK(!HasAction(given, 13, ActionType::kRevive));                                    // given up after three tries
-    CHECK(HasAction(given, 13, ActionType::kMoveTo));                                     // the corpse run goes on
+    CHECK(!HasAction(given, 13, ActionType::kMoveTo));                                    // and it stays by the leader: no corpse run (0.34.3)
 
     BotPolicy busy(options);
     busy.SetRouteActive(true);
@@ -3307,7 +3307,7 @@ void ADeadMemberIsRevivedByItsLeaderInsideTheDungeon()
 }
 
 // A ghost of a dungeon party still on the outside map is not revived there (it stood up at the graveyard and died outside the dungeon);
-// it walks to the instance door, whatever the leader is doing.
+// out of combat it is teleported to its leader inside the instance (0.34.3); it is still not revived outside.
 void AGhostOnTheOutsideMapIsNotRevivedBeforeItEnters()
 {
     std::vector<std::string> events;
@@ -3319,13 +3319,14 @@ void AGhostOnTheOutsideMapIsNotRevivedBeforeItEnters()
     WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 });
     Ghost(v.bots[3], 0.0f, 36, 50.0f);
     v.bots[3].map_id = 0;                                                                 // the graveyard outside
+    v.bots[2].map_id = 36;                                                                // the leader (bot 12) is inside the instance
     std::vector<BotAction> first = policy.Decide(v, 1000);
     CHECK(!HasAction(first, 13, ActionType::kRevive));
     CHECK(!Logged(events, "revive_out_of_combat:"));
-    bool towardPortal = false;
+    bool toLeader = false;
     for (BotAction const& action : first)
-        towardPortal = towardPortal || (action.type == ActionType::kMoveTo && action.bot_guid == 13 && action.dest_x == 500.0f);
-    CHECK(towardPortal);                                                                 // to the instance door
+        toLeader = toLeader || (action.type == ActionType::kTeleport && action.bot_guid == 13 && action.spell_id == 36);
+    CHECK(toLeader);                                                                     // teleported to the leader in the instance
     CHECK(!HasAction(policy.Decide(v, 12000), 13, ActionType::kRevive));                 // still outside: still not revived
 }
 

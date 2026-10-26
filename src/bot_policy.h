@@ -223,7 +223,7 @@ struct PolicyOptions
     std::uint64_t CorpseRunTimeoutMs = 240000;  // a ghost that has not reached its corpse by then gives up
     // A corpse run that takes longer than this (config CorpseRunTeleportSec, 0 = off) puts the ghost at its corpse (the CorpseRunTimeoutMs teleport, brought forward).
     std::uint64_t CorpseRunTeleportMs = 60000;
-    std::uint64_t WaitForRezMs = 90000;         // the party waits this long for a corpse to be resurrected
+    std::uint64_t WaitForRezMs = 20000;         // the party waits this long for a corpse to be resurrected (20 s: a rez that has not come by then is not coming)
     std::uint64_t WaitForGhostMs = 180000;      // and this long after the ghost entered the corpse's map
     // Supplies (layout 15): a bot short of ammunition, food or drink walks to a vendor that sells it and buys, and eats or drinks while resting.
     supply::Settings Supplies;

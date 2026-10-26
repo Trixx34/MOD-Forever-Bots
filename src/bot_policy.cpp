@@ -2261,6 +2261,29 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 state.EntrySinceMs = nowMs;
             bool const atEntry = bot.map_id == bot.corpse_map && entryOf != _options.DungeonsByMap.end() && entryOf->second.HasEntry &&
                                  DistanceTo(bot, entryOf->second.Entry) <= kEntryYards;
+            // Out of combat with the party's leader up: the ghost does not wait at the entrance or walk to its corpse. It is teleported to the leader and stays
+            // by it for the revive (above). A fight in the party brings back the entrance wait below.
+            auto const leaderAt = deadParty != 0 && deadParty != bot.guid ? indexOf.find(deadParty) : indexOf.end();
+            if (instanceParty && leaderAt != indexOf.end() && view.bots[leaderAt->second].life_state == 0 && !partyFighting(deadParty))
+            {
+                BotSnapshot const& leader = view.bots[leaderAt->second];
+                bool const withLeader = bot.map_id == leader.map_id && DistanceTo(bot, Point{ leader.pos_x, leader.pos_y, leader.pos_z }) <= kEntryYards;
+                if (!withLeader && nowMs >= state.CorpseTeleportRetryMs)
+                {
+                    state.CorpseTeleportRetryMs = nowMs + kEntryTeleportRetryMs;
+                    BotAction toLeader;
+                    toLeader.bot_guid = bot.guid;
+                    toLeader.type = ActionType::kTeleport;
+                    toLeader.spell_id = leader.map_id;
+                    toLeader.dest_x = leader.pos_x;
+                    toLeader.dest_y = leader.pos_y;
+                    toLeader.dest_z = leader.pos_z;
+                    actions.push_back(toLeader);
+                    event("party_teleport: bot=" + std::to_string(bot.guid) + " leader=" + std::to_string(leader.guid) + " map=" + std::to_string(bot.map_id) +
+                          " leader_map=" + std::to_string(leader.map_id) + " waited_ms=" + std::to_string(nowMs - state.DeathMs));
+                }
+                continue;
+            }
             if (instanceParty && entryOf != _options.DungeonsByMap.end() && entryOf->second.HasEntry && nowMs - state.EntrySinceMs < kDungeonEntryWaitMs)
             {
                 if (!atEntry && nowMs >= state.CorpseTeleportRetryMs)
