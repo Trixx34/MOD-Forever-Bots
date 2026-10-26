@@ -2783,7 +2783,8 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         }
         // A hunter with no pet that has a beast to tame in view does not pull whatever else is standing there (Westfall's hostile Fleshrippers made the 2026-10-26 hunters fight and get hurt
         // before they ever cast Tame Beast); it tames, and defends itself only when something attacks it. The hold of a cast in progress counts as well.
-        bool const tameNow = classId == kHunterClass && _options.TameBeasts && !_options.TameBeasts->ByEntry.empty() && bot.life_state == 0 && bot.group_role == 0 &&
+        bool const tamingPhase = classId == kHunterClass && _tamingFn && _tamingFn(bot.guid);
+        bool const tameNow = classId == kHunterClass && _options.TameBeasts && !_options.TameBeasts->ByEntry.empty() && bot.life_state == 0 && (bot.group_role == 0 || tamingPhase) &&
                              (bot.level == 0 || bot.level >= kTameMinLevel) && bot.in_combat == 0 && PetOf(bot) == PetKnown::kNone &&
                              (state.TameUntilMs != 0 || (nowMs >= state.TameRetryAtMs && tame::PickTameTarget(bot, nearby, *_options.TameBeasts, kTameSearchYards) != nullptr));
         if (targetRef != 0)
@@ -2802,7 +2803,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
 
         // Taming (Tame Beast). A hunter with no pet, not in a party, out of combat: walk to the nearest beast of data/tame_beasts.txt its level allows, cast Tame Beast on it and
         // hold still for the channel. The snapshot's pet_state tells whether it worked (the core creates the pet when the channel ends). Not for a hunter that fights or runs a route.
-        if (classId == kHunterClass && _options.TameBeasts && !_options.TameBeasts->ByEntry.empty() && bot.life_state == 0 && bot.group_role == 0 &&
+        if (classId == kHunterClass && _options.TameBeasts && !_options.TameBeasts->ByEntry.empty() && bot.life_state == 0 && (bot.group_role == 0 || tamingPhase) &&
             (bot.level == 0 || bot.level >= kTameMinLevel))
         {
             if (state.TameUntilMs != 0)
@@ -2882,6 +2883,21 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                                          " dist=" + std::to_string(int(rotation::DistanceYards(bot, *beast))));
                     continue;
                 }
+            }
+            // In the scenario's Taming phase a hunter with no pet stays where the teleport put it, whatever is or is not in view: a grouped bot would follow its leader back to the
+            // staging place (the party forms before the phase), and the scenario would teleport it out again.
+            if (tamingPhase && state.TameUntilMs == 0 && !hasTarget && PetOf(bot) == PetKnown::kNone)
+            {
+                if (bot.moving != 0)
+                {
+                    BotAction stop;
+                    stop.bot_guid = bot.guid;
+                    stop.type = ActionType::kStop;
+                    actions.push_back(stop);
+                    state.Last = Decision{ ActionType::kStop, 0 };
+                    state.Approaching = false;
+                }
+                continue;
             }
         }
 

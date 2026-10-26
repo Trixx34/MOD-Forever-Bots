@@ -845,6 +845,11 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
                     auto const at = partyOf.find(guid);
                     return at != partyOf.end() && directors[at->second].RouteActive();
                 });
+                policy.SetTamingFor([&directors, &partyOf](std::uint64_t guid)
+                {
+                    auto const at = partyOf.find(guid);
+                    return at != partyOf.end() && directors[at->second].Taming();
+                });
                 policy.SetKilledBossesFor([&directors, &partyOf](std::uint64_t guid) -> std::set<std::uint32_t> const&
                 {
                     static std::set<std::uint32_t> const none;

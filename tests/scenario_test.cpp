@@ -1077,7 +1077,7 @@ void HuntersWithoutAPetAreTakenToTameOneAndBack()
     for (BotSnapshot& bot : bots)
         bot.level = 20;
     IntoTaming(director, bots, t, tick, actions);
-    CHECK(director.Phase() == ScenarioPhase::Taming);
+    CHECK(director.Phase() == ScenarioPhase::Taming && director.Taming());
     // The hunter is sent to the spot, the others stay.
     actions.clear();
     director.Decide(View(++tick, bots), t += 100, actions);

@@ -138,6 +138,7 @@ public:
     void Decide(forever_module::WorldTickSnapshotView const& view, std::uint64_t nowMs, std::vector<forever_module::BotAction>& actions);
 
     ScenarioPhase Phase() const { return _phase; }
+    bool Taming() const { return _phase == ScenarioPhase::Taming; }
     bool RouteActive() const { return _phase == ScenarioPhase::Running; }
 
     // The result, once, after the scenario has ended.

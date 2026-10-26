@@ -185,6 +185,74 @@ void ARefusedCastEndsTheHoldAtOnce()
     CHECK(!Has(policy.Decide(View(bot, { beast }, 3), 9000), ActionType::kCastSpell, 1515));   // not hammering a refused spell
 }
 
+// The scenario forms the party before its Taming phase: the hunter is a member whose leader stays at the staging place.
+WorldTickSnapshotView GroupedView(BotSnapshot hunter, std::vector<NearbyUnit> const& units, std::uint64_t tick)
+{
+    constexpr std::uint64_t kLeaderRef = (std::uint64_t(2) << 56) | 12;
+    hunter.group_role = 1;
+    hunter.group_leader_guid = kLeaderRef;
+    BotSnapshot leader;
+    leader.guid = 12;
+    leader.level = 20;
+    leader.health = 1000;
+    leader.max_health = 1000;
+    leader.pos_x = 900.0f;                       // far away, in the city
+    leader.group_role = 2;
+    leader.group_leader_guid = kLeaderRef;
+    WorldTickSnapshotView view;
+    view.tick_number = tick;
+    view.max_nearby_units = 4;
+    view.bots = { hunter, leader };
+    view.bots[0].nearby_count = std::uint32_t(units.size());
+    view.nearby.resize(8);
+    for (std::size_t i = 0; i < units.size(); ++i)
+        view.nearby[i] = units[i];
+    return view;
+}
+
+void AGroupedHunterTamesOnlyInTheTamingPhaseAndStaysPut()
+{
+    PolicyOptions options;
+    options.ClassId = 3;
+    options.TameBeasts = Beasts();
+    options.ClassOf = [](std::uint64_t guid) { return guid == 10 ? 3u : 1u; };
+    options.PartySize = 2;                       // a party of the hunter and its leader: the hunter follows the leader
+    options.PartyCount = 1;
+    NearbyUnit const beast = Beast(157, 5, 10.0f, 15);
+    BotSnapshot const hunter = Hunter(20);
+    {
+        BotPolicy policy(options);              // no Taming phase: a party member does not wander off to tame
+        CHECK(!Has(policy.Decide(GroupedView(hunter, { beast }, 1), 1000), ActionType::kCastSpell, 1515));
+    }
+    {
+        BotPolicy policy(options);
+        policy.SetTamingFor([](std::uint64_t guid) { return guid == 10; });
+        CHECK(Has(policy.Decide(GroupedView(hunter, { beast }, 1), 1000), ActionType::kCastSpell, 1515, beast.guid));
+        // Holding through the channel: nothing, however far the leader is.
+        BotSnapshot channel = hunter;
+        channel.casting_spell = 1515;
+        CHECK(policy.Decide(GroupedView(channel, { beast }, 2), 9000).empty());
+    }
+    {
+        // Nothing to tame in view: it does not follow its leader back to the staging place; it stays, and only stops if it was moving.
+        BotPolicy policy(options);
+        policy.SetTamingFor([](std::uint64_t guid) { return guid == 10; });
+        auto const idle = policy.Decide(GroupedView(hunter, {}, 1), 1000);
+        CHECK(!Has(idle, ActionType::kFollow) && !Has(idle, ActionType::kMoveTo));
+        BotSnapshot moving = hunter;
+        moving.moving = 1;
+        CHECK(Has(policy.Decide(GroupedView(moving, {}, 2), 2000), ActionType::kStop));
+        // The same hunter without the phase follows its leader.
+        BotPolicy follower(options);
+        auto const follows = follower.Decide(GroupedView(hunter, {}, 1), 1000);
+        CHECK(Has(follows, ActionType::kFollow) || Has(follows, ActionType::kMoveTo));
+        // With a pet the phase changes nothing.
+        BotSnapshot pet = hunter;
+        pet.pet_state = 1;
+        CHECK(!Has(policy.Decide(GroupedView(pet, { beast }, 3), 3000), ActionType::kCastSpell, 1515));
+    }
+}
+
 void AHunterTamesInsteadOfPullingAHostileMobStandingNearby()
 {
     // Westfall: aggressive Fleshrippers around the Goretusks. The hunter's own pull logic used to take the mob first and the hunter fought (0.33.0, 2026-10-26).
@@ -270,6 +338,7 @@ int main()
     AHunterWalksToTheBeastCastsAndHoldsStill();
     ANoPetAfterTheChannelIsAFailureWithARetryPause();
     ARefusedCastEndsTheHoldAtOnce();
+    AGroupedHunterTamesOnlyInTheTamingPhaseAndStaysPut();
     AHunterTamesInsteadOfPullingAHostileMobStandingNearby();
     ACombatDuringTheChannelDoesNotEndTheHoldUntilTheHunterIsHurt();
     NoTamingInAPartyBelowLevel10WithAPetOrInCombat();
