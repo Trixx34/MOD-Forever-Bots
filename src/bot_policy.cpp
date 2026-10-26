@@ -148,7 +148,9 @@ constexpr std::uint64_t kHubRetryIdleMs = 5000;
 constexpr float kHubReachYards = 10.0f;          // a bot this close to its hub has arrived
 constexpr float kVendorReachYards = 4.0f;       // a bot this close to its vendor can use it (the core allows 5)
 constexpr std::uint64_t kBossHoldMs = 180000;     // how long the leader waits at a boss point for the boss to die before it goes on
-constexpr float kLostLeaderYards = 60.0f;         // a member this far from its leader (2D) has lost it ...
+// A member this far from its leader (2D) has lost it ... The same as kRouteWaitYards: the leader waits for a member farther than that, so a member that stays
+// farther (stuck below a ramp the leader climbed) held the party for good when this was 60 (Ragefire Chasm and the Deadmines, 2026-10-26).
+constexpr float kLostLeaderYards = 30.0f;
 constexpr float kLostLeaderHeight = 25.0f;        // ... or this far above or below it (another level of the dungeon)
 constexpr std::uint64_t kLostLeaderMs = 20000;    // for this long, then it is put next to the leader (DungeonTeleport)
 constexpr std::uint32_t kRouteNoRouteSkip = 3;     // refusals in a row (no route) after which a dungeon waypoint is skipped

@@ -65,4 +65,4 @@ scenarios, never in normal play):
 
 - A leader whose move to a route point is refused three times for lack of a route is put back on the route once, on the point before (`route_recover` in the log). If the same point fails
   again, it is skipped (a boss point is never skipped: `route_blocked`).
-- A member more than 60 yards from its leader, or more than 25 yards above or below it, for 20 seconds is put next to the leader (`member_recover`), and not again for 30 seconds.
+- A member more than 30 yards from its leader (the distance the leader waits at; 60 before 0.27.1), or more than 25 yards above or below it, for 20 seconds is put next to the leader (`member_recover`), and not again for 30 seconds.

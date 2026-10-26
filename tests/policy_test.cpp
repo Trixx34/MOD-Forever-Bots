@@ -2582,6 +2582,13 @@ void AMemberThatLostItsLeaderIsPutNextToIt()
     std::optional<BotAction> back = TeleportOf(policy.Decide(view, 22000), 10);
     CHECK(back.has_value() && back->dest_x == -3.0f);                 // next to the leader (3 yards behind it)
     CHECK(!TeleportOf(policy.Decide(view, 23000), 10).has_value());   // and not again at once
+    // A member stuck past the distance the leader waits at (30 yards), but not far, is put back too: the leader would wait for it for good.
+    BotPolicy near(options);
+    near.SetRouteActive(true);
+    view.bots[0].pos_x = -45.0f;
+    near.Decide(view, 1000);
+    std::optional<BotAction> close = TeleportOf(near.Decide(view, 22000), 10);
+    CHECK(close.has_value() && close->dest_x == -3.0f);
     // Off, nothing happens.
     PolicyOptions off = options;
     off.DungeonTeleport = false;
