@@ -165,6 +165,7 @@ Module.forever-bots.TelemetrySummarySec = 60
 #                            core; in a wipe the ghost is put at its corpse, needs Bot.Actions.Teleport. 0 = off, else 10..3600)
 # DungeonHealBelowPct = 55
 # DungeonTankHealBelowPct = 75
+#                            (out of a fight the route leader is also healed up to 90%, whatever these say: it walks on only at 80%; since 0.30.0)
 # HealerDpsManaPct = 40
 # HealerLosMoveYards = 6
 

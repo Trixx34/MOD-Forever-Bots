@@ -165,6 +165,7 @@ constexpr float kRoutePointReachYards = 6.0f;    // the leader has arrived at a 
 constexpr float kFocusPackYards = 12.0f;         // a unit this close to the tank's target is of the same pack: the damage dealers may take it first
 constexpr float kRouteWaitYards = 30.0f;         // the leader waits for a member farther behind than this
 constexpr std::uint32_t kRouteMinHealthPct = 80; // and for its own health to be at least this
+constexpr std::uint32_t kRouteTopUpPct = 90;     // out of a fight, the party's healer heals the route leader up to this (above kRouteMinHealthPct, so it walks on)
 // A leader walking the route that has not moved this far in this long, out of combat, has a move that went nowhere (sent once, no answer; dm#6 of 2026-10-26 stood
 // 53 minutes so): the move is sent again and counted as a refusal (kRouteNoRouteSkip), so the point is recovered or skipped as for a "no route".
 constexpr std::uint64_t kRouteStallMs = 30000;
@@ -4235,6 +4236,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 std::uint64_t hurtPct = (routeActiveOf(bot.guid) && _options.TacticHeal) ? _options.DungeonHealBelowPct : kHealBelowPct;
                 BotSnapshot const* leaderHurt = nullptr;   // the tank with a target: healed first, whatever its share
                 std::uint64_t leaderHurtPct = _options.DungeonTankHealBelowPct;
+                BotSnapshot const* leaderTopUp = nullptr;  // the route leader out of a fight, below kRouteTopUpPct
                 // Emergency target: anyone under kEmergencyHealBelowPct gets Flash Heal first.
                 BotSnapshot const* emergencyHurt = nullptr;
                 // Shield target: a member under kShieldBelowPct that took damage recently (health dropped since last tick).
@@ -4248,6 +4250,14 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                         nowMs < claim->second.UntilMs && claim->second.Group == healGroup)
                         return;
                     std::uint64_t const pct = std::uint64_t(member.health) * 100 / member.max_health;
+                    // Out of a fight the route leader is healed up: it walks on only at kRouteMinHealthPct, and with creatures in view it cannot sit to get there.
+                    // Ragefire Chasm, 2026-10-26: leaders stood between 50 and 79% for half an hour, below the 80% to walk and above the healer's 40%.
+                    if (member.guid == partyLeader && member.threat_target_guid == 0 && member.in_combat == 0 && bot.in_combat == 0 && routeActiveOf(bot.guid) &&
+                        pct < kRouteTopUpPct && pct >= kEmergencyHealBelowPct)
+                    {
+                        leaderTopUp = &member;
+                        return;
+                    }
                     if (member.guid == partyLeader && member.threat_target_guid != 0)
                     {
                         if (pct < leaderHurtPct)
@@ -4320,6 +4330,13 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     spellToCast = healSpell;
                     target = hurt;
                     note = "";
+                }
+                else if (leaderTopUp)
+                {
+                    spellToCast = healSpell;
+                    target = leaderTopUp;
+                    hurtPct = std::uint64_t(leaderTopUp->health) * 100 / leaderTopUp->max_health;
+                    note = "top_up";
                 }
                 if (target)
                 {

@@ -4214,6 +4214,31 @@ void TankIsHealedBeforeTheLowestMember()
     CHECK(CastsSpell(actions, 10, 2050, PlayerOf(12))); // the tank, not the member
 }
 
+// Out of a fight, on a dungeon route, the healer heals the leader up (below 90%): the leader walks on only at 80%, and cannot sit with creatures in view.
+void TheRouteLeaderIsHealedUpOutOfAFight()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.PartyCount = 1;
+    options.ClassOf = WarriorLeads;
+    options.Route = { Point{ 100.0f, 0.0f, 0.0f } };
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 }, WarriorLeads);
+    for (BotSnapshot& bot : view.bots)
+    {
+        bot.group_role = bot.guid == 12 ? 2 : 1;
+        bot.group_leader_guid = (std::uint64_t(2) << 56) | 12;
+    }
+    view.bots[2].health = 650;                                        // the leader at 65%, no target, nobody fighting
+    CHECK(CastsSpell(policy.Decide(view, 0), 10, 2050, PlayerOf(12)));
+    // Healthy enough (95%): no heal.
+    BotPolicy healthy(options);
+    healthy.SetRouteActive(true);
+    view.bots[2].health = 950;
+    CHECK(!CastsSpell(healthy.Decide(view, 0), 10, 2050, PlayerOf(12)));
+}
+
 // Two druids of one party with one party buff: each member gets it once, however many druids know it.
 void TwoDruidsDoNotBothCastThePartyBuff()
 {
@@ -5147,6 +5172,7 @@ int main()
     RogueWithoutAPartyStillInterrupts();
     TwoHealersDoNotHealTheSameMember();
     TankIsHealedBeforeTheLowestMember();
+    TheRouteLeaderIsHealedUpOutOfAFight();
     TwoDruidsDoNotBothCastThePartyBuff();
     AFailingBuffBacksOffLongerEachTime();
     HubTimeoutTriesTheNextHubSoonerThanAnArrival();
