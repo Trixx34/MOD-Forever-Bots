@@ -79,7 +79,8 @@ Module.forever-bots.TelemetrySummarySec = 60
 #
 # Rotations from a file: fight rows and upkeep buffs for all classes up to level 60, with the real spell ids from the core's ability dump
 # (tools/make_rotations.py, doc/rotations.md). Without it the built-in rank 1 rotations are used.
-# RotationFile = "data/rotations.txt"
+# RotationFile = "data/rotations.txt"        # the default (a relative path is looked up beside the module executable); "" uses the built-in rank 1 rows
+# TameBeastFile = "data/tame_beasts.txt"      # the beasts a hunter may tame (Tame Beast); "" = hunters do not tame
 #
 # Grind spots (leveling): idle bots walk to the spots that suit their level instead of their map's hubs. The file is made from the world database
 # (tools/make_grind_spots.py, doc/grind-spots.md).
@@ -141,7 +142,7 @@ Module.forever-bots.TelemetrySummarySec = 60
 # ScenarioResultFile: how it ended (complete, wipe, timeout, enter_failed), the furthest route point, deaths. The core needs
 # Bot.Actions.Teleport = 1 for it. Use MaxBots >= the roster size; the ramp and the saved bots are not used while a scenario is set.
 # Scenario = deadmines_a
-# ScenarioRoster = 1:1,1:5,7:8,7:8,1:4          # race:class: Human warrior, Human priest, Gnome mage x2, Human rogue
+# ScenarioRoster = 1:1,1:5,7:8,7:8,1:4          # race:class: Human warrior, Human priest, Gnome mage x2, Human rogue; race:class:spec picks the spec (1:1:prot,3:3:bm,7:9:demonology)
 # ScenarioLevel = 18
 # ScenarioStaging = 0 -8913.2 554.5 93.8        # map x y z: where the bots log in (a city, so nothing attacks them)
 # ScenarioEntry = 36 -14.57 -385.48 62.46       # map x y z: where the party enters the dungeon
@@ -158,6 +159,10 @@ Module.forever-bots.TelemetrySummarySec = 60
 # ScenarioRoster.dm = 1:1,1:5,1:8,3:3,7:9
 # ScenarioLevel.dm = 18
 # ScenarioStaging.dm = 0 -8913 554 94
+# ScenarioTameSpot.dm = 0 -10439.4 929.2 38.9   # map x y z: hunters without a pet are taken here to tame one (Westfall), and back, before the party forms
+# ScenarioAmmo = 1000                           # ammunition given to a hunter that has none (0 = none)
+# ScenarioClassSupplies = 9:6265:10             # class:item:count after the gear (default: a warlock gets 10 Soul Shards)
+# ScenarioClassQuests = 9:1504,3:6061           # class:quest completed with its reward in the dressing (core quest operation 4; the core must add the quest first)
 # ScenarioLevel.rfc = 17
 # Offline policy lab: each candidate applies to all ScenarioParties in that run. Defaults preserve current behavior;
 # bounded parameter ranges are validated by the module. See tools/dungeon_learning/README.md.

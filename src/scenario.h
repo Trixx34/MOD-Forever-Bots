@@ -38,6 +38,13 @@ struct ScenarioPlan
     std::uint64_t DurationMs = 1200000;
     std::map<std::uint32_t, std::vector<std::uint32_t>> Gear; // class id -> item entries to grant and equip
     std::vector<std::pair<std::uint32_t, std::uint32_t>> Supplies; // item entry and count granted to every bot after its gear (food, drink)
+    // Per class, after the gear: items (a warlock's Soul Shards, which the Voidwalker and Succubus summons use up) and class quests completed with their
+    // reward (core quest operation 4, the quests that teach the pets' spells). A quest the core refuses (not in the log, wrong race) is not tried again.
+    std::map<std::uint32_t, std::vector<std::pair<std::uint32_t, std::uint32_t>>> ClassSupplies;
+    std::map<std::uint32_t, std::vector<std::uint32_t>> ClassQuests;
+    // A hunter whose ranged weapon takes ammunition and who carries none is given this many of the ammunition the snapshot names (ammo_entry), in every phase
+    // from the dressing on, and again when the count falls below kAmmoLow (an hour of Auto Shot is about 1800 shots). 0 = no ammunition is granted.
+    std::uint32_t AmmoCount = 1000;
     std::vector<std::pair<std::uint32_t, std::string>> Bosses; // creature entry and name of each boss; one seen dead counts as killed
     std::function<std::uint32_t(std::uint64_t)> ClassOf;      // bot guid -> class id
     // Dead-bot recovery. With WipeRecovery on, an all-down state starts a timer of WipeRecoveryMs: if a bot is alive again before it ends,
@@ -52,12 +59,18 @@ struct ScenarioPlan
     // not when the leader touches the last waypoint; a leader at the last waypoint with bosses still alive gets kBossGraceMs more, then the
     // run ends as "bosses_missing".
     bool RequireBosses = false;
+    // Taming (the Taming phase, between the dressing and the grouping): the hunters of the roster that have no pet are taken to TameSpot (map TameMap), where the policy walks them to a
+    // beast and tames it, and taken back to where they stood. The phase ends when every such hunter has a pet or after kTameTimeoutMs; a hunter that failed stays in the party without one.
+    bool TameEnabled = false;
+    std::uint32_t TameMap = 0;
+    ScenarioPoint TameSpot;
 };
 
 enum class ScenarioPhase
 {
     Waiting,
     Dressing,
+    Taming,
     Grouping,
     Entering,
     Running,
@@ -85,6 +98,15 @@ struct ScenarioResult
 
 constexpr std::uint64_t kDressPauseMs = 1500;
 constexpr std::uint64_t kEquipPauseMs = 3000;
+constexpr std::uint64_t kTameTimeoutMs = 240000;    // the Taming phase gives the hunters this long to get a pet
+constexpr std::uint64_t kTameRetryMs = 6000;        // a teleport that was refused (in combat) is sent again after this
+constexpr std::uint64_t kTameBackMs = 20000;        // the hunters are given this long to be back before the grouping starts anyway
+constexpr float kTameArrivedYards = 150.0f;         // a hunter this close to the spot has arrived
+constexpr float kTameHomeYards = 40.0f;             // and one this close to where it stood is back
+constexpr std::uint32_t kTameMinLevel = 10;         // the hunter pet quest is given at level 10
+constexpr std::uint32_t kAmmoLow = 100;             // below this many pieces of its ammunition a hunter is given more
+constexpr std::uint64_t kAmmoRetryMs = 5000;        // a bot is given ammunition at most this often (the snapshot needs a moment to show it)
+constexpr std::uint32_t kAmmoGrantsMax = 40;        // per bot and run
 constexpr std::uint64_t kGroupingTimeoutMs = 120000;
 constexpr std::uint64_t kMembersDelayMs = 3000;
 constexpr std::uint64_t kEnterRetryMs = 10000;
@@ -133,6 +155,15 @@ private:
     bool _phaseStarted = false;
     std::map<std::uint64_t, std::size_t> _nextGrant;   // bot -> index of the next gear item to grant
     std::map<std::uint64_t, std::size_t> _nextSupply;  // bot -> index of the next supply to grant
+    std::map<std::uint64_t, std::size_t> _nextClassSupply; // bot -> index of the next class supply to grant
+    std::map<std::uint64_t, std::size_t> _nextClassQuest;  // bot -> index of the next class quest to send
+    std::map<std::uint64_t, std::uint64_t> _ammoAtMs;      // bot -> when it was last given ammunition
+    std::map<std::uint64_t, std::uint32_t> _ammoGrants;    // bot -> how often
+    struct Home { std::uint32_t Map = 0; float X = 0, Y = 0, Z = 0; };
+    std::map<std::uint64_t, Home> _tameHome;               // hunter -> where it stood when the Taming phase began
+    std::map<std::uint64_t, std::uint64_t> _tameSentAtMs;  // hunter -> when it was last sent to the spot or back
+    std::uint64_t _tameStartMs = 0;
+    std::uint64_t _tameBackMs = 0;                         // when the hunters were first sent back (0 = not yet)
     bool _equipSent = false;
     std::uint64_t _outsideSinceMs = 0;     // since when the living leader has been outside the dungeon map in the Running phase (0 = not outside)
     std::uint64_t _lastReenterMs = 0;

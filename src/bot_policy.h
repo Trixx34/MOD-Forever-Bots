@@ -34,6 +34,7 @@
 #include "ground_avoid.h"
 #include "quest_planner.h"
 #include "spell_costs.h"
+#include "tame_beasts.h"
 #include "crafting_foci.h"
 #include "bot_random.h"
 #include "chat_say.h"
@@ -83,6 +84,9 @@ struct PolicyOptions
     std::uint32_t ClassId = 0;
     // The class of each bot, when bots differ (random picks). Unset, or returning 0, falls back to ClassId.
     std::function<std::uint32_t(std::uint64_t botGuid)> ClassOf;
+    // The spec of a scenario bot (the third field of its roster entry, race:class:spec; "" = none): the rotation file's block of that spec is its rotation, and it sets the role
+    // of a bot that has none (a shadow priest does not heal). A bot without one plays the default spec of its class and role (rotation::DefaultSpec).
+    std::function<std::string(std::uint64_t botGuid)> SpecOf;
     // Vendor visits and trainer checks for an idle bot (M3, M4). A level-up checks the trainer at once. Zero turns that
     // service off; the module turns them on from its settings.
     std::uint64_t ServiceEveryMs = 0;
@@ -185,6 +189,9 @@ struct PolicyOptions
     // Rotations from a file (data/rotations.txt, tools/make_rotations.py): the fight rows and the upkeep buffs of the classes it lists. A class it does
     // not list keeps the built-in rows.
     std::shared_ptr<rotation::RotationData const> Rotations;
+    // The beasts a hunter may tame (data/tame_beasts.txt). With it, a hunter of level 10 or more who has no pet and is not in a party walks to the nearest of them its level allows,
+    // casts Tame Beast on it and waits out the 20 second channel; the core creates the pet. Without it (or empty) hunters do not tame.
+    std::shared_ptr<tame::TameBeasts const> TameBeasts;
     // What spells cost (data/spell_costs.txt, made by the core): with it a bot does not try a spell it cannot pay for. Unset, every cast is tried.
     std::shared_ptr<spell_cost::SpellCostData const> SpellCosts;
     // Chat commands: a bot accepts a party invite from a player (a human leader), so the player can bring bots into a group and command them.
@@ -337,6 +344,12 @@ private:
         std::uint64_t PetRetryAtMs = 0;                  // no pet cast out of combat before this
         std::uint64_t PetProbeAtMs = 0;                  // below level 12 (no Mend Pet) a Call Pet probe is not sent before this
         std::uint64_t PetMendAtMs = 0;                   // no Mend Pet in a fight before this
+        // Taming (Tame Beast on a beast of data/tame_beasts.txt): the hold lasts through the channel, during which the bot stands still and casts nothing else.
+        std::uint64_t TameUntilMs = 0;                   // the hold ends here (0 = not taming)
+        std::uint64_t TameCastAtMs = 0;                  // when Tame Beast was sent
+        std::uint64_t TameTarget = 0;                    // the beast being tamed or approached
+        std::uint64_t TameRetryAtMs = 0;                 // no search or cast before this
+        std::uint32_t TameFailures = 0;                  // casts that ended with no pet; the hunter gives up for a while at kTameMaxFailures
         bool PetCommanded = false;                       // the pet has been sent at this fight's target (layout 13)
         bool Sitting = false;                            // sat down to rest; stands before it moves or fights
         std::uint64_t RestRetryAtMs = 0;                 // a refused sit is not tried again before this
@@ -458,6 +471,7 @@ private:
         enum class Stance : std::uint8_t { Aggressive, Defensive, Passive };
         Stance Stance_ = Stance::Defensive;              // aggressive: fights what the group fights or meets; defensive: only what attacks it or the group; passive: only what attacks it
         enum class Role : std::uint8_t { Auto, Tank, Healer, Dps };
+        bool SpecRoleApplied = false;                    // the role was set from the roster spec once
         Role Role_ = Role::Auto;                         // overrides what the class gives (tank pulls and leads, dps does not heal on its own)
         std::uint64_t FocusMissingMs = 0;                // since when the focus target has not been in view
         std::uint64_t Focus = 0;                         // the creature attacked first in a fight
@@ -527,10 +541,12 @@ private:
         std::unordered_map<std::uint64_t, std::uint32_t> RezRefusals;  // dead member -> refusals in a row
     };
 
-    // The rows of a class's rotation: from the rotation file when it lists the class, else the built-in ones.
-    std::span<rotation::Row const> RowsFor(std::uint32_t classId) const;
+    // The rows of a class's rotation: from the rotation file's block of the spec when it has one, else the class's block, else the built-in rows.
+    std::span<rotation::Row const> RowsFor(std::uint32_t classId, std::string const& spec = {}) const;
+    // The spec a bot plays: its roster entry's, else the default of its class and role (the role the policy gives it: set, or from the class).
+    std::string SpecFor(std::uint64_t botGuid, std::uint32_t classId) const;
     // How long a spell's effect lasts, for the dot and buff upkeep: from the rotation file, else the built-in table (0 = not tracked).
-    std::uint64_t DurationMsOf(std::uint32_t classId, std::uint32_t spell) const;
+    std::uint64_t DurationMsOf(std::uint32_t classId, std::uint32_t spell, std::string const& spec = {}) const;
 
     void ReadResult(BotState& state, forever_module::BotSnapshot const& bot, std::uint64_t nowMs);
 

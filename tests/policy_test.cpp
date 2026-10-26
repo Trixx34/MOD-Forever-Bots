@@ -2873,21 +2873,21 @@ void MembersDoNotPullInADungeon()
     CHECK(!CastsSpell(actions, 10, 585));
 }
 
-// The party pulls a dungeon pack of three at most. A pack of four 20 yards off is left alone; a pack of three is pulled.
-void ADungeonPackOfFourIsNotPulled()
+// The party pulls a dungeon pack of four at most. A pack of five 20 yards off is left alone; a pack of four is pulled. (The view holds 4 nearby units per bot by
+// default: it is widened to 8 so that five fit.)
+void ADungeonPackOfFiveIsNotPulled()
 {
-    WorldTickSnapshotView four = DungeonView({ 10, 11, 12, 13, 14 });
-    AddNearby(four, 2, Unit(8, 7, 20.0f, true));
-    AddNearby(four, 2, Unit(8, 8, 21.0f, true));
-    AddNearby(four, 2, Unit(8, 9, 22.0f, true));
-    AddNearby(four, 2, Unit(8, 10, 22.5f, true));
-    CHECK(!HasAction(DungeonPolicy().Decide(four, 0), 12, ActionType::kFollow, MakeUnitRef(8, 1, 7)));
-
-    WorldTickSnapshotView three = DungeonView({ 10, 11, 12, 13, 14 });
-    AddNearby(three, 2, Unit(8, 7, 20.0f, true));
-    AddNearby(three, 2, Unit(8, 8, 21.0f, true));
-    AddNearby(three, 2, Unit(8, 9, 22.0f, true));
-    CHECK(HasAction(DungeonPolicy().Decide(three, 0), 12, ActionType::kFollow, MakeUnitRef(8, 1, 7)));
+    auto const packView = [](int mobs)
+    {
+        WorldTickSnapshotView view = DungeonView({ 10, 11, 12, 13, 14 });
+        view.max_nearby_units = 8;
+        view.nearby.assign(view.bots.size() * view.max_nearby_units, NearbyUnit{});
+        for (int i = 0; i < mobs; ++i)
+            AddNearby(view, 2, Unit(8, 7 + i, 20.0f + float(i), true));
+        return view;
+    };
+    CHECK(!HasAction(DungeonPolicy().Decide(packView(5), 0), 12, ActionType::kFollow, MakeUnitRef(8, 1, 7)));
+    CHECK(HasAction(DungeonPolicy().Decide(packView(4), 0), 12, ActionType::kFollow, MakeUnitRef(8, 1, 7)));
 }
 
 // Members defend themselves: bot 10 is a rogue here, since the healer holds its range instead (HealerDoesNotMelee).
@@ -4423,6 +4423,10 @@ void PetIsSentAtTheTargetAndCalledBack()
     over.bots[0].pet_state = 1;
     auto const after = policy.Decide(over, 5000);
     CHECK(HasAction(after, kBot, ActionType::kPetCommand)); // called back
+    bool follows = false;
+    for (BotAction const& action : after)
+        follows = follows || (action.type == ActionType::kPetCommand && action.spell_id == 2);   // to follow its owner, not to stay where the fight was
+    CHECK(follows);
     CHECK(!HasAction(policy.Decide(over, 6000), kBot, ActionType::kPetCommand)); // once, not every tick
 }
 
@@ -5005,8 +5009,130 @@ void FlightsAreOffByDefaultAndNotForPartyMembers()
     CHECK(!FirstOf(off.Decide(there, 30000), ActionType::kTaxi).has_value());
 }
  
+
+// --- The Holy priest of the level 30 guide: Renew on the tank, Binding Heal, Prayer of Healing, no shield on a rage user; a roster spec sets the role ---
+
+WorldTickSnapshotView LeveledDungeonView(std::uint32_t level, std::function<std::uint32_t(std::uint64_t)> classOf = nullptr)
+{
+    WorldTickSnapshotView view = DungeonView({ 10, 11, 12, 13, 14 }, classOf);
+    for (BotSnapshot& bot : view.bots)
+        bot.level = level;
+    return view;
+}
+
+void RenewKeepsUpOnTheFightingTankEveryFifteenSeconds()
+{
+    BotPolicy policy = DungeonPolicy();
+    WorldTickSnapshotView view = LeveledDungeonView(40);
+    view.bots[2].in_combat = 1;                          // the tank (bot 12) fights, at full health
+    view.bots[2].threat_target_guid = MakeUnitRef(8, 1, 7);
+    CHECK(CastsSpell(policy.Decide(view, 1000), 10, 139, PlayerOf(12)));
+    CHECK(!CastsSpell(policy.Decide(view, 8000), 10, 139, PlayerOf(12)));      // it still runs
+    CHECK(CastsSpell(policy.Decide(view, 17000), 10, 139, PlayerOf(12)));      // run out: again
+    // Not before level 8, and not while the tank is out of the fight.
+    BotPolicy low = DungeonPolicy();
+    WorldTickSnapshotView young = LeveledDungeonView(6);
+    young.bots[2].in_combat = 1;
+    CHECK(!CastsSpell(low.Decide(young, 1000), 10, 139, PlayerOf(12)));
+    BotPolicy calm = DungeonPolicy();
+    CHECK(!CastsSpell(calm.Decide(LeveledDungeonView(40), 1000), 10, 139, PlayerOf(12)));
+}
+
+void BindingHealWhenThePriestAndTheTankAreBothHurt()
+{
+    BotPolicy policy = DungeonPolicy();
+    WorldTickSnapshotView view = LeveledDungeonView(40);
+    view.bots[0].health = 500;                           // the priest at 50%
+    view.bots[2].health = 500;                           // the tank at 50%, fighting
+    view.bots[2].in_combat = 1;
+    view.bots[2].threat_target_guid = MakeUnitRef(8, 1, 7);
+    CHECK(CastsSpell(policy.Decide(view, 1000), 10, 1240770, PlayerOf(12)));
+    // The priest unhurt: a plain heal of the tank. Below the spell's level: a plain heal as well.
+    BotPolicy fine = DungeonPolicy();
+    WorldTickSnapshotView healthy = LeveledDungeonView(40);
+    healthy.bots[2].health = 500;
+    healthy.bots[2].in_combat = 1;
+    healthy.bots[2].threat_target_guid = MakeUnitRef(8, 1, 7);
+    CHECK(!CastsSpell(fine.Decide(healthy, 1000), 10, 1240770, PlayerOf(12)) && CastsSpell(DungeonPolicy().Decide(healthy, 1000), 10, 2054, PlayerOf(12)));
+    BotPolicy young = DungeonPolicy();
+    WorldTickSnapshotView below = LeveledDungeonView(30);
+    below.bots[0].health = 500;
+    below.bots[2].health = 500;
+    below.bots[2].in_combat = 1;
+    below.bots[2].threat_target_guid = MakeUnitRef(8, 1, 7);
+    CHECK(!CastsSpell(young.Decide(below, 1000), 10, 1240770, PlayerOf(12)));
+}
+
+void PrayerOfHealingOnlyWhenMostOfThePartyIsLow()
+{
+    BotPolicy policy = DungeonPolicy();
+    WorldTickSnapshotView view = LeveledDungeonView(40);
+    view.bots[1].health = 400;                           // three members under half
+    view.bots[3].health = 400;
+    view.bots[4].health = 400;
+    CHECK(CastsSpell(policy.Decide(view, 1000), 10, 596));
+    BotPolicy two = DungeonPolicy();
+    WorldTickSnapshotView fewer = LeveledDungeonView(40);
+    fewer.bots[1].health = 400;
+    fewer.bots[3].health = 400;
+    CHECK(!CastsSpell(two.Decide(fewer, 1000), 10, 596));
+    BotPolicy young = DungeonPolicy();
+    WorldTickSnapshotView below = LeveledDungeonView(28);
+    below.bots[1].health = 400;
+    below.bots[3].health = 400;
+    below.bots[4].health = 400;
+    CHECK(!CastsSpell(young.Decide(below, 1000), 10, 596));
+}
+
+void NoShieldOnAWarriorOrADruid()
+{
+    // Bot 12 is a warrior at 40% and in a fight with no target of its own: a shield candidate for any other class. For a warrior (rage) it is not.
+    BotPolicy policy = DungeonPolicy();
+    WorldTickSnapshotView view = LeveledDungeonView(40);
+    view.bots[2].health = 400;
+    view.bots[2].in_combat = 1;
+    CHECK(!CastsSpell(policy.Decide(view, 1000), 10, 17, PlayerOf(12)));
+    // The same member as a priest is shielded.
+    auto const allPriests = [](std::uint64_t) { return 5u; };
+    BotPolicy priests = DungeonPolicy(allPriests);
+    WorldTickSnapshotView same = LeveledDungeonView(40, allPriests);
+    same.bots[2].health = 400;
+    same.bots[2].in_combat = 1;
+    CHECK(CastsSpell(priests.Decide(same, 1000), 10, 17, PlayerOf(12)));
+    // And a druid is not shielded either.
+    auto const druidTwelve = [](std::uint64_t guid) { return guid == 12 ? 11u : 5u; };
+    BotPolicy druid = DungeonPolicy(druidTwelve);
+    WorldTickSnapshotView drood = LeveledDungeonView(40, druidTwelve);
+    drood.bots[2].health = 400;
+    drood.bots[2].in_combat = 1;
+    CHECK(!CastsSpell(druid.Decide(drood, 1000), 10, 17, PlayerOf(12)));
+}
+
+void ARosterSpecSetsTheRoleOfAPriest()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.PartyCount = 1;
+    options.ClassOf = WarriorLeads;
+    options.SpecOf = [](std::uint64_t guid) { return guid == 10 ? std::string("shadow") : std::string(); };
+    BotPolicy shadow(options);
+    shadow.SetRouteActive(true);
+    WorldTickSnapshotView view = DungeonView({ 10, 11, 12, 13, 14 });
+    view.bots[3].health = 300; // bot 13 is hurt
+    CHECK(!CastsSpell(shadow.Decide(view, 0), 10, 2050, PlayerOf(13)));        // a shadow priest does not heal
+    options.SpecOf = [](std::uint64_t guid) { return guid == 10 ? std::string("holy") : std::string(); };
+    BotPolicy holy(options);
+    holy.SetRouteActive(true);
+    CHECK(CastsSpell(holy.Decide(view, 0), 10, 2050, PlayerOf(13)));           // a holy priest does
+}
+
 int main()
 {
+    RenewKeepsUpOnTheFightingTankEveryFifteenSeconds();
+    BindingHealWhenThePriestAndTheTankAreBothHurt();
+    PrayerOfHealingOnlyWhenMostOfThePartyIsLow();
+    NoShieldOnAWarriorOrADruid();
+    ARosterSpecSetsTheRoleOfAPriest();
     ShortOfAmmoWalksToTheAmmoVendor();
     AFlippingPartyDoesNotHoldTheLeaderForever();
     ALeaderWithNoRouteIsPutBackOnTheRouteOnce();
@@ -5058,7 +5184,7 @@ int main()
     LeaderDoesNotPullWhileAMemberIsHurt();
     LeaderPullsWhenThePartyIsReady();
     LeaderPullsAfterWaitingTooLong();
-    ADungeonPackOfFourIsNotPulled();
+    ADungeonPackOfFiveIsNotPulled();
     MembersDoNotPullInADungeon();
     MembersAttackedInADungeonDefendThemselves();
     MembersWaitForTheTankToHoldTheTarget();

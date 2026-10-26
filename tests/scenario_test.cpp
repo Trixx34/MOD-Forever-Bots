@@ -908,8 +908,265 @@ void FormatShowsEventsRevivedWipes()
     CHECK(text.find("wipes=1") != std::string::npos && text.find("ghosts=1") != std::string::npos);
 }
 
+
+// --- Ammunition, class supplies, class quests and the Taming phase ---
+
+std::uint32_t HunterWarlockOrPriest(std::uint64_t guid)
+{
+    return guid == 1 ? 3u : guid == 2 ? 9u : 5u; // bot 1 is a hunter, bot 2 a warlock, bot 3 a priest
+}
+
+void Reach(ScenarioDirector& director, std::vector<BotSnapshot>& bots, std::uint64_t& t, std::uint64_t& tick, std::vector<BotAction>& actions)
+{
+    auto const step = [&](std::uint64_t advance)
+    {
+        actions.clear();
+        t += advance;
+        director.Decide(View(++tick, bots), t, actions);
+    };
+    step(100);   // the roster is complete
+    step(100);   // the dressing: auto gear
+}
+
+void AHunterWithoutAmmunitionIsGivenSome()
+{
+    ScenarioPlan plan = Plan();
+    plan.ClassOf = HunterWarlockOrPriest;
+    ScenarioDirector director(plan);
+    std::vector<BotAction> actions;
+    std::uint64_t t = 1000, tick = 1;
+    std::vector<BotSnapshot> bots = { Bot(1, 0, 0, 0), Bot(2, 0, 0, 0), Bot(3, 0, 0, 0) };
+    bots[0].ammo_entry = 2515;   // the core's recommended arrow for its bow; none carried
+    bots[0].ammo_count = 0;
+    Reach(director, bots, t, tick, actions);
+    int grants = 0;
+    for (BotAction const& action : actions)
+        if (action.type == ActionType::kGrant && action.bot_guid == 1 && action.spell_id == 2515 && action.dest_x == 1000.0f)
+            ++grants;
+    CHECK(grants == 1);
+    // Not again at once (the snapshot has not shown it yet), again after the retry gap, never once it carries enough.
+    actions.clear();
+    director.Decide(View(++tick, bots), t += 100, actions);
+    CHECK(Count(actions, ActionType::kGrant, 1) == 0);
+    actions.clear();
+    director.Decide(View(++tick, bots), t += kAmmoRetryMs, actions);
+    CHECK(Count(actions, ActionType::kGrant, 1) == 1);
+    bots[0].ammo_count = 1000;
+    actions.clear();
+    director.Decide(View(++tick, bots), t += kAmmoRetryMs, actions);
+    CHECK(Count(actions, ActionType::kGrant, 1) == 0);
+    // A plan with no ammunition count: nothing.
+    ScenarioPlan none = plan;
+    none.AmmoCount = 0;
+    ScenarioDirector quiet(none);
+    std::vector<BotSnapshot> hungry = { Bot(1, 0, 0, 0), Bot(2, 0, 0, 0), Bot(3, 0, 0, 0) };
+    hungry[0].ammo_entry = 2515;
+    std::uint64_t t2 = 1000, tick2 = 1;
+    Reach(quiet, hungry, t2, tick2, actions);
+    CHECK(Count(actions, ActionType::kGrant, 1) == 0);
+    // A bot whose weapon takes no ammunition (ammo_entry 0) is given none.
+    ScenarioDirector melee(plan);
+    std::vector<BotSnapshot> plain = { Bot(1, 0, 0, 0), Bot(2, 0, 0, 0), Bot(3, 0, 0, 0) };
+    std::uint64_t t3 = 1000, tick3 = 1;
+    Reach(melee, plain, t3, tick3, actions);
+    CHECK(Count(actions, ActionType::kGrant) == 0);
+}
+
+void ClassSuppliesAndClassQuestsAreSentOnceEach()
+{
+    ScenarioPlan plan = Plan();
+    plan.ClassOf = HunterWarlockOrPriest;
+    plan.ClassSupplies[9] = { { 6265, 10 } };          // Soul Shards for the warlock
+    plan.ClassQuests[9] = { 1504, 1474 };               // the Voidwalker and Succubus quests
+    ScenarioDirector director(plan);
+    std::vector<BotAction> actions;
+    std::uint64_t t = 1000, tick = 1;
+    std::vector<BotSnapshot> bots = { Bot(1, 0, 0, 0), Bot(2, 0, 0, 0), Bot(3, 0, 0, 0) };
+    int shards = 0, quest1504 = 0, quest1474 = 0, other = 0;
+    for (int i = 0; i < 8; ++i)
+    {
+        actions.clear();
+        director.Decide(View(++tick, bots), t += 100, actions);
+        for (BotAction const& action : actions)
+        {
+            if (action.type == ActionType::kGrant && action.bot_guid == 2 && action.spell_id == 6265 && action.dest_x == 10.0f)
+                ++shards;
+            else if (action.type == ActionType::kQuest && action.bot_guid == 2 && action.spell_id == ((4u << 24) | 1504u))
+                ++quest1504;
+            else if (action.type == ActionType::kQuest && action.bot_guid == 2 && action.spell_id == ((4u << 24) | 1474u))
+                ++quest1474;
+            else if ((action.type == ActionType::kGrant || action.type == ActionType::kQuest) && action.bot_guid != 2)
+                ++other;
+        }
+    }
+    CHECK(shards == 1 && quest1504 == 1 && quest1474 == 1 && other == 0);
+}
+
+ScenarioPlan TamingPlan()
+{
+    ScenarioPlan plan = Plan();
+    plan.ClassOf = HunterWarlockOrPriest;
+    plan.TameEnabled = true;
+    plan.TameMap = 0;
+    plan.TameSpot = { -10439.0f, 929.0f, 39.0f };
+    return plan;
+}
+
+void IntoTaming(ScenarioDirector& director, std::vector<BotSnapshot>& bots, std::uint64_t& t, std::uint64_t& tick, std::vector<BotAction>& actions)
+{
+    for (int i = 0; i < 12 && director.Phase() != ScenarioPhase::Taming && director.Phase() != ScenarioPhase::Grouping; ++i)
+    {
+        actions.clear();
+        director.Decide(View(++tick, bots), t += 3000, actions);
+    }
+}
+
+void HuntersWithoutAPetAreTakenToTameOneAndBack()
+{
+    ScenarioDirector director(TamingPlan());
+    std::vector<BotAction> actions;
+    std::uint64_t t = 1000, tick = 1;
+    std::vector<BotSnapshot> bots = { Bot(1, 0, -8913, 554), Bot(2, 0, -8913, 554), Bot(3, 0, -8913, 554) };
+    for (BotSnapshot& bot : bots)
+        bot.level = 20;
+    IntoTaming(director, bots, t, tick, actions);
+    CHECK(director.Phase() == ScenarioPhase::Taming);
+    // The hunter is sent to the spot, the others stay.
+    actions.clear();
+    director.Decide(View(++tick, bots), t += 100, actions);
+    int away = 0;
+    for (BotAction const& action : actions)
+        if (action.type == ActionType::kTeleport)
+            away += action.bot_guid == 1 && action.spell_id == 0 && action.dest_x == -10439.0f && action.dest_y == 929.0f;
+    CHECK(away == 1 && Count(actions, ActionType::kTeleport) == 1);
+    // It arrives, spends a while; nothing more is sent, the phase stays.
+    bots[0].pos_x = -10439.0f;
+    bots[0].pos_y = 929.0f;
+    actions.clear();
+    director.Decide(View(++tick, bots), t += 30000, actions);
+    CHECK(director.Phase() == ScenarioPhase::Taming && Count(actions, ActionType::kTeleport) == 0);
+    // It has a pet: back to where it stood, and then the grouping.
+    bots[0].pet_state = 1;
+    actions.clear();
+    director.Decide(View(++tick, bots), t += 1000, actions);
+    int back = 0;
+    for (BotAction const& action : actions)
+        if (action.type == ActionType::kTeleport)
+            back += action.bot_guid == 1 && action.dest_x == -8913.0f && action.dest_y == 554.0f;
+    CHECK(back == 1);
+    bots[0].pos_x = -8913.0f;
+    bots[0].pos_y = 554.0f;
+    actions.clear();
+    director.Decide(View(++tick, bots), t += 1000, actions);
+    CHECK(director.Phase() == ScenarioPhase::Grouping);
+}
+
+void TheTamingPhaseGivesUpAtTheTimeout()
+{
+    ScenarioDirector director(TamingPlan());
+    std::vector<BotAction> actions;
+    std::uint64_t t = 1000, tick = 1;
+    std::vector<BotSnapshot> bots = { Bot(1, 0, -8913, 554), Bot(2, 0, -8913, 554), Bot(3, 0, -8913, 554) };
+    for (BotSnapshot& bot : bots)
+        bot.level = 20;
+    IntoTaming(director, bots, t, tick, actions);
+    CHECK(director.Phase() == ScenarioPhase::Taming);
+    bots[0].pos_x = -10439.0f;                  // there, and never gets a pet
+    bots[0].pos_y = 929.0f;
+    actions.clear();
+    director.Decide(View(++tick, bots), t += kTameTimeoutMs - 5000, actions);
+    CHECK(director.Phase() == ScenarioPhase::Taming);
+    actions.clear();
+    director.Decide(View(++tick, bots), t += 7000, actions);      // the timeout: sent back
+    CHECK(Count(actions, ActionType::kTeleport, 1) == 1);
+    actions.clear();
+    director.Decide(View(++tick, bots), t += kTameBackMs, actions);   // not back yet, but the grouping goes on
+    CHECK(director.Phase() == ScenarioPhase::Grouping);
+}
+
+void NoTamingWithoutAHunterThatNeedsAPetOrWithoutASpot()
+{
+    // A hunter that has a pet: straight to the grouping.
+    {
+        ScenarioDirector director(TamingPlan());
+        std::vector<BotAction> actions;
+        std::uint64_t t = 1000, tick = 1;
+        std::vector<BotSnapshot> bots = { Bot(1, 0, 0, 0), Bot(2, 0, 0, 0), Bot(3, 0, 0, 0) };
+        for (BotSnapshot& bot : bots)
+            bot.level = 20;
+        bots[0].pet_state = 1;
+        IntoTaming(director, bots, t, tick, actions);
+        CHECK(director.Phase() == ScenarioPhase::Grouping);
+    }
+    // No tame spot in the plan: a hunter with no pet is not sent anywhere.
+    {
+        ScenarioPlan plan = TamingPlan();
+        plan.TameEnabled = false;
+        ScenarioDirector director(plan);
+        std::vector<BotAction> actions;
+        std::uint64_t t = 1000, tick = 1;
+        std::vector<BotSnapshot> bots = { Bot(1, 0, 0, 0), Bot(2, 0, 0, 0), Bot(3, 0, 0, 0) };
+        for (BotSnapshot& bot : bots)
+            bot.level = 20;
+        IntoTaming(director, bots, t, tick, actions);
+        CHECK(director.Phase() == ScenarioPhase::Grouping);
+    }
+    // A hunter below the pet level is not sent either.
+    {
+        ScenarioDirector director(TamingPlan());
+        std::vector<BotAction> actions;
+        std::uint64_t t = 1000, tick = 1;
+        std::vector<BotSnapshot> bots = { Bot(1, 0, 0, 0), Bot(2, 0, 0, 0), Bot(3, 0, 0, 0) };
+        for (BotSnapshot& bot : bots)
+            bot.level = 9;
+        IntoTaming(director, bots, t, tick, actions);
+        CHECK(director.Phase() == ScenarioPhase::Grouping);
+    }
+}
+
+void SettingsReadRosterSpecsClassSuppliesAndTheTameSpot()
+{
+    std::unordered_map<std::string, std::string> config = {
+        { "Scenario", "dm" }, { "ScenarioRoster", "1:1:prot,1:5,3:3:bm,7:9:demonology" }, { "ScenarioTameSpot", "0 -10439 929 39" }, { "ScenarioEntry", "36 -14.5 -385.4 62.4" },
+        { "ScenarioClassSupplies", "9:6265:10,5:17026:5" }, { "ScenarioClassQuests", "9:1504,3:6061" }, { "ScenarioAmmo", "600" },
+    };
+    std::vector<std::string> warnings;
+    BotSettings const settings = ParseBotSettings(config, warnings);
+    ScenarioSettings const& s = settings.Scenario;
+    CHECK(s.Roster.size() == 4 && s.RosterSpec.size() == 4);
+    CHECK(s.RosterSpec[0] == "prot" && s.RosterSpec[1].empty() && s.RosterSpec[2] == "bm" && s.RosterSpec[3] == "demonology");
+    CHECK(s.Roster[2][0] == 3 && s.Roster[2][1] == 3 && s.Roster[3][1] == 9);
+    CHECK(s.HasTameSpot && s.TameSpot[0] == 0.0f && s.TameSpot[1] == -10439.0f && s.TameSpot[3] == 39.0f);
+    CHECK(s.ClassSupplies.size() == 2 && s.ClassSupplies.at(9)[0].first == 6265 && s.ClassSupplies.at(9)[0].second == 10 && s.ClassSupplies.at(5)[0].first == 17026);
+    CHECK(s.ClassQuests.size() == 2 && s.ClassQuests.at(9)[0] == 1504 && s.ClassQuests.at(3)[0] == 6061);
+    CHECK(s.Ammo == 600);
+    CHECK(warnings.empty());
+
+    // A broken spec is dropped with a warning; the defaults give a warlock shards and send the pet quests; a default BotSettings loads data/rotations.txt.
+    std::unordered_map<std::string, std::string> broken = { { "Scenario", "dm" }, { "ScenarioRoster", "1:1:Prot!,1:5" }, { "ScenarioEntry", "36 -14.5 -385.4 62.4" } };
+    std::vector<std::string> brokenWarnings;
+    BotSettings const second = ParseBotSettings(broken, brokenWarnings);
+    CHECK(second.Scenario.Roster.size() == 1 && brokenWarnings.size() == 1);
+    CHECK(second.Scenario.ClassSupplies.count(9) == 1 && second.Scenario.ClassSupplies.at(9)[0].first == 6265);
+    CHECK(second.Scenario.ClassQuests.count(9) == 1 && second.Scenario.ClassQuests.count(3) == 1 && second.Scenario.Ammo == 1000);
+    CHECK(second.RotationFile == "data/rotations.txt");
+    std::unordered_map<std::string, std::string> off = { { "RotationFile", "" } };
+    std::vector<std::string> offWarnings;
+    CHECK(ParseBotSettings(off, offWarnings).RotationFile.empty());
+
+    ScenarioSlot const slot = ScenarioSlotOf({ s }, 2);
+    CHECK(slot.Valid && slot.Class == 3 && slot.Spec == "bm");
+    CHECK(ScenarioSlotOf({ s }, 1).Spec.empty());
+}
+
 int main()
 {
+    AHunterWithoutAmmunitionIsGivenSome();
+    ClassSuppliesAndClassQuestsAreSentOnceEach();
+    HuntersWithoutAPetAreTakenToTameOneAndBack();
+    TheTamingPhaseGivesUpAtTheTimeout();
+    NoTamingWithoutAHunterThatNeedsAPetOrWithoutASpot();
+    SettingsReadRosterSpecsClassSuppliesAndTheTameSpot();
     CountsBossesSeenDead();
     WaitsForTheWholeRoster();
     DressesThenGroupsThenEnters();

@@ -97,6 +97,15 @@ bool IsLiveHostile(NearbyUnit const& unit)
 
 } // namespace
 
+// Stacks the bot carries of an aura (0 when it has none). An aura with one application reports 0 or 1 stack: both count as one while it runs.
+static std::uint32_t AuraStacks(Facts const& f, std::uint32_t spell)
+{
+    for (std::uint32_t i = 0; i < f.AuraCount && i < 16; ++i)
+        if (f.AuraSpell[i] == spell)
+            return std::max<std::uint32_t>(f.AuraStacks[i], 1);
+    return 0;
+}
+
 bool Allowed(Rule const& rule, Facts const& f)
 {
     switch (rule.Condition)
@@ -113,8 +122,63 @@ bool Allowed(Rule const& rule, Facts const& f)
         case Cond::Opener:         return f.FightMs < std::uint64_t(std::max(rule.Param, 0)) * 1000u;
         case Cond::TargetStrong:   return f.TargetElite || f.TargetLevelDiff >= std::max(rule.Param, 1);
         case Cond::ComboPointsAtLeast: return f.ComboPoints >= rule.Param;
+        case Cond::EnemiesBelow:   return f.EnemiesOnBot < std::uint32_t(std::max(rule.Param, 1));
+        case Cond::InParty:        return f.InParty;
+        case Cond::NoPet:          return f.PetState == 0;
+        case Cond::SelfAuraBelow:  return AuraStacks(f, std::uint32_t(rule.Param)) < std::uint32_t(std::max(rule.Param2, 1));
+        case Cond::SelfAuraAtLeast: return AuraStacks(f, std::uint32_t(rule.Param)) >= std::uint32_t(std::max(rule.Param2, 1));
     }
     return false;
+}
+
+namespace {
+
+struct SpecInfo
+{
+    std::uint32_t ClassId;
+    char const* Key;
+    std::uint32_t Role; // 1 tank, 2 healer, 3 dps
+    bool Default;       // the spec a bot of this class and role plays without one in its roster entry
+};
+
+constexpr SpecInfo kSpecs[] = {
+    { 3, "bm", 3, true },           { 3, "mm", 3, false },            { 3, "sv", 3, false },
+    { 1, "prot", 1, true },         { 1, "arms", 3, true },           { 1, "fury", 3, false },
+    { 2, "prot", 1, true },         { 2, "holy", 2, true },           { 2, "ret", 3, true },
+    { 5, "holy", 2, true },         { 5, "disc", 2, false },          { 5, "shadow", 3, true },
+    { 7, "resto", 2, true },        { 7, "ele", 3, false },           { 7, "enh", 3, true },
+    { 8, "arcane", 3, true },       { 8, "fire", 3, false },          { 8, "frost", 3, false },
+    { 9, "demonology", 3, true },   { 9, "affliction", 3, false },    { 9, "destruction", 3, false },
+    { 4, "combat", 3, true },       { 4, "assassination", 3, false }, { 4, "subtlety", 3, false },
+    { 11, "feral_tank", 1, true },  { 11, "resto", 2, true },         { 11, "feral_cat", 3, true },   { 11, "balance", 3, false },
+};
+
+} // namespace
+
+std::uint32_t SpecRole(std::uint32_t classId, std::string const& spec)
+{
+    for (SpecInfo const& info : kSpecs)
+        if (info.ClassId == classId && spec == info.Key)
+            return info.Role;
+    return 0;
+}
+
+std::string DefaultSpec(std::uint32_t classId, std::uint32_t role)
+{
+    for (SpecInfo const& info : kSpecs)
+        if (info.ClassId == classId && info.Role == role && info.Default)
+            return info.Key;
+    return {};
+}
+
+std::vector<Row> const* RowsFor(RotationData const& data, std::uint32_t classId, std::string const& spec)
+{
+    if (!spec.empty())
+        if (auto const at = data.BySpec.find({ classId, spec }); at != data.BySpec.end())
+            return &at->second;
+    if (auto const at = data.ByClass.find(classId); at != data.ByClass.end())
+        return &at->second;
+    return nullptr;
 }
 
 std::span<Row const> RowsForClass(std::uint32_t classId)
@@ -213,6 +277,17 @@ Facts FactsFor(BotSnapshot const& bot, std::span<NearbyUnit const> nearby, Nearb
         facts.TargetLevelDiff = std::int32_t(target->level) - std::int32_t(bot.level);
     }
 
+    facts.InParty = bot.group_role != 0;
+    facts.PetState = bot.pet_state;
+    for (std::uint32_t i = 0; i < bot.aura_count && i < forever_module::kMaxAuras && i < 16; ++i)
+    {
+        if (bot.auras[i].remaining_ms == 0)
+            continue; // a reported aura with 0 left is one that just expired
+        facts.AuraSpell[facts.AuraCount] = bot.auras[i].spell_id;
+        facts.AuraStacks[facts.AuraCount] = bot.auras[i].stacks;
+        ++facts.AuraCount;
+    }
+
     // Hostile units close to the bot: an approximation of the ones attacking it, for area rules.
     for (NearbyUnit const& unit : nearby)
         if (IsLiveHostile(unit) && DistanceYards(bot, unit) <= 8.0f)
@@ -247,6 +322,7 @@ RotationData ParseRotationData(std::istream& in, std::vector<std::string>& warni
 {
     RotationData data;
     std::uint32_t classId = 0;
+    std::string specKey; // the spec of the current block (empty: the class default)
     std::string line;
     std::size_t number = 0;
     while (std::getline(in, line))
@@ -264,12 +340,21 @@ RotationData ParseRotationData(std::istream& in, std::vector<std::string>& warni
 
         if (t[0] == "class")
         {
-            if (t.size() == 2 && Whole(t[1], classId) && classId > 0 && classId < 32)
-                data.ByClass[classId];
+            specKey.clear();
+            if ((t.size() == 2 || (t.size() == 4 && t[2] == "spec")) && Whole(t[1], classId) && classId > 0 && classId < 32 && (t.size() == 2 || SpecRole(classId, t[3]) != 0))
+            {
+                if (t.size() == 4)
+                {
+                    specKey = t[3];
+                    data.BySpec[{ classId, specKey }];
+                }
+                else
+                    data.ByClass[classId];
+            }
             else
             {
                 classId = 0;
-                drop("class needs a class id");
+                drop("class needs a class id, and 'spec <key>' a key the class has");
             }
             continue;
         }
@@ -313,6 +398,16 @@ RotationData ParseRotationData(std::istream& in, std::vector<std::string>& warni
             else if (key == "opener") { ok = arg(n); row.When = Rule{ Cond::Opener, std::int32_t(n) }; }
             else if (key == "target_strong") { ok = arg(n); row.When = Rule{ Cond::TargetStrong, std::int32_t(n) }; }
             else if (key == "combo") { ok = arg(n); row.When = Rule{ Cond::ComboPointsAtLeast, std::int32_t(n) }; }
+            else if (key == "enemies_below") { ok = arg(n); row.When = Rule{ Cond::EnemiesBelow, std::int32_t(n) }; }
+            else if (key == "in_party") row.When = Rule{ Cond::InParty, 0 };
+            else if (key == "no_pet") row.When = Rule{ Cond::NoPet, 0 };
+            else if (key == "self_aura_below" || key == "self_aura_at_least")
+            {
+                std::uint32_t spell = 0;
+                std::uint32_t stacks = 0;
+                ok = arg(spell) && arg(stacks) && spell != 0 && stacks != 0;
+                row.When = Rule{ key == "self_aura_below" ? Cond::SelfAuraBelow : Cond::SelfAuraAtLeast, std::int32_t(spell), std::int32_t(stacks) };
+            }
             else ok = false;
         }
         if (ok && buff && (!targetGiven || row.OnTarget || row.DurationSec == 0))
@@ -324,7 +419,7 @@ RotationData ParseRotationData(std::istream& in, std::vector<std::string>& warni
         }
         if (!buff && !targetGiven)
             row.OnTarget = true;
-        data.ByClass[classId].push_back(row);
+        (specKey.empty() ? data.ByClass[classId] : data.BySpec[{ classId, specKey }]).push_back(row);
     }
     return data;
 }

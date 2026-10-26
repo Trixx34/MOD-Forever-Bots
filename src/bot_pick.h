@@ -59,4 +59,16 @@ private:
     mutable std::mutex _mutex;
     std::unordered_map<std::uint64_t, std::uint32_t> _classes;
 };
+
+// The spec of a bot (the third field of a scenario roster entry): a lower case key such as "bm" or "prot", "" for a bot without one.
+class SpecTable
+{
+public:
+    void Set(std::uint64_t botGuid, std::string spec);
+    std::string Get(std::uint64_t botGuid) const;
+
+private:
+    mutable std::mutex _mutex;
+    std::unordered_map<std::uint64_t, std::string> _specs;
+};
 } // namespace pick

@@ -125,6 +125,19 @@ std::uint32_t ClassTable::Get(std::uint64_t botGuid) const
     return it == _classes.end() ? 0 : it->second;
 }
 
+void SpecTable::Set(std::uint64_t botGuid, std::string spec)
+{
+    std::lock_guard<std::mutex> lock(_mutex);
+    _specs[botGuid] = std::move(spec);
+}
+
+std::string SpecTable::Get(std::uint64_t botGuid) const
+{
+    std::lock_guard<std::mutex> lock(_mutex);
+    auto const it = _specs.find(botGuid);
+    return it == _specs.end() ? std::string() : it->second;
+}
+
 std::size_t ClassTable::Size() const
 {
     std::lock_guard<std::mutex> lock(_mutex);

@@ -6,7 +6,7 @@ from 1 to 60 and, in a party of five, clear a dungeon.
 
 ## Status
 
-Built and unit-tested (16 test suites). Run on a dedicated sim worldserver with 300, 500 and 1000 bots: spawn and login, the ramp,
+Built and unit-tested (38 test programs). Run on a dedicated sim worldserver with 300, 500 and 1000 bots: spawn and login, the ramp,
 the safety valves, telemetry and the pump all work. What is **not yet verified** on the sim: sustained combat and kills (the last run
 found bots could not see neutral creatures, now fixed), experience and levelling, vendor and hub walks, parties and looting.
 
@@ -180,12 +180,10 @@ Without `FOREVER_MODULE_SDK_SOURCE`, CMake fetches `Trixx34/forever-module-sdk` 
 
 - Quests and levelling are built from data files but not verified on the sim. Dungeons (M9) are a first slice: a data-driven route and a boss-clear rule on top of the scenario director; the sample Ragefire Chasm route is approximate, no run has been done on the sim, there is no crowd control, boss mechanics or walk to the portal (`doc/dungeons.md`).
 - Layout 13 (protocol 7) is what the module is built against: the bot's auras, the pet, `casting_target`, vendor/repair/auctioneer guids, money and free bag slots, and `last_target_lost_reason`. A core that still runs layout 12 refuses the module at attach, so the core has to move first. What the module does with them is in `src/bot_policy.cpp` (`AuraRunning`, `PetOf`, the `kPetCommand` actions, the avoid of a leashed creature); a target's DOTs are still a coarse `aura_mask`, whose bit assignment the core has not published, so a DOT on a target is still estimated.
-- The rotation spec uses the Forever abilities that could be verified in the client data (Holy Strike, Divine Storm, Chaos Bolt and others; `doc/rotations.md`). Abilities that need special handling or whose effect could not be verified (Demonic Brand, rogue finishers, forms, channels) are not used yet.
-- A hunter's pet is handled by spell casts only (Call Pet 883, Revive Pet 982, Mend Pet 136, its state guessed from accepted and
-  refused casts): the snapshot has no pet and the core has no pet command action, so the pet's health and presence are not seen and
-  the pet is not sent to attack the bot's target (it acts on its own AI). See doc/rotations.md, Limits, for the core/SDK change
-  needed. Auto Shot is tracked and not re-cast while active. Rend's bleed is estimated (21 s per accepted cast) because the
-  snapshot has no auras. A fleeing target is not detected.
+- The rotation spec uses the Forever abilities that could be verified in the client data (Holy Strike, Seal of Fury, Summon Hawk, Conflagrate and others; `doc/rotations.md`). Abilities that need special handling or whose effect could not be verified (Demonic Brand, rogue finishers, forms, channels) are not used yet.
+- A pet is read from the snapshot (layout 13: `pet_state`) and sent at the fight's target; Call Pet 883, Revive Pet 982 and Mend Pet 136 are the policy's own logic, and a hunter without a pet tames one (Tame Beast, 20 s channel).
+  Call Pet must be a spell the hunter knows (a trainer row in the world database); a hunter without it cannot tame. Auto Shot is tracked and not re-cast while active. Rend's bleed is estimated (21 s per accepted cast) for a
+  bot with no aura list. A fleeing target is not detected.
 - Hub positions come from the sim's quest-giver clusters and may sit in rock; a bot that cannot reach one gives up after 3 minutes.
 - Classes 6 and 10 are not spawned.
 - **Not yet built on layout 13:** vendor buying (`client.BuyItem`, needs an item list to buy from and the Tier 1 action sent from the `Run()` thread), the auction house (`client.AuctionHouse` plus `PlayerScript.OnAuctionResult`), and crafting and gathering (`client.Craft`, `client.Gather`, which need recipe and node data). The SDK has all of it; the module does not use it yet.
@@ -231,7 +229,9 @@ trainer spells or talents, and it cannot be played while it is a bot. Alts are n
 through its objectives. Once the bot has it in its log, the bot completes it with its reward at once, wherever it stands, as the GM command
 `.quest reward <id>` does (core action `kQuest`, operation 4). Only bots send it; player characters are not touched. It applies on prod as well as the sim.
 
-**Rotations.** With `RotationFile` set, the classes use rows from a file (levels 1 to 60, damage-over-time lengths, and upkeep buffs such as Power Word: Fortitude, armor spells and Battle Shout cast out of combat, on the bot or its whole group). The file is made from a spec of spell names and the core's ability dump by `tools/make_rotations.py`; see `doc/rotations.md`.
+**Rotations.** Since 0.33.0 the classes use the rows of `data/rotations.txt` (`RotationFile`, default `data/rotations.txt` beside the module's executable; `RotationFile = ""` uses the built-in rank 1 rows): levels 1 to 60, damage-over-time lengths, procs and stacks (`self_aura_*`), upkeep buffs such as Power Word: Fortitude, armor spells, Battle Shout and the warrior's Defensive Stance cast out of combat, and a warlock's demon (`no_pet`). A class has a block per spec (`class 3 spec bm`); a bot's spec is the third field of its scenario roster entry (`ScenarioRoster = "1:1:prot,1:5:holy,1:8:arcane,3:3:bm,7:9:demonology"`), else the default of its class and role. The file is made from `data/rotation_spec.txt` (spell names) and the abilities per class by `tools/make_rotations.py` (`tools/abilities_from_db2.py` builds the abilities from the client files and a trainer export, no restart needed); see `doc/rotations.md`.
+
+**Hunter and warlock pets.** A warlock's demon is an upkeep row (Succubus, else Voidwalker, else Imp, re-summoned when it is gone). A hunter of level 10 or more with no pet and not in a party walks to a beast of `data/tame_beasts.txt` (`TameBeastFile`) and tames it with Tame Beast; in a scenario, `ScenarioTameSpot.<dungeon> = "map x y z"` adds a Taming phase that takes the hunters there and back before the party forms. The scenario gives a hunter without ammunition 1000 pieces of what its weapon takes (`ScenarioAmmo`) and a warlock 10 Soul Shards (`ScenarioClassSupplies`); see `doc/rotations.md`.
 
 **Grind spots.** With `GrindFile` set, an idle bot walks to a place that suits its level (nearest first, not back to the last two) instead of the hubs of its map. The file is made from the world database with `tools/make_grind_spots.py`; see `doc/grind-spots.md`.
 
@@ -242,7 +242,7 @@ most) when it first appears and after every `AutoGearEveryLevels` levels. With i
 **Scenarios.** A scenario is a repeatable test situation: `Scenario = <name>` with a roster, a staging place, an entry, a route and a
 duration (see `config/modules.d/forever-bots.conf.example`). The module spawns the roster at the staging place, dresses it (auto gear,
 or the class's `ScenarioGear<class>` list), waits for the party to form, teleports the leader to the entry and then the members, and
-lets the leader walk the route (it waits for members more than 30 yards behind and while its health is under 80%). One result line is
+lets the leader walk the route (it waits for members more than 30 yards behind and while its health is under 80%). Between the dressing and the grouping the scenario grants the classes their supplies and ammunition, and with `ScenarioTameSpot` a Taming phase gives its hunters a pet. One result line is
 written when it ends: `scenario <name>: outcome=<complete|wipe|timeout|enter_failed> furthest=3/7 deaths=2 alive=3/5 run=412s`.
 `tests/scenario_test.cpp` covers the director, the route and the settings.
 

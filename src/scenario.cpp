@@ -13,6 +13,7 @@ namespace
 
 constexpr std::uint32_t kServiceEquip = 4; // kVendor's equip bit
 constexpr std::uint32_t kWarriorClass = 1;
+constexpr std::uint32_t kHunterClass = 3;
 
 float Distance2d(BotSnapshot const& bot, ScenarioPoint const& point)
 {
@@ -85,6 +86,11 @@ void ScenarioDirector::Decide(forever_module::WorldTickSnapshotView const& view,
     };
 
     std::vector<BotSnapshot> const& bots = view.bots;
+    // A hunter of the pet level with no pet (pet_state 0 none, 1 alive, 2 dead: a dead one is revived by the policy, so it is not sent to tame).
+    auto const needsPet = [&](BotSnapshot const& bot)
+    {
+        return _plan.ClassOf && _plan.ClassOf(bot.guid) == kHunterClass && bot.level >= kTameMinLevel && bot.life_state == 0 && bot.pet_state == 0;
+    };
     // A bot is up only with life_state 0: a released ghost has health 1, so health says nothing about it.
     for (BotSnapshot const& bot : bots)
     {
@@ -112,6 +118,27 @@ void ScenarioDirector::Decide(forever_module::WorldTickSnapshotView const& view,
             ghosts += bot.life_state == 2;
         return ghosts;
     };
+
+    // Ammunition for a hunter that carries none (the core recommends the projectile its bow, crossbow or gun takes: ammo_entry): without it the policy leaves
+    // every ranged row out and the hunter only swings. From the dressing on, so the grant is in the bags before the party enters; the retry gap lets the
+    // snapshot show the grant before the next one.
+    if (_plan.AmmoCount != 0 && _phase != ScenarioPhase::Waiting)
+        for (BotSnapshot const& bot : bots)
+        {
+            if (bot.life_state != 0 || bot.ammo_entry == 0 || bot.ammo_count >= kAmmoLow || _ammoGrants[bot.guid] >= kAmmoGrantsMax)
+                continue;
+            std::uint64_t& last = _ammoAtMs[bot.guid];
+            if (last != 0 && nowMs - last < kAmmoRetryMs)
+                continue;
+            BotAction grant;
+            grant.bot_guid = bot.guid;
+            grant.type = ActionType::kGrant;
+            grant.spell_id = bot.ammo_entry;
+            grant.dest_x = float(_plan.AmmoCount);
+            actions.push_back(grant);
+            last = nowMs;
+            ++_ammoGrants[bot.guid];
+        }
 
     switch (_phase)
     {
@@ -171,6 +198,41 @@ void ScenarioDirector::Decide(forever_module::WorldTickSnapshotView const& view,
                 ++next;
                 pending = true;
             }
+            // Class supplies (a warlock's Soul Shards), then the class quests that teach a pet's spells.
+            for (BotSnapshot const& bot : bots)
+            {
+                std::uint32_t const classId = _plan.ClassOf ? _plan.ClassOf(bot.guid) : 0;
+                if (auto const supplies = _plan.ClassSupplies.find(classId); supplies != _plan.ClassSupplies.end())
+                {
+                    std::size_t& next = _nextClassSupply[bot.guid];
+                    if (next < supplies->second.size())
+                    {
+                        BotAction grant;
+                        grant.bot_guid = bot.guid;
+                        grant.type = ActionType::kGrant;
+                        grant.spell_id = supplies->second[next].first;
+                        grant.dest_x = float(supplies->second[next].second);
+                        actions.push_back(grant);
+                        ++next;
+                        pending = true;
+                        continue;
+                    }
+                }
+                if (auto const quests = _plan.ClassQuests.find(classId); quests != _plan.ClassQuests.end())
+                {
+                    std::size_t& next = _nextClassQuest[bot.guid];
+                    if (next < quests->second.size())
+                    {
+                        BotAction quest;
+                        quest.bot_guid = bot.guid;
+                        quest.type = ActionType::kQuest;
+                        quest.spell_id = (4u << 24) | (quests->second[next] & 0xFFFFFFu); // operation 4: complete with the reward
+                        actions.push_back(quest);
+                        ++next;
+                        pending = true;
+                    }
+                }
+            }
             if (pending)
             {
                 _phaseSinceMs = nowMs; // the pause counts from the last grant
@@ -190,6 +252,82 @@ void ScenarioDirector::Decide(forever_module::WorldTickSnapshotView const& view,
                 _phaseSinceMs = nowMs;
             }
             else if (_equipSent && nowMs - _phaseSinceMs >= kEquipPauseMs)
+            {
+                // Hunters without a pet are sent to tame one first (when the plan has a place for it).
+                bool tamers = false;
+                if (_plan.TameEnabled)
+                    for (BotSnapshot const& bot : bots)
+                        if (needsPet(bot))
+                        {
+                            tamers = true;
+                            _tameHome[bot.guid] = Home{ bot.map_id, bot.pos_x, bot.pos_y, bot.pos_z };
+                        }
+                if (tamers)
+                {
+                    _tameStartMs = nowMs;
+                    enter(ScenarioPhase::Taming);
+                }
+                else
+                    enter(ScenarioPhase::Grouping);
+            }
+            break;
+        }
+
+        case ScenarioPhase::Taming:
+        {
+            // Out to the spot, one teleport per hunter that has not arrived (again after kTameRetryMs, for a refusal in combat); then the policy tames. Back when all have a pet, or at the timeout.
+            bool pending = false;
+            for (BotSnapshot const& bot : bots)
+            {
+                auto const home = _tameHome.find(bot.guid);
+                if (home == _tameHome.end() || bot.life_state != 0 || bot.pet_state == 1)
+                    continue;
+                pending = true;
+                std::uint64_t& sent = _tameSentAtMs[bot.guid];
+                bool const there = bot.map_id == _plan.TameMap && Distance2d(bot, _plan.TameSpot) <= kTameArrivedYards;
+                if (!there && (sent == 0 || nowMs - sent >= kTameRetryMs))
+                {
+                    BotAction away;
+                    away.bot_guid = bot.guid;
+                    away.type = ActionType::kTeleport;
+                    away.spell_id = _plan.TameMap;
+                    away.dest_x = _plan.TameSpot.X;
+                    away.dest_y = _plan.TameSpot.Y;
+                    away.dest_z = _plan.TameSpot.Z;
+                    actions.push_back(away);
+                    sent = nowMs;
+                }
+            }
+            if (pending && nowMs - _tameStartMs < kTameTimeoutMs)
+                break;
+            // Back to where each hunter stood. The grouping starts when they are there, or kTameBackMs after the first order.
+            if (_tameBackMs == 0)
+                _tameBackMs = nowMs;
+            bool allHome = true;
+            for (BotSnapshot const& bot : bots)
+            {
+                auto const home = _tameHome.find(bot.guid);
+                if (home == _tameHome.end() || bot.life_state != 0)
+                    continue;
+                bool const there = bot.map_id == home->second.Map && std::hypot(bot.pos_x - home->second.X, bot.pos_y - home->second.Y) <= kTameHomeYards;
+                if (there)
+                    continue;
+                allHome = false;
+                std::uint64_t& sent = _tameSentAtMs[bot.guid];
+                if (sent == 0 || nowMs - sent >= kTameRetryMs)
+                {
+                    BotAction back;
+                    back.bot_guid = bot.guid;
+                    back.type = ActionType::kTeleport;
+                    back.spell_id = home->second.Map;
+                    back.dest_x = home->second.X;
+                    back.dest_y = home->second.Y;
+                    back.dest_z = home->second.Z;
+                    actions.push_back(back);
+                    sent = nowMs;
+                }
+            }
+            if (allHome || nowMs - _tameBackMs >= kTameBackMs)
                 enter(ScenarioPhase::Grouping);
             break;
         }

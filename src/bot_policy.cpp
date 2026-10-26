@@ -37,7 +37,7 @@ constexpr std::uint32_t kLosRefusalsAvoid = 3;   // this many line-of-sight refu
 constexpr std::uint64_t kBusyRetryMs = 300;  // a cast refused because the bot was casting or moving: tried again very soon
 constexpr std::uint64_t kNotKnownRetryMs = 60000; // the spell may be learned later
 constexpr float kPullRadius = 10.0f;         // yards: hostiles this close to a candidate are pulled with it
-constexpr std::size_t kMaxDungeonPull = 3;  // a dungeon pack is larger than an outdoor one, but four at once wiped the party in the Ragefire Searing Blade room
+constexpr std::size_t kMaxDungeonPull = 4;  // a dungeon pack is larger than an outdoor one; the party pulls up to this many together (3 was tried in 0.32.0: no gain, reverted)
 constexpr std::size_t kMaxPull = 3;          // a group larger than this is not pulled (over-pull control)
 constexpr std::uint32_t kRend = 772;         // warrior rank 1; the bleed lasts 21 seconds
 constexpr std::uint64_t kRendDurationMs = 21000;
@@ -99,6 +99,14 @@ constexpr std::uint32_t kCallPet = 883;
 constexpr std::uint32_t kRevivePet = 982;
 constexpr std::uint32_t kMendPet = 136;
 constexpr std::uint32_t kHunterClass = 3;
+constexpr std::uint32_t kTameBeast = 1515;           // Tame Beast: a 20 second channel; the core creates the pet when it ends (it needs Call Pet, 883, known)
+constexpr std::uint32_t kTameMinLevel = 10;          // the level the hunter pet quest is given at
+constexpr float kTameSearchYards = 60.0f;            // a beast farther than this is not looked for
+constexpr float kTameCastYards = 18.0f;              // the cast range of Tame Beast is 20 yards; walk to within this
+constexpr std::uint64_t kTameHoldMs = 22000;         // the channel (20 s) and a margin: no move, no other cast
+constexpr std::uint64_t kTameRetryMs = 20000;        // after a cast that gave no pet, or a search that found nothing
+constexpr std::uint32_t kTameMaxFailures = 4;        // casts with no pet before the hunter stops for kTameGiveUpMs
+constexpr std::uint64_t kTameGiveUpMs = 600000;
 constexpr std::uint64_t kPetBackoffMs = 30000;       // first wait after a refused revive; doubles per failure
 constexpr std::uint64_t kPetBackoffMaxMs = 300000;
 constexpr std::uint64_t kPetProbeMs = 120000;        // below level 12 a Call Pet check after a fight is sent at most this often
@@ -115,10 +123,18 @@ constexpr std::uint32_t kMaxComboPoints = 5;
 // Saber Slash (Forever): like Sinister Strike it gives one combo point (SpellEffect 30 energize, power type 4, 1 point, in the client data).
 constexpr std::uint32_t kSaberSlash = 424785;
 
+// Mutilate (Assassination, level 40) gives two combo points and Hemorrhage (Subtlety, level 30) one: the builders of the other rogue specs (docs/102 in forever-ops).
+constexpr std::uint32_t kMutilate = 399956;
+constexpr std::uint32_t kHemorrhage = 16511;
+constexpr std::uint32_t kRupture = 1943;
+constexpr std::uint32_t kSliceAndDice = 5171;
+
 // Combo points a rogue spell adds on its target when it lands, 0 for any other spell.
 std::uint32_t ComboPointsGained(std::uint32_t spell)
 {
-    return spell == kSinisterStrike || spell == kSaberSlash ? 1 : 0;
+    if (spell == kMutilate)
+        return 2;
+    return spell == kSinisterStrike || spell == kSaberSlash || spell == kHemorrhage ? 1 : 0;
 }
 // A ranged bot below this share of its power walks to melee range and fights there, since its spells are spent.
 constexpr std::uint32_t kOutOfPowerPct = 15;
@@ -244,6 +260,20 @@ constexpr std::uint32_t kAncestralSpirit = 2008;
 constexpr std::uint32_t kFlashHeal = 2061;       // rank 1, upranked by HighestKnownRank
 constexpr std::uint32_t kLesserHeal = 2050;      // rank 1, upranked
 constexpr std::uint32_t kPowerWordShield = 17;   // rank 1, upranked (30 s duration, self or ally)
+// The Holy priest of the Wowhead level 30 guide (docs/102 in forever-ops): Renew on the tank, Binding Heal when the priest and the tank are both hurt, Prayer of Healing only
+// when most of the party is low. Ids are the first ranks of the client data; the core casts the highest rank the bot knows, and a spell it has not learned is refused and left alone for a minute.
+constexpr std::uint32_t kRenew = 139;                // level 8
+constexpr std::uint32_t kBindingHeal = 1240770;      // level 32 (the first rank a trainer teaches; later ranks to 1240774)
+constexpr std::uint32_t kPrayerOfHealing = 596;      // level 30
+constexpr std::uint32_t kRenewLevel = 8;
+constexpr std::uint32_t kBindingHealLevel = 32;
+constexpr std::uint32_t kPrayerOfHealingLevel = 30;
+constexpr std::uint64_t kRenewMs = 15000;            // the Renew on the tank is cast again when it has run out
+constexpr std::uint32_t kPrayerBelowPct = 50;        // a member this low counts toward Prayer of Healing
+constexpr std::uint32_t kPrayerMinLow = 3;           // this many members low: Prayer of Healing instead of single heals
+constexpr std::uint32_t kBindingBelowPct = 70;       // Binding Heal when both the priest and the tank are below this
+constexpr std::uint32_t kWarriorClass_ = 1;
+constexpr std::uint32_t kDruidClass_ = 11;
 // A dungeon party's dead wait longer for a resurrect than a leveling party's: the healer needs the fight to end, to get within range, and a 10 s cast. A bot that releases too early
 // stands at the graveyard outside the instance (one tank was killed there seven times in a row by a wandering scout, with every re-entry refused for being in combat).
 constexpr std::uint64_t kDungeonReleaseDelayMs = 60000;
@@ -645,17 +675,31 @@ char const* ActionStatusName(BotActionStatus status)
 }
 
 // Reads the result of the bot's last action, once per sequence number, and sets when the spell may be tried again.
-std::span<rotation::Row const> BotPolicy::RowsFor(std::uint32_t classId) const
+std::span<rotation::Row const> BotPolicy::RowsFor(std::uint32_t classId, std::string const& spec) const
 {
     if (_options.Rotations)
-        if (auto const at = _options.Rotations->ByClass.find(classId); at != _options.Rotations->ByClass.end())
-            return at->second;
+        if (std::vector<rotation::Row> const* rows = rotation::RowsFor(*_options.Rotations, classId, spec))
+            return *rows;
     return rotation::RowsForClass(classId);
 }
 
-std::uint64_t BotPolicy::DurationMsOf(std::uint32_t classId, std::uint32_t spell) const
+std::string BotPolicy::SpecFor(std::uint64_t botGuid, std::uint32_t classId) const
 {
-    for (rotation::Row const& row : RowsFor(classId))
+    if (_options.SpecOf)
+        if (std::string spec = _options.SpecOf(botGuid); !spec.empty())
+            return spec;
+    // No spec in the roster: the default of the class and the role the policy gives the bot (a set role, else a warrior in a party tanks, a healer class heals, the rest deal damage).
+    std::uint32_t role = 0;
+    if (auto const known = _bots.find(botGuid); known != _bots.end())
+        role = known->second.Role_ == BotState::Role::Tank ? 1u : known->second.Role_ == BotState::Role::Healer ? 2u : known->second.Role_ == BotState::Role::Dps ? 3u : 0u;
+    if (role == 0)
+        role = (classId == kWarriorClass && _options.PartySize != 0) ? 1u : HealSpellFor(classId, 99) != 0 ? 2u : 3u;
+    return rotation::DefaultSpec(classId, role);
+}
+
+std::uint64_t BotPolicy::DurationMsOf(std::uint32_t classId, std::uint32_t spell, std::string const& spec) const
+{
+    for (rotation::Row const& row : RowsFor(classId, spec))
         if (row.Spell == spell && row.DurationSec != 0)
             return std::uint64_t(row.DurationSec) * 1000;
     return DotDurationMs(spell);
@@ -1139,7 +1183,7 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
         auto const cast = state.CastTarget.find(spell);
         if (cast != state.CastTarget.end())
         {
-            std::uint64_t const duration = DurationMsOf(ClassFor(_options, bot.guid), spell);
+            std::uint64_t const duration = DurationMsOf(ClassFor(_options, bot.guid), spell, SpecFor(bot.guid, ClassFor(_options, bot.guid)));
             if (duration != 0)
             {
                 state.Dots[spell] = Dot{ cast->second, nowMs + duration };
@@ -1153,8 +1197,8 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
                 state.ComboTarget = cast->second;
             }
         }
-        if (spell == kEviscerate)
-            state.ComboPoints = 0;
+        if (spell == kEviscerate || spell == kRupture || spell == kSliceAndDice)
+            state.ComboPoints = 0; // a finisher spends every combo point
     }
 
     // An upkeep buff (Battle Shout, Rockbiter Weapon, Lightning Shield...) is cast out of combat, nobody waits for it, and it was retried as fast as a fight
@@ -1163,7 +1207,7 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
     bool const castFailed = bot.last_action_status != BotActionStatus::kApplied && bot.last_action_status != BotActionStatus::kNone &&
                             bot.last_action_status != BotActionStatus::kNotOnline;
     if (castFailed)
-        for (rotation::Row const& row : RowsFor(ClassFor(_options, bot.guid)))
+        for (rotation::Row const& row : RowsFor(ClassFor(_options, bot.guid), SpecFor(bot.guid, ClassFor(_options, bot.guid))))
             buff = buff || (row.Buff && row.Spell == spell);
     if (buff)
     {
@@ -2402,6 +2446,15 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
 
         // The bot's class: its own (from the class table) or the configured one. Ranged classes approach to range.
         std::uint32_t const classId = ClassFor(_options, bot.guid);
+        // A spec in the roster sets the role of a bot that has none: a tank spec tanks, a healer spec heals, a damage spec does not heal on its own (a shadow priest).
+        if (!state.SpecRoleApplied && state.Role_ == BotState::Role::Auto && _options.SpecOf)
+        {
+            state.SpecRoleApplied = true;
+            if (std::string const rosterSpec = _options.SpecOf(bot.guid); !rosterSpec.empty())
+                if (std::uint32_t const role = rotation::SpecRole(classId, rosterSpec))
+                    state.Role_ = role == 1 ? BotState::Role::Tank : role == 2 ? BotState::Role::Healer : BotState::Role::Dps;
+        }
+        std::string const spec = SpecFor(bot.guid, classId);
 
         // The bot's party: a leader is the bot that invites, a member follows its leader. The leader's snapshot is the one
         // this tick's view holds, when the leader is online.
@@ -2736,6 +2789,89 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             targetRef = hostile->guid;
         }
         bool hasTarget = targetRef != 0 && !lowHealth;
+
+        // Taming (Tame Beast). A hunter with no pet, not in a party, out of combat: walk to the nearest beast of data/tame_beasts.txt its level allows, cast Tame Beast on it and
+        // hold still for the channel. The snapshot's pet_state tells whether it worked (the core creates the pet when the channel ends). Not for a hunter that fights or runs a route.
+        if (classId == kHunterClass && _options.TameBeasts && !_options.TameBeasts->ByEntry.empty() && bot.life_state == 0 && bot.group_role == 0 &&
+            (bot.level == 0 || bot.level >= kTameMinLevel))
+        {
+            if (state.TameUntilMs != 0)
+            {
+                // Holding: the channel runs. A pet means it worked; combat, a refusal, or the hold running out means it did not.
+                auto const refused = state.RetryAtMs.find(kTameBeast);
+                bool const refusedNow = refused != state.RetryAtMs.end() && refused->second > state.TameCastAtMs && nowMs >= state.TameCastAtMs + 2 * kGlobalCooldownMs;
+                if (PetOf(bot) == PetKnown::kOut)
+                {
+                    state.TameUntilMs = 0;
+                    state.TameFailures = 0;
+                    if (_options.OnEvent)
+                        _options.OnEvent("tame_done: bot=" + std::to_string(bot.guid) + " target=" + std::to_string(state.TameTarget));
+                }
+                else if (bot.in_combat != 0 || refusedNow || nowMs >= state.TameUntilMs)
+                {
+                    state.TameUntilMs = 0;
+                    ++state.TameFailures;
+                    state.TameRetryAtMs = nowMs + (state.TameFailures >= kTameMaxFailures ? kTameGiveUpMs : kTameRetryMs);
+                    if (state.TameFailures >= kTameMaxFailures)
+                        state.TameFailures = 0;
+                    if (_options.OnEvent)
+                        _options.OnEvent("tame_failed: bot=" + std::to_string(bot.guid) + " target=" + std::to_string(state.TameTarget) +
+                                         (bot.in_combat != 0 ? " why=combat" : refusedNow ? " why=refused" : " why=no_pet"));
+                }
+                else
+                    continue; // still channelling: stand still, send nothing
+            }
+            if (state.TameUntilMs == 0 && !hasTarget && bot.in_combat == 0 && !IsCasting(bot) && !state.Sitting && nowMs >= state.NextCastMs && nowMs >= state.TameRetryAtMs &&
+                PetOf(bot) == PetKnown::kNone && !(state.RetryAtMs.count(kTameBeast) && nowMs < state.RetryAtMs[kTameBeast]))
+            {
+                NearbyUnit const* beast = tame::PickTameTarget(bot, nearby, *_options.TameBeasts, kTameSearchYards);
+                if (!beast)
+                    state.TameRetryAtMs = nowMs + kTameRetryMs / 2; // nothing to tame in view: look again soon
+                else if (rotation::DistanceYards(bot, *beast) > kTameCastYards)
+                {
+                    if (state.TameTarget != beast->guid || bot.moving == 0)
+                    {
+                        BotAction walk;
+                        walk.bot_guid = bot.guid;
+                        walk.type = ActionType::kFollow;
+                        walk.target_guid = beast->guid;
+                        actions.push_back(walk);
+                        state.TameTarget = beast->guid;
+                        state.Last = Decision{ ActionType::kFollow, beast->guid };
+                    }
+                    continue;
+                }
+                else if (bot.moving != 0)
+                {
+                    BotAction stop;
+                    stop.bot_guid = bot.guid;
+                    stop.type = ActionType::kStop;
+                    actions.push_back(stop);
+                    state.Last = Decision{ ActionType::kStop, 0 };
+                    state.Approaching = false;
+                    continue;
+                }
+                else
+                {
+                    BotAction tameCast;
+                    tameCast.bot_guid = bot.guid;
+                    tameCast.type = ActionType::kCastSpell;
+                    tameCast.spell_id = kTameBeast;
+                    tameCast.target_guid = beast->guid;
+                    actions.push_back(tameCast);
+                    state.CastTarget[kTameBeast] = beast->guid;
+                    state.NextCastMs = nowMs + kGlobalCooldownMs;
+                    state.TameTarget = beast->guid;
+                    state.TameCastAtMs = nowMs;
+                    state.TameUntilMs = nowMs + kTameHoldMs;
+                    if (_options.OnEvent)
+                        _options.OnEvent("tame: bot=" + std::to_string(bot.guid) + " target=" + std::to_string(beast->guid) + " level=" + std::to_string(beast->level) +
+                                         " dist=" + std::to_string(int(rotation::DistanceYards(bot, *beast))));
+                    continue;
+                }
+            }
+        }
+
         // The target of this fight is looted once it is dead: remember it, and forget the ones too old to still be on the ground.
         if (hasTarget && forever_module::UnitRefType(targetRef) == 8)
             state.FoughtAtMs[targetRef] = nowMs;
@@ -2952,7 +3088,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 BotAction back;
                 back.bot_guid = bot.guid;
                 back.type = ActionType::kPetCommand;
-                back.spell_id = kPetStay;
+                back.spell_id = kPetFollow; // not Stay: a pet left standing where the fight ended is left behind when the party walks on
                 actions.push_back(back);
                 state.PetCommanded = false;
             }
@@ -4261,6 +4397,14 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 BotSnapshot const* emergencyHurt = nullptr;
                 // Shield target: a member under kShieldBelowPct that took damage recently (health dropped since last tick).
                 BotSnapshot const* shieldHurt = nullptr;
+                BotSnapshot const* tankMember = nullptr;   // the party leader, who tanks: Renew keeps a heal over time on it, Binding Heal pairs it with the priest
+                std::uint64_t tankPct = 100;
+                std::uint32_t lowCount = 0;                // members under kPrayerBelowPct (Prayer of Healing)
+                auto const ready = [&](std::uint32_t spell)
+                {
+                    auto const at = state.RetryAtMs.find(spell);
+                    return at == state.RetryAtMs.end() || nowMs >= at->second;
+                };
                 auto const consider = [&](BotSnapshot const& member)
                 {
                     if (member.life_state != 0 || member.max_health == 0 || Distance2d(bot, member) > kHealRangeYards)
@@ -4270,6 +4414,13 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                         nowMs < claim->second.UntilMs && claim->second.Group == healGroup)
                         return;
                     std::uint64_t const pct = std::uint64_t(member.health) * 100 / member.max_health;
+                    if (pct < kPrayerBelowPct)
+                        ++lowCount;
+                    if (member.guid == partyLeader)
+                    {
+                        tankMember = &member;
+                        tankPct = pct;
+                    }
                     // Out of a fight the route leader is healed up: it walks on only at kRouteMinHealthPct, and with creatures in view it cannot sit to get there.
                     // Ragefire Chasm, 2026-10-26: leaders stood between 50 and 79% for half an hour, below the 80% to walk and above the healer's 40%.
                     if (member.guid == partyLeader && member.threat_target_guid == 0 && member.in_combat == 0 && bot.in_combat == 0 && routeActiveOf(bot.guid) &&
@@ -4296,7 +4447,8 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     else
                     {
                         // Power Word: Shield is a priest spell; the other healers have no shield to cast.
-                        if (pct < kShieldBelowPct && classId == 5)
+                        // Not on a warrior or a druid: the absorb starves a rage user of rage (the guide).
+                        if (pct < kShieldBelowPct && classId == 5 && ClassFor(_options, member.guid) != kWarriorClass_ && ClassFor(_options, member.guid) != kDruidClass_)
                         {
                             // Shield preemptive: check if this member's health dropped since the last tick (took damage).
                             // The module keeps a short history via state.StallBotHealth etc; here we approximate by checking
@@ -4324,7 +4476,19 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 std::uint32_t spellToCast = 0;
                 BotSnapshot const* target = nullptr;
                 std::string note;
-                if (emergencyHurt)
+                bool const priest = classId == 5;
+                bool const prayer = priest && lowCount >= kPrayerMinLow && bot.level >= kPrayerOfHealingLevel && ready(kPrayerOfHealing);
+                // Renew on the tank: while it fights and the last Renew has run out. The priest sees only its own auras, so the timer is the module's.
+                bool const renewDue = priest && tankMember && tankMember->in_combat != 0 && bot.level >= kRenewLevel && ready(kRenew) &&
+                                      !(state.BuffUntilMs.count({ kRenew, PlayerRef(tankMember->guid) }) && nowMs < state.BuffUntilMs[{ kRenew, PlayerRef(tankMember->guid) }]);
+                if (prayer)
+                {
+                    spellToCast = kPrayerOfHealing; // a party heal around the priest: most of the party is low
+                    target = &bot;
+                    hurtPct = std::uint64_t(bot.health) * 100 / std::max<std::uint32_t>(bot.max_health, 1);
+                    note = "party";
+                }
+                else if (emergencyHurt)
                 {
                     // Flash Heal is a priest spell; the other healers answer an emergency with their own heal.
                     spellToCast = classId == 5 ? kFlashHeal : healSpell;
@@ -4345,6 +4509,13 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     hurtPct = std::uint64_t(shieldHurt->health) * 100 / shieldHurt->max_health;
                     note = "shield";
                 }
+                else if (renewDue)
+                {
+                    spellToCast = kRenew;
+                    target = tankMember;
+                    hurtPct = tankPct;
+                    note = "renew";
+                }
                 else if (hurt)
                 {
                     spellToCast = healSpell;
@@ -4357,6 +4528,13 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     target = leaderTopUp;
                     hurtPct = std::uint64_t(leaderTopUp->health) * 100 / leaderTopUp->max_health;
                     note = "top_up";
+                }
+                // Binding Heal heals the priest and the tank together: when both are hurt and the chosen heal is for the tank.
+                if (priest && target && target != &bot && target == tankMember && spellToCast != kPrayerOfHealing && spellToCast != kRenew && bot.level >= kBindingHealLevel &&
+                    ready(kBindingHeal) && std::uint64_t(bot.health) * 100 / std::max<std::uint32_t>(bot.max_health, 1) < kBindingBelowPct && tankPct < kBindingBelowPct)
+                {
+                    spellToCast = kBindingHeal;
+                    note = note.empty() ? "binding" : note + " binding";
                 }
                 if (target)
                 {
@@ -4388,6 +4566,8 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                             heal.target_guid = target->guid == bot.guid ? 0 : PlayerRef(target->guid);
                             actions.push_back(heal);
                             state.CastTarget[spellToCast] = heal.target_guid;
+                            if (spellToCast == kRenew)
+                                state.BuffUntilMs[{ kRenew, PlayerRef(target->guid) }] = nowMs + kRenewMs;
                             _healClaims[target->guid] = HealClaim{ healGroup, nowMs + kHealClaimMs };
                             if (_options.OnEvent)
                                 _options.OnEvent("heal: healer=" + std::to_string(bot.guid) + " spell=" + std::to_string(spellToCast) +
@@ -4610,15 +4790,34 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 for (auto it = _buffClaims.begin(); it != _buffClaims.end();)
                     it = nowMs >= it->second.UntilMs ? _buffClaims.erase(it) : std::next(it);
             std::uint64_t const buffGroup = bot.group_leader_guid != 0 ? bot.group_leader_guid : bot.guid;
-            for (rotation::Row const& row : RowsFor(classId))
+            rotation::Facts const buffFacts = rotation::FactsFor(bot, nearby, nullptr, 0);
+            for (rotation::Row const& row : RowsFor(classId, spec))
             {
                 if (!row.Buff || (bot.level != 0 && (row.MinLevel > bot.level || (row.MaxLevel != 0 && bot.level > row.MaxLevel))))
+                    continue;
+                // A buff row may carry a condition: a stance only in a party (in_party), a pet summon only with no pet (no_pet).
+                if (row.When.Condition != rotation::Cond::Always && !rotation::Allowed(row.When, buffFacts))
                     continue;
                 auto const retry = state.RetryAtMs.find(row.Spell);
                 if (retry != state.RetryAtMs.end() && nowMs < retry->second)
                     continue;
                 if (!CanPay(_options.SpellCosts.get(), row.Spell, bot))
                     continue; // a warrior has no rage out of combat: Battle Shout waits until it has some, instead of a cast the core refuses
+                // A pet summon (no_pet) is due whenever the snapshot shows no pet: the party claim and the buff timer below would hold it off for the
+                // spell's duration (an hour), long after the demon died. The cast in progress and the global cooldown stop it being sent twice.
+                if (row.When.Condition == rotation::Cond::NoPet)
+                {
+                    BotAction summon;
+                    summon.bot_guid = bot.guid;
+                    summon.type = ActionType::kCastSpell;
+                    summon.spell_id = row.Spell;
+                    summon.target_guid = 0;
+                    actions.push_back(summon);
+                    state.CastTarget[row.Spell] = 0;
+                    state.NextCastMs = nowMs + kGlobalCooldownMs;
+                    cast = true;
+                    break;
+                }
                 // The recipients: the bot itself (reference 0), and for a party buff the members of its group that are alive and close.
                 std::vector<std::uint64_t> recipients{ 0 };
                 if (row.Party)
@@ -4794,7 +4993,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             }
         }
 
-        for (rotation::Row const& row : RowsFor(classId))
+        for (rotation::Row const& row : RowsFor(classId, spec))
         {
             if (row.Buff)
                 continue; // upkeep spells are cast out of combat, below

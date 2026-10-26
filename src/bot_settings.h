@@ -49,9 +49,14 @@ struct ScenarioSettings
 {
     std::string Name;                                    // empty: no scenario
     std::vector<std::array<std::uint32_t, 2>> Roster;    // race, class
+    std::vector<std::string> RosterSpec;                  // the spec of each roster entry (race:class:spec), "" for none; the same size as Roster
     std::uint32_t Level = 18;
     bool HasStaging = false;
     std::array<float, 4> Staging{};                      // map, x, y, z
+    // Where a hunter without a pet goes to tame one before the party forms (ScenarioTameSpot = "0 -10439 929 39": map x y z, a place with tameable beasts near the hunters' level,
+    // such as Westfall); the hunters are taken there after the dressing and back. Without it hunters without a pet stay where they are.
+    bool HasTameSpot = false;
+    std::array<float, 4> TameSpot{};
     bool HasEntry = false;
     std::array<float, 4> Entry{};
     std::uint32_t DurationSec = 1200;
@@ -59,6 +64,13 @@ struct ScenarioSettings
     std::map<std::uint32_t, std::vector<std::uint32_t>> Gear;
     // Food and drink (and anything else) every bot of the scenario is given, after its gear: item entry and count (ScenarioSupplies = "4540:5,1205:5").
     std::vector<std::pair<std::uint32_t, std::uint32_t>> Supplies;
+    // Per class (ScenarioClassSupplies = "9:6265:10": class:item:count, comma separated; ScenarioClassQuests = "9:1504,3:6061": class:quest). The defaults give a
+    // warlock Soul Shards (the Voidwalker and Succubus summons use one each) and send the pet quests of the warlock and the hunter to the core, which completes
+    // them with their reward when the bot may take them (the quest must be in the log, or the core must add it: see doc/rotations.md). ScenarioAmmo is the count
+    // of ammunition a hunter without any is given (0 = none).
+    std::map<std::uint32_t, std::vector<std::pair<std::uint32_t, std::uint32_t>>> ClassSupplies{ { 9, { { 6265, 10 } } } };
+    std::map<std::uint32_t, std::vector<std::uint32_t>> ClassQuests{ { 9, { 1504, 9619, 1474, 1513 } }, { 3, { 6061, 6062, 6063, 6064, 6082, 6083, 6084, 6085 } } };
+    std::uint32_t Ammo = 1000;
     std::vector<std::pair<std::uint32_t, std::string>> Bosses; // creature entry, name
     std::vector<std::pair<std::uint32_t, std::uint32_t>> BossAt; // route point (0-based) and the boss entry standing there (ScenarioBossAt)
     std::string ResultFile = "scenario-results.log";
@@ -126,7 +138,10 @@ struct BotSettings
     // Grind spots (config key GrindFile, see grind_data.h): the places idle bots walk to for their level. Empty turns it off (hubs are used).
     std::string GrindFile;
     // Rotations (config key RotationFile, see combat_rotation.h): fight rows and upkeep buffs per class from a file. Empty = the built-in rotations.
-    std::string RotationFile;
+    // RotationFile and TameBeastFile default to the data folder beside the module's executable (a relative path is looked up there first); an empty value (RotationFile = "") uses the
+    // built-in rows, an empty TameBeastFile switches taming off.
+    std::string RotationFile = "data/rotations.txt";
+    std::string TameBeastFile = "data/tame_beasts.txt";
     // Spell costs (config key SpellCostFile, see spell_costs.h): what each spell costs in mana, rage or energy, so a bot does not try a cast it cannot pay for.
     // Empty = no check (the core refuses the cast instead).
     std::string SpellCostFile;
@@ -248,6 +263,7 @@ struct ScenarioSlot
     std::size_t Party = 0;
     std::uint32_t Race = 0;
     std::uint32_t Class = 0;
+    std::string Spec;      // the roster entry's spec (race:class:spec), "" when it has none
 };
 ScenarioSlot ScenarioSlotOf(std::vector<ScenarioSettings> const& scenarios, std::size_t slot);
 

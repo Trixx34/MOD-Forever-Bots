@@ -38,6 +38,7 @@
 #include <cstdint>
 #include <ctime>
 #include <exception>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -84,6 +85,23 @@ constexpr std::uint32_t kBagSlotsAssumed = 16;      // the snapshot gives free s
 constexpr std::size_t kAuctionItemsPerBot = 200;    // looted items kept per bot for listing
 constexpr std::uint32_t kItemClassWeapon = 2;       // ITEM_CLASS_WEAPON
 constexpr std::uint32_t kItemClassArmor = 4;        // ITEM_CLASS_ARMOR
+// A relative data path (the defaults of RotationFile and TameBeastFile are "data/...") is looked up beside the module's executable first, since the core starts a module
+// from a working directory of its own; a path that exists nowhere else is returned as given, so the load reports it.
+std::string BesideTheModule(std::string const& path)
+{
+    if (path.empty() || path.front() == '/')
+        return path;
+    std::error_code ec;
+    std::filesystem::path const exe = std::filesystem::read_symlink("/proc/self/exe", ec);
+    if (!ec)
+    {
+        std::filesystem::path const candidate = exe.parent_path() / path;
+        if (std::filesystem::exists(candidate, ec))
+            return candidate.string();
+    }
+    return path;
+}
+
 constexpr std::uint32_t kItemClassQuest = 12;       // ITEM_CLASS_QUEST
 
 // Vendor sales (sell_policy.h, doc/economy.md): the white items a bot loots are kept for its next vendor visit, and a bot sells from a vendor in reach.
@@ -162,6 +180,7 @@ struct RunContext
     std::uint64_t BackoffUntilMs = 0;
     bool StopLogged = false;
     bool Halted = false; // a fixed race and class with no valid combination: nothing is spawned
+    pick::SpecTable Specs; // the spec of each scenario bot whose roster entry names one (race:class:spec)
 };
 
 forever_module::SpawnParams ParamsFor(RaceClass const& combo)
@@ -573,7 +592,8 @@ void ScenarioSpawnTick(RunContext& run, std::size_t& spawned)
     }
     ++spawned;
     run.Roster.NoteRequestSent(0);
-    run.Client.RequestControl(0, params, [&run, combo, &spawned](forever_module::ControlResponse const& reply)
+    std::string const spec = slot.Spec;
+    run.Client.RequestControl(0, params, [&run, combo, spec, &spawned](forever_module::ControlResponse const& reply)
     {
         if (!reply.granted())
         {
@@ -589,7 +609,14 @@ void ScenarioSpawnTick(RunContext& run, std::size_t& spawned)
         run.Roster.OnGranted(0, guid);
         run.Classes.Set(guid, combo.Class);
         run.Races.Set(guid, combo.Race);
-        std::cerr << "forever-bots: scenario bot " << guid << " race " << combo.Race << " class " << combo.Class << "\n";
+        if (!spec.empty())
+        {
+            if (rotation::SpecRole(combo.Class, spec) != 0)
+                run.Specs.Set(guid, spec);
+            else
+                std::cerr << "forever-bots: scenario bot " << guid << ": class " << combo.Class << " has no spec '" << spec << "'; it plays the default spec\n";
+        }
+        std::cerr << "forever-bots: scenario bot " << guid << " race " << combo.Race << " class " << combo.Class << (spec.empty() ? "" : " spec " + spec) << "\n";
     });
 }
 
@@ -929,7 +956,7 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
                 // The scenario's progress, in the module's log: each phase as it starts, and every teleport the director sends.
                 if (!phaseLogged[k] || director.Phase() != lastPhases[k])
                 {
-                    static char const* const names[] = { "waiting for the roster", "dressing", "grouping", "entering", "running", "done" };
+                    static char const* const names[] = { "waiting for the roster", "dressing", "taming", "grouping", "entering", "running", "done" };
                     std::cerr << "forever-bots: scenario " << name << ": phase " << names[int(director.Phase())] << " ("
                               << partyView.bots.size() << " bots in view)\n";
                     lastPhases[k] = director.Phase();
@@ -1619,13 +1646,23 @@ int main(int argc, char** argv)
         policyOptions.Quests = std::move(quests);
     }
     policyOptions.QuestTeleport = settings.QuestTeleport;
+    if (!settings.TameBeastFile.empty())
+    {
+        std::vector<std::string> tameWarnings;
+        auto beasts = std::make_shared<tame::TameBeasts>(tame::LoadTameBeasts(BesideTheModule(settings.TameBeastFile), tameWarnings));
+        for (std::string const& warning : tameWarnings)
+            std::cerr << "forever-bots: " << warning << "\n";
+        std::cerr << "forever-bots: tame beasts: " << beasts->ByEntry.size() << " from " << BesideTheModule(settings.TameBeastFile) << "\n";
+        if (!beasts->ByEntry.empty())
+            policyOptions.TameBeasts = std::move(beasts);
+    }
     if (!settings.RotationFile.empty())
     {
         std::vector<std::string> rotationWarnings;
-        auto rotations = std::make_shared<rotation::RotationData>(rotation::LoadRotationData(settings.RotationFile, rotationWarnings));
+        auto rotations = std::make_shared<rotation::RotationData>(rotation::LoadRotationData(BesideTheModule(settings.RotationFile), rotationWarnings));
         for (std::string const& warning : rotationWarnings)
             std::cerr << "forever-bots: " << warning << "\n";
-        std::cerr << "forever-bots: rotations for " << rotations->ByClass.size() << " class(es) from " << settings.RotationFile << "\n";
+        std::cerr << "forever-bots: rotations for " << rotations->ByClass.size() << " class(es) and " << rotations->BySpec.size() << " spec(s) from " << BesideTheModule(settings.RotationFile) << "\n";
         policyOptions.Rotations = std::move(rotations);
     }
     if (!settings.SpellCostFile.empty())
@@ -1658,6 +1695,7 @@ int main(int argc, char** argv)
         return SideOfRace(race);
     };
     policyOptions.ClassOf = [&classes](std::uint64_t botGuid) { return classes.Get(botGuid); };
+    policyOptions.SpecOf = [&run](std::uint64_t botGuid) { return run.Specs.Get(botGuid); };
     policyOptions.AutoGearing = settings.AutoGearing;
     policyOptions.AcceptInvites = settings.ChatCommands;
     policyOptions.IsAlt = [alts](std::uint64_t guid) { return alts->Has(guid); };
@@ -1985,8 +2023,14 @@ int main(int argc, char** argv)
             plan.DurationMs = std::uint64_t(scenario.DurationSec) * 1000;
             plan.Gear = scenario.Gear;
             plan.Supplies = scenario.Supplies;
+            plan.ClassSupplies = scenario.ClassSupplies;
+            plan.ClassQuests = scenario.ClassQuests;
+            plan.AmmoCount = scenario.Ammo;
             plan.Bosses = scenario.Bosses;
             plan.ClassOf = policyOptions.ClassOf;
+            plan.TameEnabled = scenario.HasTameSpot;
+            plan.TameMap = static_cast<std::uint32_t>(scenario.TameSpot[0]);
+            plan.TameSpot = { scenario.TameSpot[1], scenario.TameSpot[2], scenario.TameSpot[3] };
             plan.WipeRecovery = scenario.WipeRecovery;
             plan.WipeRecoveryMs = std::uint64_t(scenario.WipeRecoverySec) * 1000;
             plan.RequireBosses = scenario.RequireBosses;
