@@ -1,5 +1,7 @@
 #include "bot_policy.h"
 
+#include "forever_module/talent_spec.h"
+
 #include "combat_rotation.h"
 
 #include <algorithm>
@@ -2531,12 +2533,15 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             std::uint32_t const role = state.Role_ == BotState::Role::Tank ? 1u : state.Role_ == BotState::Role::Healer ? 2u
                                        : state.Role_ == BotState::Role::Dps ? 3u
                                        : (classId == kWarriorClass && _options.PartySize != 0) ? 1u : HealSpellFor(classId, bot.level) != 0 ? 2u : 3u;
-            if (state.TalentLevel != bot.level || state.TalentRole != role)
+            // The spec (roster field race:class:spec, else the default of the class and role) picks the (class, spec) profile first in the core.
+            std::uint32_t const spec = static_cast<std::uint32_t>(forever_module::TalentSpecFromKey(classId, SpecFor(bot.guid, classId)));
+            if (state.TalentLevel != bot.level || state.TalentRole != role || state.TalentSpec != spec)
             {
                 state.TalentLevel = bot.level;
                 state.TalentRole = role;
+                state.TalentSpec = spec;
                 if (_talentOrders.size() < 256)
-                    _talentOrders.push_back({ bot.guid, role });
+                    _talentOrders.push_back({ bot.guid, role, spec });
             }
         }
 

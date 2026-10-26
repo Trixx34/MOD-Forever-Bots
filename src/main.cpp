@@ -1466,7 +1466,7 @@ int main(int argc, char** argv)
             talents.swap(commands->Talents);
         }
         for (BotPolicy::TalentOrder const& order : talents)
-            client.SpendBotTalents(order.Bot, static_cast<forever_module::ModuleClient::TalentRole>(order.Role), [commands, bot = order.Bot](forever_module::ActionReply const& reply)
+            client.SpendBotTalents(order.Bot, static_cast<forever_module::ModuleClient::TalentRole>(order.Role), static_cast<forever_module::TalentSpec>(order.Spec), [commands, bot = order.Bot](forever_module::ActionReply const& reply)
             {
                 if (!reply.success())
                 {

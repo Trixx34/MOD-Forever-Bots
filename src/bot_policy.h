@@ -300,6 +300,7 @@ public:
     {
         std::uint64_t Bot = 0;
         std::uint32_t Role = 0;
+        std::uint32_t Spec = 0;   // forever_module::TalentSpec of the bot's spec (protocol 18), 0 = none: the core falls back to the role's profile
     };
     std::vector<TalentOrder> TakeTalentOrders();
     void TalentOrderFailed(std::uint64_t bot, std::uint64_t nowMs);
@@ -498,6 +499,7 @@ private:
         std::uint64_t HoldSinceMs = 0;                   // the party leader waits for the party to be ready since this time (0 = not waiting)
         std::uint32_t TalentLevel = 0;                   // the level and role (1 to 3) of the last talent order sent for this bot (0 = none yet)
         std::uint32_t TalentRole = 0;
+        std::uint32_t TalentSpec = 0;     // the spec the last talent order carried (a changed spec orders again)
         std::uint64_t TalentRetryMs = 0;                 // no talent order before this time (after a refusal)
         std::uint32_t GearedAtLevel = 0;                 // the level at the last auto gear (0 = not yet)
         bool GearRequested = false;                      // the .autogear command asked for it
