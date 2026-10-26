@@ -125,16 +125,29 @@ void ScenarioDirector::Decide(forever_module::WorldTickSnapshotView const& view,
     if (_plan.AmmoCount != 0 && _phase != ScenarioPhase::Waiting)
         for (BotSnapshot const& bot : bots)
         {
+            if (bot.ammo_entry != 0)
+                _ammoPeak[bot.guid] = std::max(_ammoPeak[bot.guid], bot.ammo_count);
             if (bot.life_state != 0 || bot.ammo_entry == 0 || bot.ammo_count >= kAmmoLow || _ammoGrants[bot.guid] >= kAmmoGrantsMax)
                 continue;
             std::uint64_t& last = _ammoAtMs[bot.guid];
             if (last != 0 && nowMs - last < kAmmoRetryMs)
                 continue;
+            // A grant that never raised the count (the core refused it) is not sent again and again: after kAmmoUselessMax in a row the bot is left alone. The count is compared
+            // with the highest one seen since the grant, since a hunter shoots what it was given.
+            if (last != 0)
+                _ammoUseless[bot.guid] = _ammoPeak[bot.guid] > _ammoSeen[bot.guid] ? 0 : _ammoUseless[bot.guid] + 1;
+            if (_ammoUseless[bot.guid] >= kAmmoUselessMax)
+            {
+                _ammoGrants[bot.guid] = kAmmoGrantsMax;
+                continue;
+            }
+            _ammoSeen[bot.guid] = bot.ammo_count;
+            _ammoPeak[bot.guid] = bot.ammo_count;
             BotAction grant;
             grant.bot_guid = bot.guid;
             grant.type = ActionType::kGrant;
             grant.spell_id = bot.ammo_entry;
-            grant.dest_x = float(_plan.AmmoCount);
+            grant.dest_x = float(std::min(_plan.AmmoCount, kAmmoStackMax));
             actions.push_back(grant);
             last = nowMs;
             ++_ammoGrants[bot.guid];

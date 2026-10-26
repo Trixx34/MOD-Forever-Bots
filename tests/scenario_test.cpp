@@ -941,7 +941,7 @@ void AHunterWithoutAmmunitionIsGivenSome()
     Reach(director, bots, t, tick, actions);
     int grants = 0;
     for (BotAction const& action : actions)
-        if (action.type == ActionType::kGrant && action.bot_guid == 1 && action.spell_id == 2515 && action.dest_x == 1000.0f)
+        if (action.type == ActionType::kGrant && action.bot_guid == 1 && action.spell_id == 2515 && action.dest_x == 200.0f)
             ++grants;
     CHECK(grants == 1);
     // Not again at once (the snapshot has not shown it yet), again after the retry gap, never once it carries enough.
@@ -970,6 +970,53 @@ void AHunterWithoutAmmunitionIsGivenSome()
     std::uint64_t t3 = 1000, tick3 = 1;
     Reach(melee, plain, t3, tick3, actions);
     CHECK(Count(actions, ActionType::kGrant) == 0);
+}
+
+void AnAmmunitionGrantIsOneStackAtMostAndStopsWhenItDoesNothing()
+{
+    // The core refuses a grant above the item's stack size (200 for arrows and shot): 0.33.0 asked for 1000 and 164 grants were refused.
+    ScenarioPlan plan = Plan();
+    plan.ClassOf = HunterWarlockOrPriest;
+    plan.AmmoCount = 1000;
+    ScenarioDirector director(plan);
+    std::vector<BotAction> actions;
+    std::uint64_t t = 1000, tick = 1;
+    std::vector<BotSnapshot> bots = { Bot(1, 0, 0, 0), Bot(2, 0, 0, 0), Bot(3, 0, 0, 0) };
+    bots[0].ammo_entry = 2516;
+    bots[0].ammo_count = 0;
+    Reach(director, bots, t, tick, actions);
+    bool stack = false;
+    for (BotAction const& action : actions)
+        stack = stack || (action.type == ActionType::kGrant && action.bot_guid == 1 && action.spell_id == 2516 && action.dest_x == 200.0f);
+    CHECK(stack);
+    // Refused every time (the count never rises): three grants, then the bot is left alone.
+    int grants = 1;
+    for (int i = 0; i < 12; ++i)
+    {
+        actions.clear();
+        director.Decide(View(++tick, bots), t += kAmmoRetryMs, actions);
+        grants += Count(actions, ActionType::kGrant, 1);
+    }
+    CHECK(grants >= 3 && grants <= 4);
+    // A grant that works keeps the hunter supplied: the count rises, so the next low count is topped up again.
+    ScenarioDirector working(plan);
+    std::vector<BotSnapshot> good = { Bot(1, 0, 0, 0), Bot(2, 0, 0, 0), Bot(3, 0, 0, 0) };
+    good[0].ammo_entry = 2516;
+    std::uint64_t t2 = 1000, tick2 = 1;
+    Reach(working, good, t2, tick2, actions);
+    int given = Count(actions, ActionType::kGrant, 1);
+    for (int i = 0; i < 6; ++i)
+    {
+        good[0].ammo_count = 200;                       // the grant landed
+        actions.clear();
+        working.Decide(View(++tick2, good), t2 += kAmmoRetryMs, actions);
+        given += Count(actions, ActionType::kGrant, 1);
+        good[0].ammo_count = 20;                        // and the hunter shot most of it
+        actions.clear();
+        working.Decide(View(++tick2, good), t2 += kAmmoRetryMs, actions);
+        given += Count(actions, ActionType::kGrant, 1);
+    }
+    CHECK(given >= 6);
 }
 
 void ClassSuppliesAndClassQuestsAreSentOnceEach()
@@ -1148,7 +1195,7 @@ void SettingsReadRosterSpecsClassSuppliesAndTheTameSpot()
     BotSettings const second = ParseBotSettings(broken, brokenWarnings);
     CHECK(second.Scenario.Roster.size() == 1 && brokenWarnings.size() == 1);
     CHECK(second.Scenario.ClassSupplies.count(9) == 1 && second.Scenario.ClassSupplies.at(9)[0].first == 6265);
-    CHECK(second.Scenario.ClassQuests.count(9) == 1 && second.Scenario.ClassQuests.count(3) == 1 && second.Scenario.Ammo == 1000);
+    CHECK(second.Scenario.ClassQuests.empty() && second.Scenario.Ammo == 200);   // class quests are opt-in: the core refuses them until it adds the quest first
     CHECK(second.RotationFile == "data/rotations.txt");
     std::unordered_map<std::string, std::string> off = { { "RotationFile", "" } };
     std::vector<std::string> offWarnings;
@@ -1162,6 +1209,7 @@ void SettingsReadRosterSpecsClassSuppliesAndTheTameSpot()
 int main()
 {
     AHunterWithoutAmmunitionIsGivenSome();
+    AnAmmunitionGrantIsOneStackAtMostAndStopsWhenItDoesNothing();
     ClassSuppliesAndClassQuestsAreSentOnceEach();
     HuntersWithoutAPetAreTakenToTameOneAndBack();
     TheTamingPhaseGivesUpAtTheTimeout();

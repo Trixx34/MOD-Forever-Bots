@@ -67,18 +67,19 @@ Power Word: Shield on the tank before the pull (the tank is a warrior in these r
   learned (refused: "not known") is left for a minute and the next row is tried: Succubus (level 20), Voidwalker (level 10), Imp. The affliction and destruction blocks have no Succubus (the Voidwalker holds threat). Voidwalker and Succubus use a
   Soul Shard each: the scenario gives a warlock 10 (`ScenarioClassSupplies`, default `9:6265:10`). The pet is sent at the fight's target and told to follow after it (since 0.33.0; before, it was told to stay).
 - **Hunter.** A hunter of level 10 or more with no pet that is not in a party walks to the nearest beast of `data/tame_beasts.txt` its level allows (the pet takes the beast's level, so the closest level wins; then a neutral beast over a hostile one;
-  then cat, wolf, boar, bear), casts Tame Beast (1515) on it within 18 yards, and stands still for the 20 s channel; the core creates the pet when it ends. It needs Call Pet (883) known: without it the core refuses the cast, the hunter tries
+  then cat, wolf, boar, bear), casts Tame Beast (1515) on it within 18 yards, and stands still for the 20 s channel; the core creates the pet when it ends. While a beast is in view and the hunter has no pet, the hunter does not pull anything else (0.34.1: in Westfall the hostile Fleshrippers
+  were pulled first and the hunters fought and never cast), and a mob that bites during the channel does not end it unless the hunter drops under half its health. It needs Call Pet (883) known: without it the core refuses the cast, the hunter tries
   four times and then waits ten minutes. Call Pet and Revive Pet after that are the policy's earlier pet logic (`pet_state` from the snapshot). `TameBeastFile` names the list (default `data/tame_beasts.txt` beside the executable; empty = no taming).
 - **In a scenario** the hunters stand in a city, so the scenario has a Taming phase (after the dressing, before the grouping): with `ScenarioTameSpot.<dungeon> = "map x y z"` the hunters without a pet are teleported there, tame, and are
-  teleported back; the phase ends when all have a pet or after 240 s (a hunter that failed stays in the party without one). Westfall (`0 -10439.4 929.2 38.9`, level 14 to 15 Goretusks, Fleshrippers and Coyotes) is near the Deadmines.
+  teleported back; the phase ends when all have a pet or after 300 s (a hunter that failed stays in the party without one). Westfall (`0 -10439.4 929.2 38.9`, level 14 to 15 Goretusks, Fleshrippers and Coyotes) is near the Deadmines.
 - **Class quests.** Pets also come from class quests (the guide), and the core completes a quest with its reward on core quest operation 4. That operation needs the quest in the bot's log, and a bot in a scenario has accepted nothing, so
-  `ScenarioClassQuests` (default: the warlock's pet quests 1504, 9619, 1474, 1513 and the hunter's Taming the Beast quests 6061 to 6064 and 6082 to 6085) sends operation 4 in the dressing and the core refuses it ("quest is not in the log") until
+  `ScenarioClassQuests` (off by default since 0.34.1: the refusals filled the log and paused the bots' quest planning; the warlock's pet quests are 1504, 9619, 1474, 1513 and the hunter's Taming the Beast quests 6061 to 6064 and 6082 to 6085) sends operation 4 in the dressing and the core refuses it ("quest is not in the log") until
   operation 4 adds the quest first. On the sim the trainer rows now teach the warlock demons, so the quests are only a second way.
 
 ## The scenario's helpers
 
-- **Ammunition.** A hunter whose snapshot says `ammo_entry != 0` and `ammo_count < 100` is given `ScenarioAmmo` pieces (default 1000) of the ammunition the core recommends for its weapon, in every phase from the dressing on
-  (`kGrant`, at most every 5 s, 40 times a run). Without ammunition the policy leaves every ranged row out (the core would refuse it), so the 2026-10-26 hunters only swung in melee and logged no cast at all.
+- **Ammunition.** A hunter whose snapshot says `ammo_entry != 0` and `ammo_count < 100` is given `ScenarioAmmo` pieces (default 200, at most one stack: the core refuses a larger count, which refused every grant of 1000 in the first 0.33.0 run) of the ammunition the core recommends for its weapon, in every phase from the dressing on
+  (`kGrant`, at most every 5 s and 40 times a run; three grants in a row that never raised the count stop it). Without ammunition the policy leaves every ranged row out (the core would refuse it), so the 2026-10-26 hunters only swung in melee and logged no cast at all.
 - **Class supplies and quests**: `ScenarioClassSupplies = "9:6265:10"` (class:item:count) and `ScenarioClassQuests = "9:1504,3:6061"` (class:quest).
 
 ## Making the file

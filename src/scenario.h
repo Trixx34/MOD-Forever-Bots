@@ -43,8 +43,9 @@ struct ScenarioPlan
     std::map<std::uint32_t, std::vector<std::pair<std::uint32_t, std::uint32_t>>> ClassSupplies;
     std::map<std::uint32_t, std::vector<std::uint32_t>> ClassQuests;
     // A hunter whose ranged weapon takes ammunition and who carries none is given this many of the ammunition the snapshot names (ammo_entry), in every phase
-    // from the dressing on, and again when the count falls below kAmmoLow (an hour of Auto Shot is about 1800 shots). 0 = no ammunition is granted.
-    std::uint32_t AmmoCount = 1000;
+    // from the dressing on, and again when the count falls below kAmmoLow (an hour of Auto Shot is about 1800 shots: 40 grants of a stack are 8000). 0 = no ammunition is granted.
+    // A grant is one stack at most, kAmmoStackMax (200): the core refuses a larger count.
+    std::uint32_t AmmoCount = 200;
     std::vector<std::pair<std::uint32_t, std::string>> Bosses; // creature entry and name of each boss; one seen dead counts as killed
     std::function<std::uint32_t(std::uint64_t)> ClassOf;      // bot guid -> class id
     // Dead-bot recovery. With WipeRecovery on, an all-down state starts a timer of WipeRecoveryMs: if a bot is alive again before it ends,
@@ -98,7 +99,7 @@ struct ScenarioResult
 
 constexpr std::uint64_t kDressPauseMs = 1500;
 constexpr std::uint64_t kEquipPauseMs = 3000;
-constexpr std::uint64_t kTameTimeoutMs = 240000;    // the Taming phase gives the hunters this long to get a pet
+constexpr std::uint64_t kTameTimeoutMs = 300000;    // the Taming phase gives the hunters this long to get a pet
 constexpr std::uint64_t kTameRetryMs = 6000;        // a teleport that was refused (in combat) is sent again after this
 constexpr std::uint64_t kTameBackMs = 20000;        // the hunters are given this long to be back before the grouping starts anyway
 constexpr float kTameArrivedYards = 150.0f;         // a hunter this close to the spot has arrived
@@ -107,6 +108,8 @@ constexpr std::uint32_t kTameMinLevel = 10;         // the hunter pet quest is g
 constexpr std::uint32_t kAmmoLow = 100;             // below this many pieces of its ammunition a hunter is given more
 constexpr std::uint64_t kAmmoRetryMs = 5000;        // a bot is given ammunition at most this often (the snapshot needs a moment to show it)
 constexpr std::uint32_t kAmmoGrantsMax = 40;        // per bot and run
+constexpr std::uint32_t kAmmoStackMax = 200;        // a grant is at most one stack (the core refuses a count above the item's stack size: 200 for arrows and shot)
+constexpr std::uint32_t kAmmoUselessMax = 3;        // grants in a row after which the count did not grow: the bot is left alone (the core refuses for another reason)
 constexpr std::uint64_t kGroupingTimeoutMs = 120000;
 constexpr std::uint64_t kMembersDelayMs = 3000;
 constexpr std::uint64_t kEnterRetryMs = 10000;
@@ -159,6 +162,9 @@ private:
     std::map<std::uint64_t, std::size_t> _nextClassQuest;  // bot -> index of the next class quest to send
     std::map<std::uint64_t, std::uint64_t> _ammoAtMs;      // bot -> when it was last given ammunition
     std::map<std::uint64_t, std::uint32_t> _ammoGrants;    // bot -> how often
+    std::map<std::uint64_t, std::uint32_t> _ammoSeen;      // bot -> its ammunition count when it was last given some
+    std::map<std::uint64_t, std::uint32_t> _ammoPeak;      // bot -> the highest count it showed since then
+    std::map<std::uint64_t, std::uint32_t> _ammoUseless;   // bot -> grants in a row that did not raise its count
     struct Home { std::uint32_t Map = 0; float X = 0, Y = 0, Z = 0; };
     std::map<std::uint64_t, Home> _tameHome;               // hunter -> where it stood when the Taming phase began
     std::map<std::uint64_t, std::uint64_t> _tameSentAtMs;  // hunter -> when it was last sent to the spot or back

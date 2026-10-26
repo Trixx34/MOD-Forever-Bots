@@ -65,12 +65,11 @@ struct ScenarioSettings
     // Food and drink (and anything else) every bot of the scenario is given, after its gear: item entry and count (ScenarioSupplies = "4540:5,1205:5").
     std::vector<std::pair<std::uint32_t, std::uint32_t>> Supplies;
     // Per class (ScenarioClassSupplies = "9:6265:10": class:item:count, comma separated; ScenarioClassQuests = "9:1504,3:6061": class:quest). The defaults give a
-    // warlock Soul Shards (the Voidwalker and Succubus summons use one each) and send the pet quests of the warlock and the hunter to the core, which completes
-    // them with their reward when the bot may take them (the quest must be in the log, or the core must add it: see doc/rotations.md). ScenarioAmmo is the count
-    // of ammunition a hunter without any is given (0 = none).
+    // warlock Soul Shards (the Voidwalker and Succubus summons use one each). ScenarioClassQuests (off by default: the core refuses a quest that is not in the log, and the
+    // refusals paused the bots' quest planning) sends core quest operation 4. ScenarioAmmo is the count of ammunition a hunter without any is given per grant (0 = none; at most 200, a stack).
     std::map<std::uint32_t, std::vector<std::pair<std::uint32_t, std::uint32_t>>> ClassSupplies{ { 9, { { 6265, 10 } } } };
-    std::map<std::uint32_t, std::vector<std::uint32_t>> ClassQuests{ { 9, { 1504, 9619, 1474, 1513 } }, { 3, { 6061, 6062, 6063, 6064, 6082, 6083, 6084, 6085 } } };
-    std::uint32_t Ammo = 1000;
+    std::map<std::uint32_t, std::vector<std::uint32_t>> ClassQuests;
+    std::uint32_t Ammo = 200;
     std::vector<std::pair<std::uint32_t, std::string>> Bosses; // creature entry, name
     std::vector<std::pair<std::uint32_t, std::uint32_t>> BossAt; // route point (0-based) and the boss entry standing there (ScenarioBossAt)
     std::string ResultFile = "scenario-results.log";

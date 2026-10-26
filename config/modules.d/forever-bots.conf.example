@@ -160,9 +160,9 @@ Module.forever-bots.TelemetrySummarySec = 60
 # ScenarioLevel.dm = 18
 # ScenarioStaging.dm = 0 -8913 554 94
 # ScenarioTameSpot.dm = 0 -10439.4 929.2 38.9   # map x y z: hunters without a pet are taken here to tame one (Westfall), and back, before the party forms
-# ScenarioAmmo = 1000                           # ammunition given to a hunter that has none (0 = none)
+# ScenarioAmmo = 200                            # ammunition given to a hunter that has none, per grant, one stack at most (0 = none)
 # ScenarioClassSupplies = 9:6265:10             # class:item:count after the gear (default: a warlock gets 10 Soul Shards)
-# ScenarioClassQuests = 9:1504,3:6061           # class:quest completed with its reward in the dressing (core quest operation 4; the core must add the quest first)
+# ScenarioClassQuests = 9:1504,3:6061           # off by default: class:quest completed with its reward in the dressing (core quest operation 4; the core refuses a quest not in the log)
 # ScenarioLevel.rfc = 17
 # Offline policy lab: each candidate applies to all ScenarioParties in that run. Defaults preserve current behavior;
 # bounded parameter ranges are validated by the module. See tools/dungeon_learning/README.md.

@@ -2781,13 +2781,18 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 }
             }
         }
+        // A hunter with no pet that has a beast to tame in view does not pull whatever else is standing there (Westfall's hostile Fleshrippers made the 2026-10-26 hunters fight and get hurt
+        // before they ever cast Tame Beast); it tames, and defends itself only when something attacks it. The hold of a cast in progress counts as well.
+        bool const tameNow = classId == kHunterClass && _options.TameBeasts && !_options.TameBeasts->ByEntry.empty() && bot.life_state == 0 && bot.group_role == 0 &&
+                             (bot.level == 0 || bot.level >= kTameMinLevel) && bot.in_combat == 0 && PetOf(bot) == PetKnown::kNone &&
+                             (state.TameUntilMs != 0 || (nowMs >= state.TameRetryAtMs && tame::PickTameTarget(bot, nearby, *_options.TameBeasts, kTameSearchYards) != nullptr));
         if (targetRef != 0)
         {
             for (NearbyUnit const& unit : nearby)
                 if (unit.guid == targetRef)
                     targetUnit = &unit;
         }
-        else if (NearbyUnit const* hostile = (dungeonHold || noSelfPull) ? nullptr
+        else if (NearbyUnit const* hostile = (dungeonHold || noSelfPull || tameNow) ? nullptr
                      : PullTarget(bot, nearby, avoided, bot.in_combat != 0, huntEntries, routeOn))
         {
             targetUnit = hostile;
@@ -2803,6 +2808,9 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             if (state.TameUntilMs != 0)
             {
                 // Holding: the channel runs. A pet means it worked; combat, a refusal, or the hold running out means it did not.
+                // Combat does not end the hold while the channel runs: a mob that attacks does not stop a channel, and walking away from the beast would. It ends when the bot is hurt (under half
+                // its health) or no longer casting.
+                bool const hurtInCombat = bot.in_combat != 0 && (!IsCasting(bot) || std::uint64_t(bot.health) * 2 < bot.max_health);
                 auto const refused = state.RetryAtMs.find(kTameBeast);
                 bool const refusedNow = refused != state.RetryAtMs.end() && refused->second > state.TameCastAtMs && nowMs >= state.TameCastAtMs + 2 * kGlobalCooldownMs;
                 if (PetOf(bot) == PetKnown::kOut)
@@ -2812,7 +2820,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     if (_options.OnEvent)
                         _options.OnEvent("tame_done: bot=" + std::to_string(bot.guid) + " target=" + std::to_string(state.TameTarget));
                 }
-                else if (bot.in_combat != 0 || refusedNow || nowMs >= state.TameUntilMs)
+                else if (hurtInCombat || refusedNow || nowMs >= state.TameUntilMs)
                 {
                     state.TameUntilMs = 0;
                     ++state.TameFailures;
@@ -2821,7 +2829,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                         state.TameFailures = 0;
                     if (_options.OnEvent)
                         _options.OnEvent("tame_failed: bot=" + std::to_string(bot.guid) + " target=" + std::to_string(state.TameTarget) +
-                                         (bot.in_combat != 0 ? " why=combat" : refusedNow ? " why=refused" : " why=no_pet"));
+                                         (hurtInCombat ? " why=combat" : refusedNow ? " why=refused" : " why=no_pet"));
                 }
                 else
                     continue; // still channelling: stand still, send nothing

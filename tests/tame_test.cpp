@@ -185,6 +185,42 @@ void ARefusedCastEndsTheHoldAtOnce()
     CHECK(!Has(policy.Decide(View(bot, { beast }, 3), 9000), ActionType::kCastSpell, 1515));   // not hammering a refused spell
 }
 
+void AHunterTamesInsteadOfPullingAHostileMobStandingNearby()
+{
+    // Westfall: aggressive Fleshrippers around the Goretusks. The hunter's own pull logic used to take the mob first and the hunter fought (0.33.0, 2026-10-26).
+    PolicyOptions options;
+    options.ClassId = 3;
+    options.AggressiveStart = true;
+    options.TameBeasts = Beasts();
+    BotPolicy policy(options);
+    NearbyUnit mob = Beast(4242, 9, 12.0f, 14, true);        // a hostile creature that is not on the list
+    NearbyUnit const beast = Beast(157, 5, 10.0f, 15);
+    auto const actions = policy.Decide(View(Hunter(20), { mob, beast }, 1), 1000);
+    CHECK(Has(actions, ActionType::kCastSpell, 1515, beast.guid));
+    CHECK(!Has(actions, ActionType::kAttackTarget, 0, mob.guid) && !Has(actions, ActionType::kFollow, 0, mob.guid));
+    // With nothing to tame in view the hunter pulls as before (a city, or a place without beasts).
+    BotPolicy plain(options);
+    auto const pulls = plain.Decide(View(Hunter(20), { mob }, 1), 1000);
+    CHECK(Has(pulls, ActionType::kAttackTarget, 0, mob.guid) || Has(pulls, ActionType::kFollow, 0, mob.guid) || Has(pulls, ActionType::kCastSpell));
+}
+
+void ACombatDuringTheChannelDoesNotEndTheHoldUntilTheHunterIsHurt()
+{
+    BotPolicy policy = HunterPolicy();
+    NearbyUnit const beast = Beast(157, 5, 10.0f, 15);
+    BotSnapshot bot = Hunter(20);
+    CHECK(Has(policy.Decide(View(bot, { beast }, 1), 1000), ActionType::kCastSpell, 1515));
+    bot.casting_spell = 1515;
+    bot.in_combat = 1;                                     // a Fleshripper bites; the channel runs on
+    CHECK(policy.Decide(View(bot, { beast }, 2), 6000).empty());
+    bot.health = 400;                                      // under half: the hold ends and the hunter looks after itself
+    auto const hurt = policy.Decide(View(bot, { beast }, 3), 9000);
+    CHECK(!Has(hurt, ActionType::kCastSpell, 1515));
+    bot.health = 1000;
+    bot.casting_spell = 0;                                 // not casting any more, still in combat: the hold ended
+    CHECK(!Has(policy.Decide(View(bot, { beast }, 4), 12000), ActionType::kCastSpell, 1515));
+}
+
 void NoTamingInAPartyBelowLevel10WithAPetOrInCombat()
 {
     NearbyUnit const beast = Beast(157, 5, 10.0f, 15);
@@ -234,6 +270,8 @@ int main()
     AHunterWalksToTheBeastCastsAndHoldsStill();
     ANoPetAfterTheChannelIsAFailureWithARetryPause();
     ARefusedCastEndsTheHoldAtOnce();
+    AHunterTamesInsteadOfPullingAHostileMobStandingNearby();
+    ACombatDuringTheChannelDoesNotEndTheHoldUntilTheHunterIsHurt();
     NoTamingInAPartyBelowLevel10WithAPetOrInCombat();
     if (failures == 0)
         std::printf("tame_test: all checks passed\n");
