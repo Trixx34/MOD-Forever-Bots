@@ -36,11 +36,16 @@ buff "Devotion Aura" duration 3600 self
 buff "Blessing of Might" duration 300 party
 
 class 3
+row "Bestial Wrath" target_strong 2 self             # Forever: burst cooldown (Beast Mastery only; refused and skipped for other specs)
 row "Hunter's Mark" duration 120 always target range 0 35
 row "Serpent Sting" duration 15 always target range 0 35
 row "Black Arrow" duration 30 always target range 0 35   # Forever: 30 s damage over time
 row "Chimera Shot" always target range 0 35         # Forever: instant, 6 s cooldown
+row "Mongoose Bite" always target range 0 5          # Survival only (needs a dodge/Expose Prey proc; refused and skipped otherwise)
+row "Counterattack" always target range 0 5          # Survival only (needs a parry; refused and skipped otherwise)
+row "Strider Kick" always target range 0 5           # Forever: Survival melee, 3 s movement speed boost (not an interrupt)
 row "Multi-Shot" enemies 2 target range 0 35
+row "Aimed Shot" always target range 0 35
 row "Arcane Shot" always target range 0 35
 row "Raptor Strike" always target range 0 5
 row "Auto Shot" always target range 0 35
@@ -68,15 +73,19 @@ buff "Divine Spirit" duration 1800 party
 
 class 7
 row "Earth Shock" target_casting target range 0 20
+row "Stormstrike" always target range 0 5            # Forever: Enhancement melee, learned at 40; refused and skipped by other specs until then
 row "Healing Wave" self_hp_below 40 self
 row "Searing Totem" duration 55 always self
 row "Flame Shock" duration 12 always target range 0 20
+row "Fire Nova" enemies 2 self                       # Forever: self-targeted pulse, like Thunder Clap
 row "Lava Burst" always target range 0 30          # Forever: 10 s cooldown
 row "Lightning Bolt" always target range 0 30
 buff "Lightning Shield" duration 600 self
 buff "Water Shield" duration 600 self               # Forever
 supersede "Lightning Shield" by "Water Shield"
 buff "Rockbiter Weapon" duration 300 self
+# Windfury Weapon is not added: it and Rockbiter Weapon are both self buffs with no "pick one" mechanism in this DSL,
+# and adding both would have the bot alternate between the two enchants every time either expires.
 
 class 8
 row "Counterspell" target_casting target range 0 30
@@ -97,10 +106,17 @@ supersede "Ice Armor" by "Mage Armor"
 class 9
 row "Life Tap" self_power_below 25 self
 row "Corruption" duration 18 always target range 0 30
-row "Curse of Agony" duration 24 always target range 0 30
+row "Bane of Agony" duration 24 always target range 0 30     # Forever renamed the classic curse DoTs to "Bane of ..." (confirmed in the ability dump)
 row "Immolate" duration 15 always target range 0 30
+row "Siphon Life" duration 30 always target range 0 30      # Forever: Affliction life-drain dot; refused and skipped by other specs
+row "Conflagrate" always target range 0 30                  # Destruction only (needs Immolate up); refused and skipped otherwise
+row "Shadowburn" target_hp_below 20 target range 0 30       # Destruction execute; refused and skipped otherwise
+row "Searing Pain" always target range 0 30                 # Demonology filler; refused and skipped otherwise
+row "Incinerate" always target range 0 30                    # Destruction filler, needs 30 Destruction points; refused below that
 row "Wrack" duration 6 always target range 0 30      # Forever: instant damage over time
 row "Chaos Bolt" always target range 0 30           # Forever: 12 s cooldown
+row "Drain Life" always target range 0 30
+row "Drain Soul" always target range 0 30
 row "Shadow Bolt" always target range 0 30
 buff "Demon Skin" duration 1800 self
 buff "Demon Armor" duration 1800 self
