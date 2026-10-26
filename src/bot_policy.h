@@ -445,6 +445,7 @@ private:
         std::uint32_t RouteNoRoute = 0;                  // moves in a row to the current dungeon waypoint that the core found no route for
         Point RouteStallAt{};                            // where the leader stood when its walk along the route was last seen to move
         std::uint64_t RouteStallSinceMs = 0;             // since when it has stood there while walking (0 = not walking)
+        std::uint64_t RouteManaSinceMs = 0;              // since when a mana user of the party has been below kRouteMinManaPct (0 = none)
         std::uint64_t RouteHoldLoggedMs = 0;             // when the leader last logged why it does not walk on (route_hold)
         std::uint64_t TaxiBlockedUntilMs = 0;            // the core refused a flight: walk until this
         std::uint64_t TaxiWaitUntilMs = 0;               // a flight was ordered: give it time to show

@@ -3040,7 +3040,7 @@ void ACorpseIsRevivedByTheQuietLeaderAfterAFewSeconds()
     CHECK(!HasAction(fighting.Decide(busy(), 9500), 13, ActionType::kRevive));
 }
 
-// A dungeon party's dead wait much longer for the healer (90 s, not 20 s): releasing early left the tank standing at the graveyard outside, killed again and again.
+// A dungeon party's dead wait much longer for the healer (60 s, not 20 s): releasing early left the tank standing at the graveyard outside, killed again and again.
 void ADungeonCorpseWaitsLongerForARezzer()
 {
     BotPolicy policy(DeadOptions(nullptr));
@@ -3048,8 +3048,8 @@ void ADungeonCorpseWaitsLongerForARezzer()
     auto const build = [] { WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 }); Corpse(v.bots[3], 10.0f); return v; };
     CHECK(!HasAction(policy.Decide(build(), 1000), 13, ActionType::kReleaseSpirit));
     CHECK(!HasAction(policy.Decide(build(), 21500), 13, ActionType::kReleaseSpirit));
-    CHECK(!HasAction(policy.Decide(build(), 80000), 13, ActionType::kReleaseSpirit));
-    CHECK(HasAction(policy.Decide(build(), 92000), 13, ActionType::kReleaseSpirit));
+    CHECK(!HasAction(policy.Decide(build(), 50000), 13, ActionType::kReleaseSpirit));
+    CHECK(HasAction(policy.Decide(build(), 65000), 13, ActionType::kReleaseSpirit));
 }
 
 // A ghost whose run takes too long is put at its corpse once, and the run starts over; it does not stay a ghost for good.
@@ -4239,6 +4239,48 @@ void TheRouteLeaderIsHealedUpOutOfAFight()
     CHECK(!CastsSpell(healthy.Decide(view, 0), 10, 2050, PlayerOf(12)));
 }
 
+// The route leader waits while a mana user of the party is dry (the healer walked into fights at 3% mana), and goes on after kRouteManaMaxMs.
+void TheRouteWaitsForTheHealersMana()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.PartyCount = 1;
+    options.ClassOf = WarriorLeads;
+    options.Route = { Point{ 100.0f, 0.0f, 0.0f } };
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 }, WarriorLeads);
+    for (BotSnapshot& bot : view.bots)
+    {
+        bot.group_role = bot.guid == 12 ? 2 : 1;
+        bot.group_leader_guid = (std::uint64_t(2) << 56) | 12;
+    }
+    for (BotSnapshot& bot : view.bots)
+        if (bot.guid == 10)
+        {
+            bot.power_type = 0;
+            bot.max_power = 1000;
+            bot.power = 50; // the healer at 5%
+        }
+    auto const walks = [](std::vector<BotAction> const& actions, std::uint64_t guid)
+    {
+        for (BotAction const& action : actions)
+            if (action.bot_guid == guid && action.type == ActionType::kMoveTo && action.dest_x == 100.0f) // the route point
+                return true;
+        return false;
+    };
+    CHECK(!walks(policy.Decide(view, 1000), 12));
+    CHECK(!walks(policy.Decide(view, 61000), 12));
+    CHECK(walks(policy.Decide(view, 160000), 12)); // given up after 150 s
+    // Mana full: the leader walks at once.
+    BotPolicy full(options);
+    full.SetRouteActive(true);
+    for (BotSnapshot& bot : view.bots)
+        if (bot.guid == 10)
+            bot.power = 1000;
+    CHECK(walks(full.Decide(view, 0), 12));
+}
+
 // Two druids of one party with one party buff: each member gets it once, however many druids know it.
 void TwoDruidsDoNotBothCastThePartyBuff()
 {
@@ -5173,6 +5215,7 @@ int main()
     TwoHealersDoNotHealTheSameMember();
     TankIsHealedBeforeTheLowestMember();
     TheRouteLeaderIsHealedUpOutOfAFight();
+    TheRouteWaitsForTheHealersMana();
     TwoDruidsDoNotBothCastThePartyBuff();
     AFailingBuffBacksOffLongerEachTime();
     HubTimeoutTriesTheNextHubSoonerThanAnArrival();

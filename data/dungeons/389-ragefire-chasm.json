@@ -66,6 +66,9 @@
     { "x": -401.3, "y": 185.1, "z": 6.4 },
     { "x": -384.9, "y": 146.0, "z": 7.8, "boss": 11519 }  // boss: Bazzalan
   ],
+  // Kill order when the party fights a pack (focus tactic): the Searing Blade Warlock first (it summons the Voidwalker Minion that killed 341 bots in the 2026-10-26 runs),
+  // then the Cultist (a caster), then the Enforcer (melee, the tank holds it).
+  "kill_priority": [11324, 11322, 11323],
   // The bosses, in the order the route meets them. "strategy" holds the tactics for each boss: pull, tank_position, interrupt, dispel, avoid, avoid_spells, kill_order,
   // notes. Fields the bots act on today are listed in doc/dungeon-strategy.md ("what bots do today"); the others are kept but not used yet.
   "bosses": [

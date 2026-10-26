@@ -93,7 +93,7 @@ Each tick the policy (`src/bot_policy.cpp`) reads the bot's snapshot and sends a
   points by its profile for the (class, role), when `Bot.Talents.Profiles` names a profile file; otherwise, or for a class with no profile,
   its greedy allocator. A refusal (in combat) is asked again after 5 s. Points already spent are not taken back, so a role change affects
   only new points (no respec yet). Protocol 17.
-- **Death and corpse run.** A dead bot waits for a resurrect while a healer of its party is up (20 s, 90 s in a dungeon), then releases and walks
+- **Death and corpse run.** A dead bot waits for a resurrect while a healer of its party is up (20 s, 60 s in a dungeon since 0.31.0; 90 s before), then releases and walks
   back to its corpse (through the instance door when the corpse is inside) and reclaims it. A run longer than `CorpseRunTeleportSec` (60 s) puts the ghost
   at its corpse; a run still not done four minutes after that is given up.
   A ghost still outside a dungeon is never stood up there. Since 0.22.0.

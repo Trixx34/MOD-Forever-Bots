@@ -165,6 +165,8 @@ constexpr float kRoutePointReachYards = 6.0f;    // the leader has arrived at a 
 constexpr float kFocusPackYards = 12.0f;         // a unit this close to the tank's target is of the same pack: the damage dealers may take it first
 constexpr float kRouteWaitYards = 30.0f;         // the leader waits for a member farther behind than this
 constexpr std::uint32_t kRouteMinHealthPct = 80; // and for its own health to be at least this
+constexpr std::uint32_t kRouteMinManaPct = 80;   // the leader walks on only when every mana user of the party has at least this much mana (the healer walked into fights at 3%)
+constexpr std::uint64_t kRouteManaMaxMs = 150000; // and never waits longer than this for mana (no drink left, or a member that cannot sit)
 constexpr std::uint32_t kRouteTopUpPct = 90;     // out of a fight, the party's healer heals the route leader up to this (above kRouteMinHealthPct, so it walks on)
 // A leader walking the route that has not moved this far in this long, out of combat, has a move that went nowhere (sent once, no answer; dm#6 of 2026-10-26 stood
 // 53 minutes so): the move is sent again and counted as a refusal (kRouteNoRouteSkip), so the point is recovered or skipped as for a "no route".
@@ -244,8 +246,8 @@ constexpr std::uint32_t kLesserHeal = 2050;      // rank 1, upranked
 constexpr std::uint32_t kPowerWordShield = 17;   // rank 1, upranked (30 s duration, self or ally)
 // A dungeon party's dead wait longer for a resurrect than a leveling party's: the healer needs the fight to end, to get within range, and a 10 s cast. A bot that releases too early
 // stands at the graveyard outside the instance (one tank was killed there seven times in a row by a wandering scout, with every re-entry refused for being in combat).
-constexpr std::uint64_t kDungeonReleaseDelayMs = 90000;
-constexpr std::uint64_t kDungeonReleaseCombatHoldMs = 180000;
+constexpr std::uint64_t kDungeonReleaseDelayMs = 60000;
+constexpr std::uint64_t kDungeonReleaseCombatHoldMs = 120000;
 constexpr float kRezRangeYards = 30.0f;              // a rezzer resurrects a corpse within this range
 constexpr std::uint32_t kRezManaPct = 35;            // and starts the 10 s cast with at least this much mana
 constexpr std::uint64_t kRezCastMs = 11000;          // after a resurrect cast started, the same target is left alone this long
@@ -3048,6 +3050,24 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 together = together && deadWaitKind == 0;
                 bool const strong = bot.max_health == 0 ||
                                     std::uint64_t(bot.health) * 100 >= std::uint64_t(bot.max_health) * kRouteMinHealthPct;
+                // Mana: a party whose healer (or any caster) is dry walks into the next pack and loses it. The members sit and drink while the leader waits, at most kRouteManaMaxMs.
+                bool manaLowInParty = false;
+                {
+                    auto const dry = [](BotSnapshot const& member)
+                    {
+                        return member.life_state == 0 && member.power_type == 0 && member.max_power > 0 &&
+                               std::uint64_t(member.power) * 100 < std::uint64_t(member.max_power) * kRouteMinManaPct;
+                    };
+                    manaLowInParty = dry(bot);
+                    for (std::uint64_t member : membersOf[bot.guid])
+                        if (auto const at = indexOf.find(member); at != indexOf.end())
+                            manaLowInParty = manaLowInParty || dry(view.bots[at->second]);
+                    if (!manaLowInParty || bot.in_combat != 0)
+                        state.RouteManaSinceMs = 0;
+                    else if (state.RouteManaSinceMs == 0)
+                        state.RouteManaSinceMs = nowMs;
+                }
+                bool const manaReady = !manaLowInParty || nowMs - state.RouteManaSinceMs >= kRouteManaMaxMs;
                 // A waypoint the core finds no route to (a spawn on a ledge or off the navmesh, a generated point inside a wall) would hold the whole run for
                 // good: after kRouteNoRouteSkip refusals in a row the leader gives that point up and goes on to the next one.
                 // A boss point is never skipped: the boss stands between the party and the rest of the dungeon (a locked door opens when it dies, or it guards
@@ -3215,7 +3235,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                         }
                     }
                 }
-                if (waypoint && together && strong)
+                if (waypoint && together && strong && manaReady)
                 {
                     wanted = Decision{ ActionType::kMoveTo, 0, *waypoint };
                     moveWhy = "*waypoint";
@@ -3271,7 +3291,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                                     farthestYards = yards;
                                     farthest = member;
                                 }
-                        char const* why = !strong ? "health" : deadWaitKind != 0 ? "dead_member" : farthestYards > kRouteWaitYards ? "member_far" : "player_far";
+                        char const* why = !strong ? "health" : !manaReady ? "mana" : deadWaitKind != 0 ? "dead_member" : farthestYards > kRouteWaitYards ? "member_far" : "player_far";
                         _options.OnEvent(std::string("route_hold: bot=") + std::to_string(bot.guid) + " point=" + std::to_string(state.RouteIndex) + "/" +
                                          std::to_string(routePoints->size()) + " why=" + why + " hp_pct=" +
                                          std::to_string(bot.max_health ? std::uint64_t(bot.health) * 100 / bot.max_health : 100) + " farthest=" + std::to_string(farthest) +

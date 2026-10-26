@@ -90,8 +90,8 @@
     { "x": -87.4, "y": -819.9, "z": 39.3, "boss": 639 }  // boss: Edwin VanCleef
   ],
   // Kill order when the party fights a pack (used with the focus tactic, Module.forever-bots.DungeonTactics): creature entries, first = killed first
-  // (Defias Evoker, Wizard, Squallshaper, Goblin Craftsman, Engineer, Overseer). Off by default until a sim run shows it helps.
-  "kill_priority": [1729, 4418, 1731, 1732, 622, 634],
+  // (Goblin Engineer first: the Remote-Controlled Golem it summons despawns when it dies; then Defias Evoker, Wizard, Goblin Craftsman, Squallshaper, Overseer). Off by default until a sim run shows it helps.
+  "kill_priority": [622, 1729, 4418, 1731, 1732, 634],
   // The bosses, in the order the route meets them. "strategy" holds the tactics for each boss: pull, tank_position, interrupt, dispel, avoid, avoid_spells, kill_order,
   // notes. Fields the bots act on today are listed in doc/dungeon-strategy.md ("what bots do today"); the others are kept but not used yet.
   "bosses": [
