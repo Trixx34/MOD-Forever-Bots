@@ -2873,6 +2873,23 @@ void MembersDoNotPullInADungeon()
     CHECK(!CastsSpell(actions, 10, 585));
 }
 
+// The party pulls a dungeon pack of three at most. A pack of four 20 yards off is left alone; a pack of three is pulled.
+void ADungeonPackOfFourIsNotPulled()
+{
+    WorldTickSnapshotView four = DungeonView({ 10, 11, 12, 13, 14 });
+    AddNearby(four, 2, Unit(8, 7, 20.0f, true));
+    AddNearby(four, 2, Unit(8, 8, 21.0f, true));
+    AddNearby(four, 2, Unit(8, 9, 22.0f, true));
+    AddNearby(four, 2, Unit(8, 10, 22.5f, true));
+    CHECK(!HasAction(DungeonPolicy().Decide(four, 0), 12, ActionType::kFollow, MakeUnitRef(8, 1, 7)));
+
+    WorldTickSnapshotView three = DungeonView({ 10, 11, 12, 13, 14 });
+    AddNearby(three, 2, Unit(8, 7, 20.0f, true));
+    AddNearby(three, 2, Unit(8, 8, 21.0f, true));
+    AddNearby(three, 2, Unit(8, 9, 22.0f, true));
+    CHECK(HasAction(DungeonPolicy().Decide(three, 0), 12, ActionType::kFollow, MakeUnitRef(8, 1, 7)));
+}
+
 // Members defend themselves: bot 10 is a rogue here, since the healer holds its range instead (HealerDoesNotMelee).
 std::uint32_t RogueTenLeadsTheRest(std::uint64_t guid)
 {
@@ -5041,6 +5058,7 @@ int main()
     LeaderDoesNotPullWhileAMemberIsHurt();
     LeaderPullsWhenThePartyIsReady();
     LeaderPullsAfterWaitingTooLong();
+    ADungeonPackOfFourIsNotPulled();
     MembersDoNotPullInADungeon();
     MembersAttackedInADungeonDefendThemselves();
     MembersWaitForTheTankToHoldTheTarget();
