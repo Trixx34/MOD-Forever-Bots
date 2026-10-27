@@ -194,6 +194,13 @@ constexpr float kFocusPackYards = 12.0f;         // a unit this close to the tan
 // Voidwalker is really a fourth, passive pack member that just joins the melee late. The same cap-exemption this comment describes is why that
 // dungeon file now lists 8996 in kill_priority too: once the Voidwalker attacks, it must stay reachable past the cap the same way the Warlock does.
 constexpr std::size_t kMaxDungeonEngaged = 2;
+// The cc tactic: Sap (rogue), Polymorph (mage) and Banish (warlock) hold one extra member of the tank's pack. Rank 1 ids; none of
+// the three has a second rank on this server (data/spell_costs.txt). kCcRefreshBeforeMs: the hold is recast once this close to
+// running out, not only once it has already dropped, so a short gap in the snapshot tick does not let a held unit go free.
+constexpr std::uint32_t kSapSpell = 6770;
+constexpr std::uint32_t kPolymorphSpell = 118;
+constexpr std::uint32_t kBanishSpell = 710;
+constexpr std::uint64_t kCcRefreshBeforeMs = 3000;
 constexpr float kRouteWaitYards = 30.0f;         // the leader waits for a member farther behind than this
 constexpr std::uint32_t kRouteMinHealthPct = 80; // and for its own health to be at least this
 constexpr std::uint32_t kRouteMinManaPct = 80;   // the leader walks on only when every mana user of the party has at least this much mana (the healer walked into fights at 3%)
@@ -380,6 +387,91 @@ bool IsInterruptSpell(std::uint32_t spell)
     return spell == 853 || spell == 1766 || spell == 8042; // Hammer of Justice, Kick, Earth Shock
 }
 
+// The creature type the cc tactic needs (world database's creature_template.type) to pick a spell that can affect a pack member.
+// The snapshot has no such field (forever_module::NearbyUnit, tier2_layout.h): the core does not report a unit's creature type at
+// all, so this is a small built-in table of the entries the two shipped dungeon files can put in a tank's pack (data/dungeons/36-
+// the-deadmines.json and 389-ragefire-chasm.json, kill_priority and bosses; verified against creature_template on 2026-10-27, the
+// Forever test world database). An entry not listed here is of unknown type to the policy, so a type-restricted cc spell is never
+// tried on it: a wider table for a dungeon added later belongs here, the same way a new dungeon's kill_priority needs its own list.
+enum class CreatureType : std::uint8_t { kUnknown = 0, kHumanoid, kDemon, kElemental, kMechanical };
+
+CreatureType CreatureTypeOf(std::uint32_t entry)
+{
+    switch (entry)
+    {
+        // Deadmines (36): the Defias Brotherhood and its goblins, all Humanoid.
+        case 622:    // Goblin Engineer
+        case 634:    // Defias Overseer
+        case 639:    // Edwin VanCleef
+        case 644:    // Rhahk'Zor
+        case 645:    // Cookie
+        case 646:    // Mr. Smite
+        case 647:    // Captain Greenskin
+        case 1729:   // Defias Evoker
+        case 1731:   // Goblin Craftsman
+        case 1732:   // Defias Squallshaper
+        case 1763:   // Gilnid
+        case 4418:   // Defias Wizard
+        // Ragefire Chasm (389): orcs, trolls and goblins of the Searing Blade camp and the bosses, all Humanoid.
+        case 11322:  // Searing Blade Cultist
+        case 11323:  // Searing Blade Enforcer
+        case 11324:  // Searing Blade Warlock
+        case 11517:  // Oggleflint
+        case 11518:  // Jergosh the Invoker
+        case 11519:  // Bazzalan
+        case 11520:  // Taragaman the Hungerer
+            return CreatureType::kHumanoid;
+        case 642:    // Sneed's Shredder: Mechanical (and a boss: never a cc target anyway, see the elite check below)
+        case 2520:   // Remote-Controlled Golem: Mechanical
+            return CreatureType::kMechanical;
+        default:
+            return CreatureType::kUnknown;
+    }
+}
+
+// The cc spell a class has at all, whatever the target: 0 for a class with none. Sap (rogue), Polymorph (mage), Banish (warlock);
+// no other class has a single-target hold in this module's scope today (a priest's Shackle Undead, a hunter's Freezing Trap and a
+// druid's Entangling Roots are not: this change is scoped to the three the task names).
+std::uint32_t CcSpellForClass(std::uint32_t classId)
+{
+    switch (classId)
+    {
+        case 4: return kSapSpell;        // rogue
+        case 8: return kPolymorphSpell;  // mage
+        case 9: return kBanishSpell;     // warlock
+        default: return 0;
+    }
+}
+
+// The level the Forever trainers teach a cc spell at (trainer_spell, verified 2026-10-27 against the test world database; the same
+// levels as this file's SpellCostFile dump, data/spell_costs.txt). Sap and Polymorph are both well below either shipped dungeon's
+// spawn level (Deadmines 23, Ragefire Chasm 18); Banish is not reached by either (it needs 28) -- kept here regardless, since cc is a
+// general, dungeon-wide feature and a later, higher-level dungeon with a Demon or Elemental pack can use it once its roster is.
+std::uint32_t CcLearnLevel(std::uint32_t spell)
+{
+    switch (spell)
+    {
+        case kSapSpell: return 10;
+        case kPolymorphSpell: return 8;
+        case kBanishSpell: return 28;
+        default: return 0;
+    }
+}
+
+// Whether a cc spell can affect this creature type at all (classic's type restrictions: Sap and Polymorph are Humanoid only,
+// Banish is Demon or Elemental only). kUnknown never matches: the policy does not try a type-restricted spell on a creature it
+// cannot place (see CreatureTypeOf above).
+bool CcAffects(std::uint32_t spell, CreatureType type)
+{
+    switch (spell)
+    {
+        case kSapSpell:
+        case kPolymorphSpell: return type == CreatureType::kHumanoid;
+        case kBanishSpell: return type == CreatureType::kDemon || type == CreatureType::kElemental;
+        default: return false;
+    }
+}
+
 // Layout 13: whether the bot carries this aura right now. The aura list replaces the module's own buff timers, so a buff
 // another player cast over the bot, or one it lost to a death, is the fact it is. An aura with no duration reports a large
 // remaining_ms and runs for ever; a reported aura with 0 left is one that just expired.
@@ -420,6 +512,11 @@ std::uint64_t DotDurationMs(std::uint32_t spell)
         case 8921: return 12000; // Moonfire
         case 21084: return 30000; // Seal of Righteousness (self)
         case 17: return 30000;    // Power Word: Shield (self)
+        // The cc tactic's holds (SpellDuration.db2 of this server's own client data, read 2026-10-27): the same record keeps the
+        // policy from recasting a hold that is still running, same as a dot.
+        case kSapSpell: return 25000;        // Sap
+        case kPolymorphSpell: return 20000;  // Polymorph
+        case kBanishSpell: return 20000;     // Banish
         default: return 0;
     }
 }
@@ -2884,6 +2981,84 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                             _options.OnEvent(std::string(interruptNow && best->casting != 0 ? "interrupt_target: bot=" : engineerUnderGolemPressure ? "golem_engineer: bot=" : "focus: bot=") + std::to_string(bot.guid) + " entry=" + std::to_string(forever_module::UnitRefEntry(best->guid)) + " instead_of=" +
                                              std::to_string(forever_module::UnitRefEntry(assist->guid)) + (best->casting != 0 ? " casting" : ""));
                         }
+                    }
+                }
+            }
+        }
+        // Cc tactic: a rogue, mage or warlock with a cc spell for its level (CcSpellForClass, CcLearnLevel) holds one extra member of
+        // the tank's pack -- a unit nobody has engaged yet (partyEngagedTargets, the same set focus and interrupt use), not casting
+        // (interrupt's to pick, not held mid-cast for nothing) and not the dungeon's own kill priority (never hold what the party
+        // means to kill first), of a creature type the spell affects (CcAffects, CreatureTypeOf). One bot, one unit at a time, the
+        // same rule interrupt uses for a cast: a party member already holding one (another bot's Dots entry for a cc spell, still
+        // running) means this bot does not start a second. Once a unit is held the bot keeps its own normal target and rotation
+        // (below); only the GCD that sends the hold, and later its refresh a little before it would run out (kCcRefreshBeforeMs), is
+        // spent on it. A pack with no match for any cc-capable class present (no learned spell, or no pack member of a type it
+        // affects) does nothing, same as a fight with nothing to interrupt.
+        if (_options.TacticCc && routeOn && partyMember && leaderSnap && leaderSnap->threat_target_guid != 0 && nowMs >= state.NextCastMs && !IsCasting(bot))
+        {
+            std::uint32_t const ccSpell = CcSpellForClass(classId);
+            std::uint32_t const ccLearn = ccSpell != 0 ? CcLearnLevel(ccSpell) : 0;
+            if (ccSpell != 0 && (bot.level == 0 || bot.level >= ccLearn) && CanPay(_options.SpellCosts.get(), ccSpell, bot))
+            {
+                auto const retry = state.RetryAtMs.find(ccSpell);
+                if (retry == state.RetryAtMs.end() || nowMs >= retry->second)
+                {
+                    auto const mine = state.Dots.find(ccSpell);
+                    NearbyUnit const* held = mine != state.Dots.end() ? FindLiveMob(nearby, mine->second.Target) : nullptr;
+                    bool const dueForRefresh = held != nullptr && nowMs + kCcRefreshBeforeMs >= mine->second.UntilMs;
+                    NearbyUnit const* candidate = (held != nullptr && dueForRefresh) ? held : nullptr;
+                    if (held == nullptr)
+                    {
+                        // Someone else of this party already holds a unit: only one of the pack is held at a time.
+                        bool otherHolder = false;
+                        forParty(partyLeader, [&](BotSnapshot const& member)
+                        {
+                            if (otherHolder || member.guid == bot.guid)
+                                return;
+                            auto const known = _bots.find(member.guid);
+                            if (known == _bots.end())
+                                return;
+                            for (std::uint32_t const otherSpell : { kSapSpell, kPolymorphSpell, kBanishSpell })
+                            {
+                                auto const theirs = known->second.Dots.find(otherSpell);
+                                if (theirs != known->second.Dots.end() && nowMs < theirs->second.UntilMs)
+                                    otherHolder = true;
+                            }
+                        });
+                        if (!otherHolder)
+                        {
+                            NearbyUnit const* tankTarget = FindLiveMob(nearby, leaderSnap->threat_target_guid);
+                            if (tankTarget != nullptr)
+                            {
+                                std::set<std::uint64_t> const engaged = partyEngagedTargets(partyLeader);
+                                for (NearbyUnit const& unit : nearby)
+                                    if (unit.is_hostile && unit.health != 0 && IsLiveMob(unit) && !avoided(unit.guid) && unit.elite == 0 &&
+                                        unit.casting == 0 && // a casting unit is interrupt's to pick, not held mid-cast for nothing
+                                        engaged.count(unit.guid) == 0 &&
+                                        scenario.KillPriority.find(forever_module::UnitRefEntry(unit.guid)) == scenario.KillPriority.end() &&
+                                        CcAffects(ccSpell, CreatureTypeOf(forever_module::UnitRefEntry(unit.guid))) &&
+                                        std::hypot(unit.pos_x - tankTarget->pos_x, unit.pos_y - tankTarget->pos_y) <= kFocusPackYards)
+                                    {
+                                        candidate = &unit;
+                                        break;
+                                    }
+                            }
+                        }
+                    }
+                    if (candidate != nullptr)
+                    {
+                        BotAction cc;
+                        cc.bot_guid = bot.guid;
+                        cc.type = ActionType::kCastSpell;
+                        cc.spell_id = ccSpell;
+                        cc.target_guid = candidate->guid;
+                        actions.push_back(cc);
+                        state.CastTarget[ccSpell] = candidate->guid;
+                        state.NextCastMs = nowMs + kGlobalCooldownMs;
+                        if (_options.OnEvent && mine == state.Dots.end())
+                            _options.OnEvent("cc_target: bot=" + std::to_string(bot.guid) + " spell=" + std::to_string(ccSpell) + " entry=" +
+                                             std::to_string(forever_module::UnitRefEntry(candidate->guid)));
+                        continue;
                     }
                 }
             }

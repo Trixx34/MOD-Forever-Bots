@@ -1566,6 +1566,7 @@ int main(int argc, char** argv)
     policyOptions.TacticHeal = settings.TacticHeal;
     policyOptions.TacticRest = settings.TacticRest;
     policyOptions.TacticRecover = settings.TacticRecover;
+    policyOptions.TacticCc = settings.TacticCc;
     policyOptions.DungeonHealBelowPct = settings.DungeonHealBelowPct;
     policyOptions.DungeonTankHealBelowPct = settings.DungeonTankHealBelowPct;
     policyOptions.HealerDpsManaPct = settings.HealerDpsManaPct;

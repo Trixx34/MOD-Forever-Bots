@@ -1624,6 +1624,118 @@ void TheVoidwalkerCompanionStaysReachablePastTheEngagementCapToo()
     CHECK(!onUnlistedAdd);  // an unrelated unlisted hostile in the same spot is still not pulled in: only the dungeon's own list is exempt
 }
 
+// Cc: a mage (Polymorph, spell 118) holds one extra, unengaged Humanoid member of the tank's pack -- not the tank's own target,
+// which is already engaged.
+void CcHoldsAnUnengagedHumanoidPackMember()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.PartyCount = 1;
+    options.ClassOf = [](std::uint64_t guid) { return guid == 12 ? 1u : guid == 11 ? 8u : 5u; };
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    NearbyUnit tankTarget = Hostile(7, 2.0f, 100);
+    tankTarget.guid = MakeUnitRef(8, 598, 7);   // the tank's own target, already engaged: never a cc candidate
+    NearbyUnit evoker = Hostile(8, 8.0f, 100);
+    evoker.guid = MakeUnitRef(8, 1729, 8);      // a Defias Evoker of the same pack: Humanoid, Polymorph can hold it
+    view.bots[2].in_combat = 1;
+    view.bots[2].threat_target_guid = tankTarget.guid;
+    AddNearby(view, 1, tankTarget);
+    AddNearby(view, 1, evoker);
+    bool onEvoker = false, onTankTarget = false;
+    for (std::uint64_t at = 0; at < 6000; at += 500)
+        for (BotAction const& action : policy.Decide(view, at))
+            if (action.bot_guid == 11 && action.type == ActionType::kCastSpell && action.spell_id == 118)
+            {
+                onEvoker = onEvoker || action.target_guid == evoker.guid;
+                onTankTarget = onTankTarget || action.target_guid == tankTarget.guid;
+            }
+    CHECK(onEvoker);
+    CHECK(!onTankTarget);
+}
+
+// Cc: a creature type with no spell to hold it (Mechanical: the Remote-Controlled Golem, 2520) is never tried -- the policy does
+// nothing instead of risking a cast the server would refuse (and recast every tick for ever).
+void CcDoesNotHoldACreatureTypeItHasNoSpellFor()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.PartyCount = 1;
+    options.ClassOf = [](std::uint64_t guid) { return guid == 12 ? 1u : guid == 11 ? 8u : 5u; };
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    NearbyUnit tankTarget = Hostile(7, 2.0f, 100);
+    tankTarget.guid = MakeUnitRef(8, 622, 7);  // Goblin Engineer, Humanoid: the tank's own target, already engaged
+    NearbyUnit golem = Hostile(8, 8.0f, 100);
+    golem.guid = MakeUnitRef(8, 2520, 8);      // Remote-Controlled Golem: Mechanical, Polymorph cannot hold it
+    view.bots[2].in_combat = 1;
+    view.bots[2].threat_target_guid = tankTarget.guid;
+    AddNearby(view, 1, tankTarget);
+    AddNearby(view, 1, golem);
+    bool anyCc = false;
+    for (std::uint64_t at = 0; at < 6000; at += 500)
+        for (BotAction const& action : policy.Decide(view, at))
+            if (action.bot_guid == 11 && action.type == ActionType::kCastSpell && action.spell_id == 118)
+                anyCc = true;
+    CHECK(!anyCc);
+}
+
+// Cc: the dungeon's own kill_priority unit is never held -- the point of cc is one fewer attacker, not a delay on the one the
+// party means to kill first.
+void CcNeverHoldsTheKillPriorityTarget()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.PartyCount = 1;
+    options.ClassOf = [](std::uint64_t guid) { return guid == 12 ? 1u : guid == 11 ? 8u : 5u; };
+    options.KillPriority = { { 1729, 0 } }; // the Defias Evoker is the one to kill first, not to hold
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    NearbyUnit tankTarget = Hostile(7, 2.0f, 100);
+    tankTarget.guid = MakeUnitRef(8, 598, 7);
+    NearbyUnit evoker = Hostile(8, 8.0f, 100);
+    evoker.guid = MakeUnitRef(8, 1729, 8); // Humanoid, and otherwise eligible, but it is the kill_priority unit
+    view.bots[2].in_combat = 1;
+    view.bots[2].threat_target_guid = tankTarget.guid;
+    AddNearby(view, 1, tankTarget);
+    AddNearby(view, 1, evoker);
+    bool onEvoker = false;
+    for (std::uint64_t at = 0; at < 6000; at += 500)
+        for (BotAction const& action : policy.Decide(view, at))
+            if (action.bot_guid == 11 && action.type == ActionType::kCastSpell && action.spell_id == 118 && action.target_guid == evoker.guid)
+                onEvoker = true;
+    CHECK(!onEvoker);
+}
+
+// Cc: with the tactic off (the default when DungeonTactics does not list cc) no hold is attempted, whatever the pack holds.
+void CcTacticOffMeansNoHold()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.PartyCount = 1;
+    options.ClassOf = [](std::uint64_t guid) { return guid == 12 ? 1u : guid == 11 ? 8u : 5u; };
+    options.TacticCc = false;
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    NearbyUnit tankTarget = Hostile(7, 2.0f, 100);
+    tankTarget.guid = MakeUnitRef(8, 598, 7);
+    NearbyUnit evoker = Hostile(8, 8.0f, 100);
+    evoker.guid = MakeUnitRef(8, 1729, 8);
+    view.bots[2].in_combat = 1;
+    view.bots[2].threat_target_guid = tankTarget.guid;
+    AddNearby(view, 1, tankTarget);
+    AddNearby(view, 1, evoker);
+    bool anyCc = false;
+    for (std::uint64_t at = 0; at < 6000; at += 500)
+        for (BotAction const& action : policy.Decide(view, at))
+            if (action.bot_guid == 11 && action.type == ActionType::kCastSpell && action.spell_id == 118)
+                anyCc = true;
+    CHECK(!anyCc);
+}
 
 void NoPartyActionsInCombat()
 {
@@ -5392,6 +5504,10 @@ int main()
     ACasterOfThePackIsTargetedForAnInterrupt();
     ADamageDealerDoesNotWidenPastTwoAlreadyEngagedHostiles();
     TheVoidwalkerCompanionStaysReachablePastTheEngagementCapToo();
+    CcHoldsAnUnengagedHumanoidPackMember();
+    CcDoesNotHoldACreatureTypeItHasNoSpellFor();
+    CcNeverHoldsTheKillPriorityTarget();
+    CcTacticOffMeansNoHold();
     NoPartyActionsInCombat();
     SealIsNotRecastWhileUp();
     EviscerateAtFivePoints();
