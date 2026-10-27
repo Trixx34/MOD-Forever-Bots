@@ -2851,15 +2851,15 @@ void AMemberThatLostItsLeaderIsPutNextToIt()
     view.bots[0].pos_x = -200.0f;                                     // bot 10 is far away
     CHECK(!TeleportOf(policy.Decide(view, 1000), 10).has_value());    // not at once
     CHECK(!TeleportOf(policy.Decide(view, 10000), 10).has_value());
-    std::optional<BotAction> back = TeleportOf(policy.Decide(view, 22000), 10);
+    std::optional<BotAction> back = TeleportOf(policy.Decide(view, 32000), 10);      // after kLostLeaderMs (30 s)
     CHECK(back.has_value() && back->dest_x == -3.0f);                 // next to the leader (3 yards behind it)
-    CHECK(!TeleportOf(policy.Decide(view, 23000), 10).has_value());   // and not again at once
+    CHECK(!TeleportOf(policy.Decide(view, 33000), 10).has_value());   // and not again at once
     // A member stuck past the distance the leader waits at (30 yards), but not far, is put back too: the leader would wait for it for good.
     BotPolicy near(options);
     near.SetRouteActive(true);
     view.bots[0].pos_x = -45.0f;
     near.Decide(view, 1000);
-    std::optional<BotAction> close = TeleportOf(near.Decide(view, 22000), 10);
+    std::optional<BotAction> close = TeleportOf(near.Decide(view, 32000), 10);
     CHECK(close.has_value() && close->dest_x == -3.0f);
     // Off, nothing happens.
     PolicyOptions off = options;
@@ -2981,6 +2981,79 @@ void ARegroupStopsWaitingForAStuckMember()
     for (std::string const& line : events)
         done = done || (line.rfind("regroup_done: leader=12 ", 0) == 0 && line.find(" stuck=1") != std::string::npos);
     CHECK(done);
+}
+
+// Regroup (0.36.2): a member that trails the leader at the edge of the wait distance does not flip the stuck flag. It is logged once per regroup, stays stuck
+// until it is back inside kRegroupClearYards, and the leader keeps walking.
+void AStuckMemberAtTheBoundaryIsLoggedOnce()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.ClassOf = WarriorLeads;
+    options.Route = { Point{ 100.0f, 0.0f, 0.0f }, Point{ 140.0f, 0.0f, 0.0f } };
+    std::vector<std::string> events;
+    options.OnEvent = [&events](std::string const& line) { events.push_back(line); };
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    for (BotSnapshot& bot : view.bots)
+        bot.pos_x = 0.0f;
+    auto const count = [&events](std::string const& prefix)
+    {
+        int found = 0;
+        for (std::string const& line : events)
+            found += line.rfind(prefix, 0) == 0;
+        return found;
+    };
+    // Bot 10 is 31 yards behind until it is stuck (22 s), then steps in and out of range (29 and 31 yards) every second for a minute.
+    bool walked = false;                                              // the walk order is sent when it changes, so look for it over the minute
+    for (std::uint64_t now = 1000; now <= 60000; now += 1000)
+    {
+        view.bots[0].pos_x = (now > 22000 && (now / 1000) % 2 == 0) ? -29.0f : -31.0f;
+        walked = LeaderWalk(policy.Decide(view, now)) == 100.0f || walked;
+    }
+    CHECK(count("regroup_stuck: leader=12 bot=10 ") == 1);            // one line, not one per step in and out of range
+    CHECK(walked);                                                    // the leader walked on once it was stuck
+    // Back to 25 yards: inside the wait distance, but not inside the clearing distance, so it is still stuck and the regroup goes on.
+    view.bots[0].pos_x = -25.0f;
+    policy.Decide(view, 61000);
+    CHECK(count("regroup_stuck: leader=12 bot=10 ") == 1);
+    view.bots[0].pos_x = -31.0f;
+    policy.Decide(view, 90000);
+    policy.Decide(view, 120000);
+    CHECK(count("regroup_stuck: leader=12 bot=10 ") == 1);            // the same regroup: not logged again
+    CHECK(count("regroup_done:") == 0);
+}
+
+// Regroup (0.36.2): member_recover waits longer than the stuck flag, so the leader has walked on before the member is put next to it.
+void MemberRecoverDoesNotFireWithTheStuckEvent()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.ClassOf = WarriorLeads;
+    options.DungeonTeleport = true;
+    options.Route = { Point{ 100.0f, 0.0f, 0.0f }, Point{ 140.0f, 0.0f, 0.0f } };
+    std::uint64_t now = 0;
+    std::uint64_t stuckAt = 0;
+    std::uint64_t recoverAt = 0;
+    options.OnEvent = [&](std::string const& line)
+    {
+        if (line.rfind("regroup_stuck:", 0) == 0 && stuckAt == 0)
+            stuckAt = now;
+        if (line.rfind("member_recover: bot=10", 0) == 0 && recoverAt == 0)
+            recoverAt = now;
+    };
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    for (BotSnapshot& bot : view.bots)
+        bot.pos_x = 0.0f;
+    view.bots[0].pos_x = -31.0f;                                      // bot 10 trails at the edge
+    for (now = 1000; now <= 60000 && recoverAt == 0; now += 500)
+        policy.Decide(view, now);
+    CHECK(stuckAt != 0 && recoverAt != 0);
+    CHECK(recoverAt > stuckAt);                                       // never in the same tick
+    CHECK(recoverAt - stuckAt >= 5000);                               // the party has had time to move on
 }
 
 // The default stance is defensive: a bot does not pull what is in range on its own, and it fights what attacks it.
@@ -3311,16 +3384,83 @@ void ACorpseIsRevivedByTheQuietLeaderAfterAFewSeconds()
     CHECK(!HasAction(fighting.Decide(busy(), 9500), 13, ActionType::kRevive));
 }
 
-// A dungeon party's dead wait much longer for the healer (60 s, not 20 s): releasing early left the tank standing at the graveyard outside, killed again and again.
-void ADungeonCorpseWaitsLongerForARezzer()
+// A dungeon party's dead wait for a rezzer no longer than a leveling party's: 20 s (0.36.2; the 60 s of 0.34 left ghosts for whole fights, 44-87 s in the sim's Ragefire Chasm).
+void ADungeonCorpseWaitsTwentySecondsForARezzer()
 {
     BotPolicy policy(DeadOptions(nullptr));
     policy.SetRouteActive(true);
     auto const build = [] { WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 }); Corpse(v.bots[3], 10.0f); return v; };
     CHECK(!HasAction(policy.Decide(build(), 1000), 13, ActionType::kReleaseSpirit));
-    CHECK(!HasAction(policy.Decide(build(), 21500), 13, ActionType::kReleaseSpirit));
-    CHECK(!HasAction(policy.Decide(build(), 50000), 13, ActionType::kReleaseSpirit));
-    CHECK(HasAction(policy.Decide(build(), 65000), 13, ActionType::kReleaseSpirit));
+    CHECK(!HasAction(policy.Decide(build(), 15000), 13, ActionType::kReleaseSpirit));
+    CHECK(HasAction(policy.Decide(build(), 21500), 13, ActionType::kReleaseSpirit));
+}
+
+// No rezzer in the party (all warriors): the corpse is released at once, a fight in the party or not, and well inside the 20 s.
+void ADungeonCorpseWithoutARezzerIsReleasedWithinTwentySeconds()
+{
+    std::vector<std::string> events;
+    BotPolicy policy(DeadOptions(&events, AllWarriors));
+    policy.SetRouteActive(true);
+    auto const build = [] { WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 }); Corpse(v.bots[3], 10.0f); return v; };
+    CHECK(HasAction(policy.Decide(build(), 1000), 13, ActionType::kReleaseSpirit));
+    CHECK(LoggedWith(events, "reason=release_no_rezzer"));
+    CHECK(LoggedWith(events, "waited_ms=0"));
+}
+
+// A fight elsewhere in the party does not hold a release (the core refuses it only for a corpse in combat): the regroup loop started from ghosts held 44-87 s.
+void AFightInThePartyDoesNotHoldADungeonRelease()
+{
+    std::vector<std::string> events;
+    BotPolicy policy(DeadOptions(&events, AllWarriors));
+    policy.SetRouteActive(true);
+    auto const build = [](bool ownCombat)
+    {
+        WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 });
+        Corpse(v.bots[3], 10.0f);
+        v.bots[1].in_combat = 1;
+        v.bots[3].in_combat = ownCombat ? 1 : 0;
+        return v;
+    };
+    CHECK(HasAction(policy.Decide(build(false), 1000), 13, ActionType::kReleaseSpirit));
+    CHECK(!Logged(events, "release_held:"));
+    BotPolicy own(DeadOptions(&events, AllWarriors));                                   // a corpse in combat itself is still held, as the core wants
+    own.SetRouteActive(true);
+    CHECK(!HasAction(own.Decide(build(true), 1000), 13, ActionType::kReleaseSpirit));
+    CHECK(Logged(events, "release_held:"));
+}
+
+// After the release, a ghost of a dungeon party that is out of combat is teleported to its leader (the tank), not left at the graveyard or sent to its corpse.
+bool LoggedTeleportToLeader(std::vector<BotAction> const& actions)
+{
+    std::optional<BotAction> const teleport = TeleportOf(actions, 13);
+    return teleport.has_value() && teleport->spell_id == 36 && teleport->dest_x != 50.0f; // 50 is the corpse and the entrance, not a leader
+}
+
+void AReleasedDungeonGhostIsTeleportedToTheLeader()
+{
+    std::vector<std::string> events;
+    BotPolicy policy(DeadOptions(&events, AllWarriors));
+    policy.SetRouteActive(true);
+    WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 });
+    for (BotSnapshot& bot : v.bots)
+        bot.map_id = 36;
+    Ghost(v.bots[3], 0.0f, 36, 50.0f);
+    v.bots[3].map_id = 0;                                                               // the ghost is outside, at the graveyard
+    std::optional<BotAction> const teleport = TeleportOf(policy.Decide(v, 1000), 13);
+    CHECK(teleport.has_value());
+    if (teleport)
+    {
+        bool atALeader = false;                                                         // the destination is a living member's spot, on the instance map
+        for (BotSnapshot const& bot : v.bots)
+            atALeader = atALeader || (bot.guid != 13 && bot.pos_x == teleport->dest_x && bot.pos_y == teleport->dest_y && bot.pos_z == teleport->dest_z);
+        CHECK(teleport->spell_id == 36 && atALeader);
+    }
+    CHECK(Logged(events, "party_teleport:"));
+    // with a fight going on the ghost is not sent to the leader: it waits for the quiet
+    BotPolicy busy(DeadOptions(nullptr, AllWarriors));
+    busy.SetRouteActive(true);
+    v.bots[1].in_combat = 1;
+    CHECK(!LoggedTeleportToLeader(busy.Decide(v, 1000)));
 }
 
 // A ghost whose run takes too long is put at its corpse once, and the run starts over; it does not stay a ghost for good.
@@ -3474,7 +3614,7 @@ void ReleaseIsHeldInCombatUpToTheCap()
 {
     std::vector<std::string> events;
     BotPolicy policy(DeadOptions(&events, AllWarriors));
-    auto const build = [] { WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 }); Corpse(v.bots[3], 10.0f); v.bots[1].in_combat = 1; return v; };
+    auto const build = [] { WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 }); Corpse(v.bots[3], 10.0f); v.bots[3].in_combat = 1; return v; };
     CHECK(!HasAction(policy.Decide(build(), 1000), 13, ActionType::kReleaseSpirit));
     CHECK(!HasAction(policy.Decide(build(), 30000), 13, ActionType::kReleaseSpirit));
     CHECK(Logged(events, "release_held:"));
@@ -5391,6 +5531,8 @@ int main()
     ShortOfAmmoWalksToTheAmmoVendor();
     AFlippingPartyDoesNotHoldTheLeaderForever();
     ARegroupStopsWaitingForAStuckMember();
+    AStuckMemberAtTheBoundaryIsLoggedOnce();
+    MemberRecoverDoesNotFireWithTheStuckEvent();
     ALeaderWithNoRouteIsPutBackOnTheRouteOnce();
     AMemberThatLostItsLeaderIsPutNextToIt();
     ALeaderRevivedAtTheEntranceGoesToItsParty();
@@ -5563,7 +5705,10 @@ int main()
     AWipedPartysGhostsArePutAtTheirCorpsesAfterAMinute();
     DeathLoopMovesTheBotToAGrindSpot();
     CorpseWaitsForARezzerThenReleases();
-    ADungeonCorpseWaitsLongerForARezzer();
+    ADungeonCorpseWaitsTwentySecondsForARezzer();
+    ADungeonCorpseWithoutARezzerIsReleasedWithinTwentySeconds();
+    AFightInThePartyDoesNotHoldADungeonRelease();
+    AReleasedDungeonGhostIsTeleportedToTheLeader();
     ACorpseIsRevivedByTheQuietLeaderAfterAFewSeconds();
     CorpseReleasesAtOnceWithoutARezzer();
     CorpseReleasesWhenTheWholePartyIsDown();

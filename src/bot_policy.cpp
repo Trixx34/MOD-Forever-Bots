@@ -170,7 +170,8 @@ constexpr std::uint64_t kBossHoldMs = 180000;     // how long the leader waits a
 // farther (stuck below a ramp the leader climbed) held the party for good when this was 60 (Ragefire Chasm and the Deadmines, 2026-10-26).
 constexpr float kLostLeaderYards = 30.0f;
 constexpr float kLostLeaderHeight = 25.0f;        // ... or this far above or below it (another level of the dungeon)
-constexpr std::uint64_t kLostLeaderMs = 20000;    // for this long, then it is put next to the leader (DungeonTeleport)
+constexpr std::uint64_t kLostLeaderMs = 30000;    // for this long, then it is put next to the leader (DungeonTeleport). Longer than kRegroupStuckMs: the leader has
+                                                  // flagged the member and walked on by then, so the teleport is not in the same second as the regroup_stuck line (0.36.2)
 constexpr std::uint32_t kRouteNoRouteSkip = 3;     // refusals in a row (no route) after which a dungeon waypoint is skipped
 constexpr std::uint32_t kRepairBelowPct = 50;    // worn gear below this durability sends the bot to a repairman, not just any vendor
 // The fights draw the leader past route points: when it is this close to the next point, the one it was heading for (not a boss point) is dropped, so it never walks back
@@ -218,6 +219,7 @@ constexpr std::uint32_t kPartyReadyPowerPct = 95;   // and every mana user at le
 constexpr std::uint32_t kPartyReadySitHealthPct = 95; // a sitting member rests up to this much
 constexpr std::uint64_t kPullHoldClearMs = 10000;  // the party must be ready this long in a row before a pull hold ends
 constexpr std::uint64_t kPullHoldMaxMs = 120000;    // the party never waits longer than this for itself
+constexpr float kRegroupClearYards = 20.0f;               // a stuck member counts as back only inside this (hysteresis: it trails the leader at about kRouteWaitYards)
 constexpr std::uint64_t kRegroupStuckMs = 20000;    // a member out of range this long is stuck: the party stops waiting for it (regroup, 0.35.0)
 constexpr std::uint64_t kTankHeadStartMs = 2500;    // the others join a fight this long after the tank started it, so the tank has the threat
 // Healing: a healer class heals the party member with the lowest health below this share, within this range.
@@ -297,10 +299,6 @@ constexpr std::uint32_t kPrayerMinLow = 3;           // this many members low: P
 constexpr std::uint32_t kBindingBelowPct = 70;       // Binding Heal when both the priest and the tank are below this
 constexpr std::uint32_t kWarriorClass_ = 1;
 constexpr std::uint32_t kDruidClass_ = 11;
-// A dungeon party's dead wait longer for a resurrect than a leveling party's: the healer needs the fight to end, to get within range, and a 10 s cast. A bot that releases too early
-// stands at the graveyard outside the instance (one tank was killed there seven times in a row by a wandering scout, with every re-entry refused for being in combat).
-constexpr std::uint64_t kDungeonReleaseDelayMs = 60000;
-constexpr std::uint64_t kDungeonReleaseCombatHoldMs = 120000;
 constexpr float kRezRangeYards = 30.0f;              // a rezzer resurrects a corpse within this range
 constexpr std::uint32_t kRezManaPct = 35;            // and starts the 10 s cast with at least this much mana
 constexpr std::uint64_t kRezCastMs = 11000;          // after a resurrect cast started, the same target is left alone this long
@@ -2261,7 +2259,10 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 std::uint64_t const waited = nowMs - state.DeathMs;
                 bool anyAlive = false;
                 bool rezzer = false;
-                bool fighting = bot.in_combat != 0;
+                // The core refuses a release only for a corpse that is itself in combat; a fight elsewhere in the party does not hold it (0.36.2: the dungeon
+                // ghosts waited out whole fights, 44-87 s, with no rezzer up). A ghost released in a fight waits at the entrance, or goes to the leader once it is quiet.
+                bool const fighting = bot.in_combat != 0;
+                bool partyFights = fighting;
                 if (deadParty != 0)
                     forParty(deadParty, [&](BotSnapshot const& member)
                     {
@@ -2269,14 +2270,15 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                             return;
                         anyAlive = true;
                         rezzer = rezzer || isRezzer(member);
-                        fighting = fighting || member.in_combat != 0;
+                        partyFights = partyFights || member.in_combat != 0;
                     });
                 bool const dungeonParty = routeActiveOf(bot.guid) || (deadParty != 0 && tankLed.count(deadParty) != 0);
-                std::uint64_t const releaseDelayMs = dungeonParty ? std::max(_options.ReleaseDelayMs, kDungeonReleaseDelayMs) : _options.ReleaseDelayMs;
-                std::uint64_t const releaseCombatHoldMs = dungeonParty ? std::max(_options.ReleaseCombatHoldMs, kDungeonReleaseCombatHoldMs) : _options.ReleaseCombatHoldMs;
+                // The wait for a rezzer is the same 20 s in a dungeon as outside (the owner's rule of 2026-10-27).
+                std::uint64_t const releaseDelayMs = _options.ReleaseDelayMs;
+                std::uint64_t const releaseCombatHoldMs = _options.ReleaseCombatHoldMs;
                 // The Recover tactic (the core's revive order, as for a ghost): the leader is up and nothing is fighting, so the dead member is stood up at the leader's side after a few
                 // seconds instead of waiting for the healer's 10 s cast, a release and a corpse run (the members that released were killed again outside by the wolves of Westfall).
-                if (_options.TacticRecover && _options.DungeonReviveOutOfCombat && dungeonParty && deadParty != 0 && deadParty != bot.guid && !fighting &&
+                if (_options.TacticRecover && _options.DungeonReviveOutOfCombat && dungeonParty && deadParty != 0 && deadParty != bot.guid && !partyFights &&
                     state.ReviveAttempts < kOutOfCombatReviveTries && waited >= kCorpseReviveDelayMs && bot.resurrect_from == 0)
                 {
                     auto const leaderAt = indexOf.find(deadParty);
@@ -2312,7 +2314,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     continue; // waiting for a resurrect
                 if (fighting && waited < releaseCombatHoldMs)
                 {
-                    // The core refuses a release in combat, and the party is still fighting: held back, capped.
+                    // The core refuses a release in combat, and this corpse is still in combat: held back, capped.
                     if (!state.ReleaseHeldLogged)
                     {
                         state.ReleaseHeldLogged = true;
@@ -2782,15 +2784,20 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     }
                 };
                 // Regroup (0.35.0): how many members are out of range (kRouteWaitYards), and for how long. A member out of range for kRegroupStuckMs is
-                // stuck: logged once, and the party no longer waits for it (checkReady and the route walk). It is no longer stuck once it is back in range.
+                // stuck: logged once, and the party no longer waits for it (checkReady and the route walk). Since 0.36.2 it stays stuck until the regroup
+                // ends (regroup_done), and only counts as back inside kRegroupClearYards: a member that trails the leader at the edge of kRouteWaitYards
+                // flipped the flag (and the log line) on every step in and out of range.
+                if (state.RegroupSinceMs == 0)
+                    state.RegroupStuck.clear();
                 std::uint32_t farMembers = 0;
                 for (std::uint64_t member : membersOf[bot.guid])
                 {
                     auto const at = indexOf.find(member);
-                    if (at == indexOf.end() || view.bots[at->second].life_state != 0 || Distance2d(bot, view.bots[at->second]) <= kRouteWaitYards)
+                    bool const flagged = state.RegroupStuck.count(member) != 0;
+                    if (at == indexOf.end() || view.bots[at->second].life_state != 0 ||
+                        Distance2d(bot, view.bots[at->second]) <= (flagged ? kRegroupClearYards : kRouteWaitYards))
                     {
                         state.RegroupFarSinceMs.erase(member);
-                        state.RegroupStuck.erase(member);
                         continue;
                     }
                     ++farMembers;
