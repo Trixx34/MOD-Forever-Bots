@@ -181,12 +181,15 @@ constexpr float kRouteSkipAheadYards = 25.0f;
 constexpr float kPartyChaseYards = 45.0f;
 constexpr float kRoutePointReachYards = 6.0f;    // the leader has arrived at a route waypoint this close to it
 constexpr float kFocusPackYards = 12.0f;         // a unit this close to the tank's target is of the same pack: the damage dealers may take it first
-// Ragefire Chasm's Searing Blade camp (2026-10-27 soak): kMaxDungeonPull caps the tank's own pull, but nothing capped what the focus tactic reached for
-// afterwards. kFocusPackYards is wider than kPullRadius, and the pack scan below has no size limit of its own, so as the fight moved on it kept reaching
-// a little further each time for whichever caster now ranked highest or was casting -- the tank's party ended up fighting the Enforcer, then the Cultist,
-// then a Voidwalker the Warlock summoned, three distinct adds deep before anyone died (entry 8996 alone was 63% of the dungeon's deaths). Once the party
-// is already fighting this many distinct hostiles, the pack scan below no longer reaches for one more that nobody has engaged yet; it still freely
-// re-targets among the ones already in the fight (interrupting or re-prioritizing them), since that was never the problem.
+// Ragefire Chasm's Searing Blade camp (2026-10-27 soak): kMaxDungeonPull caps the tank's own pull, but nothing capped what the pack-focus scan below
+// reached for afterwards. kFocusPackYards is wider than kPullRadius, and the scan has no size limit of its own, so as a fight went on it kept
+// reaching a little further for whichever unlisted hostile happened to stand nearby next -- a party ended up fighting the Enforcer, then some
+// unrelated trash nobody had told it about, then another, three and four distinct adds deep before anyone died. This caps that: past this many
+// distinct hostiles already engaged, the scan stops reaching for an *unlisted* one (not in the dungeon file's kill_priority, rank 1000 below); it
+// still reaches for any of the dungeon's own kill_priority entries whatever the count already engaged, since that list is the dungeon author's own
+// "kill this one first no matter what" (the first version of this cap did not exempt it, and a same-day re-run of the soak showed why it must: it
+// silenced the one tool meant to keep the Searing Blade Warlock -- kill_priority rank 0, it summons the Voidwalker that was 63% of the dungeon's
+// deaths -- from being focused down at all once two lower-priority trash had already claimed the two engaged slots first).
 constexpr std::size_t kMaxDungeonEngaged = 2;
 constexpr float kRouteWaitYards = 30.0f;         // the leader waits for a member farther behind than this
 constexpr std::uint32_t kRouteMinHealthPct = 80; // and for its own health to be at least this
@@ -2847,17 +2850,19 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                             tier = 1;
                         return std::make_tuple(tier, rankOf(unit), unit.casting != 0 ? 0 : 1, unit.health);
                     };
-                    // kMaxDungeonEngaged: past this many distinct hostiles already fought, the scan only re-targets among them (interrupting one,
-                    // or chasing the kill priority within the pack already pulled); it stops reaching for one more that nobody has engaged yet.
-                    // The interrupt and golem-engineer tiers are exempt: stopping a cast is worth it whatever is already going on (a Warlock's
-                    // Summon Voidwalker, concretely, is worse left uninterrupted than briefly fought), and an engineer with a golem up was
-                    // already a hard exception to every other rule above.
+                    // kMaxDungeonEngaged: past this many distinct hostiles already fought, the scan no longer reaches for a hostile nobody told
+                    // the party about (an unlisted creature it just happens to notice nearby, rank 1000 below); it still freely re-targets among
+                    // the hostiles already in the fight, interrupts one, and reaches for any of the dungeon file's own kill_priority list whatever
+                    // the count already engaged -- that list is the dungeon author's own "kill this one first, whatever else is going on" (the
+                    // Searing Blade Warlock summons the Voidwalker that caused 63% of a soak's Ragefire deaths; capping the reach for it past two
+                    // engaged would have silenced the one tool meant to stop it). The interrupt and golem-engineer tiers are exempt the same way.
                     std::set<std::uint64_t> const engaged = partyEngagedTargets(partyLeader);
                     bool const atEngagementCap = engaged.size() >= kMaxDungeonEngaged;
                     auto const reachable = [&](NearbyUnit const& unit)
                     {
                         bool const specialTier = (interruptNow && unit.casting != 0) ||
-                                                  (golemNearby && forever_module::UnitRefEntry(unit.guid) == kGoblinEngineerEntry);
+                                                  (golemNearby && forever_module::UnitRefEntry(unit.guid) == kGoblinEngineerEntry) ||
+                                                  rankOf(unit) != 1000;
                         return specialTier || engaged.count(unit.guid) != 0 || !atEngagementCap;
                     };
                     for (NearbyUnit const& unit : nearby)
