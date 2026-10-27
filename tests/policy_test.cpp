@@ -2729,6 +2729,45 @@ void ALeaderThatDoesNotMoveIsNoticed()
     CHECK(named);
 }
 
+// Regroup (0.35.0): a member out of range for kRegroupStuckMs is stuck. The leader holds for it until then, then walks on without it, and the
+// regroup ends when the party is ready again after the member is back.
+void ARegroupStopsWaitingForAStuckMember()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.ClassOf = WarriorLeads;
+    options.Route = { Point{ 100.0f, 0.0f, 0.0f }, Point{ 140.0f, 0.0f, 0.0f } };
+    std::vector<std::string> events;
+    options.OnEvent = [&events](std::string const& line) { events.push_back(line); };
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    for (BotSnapshot& bot : view.bots)
+        bot.pos_x = 50.0f;                                            // together at 50
+    view.bots[0].pos_x = 0.0f;                                        // bot 10 stays 50 yards behind
+    auto const has = [&events](std::string const& prefix)
+    {
+        for (std::string const& line : events)
+            if (line.rfind(prefix, 0) == 0)
+                return true;
+        return false;
+    };
+    CHECK(LeaderWalk(policy.Decide(view, 1000)) == -1.0f);            // the party is not together: no walk
+    CHECK(has("regroup_start: leader=12 reason=member_far far=1"));
+    CHECK(LeaderWalk(policy.Decide(view, 10000)) == -1.0f);           // not stuck yet (9 s out of range)
+    CHECK(LeaderWalk(policy.Decide(view, 22000)) == 100.0f);          // stuck (21 s): the leader walks on without it
+    CHECK(has("regroup_stuck: leader=12 bot=10 "));
+    policy.Decide(view, 23000);
+    CHECK(!has("regroup_done:"));                                     // the regroup stays on while a member is out of range
+    view.bots[0].pos_x = 50.0f;                                       // bot 10 catches up
+    policy.Decide(view, 24000);
+    policy.Decide(view, 40000);                                       // the party has been ready for the clearing time
+    bool done = false;
+    for (std::string const& line : events)
+        done = done || (line.rfind("regroup_done: leader=12 ", 0) == 0 && line.find(" stuck=1") != std::string::npos);
+    CHECK(done);
+}
+
 // The default stance is defensive: a bot does not pull what is in range on its own, and it fights what attacks it.
 void DefaultBotsDoNotPullWhatIsInRange()
 {
@@ -5136,6 +5175,7 @@ int main()
     ARosterSpecSetsTheRoleOfAPriest();
     ShortOfAmmoWalksToTheAmmoVendor();
     AFlippingPartyDoesNotHoldTheLeaderForever();
+    ARegroupStopsWaitingForAStuckMember();
     ALeaderWithNoRouteIsPutBackOnTheRouteOnce();
     AMemberThatLostItsLeaderIsPutNextToIt();
     ALeaderRevivedAtTheEntranceGoesToItsParty();

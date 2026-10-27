@@ -97,6 +97,7 @@ Each tick the policy (`src/bot_policy.cpp`) reads the bot's snapshot and sends a
   back to its corpse (through the instance door when the corpse is inside) and reclaims it. A run longer than `CorpseRunTeleportSec` (60 s) puts the ghost
   at its corpse; a run still not done four minutes after that is given up.
   A ghost still outside a dungeon is never stood up there. Since 0.22.0.
+- **Regroup (since 0.35.0).** After a death or when a member is out of range, the party leader holds the party until it is together again. A member out of range for 20 s is stuck: the party stops waiting for it and walks on (`regroup_stuck`); `member_recover` still brings it back. The regroup ends once nobody is dead or out of range and the pull hold has ended (`regroup_start` / `regroup_done`).
 - **Dungeon death.** A dead member of a dungeon party does not walk back to its corpse. While the party is out of combat and its leader is up, the ghost is teleported to the leader and stays by it for the leader's revive (since 0.34.3; before, it waited at the instance entrance). In combat it waits at the entrance, and if no revive comes within 90 seconds it walks to its corpse as before. Since 0.24.0 (90 seconds since 0.26.0).
 - **Healing.** A priest casts Flash Heal in an emergency and Power Word: Shield on a member that took damage; a paladin, shaman or druid
   answers an emergency with its own heal spell and never casts a priest spell. Each spell is cast only when the healer can pay for it, so a

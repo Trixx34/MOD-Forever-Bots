@@ -198,6 +198,7 @@ constexpr std::uint32_t kPartyReadyPowerPct = 95;   // and every mana user at le
 constexpr std::uint32_t kPartyReadySitHealthPct = 95; // a sitting member rests up to this much
 constexpr std::uint64_t kPullHoldClearMs = 10000;  // the party must be ready this long in a row before a pull hold ends
 constexpr std::uint64_t kPullHoldMaxMs = 120000;    // the party never waits longer than this for itself
+constexpr std::uint64_t kRegroupStuckMs = 20000;    // a member out of range this long is stuck: the party stops waiting for it (regroup, 0.35.0)
 constexpr std::uint64_t kTankHeadStartMs = 2500;    // the others join a fight this long after the tank started it, so the tank has the threat
 // Healing: a healer class heals the party member with the lowest health below this share, within this range.
 constexpr std::uint32_t kHealBelowPct = 60;
@@ -2652,12 +2653,35 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                         ready = false;
                         not_ready_reason = "mana bot=" + std::to_string(member.guid) + " pct=" + std::to_string(std::uint64_t(member.power) * 100 / member.max_power);
                     }
-                    else if (Distance2d(bot, member) > kRouteWaitYards)
+                    else if (Distance2d(bot, member) > kRouteWaitYards && state.RegroupStuck.count(member.guid) == 0)
                     {
                         ready = false;
                         not_ready_reason = "far bot=" + std::to_string(member.guid);
                     }
                 };
+                // Regroup (0.35.0): how many members are out of range (kRouteWaitYards), and for how long. A member out of range for kRegroupStuckMs is
+                // stuck: logged once, and the party no longer waits for it (checkReady and the route walk). It is no longer stuck once it is back in range.
+                std::uint32_t farMembers = 0;
+                for (std::uint64_t member : membersOf[bot.guid])
+                {
+                    auto const at = indexOf.find(member);
+                    if (at == indexOf.end() || view.bots[at->second].life_state != 0 || Distance2d(bot, view.bots[at->second]) <= kRouteWaitYards)
+                    {
+                        state.RegroupFarSinceMs.erase(member);
+                        state.RegroupStuck.erase(member);
+                        continue;
+                    }
+                    ++farMembers;
+                    auto const since = state.RegroupFarSinceMs.emplace(member, nowMs).first;
+                    if (nowMs - since->second >= kRegroupStuckMs && state.RegroupStuck.insert(member).second)
+                    {
+                        ++state.RegroupStuckCount;
+                        if (_options.OnEvent)
+                            _options.OnEvent("regroup_stuck: leader=" + std::to_string(bot.guid) + " bot=" + std::to_string(member) + " yards=" +
+                                             std::to_string(int(Distance2d(bot, view.bots[at->second]))) + " in_combat=" + std::to_string(view.bots[at->second].in_combat) +
+                                             " waited_ms=" + std::to_string(nowMs - since->second));
+                    }
+                }
                 checkReady(bot);
                 for (std::uint64_t member : membersOf[bot.guid])
                     if (auto const at = indexOf.find(member); at != indexOf.end())
@@ -2674,6 +2698,24 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     if (_options.OnEvent)
                         _options.OnEvent("pull hold ended: leader=" + std::to_string(bot.guid) + " waited_ms=" + std::to_string(nowMs - state.HoldSinceMs));
                     state.HoldSinceMs = 0;
+                }
+                // A regroup starts when a member is dead or out of range, and ends once nobody is dead or out of range and the party is ready again (the pull
+                // hold has ended). A stuck member still out of range keeps it on: the stuck set must not be dropped while the member is still far.
+                if (!ready && state.RegroupSinceMs == 0 && (deadWaitKind != 0 || farMembers != 0))
+                {
+                    state.RegroupSinceMs = nowMs;
+                    state.RegroupStuckCount = 0;
+                    if (_options.OnEvent)
+                        _options.OnEvent("regroup_start: leader=" + std::to_string(bot.guid) + " reason=" + (deadWaitKind != 0 ? "dead_member" : "member_far") +
+                                         " far=" + std::to_string(farMembers));
+                }
+                if (ready && state.RegroupSinceMs != 0 && state.HoldSinceMs == 0 && farMembers == 0 && deadWaitKind == 0)
+                {
+                    if (_options.OnEvent)
+                        _options.OnEvent("regroup_done: leader=" + std::to_string(bot.guid) + " waited_ms=" + std::to_string(nowMs - state.RegroupSinceMs) +
+                                         " stuck=" + std::to_string(state.RegroupStuckCount));
+                    state.RegroupSinceMs = 0;
+                    state.RegroupStuck.clear();
                 }
                 if (!ready)
                 {
@@ -3224,7 +3266,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     auto const at = indexOf.find(member);
                     if (at == indexOf.end() || view.bots[at->second].life_state != 0)
                         continue;
-                    together = together && Distance2d(bot, view.bots[at->second]) <= kRouteWaitYards;
+                    together = together && (state.RegroupStuck.count(member) != 0 || Distance2d(bot, view.bots[at->second]) <= kRouteWaitYards);
                 }
                 if (state.TankLead && !routeActiveOf(bot.guid))
                 {
