@@ -1525,7 +1525,8 @@ void ACasterOfThePackIsTargetedForAnInterrupt()
 // The 2026-10-27 Ragefire Chasm soak: kMaxDungeonEngaged caps the pack-focus widening once the party is already fighting two distinct
 // hostiles, so it does not reach for a third, *unlisted* one nobody has engaged yet. It still reaches for any of the dungeon file's own
 // kill_priority entries whatever the count already engaged (the Searing Blade Warlock must still be reachable even with two lower-priority
-// trash already in the fight, or nothing ever stops it summoning the Voidwalker that was 63% of the dungeon's deaths).
+// trash already in the fight: a follow-up investigation found its "summon" is a one-time, out-of-combat cast, not a mid-fight resummon --
+// see TheVoidwalkerCompanionStaysReachablePastTheEngagementCapToo below for the actual fourth pack member this cap must also reach).
 void ADamageDealerDoesNotWidenPastTwoAlreadyEngagedHostiles()
 {
     PolicyOptions options = AggressiveOptions();
@@ -1567,9 +1568,62 @@ void ADamageDealerDoesNotWidenPastTwoAlreadyEngagedHostiles()
                 onTrash = onTrash || action.target_guid == trash.guid;
             }
     CHECK(!onUnlistedAdd); // an unlisted hostile nobody has engaged yet is not pulled in once two others already are
-    CHECK(onWarlock);      // the dungeon's own kill_priority still reaches past the cap: it must, or nothing stops the Warlock's summon
+    CHECK(onWarlock);      // the dungeon's own kill_priority still reaches past the cap, whatever is already engaged
     CHECK(!onTrash);       // (the mage prefers the Warlock over re-targeting the already engaged, unlisted trash: rank 0 beats rank 1000)
 }
+
+// 2026-10-27 follow-up to the test above: the Searing Blade Warlock's "Summon Voidwalker" turned out to be SmartAI event UPDATE_OOC with no
+// repeat timer (this fork's own smart_scripts: entryorguid 11324, a one-time out-of-combat cast, spell 12746) -- it fires once before the party
+// ever reaches the pack, not as a resummon mid-fight, and entry 8996 (Voidwalker Minion) has no spawn of its own anywhere in the world
+// database. The Voidwalker is really a fourth, passive pack member that already exists when the party arrives and simply joins the melee late
+// (the 2026-10-26 soak's combat log: the tank fought the Cultist and the Enforcer for 30+ seconds before the Voidwalker engaged too, and died 3
+// seconds later). 389-ragefire-chasm.json now lists 8996 in kill_priority for exactly the reason the test above exists: without it, a late-
+// joining, unengaged Voidwalker is just as "unlisted" as any other trash once two pack members are already fought, and kMaxDungeonEngaged would
+// keep the party from ever turning on it.
+void TheVoidwalkerCompanionStaysReachablePastTheEngagementCapToo()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.PartyCount = 1;
+    options.ClassOf = [](std::uint64_t guid) { return guid == 12 ? 1u : guid == 11 ? 8u : 5u; }; // bot 11 is the mage, 12 the warrior, the rest priests
+    options.KillPriority = { { 11324, 0 }, { 8996, 1 }, { 11322, 2 }, { 11323, 3 } }; // the shipped dungeon file's order
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+
+    // The party is already fighting the Cultist and the Enforcer (two distinct hostiles engaged, the cap), the same as a tank-and-two-adds
+    // fight already 30+ seconds in.
+    NearbyUnit cultist = Hostile(7, 2.0f, 100);
+    cultist.guid = MakeUnitRef(8, 11322, 7);
+    view.bots[2].in_combat = 1;
+    view.bots[2].threat_target_guid = cultist.guid;
+    NearbyUnit enforcer = Hostile(8, 6.0f, 100);
+    enforcer.guid = MakeUnitRef(8, 11323, 8);
+    view.bots[3].in_combat = 1;
+    view.bots[3].threat_target_guid = enforcer.guid;
+    // The Voidwalker joins late: unengaged, standing near the pack, the same as the soak's combat log.
+    NearbyUnit voidwalker = Hostile(9, 10.0f, 100);
+    voidwalker.guid = MakeUnitRef(8, 8996, 9);
+    // An unlisted trash in the same spot must still not be reached, same as the test above: the cap is not simply lifted outright.
+    NearbyUnit unlistedAdd = Hostile(10, 10.0f, 100);
+    unlistedAdd.guid = MakeUnitRef(8, 12001, 10);
+    AddNearby(view, 1, cultist);
+    AddNearby(view, 1, enforcer);
+    AddNearby(view, 1, voidwalker);
+    AddNearby(view, 1, unlistedAdd);
+
+    bool onVoidwalker = false, onUnlistedAdd = false;
+    for (std::uint64_t at = 0; at < 6000; at += 500)
+        for (BotAction const& action : policy.Decide(view, at))
+            if (action.bot_guid == 11)
+            {
+                onVoidwalker = onVoidwalker || action.target_guid == voidwalker.guid;
+                onUnlistedAdd = onUnlistedAdd || action.target_guid == unlistedAdd.guid;
+            }
+    CHECK(onVoidwalker);    // the Voidwalker (kill_priority rank 1) is reached past the cap once it joins, same as the Warlock
+    CHECK(!onUnlistedAdd);  // an unrelated unlisted hostile in the same spot is still not pulled in: only the dungeon's own list is exempt
+}
+
 
 void NoPartyActionsInCombat()
 {
@@ -5337,6 +5391,7 @@ int main()
     ADamageDealerFocusesTheEngineerWhenAGolemIsUp();
     ACasterOfThePackIsTargetedForAnInterrupt();
     ADamageDealerDoesNotWidenPastTwoAlreadyEngagedHostiles();
+    TheVoidwalkerCompanionStaysReachablePastTheEngagementCapToo();
     NoPartyActionsInCombat();
     SealIsNotRecastWhileUp();
     EviscerateAtFivePoints();
