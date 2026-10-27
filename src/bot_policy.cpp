@@ -2982,13 +2982,14 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             }
         }
         // Cc tactic: a rogue, mage or warlock with a cc spell for its level (CcSpellForClass, CcLearnLevel) holds one extra member of
-        // the tank's pack -- a unit nobody has engaged yet (partyEngagedTargets, the same set focus and interrupt use) and that is
-        // not the dungeon's own kill priority (never hold what the party means to kill first), of a creature type the spell affects
-        // (CcAffects, CreatureTypeOf). One bot, one unit at a time, the same rule interrupt uses for a cast: a party member already
-        // holding one (another bot's Dots entry for a cc spell, still running) means this bot does not start a second. Once a unit is
-        // held the bot keeps its own normal target and rotation (below); only the GCD that sends the hold, and later its refresh a
-        // little before it would run out (kCcRefreshBeforeMs), is spent on it. A pack with no match for any cc-capable class present
-        // (no learned spell, or no pack member of a type it affects) does nothing, same as a fight with nothing to interrupt.
+        // the tank's pack -- a unit nobody has engaged yet (partyEngagedTargets, the same set focus and interrupt use), not casting
+        // (interrupt's to pick, not held mid-cast for nothing) and not the dungeon's own kill priority (never hold what the party
+        // means to kill first), of a creature type the spell affects (CcAffects, CreatureTypeOf). One bot, one unit at a time, the
+        // same rule interrupt uses for a cast: a party member already holding one (another bot's Dots entry for a cc spell, still
+        // running) means this bot does not start a second. Once a unit is held the bot keeps its own normal target and rotation
+        // (below); only the GCD that sends the hold, and later its refresh a little before it would run out (kCcRefreshBeforeMs), is
+        // spent on it. A pack with no match for any cc-capable class present (no learned spell, or no pack member of a type it
+        // affects) does nothing, same as a fight with nothing to interrupt.
         if (_options.TacticCc && routeOn && partyMember && leaderSnap && leaderSnap->threat_target_guid != 0 && nowMs >= state.NextCastMs && !IsCasting(bot))
         {
             std::uint32_t const ccSpell = CcSpellForClass(classId);
@@ -3028,6 +3029,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                                 std::set<std::uint64_t> const engaged = partyEngagedTargets(partyLeader);
                                 for (NearbyUnit const& unit : nearby)
                                     if (unit.is_hostile && unit.health != 0 && IsLiveMob(unit) && !avoided(unit.guid) && unit.elite == 0 &&
+                                        unit.casting == 0 && // a casting unit is interrupt's to pick, not held mid-cast for nothing
                                         engaged.count(unit.guid) == 0 &&
                                         scenario.KillPriority.find(forever_module::UnitRefEntry(unit.guid)) == scenario.KillPriority.end() &&
                                         CcAffects(ccSpell, CreatureTypeOf(forever_module::UnitRefEntry(unit.guid))) &&
