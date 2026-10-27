@@ -223,7 +223,7 @@ struct PolicyOptions
     std::uint64_t CorpseRunTimeoutMs = 240000;  // a ghost that has not reached its corpse by then gives up
     // A corpse run that takes longer than this (config CorpseRunTeleportSec, 0 = off) puts the ghost at its corpse (the CorpseRunTimeoutMs teleport, brought forward).
     std::uint64_t CorpseRunTeleportMs = 60000;
-    std::uint64_t WaitForRezMs = 90000;         // the party waits this long for a corpse to be resurrected
+    std::uint64_t WaitForRezMs = 20000;         // the party waits this long for a corpse to be resurrected (20 s: a rez that has not come by then is not coming)
     std::uint64_t WaitForGhostMs = 180000;      // and this long after the ghost entered the corpse's map
     // Supplies (layout 15): a bot short of ammunition, food or drink walks to a vendor that sells it and buys, and eats or drinks while resting.
     supply::Settings Supplies;
@@ -500,6 +500,10 @@ private:
         std::uint64_t LosRepositionTarget = 0;            // target of a healer DPS cast refused for LoS; move to clear it before retrying
         std::uint64_t HoldLastNotReadyMs = 0;            // the last tick the party was not ready (the pull hold ends after kPullHoldClearMs of readiness)
         std::uint64_t HoldSinceMs = 0;                   // the party leader waits for the party to be ready since this time (0 = not waiting)
+        std::uint64_t RegroupSinceMs = 0;                // the party leader's regroup started at this time (a member dead or out of range; 0 = none)
+        std::map<std::uint64_t, std::uint64_t> RegroupFarSinceMs; // member guid -> the time it was first out of range (cleared once it is back or dead)
+        std::set<std::uint64_t> RegroupStuck;            // members out of range for kRegroupStuckMs in this regroup: the party does not wait for them
+        std::uint32_t RegroupStuckCount = 0;             // how many members were stuck in this regroup (for the regroup_done line)
         std::uint32_t TalentLevel = 0;                   // the level and role (1 to 3) of the last talent order sent for this bot (0 = none yet)
         std::uint32_t TalentRole = 0;
         std::uint32_t TalentSpec = 0;     // the spec the last talent order carried (a changed spec orders again)
