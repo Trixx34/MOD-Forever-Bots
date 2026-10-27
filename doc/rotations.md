@@ -82,6 +82,10 @@ Power Word: Shield on the tank before the pull (the tank is a warrior in these r
 
 - **Ammunition.** A hunter whose snapshot says `ammo_entry != 0` and `ammo_count < 100` is given `ScenarioAmmo` pieces (default 200, at most one stack: the core refuses a larger count, which refused every grant of 1000 in the first 0.33.0 run) of the ammunition the core recommends for its weapon, in every phase from the dressing on
   (`kGrant`, at most every 5 s and 40 times a run; three grants in a row that never raised the count stop it). Without ammunition the policy leaves every ranged row out (the core would refuse it), so the 2026-10-26 hunters only swung in melee and logged no cast at all.
+- **Supplies (food, drink)**: `ScenarioSupplies = "4540:10,1205:6"` (item:count,item:count) gives every bot in the roster the first entry as food and the second as drink. Before 0.35.3 these two were granted once, in the dressing, and never again for the
+  rest of the run. Since 0.35.3 they are kept topped up the same way as ammunition: a bot with fewer than half of an entry's count (`food_count` or `drink_count` in the snapshot, the only bag counts the core gives for these) is given that many more of it,
+  at most every 5 s and 40 times a run; three grants in a row that never raised the total stop that one (food or drink) being retried, independently of the other. A third entry and beyond are granted once in the dressing, like gear: the snapshot has no bag
+  count for anything past food and drink to keep them topped up by.
 - **Class supplies and quests**: `ScenarioClassSupplies = "9:6265:10"` (class:item:count) and `ScenarioClassQuests = "9:1504,3:6061"` (class:quest).
 
 ## Making the file
