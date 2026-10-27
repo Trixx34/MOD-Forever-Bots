@@ -166,6 +166,11 @@ struct PolicyOptions
     bool TacticRest = true;
     // Recover: the leader of a dungeon party stands a dead member up at its side (the core's revive order) a few seconds after the fight, once it is up and quiet.
     bool TacticRecover = true;
+    // Cc: a rogue (Sap), mage (Polymorph) or warlock (Banish) holds one extra member of the tank's pack that nobody has engaged yet and that is not the
+    // dungeon's own kill priority, of a creature type its spell can affect (CreatureTypeOf in bot_policy.cpp; Sap and Polymorph are Humanoid only, Banish
+    // Demon or Elemental only); one bot, one unit, the same "one at a time" rule as interrupt. Maintained for as long as the fight runs (recast a little
+    // before the hold would run out); nothing to hold (no learned spell, or no pack member of a type it affects) does nothing, not an error.
+    bool TacticCc = true;
     // Bounded knobs for offline dungeon-policy experiments; defaults preserve current behavior.
     std::uint32_t DungeonHealBelowPct = 55;
     std::uint32_t DungeonTankHealBelowPct = 75;

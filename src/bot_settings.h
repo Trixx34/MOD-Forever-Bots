@@ -177,10 +177,10 @@ struct BotSettings
     // Crafting = 1 (default): a bot with nothing to fight makes bandages from its cloth and cooks its meat (kSkillUp, SDK 0.17; the core must have the action), which
     // raises First Aid and Cooking and uses up what fills its bags. 0 turns it off.
     bool Crafting = true;
-    // DungeonTactics = "focus,interrupt,heal,rest,recover" or "all" or "none" (default: none): which of the dungeon party's tactics are on (bot_policy.h). In the first sim
+    // DungeonTactics = "focus,interrupt,heal,rest,recover,cc" or "all" or "none" (default: none): which of the dungeon party's tactics are on (bot_policy.h). In the first sim
     // runs (docs/99-deadmines-runs.md) all of them on did slightly worse than none (2.0 bosses and 36 deaths against 2.25 and 14), and no single tactic is proven yet, so they
     // are off until each has a run of its own that shows a gain.
-    bool TacticFocus = false, TacticInterrupt = false, TacticHeal = false, TacticRest = false, TacticRecover = false;
+    bool TacticFocus = false, TacticInterrupt = false, TacticHeal = false, TacticRest = false, TacticRecover = false, TacticCc = false;
     // Bounded policy-lab knobs; defaults match the built-in dungeon policy.
     std::uint32_t DungeonHealBelowPct = 55;
     std::uint32_t DungeonTankHealBelowPct = 75;
