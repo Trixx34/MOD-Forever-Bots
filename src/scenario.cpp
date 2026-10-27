@@ -22,6 +22,12 @@ float Distance2d(BotSnapshot const& bot, ScenarioPoint const& point)
     return std::sqrt(dx * dx + dy * dy);
 }
 
+// "Reached" a waypoint: close on the ground AND not on another floor (kRouteReachMaxZYards in scenario.h says why).
+bool Reached(BotSnapshot const& bot, ScenarioPoint const& point)
+{
+    return Distance2d(bot, point) <= kRoutePointReachYards && std::fabs(bot.pos_z - point.Z) <= kRouteReachMaxZYards;
+}
+
 BotSnapshot const* LeaderOf(std::vector<BotSnapshot> const& bots)
 {
     for (BotSnapshot const& bot : bots)
@@ -492,7 +498,7 @@ void ScenarioDirector::Decide(forever_module::WorldTickSnapshotView const& view,
                 if (bot.life_state != 0 || (leader && leader->life_state == 0 && &bot != leader))
                     continue;
                 for (std::size_t i = 0; i < _plan.Route.size(); ++i)
-                    if (Distance2d(bot, _plan.Route[i]) <= kRoutePointReachYards)
+                    if (Reached(bot, _plan.Route[i]))
                         _furthest = std::max<std::uint32_t>(_furthest, std::uint32_t(i + 1));
             }
             // A boss counts as killed once any bot sees its corpse (a creature of that entry with no health).
