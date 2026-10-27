@@ -181,6 +181,13 @@ constexpr float kRouteSkipAheadYards = 25.0f;
 constexpr float kPartyChaseYards = 45.0f;
 constexpr float kRoutePointReachYards = 6.0f;    // the leader has arrived at a route waypoint this close to it
 constexpr float kFocusPackYards = 12.0f;         // a unit this close to the tank's target is of the same pack: the damage dealers may take it first
+// Ragefire Chasm's Searing Blade camp (2026-10-27 soak): kMaxDungeonPull caps the tank's own pull, but nothing capped what the focus tactic reached for
+// afterwards. kFocusPackYards is wider than kPullRadius, and the pack scan below has no size limit of its own, so as the fight moved on it kept reaching
+// a little further each time for whichever caster now ranked highest or was casting -- the tank's party ended up fighting the Enforcer, then the Cultist,
+// then a Voidwalker the Warlock summoned, three distinct adds deep before anyone died (entry 8996 alone was 63% of the dungeon's deaths). Once the party
+// is already fighting this many distinct hostiles, the pack scan below no longer reaches for one more that nobody has engaged yet; it still freely
+// re-targets among the ones already in the fight (interrupting or re-prioritizing them), since that was never the problem.
+constexpr std::size_t kMaxDungeonEngaged = 2;
 constexpr float kRouteWaitYards = 30.0f;         // the leader waits for a member farther behind than this
 constexpr std::uint32_t kRouteMinHealthPct = 80; // and for its own health to be at least this
 constexpr std::uint32_t kRouteMinManaPct = 80;   // the leader walks on only when every mana user of the party has at least this much mana (the healer walked into fights at 3%)
@@ -1770,6 +1777,18 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         forParty(leaderGuid, [&](BotSnapshot const& member) { fighting = fighting || (member.life_state == 0 && member.in_combat != 0); });
         return fighting;
     };
+    // The distinct live hostiles this party's members are already fighting (their own threat targets, deduped). kMaxDungeonEngaged caps how far
+    // the pack-focus widening below may reach for a hostile nobody has engaged yet (see kMaxDungeonEngaged).
+    auto const partyEngagedTargets = [&](std::uint64_t leaderGuid)
+    {
+        std::set<std::uint64_t> targets;
+        forParty(leaderGuid, [&](BotSnapshot const& member)
+        {
+            if (member.life_state == 0 && member.in_combat != 0 && member.threat_target_guid != 0)
+                targets.insert(member.threat_target_guid);
+        });
+        return targets;
+    };
     // Whether another member of this bot's party is already stopping a cast. The snapshot says who casts what, and a member with
     // casting_spell set is mid-cast (cast_remaining_ms is 0 for a spell in flight, which the core still counts as casting).
     // Only the party is looked at, so the cost does not grow with the bot count.
@@ -2828,9 +2847,23 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                             tier = 1;
                         return std::make_tuple(tier, rankOf(unit), unit.casting != 0 ? 0 : 1, unit.health);
                     };
+                    // kMaxDungeonEngaged: past this many distinct hostiles already fought, the scan only re-targets among them (interrupting one,
+                    // or chasing the kill priority within the pack already pulled); it stops reaching for one more that nobody has engaged yet.
+                    // The interrupt and golem-engineer tiers are exempt: stopping a cast is worth it whatever is already going on (a Warlock's
+                    // Summon Voidwalker, concretely, is worse left uninterrupted than briefly fought), and an engineer with a golem up was
+                    // already a hard exception to every other rule above.
+                    std::set<std::uint64_t> const engaged = partyEngagedTargets(partyLeader);
+                    bool const atEngagementCap = engaged.size() >= kMaxDungeonEngaged;
+                    auto const reachable = [&](NearbyUnit const& unit)
+                    {
+                        bool const specialTier = (interruptNow && unit.casting != 0) ||
+                                                  (golemNearby && forever_module::UnitRefEntry(unit.guid) == kGoblinEngineerEntry);
+                        return specialTier || engaged.count(unit.guid) != 0 || !atEngagementCap;
+                    };
                     for (NearbyUnit const& unit : nearby)
                         if (unit.is_hostile && unit.health != 0 && IsLiveMob(unit) && !avoided(unit.guid) && unit.guid != assist->guid &&
-                            std::hypot(unit.pos_x - assist->pos_x, unit.pos_y - assist->pos_y) <= kFocusPackYards && keyOf(unit) < keyOf(*best))
+                            std::hypot(unit.pos_x - assist->pos_x, unit.pos_y - assist->pos_y) <= kFocusPackYards && reachable(unit) &&
+                            keyOf(unit) < keyOf(*best))
                             best = &unit;
                     if (best != assist)
                     {

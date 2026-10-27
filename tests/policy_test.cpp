@@ -1522,6 +1522,62 @@ void ACasterOfThePackIsTargetedForAnInterrupt()
     CHECK(targets(off, tankTarget.guid));
 }
 
+// The 2026-10-27 Ragefire Chasm soak: kMaxDungeonEngaged caps the pack-focus widening once the party is already fighting two distinct
+// hostiles, so it does not reach for a third one nobody has engaged yet (the Searing Blade camp's Enforcer, Cultist and the Warlock's
+// summoned Voidwalker -- entry 8996 alone was 63% of the dungeon's deaths). It still re-targets freely among the two already engaged.
+void ADamageDealerDoesNotWidenPastTwoAlreadyEngagedHostiles()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.PartyCount = 1;
+    options.ClassOf = [](std::uint64_t guid) { return guid == 12 ? 1u : guid == 11 ? 8u : 5u; }; // bot 11 is the mage, 12 the warrior, the rest priests
+    options.KillPriority = { { 11324, 0 }, { 11322, 1 }, { 11323, 2 } }; // Searing Blade Warlock, Cultist, Enforcer
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+
+    // The tank (12) is already fighting the Enforcer, and a priest (13) is already fighting the Cultist: two distinct hostiles engaged.
+    NearbyUnit enforcer = Hostile(7, 2.0f, 100);
+    enforcer.guid = MakeUnitRef(8, 11323, 7);
+    view.bots[2].in_combat = 1;
+    view.bots[2].threat_target_guid = enforcer.guid;
+    NearbyUnit cultist = Hostile(8, 6.0f, 100);
+    cultist.guid = MakeUnitRef(8, 11322, 8);
+    view.bots[3].in_combat = 1;
+    view.bots[3].threat_target_guid = cultist.guid;
+    // The Warlock outranks both and stands within kFocusPackYards of the tank's target, but nobody has engaged it yet.
+    NearbyUnit warlock = Hostile(9, 10.0f, 100);
+    warlock.guid = MakeUnitRef(8, 11324, 9);
+    AddNearby(view, 1, enforcer);
+    AddNearby(view, 1, cultist);
+    AddNearby(view, 1, warlock);
+
+    bool onWarlock = false, onCultist = false;
+    for (std::uint64_t at = 0; at < 6000; at += 500)
+        for (BotAction const& action : policy.Decide(view, at))
+            if (action.bot_guid == 11)
+            {
+                onWarlock = onWarlock || action.target_guid == warlock.guid;
+                onCultist = onCultist || action.target_guid == cultist.guid;
+            }
+    CHECK(!onWarlock);  // not pulled in: two are already engaged
+    CHECK(onCultist);   // still free to re-target among the ones already in the fight (the Cultist outranks the tank's own Enforcer)
+
+    // With only one hostile already engaged (no priest on the Cultist yet), the mage is still free to widen onto the Warlock.
+    WorldTickSnapshotView oneEngaged = PartyView({ 10, 11, 12, 13, 14 });
+    oneEngaged.bots[2].in_combat = 1;
+    oneEngaged.bots[2].threat_target_guid = enforcer.guid;
+    AddNearby(oneEngaged, 1, enforcer);
+    AddNearby(oneEngaged, 1, warlock);
+    BotPolicy second(options);
+    second.SetRouteActive(true);
+    bool onWarlockNow = false;
+    for (std::uint64_t at = 0; at < 6000; at += 500)
+        for (BotAction const& action : second.Decide(oneEngaged, at))
+            onWarlockNow = onWarlockNow || (action.bot_guid == 11 && action.target_guid == warlock.guid);
+    CHECK(onWarlockNow);
+}
+
 void NoPartyActionsInCombat()
 {
     WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
@@ -5287,6 +5343,7 @@ int main()
     ADamageDealerFightsThePriorityCasterOfThePack();
     ADamageDealerFocusesTheEngineerWhenAGolemIsUp();
     ACasterOfThePackIsTargetedForAnInterrupt();
+    ADamageDealerDoesNotWidenPastTwoAlreadyEngagedHostiles();
     NoPartyActionsInCombat();
     SealIsNotRecastWhileUp();
     EviscerateAtFivePoints();
