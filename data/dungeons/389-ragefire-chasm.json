@@ -66,9 +66,18 @@
     { "x": -401.3, "y": 185.1, "z": 6.4 },
     { "x": -384.9, "y": 146.0, "z": 7.8, "boss": 11519 }  // boss: Bazzalan
   ],
-  // Kill order when the party fights a pack (focus tactic): the Searing Blade Warlock first (it summons the Voidwalker Minion that killed 341 bots in the 2026-10-26 runs),
-  // then the Cultist (a caster), then the Enforcer (melee, the tank holds it).
-  "kill_priority": [11324, 11322, 11323],
+  // Kill order when the party fights a pack (focus tactic). 2026-10-27 investigation (creature_template/smart_scripts/Spell.db2 of this fork's own
+  // world database, not assumed from memory): the Warlock's only "Summon Voidwalker" cast (spell 12746) is SmartAI event UPDATE_OOC with no repeat
+  // timer -- it fires once, out of combat, before the party ever reaches the pack, not as a resummon during the fight. Entry 8996 (Voidwalker Minion)
+  // has no spawn of its own anywhere in the world database: that one-time cast is the only thing that can have created it, so by the time the party
+  // engages, the Voidwalker already exists as a fourth, passive pack member that simply joins the melee late (the 2026-10-26 soak's combat log: the
+  // tank fought the Cultist and the Enforcer for 30+ seconds before the Voidwalker engaged too, and died 3 seconds later). Neither interrupt nor
+  // killing the Warlock fast can stop a cast that already happened; what was missing is that 8996 was not in this list, so once it joined, the
+  // kMaxDungeonEngaged cap in bot_policy.cpp (reached by the Cultist and Enforcer already being fought) kept the party from ever turning on it as a
+  // third, unlisted hostile -- it is listed now, second, so the party turns on it as soon as it attacks instead of leaving it free to pile onto an
+  // already two-mob fight unopposed. Order: the Warlock first (an interruptible Shadow Bolt caster, spell 20791), then the Voidwalker once it
+  // joins, then the Cultist (a caster), then the Enforcer (melee, the tank holds it).
+  "kill_priority": [11324, 8996, 11322, 11323],
   // The bosses, in the order the route meets them. "strategy" holds the tactics for each boss: pull, tank_position, interrupt, dispel, avoid, avoid_spells, kill_order,
   // notes. Fields the bots act on today are listed in doc/dungeon-strategy.md ("what bots do today"); the others are kept but not used yet.
   "bosses": [
