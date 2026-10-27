@@ -243,7 +243,8 @@ most) when it first appears and after every `AutoGearEveryLevels` levels. With i
 **Scenarios.** A scenario is a repeatable test situation: `Scenario = <name>` with a roster, a staging place, an entry, a route and a
 duration (see `config/modules.d/forever-bots.conf.example`). The module spawns the roster at the staging place, dresses it (auto gear,
 or the class's `ScenarioGear<class>` list), waits for the party to form, teleports the leader to the entry and then the members, and
-lets the leader walk the route (it waits for members more than 30 yards behind and while its health is under 80%). Between the dressing and the grouping the scenario grants the classes their supplies and ammunition, and with `ScenarioTameSpot` a Taming phase gives its hunters a pet. One result line is
+lets the leader walk the route (it waits for members more than 30 yards behind and while its health is under 80%). The dressing grants the classes their supplies (food, drink, ammunition, Soul Shards) and, since 0.35.3, keeps ammunition, food and drink
+topped up for the whole run, not just once (`ScenarioSupplies`, `ScenarioAmmo`; see `doc/rotations.md`); with `ScenarioTameSpot` a Taming phase gives its hunters a pet. One result line is
 written when it ends: `scenario <name>: outcome=<complete|wipe|timeout|enter_failed> furthest=3/7 deaths=2 alive=3/5 run=412s`.
 `tests/scenario_test.cpp` covers the director, the route and the settings.
 

@@ -4,7 +4,8 @@
 //
 // Phases, in order:
 //   Waiting  until the whole roster is in the world and alive
-//   Dressing one grant per bot per tick for each item of its class's gear list, then an equip service, then a pause
+//   Dressing one grant per bot per tick for each item of its class's gear list, then an equip service, then a pause. Ammunition and
+//            supplies (food, drink) are granted and kept topped up for the whole run from here on, alongside the phases, not gating them.
 //   Grouping until the policy's party logic has put everyone in one party (or kGroupingTimeoutMs)
 //   Entering the leader teleports to the entry; kMembersDelayMs after it arrives the members follow; all there -> Running
 //   Running  the route is active; ends on the time limit, a wipe (all bots down; see WipeRecovery), or the leader reaching the last waypoint
@@ -37,7 +38,14 @@ struct ScenarioPlan
     std::vector<ScenarioPoint> Route;
     std::uint64_t DurationMs = 1200000;
     std::map<std::uint32_t, std::vector<std::uint32_t>> Gear; // class id -> item entries to grant and equip
-    std::vector<std::pair<std::uint32_t, std::uint32_t>> Supplies; // item entry and count granted to every bot after its gear (food, drink)
+    // Item entry and count granted to every bot after its gear: index 0 is food, index 1 is drink (the order the config doc asks for; an
+    // index beyond that is granted once, in the dressing, and not tracked further -- the snapshot has no bag count for it to watch). The
+    // first grant of food and drink is in the dressing, like gear; after that each is kept topped up for the whole run the same way as
+    // ammunition (see AmmoCount below) -- a bot with fewer than half of its index's count is given that many more of it (BotSnapshot's
+    // food_count or drink_count says how many it carries; there is no per-item-entry count), at most kSupplyGrantsMax times and never
+    // closer together than kSupplyRetryMs. A grant that does not raise the total, kSupplyUselessMax times running, stops that one of the
+    // two being retried; the other is unaffected.
+    std::vector<std::pair<std::uint32_t, std::uint32_t>> Supplies;
     // Per class, after the gear: items (a warlock's Soul Shards, which the Voidwalker and Succubus summons use up) and class quests completed with their
     // reward (core quest operation 4, the quests that teach the pets' spells). A quest the core refuses (not in the log, wrong race) is not tried again.
     std::map<std::uint32_t, std::vector<std::pair<std::uint32_t, std::uint32_t>>> ClassSupplies;
@@ -110,6 +118,9 @@ constexpr std::uint64_t kAmmoRetryMs = 5000;        // a bot is given ammunition
 constexpr std::uint32_t kAmmoGrantsMax = 40;        // per bot and run
 constexpr std::uint32_t kAmmoStackMax = 200;        // a grant is at most one stack (the core refuses a count above the item's stack size: 200 for arrows and shot)
 constexpr std::uint32_t kAmmoUselessMax = 3;        // grants in a row after which the count did not grow: the bot is left alone (the core refuses for another reason)
+constexpr std::uint64_t kSupplyRetryMs = 5000;      // a bot is given more of a supply item at most this often (the snapshot needs a moment to show it)
+constexpr std::uint32_t kSupplyGrantsMax = 40;       // per bot and item, per run (on top of the dressing's first grant)
+constexpr std::uint32_t kSupplyUselessMax = 3;       // grants in a row after which neither total grew: the bot is left alone for that item
 constexpr std::uint64_t kGroupingTimeoutMs = 120000;
 constexpr std::uint64_t kMembersDelayMs = 3000;
 constexpr std::uint64_t kEnterRetryMs = 10000;
@@ -158,7 +169,7 @@ private:
     std::uint64_t _phaseSinceMs = 0;
     bool _phaseStarted = false;
     std::map<std::uint64_t, std::size_t> _nextGrant;   // bot -> index of the next gear item to grant
-    std::map<std::uint64_t, std::size_t> _nextSupply;  // bot -> index of the next supply to grant
+    std::map<std::uint64_t, std::size_t> _nextSupply;  // bot -> index of the next supply beyond food and drink (index 2+) to grant once
     std::map<std::uint64_t, std::size_t> _nextClassSupply; // bot -> index of the next class supply to grant
     std::map<std::uint64_t, std::size_t> _nextClassQuest;  // bot -> index of the next class quest to send
     std::map<std::uint64_t, std::uint64_t> _ammoAtMs;      // bot -> when it was last given ammunition
@@ -166,6 +177,15 @@ private:
     std::map<std::uint64_t, std::uint32_t> _ammoSeen;      // bot -> its ammunition count when it was last given some
     std::map<std::uint64_t, std::uint32_t> _ammoPeak;      // bot -> the highest count it showed since then
     std::map<std::uint64_t, std::uint32_t> _ammoUseless;   // bot -> grants in a row that did not raise its count
+    // Supplies 0 (food) and 1 (drink) of _plan.Supplies, kept topped up the same way as ammunition: these are the only two the snapshot
+    // gives a bag count for (BotSnapshot::food_count, drink_count; a count per item entry does not exist). Keyed by (bot guid, index) so
+    // that one of the two having bag trouble never stops the other being granted to the same bot.
+    using SupplyKey = std::pair<std::uint64_t, std::size_t>;
+    std::map<SupplyKey, std::uint64_t> _supplyAtMs;     // when the item was last granted
+    std::map<SupplyKey, std::uint32_t> _supplyGrants;   // how often
+    std::map<SupplyKey, std::uint32_t> _supplySeen;     // its total (food_count or drink_count) when it was last granted
+    std::map<SupplyKey, std::uint32_t> _supplyPeak;     // the highest total shown since then
+    std::map<SupplyKey, std::uint32_t> _supplyUseless;  // grants in a row that did not raise it
     struct Home { std::uint32_t Map = 0; float X = 0, Y = 0, Z = 0; };
     std::map<std::uint64_t, Home> _tameHome;               // hunter -> where it stood when the Taming phase began
     std::map<std::uint64_t, std::uint64_t> _tameSentAtMs;  // hunter -> when it was last sent to the spot or back

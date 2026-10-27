@@ -153,6 +153,49 @@ void ScenarioDirector::Decide(forever_module::WorldTickSnapshotView const& view,
             ++_ammoGrants[bot.guid];
         }
 
+    // Supplies 0 (food) and 1 (drink) of _plan.Supplies: kept topped up for the whole run the same way as ammunition, including the first grant (so
+    // nothing here needs the dressing phase specifically). A bot below half of its index's configured count is given that many more of it. These are
+    // the only two the snapshot gives a bag count for (BotSnapshot::food_count, drink_count; there is no count per item entry), so each is compared
+    // with and tracked by its own total. A grant that never raises it (the core refused it: a full bag, or -- for drink -- a class without mana,
+    // which the core always reports a drink total of 0 for) is not sent again and again: after kSupplyUselessMax in a row that one is left alone;
+    // the other (food or drink) is unaffected, since every count here is kept per (bot, index).
+    if (!_plan.Supplies.empty() && _phase != ScenarioPhase::Waiting)
+        for (BotSnapshot const& bot : bots)
+        {
+            if (bot.life_state != 0)
+                continue;
+            for (std::size_t i = 0; i < _plan.Supplies.size() && i < 2; ++i)
+            {
+                SupplyKey const key{ bot.guid, i };
+                std::uint32_t const total = i == 0 ? bot.food_count : bot.drink_count;
+                _supplyPeak[key] = std::max(_supplyPeak[key], total);
+                std::uint32_t const configured = _plan.Supplies[i].second;
+                std::uint32_t const low = std::max<std::uint32_t>(1, configured / 2);
+                if (total >= low || _supplyGrants[key] >= kSupplyGrantsMax)
+                    continue;
+                std::uint64_t& last = _supplyAtMs[key];
+                if (last != 0 && nowMs - last < kSupplyRetryMs)
+                    continue;
+                if (last != 0)
+                    _supplyUseless[key] = _supplyPeak[key] > _supplySeen[key] ? 0 : _supplyUseless[key] + 1;
+                if (_supplyUseless[key] >= kSupplyUselessMax)
+                {
+                    _supplyGrants[key] = kSupplyGrantsMax;
+                    continue;
+                }
+                _supplySeen[key] = total;
+                _supplyPeak[key] = total;
+                BotAction grant;
+                grant.bot_guid = bot.guid;
+                grant.type = ActionType::kGrant;
+                grant.spell_id = _plan.Supplies[i].first;
+                grant.dest_x = float(configured);
+                actions.push_back(grant);
+                last = nowMs;
+                ++_supplyGrants[key];
+            }
+        }
+
     switch (_phase)
     {
         case ScenarioPhase::Waiting:
@@ -196,10 +239,13 @@ void ScenarioDirector::Decide(forever_module::WorldTickSnapshotView const& view,
                 actions.push_back(grant);
                 pending = true;
             }
-            // Supplies: food and drink, one kind per bot per tick, after its gear, so the party can eat and drink between pulls.
+            // Supplies 0 (food) and 1 (drink) are granted by the block above, running from here on alongside every phase like ammunition, not
+            // gating this one. A Supplies index beyond that has no bag count to keep it topped up by, so it is granted once here instead, like gear.
             for (BotSnapshot const& bot : bots)
             {
                 std::size_t& next = _nextSupply[bot.guid];
+                if (next < 2)
+                    next = 2; // indices 0 and 1 belong to the block above
                 if (next >= _plan.Supplies.size())
                     continue;
                 BotAction grant;

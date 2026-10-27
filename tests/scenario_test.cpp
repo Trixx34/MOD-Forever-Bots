@@ -81,6 +81,14 @@ int Count(std::vector<BotAction> const& actions, ActionType type, std::uint64_t 
     return n;
 }
 
+int GrantCount(std::vector<BotAction> const& actions, std::uint64_t bot, std::uint32_t spellId)
+{
+    int n = 0;
+    for (BotAction const& action : actions)
+        n += action.type == ActionType::kGrant && action.bot_guid == bot && action.spell_id == spellId;
+    return n;
+}
+
 void WaitsForTheWholeRoster()
 {
     ScenarioDirector director(Plan());
@@ -1019,6 +1027,80 @@ void AnAmmunitionGrantIsOneStackAtMostAndStopsWhenItDoesNothing()
     CHECK(given >= 6);
 }
 
+// --- Supplies (food index 0, drink index 1): the dressing's first grant, then kept topped up like ammunition ---
+
+void ASupplyBelowHalfItsCountIsRegrantedOneAboveItIsNot()
+{
+    ScenarioPlan plan = Plan();
+    plan.Supplies = { { 4540, 10 }, { 1205, 6 } }; // food (Tough Jerky), drink (Ice Cold Milk), by their doc order
+    ScenarioDirector director(plan);
+    std::vector<BotAction> actions;
+    std::uint64_t t = 1000, tick = 1;
+    std::vector<BotSnapshot> bots = { Bot(1, 0, 0, 0), Bot(2, 0, 0, 0), Bot(3, 0, 0, 0) };
+    Reach(director, bots, t, tick, actions);
+    // The dressing's first grant: both items, at their configured count.
+    bool food = false, drink = false;
+    for (BotAction const& action : actions)
+        if (action.type == ActionType::kGrant && action.bot_guid == 1)
+        {
+            food = food || (action.spell_id == 4540 && action.dest_x == 10.0f);
+            drink = drink || (action.spell_id == 1205 && action.dest_x == 6.0f);
+        }
+    CHECK(food && drink);
+    // Plenty of food (10, half of 10 is 5: not low), almost no drink (1, half of 6 is 3: low): only the drink is topped up again.
+    bots[0].food_count = 10;
+    bots[0].drink_count = 1;
+    actions.clear();
+    director.Decide(View(++tick, bots), t += kSupplyRetryMs, actions);
+    CHECK(GrantCount(actions, 1, 4540) == 0);
+    CHECK(GrantCount(actions, 1, 1205) == 1);
+    // Flipped: almost no food, plenty of drink: only the food is topped up.
+    bots[0].food_count = 2;
+    bots[0].drink_count = 6;
+    actions.clear();
+    director.Decide(View(++tick, bots), t += kSupplyRetryMs, actions);
+    CHECK(GrantCount(actions, 1, 4540) == 1);
+    CHECK(GrantCount(actions, 1, 1205) == 0);
+    // Plenty of both: neither.
+    bots[0].food_count = 10;
+    bots[0].drink_count = 6;
+    actions.clear();
+    director.Decide(View(++tick, bots), t += kSupplyRetryMs, actions);
+    CHECK(Count(actions, ActionType::kGrant, 1) == 0);
+}
+
+void ASupplyGrantThatNeverRaisesItsCountStopsAfterTheUselessCapAndDoesNotAffectTheOtherItem()
+{
+    // Food never rises (the core keeps refusing it: a full bag of it, say): it stops being retried after kSupplyUselessMax in a row, the
+    // same way ammunition does. Drink, granted alongside it on the same bot, rises each time and falls again (as if drunk) and keeps being
+    // topped up the whole time: food's cap does not touch it.
+    ScenarioPlan plan = Plan();
+    plan.Supplies = { { 4540, 10 }, { 1205, 6 } };
+    ScenarioDirector director(plan);
+    std::vector<BotAction> actions;
+    std::uint64_t t = 1000, tick = 1;
+    std::vector<BotSnapshot> bots = { Bot(1, 0, 0, 0), Bot(2, 0, 0, 0), Bot(3, 0, 0, 0) };
+    Reach(director, bots, t, tick, actions);
+    int food = GrantCount(actions, 1, 4540);
+    int drink = GrantCount(actions, 1, 1205);
+    CHECK(food == 1 && drink == 1);
+    for (int i = 0; i < 6; ++i)
+    {
+        bots[0].drink_count = 6; // the previous grant landed: not low, nothing sent this tick
+        actions.clear();
+        director.Decide(View(++tick, bots), t += kSupplyRetryMs, actions);
+        food += GrantCount(actions, 1, 4540);
+        drink += GrantCount(actions, 1, 1205);
+        bots[0].drink_count = 1; // and most of it is drunk again: low, topped back up
+        actions.clear();
+        director.Decide(View(++tick, bots), t += kSupplyRetryMs, actions);
+        food += GrantCount(actions, 1, 4540);
+        drink += GrantCount(actions, 1, 1205);
+    }
+    CHECK(food == 3);  // the dressing's grant plus two retries, then the useless cap leaves it alone for the rest of the run
+    CHECK(drink == 7); // the dressing's grant plus once per loop, never stopped
+}
+
 void ClassSuppliesAndClassQuestsAreSentOnceEach()
 {
     ScenarioPlan plan = Plan();
@@ -1210,6 +1292,8 @@ int main()
 {
     AHunterWithoutAmmunitionIsGivenSome();
     AnAmmunitionGrantIsOneStackAtMostAndStopsWhenItDoesNothing();
+    ASupplyBelowHalfItsCountIsRegrantedOneAboveItIsNot();
+    ASupplyGrantThatNeverRaisesItsCountStopsAfterTheUselessCapAndDoesNotAffectTheOtherItem();
     ClassSuppliesAndClassQuestsAreSentOnceEach();
     HuntersWithoutAPetAreTakenToTameOneAndBack();
     TheTamingPhaseGivesUpAtTheTimeout();
