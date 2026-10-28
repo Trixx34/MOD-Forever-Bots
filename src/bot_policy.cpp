@@ -295,6 +295,7 @@ constexpr std::uint32_t kPrayerOfHealing = 596;      // level 30
 constexpr std::uint32_t kRenewLevel = 8;
 constexpr std::uint32_t kBindingHealLevel = 32;
 constexpr std::uint32_t kPrayerOfHealingLevel = 30;
+constexpr std::uint64_t kShieldLockMs = 15000;       // Weakened Soul: the same member cannot take another Power Word: Shield for 15 seconds
 constexpr std::uint64_t kRenewMs = 15000;            // the Renew on the tank is cast again when it has run out
 constexpr std::uint32_t kPrayerBelowPct = 50;        // a member this low counts toward Prayer of Healing
 constexpr std::uint32_t kPrayerMinLow = 3;           // this many members low: Prayer of Healing instead of single heals
@@ -331,6 +332,7 @@ constexpr std::uint32_t kOutOfCombatReviveTries = 3;       // and after this man
 constexpr std::uint64_t kDungeonEntryWaitMs = 90000;       // a ghost of a dungeon party waits this long at the instance entrance for its revive, then walks to its corpse as before
 constexpr std::uint64_t kEntryTeleportRetryMs = 5000;      // the next try of the teleport to the entrance, while it is refused or the ghost is not there yet
 constexpr float kEntryYards = 15.0f;                        // a ghost this close to the entrance is at it
+constexpr std::uint64_t kLeaderRecoverMaxWaitMs = 120000;  // a revived leader rests at the entrance this long at most before it goes to its party (kRouteMinHealthPct first)
 // A ghost cannot be attacked; the body it reclaims can: it comes back alive at about half health, on the spot where it died, next to whatever killed it (on the sim a tank was
 // killed seven times in a row by the same scout, each time minutes after its reclaim). A ghost therefore waits, up to this long, while a live hostile stands this close to it.
 constexpr float kReclaimDangerYards = 30.0f;
@@ -2674,6 +2676,13 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         std::uint64_t followRef = 0;
         if (partyMember && leaderSnap)
             followRef = atLeader ? 0 : leaderRef;
+        // A leader revived at the instance entrance rests there before it goes back to its party (leader_recover_wait, below): the members deep in the dungeon stay where they are,
+        // they do not walk back through the packs to it.
+        if (followRef != 0 && routeOn && _options.DungeonTeleport && leaderSnap && leaderSnap->life_state == 0)
+            if (auto const dungeon = _options.DungeonsByMap.find(bot.map_id);
+                dungeon != _options.DungeonsByMap.end() && dungeon->second.HasEntry && DistanceTo(*leaderSnap, dungeon->second.Entry) <= kEntryYards &&
+                DistanceTo(bot, dungeon->second.Entry) > kLostLeaderYards)
+                followRef = 0;
         if (state.ChatFollow != 0)
         {
             followRef = state.ChatFollow; // told to follow the speaker
@@ -3631,9 +3640,20 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 // The leader revived at the instance entrance (a ghost of a dungeon party is put there) while a living member stands further in: the leader is put
                 // next to that member, and the party goes on from where it was. Before, the members were put next to the leader at the entrance and the party walked
                 // the cleared way again (60 of the 141 member teleports of the 2026-10-26 Deadmines run).
-                if (!recovering && _options.DungeonTeleport && bot.life_state == 0 && bot.in_combat == 0 && nowMs >= state.NextRecoverMs)
+                // Stockade, 2026-10-28 (0.39.0 sim, 220 deaths in 6 h): the leader comes back at about half health (a release brings it back at 49 %, and it then arrives next to the party
+                // with 30 %): 31 of the 96 tank deaths came less than 120 s after the same tank's previous death, 24 of 60 leader_recover teleports were followed by that tank's death
+                // within 120 s, and 38 of 72 tank pull lines of a 50-minute journal window began below 50 % health (5 to 13 % in the other dungeons). The tank stays at the entrance, which is quiet, and sits
+                // there until it is fit to walk on (kRouteMinHealthPct, the same as for a walk along the route), at most kLeaderRecoverMaxWaitMs: a tank that cannot get there (no food,
+                // a slow regeneration) goes in all the same.
+                bool atEntry = false;
+                if (!recovering && _options.DungeonTeleport && bot.life_state == 0 && bot.in_combat == 0)
                     if (auto const dungeon = _options.DungeonsByMap.find(bot.map_id);
                         dungeon != _options.DungeonsByMap.end() && dungeon->second.HasEntry && DistanceTo(bot, dungeon->second.Entry) <= kEntryYards)
+                        atEntry = true;
+                if (!atEntry)
+                    state.LeaderRecoverWaitSinceMs = 0;
+                if (!recovering && atEntry && nowMs >= state.NextRecoverMs)
+                    if (auto const dungeon = _options.DungeonsByMap.find(bot.map_id); dungeon != _options.DungeonsByMap.end())
                         for (std::uint64_t member : membersOf[bot.guid])
                         {
                             auto const at = indexOf.find(member);
@@ -3642,6 +3662,19 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                             BotSnapshot const& other = view.bots[at->second];
                             if (other.life_state != 0 || other.in_combat != 0 || other.map_id != bot.map_id || DistanceTo(other, dungeon->second.Entry) <= kLostLeaderYards)
                                 continue;
+                            if (!strong)
+                            {
+                                if (state.LeaderRecoverWaitSinceMs == 0)
+                                {
+                                    state.LeaderRecoverWaitSinceMs = nowMs;
+                                    if (_options.OnEvent)
+                                        _options.OnEvent("leader_recover_wait: bot=" + std::to_string(bot.guid) + " member=" + std::to_string(other.guid) + " hp_pct=" +
+                                                         std::to_string(bot.max_health ? std::uint64_t(bot.health) * 100 / bot.max_health : 100));
+                                }
+                                if (nowMs - state.LeaderRecoverWaitSinceMs < kLeaderRecoverMaxWaitMs)
+                                    break; // rests at the entrance first
+                            }
+                            state.LeaderRecoverWaitSinceMs = 0;
                             if (_options.OnEvent)
                                 _options.OnEvent("leader_recover: bot=" + std::to_string(bot.guid) + " member=" + std::to_string(other.guid) + " from=" + std::to_string(int(bot.pos_x)) +
                                                  "," + std::to_string(int(bot.pos_y)) + "," + std::to_string(int(bot.pos_z)) + " member_at=" + std::to_string(int(other.pos_x)) + "," +
@@ -4832,7 +4865,11 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     {
                         // Power Word: Shield is a priest spell; the other healers have no shield to cast.
                         // Not on a warrior or a druid: the absorb starves a rage user of rage (the guide).
-                        if (pct < kShieldBelowPct && classId == 5 && ClassFor(_options, member.guid) != kWarriorClass_ && ClassFor(_options, member.guid) != kDruidClass_)
+                        // Not while Weakened Soul keeps a new shield off it (kShieldLockMs after the last one was ordered): the cast is refused, and with the shield first in the
+                        // priority chain the member below 55 % was never healed (Stockade, 2026-10-28: a mage held at 44 % for over 30 s while the priest ordered 15 shields).
+                        auto const shielded = state.BuffUntilMs.find({ kPowerWordShield, member.guid == bot.guid ? 0 : PlayerRef(member.guid) });
+                        bool const shieldLocked = shielded != state.BuffUntilMs.end() && nowMs < shielded->second;
+                        if (pct < kShieldBelowPct && !shieldLocked && classId == 5 && ClassFor(_options, member.guid) != kWarriorClass_ && ClassFor(_options, member.guid) != kDruidClass_)
                         {
                             // Shield preemptive: check if this member's health dropped since the last tick (took damage).
                             // The module keeps a short history via state.StallBotHealth etc; here we approximate by checking
@@ -4952,6 +4989,8 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                             state.CastTarget[spellToCast] = heal.target_guid;
                             if (spellToCast == kRenew)
                                 state.BuffUntilMs[{ kRenew, PlayerRef(target->guid) }] = nowMs + kRenewMs;
+                            if (spellToCast == kPowerWordShield)
+                                state.BuffUntilMs[{ kPowerWordShield, heal.target_guid }] = nowMs + kShieldLockMs;
                             _healClaims[target->guid] = HealClaim{ healGroup, nowMs + kHealClaimMs };
                             if (_options.OnEvent)
                                 _options.OnEvent("heal: healer=" + std::to_string(bot.guid) + " spell=" + std::to_string(spellToCast) +

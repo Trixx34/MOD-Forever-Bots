@@ -461,6 +461,7 @@ private:
         std::size_t RouteRecoveredAt = std::size_t(-1);  // the route point the leader was last put back on the route for (once per point)
         std::uint64_t LostSinceMs = 0;                   // a member has been far from its leader since this time (0 = not lost)
         std::uint64_t NextRecoverMs = 0;                 // no teleport back to the leader before this
+        std::uint64_t LeaderRecoverWaitSinceMs = 0;      // a revived leader at the entrance, resting before it goes to its party: since when (0 = not waiting)
         std::uint64_t RouteBossSinceMs = 0;              // when the leader began to wait at a boss point (0 = not waiting)
         std::uint64_t MoveWhyLoggedMs = 0;               // when the policy last logged why a party bot moves (move_why)
         Point MoveWhyDest{};
