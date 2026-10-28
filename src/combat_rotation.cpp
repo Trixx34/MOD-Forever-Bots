@@ -142,18 +142,19 @@ struct SpecInfo
     std::uint32_t GearProfile; // see GearProfileFor's comment in combat_rotation.h
 };
 
-constexpr std::uint32_t kGearStrStam = 0, kGearAgiStam = 1, kGearIntSpiritStam = 2, kGearIntCrit = 3, kGearIntSpiritHaste = 4;
+constexpr std::uint32_t kGearStrStam = 0, kGearAgiStam = 1, kGearIntSpiritStam = 2, kGearIntCrit = 3, kGearIntSpiritHaste = 4,
+                         kGearStrStamDef = 5, kGearAgiStamDef = 6;
 
 constexpr SpecInfo kSpecs[] = {
     { 3, "bm", 3, true, kGearAgiStam },           { 3, "mm", 3, false, kGearAgiStam },            { 3, "sv", 3, false, kGearAgiStam },
-    { 1, "prot", 1, true, kGearStrStam },         { 1, "arms", 3, true, kGearStrStam },           { 1, "fury", 3, false, kGearStrStam },
-    { 2, "prot", 1, true, kGearStrStam },         { 2, "holy", 2, true, kGearIntSpiritHaste },    { 2, "ret", 3, true, kGearStrStam },
+    { 1, "prot", 1, true, kGearStrStamDef },      { 1, "arms", 3, true, kGearStrStam },           { 1, "fury", 3, false, kGearStrStam },
+    { 2, "prot", 1, true, kGearStrStamDef },      { 2, "holy", 2, true, kGearIntSpiritHaste },    { 2, "ret", 3, true, kGearStrStam },
     { 5, "holy", 2, true, kGearIntSpiritHaste },  { 5, "disc", 2, false, kGearIntSpiritHaste },   { 5, "shadow", 3, true, kGearIntCrit },
     { 7, "resto", 2, true, kGearIntSpiritHaste }, { 7, "ele", 3, false, kGearIntCrit },           { 7, "enh", 3, true, kGearAgiStam },
     { 8, "arcane", 3, true, kGearIntCrit },       { 8, "fire", 3, false, kGearIntCrit },          { 8, "frost", 3, false, kGearIntCrit },
     { 9, "demonology", 3, true, kGearIntCrit },   { 9, "affliction", 3, false, kGearIntCrit },    { 9, "destruction", 3, false, kGearIntCrit },
     { 4, "combat", 3, true, kGearAgiStam },       { 4, "assassination", 3, false, kGearAgiStam }, { 4, "subtlety", 3, false, kGearAgiStam },
-    { 11, "feral_tank", 1, true, kGearAgiStam },  { 11, "resto", 2, true, kGearIntSpiritHaste },  { 11, "feral_cat", 3, true, kGearAgiStam },   { 11, "balance", 3, false, kGearIntCrit },
+    { 11, "feral_tank", 1, true, kGearAgiStamDef },{ 11, "resto", 2, true, kGearIntSpiritHaste }, { 11, "feral_cat", 3, true, kGearAgiStam },   { 11, "balance", 3, false, kGearIntCrit },
 };
 
 } // namespace
