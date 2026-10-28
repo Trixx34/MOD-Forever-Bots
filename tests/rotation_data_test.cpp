@@ -317,6 +317,20 @@ void SpecKeysAndTheirDefaults()
     CHECK(rotation::DefaultSpec(3, 1).empty() && rotation::DefaultSpec(8, 2).empty()); // a hunter does not tank, a mage does not heal
 }
 
+void GearProfilesMatchTheirSpec()
+{
+    // Balance druid: intellect and crit. Restoration: intellect, spirit and haste. Feral of either role: stamina and agility
+    // (the owner's explicit example, 2026-10-28).
+    CHECK(rotation::GearProfileFor(11, "balance") == 3 && rotation::GearProfileFor(11, "resto") == 4);
+    CHECK(rotation::GearProfileFor(11, "feral_cat") == 1 && rotation::GearProfileFor(11, "feral_tank") == 1);
+    // A caster healer (any class) is profile 4; a caster dps (any class) is profile 3; melee/physical is 1 or 0.
+    CHECK(rotation::GearProfileFor(2, "holy") == 4 && rotation::GearProfileFor(5, "holy") == 4 && rotation::GearProfileFor(7, "resto") == 4);
+    CHECK(rotation::GearProfileFor(5, "shadow") == 3 && rotation::GearProfileFor(7, "ele") == 3 && rotation::GearProfileFor(8, "fire") == 3 && rotation::GearProfileFor(9, "affliction") == 3);
+    CHECK(rotation::GearProfileFor(3, "mm") == 1 && rotation::GearProfileFor(4, "combat") == 1 && rotation::GearProfileFor(7, "enh") == 1);
+    CHECK(rotation::GearProfileFor(1, "arms") == 0 && rotation::GearProfileFor(1, "prot") == 0 && rotation::GearProfileFor(2, "ret") == 0);
+    CHECK(rotation::GearProfileFor(99, "nope") == 2); // an unmapped class+spec: the generic caster bucket, never penalised for strength/agility
+}
+
 void TheNewConditionsParseAndDecide()
 {
     std::vector<std::string> warnings;
@@ -555,6 +569,7 @@ int main()
     ClassesMissingFromTheFileKeepTheBuiltInRows();
     SpecBlocksAreParsedAndLookedUp();
     SpecKeysAndTheirDefaults();
+    GearProfilesMatchTheirSpec();
     TheNewConditionsParseAndDecide();
     ASpecPlaysItsOwnBlock();
     TheDefaultSpecOfTheClassPlaysItsBlock();

@@ -139,18 +139,21 @@ struct SpecInfo
     char const* Key;
     std::uint32_t Role; // 1 tank, 2 healer, 3 dps
     bool Default;       // the spec a bot of this class and role plays without one in its roster entry
+    std::uint32_t GearProfile; // see GearProfileFor's comment in combat_rotation.h
 };
 
+constexpr std::uint32_t kGearStrStam = 0, kGearAgiStam = 1, kGearIntSpiritStam = 2, kGearIntCrit = 3, kGearIntSpiritHaste = 4;
+
 constexpr SpecInfo kSpecs[] = {
-    { 3, "bm", 3, true },           { 3, "mm", 3, false },            { 3, "sv", 3, false },
-    { 1, "prot", 1, true },         { 1, "arms", 3, true },           { 1, "fury", 3, false },
-    { 2, "prot", 1, true },         { 2, "holy", 2, true },           { 2, "ret", 3, true },
-    { 5, "holy", 2, true },         { 5, "disc", 2, false },          { 5, "shadow", 3, true },
-    { 7, "resto", 2, true },        { 7, "ele", 3, false },           { 7, "enh", 3, true },
-    { 8, "arcane", 3, true },       { 8, "fire", 3, false },          { 8, "frost", 3, false },
-    { 9, "demonology", 3, true },   { 9, "affliction", 3, false },    { 9, "destruction", 3, false },
-    { 4, "combat", 3, true },       { 4, "assassination", 3, false }, { 4, "subtlety", 3, false },
-    { 11, "feral_tank", 1, true },  { 11, "resto", 2, true },         { 11, "feral_cat", 3, true },   { 11, "balance", 3, false },
+    { 3, "bm", 3, true, kGearAgiStam },           { 3, "mm", 3, false, kGearAgiStam },            { 3, "sv", 3, false, kGearAgiStam },
+    { 1, "prot", 1, true, kGearStrStam },         { 1, "arms", 3, true, kGearStrStam },           { 1, "fury", 3, false, kGearStrStam },
+    { 2, "prot", 1, true, kGearStrStam },         { 2, "holy", 2, true, kGearIntSpiritHaste },    { 2, "ret", 3, true, kGearStrStam },
+    { 5, "holy", 2, true, kGearIntSpiritHaste },  { 5, "disc", 2, false, kGearIntSpiritHaste },   { 5, "shadow", 3, true, kGearIntCrit },
+    { 7, "resto", 2, true, kGearIntSpiritHaste }, { 7, "ele", 3, false, kGearIntCrit },           { 7, "enh", 3, true, kGearAgiStam },
+    { 8, "arcane", 3, true, kGearIntCrit },       { 8, "fire", 3, false, kGearIntCrit },          { 8, "frost", 3, false, kGearIntCrit },
+    { 9, "demonology", 3, true, kGearIntCrit },   { 9, "affliction", 3, false, kGearIntCrit },    { 9, "destruction", 3, false, kGearIntCrit },
+    { 4, "combat", 3, true, kGearAgiStam },       { 4, "assassination", 3, false, kGearAgiStam }, { 4, "subtlety", 3, false, kGearAgiStam },
+    { 11, "feral_tank", 1, true, kGearAgiStam },  { 11, "resto", 2, true, kGearIntSpiritHaste },  { 11, "feral_cat", 3, true, kGearAgiStam },   { 11, "balance", 3, false, kGearIntCrit },
 };
 
 } // namespace
@@ -169,6 +172,14 @@ std::string DefaultSpec(std::uint32_t classId, std::uint32_t role)
         if (info.ClassId == classId && info.Role == role && info.Default)
             return info.Key;
     return {};
+}
+
+std::uint32_t GearProfileFor(std::uint32_t classId, std::string const& spec)
+{
+    for (SpecInfo const& info : kSpecs)
+        if (info.ClassId == classId && spec == info.Key)
+            return info.GearProfile;
+    return kGearIntSpiritStam; // an unmapped class+spec: the old generic caster bucket, never strength/agility-penalised
 }
 
 std::vector<Row> const* RowsFor(RotationData const& data, std::uint32_t classId, std::string const& spec)
