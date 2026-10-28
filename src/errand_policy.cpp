@@ -1,6 +1,7 @@
 #include "errand_policy.h"
 
 #include <algorithm>
+#include <string>
 #include <unordered_set>
 
 namespace errand {
@@ -9,6 +10,11 @@ namespace {
 
 constexpr std::uint64_t kMinMs = 60000;
 constexpr std::uint64_t kDayMs = 24ull * 60 * kMinMs;
+
+std::string KindName(Kind what)
+{
+    return what == Kind::kTrain ? "train" : "auction";
+}
 
 } // namespace
 
@@ -130,6 +136,37 @@ void Scheduler::Prune(std::uint64_t nowMs)
 {
     std::uint64_t const since = nowMs > kDayMs ? nowMs - kDayMs : 0;
     _records.erase(std::remove_if(_records.begin(), _records.end(), [since](Record const& record) { return record.EndMs <= since; }), _records.end());
+}
+
+std::string Journal::OnStart(Start const& start, std::uint64_t nowMs)
+{
+    _open[start.Guid] = Open{ start.What, start.City, nowMs };
+    return "errand_start bot=" + std::to_string(start.Guid) + " city=" + _cityName(start.City) + " kind=" + KindName(start.What);
+}
+
+std::optional<std::string> Journal::OnEnd(std::uint64_t guid, EndReason why, bool failed, std::uint64_t nowMs)
+{
+    auto const found = _open.find(guid);
+    if (found == _open.end())
+        return std::nullopt;
+    Open const open = found->second;
+    _open.erase(found);
+    std::string const tail = " bot=" + std::to_string(guid) + " city=" + _cityName(open.City) + " kind=" + KindName(open.What) +
+                             " took_s=" + std::to_string(nowMs >= open.StartMs ? (nowMs - open.StartMs) / 1000 : 0);
+    if (failed)
+        return "errand_abandoned reason=failed" + tail;
+    switch (why)
+    {
+        case EndReason::kDone:
+            return "errand_done" + tail;
+        case EndReason::kTimeLimit:
+            return "errand_timeout" + tail;
+        case EndReason::kCalled:
+            return "errand_abandoned reason=called" + tail;
+        case EndReason::kUnavailable:
+            break;
+    }
+    return "errand_abandoned reason=unavailable" + tail;
 }
 
 } // namespace errand

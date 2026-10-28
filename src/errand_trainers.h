@@ -22,6 +22,9 @@ constexpr std::uint32_t kThunderBluff = 6;
 // The capital id for a name as the table spells it ("Stormwind", "ThunderBluff", ...), 0 when unknown.
 std::uint32_t CityOf(std::string_view name);
 
+// The name for a capital id, the spelling CityOf takes ("Stormwind"); "city<id>" for an id that is not a capital.
+std::string CityName(std::uint32_t city);
+
 // Sides as the table writes them: 1 Alliance, 2 Horde.
 constexpr std::uint32_t kAlliance = 1;
 constexpr std::uint32_t kHorde = 2;
