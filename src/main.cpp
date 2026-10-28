@@ -1892,8 +1892,9 @@ int main(int argc, char** argv)
             auto feed = std::make_shared<ErrandFeed>();
             extras.Errand = feed;
             auto scheduler = std::make_shared<errand::Scheduler>(settings.Errand);
+            auto journal = std::make_shared<errand::Journal>(errand::CityName); // the event lines (errand_policy.h)
             std::shared_ptr<CommandQueue> queue = commands;
-            client.AddTimer(kErrandInterval, [feed, scheduler, trainers, queue, book, &settings]
+            client.AddTimer(kErrandInterval, [feed, scheduler, journal, trainers, queue, book, &settings]
             {
                 std::uint64_t const now = nowMs();
                 std::vector<ErrandBot> list;
@@ -1906,7 +1907,11 @@ int main(int argc, char** argv)
                     fedAt = feed->AtMs;
                 }
                 for (auto const& [guid, outcome] : outcomes)
+                {
                     scheduler->Finish(guid, now); // done or failed: the trip is over either way
+                    if (auto const line = journal->OnEnd(guid, errand::EndReason::kDone, outcome == ErrandOutcome::kFailed, now))
+                        std::cerr << "forever-bots: event " << *line << "\n";
+                }
                 if (fedAt == 0 || now - fedAt > kPresenceStaleMs)
                     return;
 
@@ -1946,6 +1951,11 @@ int main(int argc, char** argv)
                 }
 
                 errand::Decisions const decisions = scheduler->Tick(now, bots);
+                for (errand::End const& end : decisions.Ends) // before the starts: a bot may start again in the same tick
+                {
+                    if (auto const line = journal->OnEnd(end.Guid, end.Why, false, now))
+                        std::cerr << "forever-bots: event " << *line << "\n";
+                }
                 std::vector<CommandQueue::ErrandItem> items;
                 for (errand::End const& end : decisions.Ends)
                 {
@@ -1969,6 +1979,7 @@ int main(int argc, char** argv)
                         item.Order.Auction = true;
                         items.push_back(item);
                         std::cerr << "forever-bots: errand: bot " << start.Guid << " to the auctioneer (city " << start.City << ")\n";
+                        std::cerr << "forever-bots: event " << journal->OnStart(start, now) << "\n";
                         continue;
                     }
                     auto const pick = errand::ChooseTrainer(*trainers, bot.Side, bot.Skill, start.City, bot.Map, bot.X, bot.Y, bot.Z);
@@ -1983,6 +1994,7 @@ int main(int argc, char** argv)
                     item.Order.Entry = trainer.Entry;
                     items.push_back(item);
                     std::cerr << "forever-bots: errand: bot " << start.Guid << " to " << trainer.Name << " (" << trainer.Subname << ") in city " << start.City << "\n";
+                    std::cerr << "forever-bots: event " << journal->OnStart(start, now) << "\n";
                 }
                 if (!items.empty() && queue)
                 {
@@ -1991,7 +2003,9 @@ int main(int argc, char** argv)
                         queue->Errands.push_back(std::move(item));
                 }
                 for (errand::End const& end : decisions.Ends)
+                {
                     std::cerr << "forever-bots: errand: bot " << end.Guid << " ended (reason " << int(end.Why) << ")\n";
+                }
             });
             std::cerr << "forever-bots: town errands are on: a check every " << kErrandInterval.count() / 1000 << " s\n";
         }

@@ -68,6 +68,9 @@ void CityNamesAreMapped()
     CHECK(CityOf("Stormwind") == kStormwind && CityOf("Ironforge") == kIronforge && CityOf("Darnassus") == kDarnassus);
     CHECK(CityOf("Undercity") == kUndercity && CityOf("Orgrimmar") == kOrgrimmar && CityOf("ThunderBluff") == kThunderBluff);
     CHECK(CityOf("Shattrath") == 0);
+    for (std::uint32_t city = kStormwind; city <= kThunderBluff; ++city)
+        CHECK(CityOf(CityName(city)) == city);
+    CHECK(CityName(42) == "city42");
 }
 
 void TrainingDueRule()

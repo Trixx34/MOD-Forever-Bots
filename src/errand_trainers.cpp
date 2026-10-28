@@ -68,6 +68,28 @@ bool ParseFloat(std::string_view text, float& value)
 
 } // namespace
 
+std::string CityName(std::uint32_t city)
+{
+    switch (city)
+    {
+        case kStormwind:
+            return "Stormwind";
+        case kIronforge:
+            return "Ironforge";
+        case kDarnassus:
+            return "Darnassus";
+        case kUndercity:
+            return "Undercity";
+        case kOrgrimmar:
+            return "Orgrimmar";
+        case kThunderBluff:
+            return "ThunderBluff";
+        default:
+            break;
+    }
+    return "city" + std::to_string(city);
+}
+
 std::uint32_t CityOf(std::string_view name)
 {
     if (name == "Stormwind")
