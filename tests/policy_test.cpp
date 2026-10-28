@@ -4038,6 +4038,42 @@ void UnseenThreatIsGivenUp()
     CHECK(!HasAction(policy.Decide(view(), 50000), 10, ActionType::kAttackTarget, threat));
 }
 
+// A hostile almost on top of the bot in the plane but 20 yards above it (a patrol on a wall walk: the Shadowfang Keep courtyard's Tormented Officers) is
+// not pulled: the bot would stand under it, its follow order finds no way and its spells have no line of sight. A hostile a short climb above, a gentle slope
+// away, or one that is already attacking the bot, is still fought.
+void HostileOnAnotherLevelIsNotPulled()
+{
+    auto const act = [](NearbyUnit const& unit, bool attacked)
+    {
+        WorldTickSnapshotView view = PartyView({ 10 });
+        view.bots[0].in_combat = attacked ? 1 : 0;
+        AddNearby(view, 0, unit);
+        BotPolicy policy(AggressiveOptions());
+        auto const actions = policy.Decide(view, 0);
+        return HasAction(actions, 10, ActionType::kAttackTarget, unit.guid) || HasAction(actions, 10, ActionType::kFollow, unit.guid);
+    };
+    NearbyUnit above = Hostile(7, 3.0f, 100);
+    above.pos_z = 20.0f;               // 3 yards along the ground, 20 up
+    CHECK(!act(above, false));
+    CHECK(act(above, true));           // it is attacking the bot: the stall watchdog and the approach timeout deal with it, not this rule
+
+    NearbyUnit farAbove = Hostile(8, 30.0f, 100);
+    farAbove.pos_z = 20.0f;            // 20 up over 30 along: steeper than 0.5
+    CHECK(!act(farAbove, false));
+
+    NearbyUnit stairs = Hostile(9, 30.0f, 100);
+    stairs.pos_z = 12.0f;              // 12 up over 30 along: a stair or a ramp
+    CHECK(act(stairs, false));
+
+    NearbyUnit step = Hostile(10, 3.0f, 100);
+    step.pos_z = 8.0f;                 // a short climb
+    CHECK(act(step, false));
+
+    NearbyUnit below = Hostile(11, 4.0f, 100);
+    below.pos_z = -18.0f;              // the floor under the bot counts the same
+    CHECK(!act(below, false));
+}
+
 // A creature far enough below the bot gives no experience: it is not pulled, and its presence does not keep the bot from walking on.
 void GreyCreatureIsNotPulled()
 {
@@ -5649,6 +5685,7 @@ int main()
     NoLootForACorpseItDidNotFight();
     NoLootForADistantCorpse();
     BotDoesNotPullAboveItsLevel();
+    HostileOnAnotherLevelIsNotPulled();
     BotDoesNotPullAnElite();
     CreatureAttackingTheBotIsFoughtWhateverItsLevel();
     RepeatedlyAvoidedTargetIsLeftLonger();

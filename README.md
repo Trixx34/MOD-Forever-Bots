@@ -120,7 +120,8 @@ Columns: `time_ms`, `kind`, `bot`, `level`, `health_pct`, `power_pct`, `in_fight
 `casts_applied`, `refusals`, `stuck_episodes`, `longest_fight_ms`, `health_lost`, `detail`.
 
 Kinds: `summary`, `fight_start`, `fight_end` (detail: reason, target, duration, health lost), `target_switch`, `death`, `alive`,
-`level`, `stuck`, `unstuck`.
+`level`, `stuck`, `unstuck`. `stuck` is a fight in which the bot's health, position and target did not change for a minute (a healthy bot standing
+still in a long fight counts); `unstuck` closes the episode when something changes, or with the fight (detail `fight_end <reason> lost <why>`).
 
 - `casts_applied` counts every applied action (move, follow, stop, rest and the rest included), not only spells.
 - A fight starts when the bot's own attack target is set. `fight_end` reason `target_gone` means the target was not in view when the
