@@ -1624,6 +1624,58 @@ void TheVoidwalkerCompanionStaysReachablePastTheEngagementCapToo()
     CHECK(!onUnlistedAdd);  // an unrelated unlisted hostile in the same spot is still not pulled in: only the dungeon's own list is exempt
 }
 
+// Ragefire Chasm, the Searing Blade camp (2026-10-28 soak data): the Voidwalker Minion (8996) is a level 47 guardian of the Searing Blade Warlock (11324) and
+// is unsummoned when the Warlock dies. The Warlock stands about 25 yards behind the tank's target, past the 12 yard pack reach, so the damage dealers
+// used to turn on the Voidwalker (kill_priority rank 1) and never on the Warlock. With the Voidwalker in view, the Warlock is taken first from up to 35
+// yards; without a Voidwalker nothing changes (a distant Warlock is left alone).
+void ADamageDealerTakesTheWarlockWhoseVoidwalkerIsUp()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.PartyCount = 1;
+    options.ClassOf = [](std::uint64_t guid) { return guid == 12 ? 1u : guid == 11 ? 8u : 5u; }; // bot 11 is the mage, 12 the warrior, the rest priests
+    options.TacticInterrupt = false;
+    options.KillPriority = { { 11324, 0 }, { 8996, 1 }, { 11322, 2 }, { 11323, 3 } }; // the shipped dungeon file's order
+    NearbyUnit enforcer = Hostile(7, 2.0f, 100);
+    enforcer.guid = MakeUnitRef(8, 11323, 7);         // the tank's own target
+    NearbyUnit voidwalker = Hostile(8, 5.0f, 100);
+    voidwalker.guid = MakeUnitRef(8, 8996, 8);        // joined the melee at the tank
+    NearbyUnit warlock = Hostile(9, 27.0f, 100);
+    warlock.guid = MakeUnitRef(8, 11324, 9);          // behind, outside the 12 yard pack reach
+    auto const run = [&](bool withVoidwalker, bool tacticFocus, std::uint64_t& onWarlock, std::uint64_t& onEnforcer, std::uint64_t& onVoidwalker)
+    {
+        options.TacticFocus = tacticFocus;
+        BotPolicy policy(options);
+        policy.SetRouteActive(true);
+        WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+        view.bots[2].in_combat = 1;
+        view.bots[2].threat_target_guid = enforcer.guid;
+        AddNearby(view, 1, enforcer);
+        if (withVoidwalker)
+            AddNearby(view, 1, voidwalker);
+        AddNearby(view, 1, warlock);
+        onWarlock = onEnforcer = onVoidwalker = 0;
+        for (std::uint64_t at = 0; at < 6000; at += 500)
+            for (BotAction const& action : policy.Decide(view, at))
+                if (action.bot_guid == 11)
+                {
+                    onWarlock += action.target_guid == warlock.guid;
+                    onEnforcer += action.target_guid == enforcer.guid;
+                    onVoidwalker += action.target_guid == voidwalker.guid;
+                }
+    };
+    std::uint64_t onWarlock = 0, onEnforcer = 0, onVoidwalker = 0;
+    run(true, true, onWarlock, onEnforcer, onVoidwalker);
+    CHECK(onWarlock > 0);       // the Warlock first, 25 yards from the tank's target
+    CHECK(onVoidwalker == 0);   // not the Voidwalker (rank 1) that stood nearer
+    CHECK(onEnforcer == 0);
+    run(true, false, onWarlock, onEnforcer, onVoidwalker); // not a tactic: it holds with focus off, as the golem's engineer does
+    CHECK(onWarlock > 0);
+    run(false, true, onWarlock, onEnforcer, onVoidwalker); // no Voidwalker up: the distant Warlock is outside the pack reach as before
+    CHECK(onWarlock == 0);
+    CHECK(onEnforcer > 0);
+}
+
 // Cc: a mage (Polymorph, spell 118) holds one extra, unengaged Humanoid member of the tank's pack -- not the tank's own target,
 // which is already engaged.
 void CcHoldsAnUnengagedHumanoidPackMember()
@@ -5646,6 +5698,7 @@ int main()
     ACasterOfThePackIsTargetedForAnInterrupt();
     ADamageDealerDoesNotWidenPastTwoAlreadyEngagedHostiles();
     TheVoidwalkerCompanionStaysReachablePastTheEngagementCapToo();
+    ADamageDealerTakesTheWarlockWhoseVoidwalkerIsUp();
     CcHoldsAnUnengagedHumanoidPackMember();
     CcDoesNotHoldACreatureTypeItHasNoSpellFor();
     CcNeverHoldsTheKillPriorityTarget();
