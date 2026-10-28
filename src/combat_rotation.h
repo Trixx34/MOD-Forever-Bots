@@ -107,6 +107,14 @@ std::vector<Row> const* RowsFor(RotationData const& data, std::uint32_t classId,
 std::uint32_t SpecRole(std::uint32_t classId, std::string const& spec);
 std::string DefaultSpec(std::uint32_t classId, std::uint32_t role);
 
+// What a spec wants from its gear, as a small id the core's autogear scoring turns into a stat list (ModuleBotActions.cpp's
+// PreferredStats): 0 strength+stamina (warrior/paladin melee, including their tanks), 1 agility+stamina (hunter, rogue,
+// enhancement shaman, and druid feral of either role -- a feral tank wants the same stats as a feral dps, just more of them),
+// 2 intellect+spirit+stamina (a caster role this table has no more specific answer for), 3 intellect+crit (a caster dps: balance
+// druid, shadow priest, elemental shaman, mage, warlock), 4 intellect+spirit+haste (a healer: holy paladin/priest, discipline
+// priest, restoration shaman/druid). Unknown class+spec falls back to 2.
+std::uint32_t GearProfileFor(std::uint32_t classId, std::string const& spec);
+
 RotationData ParseRotationData(std::istream& in, std::vector<std::string>& warnings);
 RotationData LoadRotationData(std::string const& path, std::vector<std::string>& warnings);
 

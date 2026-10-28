@@ -2703,7 +2703,12 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 BotAction gear;
                 gear.bot_guid = bot.guid;
                 gear.type = ActionType::kAutoGear;
-                gear.spell_id = (classId == kWarriorClass && _options.PartySize != 0) ? 1u : 0u; // a warrior in a party tanks
+                // bit 0: a tank takes a one-hand weapon and a shield over a two-hander (any tank role, not just a warrior --
+                // the old `classId == kWarriorClass` check never set this for a protection paladin or a feral tank druid).
+                // bits 2-4: the gear stat profile (ModuleBotActions.cpp's PreferredStats), from the bot's resolved spec.
+                bool const tankRole = state.Role_ == BotState::Role::Tank ||
+                                      (state.Role_ == BotState::Role::Auto && classId == kWarriorClass && _options.PartySize != 0);
+                gear.spell_id = (tankRole ? 1u : 0u) | (rotation::GearProfileFor(classId, spec) << 2);
                 actions.push_back(gear);
                 state.GearedAtLevel = bot.level != 0 ? bot.level : 1;
                 state.GearRequested = false;
