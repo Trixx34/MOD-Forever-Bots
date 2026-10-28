@@ -2034,6 +2034,7 @@ int main(int argc, char** argv)
             plan.AmmoCount = scenario.Ammo;
             plan.Bosses = scenario.Bosses;
             plan.ClassOf = policyOptions.ClassOf;
+            plan.RaceOf = policyOptions.RaceOf;
             plan.TameEnabled = scenario.HasTameSpot;
             plan.TameMap = static_cast<std::uint32_t>(scenario.TameSpot[0]);
             plan.TameSpot = { scenario.TameSpot[1], scenario.TameSpot[2], scenario.TameSpot[3] };

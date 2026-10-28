@@ -707,6 +707,7 @@ void CountsBossesSeenDead()
     std::vector<BotSnapshot> bots;
     ScenarioPlan plan = Plan();
     plan.Bosses = { { 644, "Rhahk'Zor" }, { 646, "Mr. Smite" } };
+    plan.RaceOf = [](std::uint64_t guid) { return guid == 1 ? 2u : 5u; };
     ScenarioDirector director(plan);
     std::vector<BotAction> actions;
     bots = { Bot(1, 36, 0, 0, 2, 3), Bot(2, 36, 0, 0, 1, 3), Bot(3, 36, 0, 0, 1, 3) };
@@ -735,6 +736,7 @@ void CountsBossesSeenDead()
     auto const result = director.TakeResult();
     CHECK(result && result->BossesTotal == 2 && result->BossesKilled.size() == 1);
     CHECK(FormatScenarioResult(*result).find("bosses=1/2 killed=Rhahk'Zor") != std::string::npos);
+    CHECK(FormatScenarioResult(*result).find("killed=Rhahk'Zor | roster=2:1,5:5,5:5 classes=1,5,5 combo=1-5-5") != std::string::npos);
 }
 
 void Down(BotSnapshot& bot, std::uint8_t life = 1)
@@ -1329,6 +1331,21 @@ void SettingsReadRosterSpecsClassSuppliesAndTheTameSpot()
     CHECK(ScenarioSlotOf({ s }, 1).Spec.empty());
 }
 
+void FormatAppendsTheRosterAfterTheBosses()
+{
+    ScenarioResult result;
+    result.Name = "rfc#2";
+    result.Outcome = "timeout";
+    result.BossesTotal = 4;
+    result.BossesKilled = { "Oggleflint", "Taragaman the Hungerer" };
+    result.Party = { { 2, 1 }, { 5, 5 }, { 8, 8 }, { 2, 9 }, { 5, 4 } };
+    std::string const text = FormatScenarioResult(result);
+    CHECK(text.find("killed=Oggleflint,Taragaman the Hungerer | roster=2:1,5:5,8:8,2:9,5:4 classes=1,4,5,8,9 combo=1-4-5-8-9") != std::string::npos);
+    CHECK(text.find(" | ") == text.rfind(" | "));
+    result.Party.clear();
+    CHECK(FormatScenarioResult(result).find(" | ") == std::string::npos);
+}
+
 int main()
 {
     AHunterWithoutAmmunitionIsGivenSome();
@@ -1358,6 +1375,7 @@ int main()
     DeadLeaderAbandonsAfterTheCap();
     EnteringSkipsGhostsAndCorpses();
     FormatShowsEventsRevivedWipes();
+    FormatAppendsTheRosterAfterTheBosses();
     TimeoutEndsTheRun();
     EnteringTimesOut();
     PartyRestsAtStagingBeforeEntering();

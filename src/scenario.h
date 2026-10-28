@@ -56,6 +56,7 @@ struct ScenarioPlan
     std::uint32_t AmmoCount = 200;
     std::vector<std::pair<std::uint32_t, std::string>> Bosses; // creature entry and name of each boss; one seen dead counts as killed
     std::function<std::uint32_t(std::uint64_t)> ClassOf;      // bot guid -> class id
+    std::function<std::uint32_t(std::uint64_t)> RaceOf;       // bot guid -> race id (for the roster in the result line)
     // Dead-bot recovery. With WipeRecovery on, an all-down state starts a timer of WipeRecoveryMs: if a bot is alive again before it ends,
     // the wipe is cancelled and counted in Wipes; else the run ends as "wipe". Off (default): all down ends the run at once.
     bool WipeRecovery = false;
@@ -103,6 +104,7 @@ struct ScenarioResult
     bool PartyFormed = true;        // false when the grouping phase timed out
     std::uint32_t BossesTotal = 0;  // bosses the plan lists
     std::vector<std::string> BossesKilled; // names of the ones seen dead, in the order they were seen
+    std::vector<std::pair<std::uint32_t, std::uint32_t>> Party; // race and class id of each member, in the order first seen
 };
 
 constexpr std::uint64_t kDressPauseMs = 1500;
@@ -207,6 +209,7 @@ private:
     std::uint64_t _routeDoneMs = 0;        // when the leader first touched the last waypoint (RequireBosses grace)
     std::set<std::uint32_t> _bossKilledEntries;
     std::map<std::uint64_t, bool> _everDead;
+    std::vector<std::uint64_t> _members;               // bot guids in the order first seen
     std::map<std::uint64_t, bool> _wasDown;            // bot -> down at the last tick (a bot never seen counts as up)
     std::uint32_t _deathEvents = 0;
     std::uint32_t _revived = 0;
@@ -226,5 +229,5 @@ private:
     std::uint64_t _lastTick = ~0ull;
 };
 
-// One line of text for the log: "scenario <name>: outcome=... furthest=3/7 deaths=2 alive=3/5 events=3 revived=1 wipes=0 ghosts=0 run=412s".
+// One line of text for the log: "scenario <name>: outcome=... furthest=3/7 deaths=2 alive=3/5 events=3 revived=1 wipes=0 ghosts=0 run=412s", then ' | roster=<race>:<class>,... classes=<sorted ids> combo=<sorted ids joined by -> ' when the party is known.
 std::string FormatScenarioResult(ScenarioResult const& result);

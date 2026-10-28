@@ -56,6 +56,8 @@ void ScenarioDirector::Finish(std::string outcome, std::uint64_t nowMs)
     result.DeathEvents = _deathEvents;
     result.Revived = _revived;
     result.Wipes = _wipes;
+    for (std::uint64_t const guid : _members)
+        result.Party.emplace_back(_plan.RaceOf ? _plan.RaceOf(guid) : 0, _plan.ClassOf ? _plan.ClassOf(guid) : 0);
     _result = result;
     _phase = ScenarioPhase::Done;
 }
@@ -100,6 +102,8 @@ void ScenarioDirector::Decide(forever_module::WorldTickSnapshotView const& view,
     // A bot is up only with life_state 0: a released ghost has health 1, so health says nothing about it.
     for (BotSnapshot const& bot : bots)
     {
+        if (std::find(_members.begin(), _members.end(), bot.guid) == _members.end())
+            _members.push_back(bot.guid);
         bool const down = bot.life_state != 0;
         bool& wasDown = _wasDown[bot.guid];
         if (down)
@@ -618,6 +622,24 @@ std::string FormatScenarioResult(ScenarioResult const& result)
             out << (i ? "," : "") << result.BossesKilled[i];
         if (result.BossesKilled.empty())
             out << "none";
+    }
+    if (!result.Party.empty())
+    {
+        // After everything the older fields said; the " | " keeps the boss names (which may hold spaces) apart from these.
+        std::vector<std::uint32_t> classes;
+        out << " | roster=";
+        for (std::size_t i = 0; i < result.Party.size(); ++i)
+        {
+            out << (i ? "," : "") << result.Party[i].first << ":" << result.Party[i].second;
+            classes.push_back(result.Party[i].second);
+        }
+        std::sort(classes.begin(), classes.end());
+        out << " classes=";
+        for (std::size_t i = 0; i < classes.size(); ++i)
+            out << (i ? "," : "") << classes[i];
+        out << " combo=";
+        for (std::size_t i = 0; i < classes.size(); ++i)
+            out << (i ? "-" : "") << classes[i];
     }
     return out.str();
 }
