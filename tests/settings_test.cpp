@@ -78,6 +78,10 @@ void SayAndSupplySettings()
     CHECK(away.Presence.OfflineMinMin == 10 && away.Presence.OfflineMaxMin == 20 && away.Presence.MinOnline == 40 && away.Presence.MaxOnline == 800);
     CHECK(away.Presence.DayPercent[0] == 1 && away.Presence.DayPercent[23] == 24 && warnings.empty());
     // Auction: off by default; the run time is one of the fork's three.
+    CHECK(!off.Auction.BuyEnabled);                                  // buying is off by default, whatever Auction says
+    CHECK(!ParseBotSettings({ { "Auction", "1" } }, warnings).Auction.BuyEnabled);
+    BotSettings const buys = ParseBotSettings({ { "Auction", "1" }, { "AuctionBuy", "1" } }, warnings);
+    CHECK(buys.Auction.Enabled && buys.Auction.BuyEnabled);
     CHECK(!off.Auction.Enabled && off.Auction.SellPctGreen == 300 && off.Auction.RunMinutes == 120 && off.Auction.EveryMs == 1800000);
     BotSettings const house = ParseBotSettings({ { "Auction", "1" }, { "AuctionSellPctGreen", "250" }, { "AuctionSellPctBlue", "350" }, { "AuctionSellPctEpic", "450" },
                                                  { "AuctionBuyoutPct", "130" }, { "AuctionRelistPct", "80" }, { "AuctionRunHours", "2" },

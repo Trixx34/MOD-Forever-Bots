@@ -213,9 +213,9 @@ struct BotSettings
     // Flight points (layout 17; config keys Taxi, TaxiMinWalkYards, TaxiMasterMaxYards, TaxiBlockedSec; off by default): a bot that is not in a party replaces a walk
     // of at least TaxiMinWalkYards with a flight from a flight master within TaxiMasterMaxYards that lies on the way. Needs Bot.Taxi.Enabled in the core (on by default).
     taxi::Settings Taxi;
-    // Auction House (doc/economy.md; config keys Auction, AuctionSellPctGreen, AuctionSellPctBlue, AuctionSellPctEpic, AuctionBuyoutPct, AuctionRelistPct,
+    // Auction House (doc/economy.md; config keys Auction, AuctionBuy (a bot also buys upgrades), AuctionSellPctGreen, AuctionSellPctBlue, AuctionSellPctEpic, AuctionBuyoutPct, AuctionRelistPct,
     // AuctionRunHours (2 only: the core runs every auction 2 hours), AuctionMinVendorCopper, AuctionBagFullPct, AuctionPerVisit, AuctionListedMax,
-    // AuctionEverySec, AuctionBuyMaxPct, AuctionBrowsePerVisit, AuctionCallsPerTick; off by default). main.cpp drives the listing visits.
+    // AuctionEverySec, AuctionBuyMaxPct, AuctionBrowsePerVisit, AuctionCallsPerTick; off by default). main.cpp drives the listing and buy visits.
     auction::Settings Auction;
     // Vendor sales (sell policy; config keys SellVendor, SellEverySec, SellPerVisit; off by default). main.cpp sends the sales on a vendor visit.
     sell::Settings Sell;

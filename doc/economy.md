@@ -22,6 +22,15 @@ owner's. The brief it replaces (`economy-design-prompt.md` in the old `.opencode
 - **Bid and buyout**: need an acting player; with `AuctionHouseForBot` the bot is that player.
 - **Bag contents**: `kListBags` gives only guid, entry, count and name. Quality, vendor price, whether the item is bound and whether the bot would wear it are not in it.
 
+### Buying (protocol 19, SDK 0.22.0, `AuctionBuy`, off by default)
+
+Built: the core's browse by filter (`ModuleClient::AuctionBrowseByFilterForBot`) returns, in the reply, the listings of one inventory type with a buyout, not the bot's own, within the bot's
+level and the buyout bound, cheapest first, each with `upgrade_score` (the core's AutoGear score against the worn piece; 0 = no upgrade). With `Auction = 1` and `AuctionBuy = 1`, every
+`AuctionEverySec` an idle bot at an auctioneer browses the next equipment slot (`auction::BrowseSlot`, in turn), `ChooseBuy` takes the best score per copper within `BuyBudget`, and the module sends the
+buyout. Journal: `auction: bot G bought item A entry=E count=N price=P` and `auction: bot G buy_failed item A entry=E price=P reason=TOKEN` (A is the auction id). A purchase arrives by mail, which the
+core collects for bots, and the next bag gear pass wears it. Not done: the score uses the class-only stat profile (not the bot's spec), rings and trinkets are compared with the weaker slot only,
+and a bot does not walk to an auctioneer to buy (the errands do that for listing).
+
 ### Still to build
 
 1. Core: let `kList` take the run time (and optionally stackable commodities); a browse mode that returns the cheapest listings of an equipment slot and level range (so the buy side can

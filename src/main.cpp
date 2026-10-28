@@ -335,6 +335,8 @@ struct AuctionBot
     std::uint32_t FreeSlots = 0;
     std::uint64_t AuctioneerGuid = 0;
     bool Idle = false;
+    std::uint64_t Copper = 0;   // for the budget of a purchase (AuctionBuy)
+    std::uint32_t Level = 0;
 };
 
 struct AuctionFeed
@@ -950,7 +952,7 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
                 {
                     if ((extras.Alts && extras.Alts->Has(bot.guid)) || bot.group_role != 0)
                         continue;
-                    list.push_back({ bot.guid, bot.bag_free_slots, bot.auctioneer_guid, bot.life_state == 0 && bot.in_combat == 0 });
+                    list.push_back({ bot.guid, bot.bag_free_slots, bot.auctioneer_guid, bot.life_state == 0 && bot.in_combat == 0, bot.copper, bot.level });
                 }
                 std::lock_guard<std::mutex> lock(extras.Auction->Lock);
                 extras.Auction->Bots.swap(list);
@@ -1849,6 +1851,55 @@ int main(int argc, char** argv)
                 return;
             auction::CallBudget budget(settings.Auction.MaxCallsPerTick);
             budget.NewTick();
+            // AuctionBuy (off by default): when the bot's buy visit is due and it has money to spend, browse the next equipment slot for upgrades
+            // (the core scores the listings for this bot) and buy out the best upgrade per copper that the budget allows. One browse per visit; the
+            // buyout follows from the browse's reply, so it is not counted again in this tick's budget.
+            auto const buyVisit = [&client, &settings, &budget, now](AuctionBot const& bot, auction::Standing& standing)
+            {
+                if (!settings.Auction.BuyEnabled || !auction::BuyVisitDue(settings.Auction, standing, now))
+                    return;
+                std::uint64_t const spend = auction::BuyBudget(settings.Auction, bot.Copper, bot.Level);
+                if (spend == 0 || !budget.Take())
+                    return;
+                standing.LastBuyMs = now;
+                forever_module::ModuleClient::AuctionBrowseFilter filter;
+                filter.inventoryType = auction::BrowseSlot(standing.BuyCursor++);
+                filter.maxLevel = bot.Level;
+                filter.maxBuyout = auction::BuyoutBound(spend);
+                filter.onlyUpgrades = true;
+                std::uint64_t const botGuid = bot.Guid;
+                std::uint64_t const auctioneer = bot.AuctioneerGuid;
+                client.AuctionBrowseByFilterForBot(botGuid, auctioneer, filter,
+                                                   [&client, &settings, botGuid, auctioneer, spend](forever_module::ActionReply const& reply)
+                {
+                    if (!reply.success())
+                        return;
+                    std::vector<auction::Offer> offers;
+                    for (forever_module::AuctionListingEvent const& listing : reply.listings())
+                    {
+                        auction::Offer offer;
+                        offer.AuctionGuid = listing.auction_guid();
+                        offer.Entry = listing.item_entry();
+                        offer.Count = listing.count() ? listing.count() : 1;
+                        offer.Bid = listing.bid();
+                        offer.Buyout = listing.buyout();
+                        offer.Upgrade = listing.upgrade_score();
+                        offers.push_back(offer);
+                    }
+                    std::optional<auction::Offer> const pick = auction::ChooseBuy(settings.Auction, spend, offers, auction::UpgradeOf);
+                    if (!pick)
+                        return;
+                    auction::Offer const offer = *pick;
+                    client.AuctionHouseForBot(botGuid, forever_module::ModuleClient::AuctionHouseOp::kBuyout, auctioneer, 0, offer.AuctionGuid, offer.Entry, 0, 0,
+                                              static_cast<std::uint32_t>(offer.Buyout), [botGuid, offer](forever_module::ActionReply const& bought)
+                    {
+                        if (bought.success())
+                            std::cerr << "forever-bots: " << auction::BoughtLine(botGuid, offer, bought.copper_spent() ? bought.copper_spent() : offer.Buyout) << "\n";
+                        else
+                            std::cerr << "forever-bots: " << auction::BuyFailedLine(botGuid, offer, bought.reason()) << "\n";
+                    });
+                });
+            };
             for (AuctionBot const& bot : list)
             {
                 if (!bot.Idle || bot.AuctioneerGuid == 0)
@@ -1859,7 +1910,10 @@ int main(int argc, char** argv)
                 standing.ListedNow = static_cast<std::uint32_t>(ends.size());
                 auction::Bags const bags{ kBagSlotsAssumed, kBagSlotsAssumed - std::min(bot.FreeSlots, kBagSlotsAssumed) };
                 if (!auction::VisitDue(settings.Auction, bags, standing, false, now))
+                {
+                    buyVisit(bot, standing);
                     continue;
+                }
                 standing.LastVisitMs = now;
 
                 std::vector<auction::Candidate> items;
@@ -1888,10 +1942,14 @@ int main(int argc, char** argv)
                             items.erase(listing.ItemGuid);
                     });
                 }
+                buyVisit(bot, standing);
             }
         });
         std::cerr << "forever-bots: auction house is on: a listing visit every " << settings.Auction.EveryMs / 1000 << " s per bot, at most "
                   << settings.Auction.PerVisit << " items per visit\n";
+        if (settings.Auction.BuyEnabled)
+            std::cerr << "forever-bots: auction buying is on: an upgrade browse (one equipment slot) every " << settings.Auction.EveryMs / 1000
+                      << " s per bot, a purchase costs at most " << settings.Auction.BuyMaxPct << " percent of the money above the reserve\n";
     }
     if (settings.Errand.Enabled && !scenarioOn)
     {

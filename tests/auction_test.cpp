@@ -224,6 +224,82 @@ void TheJournalLinesAreKeyValueAndKeepTheOldText()
     CHECK(LogToken(std::string(100, 'x')).size() == 40);
 }
 
+void TheBuyVisitFollowsTheSwitchesAndThePace()
+{
+    Settings s = On();
+    Standing standing;
+    CHECK(!BuyVisitDue(s, standing, 1000));                // AuctionBuy is off by default, whatever Auction says
+    s.BuyEnabled = true;
+    CHECK(BuyVisitDue(s, standing, 1000));                 // never browsed
+    standing.LastBuyMs = 1000;
+    CHECK(!BuyVisitDue(s, standing, 1000 + s.EveryMs - 1));
+    CHECK(BuyVisitDue(s, standing, 1000 + s.EveryMs));
+    Settings off;                                          // Auction off: no buying either
+    off.BuyEnabled = true;
+    CHECK(!BuyVisitDue(off, Standing{}, 1000));
+    // the listing visit and the buy visit keep their own time
+    standing.LastVisitMs = 1000;
+    standing.LastBuyMs = 0;
+    CHECK(BuyVisitDue(s, standing, 1001));
+}
+
+void TheBrowseSlotsTurnAndWrap()
+{
+    std::size_t const count = BrowseSlotCount();
+    CHECK(count > 10);
+    std::vector<std::uint32_t> seen;
+    for (std::uint32_t i = 0; i < count; ++i)
+    {
+        std::uint32_t const slot = BrowseSlot(i);
+        CHECK(slot >= 1 && slot <= 26);
+        CHECK(slot != 4 && slot != 12 && slot != 18 && slot != 19 && slot != 24 && slot != 25);   // shirt, trinket, bag, tabard, ammunition, thrown
+        for (std::uint32_t before : seen)
+            CHECK(before != slot);                         // each slot once per round
+        seen.push_back(slot);
+    }
+    CHECK(BrowseSlot(static_cast<std::uint32_t>(count)) == BrowseSlot(0));
+    CHECK(BrowseSlot(static_cast<std::uint32_t>(count) + 3) == BrowseSlot(3));
+    CHECK(BuyoutBound(5000) == 5000u);
+    CHECK(BuyoutBound(0x1FFFFFFFFull) == 0xFFFFFFFFu);
+}
+
+void TheCoresUpgradeScoreDecidesWhatIsBought()
+{
+    Settings s = On();
+    s.BuyEnabled = true;
+    auto offer = [](std::uint64_t id, std::uint64_t buyout, std::uint32_t upgrade)
+    {
+        Offer o;
+        o.AuctionGuid = id;
+        o.Entry = 100 + static_cast<std::uint32_t>(id);
+        o.Buyout = buyout;
+        o.Upgrade = upgrade;
+        return o;
+    };
+    std::vector<Offer> offers = { offer(1, 4000, 40), offer(2, 1000, 20), offer(3, 500, 0), offer(4, 9000, 500) };
+    std::optional<Offer> pick = ChooseBuy(s, 5000, offers, UpgradeOf);
+    CHECK(pick && pick->AuctionGuid == 2);                 // 0.02 per copper beats 0.01; the score 0 is no upgrade; the dear one is over the budget
+    CHECK(!ChooseBuy(s, 400, offers, UpgradeOf));
+    CHECK(UpgradeOf(offer(5, 1, 7)) == 7.0 && UpgradeOf(Offer{}) == 0.0);
+    // the budget: a quarter of the money above the reserve
+    s.BuyMaxPct = 25;
+    CHECK(BuyBudget(s, 100000, 10) == (100000 - 10 * s.ReserveCopperPerLevel) * 25 / 100);
+    CHECK(BuyBudget(s, 40, 10) == 0);                      // under the reserve: nothing to spend
+}
+
+void TheBuyJournalLinesAreKeyValue()
+{
+    Offer o;
+    o.AuctionGuid = 901;
+    o.Entry = 2000;
+    o.Count = 1;
+    o.Buyout = 1500;
+    CHECK(BoughtLine(7, o, 1500) == "auction: bot 7 bought item 901 entry=2000 count=1 price=1500");
+    CHECK(BuyFailedLine(7, o, "not enough money") == "auction: bot 7 buy_failed item 901 entry=2000 price=1500 reason=not_enough_money");
+    CHECK(BuyFailedLine(7, o, "") == "auction: bot 7 buy_failed item 901 entry=2000 price=1500 reason=unknown");
+    CHECK(BuyFailedLine(7, o, "auction not found, sorry") == "auction: bot 7 buy_failed item 901 entry=2000 price=1500 reason=auction_not_found_sorry");
+}
+
 } // namespace
 
 int main()
@@ -240,6 +316,10 @@ int main()
     TheBestUpgradePerCopperIsChosen();
     TheCallBudgetLimitsATick();
     TheJournalLinesAreKeyValueAndKeepTheOldText();
+    TheBuyVisitFollowsTheSwitchesAndThePace();
+    TheBrowseSlotsTurnAndWrap();
+    TheCoresUpgradeScoreDecidesWhatIsBought();
+    TheBuyJournalLinesAreKeyValue();
     if (failures == 0)
         std::printf("auction_test: all passed\n");
     return failures == 0 ? 0 : 1;

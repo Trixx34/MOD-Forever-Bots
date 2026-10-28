@@ -133,7 +133,11 @@ Module.forever-bots.TelemetrySummarySec = 60
 # AuctionPerVisit = 5           (items listed per visit, 1..20)
 # AuctionListedMax = 10         (listings a bot has at once, 1..50)
 # AuctionEverySec = 1800        (at most one visit per bot this often, 60..86400)
-# AuctionBuyMaxPct = 40         (not used yet: the most of a bot's spendable money one purchase may cost, 1..100)
+# AuctionBuy = 0                (off by default; needs Auction = 1 and a core with protocol 19. A bot also looks for upgrades: every AuctionEverySec it
+#                                browses one equipment slot of the house in turn, the core says which listings beat what the bot wears (its AutoGear score),
+#                                and the bot buys out the best upgrade per copper it can afford. Never in a scenario run. The item arrives by mail, which the
+#                                core collects for bots.)
+# AuctionBuyMaxPct = 40         (the most of a bot's spendable money (above the reserve) one purchase may cost, 1..100; used with AuctionBuy)
 # AuctionBrowsePerVisit = 3     (not used yet: item entries a bot looks up per visit, 1..20)
 # AuctionCallsPerTick = 4       (house calls the whole module makes per tick, 1..50)
 

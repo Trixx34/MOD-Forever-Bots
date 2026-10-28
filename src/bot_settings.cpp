@@ -719,6 +719,7 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
         settings.Taxi.BlockedMs = std::uint64_t(blockedSec) * 1000;
     }
     ReadBool(config, "Auction", settings.Auction.Enabled, warnings);
+    ReadBool(config, "AuctionBuy", settings.Auction.BuyEnabled, warnings);
     ReadKey(config, "AuctionSellPctGreen", 100, 2000, settings.Auction.SellPctGreen, warnings);
     ReadKey(config, "AuctionSellPctBlue", 100, 2000, settings.Auction.SellPctBlue, warnings);
     ReadKey(config, "AuctionSellPctEpic", 100, 2000, settings.Auction.SellPctEpic, warnings);
