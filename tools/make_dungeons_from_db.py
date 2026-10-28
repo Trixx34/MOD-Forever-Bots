@@ -25,7 +25,8 @@ DUNGEONS = {
     "wc": (43, "Wailing Caverns", 15, 25, ["Lady Anacondra", "Lord Cobrahn", "Kresh", "Lord Pythas", "Skum", "Lord Serpentis", "Verdan the Everliving", "Mutanus the Devourer"]),
     "dm": (36, "Deadmines", 18, 23, ["Rhahk'Zor", "Sneed's Shredder", "Gilnid", "Mr. Smite", "Cookie", "Captain Greenskin", "Edwin VanCleef"]),
     "sfk": (33, "Shadowfang Keep", 22, 30, ["Rethilgore", "Razorclaw the Butcher", "Baron Silverlaine", "Commander Springvale", "Odo the Blindwatcher", "Fenrus the Devourer", "Wolf Master Nandos", "Archmage Arugal"]),
-    "stockade": (34, "Stormwind Stockades", 24, 32, ["Targorr the Dread", "Kam Deepfury", "Hamhock", "Bazil Thredd", "Dextren Ward", "Bruegal Ironknuckle"]),
+    # Bruegal Ironknuckle (1720) is left out on purpose: rare spawn in a 15% spawn pool, absent from ~85% of instances, so requiring him ended runs bosses_missing.
+    "stockade": (34, "Stormwind Stockades", 24, 32, ["Targorr the Dread", "Kam Deepfury", "Hamhock", "Bazil Thredd", "Dextren Ward"]),
     "bfd": (48, "Blackfathom Deeps", 24, 32, ["Ghamoo-ra", "Lady Sarevess", "Gelihast", "Baron Aquanis", "Twilight Lord Kelris", "Old Serra'kis", "Aku'mai"]),
     "gnomer": (90, "Gnomeregan", 29, 38, ["Grubbis", "Viscous Fallout", "Electrocutioner 6000", "Crowd Pummeler 9-60", "Dark Iron Ambassador", "Mekgineer Thermaplugg"]),
     "rfk": (47, "Razorfen Kraul", 29, 38, ["Aggem Thorncurse", "Death Speaker Jargba", "Overlord Ramtusk", "Agathelos the Raging", "Charlga Razorflank"]),
