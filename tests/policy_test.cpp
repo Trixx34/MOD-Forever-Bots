@@ -2906,6 +2906,58 @@ void ALeaderRevivedAtTheEntranceGoesToItsParty()
     CHECK(!member.has_value());                                       // the members are not sent to the entrance
 }
 
+// The Stockade's revived tank (2026-10-28 sim: 31 of 96 tank deaths came within 120 s of the same tank's last one, 24 of 60 leader_recover teleports ended in its death):
+// a leader revived at the entrance at half health rests there until it is fit to walk (80 %), at most two minutes, and the members deep in the dungeon do not walk back to it.
+void ARevivedLeaderRestsAtTheEntranceBeforeItGoesToItsParty()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.ClassOf = WarriorLeads;
+    options.DungeonTeleport = true;
+    options.Route = { Point{ 220.0f, 0.0f, 0.0f }, Point{ 260.0f, 0.0f, 0.0f } };
+    PolicyOptions::DungeonRoute dungeon;
+    dungeon.HasEntry = true;
+    dungeon.Entry = Point{ 0.0f, 0.0f, 0.0f };
+    options.DungeonsByMap[36] = dungeon;
+    std::vector<std::string> events;
+    options.OnEvent = [&events](std::string const& line) { events.push_back(line); };
+    auto const hurtLeaderView = [](std::uint32_t health)
+    {
+        WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+        for (BotSnapshot& bot : view.bots)
+        {
+            bot.map_id = 36;
+            bot.pos_x = 200.0f;                                       // the party, deep in
+        }
+        view.bots[2].pos_x = 2.0f;                                    // the leader (12), just revived at the entrance
+        view.bots[2].health = health;                                 // of 1000
+        return view;
+    };
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    WorldTickSnapshotView hurt = hurtLeaderView(490);
+    bool followedTheLeader = false;
+    for (std::uint64_t now : { 1000ull, 5000ull, 30000ull, 100000ull })
+    {
+        std::vector<BotAction> const actions = policy.Decide(hurt, now);
+        CHECK(!TeleportOf(actions, 12).has_value());                  // it rests at the entrance first
+        for (BotAction const& action : actions)
+            followedTheLeader = followedTheLeader || (action.type == ActionType::kFollow && action.bot_guid != 12 && action.target_guid == PlayerOf(12));
+    }
+    CHECK(!followedTheLeader);                                        // and the members stay where they are
+    bool waited = false;
+    for (std::string const& line : events)
+        waited = waited || line.rfind("leader_recover_wait: bot=12", 0) == 0;
+    CHECK(waited);
+    std::optional<BotAction> gaveUp = TeleportOf(policy.Decide(hurt, 122000), 12);   // it cannot recover: after kLeaderRecoverMaxWaitMs it goes in all the same
+    CHECK(gaveUp.has_value() && gaveUp->dest_x == 197.0f);
+    // Fit (80 % or more): at once, as before.
+    BotPolicy fit(options);
+    fit.SetRouteActive(true);
+    std::optional<BotAction> now = TeleportOf(fit.Decide(hurtLeaderView(850), 1000), 12);
+    CHECK(now.has_value() && now->dest_x == 197.0f);
+}
+
 // A leader whose walk along the route goes nowhere sends it again and counts the point as refused (route_stall); a leader that waits says why (route_hold).
 void ALeaderThatDoesNotMoveIsNoticed()
 {
@@ -5503,6 +5555,20 @@ void NoShieldOnAWarriorOrADruid()
     CHECK(!CastsSpell(druid.Decide(drood, 1000), 10, 17, PlayerOf(12)));
 }
 
+// Weakened Soul keeps a second shield off the same member for 15 s: the priest heals the hurt member meanwhile (the Stockade priest ordered 15 shields in a row on a mage held at 44 %).
+void NoSecondShieldOnTheSameMemberWhileWeakenedSoulHolds()
+{
+    BotPolicy policy = DungeonPolicy();
+    WorldTickSnapshotView view = LeveledDungeonView(40);
+    view.bots[3].health = 440;                           // bot 13 (a priest, as the rest) at 44 %, in the fight
+    view.bots[3].in_combat = 1;
+    CHECK(CastsSpell(policy.Decide(view, 1000), 10, 17, PlayerOf(13)));        // shielded
+    std::vector<BotAction> const next = policy.Decide(view, 4000);
+    CHECK(!CastsSpell(next, 10, 17, PlayerOf(13)));                            // not again at once
+    CHECK(CastsSpell(next, 10, 2054, PlayerOf(13)));                           // it gets the plain heal instead
+    CHECK(CastsSpell(policy.Decide(view, 17000), 10, 17, PlayerOf(13)));       // the lock has run out: shielded again
+}
+
 void ARosterSpecSetsTheRoleOfAPriest()
 {
     PolicyOptions options = AggressiveOptions();
@@ -5527,6 +5593,7 @@ int main()
     BindingHealWhenThePriestAndTheTankAreBothHurt();
     PrayerOfHealingOnlyWhenMostOfThePartyIsLow();
     NoShieldOnAWarriorOrADruid();
+    NoSecondShieldOnTheSameMemberWhileWeakenedSoulHolds();
     ARosterSpecSetsTheRoleOfAPriest();
     ShortOfAmmoWalksToTheAmmoVendor();
     AFlippingPartyDoesNotHoldTheLeaderForever();
@@ -5536,6 +5603,7 @@ int main()
     ALeaderWithNoRouteIsPutBackOnTheRouteOnce();
     AMemberThatLostItsLeaderIsPutNextToIt();
     ALeaderRevivedAtTheEntranceGoesToItsParty();
+    ARevivedLeaderRestsAtTheEntranceBeforeItGoesToItsParty();
     ALeaderThatDoesNotMoveIsNoticed();
     TankLeadParsesAsAnOrderOfTheTank();
     TheTankLeadsTheGroupAlongTheRoute();
