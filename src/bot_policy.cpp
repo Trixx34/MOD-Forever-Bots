@@ -920,6 +920,9 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
     {
         state.TaxiBlockedUntilMs = nowMs + _options.Taxi.BlockedMs;
         state.TaxiWaitUntilMs = 0;
+        if (state.TaxiFlight.OrderedMs != 0 && _options.OnEvent)
+            _options.OnEvent(taxi::RefusedLine(bot.guid, bot.map_id, ActionStatusName(bot.last_action_status)));
+        state.TaxiFlight = taxi::Flight{};
         return;
     }
 
@@ -1945,6 +1948,17 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         present.insert(bot.guid);
         BotState& state = StateOf(bot.guid);
         ReadResult(state, bot, nowMs);
+        if (state.TaxiFlight.OrderedMs != 0)
+        {
+            taxi::Progress const progress = taxi::Track(state.TaxiFlight, bot.in_flight != 0, nowMs, _options.Taxi.WaitMs);
+            if (progress != taxi::Progress::None)
+            {
+                if (_options.OnEvent)
+                    _options.OnEvent(progress == taxi::Progress::Landed ? taxi::LandedLine(bot.guid, bot.map_id, bot.pos_x, bot.pos_y, state.TaxiFlight, nowMs)
+                                                                        : taxi::TimeoutLine(bot.guid, bot.map_id, progress, state.TaxiFlight, nowMs));
+                state.TaxiFlight = taxi::Flight{};
+            }
+        }
         if (state.LosRepositionTarget != 0 && bot.life_state == 0 && ClassFor(_options, bot.guid) == 5 && state.ForcedHeal == 0)
         {
             // LoS recovery must run before ordinary policy branches can continue early. Do not
@@ -4576,9 +4590,10 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     fly.dest_z = wanted.Dest.Z;
                     actions.push_back(fly);
                     state.TaxiWaitUntilMs = nowMs + _options.Taxi.WaitMs;
+                    state.TaxiFlight = taxi::Flight{ nowMs, 0, wanted.Dest.X, wanted.Dest.Y, bot.taxi_master_guid };
                     if (_options.OnEvent)
-                        _options.OnEvent("taxi: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id) +
-                                         " walk=" + std::to_string(int(std::hypot(bot.pos_x - wanted.Dest.X, bot.pos_y - wanted.Dest.Y))));
+                        _options.OnEvent(taxi::OrderLine(bot.guid, bot.level, bot.map_id, int(std::hypot(bot.pos_x - wanted.Dest.X, bot.pos_y - wanted.Dest.Y)),
+                                                         state.TaxiFlight));
                     [[fallthrough]];
                 }
                 case taxi::Move::Wait:

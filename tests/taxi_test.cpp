@@ -2,6 +2,7 @@
 #include "taxi_policy.h"
 
 #include <cstdio>
+#include <string>
 
 using namespace taxi;
 
@@ -99,6 +100,39 @@ void AFlightInProgressOrJustOrderedWaits()
     CHECK(Decide(On(), flying, 3000.0f, 0.0f, 0, 0, 0) == Move::Wait);               // in the air, whatever else
 }
 
+void TheFlightIsTrackedFromOrderToLanding()
+{
+    Flight f{ 1000, 0, 100.0f, 200.0f, 77 };
+    CHECK(Track(f, false, 2000, 8000) == Progress::None);                            // ordered, not in the air yet
+    CHECK(Track(f, true, 3000, 8000) == Progress::None && f.TookOffMs == 3000);
+    CHECK(Track(f, true, 60000, 8000) == Progress::None);                            // a long flight is not a timeout
+    CHECK(Track(f, false, 90000, 8000) == Progress::Landed);
+    Flight none;
+    CHECK(Track(none, false, 90000, 8000) == Progress::None);
+}
+
+void AFlightThatNeverStartsOrNeverEndsTimesOut()
+{
+    Flight f{ 1000, 0, 0.0f, 0.0f, 1 };
+    CHECK(Track(f, false, 8999, 8000) == Progress::None);
+    CHECK(Track(f, false, 9000, 8000) == Progress::NeverStarted);
+    Flight g{ 1000, 0, 0.0f, 0.0f, 1 };
+    CHECK(Track(g, true, 2000, 8000, 10000) == Progress::None);
+    CHECK(Track(g, true, 12000, 8000, 10000) == Progress::TooLong);
+}
+
+void TheLinesKeepTheOldKeysAndAppendTheNew()
+{
+    Flight f{ 1000, 3000, 1234.9f, -50.2f, 42 };
+    CHECK(OrderLine(5, 30, 1, 2500, f) == "taxi: bot=5 level=30 map=1 walk=2500 to_x=1234 to_y=-50 master=42");
+    CHECK(OrderLine(5, 30, 1, 2500, f).rfind("taxi: bot=5 level=30 map=1 walk=2500", 0) == 0);
+    CHECK(LandedLine(5, 1, 10.0f, 20.0f, f, 91000) == "taxi_landed: bot=5 map=1 x=10 y=20 to_x=1234 to_y=-50 took_s=90");
+    CHECK(TimeoutLine(5, 1, Progress::NeverStarted, f, 9000) == "taxi_timeout: bot=5 map=1 reason=not_started waited_s=8");
+    CHECK(TimeoutLine(5, 1, Progress::TooLong, f, 1801000) == "taxi_timeout: bot=5 map=1 reason=too_long waited_s=1800");
+    CHECK(RefusedLine(5, 1, "refused") == "taxi_refused: bot=5 map=1 status=refused");
+    CHECK(Seconds(5000, 1000) == 0);
+}
+
 } // namespace
 
 int main()
@@ -108,6 +142,9 @@ int main()
     AMasterThatIsFarBehindOrWrongIsNotWalkedTo();
     NothingHappensWhenOffOrBusyOrBlocked();
     AFlightInProgressOrJustOrderedWaits();
+    TheFlightIsTrackedFromOrderToLanding();
+    AFlightThatNeverStartsOrNeverEndsTimesOut();
+    TheLinesKeepTheOldKeysAndAppendTheNew();
     if (failures == 0)
         std::printf("taxi_test: all passed\n");
     return failures == 0 ? 0 : 1;

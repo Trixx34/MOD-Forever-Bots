@@ -208,6 +208,22 @@ void ARefusalForThePlaceOrTheMoneyIsTriedAgain()
     CHECK(ClassifyListFailure("") == ListFailure::Skip);
 }
 
+void TheJournalLinesAreKeyValueAndKeepTheOldText()
+{
+    Listing listing;
+    listing.ItemGuid = 900;
+    listing.Entry = 12345;
+    listing.Bid = 3000;
+    listing.Buyout = 3600;
+    CHECK(ListedLine(7, listing, 1) == "auction: bot 7 listed item 900 for 3000 copper (buyout 3600) entry=12345 count=1 price=3000");
+    CHECK(ListedLine(7, listing, 1).rfind("auction: bot 7 listed item 900 for 3000 copper (buyout 3600)", 0) == 0);
+    CHECK(ListRefusedLine(7, listing, "not enough money for the deposit") ==
+          "auction: bot 7 list_refused item 900 entry=12345 price=3000 reason=not_enough_money_for_the_deposit class=retry");
+    CHECK(ListRefusedLine(7, listing, "") == "auction: bot 7 list_refused item 900 entry=12345 price=3000 reason=unknown class=skip");
+    CHECK(LogToken("a, b=c") == "a_bc");
+    CHECK(LogToken(std::string(100, 'x')).size() == 40);
+}
+
 } // namespace
 
 int main()
@@ -223,6 +239,7 @@ int main()
     TheBuyBudgetKeepsTheReserve();
     TheBestUpgradePerCopperIsChosen();
     TheCallBudgetLimitsATick();
+    TheJournalLinesAreKeyValueAndKeepTheOldText();
     if (failures == 0)
         std::printf("auction_test: all passed\n");
     return failures == 0 ? 0 : 1;

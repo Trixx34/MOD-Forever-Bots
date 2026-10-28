@@ -1,6 +1,7 @@
 #include "auction_policy.h"
 
 #include <algorithm>
+#include <string>
 
 namespace auction {
 
@@ -151,6 +152,34 @@ std::optional<Offer> ChooseBuy(Settings const& settings, std::uint64_t budget, s
         }
     }
     return best;
+}
+
+std::string LogToken(std::string const& text)
+{
+    std::string out;
+    for (char const c : text)
+    {
+        if (out.size() >= 40)
+            break;
+        if (c == ' ')
+            out += '_';
+        else if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '.' || c == ':' || c == '-')
+            out += c;
+    }
+    return out.empty() ? "unknown" : out;
+}
+
+std::string ListedLine(std::uint64_t bot, Listing const& listing, std::uint32_t count)
+{
+    return "auction: bot " + std::to_string(bot) + " listed item " + std::to_string(listing.ItemGuid) + " for " + std::to_string(listing.Bid) + " copper (buyout " +
+           std::to_string(listing.Buyout) + ") entry=" + std::to_string(listing.Entry) + " count=" + std::to_string(count) + " price=" + std::to_string(listing.Bid);
+}
+
+std::string ListRefusedLine(std::uint64_t bot, Listing const& listing, std::string const& reason)
+{
+    return "auction: bot " + std::to_string(bot) + " list_refused item " + std::to_string(listing.ItemGuid) + " entry=" + std::to_string(listing.Entry) +
+           " price=" + std::to_string(listing.Bid) + " reason=" + LogToken(reason) + " class=" +
+           (ClassifyListFailure(reason) == ListFailure::Skip ? "skip" : "retry");
 }
 
 } // namespace auction
