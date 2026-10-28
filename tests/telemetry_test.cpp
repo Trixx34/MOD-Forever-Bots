@@ -211,6 +211,26 @@ void StuckFightIsReportedOnce()
     CHECK(rec.Count("stuck") == 1);
 }
 
+// The stuck line says where the bot stands (map, x, y, z in yards, as on a death line), after the old text.
+void StuckLineCarriesThePosition()
+{
+    Recorder rec(Quiet());
+    auto const at = [](std::uint32_t health)
+    {
+        BotSnapshot bot = Bot(health, 12.0f, kEnemy);
+        bot.map_id = 34;
+        bot.pos_y = -25.4f;
+        bot.pos_z = 7.6f;
+        return bot;
+    };
+    rec.telemetry.Observe(View(Bot(1000)), 0);
+    rec.telemetry.Observe(View(at(1000), { Enemy(3.0f) }), 1000);
+    rec.telemetry.Observe(View(at(1000), { Enemy(3.0f) }), 61000);
+    CHECK(rec.Count("stuck") == 1);
+    CHECK(rec.Last("stuck").find("no change for ") != std::string::npos); // the old text is still first
+    CHECK(rec.Last("stuck").find("against target " + std::to_string(kEnemy) + " map=34 x=12 y=-25 z=8") != std::string::npos);
+}
+
 // A stuck fight that ends (the target dies or the threat drops) closes its episode with an unstuck line that says how it ended.
 void StuckEpisodeEndsWithTheFight()
 {
@@ -376,6 +396,7 @@ int main()
     RevivalIsLoggedAfterAGhost();
     QuestDoneOnceWhenHandedIn();
     StuckFightIsReportedOnce();
+    StuckLineCarriesThePosition();
     StuckEpisodeEndsWithTheFight();
     CountsCastsAndRefusals();
     LevelChangeIsRecorded();

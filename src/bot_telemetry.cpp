@@ -248,7 +248,10 @@ void BotTelemetry::CheckStuck(Record& record, BotSnapshot const& bot, std::uint6
         record.Stuck = true;
         record.StuckEpisodes++;
         std::ostringstream detail;
-        detail << "no change for " << (nowMs - record.LastChangeMs) << " ms against target " << record.Target;
+        // The position goes after the old text, in the same form as the death line, so a stuck cluster can be put on a map (the soak of
+        // 2026-10-28 had to estimate it from the pull events).
+        detail << "no change for " << (nowMs - record.LastChangeMs) << " ms against target " << record.Target << " map=" << bot.map_id
+               << " x=" << std::lround(bot.pos_x) << " y=" << std::lround(bot.pos_y) << " z=" << std::lround(bot.pos_z);
         Write("stuck", bot, record, nowMs, detail.str());
     }
 }
