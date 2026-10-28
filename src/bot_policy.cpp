@@ -309,6 +309,16 @@ constexpr std::uint64_t kAcceptRetryMs = 2000;
 // Deadmines Foundry (Gilnid): entries checked against this fork's creature_template/smart_scripts (not hardcoded from memory).
 constexpr std::uint32_t kGoblinEngineerEntry = 622;           // casts Summon Remote-Controlled Golem (spell 3605, interruptible)
 constexpr std::uint32_t kRemoteControlledGolemEntry = 2520;   // the add it summons: immune to most abilities, despawns when its engineer dies
+// Ragefire Chasm, the Searing Blade camp (entries checked against this fork's world database on 2026-10-28): the Warlock (11324) summons a Voidwalker Minion
+// (8996) once, out of combat (spell 12746, a guardian owned by the Warlock). That minion is level 47 (the pack is 13 to 15; creature_classic_level) with
+// 1592 health, 2776 armor and 110 melee damage per hit, against the Enforcer's 900 health, 619 armor and 40: a party of level 18 bots needs several times as
+// long to kill it as to kill any other mob of the camp, and it kills the tank. It is a guardian, so it is unsummoned the moment its owner dies
+// (Unit::RemoveAllControlled in the core's setDeathState). Killing the Warlock is therefore the cheapest way to end it. But the Warlock stands back (it
+// casts Shadow Bolt from range) while the fight is at the tank's target, so the 12 yard pack reach (kFocusPackYards) rarely offered it: the 2026-10-27/28
+// journal has the focus event on the Voidwalker 295 times and on the Warlock 66.
+constexpr std::uint32_t kSearingBladeWarlockEntry = 11324;
+constexpr std::uint32_t kVoidwalkerMinionEntry = 8996;
+constexpr float kSummonerReachYards = 35.0f; // how far from the tank's target the Warlock is still taken first (the snapshot's nearby range is 40)
 constexpr std::uint64_t kReclaimRetryMs = 3000;
 constexpr std::uint64_t kDeathLoopMs = 120000;         // three deaths within this time are a death loop: the bot is moved to a grind spot for its level
 constexpr float kDeathLoopAwayYards = 400.0f;           // ... one at least this far from where it keeps dying
@@ -2955,7 +2965,21 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                         golemNearby = true;
                         break;
                     }
-                if (routeOn && HealSpellFor(classId, bot.level) == 0 && ((_options.TacticFocus && !scenario.KillPriority.empty()) || interruptNow || golemNearby))
+                // Ragefire's Searing Blade Warlock, once its Voidwalker Minion is in view (see kSearingBladeWarlockEntry): it comes first, as the
+                // engineer does with a golem up, and from farther than the pack reach, because the minion goes away when the Warlock dies.
+                bool voidwalkerNearby = false;
+                for (NearbyUnit const& unit : nearby)
+                    if (unit.is_hostile && unit.health != 0 && forever_module::UnitRefEntry(unit.guid) == kVoidwalkerMinionEntry)
+                    {
+                        voidwalkerNearby = true;
+                        break;
+                    }
+                auto const isSummonerToKill = [golemNearby, voidwalkerNearby](NearbyUnit const& unit)
+                {
+                    std::uint32_t const entry = forever_module::UnitRefEntry(unit.guid);
+                    return (golemNearby && entry == kGoblinEngineerEntry) || (voidwalkerNearby && entry == kSearingBladeWarlockEntry);
+                };
+                if (routeOn && HealSpellFor(classId, bot.level) == 0 && ((_options.TacticFocus && !scenario.KillPriority.empty()) || interruptNow || golemNearby || voidwalkerNearby))
                 {
                     auto const rankOf = [this, &scenario](NearbyUnit const& unit)
                     {
@@ -2967,12 +2991,12 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     NearbyUnit const* best = assist;
                     // A bot that can interrupt turns on a casting unit of the pack first (its rotation then fires the interrupt at its target); then
                     // an engineer with a golem already up (see above); then the priority list; then the casters; then the weakest.
-                    auto const keyOf = [&rankOf, interruptNow, golemNearby](NearbyUnit const& unit)
+                    auto const keyOf = [&rankOf, &isSummonerToKill, interruptNow](NearbyUnit const& unit)
                     {
                         int tier = 2;
                         if (interruptNow && unit.casting != 0)
                             tier = 0;
-                        else if (golemNearby && forever_module::UnitRefEntry(unit.guid) == kGoblinEngineerEntry)
+                        else if (isSummonerToKill(unit))
                             tier = 1;
                         return std::make_tuple(tier, rankOf(unit), unit.casting != 0 ? 0 : 1, unit.health);
                     };
@@ -2987,14 +3011,14 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     bool const atEngagementCap = engaged.size() >= kMaxDungeonEngaged;
                     auto const reachable = [&](NearbyUnit const& unit)
                     {
-                        bool const specialTier = (interruptNow && unit.casting != 0) ||
-                                                  (golemNearby && forever_module::UnitRefEntry(unit.guid) == kGoblinEngineerEntry) ||
-                                                  rankOf(unit) != 1000;
+                        bool const specialTier = (interruptNow && unit.casting != 0) || isSummonerToKill(unit) || rankOf(unit) != 1000;
                         return specialTier || engaged.count(unit.guid) != 0 || !atEngagementCap;
                     };
                     for (NearbyUnit const& unit : nearby)
                         if (unit.is_hostile && unit.health != 0 && IsLiveMob(unit) && !avoided(unit.guid) && unit.guid != assist->guid &&
-                            std::hypot(unit.pos_x - assist->pos_x, unit.pos_y - assist->pos_y) <= kFocusPackYards && reachable(unit) &&
+                            std::hypot(unit.pos_x - assist->pos_x, unit.pos_y - assist->pos_y) <=
+                                (voidwalkerNearby && forever_module::UnitRefEntry(unit.guid) == kSearingBladeWarlockEntry ? kSummonerReachYards : kFocusPackYards) &&
+                            reachable(unit) &&
                             keyOf(unit) < keyOf(*best))
                             best = &unit;
                     if (best != assist)

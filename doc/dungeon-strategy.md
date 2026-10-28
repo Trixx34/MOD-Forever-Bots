@@ -104,6 +104,10 @@ The damage dealers of the party (not the tank and not the healer) fight the best
 nothing listed they assist the tank's target as before. The setting `ScenarioKillPriority` (a comma list) does the same from the config and wins over the file. It needs the
 `focus` tactic (below).
 
+Two summoners are built in (they do not need the tactic): the Deadmines Goblin Engineer (622) once a Remote-Controlled Golem (2520) is in view, and, since the Ragefire fix,
+the Searing Blade Warlock (11324) once its Voidwalker Minion (8996) is in view. Each is taken first by the damage dealers because the summoned creature goes away when its
+owner dies. The Warlock is taken from up to 35 yards from the tank's target (it stands back and casts), the engineer from the usual 12.
+
 ### Dungeon tactics (`Module.forever-bots.DungeonTactics`)
 
 A comma list of `focus`, `interrupt`, `heal`, `rest`, `cc`, or `all` / `none` (default: none, until a sim run shows a gain). Each is a rule of a dungeon party that can be measured on its own:
