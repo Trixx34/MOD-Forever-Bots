@@ -319,15 +319,20 @@ void SpecKeysAndTheirDefaults()
 
 void GearProfilesMatchTheirSpec()
 {
-    // Balance druid: intellect and crit. Restoration: intellect, spirit and haste. Feral of either role: stamina and agility
-    // (the owner's explicit example, 2026-10-28).
+    // Balance druid: intellect and crit. Restoration: intellect, spirit and haste. Feral dps: stamina and agility
+    // (the owner's explicit example, 2026-10-28). Feral tank is its own profile (below), not the same as feral dps.
     CHECK(rotation::GearProfileFor(11, "balance") == 3 && rotation::GearProfileFor(11, "resto") == 4);
-    CHECK(rotation::GearProfileFor(11, "feral_cat") == 1 && rotation::GearProfileFor(11, "feral_tank") == 1);
+    CHECK(rotation::GearProfileFor(11, "feral_cat") == 1);
     // A caster healer (any class) is profile 4; a caster dps (any class) is profile 3; melee/physical is 1 or 0.
     CHECK(rotation::GearProfileFor(2, "holy") == 4 && rotation::GearProfileFor(5, "holy") == 4 && rotation::GearProfileFor(7, "resto") == 4);
     CHECK(rotation::GearProfileFor(5, "shadow") == 3 && rotation::GearProfileFor(7, "ele") == 3 && rotation::GearProfileFor(8, "fire") == 3 && rotation::GearProfileFor(9, "affliction") == 3);
     CHECK(rotation::GearProfileFor(3, "mm") == 1 && rotation::GearProfileFor(4, "combat") == 1 && rotation::GearProfileFor(7, "enh") == 1);
-    CHECK(rotation::GearProfileFor(1, "arms") == 0 && rotation::GearProfileFor(1, "prot") == 0 && rotation::GearProfileFor(2, "ret") == 0);
+    CHECK(rotation::GearProfileFor(1, "arms") == 0 && rotation::GearProfileFor(2, "ret") == 0);
+    // A shield tank (protection warrior/paladin) is profile 5 (dodge/parry/defense/block), not the same profile as its own
+    // class's dps spec; a feral tank druid is profile 6 (dodge/defense, no shield so no block/parry), not the same profile
+    // as feral dps -- the owner's follow-up, 2026-10-28.
+    CHECK(rotation::GearProfileFor(1, "prot") == 5 && rotation::GearProfileFor(2, "prot") == 5);
+    CHECK(rotation::GearProfileFor(11, "feral_tank") == 6);
     CHECK(rotation::GearProfileFor(99, "nope") == 2); // an unmapped class+spec: the generic caster bucket, never penalised for strength/agility
 }
 
