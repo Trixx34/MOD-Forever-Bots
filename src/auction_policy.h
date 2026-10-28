@@ -130,6 +130,15 @@ std::uint64_t BuyBudget(Settings const& settings, std::uint64_t copper, std::uin
 // The offer to buy outright, or none: the best upgrade per copper among the offers it can afford with the budget. A tie goes to the lower buyout.
 std::optional<Offer> ChooseBuy(Settings const& settings, std::uint64_t budget, std::vector<Offer> const& offers, UpgradeScore const& score);
 
+// ---- the journal lines (after "forever-bots: "; key=value, no spaces or commas inside a value) ----
+
+// A free-text reason as one token: spaces become '_', commas and other characters outside [A-Za-z0-9_.:-] are dropped, cut at 40 characters; empty gives "unknown".
+std::string LogToken(std::string const& text);
+// "auction: bot G listed item I for B copper (buyout X) entry=E count=N price=B": the text before " entry=" is the original line that dashboards read.
+std::string ListedLine(std::uint64_t bot, Listing const& listing, std::uint32_t count);
+// "auction: bot G list_refused item I entry=E price=B reason=TOKEN class=retry|skip"
+std::string ListRefusedLine(std::uint64_t bot, Listing const& listing, std::string const& reason);
+
 // ---- pace ----
 
 // A budget of house calls for the whole module in one tick: bots ask for a call, and some are told to wait.

@@ -1856,10 +1856,10 @@ int main(int argc, char** argv)
                             book->Ends[botGuid].push_back(nowMs() + std::uint64_t(listing.RunMinutes) * 60000u);
                             book->Standing[botGuid].Attempts[listing.ItemGuid] = listing.Attempt;
                             items.erase(listing.ItemGuid);
-                            std::cerr << "forever-bots: auction: bot " << botGuid << " listed item " << listing.ItemGuid << " for " << listing.Bid
-                                      << " copper (buyout " << listing.Buyout << ")\n";
+                            std::cerr << "forever-bots: " << auction::ListedLine(botGuid, listing, 1) << "\n";
                             return;
                         }
+                        std::cerr << "forever-bots: " << auction::ListRefusedLine(botGuid, listing, reply.reason()) << "\n";
                         // A refusal for the place or the money is tried again on a later visit; a refusal about the item drops it.
                         if (auction::ClassifyListFailure(reply.reason()) == auction::ListFailure::Skip)
                             items.erase(listing.ItemGuid);

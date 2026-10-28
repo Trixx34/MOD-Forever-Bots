@@ -471,6 +471,7 @@ private:
         std::uint64_t RouteHoldLoggedMs = 0;             // when the leader last logged why it does not walk on (route_hold)
         std::uint64_t TaxiBlockedUntilMs = 0;            // the core refused a flight: walk until this
         std::uint64_t TaxiWaitUntilMs = 0;               // a flight was ordered: give it time to show
+        taxi::Flight TaxiFlight;                         // the flight ordered and not ended yet (for the landing and timeout log lines)
         std::uint64_t NextPotionMs = 0;                  // no potion before this (the game shares one cooldown between potions)
         std::uint64_t TravelStartMs = 0;                 // when this walk began; it is dropped after kTravelTimeoutMs
         std::unordered_set<std::uint32_t> CastTimeSpells; // spells the core refused because the bot was moving: they need it standing
