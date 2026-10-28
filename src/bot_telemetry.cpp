@@ -1,6 +1,8 @@
 #include "bot_telemetry.h"
 
+#include <algorithm>
 #include <cmath>
+#include <set>
 #include <span>
 #include <sstream>
 
@@ -96,6 +98,8 @@ void BotTelemetry::Observe(WorldTickSnapshotView const& view, std::uint64_t nowM
             record.CorpseY = bot.corpse_y;
             record.CorpseZ = bot.corpse_z;
         }
+
+        CheckQuests(record, bot, nowMs);
 
         if (bot.level != 0 && bot.level != record.Level)
         {
@@ -237,6 +241,38 @@ void BotTelemetry::CheckStuck(Record& record, BotSnapshot const& bot, std::uint6
         std::ostringstream detail;
         detail << "no change for " << (nowMs - record.LastChangeMs) << " ms against target " << record.Target;
         Write("stuck", bot, record, nowMs, detail.str());
+    }
+}
+
+// A quest is handed in when it is complete (status 2) and then leaves the log; the planner does the same to mark it done. The
+// quest is written once, when it leaves: a complete quest seen on many snapshots is one entry, and a quest taken again later
+// is counted again. A quest done before the module started (or during a restart's gap) never shows as complete here, so it is
+// not counted.
+void BotTelemetry::CheckQuests(Record& record, BotSnapshot const& bot, std::uint64_t nowMs)
+{
+    std::set<std::uint32_t> inLog;
+    std::size_t const count = std::min<std::size_t>(bot.quest_count, forever_module::kMaxQuestLog);
+    for (std::size_t i = 0; i < count; ++i)
+    {
+        forever_module::QuestEntry const& entry = bot.quests[i];
+        if (entry.quest_id == 0)
+            continue;
+        inLog.insert(entry.quest_id);
+        if (entry.status == 2)
+            record.CompleteInLog.insert(entry.quest_id);
+    }
+
+    for (auto it = record.CompleteInLog.begin(); it != record.CompleteInLog.end();)
+    {
+        if (inLog.count(*it))
+        {
+            ++it;
+            continue;
+        }
+        std::ostringstream detail;
+        detail << "quest " << *it;
+        Write("quest_done", bot, record, nowMs, detail.str());
+        it = record.CompleteInLog.erase(it);
     }
 }
 

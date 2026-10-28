@@ -4,14 +4,15 @@
 //
 // Every line is self-contained: it carries the bot's running totals, so the last line of a bot tells the whole story.
 // Event lines mark fight starts and ends, target switches, targets that vanished during a fight, deaths and revivals,
-// level changes, and "stuck" (a fight with no change in health, position or target for StuckAfterMs). Summary lines are
-// written every SummaryEveryMs per bot, so a run that stops writing has stopped.
+// level changes, quest completions, and "stuck" (a fight with no change in health, position or target for StuckAfterMs).
+// Summary lines are written every SummaryEveryMs per bot, so a run that stops writing has stopped.
 #pragma once
 
 #include "forever_module/tier2_session.h"
 
 #include <cstdint>
 #include <functional>
+#include <set>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -59,6 +60,9 @@ private:
         float LastY = 0.0f;
         bool Stuck = false;
 
+        // Quests seen complete (status 2) in the log and not yet gone from it: a hand-in is the quest leaving the log.
+        std::set<std::uint32_t> CompleteInLog;
+
         // Totals since the module started.
         std::uint32_t Fights = 0;
         std::uint32_t TargetsGone = 0;
@@ -74,6 +78,7 @@ private:
     void ReadResult(Record& record, forever_module::BotSnapshot const& bot);
     void EndFight(Record& record, forever_module::BotSnapshot const& bot, std::uint64_t nowMs, char const* reason, bool targetPresent);
     void CheckStuck(Record& record, forever_module::BotSnapshot const& bot, std::uint64_t nowMs);
+    void CheckQuests(Record& record, forever_module::BotSnapshot const& bot, std::uint64_t nowMs);
     void Write(char const* kind, forever_module::BotSnapshot const& bot, Record const& record, std::uint64_t nowMs,
                std::string const& detail);
 

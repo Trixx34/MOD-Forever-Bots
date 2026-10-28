@@ -274,6 +274,41 @@ void RevivalIsLoggedAfterAGhost()
     CHECK(rec.Count("alive") == 1);
 }
 
+// A quest handed in is one quest_done line, however many snapshots show the quest complete or gone.
+void QuestDoneOnceWhenHandedIn()
+{
+    // A bot with one quest in its log (quest 0 = empty log).
+    auto const withQuest = [](std::uint32_t quest, std::uint8_t status)
+    {
+        BotSnapshot bot = Bot(1000);
+        if (quest != 0)
+        {
+            bot.quests[0].quest_id = quest;
+            bot.quests[0].status = status;
+            bot.quest_count = 1;
+        }
+        return bot;
+    };
+
+    Recorder rec(Quiet());
+    rec.telemetry.Observe(View(withQuest(500, 1)), 0);
+    rec.telemetry.Observe(View(withQuest(500, 2)), 1000);
+    rec.telemetry.Observe(View(withQuest(500, 2)), 2000); // complete, still in the log
+    CHECK(rec.Count("quest_done") == 0);
+    rec.telemetry.Observe(View(withQuest(0, 0)), 3000); // handed in: it left the log
+    rec.telemetry.Observe(View(withQuest(0, 0)), 4000); // still out of the log: no second line
+    CHECK(rec.Count("quest_done") == 1);
+    CHECK(rec.Last("quest_done").find("quest 500") != std::string::npos);
+    CHECK(Split(rec.Last("quest_done")).size() == 16);
+
+    // Taken and handed in again: counted again. A quest that leaves the log while not complete (abandoned) is not.
+    rec.telemetry.Observe(View(withQuest(500, 2)), 5000);
+    rec.telemetry.Observe(View(withQuest(0, 0)), 6000);
+    rec.telemetry.Observe(View(withQuest(501, 1)), 7000);
+    rec.telemetry.Observe(View(withQuest(0, 0)), 8000);
+    CHECK(rec.Count("quest_done") == 2);
+}
+
 int main()
 {
     HeaderHasSixteenFields();
@@ -281,6 +316,7 @@ int main()
     LostTargetReasonIsOnTheFightEndLine();
     DeathEndsTheFight();
     RevivalIsLoggedAfterAGhost();
+    QuestDoneOnceWhenHandedIn();
     StuckFightIsReportedOnce();
     CountsCastsAndRefusals();
     LevelChangeIsRecorded();
