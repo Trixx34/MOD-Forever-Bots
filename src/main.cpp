@@ -1645,6 +1645,18 @@ int main(int argc, char** argv)
         std::cerr << "forever-bots: tank lead knows " << policyOptions.DungeonsByMap.size() << " dungeon(s)\n";
     }
     policyOptions.Taxi = settings.Taxi;
+    if (settings.Taxi.Enabled)
+    {
+        // The city named in the taxi journal lines comes from the capitals' trainer table (ErrandTrainerFile); without it every city is "unknown".
+        std::ifstream in(settings.ErrandTrainerFile);
+        if (in)
+        {
+            std::ostringstream text;
+            text << in.rdbuf();
+            std::vector<std::string> ignored;
+            policyOptions.TaxiPlaces = std::make_shared<std::vector<taxi::Place>>(errand::CityPlaces(errand::ParseTrainerTable(text.str(), ignored)));
+        }
+    }
     policyOptions.PartySize = settings.PartySize;
     policyOptions.PartyCount = settings.PartyCount;
     policyOptions.PartyPercent = settings.PartyPercent;

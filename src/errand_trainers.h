@@ -9,6 +9,8 @@
 #include <string_view>
 #include <vector>
 
+#include "taxi_policy.h"
+
 namespace errand {
 
 // Capital ids, as used in errand::Bot::Cities and the trainer table.
@@ -47,6 +49,9 @@ struct Trainer
 // Parses the table: one trainer per line, "side|city|map|entry|skill|x y z|name|subname|profession|guid". Blank lines and lines starting with '#' are
 // skipped. A malformed line is left out and described in `errors` ("line N: ..."), so one bad row does not drop the table.
 std::vector<Trainer> ParseTrainerTable(std::string_view text, std::vector<std::string>& errors);
+
+// One place per capital that has trainers: the mean position of its trainers, named as CityName does. Used to name where a flight goes (taxi::PlaceName).
+std::vector<taxi::Place> CityPlaces(std::vector<Trainer> const& trainers);
 
 // The training-due rule. A bot's two primary professions are the slots with a skill line (profession_skill != 0); a slot is due when its value is
 // below its maximum. Returns the first due slot, or -1 when none is due.

@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <limits>
+#include <map>
 
 namespace errand {
 
@@ -220,6 +221,28 @@ std::optional<std::size_t> ChooseTrainer(std::vector<Trainer> const& trainers, s
         }
     }
     return best;
+}
+
+std::vector<taxi::Place> CityPlaces(std::vector<Trainer> const& trainers)
+{
+    struct Sum
+    {
+        double X = 0.0;
+        double Y = 0.0;
+        std::size_t Count = 0;
+    };
+    std::map<std::pair<std::uint32_t, std::uint32_t>, Sum> sums;    // (city, map) -> sum of the trainer positions
+    for (Trainer const& trainer : trainers)
+    {
+        Sum& sum = sums[{ trainer.City, trainer.Map }];
+        sum.X += trainer.X;
+        sum.Y += trainer.Y;
+        ++sum.Count;
+    }
+    std::vector<taxi::Place> places;
+    for (auto const& [key, sum] : sums)
+        places.push_back(taxi::Place{ CityName(key.first), key.second, float(sum.X / double(sum.Count)), float(sum.Y / double(sum.Count)) });
+    return places;
 }
 
 } // namespace errand

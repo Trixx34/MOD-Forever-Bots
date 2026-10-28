@@ -234,6 +234,7 @@ struct PolicyOptions
     supply::Settings Supplies;
     // Flight points (layout 17, taxi_policy.h): a long walk becomes a flight from the nearest flight master. Off by default.
     taxi::Settings Taxi;
+    std::shared_ptr<std::vector<taxi::Place>> TaxiPlaces;   // where flights go, to name the city in the taxi journal lines (unset: "unknown")
 };
 
 // Name of an action status, for logs.

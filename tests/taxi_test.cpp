@@ -1,8 +1,10 @@
 // Unit tests for the flight decision (src/taxi_policy.h). No core or SDK needed.
 #include "taxi_policy.h"
+#include "errand_trainers.h"
 
 #include <cstdio>
 #include <string>
+#include <vector>
 
 using namespace taxi;
 
@@ -124,13 +126,41 @@ void AFlightThatNeverStartsOrNeverEndsTimesOut()
 void TheLinesKeepTheOldKeysAndAppendTheNew()
 {
     Flight f{ 1000, 3000, 1234.9f, -50.2f, 42 };
-    CHECK(OrderLine(5, 30, 1, 2500, f) == "taxi: bot=5 level=30 map=1 walk=2500 to_x=1234 to_y=-50 master=42");
+    CHECK(OrderLine(5, 30, 1, 2500, f) == "taxi: bot=5 level=30 map=1 walk=2500 to_x=1234 to_y=-50 master=42 city=unknown");
     CHECK(OrderLine(5, 30, 1, 2500, f).rfind("taxi: bot=5 level=30 map=1 walk=2500", 0) == 0);
-    CHECK(LandedLine(5, 1, 10.0f, 20.0f, f, 91000) == "taxi_landed: bot=5 map=1 x=10 y=20 to_x=1234 to_y=-50 took_s=90");
-    CHECK(TimeoutLine(5, 1, Progress::NeverStarted, f, 9000) == "taxi_timeout: bot=5 map=1 reason=not_started waited_s=8");
-    CHECK(TimeoutLine(5, 1, Progress::TooLong, f, 1801000) == "taxi_timeout: bot=5 map=1 reason=too_long waited_s=1800");
+    f.Place = "Orgrimmar";
+    CHECK(OrderLine(5, 30, 1, 2500, f) == "taxi: bot=5 level=30 map=1 walk=2500 to_x=1234 to_y=-50 master=42 city=Orgrimmar");
+    CHECK(LandedLine(5, 1, 10.0f, 20.0f, f, 91000) == "taxi_landed: bot=5 map=1 x=10 y=20 to_x=1234 to_y=-50 took_s=90 city=Orgrimmar");
+    CHECK(TimeoutLine(5, 1, Progress::NeverStarted, f, 9000) == "taxi_timeout: bot=5 map=1 reason=not_started waited_s=8 city=Orgrimmar");
+    CHECK(TimeoutLine(5, 1, Progress::TooLong, f, 1801000) == "taxi_timeout: bot=5 map=1 reason=too_long waited_s=1800 city=Orgrimmar");
     CHECK(RefusedLine(5, 1, "refused") == "taxi_refused: bot=5 map=1 status=refused");
     CHECK(Seconds(5000, 1000) == 0);
+}
+
+void ADestinationIsNamedAfterTheNearestCityOnItsMap()
+{
+    std::vector<errand::Trainer> trainers;
+    auto add = [&](std::uint32_t city, std::uint32_t map, float x, float y) {
+        errand::Trainer t;
+        t.City = city;
+        t.Map = map;
+        t.X = x;
+        t.Y = y;
+        trainers.push_back(t);
+    };
+    add(errand::kOrgrimmar, 1, 1600.0f, -4400.0f);
+    add(errand::kOrgrimmar, 1, 1800.0f, -4400.0f);                          // Orgrimmar centre: (1700, -4400)
+    add(errand::kStormwind, 0, -8800.0f, 600.0f);
+    std::vector<Place> const places = errand::CityPlaces(trainers);
+    CHECK(places.size() == 2);
+    CHECK(PlaceName(places, 1, 1700.0f, -4400.0f) == "Orgrimmar");
+    CHECK(PlaceName(places, 1, 2400.0f, -4400.0f) == "Orgrimmar");           // 700 yards out: still the city
+    CHECK(PlaceName(places, 1, 2600.0f, -4400.0f) == "unknown");             // 900 yards out
+    CHECK(PlaceName(places, 0, 1700.0f, -4400.0f) == "unknown");             // right place, wrong map
+    CHECK(PlaceName(places, 0, -8700.0f, 650.0f) == "Stormwind");
+    CHECK(PlaceName({}, 1, 0.0f, 0.0f) == "unknown");
+    std::vector<Place> two = { Place{ "A", 1, 0.0f, 0.0f }, Place{ "B", 1, 500.0f, 0.0f } };
+    CHECK(PlaceName(two, 1, 300.0f, 0.0f) == "B");                          // the nearer of two
 }
 
 } // namespace
@@ -145,6 +175,7 @@ int main()
     TheFlightIsTrackedFromOrderToLanding();
     AFlightThatNeverStartsOrNeverEndsTimesOut();
     TheLinesKeepTheOldKeysAndAppendTheNew();
+    ADestinationIsNamedAfterTheNearestCityOnItsMap();
     if (failures == 0)
         std::printf("taxi_test: all passed\n");
     return failures == 0 ? 0 : 1;
