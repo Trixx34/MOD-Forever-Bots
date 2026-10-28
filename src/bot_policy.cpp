@@ -38,6 +38,8 @@ constexpr float kMeleeCloserYards = 3.0f;        // and of a melee bot
 constexpr std::uint32_t kLosRefusalsAvoid = 3;   // this many line-of-sight refusals in a row and the target is avoided
 constexpr std::uint64_t kBusyRetryMs = 300;  // a cast refused because the bot was casting or moving: tried again very soon
 constexpr std::uint64_t kNotKnownRetryMs = 60000; // the spell may be learned later
+constexpr float kOtherLevelHeight = 12.0f;  // yards: a hostile this far above or below the bot ...
+constexpr float kOtherLevelSlope = 0.5f;    // ... and steeper than this (height over flat distance, ~27 degrees) is on another level: a wall walk, a ledge, a floor above or below
 constexpr float kPullRadius = 10.0f;         // yards: hostiles this close to a candidate are pulled with it
 constexpr std::size_t kMaxDungeonPull = 4;  // a dungeon pack is larger than an outdoor one; the party pulls up to this many together (3 was tried in 0.32.0: no gain, reverted)
 constexpr std::size_t kMaxPull = 3;          // a group larger than this is not pulled (over-pull control)
@@ -573,6 +575,16 @@ float HealthShare(NearbyUnit const& unit)
 // included. Units already attacking the bot are not chosen here; the policy fights its threat target whatever the group size.
 // The weakest target wins and the closest breaks the tie: finishing one creature before the next is more experience per hour
 // than walking to whichever one happens to stand nearest first.
+// A creature standing high above or far below the bot while almost on top of it in the plane (a patrol on a wall walk, a ledge, the floor above) cannot be
+// walked to from here: the flat distance says "in reach" while the way there is somewhere else, so the bot stands under it, its follow order finds no path
+// and its spells have no line of sight. The 2026-10-28 soak: the Tormented Officers (entry 3873) patrol 20 yards above Shadowfang Keep's courtyard, the
+// route's first point is right under them, and 34 stuck episodes (about 77 bot-minutes, fights of up to 12 minutes) all came from pulling them.
+bool OnOtherLevel(BotSnapshot const& bot, NearbyUnit const& unit)
+{
+    float const height = std::fabs(unit.pos_z - bot.pos_z);
+    return height >= kOtherLevelHeight && height > kOtherLevelSlope * rotation::DistanceYards(bot, unit);
+}
+
 NearbyUnit const* PullTarget(BotSnapshot const& bot, std::span<NearbyUnit const> units,
                             std::function<bool(std::uint64_t)> const& avoided, bool defending,
                             std::vector<std::uint32_t> const& onlyEntries = {}, bool dungeon = false)
@@ -583,6 +595,9 @@ NearbyUnit const* PullTarget(BotSnapshot const& bot, std::span<NearbyUnit const>
     for (NearbyUnit const& candidate : units)
     {
         if (!IsLiveMob(candidate) || avoided(candidate.guid))
+            continue;
+        // A creature on another level is not pulled (one that attacks the bot is: `defending`, and the stall watchdog deals with it if it cannot be reached).
+        if (!defending && OnOtherLevel(bot, candidate))
             continue;
         // A bot hunting for a quest pulls only the creatures the quest wants (unless it is already being attacked).
         if (!defending && !onlyEntries.empty() &&
@@ -2934,7 +2949,12 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         if (targetRef == 0 && partyMember && leaderSnap && leaderSnap->threat_target_guid != 0 && !tankHeadStart && !noSelfPull &&
             !avoided(leaderSnap->threat_target_guid))
         {
-            if (NearbyUnit const* assist = FindLiveMob(nearby, leaderSnap->threat_target_guid))
+            // A leader that has not engaged the target (not in combat: it is still walking to it) and that stands on another level from the bot is not assisted: the
+            // bot would stand under it for as long as the leader tried (see OnOtherLevel).
+            NearbyUnit const* assist = FindLiveMob(nearby, leaderSnap->threat_target_guid);
+            if (assist && leaderSnap->in_combat == 0 && bot.in_combat == 0 && OnOtherLevel(bot, *assist))
+                assist = nullptr;
+            if (assist)
             {
                 targetRef = assist->guid;
                 // Focus fire (the dungeon's kill priority): a damage dealer fights the best-ranked live hostile of the tank's pack, not just the tank's own target: the casters

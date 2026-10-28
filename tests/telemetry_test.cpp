@@ -211,6 +211,29 @@ void StuckFightIsReportedOnce()
     CHECK(rec.Count("stuck") == 1);
 }
 
+// A stuck fight that ends (the target dies or the threat drops) closes its episode with an unstuck line that says how it ended.
+void StuckEpisodeEndsWithTheFight()
+{
+    Recorder rec(Quiet());
+    rec.telemetry.Observe(View(Bot(1000)), 0);
+    rec.telemetry.Observe(View(Bot(1000, 0, kEnemy), { Enemy(3.0f) }), 1000);
+    rec.telemetry.Observe(View(Bot(1000, 0, kEnemy), { Enemy(3.0f) }), 61000);
+    CHECK(rec.Count("stuck") == 1);
+    CHECK(rec.Count("unstuck") == 0);
+
+    BotSnapshot gone = Bot(1000);
+    gone.last_target_lost_reason = 1;
+    rec.telemetry.Observe(View(gone), 70000);
+    CHECK(rec.Count("unstuck") == 1);
+    CHECK(rec.Last("unstuck").find("fight_end target_gone lost killed") != std::string::npos);
+    CHECK(rec.Count("fight_end") == 1);
+
+    // A fight that was never stuck writes no unstuck line.
+    rec.telemetry.Observe(View(Bot(1000, 0, kEnemy), { Enemy(3.0f) }), 71000);
+    rec.telemetry.Observe(View(Bot(1000)), 72000);
+    CHECK(rec.Count("unstuck") == 1);
+}
+
 void CountsCastsAndRefusals()
 {
     BotTelemetry::Options options = Quiet();
@@ -353,6 +376,7 @@ int main()
     RevivalIsLoggedAfterAGhost();
     QuestDoneOnceWhenHandedIn();
     StuckFightIsReportedOnce();
+    StuckEpisodeEndsWithTheFight();
     CountsCastsAndRefusals();
     LevelChangeIsRecorded();
     SummaryIsWrittenOnItsInterval();

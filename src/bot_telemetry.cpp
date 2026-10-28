@@ -212,6 +212,14 @@ void BotTelemetry::EndFight(Record& record, BotSnapshot const& bot, std::uint64_
     std::ostringstream detail;
     detail << "reason " << reason << " target " << record.Target << " duration_ms " << duration << " health_lost " << lost
            << " lost " << LostReasonName(bot.last_target_lost_reason);
+    // A stuck episode ends with the fight as well: without a line for it, an episode that ended with the target killed (a long fight in which a
+    // healthy bot stood still, 27 of the 36 "never unstuck" episodes of the 2026-10-28 soak) was counted as never recovered.
+    if (record.Stuck)
+    {
+        std::ostringstream ended;
+        ended << "fight_end " << reason << " lost " << LostReasonName(bot.last_target_lost_reason);
+        Write("unstuck", bot, record, nowMs, ended.str());
+    }
     record.Target = 0;
     record.Stuck = false;
     Write("fight_end", bot, record, nowMs, detail.str());
