@@ -135,6 +135,12 @@ constexpr std::uint64_t kReenterDelayMs = 20000;
 constexpr std::uint64_t kUnderstrengthGraceMs = 180000; // fewer than MinAlive alive this long: the run is given up
 constexpr std::uint64_t kBossGraceMs = 120000;          // RequireBosses: time allowed after the last waypoint for the remaining bosses to die
 constexpr float kRoutePointReachYards = 15.0f; // the leader counts as having reached a waypoint this close to it
+// ...and only this far above or below it (a different storey of the same tower is not "reached"). Shadowfang Keep's own route (2026-10-27) puts its
+// courtyard-floor waypoints (points 4, 9, 10: around the Rethilgore gate) within kRoutePointReachYards in X/Y of its topmost waypoints (points 35, 36:
+// Odo the Blindwatcher, a storey above, on the tower roof) with only 9.3 yards of Z between them: a bot standing at the gate, nowhere near the roof,
+// was credited with "reached" the dungeon's last point this way (bots 0.36.2 and earlier: furthest=37/37, bosses=0/5). 8 yards keeps that pair apart
+// while staying well above the under-one-yard Z gaps between a waypoint and the very next one that are meant to count as the same spot.
+constexpr float kRouteReachMaxZYards = 8.0f;
 
 // The part of a snapshot that holds the bots in `keep` (guids), with their nearby slots: the director of one party of several sees only its own bots. The nearby units are
 // stored per bot position (max_nearby_units slots each), so they are copied along with the bots, else a director would read another party's creatures.

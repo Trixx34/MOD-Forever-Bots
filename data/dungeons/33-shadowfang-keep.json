@@ -95,5 +95,26 @@
       "name": "Odo the Blindwatcher",
       "strategy": {}
     }
+  ],
+  // Things the party must do to get on: doors, levers and the like (doc/dungeon-events.md). The Courtyard Door 18895 at (-242.6, 2159.0, 90.6), just past
+  // Rethilgore's room, blocks the way to the rest of the dungeon. In classic play it is a caged prisoner (Deathstalker Adamant or Sorcerer Ashcrombe, creature
+  // entry 3849 or 3850, both spawned in this fork's world database right by Rethilgore's room) who is freed and runs to open it; the world database's own
+  // lever for it (gameobject 101812, right next to the door) and the prisoners' gossip are both unwired to anything in this fork (checked 2026-10-27: no
+  // smart_scripts row opens the door from either; the lever's own row is a placeholder literally commented "no script", and the prisoners' only actions are a
+  // stale, non-numeric import that does not run on this core). The bots module has no "talk to an NPC" step (doc/dungeon-events.md: `use` is a gameobject click
+  // or an item used on one, nothing else), and building one is a core and SDK change, not a one-file fix. The door itself is an ordinary two-leaf door
+  // (gameobject_template type 0, the same type as the Deadmines' Heavy Doors, which this file's sibling opens with a plain `use` on the door and no lever at
+  // all) with no item or quest lock recorded against it, so it is opened the same way here: a direct `use` on 18895, the way a player would click it open by
+  // hand if the lever did not work. Until forever-ops fixes the world database's prisoner escape script, this keeps the run moving; the courtyard area once a
+  // real escape script exists would open it for free and this event would simply do nothing to an already-open door (doc/dungeon-events.md).
+  "events": [
+    {
+      "id": "courtyard-door",
+      "name": "Courtyard Door (used directly: the escape script that should open it is unwired in this fork's world database)",
+      "trigger": { "type": "near", "x": -242.6, "y": 2159.0, "z": 90.6, "radius": 30 },
+      "steps": [
+        { "type": "use", "object": 18895, "x": -242.6, "y": 2159.0, "z": 90.6 }
+      ]
+    }
   ]
 }

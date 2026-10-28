@@ -231,6 +231,47 @@ void CompletesWhenTheLeaderReachesTheLastPoint()
     CHECK(!director.TakeResult()); // only once
 }
 
+// Shadowfang Keep's own bug (2026-10-27): a route that climbs a tower can put a later waypoint almost over an earlier one in X/Y, a storey
+// up. A bot standing under it (fighting the first pack, nowhere near the stairs) must not be credited with "reached" a waypoint that is
+// really a storey above it. The numbers here are the file's own (route points 4 and 36: 4.5 yards apart in X/Y, 9.3 yards in Z) -- the
+// closest real pair in 33-shadowfang-keep.json, and why kRouteReachMaxZYards is 8, not 10 (which this pair would still have passed).
+void AWaypointAboveIsNotReachedByStandingBelowIt()
+{
+    std::uint64_t t, tick;
+    std::vector<BotSnapshot> bots;
+    ScenarioPlan plan = Plan();
+    plan.Route = { { 0.0f, 100.0f, 0.0f }, { 2.0f, 101.0f, 40.0f } }; // same spot in X/Y, 40 yards up: another floor
+    ScenarioDirector director = RunningDirector(t, tick, bots, plan);
+    std::vector<BotAction> actions;
+    bots[0].pos_y = 100.0f; // the leader reaches the first point, on the ground
+    bots[0].pos_z = 0.0f;
+    director.Decide(View(++tick, bots), t += 1000, actions);
+    director.Decide(View(++tick, bots), t += 1000, actions); // still standing there, still on the ground: no stair climbed
+    CHECK(director.Phase() == ScenarioPhase::Running);       // not "complete": the upper point is not reached
+    auto const result = director.TakeResult();
+    CHECK(!result);
+}
+
+// The same bug, but with the tight real-world numbers that actually caused it (Shadowfang Keep's own route points 4 and 36): only 4.5
+// yards apart in X/Y and 9.3 in Z, just under the old kRouteReachMaxZYards of 10, which this pair would still have falsely "reached".
+void AWaypointAStoreyUpByTheRealShadowfangKeepGapIsNotReached()
+{
+    std::uint64_t t, tick;
+    std::vector<BotSnapshot> bots;
+    ScenarioPlan plan = Plan();
+    plan.Route = { { -233.1f, 2148.8f, 90.8f }, { -236.7f, 2146.1f, 100.1f } }; // route points 4 and 36 of 33-shadowfang-keep.json
+    ScenarioDirector director = RunningDirector(t, tick, bots, plan);
+    std::vector<BotAction> actions;
+    bots[0].pos_x = -233.1f;
+    bots[0].pos_y = 2148.8f; // the leader reaches the first point, at the courtyard gate
+    bots[0].pos_z = 90.8f;
+    director.Decide(View(++tick, bots), t += 1000, actions);
+    director.Decide(View(++tick, bots), t += 1000, actions); // still at the gate, nowhere near the tower roof
+    CHECK(director.Phase() == ScenarioPhase::Running);       // not "complete": the roof point (a storey up) is not reached
+    auto const result = director.TakeResult();
+    CHECK(!result);
+}
+
 void WipeEndsTheRunAndCountsDeaths()
 {
     std::uint64_t t, tick;
@@ -1303,6 +1344,8 @@ int main()
     WaitsForTheWholeRoster();
     DressesThenGroupsThenEnters();
     CompletesWhenTheLeaderReachesTheLastPoint();
+    AWaypointAboveIsNotReachedByStandingBelowIt();
+    AWaypointAStoreyUpByTheRealShadowfangKeepGapIsNotReached();
     WipeEndsTheRunAndCountsDeaths();
     GhostCountsAsNotAlive();
     SingleDeathKeepsTheRunGoing();
