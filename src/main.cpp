@@ -36,6 +36,7 @@
 #include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <cstdio>
 #include <ctime>
 #include <exception>
 #include <filesystem>
@@ -620,6 +621,14 @@ void ScenarioSpawnTick(RunContext& run, std::size_t& spawned)
     });
 }
 
+// Actions per tick with one decimal ("0.4"), so a rate under 1 does not print as 0.
+std::string ActionsPerTick(std::uint64_t actions, std::uint64_t ticks)
+{
+    char text[32];
+    std::snprintf(text, sizeof text, "%.1f", ticks ? double(actions) / double(ticks) : 0.0);
+    return text;
+}
+
 void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& running, PolicyOptions options,
                std::string const& telemetryPath, BotSettings const& settings, PumpExtras extras)
 {
@@ -683,6 +692,8 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
                 telemetryFile->WriteLine(BotTelemetry::Header());
             BotTelemetry::Options telemetryOptions;
             telemetryOptions.SummaryEveryMs = std::uint64_t(settings.TelemetrySummarySec) * 1000;
+            telemetryOptions.ClassOf = options.ClassOf;
+            telemetryOptions.RaceOf = options.RaceOf;
             telemetry = std::make_unique<BotTelemetry>(
                 [file = telemetryFile.get()](std::string const& line) { file->WriteLine(line); }, telemetryOptions);
             std::cerr << "forever-bots: telemetry to " << telemetryPath << " (summary every " << settings.TelemetrySummarySec
@@ -1026,7 +1037,7 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
         if (now - reportedAt >= kPumpReportMs && ticks > 0)
         {
             std::cerr << "forever-bots: pump: " << lastBotCount << " bots, decide avg " << decideTotalUs / ticks << " us, max "
-                      << decideMaxUs << " us over " << ticks << " ticks, " << actionsTotal / ticks << " actions per tick\n";
+                      << decideMaxUs << " us over " << ticks << " ticks, " << ActionsPerTick(actionsTotal, ticks) << " actions per tick\n";
             reportedAt = now;
             ticks = 0;
             decideTotalUs = 0;
