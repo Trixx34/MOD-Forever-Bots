@@ -36,6 +36,9 @@ constexpr std::size_t kCastsApplied = 10;
 constexpr std::size_t kRefusals = 11;
 constexpr std::size_t kStuckEpisodes = 12;
 constexpr std::size_t kDetail = 15;
+constexpr std::size_t kClass = 16;
+constexpr std::size_t kRace = 17;
+constexpr std::size_t kCopper = 18;
 
 std::vector<std::string> Split(std::string const& line)
 {
@@ -254,9 +257,40 @@ void SummaryIsWrittenOnItsInterval()
     CHECK(rec.Count("summary") == 1);
 }
 
-void HeaderHasSixteenFields()
+void HeaderHasClassRaceAndCopperAfterDetail()
 {
-    CHECK(Split(BotTelemetry::Header()).size() == 16);
+    std::vector<std::string> const header = Split(BotTelemetry::Header());
+    CHECK(header.size() == 19);
+    CHECK(header[kDetail] == "detail" && header[kClass] == "class" && header[kRace] == "race" && header[kCopper] == "copper");
+}
+
+// Class and race come from the lookups, copper only on summary lines; every shape keeps its kind column.
+void ClassRaceAndCopperColumns()
+{
+    BotTelemetry::Options options = Quiet();
+    options.SummaryEveryMs = 1000;
+    options.ClassOf = [](std::uint64_t guid) { return guid == kBot ? 8u : 0u; };
+    options.RaceOf = [](std::uint64_t guid) { return guid == kBot ? 10u : 0u; };
+    Recorder rec(options);
+    BotSnapshot bot = Bot(1000);
+    bot.copper = 12345;
+    rec.telemetry.Observe(View(bot), 0);
+    rec.telemetry.Observe(View(Bot(1000, 0, kEnemy), { Enemy(3.0f) }), 500);
+    bot.level = 11;
+    rec.telemetry.Observe(View(bot), 1000);
+    std::vector<std::string> const summary = Split(rec.Last("summary"));
+    CHECK(summary.size() == 19);
+    CHECK(summary[kClass] == "8" && summary[kRace] == "10" && summary[kCopper] == "12345");
+    std::vector<std::string> const start = Split(rec.Last("fight_start"));
+    CHECK(start.size() == 19 && start[kClass] == "8" && start[kCopper].empty());
+    CHECK(rec.Last("level").rfind("1000,level,", 0) == 0);
+    CHECK(rec.Last("summary").rfind("1000,summary,", 0) == 0);
+
+    // No lookups: unknown (0).
+    Recorder plain(Quiet());
+    plain.telemetry.Observe(View(Bot(1000)), 0);
+    plain.telemetry.Observe(View(Bot(1000, 0, kEnemy), { Enemy(3.0f) }), 1000);
+    CHECK(Split(plain.Last("fight_start"))[kClass] == "0");
 }
 
 } // namespace
@@ -299,7 +333,7 @@ void QuestDoneOnceWhenHandedIn()
     rec.telemetry.Observe(View(withQuest(0, 0)), 4000); // still out of the log: no second line
     CHECK(rec.Count("quest_done") == 1);
     CHECK(rec.Last("quest_done").find("quest 500") != std::string::npos);
-    CHECK(Split(rec.Last("quest_done")).size() == 16);
+    CHECK(Split(rec.Last("quest_done")).size() == 19);
 
     // Taken and handed in again: counted again. A quest that leaves the log while not complete (abandoned) is not.
     rec.telemetry.Observe(View(withQuest(500, 2)), 5000);
@@ -311,7 +345,8 @@ void QuestDoneOnceWhenHandedIn()
 
 int main()
 {
-    HeaderHasSixteenFields();
+    HeaderHasClassRaceAndCopperAfterDetail();
+    ClassRaceAndCopperColumns();
     FightLifecycle();
     LostTargetReasonIsOnTheFightEndLine();
     DeathEndsTheFight();

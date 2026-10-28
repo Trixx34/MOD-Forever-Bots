@@ -5,6 +5,9 @@
 // Every line is self-contained: it carries the bot's running totals, so the last line of a bot tells the whole story.
 // Event lines mark fight starts and ends, target switches, targets that vanished during a fight, deaths and revivals,
 // level changes, quest completions, and "stuck" (a fight with no change in health, position or target for StuckAfterMs).
+// Columns 16 on: detail (free text, commas replaced by ';'), then class and race (ids, 0 = unknown), then copper (the bot's
+// money; only on summary lines, empty on the others). Appended after detail so the first 15 columns and the detail position
+// keep their meaning for existing readers.
 // Summary lines are written every SummaryEveryMs per bot, so a run that stops writing has stopped.
 #pragma once
 
@@ -26,6 +29,9 @@ public:
     {
         std::uint64_t SummaryEveryMs = 60000;
         std::uint64_t StuckAfterMs = 60000;
+        // Class and race ids by bot guid, for the class and race columns (0 = unknown, also when unset).
+        std::function<std::uint32_t(std::uint64_t botGuid)> ClassOf;
+        std::function<std::uint32_t(std::uint64_t botGuid)> RaceOf;
     };
 
     BotTelemetry(Sink sink, Options options) : _sink(std::move(sink)), _options(options) {}

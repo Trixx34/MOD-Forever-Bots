@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <set>
 #include <span>
 #include <sstream>
@@ -34,7 +35,7 @@ std::string Field(std::string text)
 char const* BotTelemetry::Header()
 {
     return "time_ms,kind,bot,level,health_pct,power_pct,in_fight,fights,targets_gone,deaths,casts_applied,refusals,"
-           "stuck_episodes,longest_fight_ms,health_lost,detail";
+           "stuck_episodes,longest_fight_ms,health_lost,detail,class,race,copper";
 }
 
 void BotTelemetry::Observe(WorldTickSnapshotView const& view, std::uint64_t nowMs)
@@ -282,6 +283,9 @@ void BotTelemetry::Write(char const* kind, BotSnapshot const& bot, Record const&
     line << nowMs << ',' << kind << ',' << bot.guid << ',' << record.Level << ',' << Percent(bot.health, bot.max_health) << ','
          << Percent(bot.power, bot.max_power) << ',' << (record.Target != 0 ? 1 : 0) << ',' << record.Fights << ','
          << record.TargetsGone << ',' << record.Deaths << ',' << record.CastsApplied << ',' << record.Refusals << ','
-         << record.StuckEpisodes << ',' << record.LongestFightMs << ',' << record.HealthLost << ',' << Field(detail);
+         << record.StuckEpisodes << ',' << record.LongestFightMs << ',' << record.HealthLost << ',' << Field(detail) << ','
+         << (_options.ClassOf ? _options.ClassOf(bot.guid) : 0) << ',' << (_options.RaceOf ? _options.RaceOf(bot.guid) : 0) << ',';
+    if (std::strcmp(kind, "summary") == 0)
+        line << bot.copper;
     _sink(line.str());
 }
