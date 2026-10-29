@@ -1,6 +1,7 @@
 // Ported from the forever branch's BotRotation.cpp (pure part) and BotCombat.cpp's warrior rows; see combat_rotation.h.
 #include "combat_rotation.h"
 
+#include "text_lines.h"
 #include "text_number.h"
 
 #include <algorithm>
@@ -337,19 +338,10 @@ RotationData ParseRotationData(std::istream& in, std::vector<std::string>& warni
     RotationData data;
     std::uint32_t classId = 0;
     std::string specKey; // the spec of the current block (empty: the class default)
-    std::string line;
     std::size_t number = 0;
-    while (std::getline(in, line))
+    std::vector<std::string> t;
+    while (text_lines::NextTokens(in, number, t))
     {
-        ++number;
-        if (auto const hash = line.find('#'); hash != std::string::npos)
-            line.erase(hash);
-        std::istringstream words(line);
-        std::vector<std::string> t;
-        for (std::string token; words >> token;)
-            t.push_back(token);
-        if (t.empty())
-            continue;
         auto const drop = [&](char const* why) { warnings.push_back("rotation file line " + std::to_string(number) + ": " + why + "; ignored"); };
 
         if (t[0] == "class")

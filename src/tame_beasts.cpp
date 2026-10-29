@@ -1,5 +1,6 @@
 #include "tame_beasts.h"
 
+#include "text_lines.h"
 #include "text_number.h"
 
 #include <cmath>
@@ -38,19 +39,10 @@ std::uint32_t FamilyRank(std::uint32_t family)
 TameBeasts ParseTameBeasts(std::istream& in, std::vector<std::string>& warnings)
 {
     TameBeasts data;
-    std::string line;
-    std::uint32_t number = 0;
-    while (std::getline(in, line))
+    std::size_t number = 0;
+    std::vector<std::string> t;
+    while (text_lines::NextTokens(in, number, t))
     {
-        ++number;
-        if (auto const hash = line.find('#'); hash != std::string::npos)
-            line.erase(hash);
-        std::istringstream words(line);
-        std::vector<std::string> t;
-        for (std::string token; words >> token;)
-            t.push_back(token);
-        if (t.empty())
-            continue;
         Beast beast;
         std::uint32_t entry = 0;
         if (t[0] == "beast" && t.size() == 5 && Whole(t[1], entry) && entry != 0 && Whole(t[2], beast.Family) && Whole(t[3], beast.LevelMin) &&

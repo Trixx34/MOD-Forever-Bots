@@ -1,5 +1,6 @@
 #include "grind_data.h"
 
+#include "text_lines.h"
 #include "text_number.h"
 
 #include <algorithm>
@@ -25,20 +26,10 @@ bool Whole(std::string const& text, std::uint32_t& out)
 GrindData ParseGrindData(std::istream& in, std::vector<std::string>& warnings)
 {
     GrindData data;
-    std::string line;
     std::size_t number = 0;
-    while (std::getline(in, line))
+    std::vector<std::string> tokens;
+    while (text_lines::NextTokens(in, number, tokens))
     {
-        ++number;
-        if (auto const hash = line.find('#'); hash != std::string::npos)
-            line.erase(hash);
-        std::istringstream words(line);
-        std::vector<std::string> tokens;
-        for (std::string token; words >> token;)
-            tokens.push_back(token);
-        if (tokens.empty())
-            continue;
-
         GrindSpot spot;
         std::uint32_t side = 0;
         bool ok = tokens[0] == "spot" && (tokens.size() == 8 || tokens.size() == 9);
