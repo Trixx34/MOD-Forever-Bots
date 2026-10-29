@@ -455,11 +455,23 @@ void ScenarioDirector::Decide(forever_module::WorldTickSnapshotView const& view,
                 actions.push_back(action);
             };
 
+            // The party goes in together, once no living member is in combat: a member still fighting would be refused, and the rest would go in without it.
+            // Waiting is capped by kEnterCombatMaxMs, after which the timeout below ends the run.
+            bool fighting = false;
+            for (BotSnapshot const& bot : bots)
+                fighting = fighting || (bot.life_state == 0 && bot.in_combat);
+            if (fighting)
+                _enterFought = true;
             if (leader->map_id != _plan.EntryMap)
             {
+                if (fighting && nowMs - _phaseSinceMs < kEnterCombatMaxMs)
+                    break;
                 if (_lastEnterMs == 0 || nowMs - _lastEnterMs >= kEnterRetryMs)
                 {
                     teleport(*leader);
+                    for (BotSnapshot const& bot : bots)
+                        if (bot.guid != leader->guid && bot.map_id != _plan.EntryMap && bot.life_state == 0)
+                            teleport(bot);
                     _lastEnterMs = nowMs;
                 }
             }
@@ -487,7 +499,9 @@ void ScenarioDirector::Decide(forever_module::WorldTickSnapshotView const& view,
                     _lastEnterMs = nowMs;
                 }
             }
-            if (nowMs - _phaseSinceMs >= kEnterTimeoutMs)
+            // While the party waits for a fight to end, the timeout is kEnterCombatMaxMs rather than kEnterTimeoutMs.
+            std::uint64_t const limitMs = _enterFought ? kEnterCombatMaxMs : kEnterTimeoutMs;
+            if (nowMs - _phaseSinceMs >= limitMs)
                 Finish("enter_failed", nowMs);
             break;
         }

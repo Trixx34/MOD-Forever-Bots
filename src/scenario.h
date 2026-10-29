@@ -138,6 +138,9 @@ constexpr std::uint64_t kGroupingTimeoutMs = 120000;
 constexpr std::uint64_t kMembersDelayMs = 3000;
 constexpr std::uint64_t kEnterRetryMs = 10000;
 constexpr std::uint64_t kEnterTimeoutMs = 90000;
+// The party waits at its staging place while any living member is in combat, and the whole party is sent in together once none is. This is the longest that
+// wait may last; a fight that outlasts it ends the run as before.
+constexpr std::uint64_t kEnterCombatMaxMs = 600000;
 // Before the party enters it rests at its staging place until every living bot has this much health (and mana, for mana users), or this long has passed: the gear
 // the dressing phase puts on raises the maximum health to two or three times the current health, so a party that entered at once started at 35-45 %.
 constexpr std::uint32_t kRecoverPct = 90;
@@ -216,6 +219,7 @@ private:
     bool _recovered = false;               // the party has rested up at its staging place (Entering waits for it once)
     std::uint64_t _lastEnterMs = 0;
     std::uint64_t _leaderArrivedMs = 0;
+    bool _enterFought = false;             // a member was in combat outside the entry map while entering: the entering timeout is kEnterCombatMaxMs from then on
     std::uint64_t _runStartMs = 0;
     std::uint64_t _routeDoneMs = 0;        // when the leader first touched the last waypoint (RequireBosses grace)
     std::set<std::uint32_t> _bossKilledEntries;
