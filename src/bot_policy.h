@@ -551,6 +551,7 @@ private:
         std::uint64_t AcceptedFrom = 0;                  // the resurrecter of the last accept sent (0 = none)
         std::uint64_t ReclaimRetryMs = 0;
         std::uint64_t CorpseTeleportRetryMs = 0;         // the next teleport of a ghost to its corpse (no portal route)
+        std::uint64_t ReviveHeldLoggedMs = 0;            // the last time this ghost logged that it is held back from its revive by a live Onyxian Warder
         std::uint64_t ReviveRetryMs = 0;                 // the next out-of-combat revive order of this ghost by its leader
         std::uint32_t ReviveAttempts = 0;                // revive orders sent in this death
         std::uint64_t EntrySinceMs = 0;                  // when this ghost of a dungeon party began its way back to the entrance (0 = not yet)

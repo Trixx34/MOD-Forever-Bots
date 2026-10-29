@@ -31,6 +31,8 @@ constexpr float kAoeKiteSpreadDegrees = 4.0f;  // each bot takes its own bearing
 constexpr float kAoeKiteRetryDegrees = 30.0f;  // and a kite point the core found no route to is tried again this much further round
 constexpr std::uint64_t kHealLosMoveMs = 4000; // after a heal refused for line of sight a healer may leave its stand-off to find the target, for this long
 constexpr std::uint32_t kOnyxianWarderEntry = 12129;
+constexpr float kReviveWarderYards = 25.0f;  // a ghost of a dungeon party is not brought back (entrance teleport, leader's revive, corpse reclaim) while a live Warder is this close to its corpse or to a living party member
+constexpr std::uint64_t kReviveWarderLogMs = 30000;
 constexpr float kFleeYards = 15.0f;          // below 30% health: flees while a threat is this close
 constexpr std::uint64_t kGlobalCooldownMs = 1500;
 constexpr std::uint64_t kRetryMs = 1000;     // out of range, invalid target, refused, not enough power
@@ -2441,6 +2443,45 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 event(std::string("release: bot=") + std::to_string(bot.guid) + " reason=" + reason + " waited_ms=" + std::to_string(waited) +
                       " rezzer_up=" + (rezzer ? "yes" : "no") + " alive_members=" + (anyAlive ? "yes" : "no"));
                 continue;
+            }
+
+            // A live Onyxian Warder near the corpse, or near a living member of the ghost's party: the ghost stays a ghost. Bringing it back there (the teleport to the entrance or to
+            // the leader, which the core answers with a resurrect at 50% health on entering the dungeon where the corpse is; the leader's revive; the corpse reclaim) put it among
+            // Fire Novas again 20 s after it died (2026-10-29: 1935 died 20:46:02, back 20:46:22, dead 20:46:38). This is not DungeonReviveOutOfCombat: that option only governs the
+            // leader's revive; the 20 s revival came from the entrance teleport of the ghost branch below, which no option stops.
+            if (deadParty != 0 && bot.corpse_valid != 0 && (routeActiveOf(bot.guid) || tankLed.count(deadParty) != 0))
+            {
+                auto const warderNear = [&](BotSnapshot const& at, std::span<NearbyUnit const> units, float x, float y)
+                {
+                    if (at.map_id != bot.corpse_map)
+                        return false;
+                    for (NearbyUnit const& unit : units)
+                        if (IsLiveMob(unit) && forever_module::UnitRefEntry(unit.guid) == kOnyxianWarderEntry &&
+                            std::hypot(unit.pos_x - x, unit.pos_y - y) <= kReviveWarderYards)
+                            return true;
+                    return false;
+                };
+                bool held = false;
+                forParty(deadParty, [&](BotSnapshot const& member)
+                {
+                    if (held || member.life_state != 0)
+                        return;
+                    auto const at = indexOf.find(member.guid);
+                    if (at == indexOf.end())
+                        return;
+                    std::span<NearbyUnit const> const units = view.NearbyOf(at->second);
+                    held = warderNear(member, units, bot.corpse_x, bot.corpse_y) || warderNear(member, units, member.pos_x, member.pos_y);
+                });
+                if (held)
+                {
+                    if (_options.OnEvent && nowMs - state.ReviveHeldLoggedMs >= kReviveWarderLogMs)
+                    {
+                        state.ReviveHeldLoggedMs = nowMs;
+                        _options.OnEvent("revive_held: bot=" + std::to_string(bot.guid) + " reason=warder_alive yards=" + std::to_string(int(kReviveWarderYards)) +
+                                         " waited_ms=" + std::to_string(nowMs - state.DeathMs));
+                    }
+                    continue;
+                }
             }
 
             // Dungeon party, out of combat (DungeonReviveOutOfCombat): a ghost is revived by its leader instead of walking back to its corpse, once the
