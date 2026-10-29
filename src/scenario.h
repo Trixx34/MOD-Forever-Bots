@@ -33,6 +33,13 @@ struct ScenarioPlan
 {
     std::string Name;
     std::uint32_t RosterSize = 5;
+    // 40-man raid support (doc 108): Raid on allows RosterSize up to 40 instead of 5 (see bot_settings.cpp's ScenarioRaid key).
+    // A raid roster is formed into one raid group of GroupSubgroups subgroups of 5, not a flat party: the roster is expected to
+    // be GroupSubgroups repeats of the same tank/healer/dps class composition a 5-man scenario's roster would use, one repeat per
+    // subgroup (bot_policy.cpp assigns subgroup = roster position / 5, so the ordering in ScenarioRoster matters). The result line
+    // carries raid=1 groups=<GroupSubgroups> so dashboards can tell a raid result from a dungeon one.
+    bool Raid = false;
+    std::uint32_t GroupSubgroups = 8; // MAX_RAID_SUBGROUPS in TrinityCore's Group.h; informational only when Raid is off
     std::uint32_t EntryMap = 0;
     ScenarioPoint Entry;
     std::vector<ScenarioPoint> Route;
@@ -102,6 +109,10 @@ struct ScenarioResult
     std::uint32_t Ghosts = 0;       // bots that are ghosts at the end
     std::uint32_t RosterSize = 0;
     bool PartyFormed = true;        // false when the grouping phase timed out
+    // 40-man raid support (doc 108): Raid and Groups mirror ScenarioPlan::Raid/GroupSubgroups, so FormatScenarioResult can print
+    // "raid=1 groups=8" for a raid scenario and nothing extra for a dungeon one.
+    bool Raid = false;
+    std::uint32_t Groups = 0;
     std::uint32_t BossesTotal = 0;  // bosses the plan lists
     std::vector<std::string> BossesKilled; // names of the ones seen dead, in the order they were seen
     std::vector<std::pair<std::uint32_t, std::uint32_t>> Party; // race and class id of each member, in the order first seen
@@ -229,5 +240,7 @@ private:
     std::uint64_t _lastTick = ~0ull;
 };
 
-// One line of text for the log: "scenario <name>: outcome=... furthest=3/7 deaths=2 alive=3/5 events=3 revived=1 wipes=0 ghosts=0 run=412s", then ' | roster=<race>:<class>,... classes=<sorted ids> combo=<sorted ids joined by -> ' when the party is known.
+// One line of text for the log: "scenario <name>: outcome=... furthest=3/7 deaths=2 alive=3/5 events=3 revived=1 wipes=0 ghosts=0 run=412s",
+// then " raid=1 groups=8" for a raid scenario (doc 108; nothing for a dungeon one), then ' | roster=<race>:<class>,... classes=<sorted ids>
+// combo=<sorted ids joined by -> ' when the party is known.
 std::string FormatScenarioResult(ScenarioResult const& result);

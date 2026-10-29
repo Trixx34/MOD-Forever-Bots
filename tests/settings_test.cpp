@@ -399,6 +399,35 @@ void SingleDungeonScenarioIsUnchanged()
     CHECK(ParseBotSettings({ { "Scenario", "rfc" }, { "ScenarioParties", "21" }, { "ScenarioRoster", "2:1" } }, warnings).Scenario.Parties == 1);
 }
 
+// 40-man raid support (doc 108): ScenarioRaid is a distinct opt-in mode. Without it (the default) a roster longer than 5 is still
+// cut to 5, exactly as before -- a raid must not change five-man scenario behavior. With it, up to 40 is kept, and OneFaction still
+// refuses a roster mixing Alliance and Horde (a raid is one faction too).
+void RaidRosterAllowsUpToFortyFiveManStaysAtFive()
+{
+    std::vector<std::string> warnings;
+    std::string roster40;
+    for (int i = 0; i < 40; ++i)
+        roster40 += (i ? "," : "") + std::string("1:1");
+    BotSettings const raid = ParseBotSettings({ { "Scenario", "ony" }, { "ScenarioRaid", "1" }, { "ScenarioRoster", roster40 },
+                                                 { "ScenarioEntry", "249 1 2 3" } },
+                                               warnings);
+    CHECK(raid.Scenario.Raid && raid.Scenario.Roster.size() == 40);
+
+    warnings.clear();
+    BotSettings const five = ParseBotSettings({ { "Scenario", "ony" }, { "ScenarioRoster", roster40 }, { "ScenarioEntry", "249 1 2 3" } }, warnings);
+    CHECK(!five.Scenario.Raid && five.Scenario.Roster.size() == 5); // ScenarioRaid unset: the old 5-bot cap, unchanged
+
+    // One faction applies to a raid roster too.
+    warnings.clear();
+    std::string mixed;
+    for (int i = 0; i < 40; ++i)
+        mixed += (i ? "," : "") + std::string(i < 20 ? "1:1" : "5:5"); // race 1 Human (Alliance), race 5 Orc (Horde)
+    BotSettings const refused = ParseBotSettings({ { "Scenario", "ony" }, { "ScenarioRaid", "1" }, { "ScenarioRoster", mixed },
+                                                    { "ScenarioEntry", "249 1 2 3" } },
+                                                  warnings);
+    CHECK(refused.Scenario.Name.empty() && HasWarning(warnings, "mixes Alliance and Horde"));
+}
+
 } // namespace
 
 void WipeRecoverySettings()
@@ -467,6 +496,7 @@ int main()
     ScenarioListReadsEachDungeon();
     MixedFactionRosterIsRefused();
     SingleDungeonScenarioIsUnchanged();
+    RaidRosterAllowsUpToFortyFiveManStaysAtFive();
 
     if (failures == 0)
         std::printf("settings_test: all checks passed\n");

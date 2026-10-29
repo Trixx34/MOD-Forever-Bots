@@ -85,6 +85,11 @@ struct ScenarioSettings
     std::vector<std::uint32_t> KillPriority;
     bool HasPortal = false;
     std::array<float, 4> Portal{};                       // map, x, y, z: the instance door, outside
+    // ScenarioRaid (0 or 1, default 0; doc 108): a raid scenario's roster may go up to 40 instead of 5, formed into one raid group of
+    // 8 subgroups of 5 instead of a flat party (bot_policy.cpp). A five-man scenario (ScenarioRaid unset or 0) is capped at 5 exactly as
+    // before -- this flag, not a universal cap raise, is what tells ReadOneScenario and the policy a roster is a raid. The roster is
+    // expected to be 8 repeats of the dungeon-style tank/healer/dps composition, one repeat per subgroup, in ScenarioRoster order.
+    bool Raid = false;
 };
 
 struct BotSettings

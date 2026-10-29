@@ -1535,7 +1535,7 @@ int main(int argc, char** argv)
         roster.SetMaxBots(std::min<std::uint32_t>(ScenarioBotCount(settings.Scenarios), maxBots));
         for (ScenarioSettings const& scenario : settings.Scenarios)
             std::cerr << "forever-bots: scenario " << scenario.Name << ": " << scenario.Parties << " part" << (scenario.Parties == 1 ? "y" : "ies") << " of " << scenario.Roster.size() << " bots at level "
-                      << scenario.Level << ", route of " << scenario.Route.size() << " point(s), " << scenario.DurationSec << " s\n";
+                      << scenario.Level << ", route of " << scenario.Route.size() << " point(s), " << scenario.DurationSec << " s" << (scenario.Raid ? " (raid, 8 subgroups)" : "") << "\n";
         if (settings.Scenarios.size() > 1)
             std::cerr << "forever-bots: scenario of " << settings.Scenarios.size() << " dungeons: " << ScenarioPartyCount(settings.Scenarios) << " parties, "
                       << ScenarioBotCount(settings.Scenarios) << " bots\n";
@@ -2102,6 +2102,11 @@ int main(int argc, char** argv)
         policyOptions.Crafting = false;
         policyOptions.ServiceEveryMs = 0;
         policyOptions.AutoGearing = false;
+        // 40-man raid support (doc 108): a raid scenario's roster is one raid group of 8 subgroups, not a flat party (bot_policy.cpp's
+        // party-formation already cuts one party of PartySize bots regardless of size; Raid only changes how that one party is
+        // handled once formed). settings.Scenarios front is used the same way policyOptions.PartySize already is above, since a raid
+        // runs on its own schedule (doc 108), never mixed into the dungeon list.
+        policyOptions.Raid = settings.Scenarios.empty() ? false : settings.Scenarios.front().Raid;
         for (ScenarioSettings const& scenario : settings.Scenarios)
         {
             PolicyOptions::ScenarioRoute route;
@@ -2117,6 +2122,7 @@ int main(int argc, char** argv)
             ScenarioPlan plan;
             plan.Name = scenario.Name;
             plan.RosterSize = std::uint32_t(scenario.Roster.size());
+            plan.Raid = scenario.Raid;
             plan.EntryMap = static_cast<std::uint32_t>(scenario.Entry[0]);
             plan.Entry = { scenario.Entry[1], scenario.Entry[2], scenario.Entry[3] };
             for (auto const& point : scenario.Route)

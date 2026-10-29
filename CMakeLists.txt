@@ -70,6 +70,10 @@ add_executable(policy_test tests/policy_test.cpp)
 target_link_libraries(policy_test PRIVATE forever_bots_policy)
 add_test(NAME policy COMMAND policy_test)
 
+add_executable(raid_test tests/raid_test.cpp)
+target_link_libraries(raid_test PRIVATE forever_bots_policy)
+add_test(NAME raid COMMAND raid_test)
+
 add_executable(quest_test tests/quest_test.cpp)
 target_link_libraries(quest_test PRIVATE forever_bots_policy)
 add_test(NAME quest COMMAND quest_test)
