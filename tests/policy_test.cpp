@@ -4547,6 +4547,44 @@ void RaidMemberOnAnotherTargetKitesOutOfWarderNova()
     CHECK(firstY != secondY);   // not one shared point
 }
 
+// The 2026-10-29 pull: the tank pulled the Warder and the other bots stayed out of combat for 55 s, standing next to it. A non-tank bot that is not in combat kites
+// as soon as a live Warder is inside the margin; the tank never does.
+void NonTankOutOfCombatKitesWhenWarderIsWithinMargin()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 3;
+    options.PartyCount = 1;
+    options.WanderWhenIdle = false;
+    options.ClassOf = [](std::uint64_t guid) { return guid == 10 ? 1u : 8u; };   // 10 the warrior tank, 11 and 12 mages
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12 });
+    NearbyUnit warder = Hostile(2, 28.0f, 100);   // inside the 30 yard margin, outside the 24.5 yard nova
+    warder.guid = MakeUnitRef(8, 12129, 2);
+    for (std::size_t i = 0; i < 3; ++i)
+    {
+        view.bots[i].in_combat = 0;
+        view.bots[i].threat_target_guid = 0;
+        AddNearby(view, i, warder);
+    }
+    int tankKites = 0, mageKites = 0;
+    for (std::uint64_t at = 1000; at < 3000; at += 100)
+    {
+        view.tick_number = at / 100;
+        for (BotAction const& action : policy.Decide(view, at))
+        {
+            bool const move = action.type == ActionType::kMoveTo && action.target_guid == 0;
+            tankKites += action.bot_guid == 10 && move;
+            if (action.bot_guid == 11 && move)
+            {
+                ++mageKites;
+                CHECK(std::hypot(action.dest_x - warder.pos_x, action.dest_y - warder.pos_y) >= 29.0f);
+            }
+        }
+    }
+    CHECK(mageKites > 0);
+    CHECK(tankKites == 0);
+}
+
 // A party member on low health keeps fighting: its healer needs it to hold still, and a fleeing bot drags the pack onto the party.
 void PartyMemberDoesNotFleeOnLowHealth()
 {
@@ -6004,6 +6042,7 @@ int main()
     PartyCasterDoesNotKite();
     RaidCasterKitesOutOfWarderNova();
     RaidMemberOnAnotherTargetKitesOutOfWarderNova();
+    NonTankOutOfCombatKitesWhenWarderIsWithinMargin();
     PartyMemberDoesNotFleeOnLowHealth();
     PartyMemberDoesNotChaseAFleeingTarget();
     RangedBotAttacksWhenBackAtRange();

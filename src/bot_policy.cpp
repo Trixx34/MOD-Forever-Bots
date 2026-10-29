@@ -27,6 +27,8 @@ constexpr float kRangedKiteYards = 12.0f;    // a ranged bot keeps a melee targe
 // Fire Nova (spell 20203) reaches 20 yards from the Warder plus the target's combat reach (1.5), and 2 more while the Warder is moving (23.5 in all); the bot stands
 // there at the centre-to-centre distance below. 21 yards (the first value) left every kiting bot inside the nova. A tuning value: 24-25 is the range to try.
 constexpr float kAoeKiteYards = 24.5f;       // every party member other than the tank keeps an Onyxian Warder this far away
+constexpr float kAoeKiteMarginYards = 5.5f;      // a party member also holds this much beyond kAoeKiteYards, and starts to kite before it is inside the radius, in combat or not
+constexpr float kAoeStandYards = kAoeKiteYards + kAoeKiteMarginYards;   // 30: where a kited bot stands, so a step of the Warder or the bot does not put it back in the nova
 constexpr float kAoeKiteSpreadDegrees = 4.0f;  // each bot takes its own bearing off the Warder, up to 5 steps of this either side of the straight line away
 constexpr float kAoeKiteRetryDegrees = 30.0f;  // and a kite point the core found no route to is tried again this much further round
 constexpr std::uint64_t kHealLosMoveMs = 4000; // after a heal refused for line of sight a healer may leave its stand-off to find the target, for this long
@@ -746,7 +748,7 @@ Point AoeKitePoint(BotSnapshot const& bot, NearbyUnit const& warder, int retry)
     float const angle = (float(slot) * kAoeKiteSpreadDegrees + float(turn) * kAoeKiteRetryDegrees) * 3.14159265f / 180.0f;
     float const c = std::cos(angle);
     float const s = std::sin(angle);
-    return Point{ warder.pos_x + (dx * c - dy * s) * kAoeKiteYards, warder.pos_y + (dx * s + dy * c) * kAoeKiteYards, bot.pos_z };
+    return Point{ warder.pos_x + (dx * c - dy * s) * kAoeStandYards, warder.pos_y + (dx * s + dy * c) * kAoeStandYards, bot.pos_z };
 }
 
 // A player's unit reference, from its character guid counter (the same reference the core's party actions take).
@@ -3435,9 +3437,10 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         Decision wanted;
         char const* moveWhy = ""; // which part of the policy chose a kMoveTo (logged for a party in a dungeon run, move_why)
         // An Onyxian Warder close to a party member (not its leader, the tank): the nearest one in view that is alive, and where a healer may step to see a member it could not heal.
+        // Not tied to the bot's own in_combat: the 2026-10-29 pull left the non-tank bots out of combat for 55 s, standing 5 yards from the Warder.
         NearbyUnit const* aoeWarder = nullptr;
         std::optional<Point> healLosPoint;
-        if (partyMember && bot.in_combat != 0)
+        if (partyMember)
         {
             float nearestWarder = std::numeric_limits<float>::max();
             for (NearbyUnit const& unit : nearby)
@@ -3450,7 +3453,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                         aoeWarder = &unit;
                     }
                 }
-            if (nowMs < state.HealLosUntilMs && state.HealLosTarget != 0 && aoeWarder)
+            if (bot.in_combat != 0 && nowMs < state.HealLosUntilMs && state.HealLosTarget != 0 && aoeWarder)
                 for (BotSnapshot const& other : view.bots)
                     if (PlayerRef(other.guid) == state.HealLosTarget && other.map_id == bot.map_id)
                     {
@@ -3514,10 +3517,10 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 wanted = followRef ? Decision{ ActionType::kFollow, followRef } : Decision{ ActionType::kStop, 0 };
             }
         }
-        else if (partyMember && bot.in_combat != 0 && aoeWarder != nullptr &&
-                 std::hypot(bot.pos_x - aoeWarder->pos_x, bot.pos_y - aoeWarder->pos_y) < kAoeKiteYards)
+        else if (partyMember && aoeWarder != nullptr &&
+                 std::hypot(bot.pos_x - aoeWarder->pos_x, bot.pos_y - aoeWarder->pos_y) < kAoeStandYards - 0.5f)
         {
-            // An Onyxian Warder is near: every party member other than the tank (the leader) gets out of its Fire Nova, whatever it is fighting or healing (the 2026-10-29 wipe:
+            // An Onyxian Warder is near (kAoeStandYards, in combat or not): every party member other than the tank (the leader) gets out of its Fire Nova, whatever it is fighting or healing (the 2026-10-29 wipe:
             // only a bot whose own target was the Warder kited). Each bot has its own point round the circle; one the core has no route to is given up for the next one
             // round, and with none left the bot stands and works from where it is.
             wanted = Decision{ ActionType::kStop, 0 };
@@ -3582,7 +3585,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             // Around an area-attack target a party member other than the tank never closes in: it holds at kite distance.
             bool const aoeTarget = partyMember && targetUnit && forever_module::UnitRefEntry(targetUnit->guid) == kOnyxianWarderEntry;
             if (aoeTarget)
-                approach = std::max(approach, kAoeKiteYards);
+                approach = std::max(approach, kAoeStandYards);
             if (distance <= approach)
             {
                 // A ranged bot that has walked into casting range stops there: the core's follow keeps running it into the target,
@@ -3601,7 +3604,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 // Deadmines runs, and each step re-pulled the next pack).
                 // The exception is a target with a big area attack around it (the Onyxian Warder): only the tank, the party leader, stands in it,
                 // and every other party member, melee class or not, backs off past its radius and casts from there.
-                float const kiteYards = aoeTarget ? kAoeKiteYards : kRangedKiteYards;
+                float const kiteYards = aoeTarget ? kAoeStandYards : kRangedKiteYards;
                 if (((partyLeader == 0 && approach > kMeleeApproachYards + 0.5f) || aoeTarget) && targetUnit && distance < kiteYards)
                 {
                     float const dx = bot.pos_x - targetUnit->pos_x;
