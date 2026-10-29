@@ -1,8 +1,9 @@
 // Ported from the forever branch's BotRotation.cpp (pure part) and BotCombat.cpp's warrior rows; see combat_rotation.h.
 #include "combat_rotation.h"
 
+#include "text_number.h"
+
 #include <algorithm>
-#include <charconv>
 #include <cmath>
 #include <fstream>
 #include <sstream>
@@ -316,16 +317,17 @@ namespace rotation {
 
 namespace {
 
+// Shared single-token parser (text_number.h): every plain-text data file in the module (rotations,
+// grind lists, tamed-beast lists, dungeon events, ground-avoid tables) uses the same Whole/Decimal
+// rules, so the implementation lives in one place.
 bool Whole(std::string const& text, std::uint32_t& out)
 {
-    auto const r = std::from_chars(text.data(), text.data() + text.size(), out);
-    return r.ec == std::errc{} && r.ptr == text.data() + text.size();
+    return text_number::ParseWhole(text, out);
 }
 
 bool Decimal(std::string const& text, float& out)
 {
-    auto const r = std::from_chars(text.data(), text.data() + text.size(), out);
-    return r.ec == std::errc{} && r.ptr == text.data() + text.size();
+    return text_number::ParseDecimal(text, out);
 }
 
 } // namespace

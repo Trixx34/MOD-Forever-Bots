@@ -1,23 +1,23 @@
 #include "grind_data.h"
 
+#include "text_number.h"
+
 #include <algorithm>
-#include <charconv>
 #include <cmath>
 #include <fstream>
 #include <sstream>
 
 namespace {
 
+// Shared single-token parser (text_number.h); see combat_rotation.cpp for the rationale.
 bool Number(std::string const& text, float& out)
 {
-    auto const result = std::from_chars(text.data(), text.data() + text.size(), out);
-    return result.ec == std::errc{} && result.ptr == text.data() + text.size();
+    return text_number::ParseDecimal(text, out);
 }
 
 bool Whole(std::string const& text, std::uint32_t& out)
 {
-    auto const result = std::from_chars(text.data(), text.data() + text.size(), out);
-    return result.ec == std::errc{} && result.ptr == text.data() + text.size();
+    return text_number::ParseWhole(text, out);
 }
 
 } // namespace

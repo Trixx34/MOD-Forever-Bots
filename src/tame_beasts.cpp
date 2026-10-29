@@ -1,6 +1,7 @@
 #include "tame_beasts.h"
 
-#include <charconv>
+#include "text_number.h"
+
 #include <cmath>
 #include <fstream>
 #include <limits>
@@ -13,10 +14,10 @@ namespace tame {
 
 namespace {
 
+// Shared single-token parser (text_number.h); see combat_rotation.cpp for the rationale.
 bool Whole(std::string const& text, std::uint32_t& out)
 {
-    auto const r = std::from_chars(text.data(), text.data() + text.size(), out);
-    return r.ec == std::errc{} && r.ptr == text.data() + text.size();
+    return text_number::ParseWhole(text, out);
 }
 
 // Lower is liked more: cats, wolves, boars, bears, then everything else.

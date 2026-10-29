@@ -1,6 +1,7 @@
 #include "dungeon_events.h"
 
-#include <charconv>
+#include "text_number.h"
+
 #include <cmath>
 #include <sstream>
 
@@ -8,23 +9,17 @@ namespace dungeon_events {
 
 namespace {
 
+// Was a local ToUint/ToFloat pair; now the shared single-token parser (text_number.h) used by every
+// other plain-text data file. The old ToUint here did not check that the whole token was consumed, so
+// e.g. "5dummy" silently parsed as 5 - that bug is gone now that every file shares one implementation.
 bool ToUint(std::string const& text, std::uint32_t& out)
 {
-    return !text.empty() && std::from_chars(text.data(), text.data() + text.size(), out).ec == std::errc{};
+    return text_number::ParseWhole(text, out);
 }
 
 bool ToFloat(std::string const& text, float& out)
 {
-    try
-    {
-        std::size_t used = 0;
-        out = std::stof(text, &used);
-        return used == text.size();
-    }
-    catch (std::exception const&)
-    {
-        return false;
-    }
+    return text_number::ParseDecimal(text, out);
 }
 
 float Dist2d(float ax, float ay, float bx, float by)
