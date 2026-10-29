@@ -144,6 +144,10 @@ add_executable(bot_random_test tests/bot_random_test.cpp)
 target_include_directories(bot_random_test PRIVATE src)
 add_test(NAME bot_random COMMAND bot_random_test)
 
+add_executable(text_helpers_test tests/text_helpers_test.cpp)
+target_include_directories(text_helpers_test PRIVATE src)
+add_test(NAME text_helpers COMMAND text_helpers_test)
+
 add_executable(scenario_test tests/scenario_test.cpp)
 target_link_libraries(scenario_test PRIVATE forever_bots_policy forever_bots_settings)
 add_test(NAME scenario COMMAND scenario_test)
