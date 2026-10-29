@@ -1751,6 +1751,93 @@ PolicyOptions::ScenarioRoute const& BotPolicy::ScenarioOf(std::uint64_t guid) co
     return _scenarioRoute;
 }
 
+// Parties (M8): the lowest-guid bots, in guid order, cut into parties of PartySize. See bot_policy.h for why this
+// is its own method.
+void BotPolicy::BuildParties(WorldTickSnapshotView const& view,
+                              std::unordered_map<std::uint64_t, std::size_t> const& indexOf,
+                              std::unordered_map<std::uint64_t, std::uint64_t>& leaderOf,
+                              std::unordered_map<std::uint64_t, std::vector<std::uint64_t>>& membersOf) const
+{
+    if (_options.PartySize == 0)
+        return;
+
+    // A leader or inviter reference that is one of this module's bots, as against a human player (both are players to the core).
+    auto const isOurBot = [&indexOf](std::uint64_t ref) { return ref != 0 && indexOf.count(ref & forever_module::kUnitRefCounterMask) != 0; };
+
+    std::vector<std::uint64_t> guids;
+    guids.reserve(view.bots.size());
+    for (BotSnapshot const& bot : view.bots)
+    {
+        // A player's own character (an alt), or a bot that sits in, or is invited to, a human's party, is not put into a bot party:
+        // the human is the one who invites it and commands it.
+        if (_options.IsAlt && _options.IsAlt(bot.guid))
+            continue;
+        std::uint64_t const heldBy = bot.group_role != 0 ? bot.group_leader_guid : bot.group_invite_from;
+        if (heldBy != 0 && !isOurBot(heldBy))
+            continue;
+        // Not every bot is sociable: PartyPercent of them take part in the parties, chosen by the run's seed, the rest stay on their own.
+        if (_options.PartyPercent < 100 &&
+            bot_random::Below(bot_random::Draw(_options.RandomSeed, bot.guid, bot_random::kSaltParty), 100) >= _options.PartyPercent)
+            continue;
+        guids.push_back(bot.guid);
+    }
+    std::sort(guids.begin(), guids.end());
+
+    // A party is one faction: the server refuses an invite across the sides. Each side's bots, in guid order, are cut into parties of PartySize,
+    // and the PartyCount parties with the lowest first guids are kept. When the module can tell the sides, a bot whose side is not known (its race is
+    // not in the table) is left out: it could land in a party of the other side, and the server would refuse that invite for ever. Without a side
+    // lookup (the tests) every bot has side 0 and they all party together.
+    bool const sidesKnown = bool(_options.PartySideOf) || bool(_options.SideOf);
+    std::map<std::uint8_t, std::vector<std::uint64_t>> bySide;
+    for (std::uint64_t guid : guids)
+    {
+        std::uint8_t const side = _options.PartySideOf ? _options.PartySideOf(guid) : (_options.SideOf ? _options.SideOf(guid) : std::uint8_t(0));
+        if (sidesKnown && side == 0)
+            continue;
+        bySide[side].push_back(guid);
+    }
+    // With PartyPercent or RandomPct set the parties are not all of the full size: each is 2 to PartySize bots, the size drawn from its first bot.
+    bool const variedSizes = _options.PartySize > 2 && (_options.PartyPercent < 100 || _options.RandomPct > 0);
+    std::vector<std::vector<std::uint64_t>> parties;
+    for (auto const& side : bySide)
+        for (std::size_t from = 0; from < side.second.size();)
+        {
+            std::size_t size = _options.PartySize;
+            if (variedSizes)
+                size = 2 + bot_random::Below(bot_random::Draw(_options.RandomSeed, side.second[from], bot_random::kSaltPartySize), _options.PartySize - 1);
+            std::size_t const to = std::min<std::size_t>(from + size, side.second.size());
+            parties.emplace_back(side.second.begin() + from, side.second.begin() + to);
+            from = to;
+        }
+    std::sort(parties.begin(), parties.end(), [](auto const& a, auto const& b) { return a.front() < b.front(); });
+    if (parties.size() > _options.PartyCount)
+        parties.resize(_options.PartyCount);
+
+    for (std::vector<std::uint64_t> const& party : parties)
+    {
+        std::size_t const start = 0;
+        std::size_t const end = party.size();
+        std::size_t leader = start;
+        for (std::size_t p = start; p < end; ++p)
+        {
+            auto const known = _bots.find(party[p]);
+            bool const tankRole = known != _bots.end() && known->second.Role_ == BotState::Role::Tank;
+            if (tankRole || (ClassFor(_options, party[p]) == kWarriorClass && (known == _bots.end() || known->second.Role_ == BotState::Role::Auto)))
+            {
+                leader = p;
+                break;
+            }
+        }
+        std::uint64_t const leaderGuid = party[leader];
+        for (std::size_t p = start; p < end; ++p)
+        {
+            leaderOf[party[p]] = leaderGuid;
+            if (p != leader)
+                membersOf[leaderGuid].push_back(party[p]);
+        }
+    }
+}
+
 std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std::uint64_t nowMs)
 {
     std::vector<BotAction> actions;
@@ -1768,81 +1855,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
 
     std::unordered_map<std::uint64_t, std::uint64_t> leaderOf;                // bot guid -> its party's leader
     std::unordered_map<std::uint64_t, std::vector<std::uint64_t>> membersOf;  // leader guid -> the other members
-    if (_options.PartySize != 0)
-    {
-        std::vector<std::uint64_t> guids;
-        guids.reserve(view.bots.size());
-        for (BotSnapshot const& bot : view.bots)
-        {
-            // A player's own character (an alt), or a bot that sits in, or is invited to, a human's party, is not put into a bot party:
-            // the human is the one who invites it and commands it.
-            if (_options.IsAlt && _options.IsAlt(bot.guid))
-                continue;
-            std::uint64_t const heldBy = bot.group_role != 0 ? bot.group_leader_guid : bot.group_invite_from;
-            if (heldBy != 0 && !isOurBot(heldBy))
-                continue;
-            // Not every bot is sociable: PartyPercent of them take part in the parties, chosen by the run's seed, the rest stay on their own.
-            if (_options.PartyPercent < 100 &&
-                bot_random::Below(bot_random::Draw(_options.RandomSeed, bot.guid, bot_random::kSaltParty), 100) >= _options.PartyPercent)
-                continue;
-            guids.push_back(bot.guid);
-        }
-        std::sort(guids.begin(), guids.end());
-
-        // A party is one faction: the server refuses an invite across the sides. Each side's bots, in guid order, are cut into parties of PartySize,
-        // and the PartyCount parties with the lowest first guids are kept. When the module can tell the sides, a bot whose side is not known (its race is
-        // not in the table) is left out: it could land in a party of the other side, and the server would refuse that invite for ever. Without a side
-        // lookup (the tests) every bot has side 0 and they all party together.
-        bool const sidesKnown = bool(_options.PartySideOf) || bool(_options.SideOf);
-        std::map<std::uint8_t, std::vector<std::uint64_t>> bySide;
-        for (std::uint64_t guid : guids)
-        {
-            std::uint8_t const side = _options.PartySideOf ? _options.PartySideOf(guid) : (_options.SideOf ? _options.SideOf(guid) : std::uint8_t(0));
-            if (sidesKnown && side == 0)
-                continue;
-            bySide[side].push_back(guid);
-        }
-        // With PartyPercent or RandomPct set the parties are not all of the full size: each is 2 to PartySize bots, the size drawn from its first bot.
-        bool const variedSizes = _options.PartySize > 2 && (_options.PartyPercent < 100 || _options.RandomPct > 0);
-        std::vector<std::vector<std::uint64_t>> parties;
-        for (auto const& side : bySide)
-            for (std::size_t from = 0; from < side.second.size();)
-            {
-                std::size_t size = _options.PartySize;
-                if (variedSizes)
-                    size = 2 + bot_random::Below(bot_random::Draw(_options.RandomSeed, side.second[from], bot_random::kSaltPartySize), _options.PartySize - 1);
-                std::size_t const to = std::min<std::size_t>(from + size, side.second.size());
-                parties.emplace_back(side.second.begin() + from, side.second.begin() + to);
-                from = to;
-            }
-        std::sort(parties.begin(), parties.end(), [](auto const& a, auto const& b) { return a.front() < b.front(); });
-        if (parties.size() > _options.PartyCount)
-            parties.resize(_options.PartyCount);
-
-        for (std::vector<std::uint64_t> const& party : parties)
-        {
-            std::size_t const start = 0;
-            std::size_t const end = party.size();
-            std::size_t leader = start;
-            for (std::size_t p = start; p < end; ++p)
-            {
-                auto const known = _bots.find(party[p]);
-                bool const tankRole = known != _bots.end() && known->second.Role_ == BotState::Role::Tank;
-                if (tankRole || (ClassFor(_options, party[p]) == kWarriorClass && (known == _bots.end() || known->second.Role_ == BotState::Role::Auto)))
-                {
-                    leader = p;
-                    break;
-                }
-            }
-            std::uint64_t const leaderGuid = party[leader];
-            for (std::size_t p = start; p < end; ++p)
-            {
-                leaderOf[party[p]] = leaderGuid;
-                if (p != leader)
-                    membersOf[leaderGuid].push_back(party[p]);
-            }
-        }
-    }
+    BuildParties(view, indexOf, leaderOf, membersOf);
 
     // "tank lead" (chat): the tank bot walks its group through the dungeon. For the dungeon rules the group becomes a party with the tank as its leader: the
     // tank pulls when the party is ready, the others follow it and join the fight. A tank that left the dungeon (its map has no route) stops leading.
