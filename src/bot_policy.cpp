@@ -149,6 +149,14 @@ constexpr std::uint32_t kRestBelowPct = 90;  // an idle bot below this health si
 constexpr std::uint32_t kGroupInvite = 1;
 constexpr std::uint32_t kGroupAccept = 2;
 constexpr std::uint32_t kGroupLeave = 3;
+// 40-man raid support (doc 108): convert the bot's own party to a raid (no target), and move the player named by
+// target_guid into the subgroup number given in dest_x (0-7). Both reuse kGroup's existing generic fields -- no new
+// ActionType, no SDK protocol bump (ModuleBotActions.cpp, Trinity-Forever-Modules).
+constexpr std::uint32_t kGroupConvertRaid = 4;
+constexpr std::uint32_t kGroupAssignSubgroup = 5;
+constexpr std::uint64_t kRaidConvertRetryMs = 10000;  // ConvertToRaid's success is not visible in the snapshot; retried at this pace
+constexpr std::uint64_t kRaidAssignRetryMs = 10000;   // likewise for a subgroup assignment
+constexpr std::uint32_t kRaidSubgroupSize = 5;        // TrinityCore's MAX_GROUP_SIZE: bots per raid subgroup
 constexpr std::uint32_t kWarriorClass = 1;
 constexpr std::uint32_t kPlayerType = 2;     // unit reference type of a player (MakeUnitRef's highType)
 constexpr std::uint64_t kInviteRetryMs = 15000; // a member is invited again this long after the last invite
@@ -4564,6 +4572,54 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     invite.target_guid = PlayerRef(member);
                     actions.push_back(invite);
                     state.InvitedAtMs[member] = nowMs;
+                }
+                // 40-man raid support (doc 108): this leader's roster is a raid (PolicyOptions::Raid). ConvertToRaid works at
+                // any party size (Group.cpp), so it is asked for as soon as this bot leads one, well before the 6th member
+                // would otherwise be refused by the 5-member party cap; repeated at kRaidConvertRetryMs since the core gives
+                // no snapshot signal of success and the ask is a harmless no-op once already a raid. Each confirmed member
+                // (group_leader_guid already this leader's) is then put in the subgroup its position in the roster implies --
+                // 5 per subgroup, leader first -- so an 8x5 roster (ScenarioRoster order) lands one tank/healer/dps group per
+                // subgroup, the same split a 5-man scenario's roster gives a single party.
+                if (_options.Raid)
+                {
+                    if (!foreign && nowMs >= state.RaidConvertRetryAtMs)
+                    {
+                        BotAction convert;
+                        convert.bot_guid = bot.guid;
+                        convert.type = ActionType::kGroup;
+                        convert.spell_id = kGroupConvertRaid;
+                        actions.push_back(convert);
+                        state.RaidConvertRetryAtMs = nowMs + kRaidConvertRetryMs;
+                    }
+                    std::vector<std::uint64_t> const& roster = membersOf[bot.guid];
+                    for (std::size_t m = 0; m < roster.size(); ++m)
+                    {
+                        std::uint64_t const member = roster[m];
+                        auto const at = indexOf.find(member);
+                        if (at == indexOf.end())
+                            continue; // not online
+                        BotSnapshot const& other = view.bots[at->second];
+                        if (other.group_leader_guid != leaderRef)
+                            continue; // not a confirmed member of this raid yet; assigned once it has joined
+                        // The leader itself holds subgroup 0's first slot (not counted in `roster`), so a member's 1-based
+                        // position (m + 1) cut by kRaidSubgroupSize gives its subgroup.
+                        std::uint8_t const subgroup = static_cast<std::uint8_t>((m + 1) / kRaidSubgroupSize);
+                        auto const sentAt = state.RaidAssignRetryAtMs.find(member);
+                        auto const sentWhat = state.RaidSubgroupSent.find(member);
+                        bool const alreadySent = sentWhat != state.RaidSubgroupSent.end() && sentWhat->second == subgroup &&
+                                                  sentAt != state.RaidAssignRetryAtMs.end() && nowMs < sentAt->second;
+                        if (alreadySent)
+                            continue;
+                        BotAction assign;
+                        assign.bot_guid = bot.guid;
+                        assign.type = ActionType::kGroup;
+                        assign.spell_id = kGroupAssignSubgroup;
+                        assign.target_guid = PlayerRef(member);
+                        assign.dest_x = float(subgroup);
+                        actions.push_back(assign);
+                        state.RaidSubgroupSent[member] = subgroup;
+                        state.RaidAssignRetryAtMs[member] = nowMs + kRaidAssignRetryMs;
+                    }
                 }
             }
             else if (partyMember)

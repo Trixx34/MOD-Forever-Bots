@@ -304,6 +304,22 @@ void TimeoutEndsTheRun()
     CHECK(FormatScenarioResult(*result).find("outcome=timeout") != std::string::npos);
 }
 
+// 40-man raid support (doc 108): a raid plan's result carries Raid/Groups through to the log line; a non-raid plan's does not.
+void RaidPlanResultCarriesRaidAndGroups()
+{
+    ScenarioPlan raidPlan = Plan();
+    raidPlan.Raid = true;
+    raidPlan.GroupSubgroups = 8;
+    std::uint64_t t, tick;
+    std::vector<BotSnapshot> bots;
+    ScenarioDirector director = RunningDirector(t, tick, bots, raidPlan);
+    std::vector<BotAction> actions;
+    director.Decide(View(++tick, bots), t += 200000, actions);
+    auto const result = director.TakeResult();
+    CHECK(result && result->Raid && result->Groups == 8);
+    CHECK(FormatScenarioResult(*result).find("raid=1 groups=8") != std::string::npos);
+}
+
 void EnteringTimesOut()
 {
     ScenarioDirector director(Plan());
@@ -959,6 +975,23 @@ void FormatShowsEventsRevivedWipes()
     CHECK(text.find("wipes=1") != std::string::npos && text.find("ghosts=1") != std::string::npos);
 }
 
+// 40-man raid support (doc 108): the result line carries "raid=1 groups=8" for a raid scenario, and nothing extra (dungeon
+// result lines unchanged) when the scenario is not a raid.
+void FormatShowsRaidAndGroupsOnlyForARaidScenario()
+{
+    ScenarioResult result;
+    result.Outcome = "complete";
+    result.Raid = true;
+    result.Groups = 8;
+    std::string const raidText = FormatScenarioResult(result);
+    CHECK(raidText.find("raid=1 groups=8") != std::string::npos);
+
+    ScenarioResult dungeon;
+    dungeon.Outcome = "complete";
+    std::string const dungeonText = FormatScenarioResult(dungeon);
+    CHECK(dungeonText.find("raid=") == std::string::npos && dungeonText.find("groups=") == std::string::npos);
+}
+
 
 // --- Ammunition, class supplies, class quests and the Taming phase ---
 
@@ -1375,6 +1408,8 @@ int main()
     DeadLeaderAbandonsAfterTheCap();
     EnteringSkipsGhostsAndCorpses();
     FormatShowsEventsRevivedWipes();
+    FormatShowsRaidAndGroupsOnlyForARaidScenario();
+    RaidPlanResultCarriesRaidAndGroups();
     FormatAppendsTheRosterAfterTheBosses();
     TimeoutEndsTheRun();
     EnteringTimesOut();

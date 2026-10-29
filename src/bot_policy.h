@@ -95,6 +95,10 @@ struct PolicyOptions
     // leader is its first warrior, else its lowest-guid bot. PartySize 0 turns parties off.
     std::uint32_t PartySize = 0;
     std::uint32_t PartyCount = 1;
+    // 40-man raid support (doc 108): with Raid on, the one party PartySize/PartyCount form (unchanged above) is raid-converted and
+    // its members assigned to 8 subgroups of 5 by roster position, instead of staying a flat party (which the server refuses past
+    // 5 members). Five-man scenarios and the plain PartySize/PartyCount feature never set this; only a raid scenario does (main.cpp).
+    bool Raid = false;
     // Randomness (bot_random.h). RandomSeed makes a run repeatable. RandomPct is how much the bots' timers and thresholds vary from bot to bot and from time
     // to time (+- this many percent); 0 turns the variation off (the tests). PartyPercent is the share of the bots that take part in the parties at all
     // (the others stay on their own); the parties are then of random sizes from 2 up to PartySize. The defaults keep the old behavior: no variation, every bot partied.
@@ -427,6 +431,13 @@ private:
         Point ExploreTarget;
         std::uint64_t InviteAcceptAtMs = 0;              // a player's invite is not answered again before this
         std::uint64_t PartyRetryAtMs = 0;                // a party action is not sent again before this
+        // 40-man raid support (doc 108), leader-side only. RaidConvertRetryAtMs paces the repeated ConvertToRaid asks (its success is
+        // not visible in the snapshot -- no is_raid field -- so it is simply retried at a slow pace, harmless once already a raid).
+        // RaidSubgroupSent/RaidAssignRetryAtMs remember, per member, the subgroup last asked for and when it may be asked again, so a
+        // confirmed member is not re-sent every tick.
+        std::uint64_t RaidConvertRetryAtMs = 0;
+        std::unordered_map<std::uint64_t, std::uint8_t> RaidSubgroupSent;
+        std::unordered_map<std::uint64_t, std::uint64_t> RaidAssignRetryAtMs;
         std::unordered_map<std::uint64_t, std::uint64_t> AvoidUntilMs; // unit -> until when the bot picks another target
         std::unordered_map<std::uint64_t, std::uint32_t> AvoidCount;   // unit -> how many times it has been avoided
         bool Approaching = false;                        // walking to its target, not yet in range

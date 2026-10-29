@@ -157,6 +157,18 @@ Module.forever-bots.TelemetrySummarySec = 60
 # ScenarioRoute3 = -177.4 -574.5 19.3
 # ScenarioGear1 = 1234,5678                     # optional: items granted to a class instead of auto gear (needs Bot.Actions.Grant)
 # ScenarioResultFile = scenario-results.log
+# 40-man raid support (doc 108): ScenarioRaid = 1 lets ScenarioRoster go up to 40 (TrinityCore's MAX_RAID_SIZE) and forms the roster into
+# one raid group of 8 subgroups of 5 (Group::ConvertToRaid, Group::ChangeMembersGroup), instead of the flat 5-member party above. Without
+# it ScenarioRoster is still capped at 5 exactly as before -- a raid is a distinct, opt-in mode, not a universal cap raise. List the roster
+# as 8 repeats of the same tank/healer/dps composition a 5-man roster would use (one repeat per subgroup, in order): bot_policy.cpp assigns
+# subgroup = roster position / 5, so a warrior at position 0, 5, 10, ... lands as each subgroup's tank the same way the single-party case
+# already makes every warrior in a PartySize-roster its tank. (Example only -- a raid's own ScenarioEntry/ScenarioBosses/route for a given
+# raid instance, e.g. Onyxia's Lair, are set up separately; not shown here.)
+# Scenario = my_raid
+# ScenarioRaid = 1
+# ScenarioRoster = 1:1,1:5,1:4,1:4,1:4,1:1,1:5,1:4,1:4,1:4,1:1,1:5,1:4,1:4,1:4,1:1,1:5,1:4,1:4,1:4,1:1,1:5,1:4,1:4,1:4,1:1,1:5,1:4,1:4,1:4,1:1,1:5,1:4,1:4,1:4,1:1,1:5,1:4,1:4,1:4
+# ScenarioLevel = 60
+# ScenarioDurationSec = 5400
 # Several dungeons in one run (0.29.0): a list of dungeon ids of the dungeon files, each with its parties (20 in all); "<key>.<id>" sets a key for one dungeon.
 # The plain dungeon keys above (roster, level, staging, entry, portal, route, bosses, parties) are ignored with a list; the others apply to every dungeon.
 # Scenario = dm:10,rfc:10

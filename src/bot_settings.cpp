@@ -156,8 +156,12 @@ void ReadOneScenario(std::unordered_map<std::string, std::string> const& config,
         scenario.Name.clear();
         return;
     }
-    if (scenario.Roster.size() > 5)
-        scenario.Roster.resize(5);
+    // ScenarioRaid (doc 108): a raid roster may go up to 40 (TrinityCore's MAX_RAID_SIZE); a five-man scenario (unset, the
+    // default) keeps the existing cap of 5 exactly as before -- this is a distinct mode, not a universal cap raise.
+    ReadBool(config, "ScenarioRaid", scenario.Raid, warnings);
+    std::uint32_t const rosterCap = scenario.Raid ? 40 : 5;
+    if (scenario.Roster.size() > rosterCap)
+        scenario.Roster.resize(rosterCap);
 
     ReadKey(config, "ScenarioLevel", 1, 60, scenario.Level, warnings);
     if (auto const it = config.find("ScenarioKillPriority"); it != config.end())
@@ -335,7 +339,7 @@ bool OneFaction(ScenarioSettings const& scenario)
 bool IsPlainDungeonKey(std::string const& key)
 {
     static char const* const keys[] = { "Dungeon", "ScenarioRoster", "ScenarioLevel", "ScenarioStaging", "ScenarioEntry", "ScenarioPortal",
-                                        "ScenarioBosses", "ScenarioBossAt", "ScenarioKillPriority", "ScenarioParties", "ScenarioTameSpot" };
+                                        "ScenarioBosses", "ScenarioBossAt", "ScenarioKillPriority", "ScenarioParties", "ScenarioTameSpot", "ScenarioRaid" };
     if (key.find('.') != std::string::npos)
         return false;
     for (char const* plain : keys)

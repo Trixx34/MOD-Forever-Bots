@@ -48,6 +48,8 @@ void ScenarioDirector::Finish(std::string outcome, std::uint64_t nowMs)
     result.RouteSize = std::uint32_t(_plan.Route.size());
     result.RosterSize = _plan.RosterSize;
     result.PartyFormed = _partyFormed;
+    result.Raid = _plan.Raid;
+    result.Groups = _plan.Raid ? _plan.GroupSubgroups : 0;
     result.BossesTotal = std::uint32_t(_plan.Bosses.size());
     result.BossesKilled = _bossKills;
     for (auto const& [guid, dead] : _everDead)
@@ -615,6 +617,9 @@ std::string FormatScenarioResult(ScenarioResult const& result)
         << " deaths=" << result.Deaths << " alive=" << result.Alive << "/" << result.RosterSize << " events=" << result.DeathEvents
         << " revived=" << result.Revived << " wipes=" << result.Wipes << " ghosts=" << result.Ghosts << " run=" << result.RunMs / 1000 << "s"
         << " party=" << (result.PartyFormed ? "yes" : "no");
+    // 40-man raid support (doc 108): raid=1 groups=<n> for a raid scenario, nothing extra for a dungeon one (acceptance criteria).
+    if (result.Raid)
+        out << " raid=1 groups=" << result.Groups;
     if (result.BossesTotal != 0)
     {
         out << " bosses=" << result.BossesKilled.size() << "/" << result.BossesTotal << " killed=";
