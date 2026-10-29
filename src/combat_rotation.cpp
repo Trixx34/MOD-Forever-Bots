@@ -1,8 +1,10 @@
 // Ported from the forever branch's BotRotation.cpp (pure part) and BotCombat.cpp's warrior rows; see combat_rotation.h.
 #include "combat_rotation.h"
 
+#include "text_lines.h"
+#include "text_number.h"
+
 #include <algorithm>
-#include <charconv>
 #include <cmath>
 #include <fstream>
 #include <sstream>
@@ -316,16 +318,17 @@ namespace rotation {
 
 namespace {
 
+// Shared single-token parser (text_number.h): every plain-text data file in the module (rotations,
+// grind lists, tamed-beast lists, dungeon events, ground-avoid tables) uses the same Whole/Decimal
+// rules, so the implementation lives in one place.
 bool Whole(std::string const& text, std::uint32_t& out)
 {
-    auto const r = std::from_chars(text.data(), text.data() + text.size(), out);
-    return r.ec == std::errc{} && r.ptr == text.data() + text.size();
+    return text_number::ParseWhole(text, out);
 }
 
 bool Decimal(std::string const& text, float& out)
 {
-    auto const r = std::from_chars(text.data(), text.data() + text.size(), out);
-    return r.ec == std::errc{} && r.ptr == text.data() + text.size();
+    return text_number::ParseDecimal(text, out);
 }
 
 } // namespace
@@ -335,19 +338,10 @@ RotationData ParseRotationData(std::istream& in, std::vector<std::string>& warni
     RotationData data;
     std::uint32_t classId = 0;
     std::string specKey; // the spec of the current block (empty: the class default)
-    std::string line;
     std::size_t number = 0;
-    while (std::getline(in, line))
+    std::vector<std::string> t;
+    while (text_lines::NextTokens(in, number, t))
     {
-        ++number;
-        if (auto const hash = line.find('#'); hash != std::string::npos)
-            line.erase(hash);
-        std::istringstream words(line);
-        std::vector<std::string> t;
-        for (std::string token; words >> token;)
-            t.push_back(token);
-        if (t.empty())
-            continue;
         auto const drop = [&](char const* why) { warnings.push_back("rotation file line " + std::to_string(number) + ": " + why + "; ignored"); };
 
         if (t[0] == "class")

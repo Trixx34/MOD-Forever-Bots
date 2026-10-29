@@ -1,6 +1,7 @@
 #include "dungeon_data.h"
 #include "dungeon_files.h"
 #include "bot_settings.h"
+#include "text_number.h"
 
 #include <charconv>
 #include <fstream>
@@ -12,11 +13,7 @@ namespace
 
 bool ReadNumbers(std::istringstream& in, float* out, std::size_t count)
 {
-    std::string trailing;
-    for (std::size_t i = 0; i < count; ++i)
-        if (!(in >> out[i]))
-            return false;
-    return !(in >> trailing);
+    return text_number::ParseFloats(in, out, count);
 }
 
 bool ReadUint(std::istringstream& in, std::uint32_t& out)

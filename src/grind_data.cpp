@@ -1,23 +1,24 @@
 #include "grind_data.h"
 
+#include "text_lines.h"
+#include "text_number.h"
+
 #include <algorithm>
-#include <charconv>
 #include <cmath>
 #include <fstream>
 #include <sstream>
 
 namespace {
 
+// Shared single-token parser (text_number.h); see combat_rotation.cpp for the rationale.
 bool Number(std::string const& text, float& out)
 {
-    auto const result = std::from_chars(text.data(), text.data() + text.size(), out);
-    return result.ec == std::errc{} && result.ptr == text.data() + text.size();
+    return text_number::ParseDecimal(text, out);
 }
 
 bool Whole(std::string const& text, std::uint32_t& out)
 {
-    auto const result = std::from_chars(text.data(), text.data() + text.size(), out);
-    return result.ec == std::errc{} && result.ptr == text.data() + text.size();
+    return text_number::ParseWhole(text, out);
 }
 
 } // namespace
@@ -25,20 +26,10 @@ bool Whole(std::string const& text, std::uint32_t& out)
 GrindData ParseGrindData(std::istream& in, std::vector<std::string>& warnings)
 {
     GrindData data;
-    std::string line;
     std::size_t number = 0;
-    while (std::getline(in, line))
+    std::vector<std::string> tokens;
+    while (text_lines::NextTokens(in, number, tokens))
     {
-        ++number;
-        if (auto const hash = line.find('#'); hash != std::string::npos)
-            line.erase(hash);
-        std::istringstream words(line);
-        std::vector<std::string> tokens;
-        for (std::string token; words >> token;)
-            tokens.push_back(token);
-        if (tokens.empty())
-            continue;
-
         GrindSpot spot;
         std::uint32_t side = 0;
         bool ok = tokens[0] == "spot" && (tokens.size() == 8 || tokens.size() == 9);

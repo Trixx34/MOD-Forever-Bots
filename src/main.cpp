@@ -26,6 +26,7 @@
 #include "dungeon_events.h"
 #include "dungeon_files.h"
 #include "scenario.h"
+#include "text_case.h"
 
 #include "forever_module/module_client.h"
 #include "forever_module/tier2_session.h"
@@ -317,8 +318,7 @@ struct AltRegistry
 
 std::string LowerCopy(std::string text)
 {
-    std::transform(text.begin(), text.end(), text.begin(), [](unsigned char c) { return char(std::tolower(c)); });
-    return text;
+    return text_case::ToLower(std::move(text));
 }
 
 struct PresenceFeed

@@ -578,6 +578,16 @@ private:
 
     void ReadResult(BotState& state, forever_module::BotSnapshot const& bot, std::uint64_t nowMs);
 
+    // Parties (M8): cuts the bots of `view` into parties of _options.PartySize (one faction each, the lowest-guid
+    // bots first), picks each party's leader (a set tank role, else a warrior with no role set), and fills
+    // `leaderOf` (every partied bot's leader) and `membersOf` (a leader's other members). Pulled out of Decide
+    // because it is a self-contained computation over `view` and _options with no side effects beyond its two
+    // out-parameters — unlike the rest of Decide, which threads per-tick fight state through the whole function.
+    void BuildParties(forever_module::WorldTickSnapshotView const& view,
+                       std::unordered_map<std::uint64_t, std::size_t> const& indexOf,
+                       std::unordered_map<std::uint64_t, std::uint64_t>& leaderOf,
+                       std::unordered_map<std::uint64_t, std::vector<std::uint64_t>>& membersOf) const;
+
     // The state of a bot, created on first use with the starting stance (PolicyOptions::AggressiveStart).
     BotState& StateOf(std::uint64_t botGuid)
     {

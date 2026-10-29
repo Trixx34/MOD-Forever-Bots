@@ -1,5 +1,7 @@
 #include "trade_policy.h"
 
+#include "text_case.h"
+
 #include <algorithm>
 #include <cctype>
 #include <regex>
@@ -10,8 +12,7 @@ namespace {
 
 std::string Lower(std::string text)
 {
-    std::transform(text.begin(), text.end(), text.begin(), [](unsigned char c) { return char(std::tolower(c)); });
-    return text;
+    return text_case::ToLower(std::move(text));
 }
 
 std::string Trim(std::string const& text)

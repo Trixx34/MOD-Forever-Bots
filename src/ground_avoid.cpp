@@ -1,7 +1,8 @@
 #include "ground_avoid.h"
 
+#include "text_number.h"
+
 #include <algorithm>
-#include <charconv>
 #include <cmath>
 
 namespace ground_avoid {
@@ -15,22 +16,14 @@ constexpr float kPi = 3.14159265358979f;
 
 bool ParseUint(std::string_view text, std::uint32_t& out)
 {
-    auto const result = std::from_chars(text.data(), text.data() + text.size(), out);
-    return result.ec == std::errc() && result.ptr == text.data() + text.size();
+    return text_number::ParseWhole(std::string(text), out);
 }
 
+// A radius: the shared decimal parser plus this file's own bound (0..200 yards is as far as an avoid
+// table entry is ever meant to reach; a wildly out-of-range number is a typo, not a wide radius).
 bool ParseFloat(std::string const& text, float& out)
 {
-    try
-    {
-        std::size_t used = 0;
-        out = std::stof(text, &used);
-        return used == text.size() && std::isfinite(out) && out >= 0.0f && out <= 200.0f;
-    }
-    catch (...)
-    {
-        return false;
-    }
+    return text_number::ParseDecimal(text, out) && std::isfinite(out) && out >= 0.0f && out <= 200.0f;
 }
 
 } // namespace
