@@ -5,14 +5,6 @@
 # Made by tools/make_dungeons_from_db.py from the world database: the doors, the spawns and the bosses are real; the ORDER of each route is a
 # nearest-next guess (see the tool). None of these routes has been walked on a sim. Check each one and edit the `go` lines that are wrong.
 
-# OPEN ITEM (2026-10-29, docs/108-onyxia-raid-job.md): Onyxia's Lair (map 249, boss entry 10184) has NO block here and NO data/dungeons/249-onyxias-lair.json
-# yet. tools/make_dungeons_from_db.py now has an "onyxia" entry in its DUNGEONS dict (map 249, level 60, boss name "Onyxia"), but nobody has run that script
-# against the real world database for it, so there is no real entrance/spawn/route data to add to this file or to a JSON file. This file's own format has no
-# precedent for a "not yet walked" or "no data yet" dungeon block: every block below already has real entrance coordinates from the database, so a block
-# cannot honestly be added here until the generator is actually run. Do not hand-write a block for onyxia; run the generator with DB access first
-# (`make_dungeons_from_db.py world.sqlite --only onyxia`), then `tools/convert_dungeons.py --map 249` into data/dungeons/249-onyxias-lair.json, review it,
-# and only then should this file possibly gain a fallback block for it (or not, per the JSON-first precedence above).
-
 # The routes below were planned over the navmesh by tools/replan_dungeons.py (tools/mmap_check --plan): boss to boss along the walkable path, nearest boss first.
 # The order of the bosses is a guess (nearest first); the corners of the path are on the mesh. None of it has been walked by a bot party on a sim yet.
 
@@ -614,4 +606,21 @@ go 2518.1 737.3 40.8
 go 2515.2 726.7 41.6
 go 2502.4 697.1 52.0
 boss 7357 2466.6 671.4 63.5 Mordresh Fire Eye
+end
+
+dungeon onyxia
+name Onyxia's Lair
+levels 60 60
+roster 2:1,5:5,8:8,2:9,5:4
+staging 1 -4753.31 -3752.42 48.2
+portal 1 -4750.4 -3754.4 49
+entry 249 30.89 -54.08 -5.03
+duration 1800
+wipe_recovery 300
+go 49.8 -114.6 -24.3
+go -49.9 -98.1 -38.6
+go -131.2 -137.5 -52.5
+go -170.3 -195.7 -66.4
+go -199.1 -209.8 -68.9
+boss 10184 -4.9 -217.2 -86.7 Onyxia
 end
