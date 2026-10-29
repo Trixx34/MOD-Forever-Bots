@@ -1344,6 +1344,22 @@ void InvitedMemberIsNotInvitedAgain()
     CHECK(!HasGroup(PartyPolicy(5).Decide(view, 0), 12, 1, PlayerOf(10)));
 }
 
+void ATankLeadsThePartyWhateverItsGuid()
+{
+    // Bots 10 and 13 are warriors. Bot 10 has no role, so by guid order it would lead; bot 13 has a prot spec, so its role is tank from the first tick on.
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.PartyCount = 1;
+    options.ClassOf = [](std::uint64_t guid) { return guid == 10 || guid == 13 ? 1u : 5u; };
+    options.SpecOf = [](std::uint64_t guid) { return guid == 13 ? std::string("prot") : std::string(); };
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    policy.Decide(view, 0); // the first tick sets the tank role from the spec
+    auto const actions = policy.Decide(view, 1000);
+    CHECK(HasGroup(actions, 13, 1));  // the tank leads and invites
+    CHECK(!HasGroup(actions, 10, 1)); // the warrior with no role follows
+}
+
 void MemberAcceptsItsLeadersInvite()
 {
     WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
@@ -5794,6 +5810,7 @@ int main()
     OnlyTheFirstPartyIsFormed();
     InvitesWaitForTheRetry();
     InvitedMemberIsNotInvitedAgain();
+    ATankLeadsThePartyWhateverItsGuid();
     MemberAcceptsItsLeadersInvite();
     MemberLeavesAForeignParty();
     MemberFollowsItsLeaderUntilClose();

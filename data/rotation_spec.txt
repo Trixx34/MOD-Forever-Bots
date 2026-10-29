@@ -141,7 +141,7 @@ supersede "Devotion Aura" by "Retribution Aura"
 class 3
 # The default hunter is Beast Mastery.
 row "Hunter's Mark" duration 120 always target range 0 35
-row 1293241 level 25 duration 18 always self       # Summon Hawk (no trainer teaches rank 1: the core refuses it until the bot has it)
+row 1293241 level 25 duration 18 always target range 0 35       # Summon Hawk (no trainer teaches rank 1: the core refuses it until the bot has it)
 row "Multi-Shot" enemies 2 target range 0 35
 row "Aimed Shot" always target range 0 35
 row "Arcane Shot" always target range 0 35
@@ -154,7 +154,7 @@ class 3 spec bm
 # Hawk, Aimed/Multi, Hawk, Aimed/Multi, Arcane. The Hawk is cast whenever it is ready (a cooldown refusal skips it). With no ammunition the policy leaves the ranged rows out and
 # Raptor Strike is what remains. The pet is the policy's own logic (Tame Beast, then Call Pet), not a row.
 row "Hunter's Mark" duration 120 always target range 0 35
-row 1293241 level 25 duration 18 always self       # Summon Hawk (rank 1; no trainer teaches it: the core refuses it until the bot has it)
+row 1293241 level 25 duration 18 always target range 0 35       # Summon Hawk (rank 1; no trainer teaches it: the core refuses it until the bot has it)
 row "Multi-Shot" enemies 2 target range 0 35
 row "Aimed Shot" always target range 0 35
 row "Arcane Shot" always target range 0 35

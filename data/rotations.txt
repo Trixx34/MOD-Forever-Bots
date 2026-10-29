@@ -113,7 +113,7 @@ buff 19740 level 4 duration 300 party   # Blessing of Might: ranks [19740, 19834
 
 class 3
 row 1130 level 6 duration 120 always target range 0 35   # Hunter's Mark: ranks [1130, 14323, 14324, 14325]
-row 1293241 level 25 duration 18 always self
+row 1293241 level 25 duration 18 always target range 0 35
 row 2643 level 18 enemies 2 target range 0 35   # Multi-Shot: ranks [2643]
 row 19434 level 20 always target range 0 35   # Aimed Shot: ranks [19434, 20900, 20901, 20902, 20903, 20904]
 row 3044 level 6 always target range 0 35   # Arcane Shot: ranks [3044, 14281, 14282, 14283, 14284, 14285, 14286, 14287]
@@ -123,7 +123,7 @@ buff 13165 level 10 duration 3600 self   # Aspect of the Hawk: ranks [13165, 143
 
 class 3 spec bm
 row 1130 level 6 duration 120 always target range 0 35   # Hunter's Mark: ranks [1130, 14323, 14324, 14325]
-row 1293241 level 25 duration 18 always self
+row 1293241 level 25 duration 18 always target range 0 35
 row 2643 level 18 enemies 2 target range 0 35   # Multi-Shot: ranks [2643]
 row 19434 level 20 always target range 0 35   # Aimed Shot: ranks [19434, 20900, 20901, 20902, 20903, 20904]
 row 3044 level 6 always target range 0 35   # Arcane Shot: ranks [3044, 14281, 14282, 14283, 14284, 14285, 14286, 14287]

@@ -1825,17 +1825,24 @@ void BotPolicy::BuildParties(WorldTickSnapshotView const& view,
     {
         std::size_t const start = 0;
         std::size_t const end = party.size();
-        std::size_t leader = start;
-        for (std::size_t p = start; p < end; ++p)
+        // A tank leads, whatever its place in guid order (a raid's tanks come from the roster's prot specs). Only without one does a warrior with no role lead.
+        auto const isTank = [this](std::uint64_t guid)
+        {
+            auto const known = _bots.find(guid);
+            return known != _bots.end() && known->second.Role_ == BotState::Role::Tank;
+        };
+        std::size_t leader = end;
+        for (std::size_t p = start; p < end && leader == end; ++p)
+            if (isTank(party[p]))
+                leader = p;
+        for (std::size_t p = start; p < end && leader == end; ++p)
         {
             auto const known = _bots.find(party[p]);
-            bool const tankRole = known != _bots.end() && known->second.Role_ == BotState::Role::Tank;
-            if (tankRole || (ClassFor(_options, party[p]) == kWarriorClass && (known == _bots.end() || known->second.Role_ == BotState::Role::Auto)))
-            {
+            if (ClassFor(_options, party[p]) == kWarriorClass && (known == _bots.end() || known->second.Role_ == BotState::Role::Auto))
                 leader = p;
-                break;
-            }
         }
+        if (leader == end)
+            leader = start;
         std::uint64_t const leaderGuid = party[leader];
         for (std::size_t p = start; p < end; ++p)
         {

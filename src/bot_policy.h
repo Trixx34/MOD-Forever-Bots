@@ -92,7 +92,7 @@ struct PolicyOptions
     std::uint64_t ServiceEveryMs = 0;
     std::uint64_t TrainEveryMs = 0;
     // Parties (M8). PartyCount parties of PartySize bots are cut from the lowest-guid bots, in guid order. Each party's
-    // leader is its first warrior, else its lowest-guid bot. PartySize 0 turns parties off.
+    // leader is its first tank (a bot with the tank role, from a prot spec in the roster), else its first warrior, else its lowest-guid bot. PartySize 0 turns parties off.
     std::uint32_t PartySize = 0;
     std::uint32_t PartyCount = 1;
     // 40-man raid support (doc 108): with Raid on, the one party PartySize/PartyCount form (unchanged above) is raid-converted and
