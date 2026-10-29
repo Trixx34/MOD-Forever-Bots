@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "id": "onyxia",
+  "map": 249,
+  "name": "Onyxia's Lair",
+  "levels": [60, 60],
+  "roster": "2:1,5:5,8:8,2:9,5:4",
+  "entrance": {
+    "staging": { "map": 1, "x": -4753.31, "y": -3752.42, "z": 48.2 },
+    "portal": { "map": 1, "x": -4750.4, "y": -3754.4, "z": 49 },
+    "entry": { "map": 249, "x": 30.89, "y": -54.08, "z": -5.03 }
+  },
+  "run": { "duration_sec": 1800, "wipe_recovery_sec": 300 },
+  "route": [
+    { "x": 49.8, "y": -114.6, "z": -24.3 },
+    { "x": -49.9, "y": -98.1, "z": -38.6 },
+    { "x": -131.2, "y": -137.5, "z": -52.5 },
+    { "x": -170.3, "y": -195.7, "z": -66.4 },
+    { "x": -199.1, "y": -209.8, "z": -68.9 },
+    { "x": -4.9, "y": -217.2, "z": -86.7, "boss": 10184 }
+  ],
+  "bosses": [
+    {
+      "entry": 10184,
+      "name": "Onyxia",
+      "strategy": {
+        "pull": "tank",
+        "kill_order": 1,
+        "notes": "40-man raid: 3 tanks, 7 healers, 30 dps. P1 ground (100-65%): tank pulls and backs Onyxia to the rear wall; dps hold until she is against it. Tail Sweep: stay clear of her tail. P2 air (65-40%): she flies to one of 8 fixed spots; on Deep Breath move to the sides of her facing; otherwise spread 8 yds (Fireball splash). P3 ground (40-0%): Bellowing Roar fear; whelp adds need an off-tank; lava cracks. Spell ids and room geometry unconfirmed: doc/onyxia-fight-notes.md."
+      }
+    }
+  ]
+}

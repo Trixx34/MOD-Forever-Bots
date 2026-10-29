@@ -29,6 +29,7 @@ SLUGS = {
     90: "gnomeregan",
     129: "razorfen-downs",
     389: "ragefire-chasm",
+    249: "onyxias-lair",
 }
 
 
