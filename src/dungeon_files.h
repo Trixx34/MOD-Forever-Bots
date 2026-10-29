@@ -24,6 +24,8 @@ constexpr int kDungeonSchema = 1;
 // Parses one JSON dungeon file. On a problem returns false with the reason in `error` (the dungeon is not usable). Things that are only odd (an unknown
 // key) are lines in `warnings`, and the file is used. `fileMap` is the map id in the file's name (36 for 36-the-deadmines.json): when given, the file's own
 // map must be the same. `source` goes into the messages and into Dungeon::Source.
+// Contract note: internally this unwinds via a private exception (dungeon_files.cpp's FileError), caught before returning here, so a failure is always
+// reported through the bool/`error` return (never an exception escaping this function) like every other parser in the codebase.
 bool ParseDungeonJson(std::string_view text, std::string const& source, std::optional<std::uint32_t> fileMap, Dungeon& out, std::string& error,
                       std::vector<std::string>& warnings);
 
