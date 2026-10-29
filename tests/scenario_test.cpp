@@ -146,6 +146,32 @@ void DressesThenGroupsThenEnters()
     CHECK(director.Phase() == ScenarioPhase::Running && director.RouteActive());
 }
 
+void NobodyEntersUntilTheWholePartyIsAtStaging()
+{
+    ScenarioDirector director(Plan());
+    std::vector<BotAction> actions;
+    std::uint64_t t = 1000, tick = 1;
+    auto step = [&](std::vector<BotSnapshot> const& bots, std::uint64_t advance = 100)
+    {
+        actions.clear();
+        t += advance;
+        director.Decide(View(++tick, bots), t, actions);
+    };
+    std::vector<BotSnapshot> bots = { Bot(1, 0, 0, 0, 2, 3), Bot(2, 0, 0, 0, 1, 3), Bot(3, 0, 0, 0, 1, 3) };
+    for (int i = 0; i < 10 && director.Phase() != ScenarioPhase::Entering; ++i)
+        step(bots, 3000);
+    CHECK(director.Phase() == ScenarioPhase::Entering);
+    // A member is still on its way (another map, not fighting): nobody is sent in, not even the leader.
+    bots[2].map_id = 1;
+    step(bots, kRecoverMaxMs);
+    step(bots);
+    CHECK(Count(actions, ActionType::kTeleport) == 0);
+    // It is at staging and out of combat: the leader and both members go in on the same tick.
+    bots[2].map_id = 0;
+    step(bots);
+    CHECK(Count(actions, ActionType::kTeleport, 1) == 1 && Count(actions, ActionType::kTeleport, 2) == 1 && Count(actions, ActionType::kTeleport, 3) == 1);
+}
+
 void PartyRestsAtStagingBeforeEntering()
 {
     ScenarioDirector director(Plan());
@@ -1415,6 +1441,7 @@ int main()
     TimeoutEndsTheRun();
     EnteringTimesOut();
     PartyRestsAtStagingBeforeEntering();
+    NobodyEntersUntilTheWholePartyIsAtStaging();
     ASubsetViewKeepsTheNearbyUnitsOfItsBots();
     TwoPartiesRunTheirRoutesApartFromEachOther();
     LeaderDoesNotWalkTheDungeonRouteOutsideTheDungeon();

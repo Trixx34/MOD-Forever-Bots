@@ -464,9 +464,14 @@ void ScenarioDirector::Decide(forever_module::WorldTickSnapshotView const& view,
                 _enterFought = true;
             if (leader->map_id != _plan.EntryMap)
             {
+                // Nobody goes in before the whole roster is at the leader's staging place: the first ones inside would meet the entrance alone.
+                // A dead bot does not hold the gate; a living one still on its way does, until the timeout below.
+                bool staged = bots.size() >= _plan.RosterSize;
+                for (BotSnapshot const& bot : bots)
+                    staged = staged && (bot.life_state != 0 || (!bot.in_combat && bot.map_id == leader->map_id));
                 if (fighting && nowMs - _phaseSinceMs < kEnterCombatMaxMs)
                     break;
-                if (_lastEnterMs == 0 || nowMs - _lastEnterMs >= kEnterRetryMs)
+                if (staged && (_lastEnterMs == 0 || nowMs - _lastEnterMs >= kEnterRetryMs))
                 {
                     teleport(*leader);
                     for (BotSnapshot const& bot : bots)
