@@ -212,7 +212,16 @@ void ScenarioDirector::Decide(forever_module::WorldTickSnapshotView const& view,
     {
         case ScenarioPhase::Waiting:
         {
-            if (bots.size() >= _plan.RosterSize && aliveCount() >= _plan.RosterSize)
+            // The whole roster in view, all of it alive; or, with a member already dead, kRosterDeadGraceMs later (the dead are revived by the policy and skipped
+            // by the entering, so they need not hold the start).
+            if (bots.size() < _plan.RosterSize)
+            {
+                _rosterInViewMs = 0;
+                break;
+            }
+            if (_rosterInViewMs == 0)
+                _rosterInViewMs = nowMs;
+            if (aliveCount() >= _plan.RosterSize || nowMs - _rosterInViewMs >= kRosterDeadGraceMs)
                 enter(ScenarioPhase::Dressing);
             break;
         }

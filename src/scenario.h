@@ -134,6 +134,9 @@ constexpr std::uint32_t kAmmoUselessMax = 3;        // grants in a row after whi
 constexpr std::uint64_t kSupplyRetryMs = 5000;      // a bot is given more of a supply item at most this often (the snapshot needs a moment to show it)
 constexpr std::uint32_t kSupplyGrantsMax = 40;       // per bot and item, per run (on top of the dressing's first grant)
 constexpr std::uint32_t kSupplyUselessMax = 3;       // grants in a row after which neither total grew: the bot is left alone for that item
+// The roster is complete (every bot in view) but one of them is already dead: the run starts anyway this long after the last one came into view. A bot that
+// died before the 40th was spawned (2026-10-29 22:31: the first tank, killed by Emberstrife while the roster was still spawning) held Waiting for good.
+constexpr std::uint64_t kRosterDeadGraceMs = 30000;
 constexpr std::uint64_t kGroupingTimeoutMs = 120000;
 constexpr std::uint64_t kMembersDelayMs = 3000;
 constexpr std::uint64_t kEnterRetryMs = 10000;
@@ -190,6 +193,7 @@ private:
     ScenarioPhase _phase = ScenarioPhase::Waiting;
     std::uint64_t _phaseSinceMs = 0;
     bool _phaseStarted = false;
+    std::uint64_t _rosterInViewMs = 0;     // when the whole roster was first in view in the Waiting phase (0 = not yet)
     std::map<std::uint64_t, std::size_t> _nextGrant;   // bot -> index of the next gear item to grant
     std::map<std::uint64_t, std::size_t> _nextSupply;  // bot -> index of the next supply beyond food and drink (index 2+) to grant once
     std::map<std::uint64_t, std::size_t> _nextClassSupply; // bot -> index of the next class supply to grant

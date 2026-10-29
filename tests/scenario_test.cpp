@@ -99,6 +99,20 @@ void WaitsForTheWholeRoster()
     CHECK(director.Phase() == ScenarioPhase::Dressing);
 }
 
+void ADeadBotDoesNotHoldTheRosterForGood()
+{
+    ScenarioDirector director(Plan());
+    std::vector<BotAction> actions;
+    std::vector<BotSnapshot> bots = { Bot(1, 0, 0, 0), Bot(2, 0, 0, 0), Bot(3, 0, 0, 0) };
+    bots[0].life_state = 1; // died before the roster was complete
+    director.Decide(View(1, bots), 1000, actions);
+    CHECK(director.Phase() == ScenarioPhase::Waiting);
+    director.Decide(View(2, bots), 1000 + kRosterDeadGraceMs - 1, actions);
+    CHECK(director.Phase() == ScenarioPhase::Waiting);
+    director.Decide(View(3, bots), 1000 + kRosterDeadGraceMs, actions);
+    CHECK(director.Phase() == ScenarioPhase::Dressing);
+}
+
 void DressesThenGroupsThenEnters()
 {
     ScenarioDirector director(Plan());
@@ -1419,6 +1433,7 @@ int main()
     SettingsReadRosterSpecsClassSuppliesAndTheTameSpot();
     CountsBossesSeenDead();
     WaitsForTheWholeRoster();
+    ADeadBotDoesNotHoldTheRosterForGood();
     DressesThenGroupsThenEnters();
     CompletesWhenTheLeaderReachesTheLastPoint();
     AWaypointAboveIsNotReachedByStandingBelowIt();
