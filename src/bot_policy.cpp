@@ -9,6 +9,7 @@
 #include <iterator>
 #include <limits>
 #include <map>
+#include <optional>
 #include <span>
 #include <tuple>
 
@@ -23,7 +24,12 @@ namespace {
 
 constexpr float kDisengagePct = 30.0f;       // below this health the bot stops fighting
 constexpr float kRangedKiteYards = 12.0f;    // a ranged bot keeps a melee target this far away
-constexpr float kAoeKiteYards = 21.0f;       // a ranged party member keeps an Onyxian Warder this far away: its Fire Nova (spell 20203) hits everything within 20 yards
+// Fire Nova (spell 20203) reaches 20 yards from the Warder plus the target's combat reach (1.5), and 2 more while the Warder is moving (23.5 in all); the bot stands
+// there at the centre-to-centre distance below. 21 yards (the first value) left every kiting bot inside the nova. A tuning value: 24-25 is the range to try.
+constexpr float kAoeKiteYards = 24.5f;       // every party member other than the tank keeps an Onyxian Warder this far away
+constexpr float kAoeKiteSpreadDegrees = 4.0f;  // each bot takes its own bearing off the Warder, up to 5 steps of this either side of the straight line away
+constexpr float kAoeKiteRetryDegrees = 30.0f;  // and a kite point the core found no route to is tried again this much further round
+constexpr std::uint64_t kHealLosMoveMs = 4000; // after a heal refused for line of sight a healer may leave its stand-off to find the target, for this long
 constexpr std::uint32_t kOnyxianWarderEntry = 12129;
 constexpr float kFleeYards = 15.0f;          // below 30% health: flees while a threat is this close
 constexpr std::uint64_t kGlobalCooldownMs = 1500;
@@ -716,6 +722,31 @@ NearbyUnit const* FindLiveMob(std::span<NearbyUnit const> units, std::uint64_t g
     return nullptr;
 }
 
+// The point kiteYards from the Warder on the bot's own bearing (so a raid does not queue up on one point), turned round by retry steps (0, +1, -1, +2, -2 times
+// kAoeKiteRetryDegrees) when the core found no route to the previous one.
+Point AoeKitePoint(BotSnapshot const& bot, NearbyUnit const& warder, int retry)
+{
+    float dx = bot.pos_x - warder.pos_x;
+    float dy = bot.pos_y - warder.pos_y;
+    float const length = std::sqrt(dx * dx + dy * dy);
+    if (length > 0.01f)
+    {
+        dx /= length;
+        dy /= length;
+    }
+    else
+    {
+        dx = 1.0f;
+        dy = 0.0f;
+    }
+    int const slot = int((bot.guid * 7) % 11) - 5;   // -5..5, fixed per bot
+    int const turn = retry == 0 ? 0 : (retry % 2 == 1 ? (retry + 1) / 2 : -(retry / 2));
+    float const angle = (float(slot) * kAoeKiteSpreadDegrees + float(turn) * kAoeKiteRetryDegrees) * 3.14159265f / 180.0f;
+    float const c = std::cos(angle);
+    float const s = std::sin(angle);
+    return Point{ warder.pos_x + (dx * c - dy * s) * kAoeKiteYards, warder.pos_y + (dx * s + dy * c) * kAoeKiteYards, bot.pos_z };
+}
+
 // A player's unit reference, from its character guid counter (the same reference the core's party actions take).
 std::uint64_t PlayerRef(std::uint64_t counter)
 {
@@ -1316,6 +1347,14 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
             if (_options.OnEvent)
                 _options.OnEvent("healer_dps_los_refused: healer=" + std::to_string(bot.guid) + " spell=" +
                                  std::to_string(spell) + " target=" + std::to_string(cast->second));
+        }
+        // A healer's heal on a party member that it cannot see (319 refusals on the 2026-10-29 Onyxia run, with the healers holding still at the Warder stand-off): it
+        // is allowed to move for a few seconds to find the member again (the Warder branch of the policy below).
+        if (cast != state.CastTarget.end() && cast->second != 0 && forever_module::UnitRefType(cast->second) == kPlayerType &&
+            state.Role_ != BotState::Role::Dps && HealSpellFor(ClassFor(_options, bot.guid), bot.level) != 0)
+        {
+            state.HealLosTarget = cast->second;
+            state.HealLosUntilMs = nowMs + kHealLosMoveMs;
         }
         if (++state.LosRefusals >= kLosRefusalsAvoid && cast != state.CastTarget.end() && cast->second != 0)
         {
@@ -3350,6 +3389,54 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
 
         Decision wanted;
         char const* moveWhy = ""; // which part of the policy chose a kMoveTo (logged for a party in a dungeon run, move_why)
+        // An Onyxian Warder close to a party member (not its leader, the tank): the nearest one in view that is alive, and where a healer may step to see a member it could not heal.
+        NearbyUnit const* aoeWarder = nullptr;
+        std::optional<Point> healLosPoint;
+        if (partyMember && bot.in_combat != 0)
+        {
+            float nearestWarder = std::numeric_limits<float>::max();
+            for (NearbyUnit const& unit : nearby)
+                if (IsLiveMob(unit) && forever_module::UnitRefEntry(unit.guid) == kOnyxianWarderEntry)
+                {
+                    float const away = std::hypot(bot.pos_x - unit.pos_x, bot.pos_y - unit.pos_y);
+                    if (away < nearestWarder)
+                    {
+                        nearestWarder = away;
+                        aoeWarder = &unit;
+                    }
+                }
+            if (nowMs < state.HealLosUntilMs && state.HealLosTarget != 0 && aoeWarder)
+                for (BotSnapshot const& other : view.bots)
+                    if (PlayerRef(other.guid) == state.HealLosTarget && other.map_id == bot.map_id)
+                    {
+                        // Toward the member, or to either side of that line, whichever keeps the kite distance from every Warder in view.
+                        float tx = other.pos_x - bot.pos_x;
+                        float ty = other.pos_y - bot.pos_y;
+                        float const length = std::hypot(tx, ty);
+                        if (length < 0.1f)
+                            break;
+                        tx /= length;
+                        ty /= length;
+                        float const step = float(_options.HealerLosMoveYards);
+                        float const tries[3][2] = { { tx, ty }, { -ty, tx }, { ty, -tx } };
+                        for (auto const& direction : tries)
+                        {
+                            Point const dest{ bot.pos_x + direction[0] * step, bot.pos_y + direction[1] * step, other.pos_z };
+                            bool clear = true;
+                            for (NearbyUnit const& unit : nearby)
+                                if (IsLiveMob(unit) && forever_module::UnitRefEntry(unit.guid) == kOnyxianWarderEntry &&
+                                    std::hypot(dest.X - unit.pos_x, dest.Y - unit.pos_y) < kAoeKiteYards)
+                                    clear = false;
+                            if (clear)
+                            {
+                                healLosPoint = dest;
+                                break;
+                            }
+                        }
+                        break;
+                    }
+        }
+
         // A member of a party does not run from the fight on low health: its healer can only heal a tank that holds still, and the pack follows a fleeing bot onto the party.
         if (lowHealth && partyLeader == 0)
         {
@@ -3381,6 +3468,31 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             {
                 wanted = followRef ? Decision{ ActionType::kFollow, followRef } : Decision{ ActionType::kStop, 0 };
             }
+        }
+        else if (partyMember && bot.in_combat != 0 && aoeWarder != nullptr &&
+                 std::hypot(bot.pos_x - aoeWarder->pos_x, bot.pos_y - aoeWarder->pos_y) < kAoeKiteYards)
+        {
+            // An Onyxian Warder is near: every party member other than the tank (the leader) gets out of its Fire Nova, whatever it is fighting or healing (the 2026-10-29 wipe:
+            // only a bot whose own target was the Warder kited). Each bot has its own point round the circle; one the core has no route to is given up for the next one
+            // round, and with none left the bot stands and works from where it is.
+            wanted = Decision{ ActionType::kStop, 0 };
+            for (int retry = 0; retry < 5; ++retry)
+            {
+                Point const kite = AoeKitePoint(bot, *aoeWarder, retry);
+                bool const blocked = nowMs < state.NoRouteUntilMs && std::hypot(kite.X - state.NoRouteDest.X, kite.Y - state.NoRouteDest.Y) < kNoRouteSameYards;
+                if (!blocked)
+                {
+                    wanted = Decision{ ActionType::kMoveTo, 0, kite };
+                    moveWhy = "kite";
+                    break;
+                }
+            }
+        }
+        else if (partyMember && bot.in_combat != 0 && nowMs < state.HealLosUntilMs && state.HealLosTarget != 0 && aoeWarder != nullptr && healLosPoint)
+        {
+            // A healer whose heal was refused for line of sight steps to where it may see the member, but never into the Fire Nova.
+            wanted = Decision{ ActionType::kMoveTo, 0, *healLosPoint };
+            moveWhy = "heal_los";
         }
         else if (targetRef != 0)
         {
@@ -3455,6 +3567,8 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                         Point kite{ targetUnit->pos_x + dx / dist * kiteYards,
                                     targetUnit->pos_y + dy / dist * kiteYards,
                                     bot.pos_z };
+                        if (aoeTarget)
+                            kite = AoeKitePoint(bot, *targetUnit, 0);   // the bot's own bearing, as in the branch above
                         wanted = Decision{ ActionType::kMoveTo, 0, kite };
                         moveWhy = "kite";
                     }
