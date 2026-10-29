@@ -4461,6 +4461,43 @@ void PartyCasterDoesNotKite()
     CHECK(casts > 0);
 }
 
+// Onyxian Warder (12129): its Fire Nova hits everything within 20 yards, so a ranged raid member backs off to 21+ yards and only the tank melees it.
+void RaidCasterKitesOutOfWarderNova()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 3;
+    options.PartyCount = 1;
+    options.WanderWhenIdle = false;
+    options.ClassOf = [](std::uint64_t guid) { return guid == 10 ? 1u : guid == 11 ? 8u : 4u; };   // 10 the warrior tank, 11 a mage, 12 a rogue
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12 });
+    NearbyUnit warder = Hostile(2, 5.0f, 100);
+    warder.guid = MakeUnitRef(8, 12129, 2);
+    for (std::size_t i = 0; i < 3; ++i)
+    {
+        view.bots[i].threat_target_guid = warder.guid;
+        view.bots[i].in_combat = 1;
+        AddNearby(view, i, warder);
+    }
+    int tankKites = 0, rogueKites = 0;
+    float mageAt = -1.0f;
+    for (std::uint64_t at = 1000; at < 3000; at += 100)
+    {
+        view.tick_number = at / 100;
+        for (BotAction const& action : policy.Decide(view, at))
+        {
+            bool const move = action.type == ActionType::kMoveTo && action.target_guid == 0;
+            tankKites += action.bot_guid == 10 && move;
+            rogueKites += action.bot_guid == 12 && move;
+            if (action.bot_guid == 11 && move)
+                mageAt = std::fabs(action.dest_x - warder.pos_x);
+        }
+    }
+    CHECK(mageAt >= 21.0f);
+    CHECK(tankKites == 0);
+    CHECK(rogueKites == 0);
+}
+
 // A party member on low health keeps fighting: its healer needs it to hold still, and a fleeing bot drags the pack onto the party.
 void PartyMemberDoesNotFleeOnLowHealth()
 {
@@ -5916,6 +5953,7 @@ int main()
     FighterWithoutManaDoesNotDrink();
     RangedBotKitesACloseTarget();
     PartyCasterDoesNotKite();
+    RaidCasterKitesOutOfWarderNova();
     PartyMemberDoesNotFleeOnLowHealth();
     PartyMemberDoesNotChaseAFleeingTarget();
     RangedBotAttacksWhenBackAtRange();

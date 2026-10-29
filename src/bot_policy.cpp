@@ -23,6 +23,8 @@ namespace {
 
 constexpr float kDisengagePct = 30.0f;       // below this health the bot stops fighting
 constexpr float kRangedKiteYards = 12.0f;    // a ranged bot keeps a melee target this far away
+constexpr float kAoeKiteYards = 21.0f;       // a ranged party member keeps an Onyxian Warder this far away: its Fire Nova (spell 20203) hits everything within 20 yards
+constexpr std::uint32_t kOnyxianWarderEntry = 12129;
 constexpr float kFleeYards = 15.0f;          // below 30% health: flees while a threat is this close
 constexpr std::uint64_t kGlobalCooldownMs = 1500;
 constexpr std::uint64_t kRetryMs = 1000;     // out of range, invalid target, refused, not enough power
@@ -3436,15 +3438,19 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 // once it is back at range.
                 // Not in a party: a party's tank holds the target, and a caster that keeps backing off never gets a spell off (300-450 move orders a minute per caster in the
                 // Deadmines runs, and each step re-pulled the next pack).
-                if (partyLeader == 0 && approach > kMeleeApproachYards + 0.5f && targetUnit && distance < kRangedKiteYards)
+                // The exception is a target with a big area attack around it (the Onyxian Warder): only the tank, the party leader, stands in it,
+                // and the others back off past its radius.
+                bool const aoeTarget = partyMember && targetUnit && forever_module::UnitRefEntry(targetUnit->guid) == kOnyxianWarderEntry;
+                float const kiteYards = aoeTarget ? kAoeKiteYards : kRangedKiteYards;
+                if ((partyLeader == 0 || aoeTarget) && approach > kMeleeApproachYards + 0.5f && targetUnit && distance < kiteYards)
                 {
                     float const dx = bot.pos_x - targetUnit->pos_x;
                     float const dy = bot.pos_y - targetUnit->pos_y;
                     float const dist = std::sqrt(dx * dx + dy * dy);
                     if (dist > 0.0f)
                     {
-                        Point kite{ targetUnit->pos_x + dx / dist * kRangedKiteYards,
-                                    targetUnit->pos_y + dy / dist * kRangedKiteYards,
+                        Point kite{ targetUnit->pos_x + dx / dist * kiteYards,
+                                    targetUnit->pos_y + dy / dist * kiteYards,
                                     bot.pos_z };
                         wanted = Decision{ ActionType::kMoveTo, 0, kite };
                         moveWhy = "kite";
