@@ -159,7 +159,7 @@ Rows added to `data/rotation_spec.txt` (all read in the client data: class skill
 | Priest | Void Plague (18 s dot), Vampiric Touch (15 s dot), before Mind Blast |
 | Shaman | Lava Burst before Lightning Bolt; Water Shield replaces Lightning Shield |
 | Mage | Icy Veins (strong target), Ice Lance (power above 60%), before Frostbolt |
-| Warlock | Conflagrate (destruction); Fel Armor replaces Demon Armor |
+| Warlock | Conflagrate (destruction). Fel Armor (403619) is left out: no trainer teaches it, so bots never know it; Demon Armor stays the armor |
 | Druid | Starsurge, Sunfire (12 s dot) before Wrath |
 
 Black Arrow, Chimera Shot, Divine Storm, Wrack and Chaos Bolt (earlier rows) are in no guide and are not rows now. The policy counts Saber Slash as a combo builder (one point, like Sinister Strike; `ComboPointsGained` in `src/bot_policy.cpp`). `tests/make_rotations_test.py`

@@ -22,7 +22,7 @@ FOREVER = {
     5: {"Void Plague": 425204, "Vampiric Touch": 402668},
     7: {"Lava Burst": 408490, "Water Shield": 408510},
     8: {"Icy Veins": 425121, "Ice Lance": 400640},
-    9: {"Fel Armor": 403619},
+    9: {},  # no Forever row: Fel Armor is left out (no trainer teaches it)
     11: {"Starsurge": 417157, "Sunfire": 414684},
 }
 VANILLA = {
@@ -102,10 +102,11 @@ check("duration 12" in row(4, 424785), "Saber Slash is a 12 s bleed")
 check("duration 18" in row(5, 425204) and "duration 15" in row(5, 402668), "priest damage over time lengths")
 check("range 0 5" in row(2, 678), "Holy Strike is a melee strike")
 check(row(7, 408510).startswith("buff") and "duration 600" in row(7, 408510), "Water Shield is a 10 minute upkeep buff")
-check(row(9, 403619).startswith("buff"), "Fel Armor is an upkeep buff")
-# the better shield / armor retires the old one from the level it is learned
+# Fel Armor (403619) is left out: no trainer teaches it, so a bot never knows it, and a supersede to it would stop Demon Armor for good
+check(not any(r.split()[1] == "403619" for r in classes[9]), "Fel Armor is not a warlock row")
+# the better shield retires the old one from the level it is learned
 check("maxlevel" in row(7, 324), "Lightning Shield is retired by Water Shield")
-check("maxlevel" in row(9, 706), "Demon Armor is retired by Fel Armor")
+check("maxlevel" not in row(9, 706), "Demon Armor is not retired: it stays the armor")
 
 # 1b. the spec blocks: a block per spec with its own rows, the class default block kept, and the pet summons as no_pet upkeep buffs
 with tempfile.TemporaryDirectory() as tmp:

@@ -422,12 +422,11 @@ row "Drain Life" always target range 0 30
 row "Shadow Bolt" always target range 0 30
 buff "Demon Skin" duration 1800 self
 buff "Demon Armor" duration 1800 self
-buff "Fel Armor" duration 1800 self                 # Forever
+# Fel Armor (403619, Forever) is left out: no trainer teaches it, so a bot never knows it (every cast is "not known") and a supersede to it stops Demon Armor.
 buff "Summon Succubus" duration 3600 self no_pet
 buff "Summon Voidwalker" duration 3600 self no_pet
 buff "Summon Imp" duration 3600 self no_pet
 supersede "Demon Skin" by "Demon Armor"
-supersede "Demon Armor" by "Fel Armor"
 
 class 9 spec demonology
 # Demonology (level 30 guide): the demon does most of the damage. Corruption, Bane of Agony on a mob with a lot of health, Searing Pain, Drain Life as the filler, Life Tap when low, Shadow Bolt
@@ -441,12 +440,10 @@ row "Drain Life" always target range 0 30
 row "Shadow Bolt" always target range 0 30
 buff "Demon Skin" duration 1800 self
 buff "Demon Armor" duration 1800 self
-buff "Fel Armor" duration 1800 self                 # Forever
 buff "Summon Succubus" duration 3600 self no_pet
 buff "Summon Voidwalker" duration 3600 self no_pet
 buff "Summon Imp" duration 3600 self no_pet
 supersede "Demon Skin" by "Demon Armor"
-supersede "Demon Armor" by "Fel Armor"
 
 class 9 spec affliction
 # Affliction: Corruption, Bane of Agony, Immolate, Drain Life as the filler, Life Tap when low, Shadow Bolt below level 14. The Voidwalker holds threat (the Succubus does not), so it is the demon.
@@ -458,11 +455,9 @@ row "Drain Life" always target range 0 30
 row "Shadow Bolt" always target range 0 30
 buff "Demon Skin" duration 1800 self
 buff "Demon Armor" duration 1800 self
-buff "Fel Armor" duration 1800 self                 # Forever
 buff "Summon Voidwalker" duration 3600 self no_pet
 buff "Summon Imp" duration 3600 self no_pet
 supersede "Demon Skin" by "Demon Armor"
-supersede "Demon Armor" by "Fel Armor"
 
 class 9 spec destruction
 # Destruction: Bane of Agony and Immolate kept up, Conflagrate (Forever, level 32) before Immolate runs out, Shadowburn to finish, Shadow Bolt, Life Tap when low. The Voidwalker is the demon.
@@ -475,11 +470,9 @@ row "Corruption" duration 18 always target range 0 30
 row "Shadow Bolt" always target range 0 30
 buff "Demon Skin" duration 1800 self
 buff "Demon Armor" duration 1800 self
-buff "Fel Armor" duration 1800 self                 # Forever
 buff "Summon Voidwalker" duration 3600 self no_pet
 buff "Summon Imp" duration 3600 self no_pet
 supersede "Demon Skin" by "Demon Armor"
-supersede "Demon Armor" by "Fel Armor"
 
 class 11
 # The default druid: Balance caster rows.
