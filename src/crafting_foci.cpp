@@ -1,5 +1,7 @@
 #include "crafting_foci.h"
 
+#include "text_split.h"
+
 #include <cmath>
 #include <cstdlib>
 #include <limits>
@@ -16,19 +18,7 @@ constexpr std::uint32_t kSkillEngineering = 202;
 
 std::vector<std::string_view> Split(std::string_view text, char separator)
 {
-    std::vector<std::string_view> parts;
-    std::size_t start = 0;
-    while (true)
-    {
-        std::size_t const at = text.find(separator, start);
-        if (at == std::string_view::npos)
-        {
-            parts.push_back(text.substr(start));
-            return parts;
-        }
-        parts.push_back(text.substr(start, at - start));
-        start = at + 1;
-    }
+    return text_split::Split(text, separator);
 }
 
 bool ParseUnsigned(std::string_view text, std::uint32_t& out)

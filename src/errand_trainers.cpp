@@ -1,5 +1,7 @@
 #include "errand_trainers.h"
 
+#include "text_split.h"
+
 #include <cerrno>
 #include <cmath>
 #include <cstdlib>
@@ -13,19 +15,7 @@ namespace {
 // Splits on a separator, keeping empty fields.
 std::vector<std::string_view> Split(std::string_view text, char sep)
 {
-    std::vector<std::string_view> parts;
-    std::size_t start = 0;
-    while (true)
-    {
-        std::size_t const at = text.find(sep, start);
-        if (at == std::string_view::npos)
-        {
-            parts.push_back(text.substr(start));
-            return parts;
-        }
-        parts.push_back(text.substr(start, at - start));
-        start = at + 1;
-    }
+    return text_split::Split(text, sep);
 }
 
 std::string_view Trim(std::string_view text)

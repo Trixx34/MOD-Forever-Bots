@@ -1,6 +1,7 @@
 #include "bot_settings.h"
 
 #include "bot_pick.h"
+#include "text_number.h"
 
 #include <algorithm>
 #include <charconv>
@@ -105,12 +106,7 @@ bool ReadBool(std::unordered_map<std::string, std::string> const& config, char c
 // "a b c ..." into exactly `count` numbers.
 bool ParseNumbers(std::string const& text, float* out, std::size_t count)
 {
-    std::istringstream in(text);
-    std::string trailing;
-    for (std::size_t i = 0; i < count; ++i)
-        if (!(in >> out[i]))
-            return false;
-    return !(in >> trailing);
+    return text_number::ParseFloats(text, out, count);
 }
 
 // One dungeon's scenario: the single form, or one entry of a list read from its ScenarioConfigFor config.

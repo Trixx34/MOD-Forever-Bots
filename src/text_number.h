@@ -10,6 +10,7 @@
 
 #include <charconv>
 #include <cstdint>
+#include <sstream>
 #include <string>
 
 namespace text_number {
@@ -31,6 +32,25 @@ inline bool ParseDecimal(std::string const& text, float& out)
         return false;
     auto const result = std::from_chars(text.data(), text.data() + text.size(), out);
     return result.ec == std::errc{} && result.ptr == text.data() + text.size();
+}
+
+// Reads exactly `count` whitespace-separated numbers from `in` (operator>>, so it accepts the same
+// syntax std::istream always has) and rejects anything left over after them - "1 2 3 x" is not three
+// numbers, it is a typo. Was duplicated (once over a string it built its own istringstream from, once
+// over a caller-owned istringstream) between bot_settings.cpp and dungeon_data.cpp.
+inline bool ParseFloats(std::istringstream& in, float* out, std::size_t count)
+{
+    std::string trailing;
+    for (std::size_t i = 0; i < count; ++i)
+        if (!(in >> out[i]))
+            return false;
+    return !(in >> trailing);
+}
+
+inline bool ParseFloats(std::string const& text, float* out, std::size_t count)
+{
+    std::istringstream in(text);
+    return ParseFloats(in, out, count);
 }
 
 } // namespace text_number
