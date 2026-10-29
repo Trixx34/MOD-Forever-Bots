@@ -29,6 +29,8 @@ constexpr float kRangedKiteYards = 12.0f;    // a ranged bot keeps a melee targe
 constexpr float kAoeKiteYards = 24.5f;       // every party member other than the tank keeps an Onyxian Warder this far away
 constexpr float kAoeKiteMarginYards = 5.5f;      // a party member also holds this much beyond kAoeKiteYards, and starts to kite before it is inside the radius, in combat or not
 constexpr float kAoeStandYards = kAoeKiteYards + kAoeKiteMarginYards;   // 30: where a kited bot stands, so a step of the Warder or the bot does not put it back in the nova
+constexpr std::uint32_t kOnyxiaMap = 249;              // Onyxia's Lair
+constexpr float kOnyxiaEntryX = 30.89f, kOnyxiaEntryY = -54.08f, kOnyxiaEntryZ = -5.03f;   // the lair's entry, the way the party came in (known walkable)
 constexpr float kAoeKiteSpreadDegrees = 4.0f;  // each bot takes its own bearing off the Warder, up to 5 steps of this either side of the straight line away
 constexpr float kAoeKiteRetryDegrees = 30.0f;  // and a kite point the core found no route to is tried again this much further round
 constexpr std::uint64_t kHealLosMoveMs = 4000; // after a heal refused for line of sight a healer may leave its stand-off to find the target, for this long
@@ -726,10 +728,29 @@ NearbyUnit const* FindLiveMob(std::span<NearbyUnit const> units, std::uint64_t g
     return nullptr;
 }
 
-// The point kiteYards from the Warder on the bot's own bearing (so a raid does not queue up on one point), turned round by retry steps (0, +1, -1, +2, -2 times
-// kAoeKiteRetryDegrees) when the core found no route to the previous one.
-Point AoeKitePoint(BotSnapshot const& bot, NearbyUnit const& warder, int retry)
+// The point the kite goes to. The module has no navmesh or path query of its own (the core finds the path, and refuses a move with "no route"), so a point on a raw circle
+// round the Warder may be a wall: 5,800 such refusals on 2026-10-29. When the dungeon's entry is known, retry 0 is therefore the retreat along the entry route: the
+// point kAoeStandYards from the Warder on the line toward the entry the party walked in by, on the bot's own bearing (a few degrees either side, so a raid does not queue
+// up on one point). Only when the core refuses that point (or the entry is unknown or nearer than the stand distance) does the circle come: the point kAoeStandYards from
+// the Warder on the bot's own bearing from it, turned round by retry steps (0, +1, -1, +2, -2 times kAoeKiteRetryDegrees).
+Point AoeKitePoint(BotSnapshot const& bot, NearbyUnit const& warder, int retry, std::optional<Point> const& entry = std::nullopt)
 {
+    if (entry && std::hypot(entry->X - warder.pos_x, entry->Y - warder.pos_y) > kAoeStandYards)
+    {
+        if (retry == 0)
+        {
+            float ex = entry->X - warder.pos_x;
+            float ey = entry->Y - warder.pos_y;
+            float const elength = std::hypot(ex, ey);
+            ex /= elength;
+            ey /= elength;
+            float const slotAngle = float(int((bot.guid * 7) % 11) - 5) * kAoeKiteSpreadDegrees * 3.14159265f / 180.0f;
+            float const ec = std::cos(slotAngle);
+            float const es = std::sin(slotAngle);
+            return Point{ warder.pos_x + (ex * ec - ey * es) * kAoeStandYards, warder.pos_y + (ex * es + ey * ec) * kAoeStandYards, bot.pos_z };
+        }
+        --retry;
+    }
     float dx = bot.pos_x - warder.pos_x;
     float dy = bot.pos_y - warder.pos_y;
     float const length = std::sqrt(dx * dx + dy * dy);
@@ -3440,6 +3461,15 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         // Not tied to the bot's own in_combat: the 2026-10-29 pull left the non-tank bots out of combat for 55 s, standing 5 yards from the Warder.
         NearbyUnit const* aoeWarder = nullptr;
         std::optional<Point> healLosPoint;
+        std::optional<Point> kiteEntry;   // the entry to retreat toward (AoeKitePoint)
+        if (partyMember)
+        {
+            auto const dungeon = _options.DungeonsByMap.find(bot.map_id);
+            if (dungeon != _options.DungeonsByMap.end() && dungeon->second.HasEntry)
+                kiteEntry = dungeon->second.Entry;
+            else if (bot.map_id == kOnyxiaMap)
+                kiteEntry = Point{ kOnyxiaEntryX, kOnyxiaEntryY, kOnyxiaEntryZ };
+        }
         if (partyMember)
         {
             float nearestWarder = std::numeric_limits<float>::max();
@@ -3524,9 +3554,9 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             // only a bot whose own target was the Warder kited). Each bot has its own point round the circle; one the core has no route to is given up for the next one
             // round, and with none left the bot stands and works from where it is.
             wanted = Decision{ ActionType::kStop, 0 };
-            for (int retry = 0; retry < 5; ++retry)
+            for (int retry = 0; retry < 6; ++retry)
             {
-                Point const kite = AoeKitePoint(bot, *aoeWarder, retry);
+                Point const kite = AoeKitePoint(bot, *aoeWarder, retry, kiteEntry);
                 bool const blocked = nowMs < state.NoRouteUntilMs && std::hypot(kite.X - state.NoRouteDest.X, kite.Y - state.NoRouteDest.Y) < kNoRouteSameYards;
                 if (!blocked)
                 {
@@ -3616,7 +3646,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                                     targetUnit->pos_y + dy / dist * kiteYards,
                                     bot.pos_z };
                         if (aoeTarget)
-                            kite = AoeKitePoint(bot, *targetUnit, 0);   // the bot's own bearing, as in the branch above
+                            kite = AoeKitePoint(bot, *targetUnit, 0, kiteEntry);   // the bot's own bearing, as in the branch above
                         wanted = Decision{ ActionType::kMoveTo, 0, kite };
                         moveWhy = "kite";
                     }

@@ -4585,6 +4585,56 @@ void NonTankOutOfCombatKitesWhenWarderIsWithinMargin()
     CHECK(tankKites == 0);
 }
 
+// The kite point must be somewhere the core can path to. The module has no path query, so the first point is the retreat along the entry route (the line from the Warder
+// toward the dungeon entry, 30 yards out); when the core refuses it, the next point is the circle round the Warder, a different place and not the refused one again.
+void KiteRetreatsAlongTheEntryRouteAndFallsBackToTheCircle()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 3;
+    options.PartyCount = 1;
+    options.WanderWhenIdle = false;
+    options.ClassOf = [](std::uint64_t guid) { return guid == 10 ? 1u : 8u; };   // 10 the warrior tank, 11 and 12 mages
+    PolicyOptions::DungeonRoute route;
+    route.HasEntry = true;
+    route.Entry = Point{ 5.0f, -100.0f, 0.0f };   // straight behind the Warder, which stands at (5, 0)
+    options.DungeonsByMap[0] = route;
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12 });
+    NearbyUnit warder = Hostile(2, 5.0f, 100);
+    warder.guid = MakeUnitRef(8, 12129, 2);
+    for (std::size_t i = 0; i < 3; ++i)
+    {
+        view.bots[i].in_combat = 1;
+        AddNearby(view, i, warder);
+    }
+    auto kiteOf = [&](std::uint64_t at, bool& found) {
+        Point dest{};
+        found = false;
+        view.tick_number = at / 100;
+        for (BotAction const& action : policy.Decide(view, at))
+            if (action.bot_guid == 11 && action.type == ActionType::kMoveTo && action.target_guid == 0)
+            {
+                dest = Point{ action.dest_x, action.dest_y, action.dest_z };
+                found = true;
+            }
+        return dest;
+    };
+    bool found = false;
+    Point const retreat = kiteOf(1000, found);
+    CHECK(found);
+    float const length = std::hypot(retreat.X - warder.pos_x, retreat.Y - warder.pos_y);
+    CHECK(length >= 29.0f && length <= 31.0f);
+    CHECK((retreat.Y - warder.pos_y) / length < -0.9f);   // toward the entry, within a spread of 25 degrees
+
+    view.bots[1].last_action_sequence = 1;
+    view.bots[1].last_action_type = uint8_t(ActionType::kMoveTo);
+    view.bots[1].last_action_status = BotActionStatus::kNoRoute;
+    Point const fallback = kiteOf(2000, found);
+    CHECK(found);
+    CHECK(std::hypot(fallback.X - retreat.X, fallback.Y - retreat.Y) >= 12.0f);   // not the refused place
+    CHECK(std::hypot(fallback.X - warder.pos_x, fallback.Y - warder.pos_y) >= 29.0f);
+}
+
 // A party member on low health keeps fighting: its healer needs it to hold still, and a fleeing bot drags the pack onto the party.
 void PartyMemberDoesNotFleeOnLowHealth()
 {
@@ -6043,6 +6093,7 @@ int main()
     RaidCasterKitesOutOfWarderNova();
     RaidMemberOnAnotherTargetKitesOutOfWarderNova();
     NonTankOutOfCombatKitesWhenWarderIsWithinMargin();
+    KiteRetreatsAlongTheEntryRouteAndFallsBackToTheCircle();
     PartyMemberDoesNotFleeOnLowHealth();
     PartyMemberDoesNotChaseAFleeingTarget();
     RangedBotAttacksWhenBackAtRange();
