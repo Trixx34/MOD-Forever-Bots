@@ -3503,7 +3503,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                             bool clear = true;
                             for (NearbyUnit const& unit : nearby)
                                 if (IsLiveMob(unit) && forever_module::UnitRefEntry(unit.guid) == kOnyxianWarderEntry &&
-                                    std::hypot(dest.X - unit.pos_x, dest.Y - unit.pos_y) < kAoeKiteYards)
+                                    std::hypot(dest.X - unit.pos_x, dest.Y - unit.pos_y) < kAoeStandYards - 0.5f)   // not into the band the kite branch above clears
                                     clear = false;
                             if (clear)
                             {
