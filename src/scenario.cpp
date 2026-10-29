@@ -471,20 +471,27 @@ void ScenarioDirector::Decide(forever_module::WorldTickSnapshotView const& view,
                 fighting = fighting || (bot.life_state == 0 && bot.in_combat);
             if (fighting)
                 _enterFought = true;
+            if (!fighting)
+                _enterFightSinceMs = 0;
+            else if (_enterFightSinceMs == 0)
+                _enterFightSinceMs = nowMs;
+            // A fight that has lasted kEnterCombatGraceMs no longer holds the others: the ones out of combat go in, the ones fighting follow when they can.
+            bool const fightTooLong = fighting && nowMs - _enterFightSinceMs >= kEnterCombatGraceMs;
             if (leader->map_id != _plan.EntryMap)
             {
                 // Nobody goes in before the whole roster is at the leader's staging place: the first ones inside would meet the entrance alone.
-                // A dead bot does not hold the gate; a living one still on its way does, until the timeout below.
+                // A dead bot does not hold the gate; a living one still on its way does, until the timeout below; one in combat does until kEnterCombatGraceMs.
                 bool staged = bots.size() >= _plan.RosterSize;
                 for (BotSnapshot const& bot : bots)
-                    staged = staged && (bot.life_state != 0 || (!bot.in_combat && bot.map_id == leader->map_id));
-                if (fighting && nowMs - _phaseSinceMs < kEnterCombatMaxMs)
+                    staged = staged && (bot.life_state != 0 || ((!bot.in_combat || fightTooLong) && bot.map_id == leader->map_id));
+                if (fighting && !fightTooLong)
                     break;
                 if (staged && (_lastEnterMs == 0 || nowMs - _lastEnterMs >= kEnterRetryMs))
                 {
-                    teleport(*leader);
+                    if (!leader->in_combat)
+                        teleport(*leader);
                     for (BotSnapshot const& bot : bots)
-                        if (bot.guid != leader->guid && bot.map_id != _plan.EntryMap && bot.life_state == 0)
+                        if (bot.guid != leader->guid && bot.map_id != _plan.EntryMap && bot.life_state == 0 && !bot.in_combat)
                             teleport(bot);
                     _lastEnterMs = nowMs;
                 }
@@ -497,9 +504,15 @@ void ScenarioDirector::Decide(forever_module::WorldTickSnapshotView const& view,
                     _lastEnterMs = 0;
                 }
                 bool allThere = true;
+                bool livingThere = true;
                 for (BotSnapshot const& bot : bots)
+                {
                     allThere = allThere && bot.map_id == _plan.EntryMap;
-                if (allThere && bots.size() >= _plan.RosterSize)
+                    livingThere = livingThere && (bot.life_state != 0 || bot.map_id == _plan.EntryMap);
+                }
+                std::uint64_t const insideMs = nowMs - _leaderArrivedMs;
+                bool const startNow = allThere || (livingThere && insideMs >= kEnterStragglersMs) || insideMs >= kEnterStragglersMaxMs;
+                if (startNow && bots.size() >= _plan.RosterSize)
                 {
                     _runStartMs = nowMs;
                     enter(ScenarioPhase::Running);

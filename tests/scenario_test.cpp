@@ -186,6 +186,55 @@ void NobodyEntersUntilTheWholePartyIsAtStaging()
     CHECK(Count(actions, ActionType::kTeleport, 1) == 1 && Count(actions, ActionType::kTeleport, 2) == 1 && Count(actions, ActionType::kTeleport, 3) == 1);
 }
 
+void AFightAtStagingHoldsThePartyOnlyForTheGrace()
+{
+    ScenarioDirector director(Plan());
+    std::vector<BotAction> actions;
+    std::uint64_t t = 1000, tick = 1;
+    auto step = [&](std::vector<BotSnapshot> const& bots, std::uint64_t advance = 100)
+    {
+        actions.clear();
+        t += advance;
+        director.Decide(View(++tick, bots), t, actions);
+    };
+    std::vector<BotSnapshot> bots = { Bot(1, 0, 0, 0, 2, 3), Bot(2, 0, 0, 0, 1, 3), Bot(3, 0, 0, 0, 1, 3) };
+    for (int i = 0; i < 10 && director.Phase() != ScenarioPhase::Entering; ++i)
+        step(bots, 3000);
+    CHECK(director.Phase() == ScenarioPhase::Entering);
+    bots[2].in_combat = 1; // one member keeps fighting at staging
+    step(bots);
+    step(bots);
+    CHECK(Count(actions, ActionType::kTeleport) == 0);
+    step(bots, kEnterCombatGraceMs);
+    // The grace is over: the leader and the free member go in, the fighting one does not (it would be refused).
+    CHECK(Count(actions, ActionType::kTeleport, 1) == 1 && Count(actions, ActionType::kTeleport, 2) == 1 && Count(actions, ActionType::kTeleport, 3) == 0);
+}
+
+void ADeadMemberOutsideDoesNotHoldTheRun()
+{
+    ScenarioDirector director(Plan());
+    std::vector<BotAction> actions;
+    std::uint64_t t = 1000, tick = 1;
+    auto step = [&](std::vector<BotSnapshot> const& bots, std::uint64_t advance = 100)
+    {
+        actions.clear();
+        t += advance;
+        director.Decide(View(++tick, bots), t, actions);
+    };
+    std::vector<BotSnapshot> bots = { Bot(1, 0, 0, 0, 2, 3), Bot(2, 0, 0, 0, 1, 3), Bot(3, 0, 0, 0, 1, 3) };
+    for (int i = 0; i < 10 && director.Phase() != ScenarioPhase::Entering; ++i)
+        step(bots, 3000);
+    CHECK(director.Phase() == ScenarioPhase::Entering);
+    bots[0].map_id = 36;
+    bots[1].map_id = 36;
+    bots[2].life_state = 2; // a ghost at staging
+    bots[2].health = 1;
+    step(bots);
+    CHECK(director.Phase() == ScenarioPhase::Entering);
+    step(bots, kEnterStragglersMs);
+    CHECK(director.Phase() == ScenarioPhase::Running);
+}
+
 void PartyRestsAtStagingBeforeEntering()
 {
     ScenarioDirector director(Plan());
@@ -1492,6 +1541,8 @@ int main()
     EnteringTimesOut();
     PartyRestsAtStagingBeforeEntering();
     NobodyEntersUntilTheWholePartyIsAtStaging();
+    AFightAtStagingHoldsThePartyOnlyForTheGrace();
+    ADeadMemberOutsideDoesNotHoldTheRun();
     ASubsetViewKeepsTheNearbyUnitsOfItsBots();
     TwoPartiesRunTheirRoutesApartFromEachOther();
     LeaderDoesNotWalkTheDungeonRouteOutsideTheDungeon();

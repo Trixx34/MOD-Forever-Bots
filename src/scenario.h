@@ -144,6 +144,13 @@ constexpr std::uint64_t kEnterTimeoutMs = 90000;
 // The party waits at its staging place while any living member is in combat, and the whole party is sent in together once none is. This is the longest that
 // wait may last; a fight that outlasts it ends the run as before.
 constexpr std::uint64_t kEnterCombatMaxMs = 600000;
+// A fight at the staging place holds the whole party only this long: then the members out of combat are sent in (the leader too, when it is one of them), and the
+// ones still fighting every kEnterRetryMs after. The 2026-10-29 21:42 run waited the full kEnterCombatMaxMs with 1-13 bots always in some fight and ended enter_failed.
+constexpr std::uint64_t kEnterCombatGraceMs = 45000;
+// Once the leader is inside, the run starts when every bot is there, or when every living one is and this long has passed (a corpse or a ghost outside does not hold
+// it: the policy walks it back through the portal), or at the latest kEnterStragglersMaxMs after the leader arrived.
+constexpr std::uint64_t kEnterStragglersMs = 15000;
+constexpr std::uint64_t kEnterStragglersMaxMs = 60000;
 // Before the party enters it rests at its staging place until every living bot has this much health (and mana, for mana users), or this long has passed: the gear
 // the dressing phase puts on raises the maximum health to two or three times the current health, so a party that entered at once started at 35-45 %.
 constexpr std::uint32_t kRecoverPct = 90;
@@ -225,6 +232,7 @@ private:
     bool _recovered = false;               // the party has rested up at its staging place (Entering waits for it once)
     std::uint64_t _lastEnterMs = 0;
     std::uint64_t _leaderArrivedMs = 0;
+    std::uint64_t _enterFightSinceMs = 0;  // since when some living member has been in combat at the staging place (0 = nobody is)
     bool _enterFought = false;             // a member was in combat outside the entry map while entering: the entering timeout is kEnterCombatMaxMs from then on
     std::uint64_t _runStartMs = 0;
     std::uint64_t _routeDoneMs = 0;        // when the leader first touched the last waypoint (RequireBosses grace)
