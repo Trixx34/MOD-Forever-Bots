@@ -1990,6 +1990,11 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         return kind;
     };
 
+    // ==== Per-bot decision loop ====
+    // Order within one bot's turn: read its last action's result, handle ground-effect avoidance and line-of-sight
+    // recovery (both can `continue` before any other logic runs), then dead-bot handling, then (while alive) party
+    // role/routing/follow, targeting and pulling, crowd control, pet taming, loot/fight-watchdog bookkeeping, and the
+    // economy/social actions (crafting, vendor, chat orders) further below.
     for (std::size_t i = 0; i < view.bots.size(); ++i)
     {
         BotSnapshot const& bot = view.bots[i];
@@ -2117,6 +2122,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         state.SeenLife = bot.life_state;
         state.SeenInCombat = bot.in_combat != 0;
 
+        // ==== Ground-effect avoidance ====
         // Ground effects (SDK 0.19): a bot inside a harmful area walks out of it before it does anything else (a healer in mid-heal included: standing in the fire costs
         // more than the heal). The walk's end point is kept for kAvoidKeepMs so that it does not shift every tick (a move would be sent anew each time). Not for a bot on a
         // flight, dead, or with no effect in view. A spell is harmful when its caster is hostile to the bot (the snapshot's flag), or when it is in the avoid table or the
@@ -2207,6 +2213,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         auto const ledBy = leaderOf.find(bot.guid);
         std::uint64_t const deadParty = ledBy == leaderOf.end() ? 0 : ledBy->second;
 
+        // ==== Dead-bot handling (corpse, resurrect, ghost run) ====
         // A dead bot (a corpse, or a ghost: it has health 1, so only life_state tells) gets its own orders and nothing else. State
         // changes are logged once.
         if (bot.life_state != 0)
@@ -2656,6 +2663,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
 
         bool const lowHealth = bot.max_health > 0 && std::uint64_t(bot.health) * 100 < std::uint64_t(bot.max_health) * kDisengagePct;
 
+        // ==== Party role, dungeon routing and follow logic (alive bots) ====
         // The bot's class: its own (from the class table) or the configured one. Ranged classes approach to range.
         std::uint32_t const classId = ClassFor(_options, bot.guid);
         // A spec in the roster sets the role of a bot that has none: a tank spec tanks, a healer spec heals, a damage spec does not heal on its own (a shadow priest).
@@ -2824,6 +2832,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         std::vector<std::uint32_t> const noEntries;
         std::vector<std::uint32_t> const& huntEntries = questStep.Kind == QuestStepKind::Hunt ? questStep.Entries : noEntries;
 
+        // ==== Target acquisition and pulling ====
         // The target is the threat target (even when it is out of view), otherwise the closest live hostile. A member with
         // no threat of its own fights its leader's target, when that is in view.
         // Dungeon pull control (the route is active): the leader pulls only when its party is ready, the others never pull and join a
@@ -3085,6 +3094,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 }
             }
         }
+        // ==== Crowd control tactics ====
         // Cc tactic: a rogue, mage or warlock with a cc spell for its level (CcSpellForClass, CcLearnLevel) holds one extra member of
         // the tank's pack -- a unit nobody has engaged yet (partyEngagedTargets, the same set focus and interrupt use), not casting
         // (interrupt's to pick, not held mid-cast for nothing) and not the dungeon's own kill priority (never hold what the party
@@ -3163,6 +3173,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 }
             }
         }
+        // ==== Hunter pet taming ====
         // A hunter with no pet that has a beast to tame in view does not pull whatever else is standing there (Westfall's hostile Fleshrippers made the 2026-10-26 hunters fight and get hurt
         // before they ever cast Tame Beast); it tames, and defends itself only when something attacks it. The hold of a cast in progress counts as well.
         bool const tamingPhase = classId == kHunterClass && _tamingFn && _tamingFn(bot.guid);
@@ -3283,6 +3294,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             }
         }
 
+        // ==== Loot tracking and fight watchdog ====
         // The target of this fight is looted once it is dead: remember it, and forget the ones too old to still be on the ground.
         if (hasTarget && forever_module::UnitRefType(targetRef) == 8)
             state.FoughtAtMs[targetRef] = nowMs;
@@ -4000,6 +4012,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             }
         }
 
+        // ==== Idle-time dispatch: grinding, errands, hubs, vendor/service trips ====
         // An enemy near keeps the bot from idling, which keeps it from walking to grind spots. Only one the bot would actually pull counts: a bot
         // whose start zone shows only elites, packs of four or more, or creatures well above its level used to stand there for the whole run
         // (all 73 Undead and many Night Elf and Tauren bots of the 8-hour soak), neither fighting nor leaving. A bot that holds position by

@@ -1083,6 +1083,11 @@ int main(int argc, char** argv)
     // Config is delivered right after the handshake, so the first callback has already run when OnConfig returns. A later
     // re-delivery (a core reload) updates the ramp, the random picks and the cap, on the Run() thread. The telemetry file
     // and the test spell take effect at restart.
+    // Ordering note: settings/roster/alts/commands below are captured by reference into the OnConfig/OnControlRevoked/
+    // OnRequest callbacks registered further down this function. Each callback's captures must outlive the ModuleClient
+    // (they do: client, settings, roster and the shared_ptr registries are all declared in this same main() frame and
+    // destructed in reverse order after client, so there is no dangling-reference risk), but it does mean a callback must
+    // not be registered before the state it captures is constructed. Keep new captured state declared above its callback.
     BotSettings settings;
     bool configured = false;
     BotRoster roster(0); // the cap is set once the settings are known
