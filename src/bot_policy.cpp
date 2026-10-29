@@ -3422,6 +3422,10 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 approach = std::min(approach, kMeleeApproachYards + 1.0f);
             if (nowMs < state.RangeCloserUntilMs)
                 approach = std::min(approach, approach > kMeleeApproachYards + 0.5f ? kCasterCloserYards : kMeleeCloserYards);
+            // Around an area-attack target a party member other than the tank never closes in: it holds at kite distance.
+            bool const aoeTarget = partyMember && targetUnit && forever_module::UnitRefEntry(targetUnit->guid) == kOnyxianWarderEntry;
+            if (aoeTarget)
+                approach = std::max(approach, kAoeKiteYards);
             if (distance <= approach)
             {
                 // A ranged bot that has walked into casting range stops there: the core's follow keeps running it into the target,
@@ -3439,10 +3443,9 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 // Not in a party: a party's tank holds the target, and a caster that keeps backing off never gets a spell off (300-450 move orders a minute per caster in the
                 // Deadmines runs, and each step re-pulled the next pack).
                 // The exception is a target with a big area attack around it (the Onyxian Warder): only the tank, the party leader, stands in it,
-                // and the others back off past its radius.
-                bool const aoeTarget = partyMember && targetUnit && forever_module::UnitRefEntry(targetUnit->guid) == kOnyxianWarderEntry;
+                // and every other party member, melee class or not, backs off past its radius and casts from there.
                 float const kiteYards = aoeTarget ? kAoeKiteYards : kRangedKiteYards;
-                if ((partyLeader == 0 || aoeTarget) && approach > kMeleeApproachYards + 0.5f && targetUnit && distance < kiteYards)
+                if (((partyLeader == 0 && approach > kMeleeApproachYards + 0.5f) || aoeTarget) && targetUnit && distance < kiteYards)
                 {
                     float const dx = bot.pos_x - targetUnit->pos_x;
                     float const dy = bot.pos_y - targetUnit->pos_y;
@@ -3458,7 +3461,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     else
                         wanted = Decision{ ActionType::kAttackTarget, targetRef };
                 }
-                else if (healerSupport)
+                else if (healerSupport || aoeTarget)
                 {
                     // A healer does not auto-attack in a party: the core's attack order runs it into melee range, where it takes the
                     // same hits as the tank and pulls aggro with its swings. It holds the ranged stand-off and works with spells.

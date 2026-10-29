@@ -4461,7 +4461,7 @@ void PartyCasterDoesNotKite()
     CHECK(casts > 0);
 }
 
-// Onyxian Warder (12129): its Fire Nova hits everything within 20 yards, so a ranged raid member backs off to 21+ yards and only the tank melees it.
+// Onyxian Warder (12129): its Fire Nova hits everything within 20 yards, so a ranged raid member backs off to 21+ yards and only the tank melees it, every other member backs off, melee classes too.
 void RaidCasterKitesOutOfWarderNova()
 {
     PolicyOptions options = AggressiveOptions();
@@ -4479,8 +4479,8 @@ void RaidCasterKitesOutOfWarderNova()
         view.bots[i].in_combat = 1;
         AddNearby(view, i, warder);
     }
-    int tankKites = 0, rogueKites = 0;
-    float mageAt = -1.0f;
+    int tankKites = 0;
+    float mageAt = -1.0f, rogueAt = -1.0f;
     for (std::uint64_t at = 1000; at < 3000; at += 100)
     {
         view.tick_number = at / 100;
@@ -4488,14 +4488,15 @@ void RaidCasterKitesOutOfWarderNova()
         {
             bool const move = action.type == ActionType::kMoveTo && action.target_guid == 0;
             tankKites += action.bot_guid == 10 && move;
-            rogueKites += action.bot_guid == 12 && move;
             if (action.bot_guid == 11 && move)
                 mageAt = std::fabs(action.dest_x - warder.pos_x);
+            if (action.bot_guid == 12 && move)
+                rogueAt = std::fabs(action.dest_x - warder.pos_x);
         }
     }
     CHECK(mageAt >= 21.0f);
     CHECK(tankKites == 0);
-    CHECK(rogueKites == 0);
+    CHECK(rogueAt >= 21.0f);
 }
 
 // A party member on low health keeps fighting: its healer needs it to hold still, and a fleeing bot drags the pack onto the party.
