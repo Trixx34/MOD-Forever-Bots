@@ -617,10 +617,12 @@ portal 1 -4750.4 -3754.4 49
 entry 249 30.89 -54.08 -5.03
 duration 1800
 wipe_recovery 300
-go 49.8 -114.6 -24.3
-go -49.9 -98.1 -38.6
-go -131.2 -137.5 -52.5
+# Standoff points: each is 36 yards short of an Onyxian Warder spawn (12129, Fire Nova 20 yards + reach), on the line from the previous spawn. The route no longer
+# walks onto the spawns: the leader pulls from here and the party, which trails it, stays out of the nova (2026-10-29 wipe).
+go 39.1 -80.2 -13.4
+go -14.4 -104.0 -33.5
+go -98.8 -121.8 -47.0
+go -150.2 -165.8 -59.3
 go -170.3 -195.7 -66.4
-go -199.1 -209.8 -68.9
 boss 10184 -4.9 -217.2 -86.7 Onyxia
 end
