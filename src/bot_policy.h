@@ -259,6 +259,8 @@ public:
     // The scenario's Taming phase is on for this bot's party: a hunter without a pet tames even though the party has formed already (it would otherwise follow its leader, who stays at
     // the staging place, and the scenario's teleport to the tame spot is undone at once), and stands still when there is nothing to tame in view.
     void SetTamingFor(std::function<bool(std::uint64_t)> fn) { _tamingFn = std::move(fn); }
+    // The bot's scenario party is not inside yet (Waiting to Entering): it holds at the staging place, with no quest, grind walk or pull of its own.
+    void SetStagingHoldFor(std::function<bool(std::uint64_t)> fn) { _stagingHoldFn = std::move(fn); }
     void SetKilledBossesFor(std::function<std::set<std::uint32_t> const&(std::uint64_t)> fn) { _killedBossesFn = std::move(fn); }
     // Several dungeons: the route, events, kill priority and portal of the bot's own party's dungeon. A bot it returns nullptr for (or without it) uses the
     // options' own Route, Events, KillPriority and portal, as a single-dungeon scenario does.
@@ -635,6 +637,7 @@ private:
     bool _routeActive = false;
     std::function<bool(std::uint64_t)> _routeActiveFn;
     std::function<bool(std::uint64_t)> _tamingFn;
+    std::function<bool(std::uint64_t)> _stagingHoldFn;
     std::function<std::set<std::uint32_t> const&(std::uint64_t)> _killedBossesFn;
     std::map<std::uint32_t, std::set<std::uint32_t>> _tankKilled;   // map -> bosses seen dead during a "tank lead" run
     std::set<std::uint32_t> _killedBosses;

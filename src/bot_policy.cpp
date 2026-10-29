@@ -2045,6 +2045,10 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         BotSnapshot const& bot = view.bots[i];
         present.insert(bot.guid);
         BotState& state = StateOf(bot.guid);
+        // A scenario bot before its party is inside (the director's Waiting to Entering phases): it stays at the staging place. No quest, no grind spot, no
+        // death-loop escape, no pull of its own; it fights only what attacks it (or its party). The 2026-10-29 Onyxia runs: the first tank walked to quest
+        // 6582 at Emberstrife's den (10321, level 61 elite) and the others grinded the Wyrmbog's Firemanes, 204 pulls and 90 deaths in 15 minutes.
+        bool const stagingHold = _stagingHoldFn && _stagingHoldFn(bot.guid);
         ReadResult(state, bot, nowMs);
         if (state.TaxiFlight.OrderedMs != 0)
         {
@@ -2712,7 +2716,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             // A death loop: the bot stands up among what killed it and dies again (a party member following a leader into a zone far above its level, a
             // grind spot with something strong on it; 470 of 942 deaths in 55 minutes on the sim, 17 bots dying every few seconds). The third death within
             // kDeathLoopMs puts the bot at the nearest grind spot for its level that is not near its corpse.
-            if (_options.Grind && !_options.Grind->Spots.empty() && bot.level != 0 && state.DeathTimesMs[0] != 0 &&
+            if (!stagingHold && _options.Grind && !_options.Grind->Spots.empty() && bot.level != 0 && state.DeathTimesMs[0] != 0 &&
                 nowMs - state.DeathTimesMs[0] <= kDeathLoopMs && nowMs >= state.EscapeUntilMs)
             {
                 std::uint8_t const side = _options.SideOf ? _options.SideOf(bot.guid) : std::uint8_t(0);
@@ -2893,7 +2897,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         // leaves quests alone until it is done.
         QuestStep questStep;
         bool routeBusy = false;
-        bool const questsAllowed = _quests.Enabled() && !partyMember && !(routeActiveOf(bot.guid) && scenario.RouteMap != 0) /* a dungeon run: the leader walks the route, not to a quest giver */ && !lowHealth && bot.in_combat == 0 && !state.ChatStay && state.ChatFollow == 0 && nowMs >= state.QuestPausedUntilMs;
+        bool const questsAllowed = _quests.Enabled() && !partyMember && !stagingHold && !(routeActiveOf(bot.guid) && scenario.RouteMap != 0) /* a dungeon run: the leader walks the route, not to a quest giver */ && !lowHealth && bot.in_combat == 0 && !state.ChatStay && state.ChatFollow == 0 && nowMs >= state.QuestPausedUntilMs;
         if (questsAllowed)
             questStep = _quests.Next(bot, state.Quest, nowMs, QuestBotInfo{ classId, _options.RaceOf ? _options.RaceOf(bot.guid) : 0u });
         // Every five minutes, what the quest planner is doing for this bot and what keeps it from doing more (the events are the only record,
@@ -3264,7 +3268,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 if (unit.guid == targetRef)
                     targetUnit = &unit;
         }
-        else if (NearbyUnit const* hostile = (dungeonHold || noSelfPull || tameNow) ? nullptr
+        else if (NearbyUnit const* hostile = (dungeonHold || noSelfPull || tameNow || (stagingHold && bot.in_combat == 0)) ? nullptr
                      : PullTarget(bot, nearby, avoided, bot.in_combat != 0, huntEntries, routeOn))
         {
             targetUnit = hostile;
@@ -4443,7 +4447,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 idle = false;
             }
         }
-        else if (idle && healthy && _options.WanderWhenIdle && grindMode && nowMs >= state.GrindRetryAtMs && !partyMember && !state.ChatStay && state.ChatFollow == 0)
+        else if (idle && healthy && _options.WanderWhenIdle && grindMode && nowMs >= state.GrindRetryAtMs && !partyMember && !stagingHold && !state.ChatStay && state.ChatFollow == 0)
         {
             // Leveling: after a quiet spell the bot walks to a grind spot that suits its level (nearest first, not the ones it just left), and
             // stays to fight what lives there until it sees nothing for a while again.

@@ -175,6 +175,8 @@ public:
 
     ScenarioPhase Phase() const { return _phase; }
     bool Taming() const { return _phase == ScenarioPhase::Taming; }
+    // Before the party is let loose inside: the bots hold at the staging place (a hunter of the Taming phase still tames: that is not a pull).
+    bool Staging() const { return _phase != ScenarioPhase::Running && _phase != ScenarioPhase::Done; }
     bool RouteActive() const { return _phase == ScenarioPhase::Running; }
 
     // The result, once, after the scenario has ended.

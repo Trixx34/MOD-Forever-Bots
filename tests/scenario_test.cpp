@@ -561,6 +561,41 @@ void TheRoutePartyPullsElitesButGrindingBotsDoNot()
     CHECK(Count(actions, ActionType::kAttackTarget) + Count(actions, ActionType::kFollow) >= 1);
 }
 
+void AStagingBotDoesNotPullWhatDoesNotAttackIt()
+{
+    auto const mobView = [](bool inCombat)
+    {
+        WorldTickSnapshotView view;
+        view.tick_number = 1;
+        view.max_nearby_units = 1;
+        BotSnapshot bot = Bot(12, 1, 0, 0);
+        bot.level = 60;
+        bot.in_combat = inCombat ? 1 : 0;
+        bot.nearby_count = 1;
+        view.bots = { bot };
+        view.nearby.resize(1);
+        view.nearby[0].guid = forever_module::MakeUnitRef(8, 4328, 1);
+        view.nearby[0].pos_x = 15.0f;
+        view.nearby[0].health = 100;
+        view.nearby[0].max_health = 100;
+        view.nearby[0].is_hostile = true;
+        view.nearby[0].level = 58; // worth a pull for a free bot
+        return view;
+    };
+    auto const engaged = [](std::vector<BotAction> const& actions)
+    {
+        return Count(actions, ActionType::kAttackTarget) + Count(actions, ActionType::kFollow);
+    };
+    BotPolicy free = RoutePolicy();
+    CHECK(engaged(free.Decide(mobView(false), 1000)) >= 1);
+    BotPolicy held = RoutePolicy();
+    held.SetStagingHoldFor([](std::uint64_t) { return true; });
+    CHECK(engaged(held.Decide(mobView(false), 1000)) == 0); // waits at staging
+    BotPolicy attacked = RoutePolicy();
+    attacked.SetStagingHoldFor([](std::uint64_t) { return true; });
+    CHECK(engaged(attacked.Decide(mobView(true), 1000)) >= 1); // defends itself
+}
+
 // ---- auto gear (policy) ----
 
 void AutoGearingDressesEachBotOnceAndAgainAfterLevels()
@@ -1467,6 +1502,7 @@ int main()
     LeaderWaitsForAMemberWhoFellBehind();
     LeaderMovesOnAfterTheFirstPoint();
     TheRoutePartyPullsElitesButGrindingBotsDoNot();
+    AStagingBotDoesNotPullWhatDoesNotAttackIt();
     AutoGearingDressesEachBotOnceAndAgainAfterLevels();
     WithoutAutoGearingOnlyTheCommandDressesABot();
     BotsWearBetterGearFromTheirBagsOnASchedule();
