@@ -129,7 +129,8 @@ void DressesThenGroupsThenEnters()
     step(bots);
     CHECK(director.Phase() == ScenarioPhase::Entering);
     step(bots);
-    CHECK(Count(actions, ActionType::kTeleport, 1) == 1 && Count(actions, ActionType::kTeleport, 2) == 0);
+    // Nobody is in combat: the whole party is sent in together, the leader and the members alike.
+    CHECK(Count(actions, ActionType::kTeleport, 1) == 1 && Count(actions, ActionType::kTeleport, 2) == 1 && Count(actions, ActionType::kTeleport, 3) == 1);
 
     // The leader arrives: the members follow after the delay.
     bots[0].map_id = 36;
