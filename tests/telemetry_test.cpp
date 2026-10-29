@@ -194,6 +194,20 @@ void DeathEndsTheFight()
     CHECK(rec.Count("alive") == 1);
 }
 
+// The death line names the last hits the bot took, oldest first: c<entry> for a creature, env for no attacker, then the spell and the amount.
+void DeathCarriesTheLastHits()
+{
+    Recorder rec(Quiet());
+    rec.telemetry.Observe(View(Bot(1000)), 0);
+    BotSnapshot dying = Bot(0, 0, kEnemy);
+    dying.damage_hit_count = 2;
+    dying.damage_hits[0] = { forever_module::MakeUnitRef(8, 10184, 7), 12097, 60, 1 };
+    dying.damage_hits[1] = { 0, 0, 20, 2 };
+    rec.telemetry.Observe(View(dying, { Enemy(3.0f) }), 2000);
+    CHECK(rec.Count("death") == 1);
+    CHECK(rec.Last("death").find("hits=c10184:12097:60|env:0:20") != std::string::npos);
+}
+
 void StuckFightIsReportedOnce()
 {
     Recorder rec(Quiet());
@@ -393,6 +407,7 @@ int main()
     FightLifecycle();
     LostTargetReasonIsOnTheFightEndLine();
     DeathEndsTheFight();
+    DeathCarriesTheLastHits();
     RevivalIsLoggedAfterAGhost();
     QuestDoneOnceWhenHandedIn();
     StuckFightIsReportedOnce();

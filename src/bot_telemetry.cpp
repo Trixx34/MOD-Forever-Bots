@@ -76,6 +76,22 @@ void BotTelemetry::Observe(WorldTickSnapshotView const& view, std::uint64_t nowM
             if (nearest)
                 where << " nearest_hostile=" << forever_module::UnitRefEntry(nearest->guid) << " level=" << nearest->level
                       << " dist=" << std::lround(std::sqrt(nearestSq)) << (nearest->elite ? " elite" : "");
+            // The last hits the bot took, oldest first (layout 22): c<entry> for a creature, p for a player, env for no attacker, then the spell
+            // (0 for a melee or auto attack) and the amount. The killing blow is the last one.
+            where << " hits=";
+            for (std::uint8_t h = 0; h < bot.damage_hit_count; ++h)
+            {
+                forever_module::DamageHit const& hit = bot.damage_hits[h];
+                if (h)
+                    where << '|';
+                if (hit.source_guid == 0)
+                    where << "env";
+                else if (forever_module::UnitRefType(hit.source_guid) == 8)
+                    where << 'c' << forever_module::UnitRefEntry(hit.source_guid);
+                else
+                    where << 'p';
+                where << ':' << hit.spell_id << ':' << hit.amount;
+            }
             where << (bot.in_combat ? " in_combat" : "");
             where << " life=" << (bot.life_state == 2 ? "ghost" : "corpse");
             Write("death", bot, record, nowMs, where.str());
