@@ -6,7 +6,7 @@ from 1 to 60 and, in a party of five, clear a dungeon.
 
 ## Status
 
-Built and unit-tested (16 test suites). Run on a dedicated sim worldserver with 300, 500 and 1000 bots: spawn and login, the ramp,
+Built and unit-tested (38 test programs). Run on a dedicated sim worldserver with 300, 500 and 1000 bots: spawn and login, the ramp,
 the safety valves, telemetry and the pump all work. What is **not yet verified** on the sim: sustained combat and kills (the last run
 found bots could not see neutral creatures, now fixed), experience and levelling, vendor and hub walks, parties and looting.
 
@@ -93,11 +93,12 @@ Each tick the policy (`src/bot_policy.cpp`) reads the bot's snapshot and sends a
   points by its profile for the (class, role), when `Bot.Talents.Profiles` names a profile file; otherwise, or for a class with no profile,
   its greedy allocator. A refusal (in combat) is asked again after 5 s. Points already spent are not taken back, so a role change affects
   only new points (no respec yet). Protocol 17.
-- **Death and corpse run.** A dead bot waits for a resurrect while a healer of its party is up (20 s, 60 s in a dungeon since 0.31.0; 90 s before), then releases and walks
+- **Death and corpse run.** A dead bot waits for a resurrect while a healer of its party is up (20 s since 0.34.3; the party waits 20 s for a rez, not 90 s), then releases (20 s in a dungeon too since 0.36.2, and a fight elsewhere in the party no longer holds the release; only the corpse's own combat does) and walks
   back to its corpse (through the instance door when the corpse is inside) and reclaims it. A run longer than `CorpseRunTeleportSec` (60 s) puts the ghost
   at its corpse; a run still not done four minutes after that is given up.
   A ghost still outside a dungeon is never stood up there. Since 0.22.0.
-- **Dungeon death.** A dead member of a dungeon party does not walk back to its corpse. It is teleported to the instance entrance (the dungeon file's `entry`) and revived there by its leader, once the leader is up and out of combat. If no revive comes within 90 seconds it walks to its corpse as before. Since 0.24.0 (90 seconds since 0.26.0).
+- **Regroup (since 0.35.0).** After a death or when a member is out of range, the party leader holds the party until it is together again. A member out of range for 20 s is stuck: the party stops waiting for it and walks on (`regroup_stuck`, logged once per member per regroup). It stays stuck until the regroup ends, and counts as back only inside 20 yards (since 0.36.2). `member_recover` brings it to the leader after 30 s out of range, later than the stuck flag. The regroup ends once nobody is dead or out of range and the pull hold has ended (`regroup_start` / `regroup_done`).
+- **Dungeon death.** A dead member of a dungeon party does not walk back to its corpse. While the party is out of combat and its leader is up, the ghost is teleported to the leader and stays by it for the leader's revive (since 0.34.3; before, it waited at the instance entrance). In combat it waits at the entrance, and if no revive comes within 90 seconds it walks to its corpse as before. Since 0.24.0 (90 seconds since 0.26.0).
 - **Healing.** A priest casts Flash Heal in an emergency and Power Word: Shield on a member that took damage; a paladin, shaman or druid
   answers an emergency with its own heal spell and never casts a priest spell. Each spell is cast only when the healer can pay for it, so a
   cheaper heal is used when the mana is low. Since 0.23.0.
@@ -119,7 +120,8 @@ Columns: `time_ms`, `kind`, `bot`, `level`, `health_pct`, `power_pct`, `in_fight
 `casts_applied`, `refusals`, `stuck_episodes`, `longest_fight_ms`, `health_lost`, `detail`.
 
 Kinds: `summary`, `fight_start`, `fight_end` (detail: reason, target, duration, health lost), `target_switch`, `death`, `alive`,
-`level`, `stuck`, `unstuck`.
+`level`, `stuck`, `unstuck`. `stuck` is a fight in which the bot's health, position and target did not change for a minute (its detail ends with `map=<id> x=<n> y=<n> z=<n>`; a healthy bot standing
+still in a long fight counts); `unstuck` closes the episode when something changes, or with the fight (detail `fight_end <reason> lost <why>`).
 
 - `casts_applied` counts every applied action (move, follow, stop, rest and the rest included), not only spells.
 - A fight starts when the bot's own attack target is set. `fight_end` reason `target_gone` means the target was not in view when the
@@ -180,12 +182,10 @@ Without `FOREVER_MODULE_SDK_SOURCE`, CMake fetches `Trixx34/forever-module-sdk` 
 
 - Quests and levelling are built from data files but not verified on the sim. Dungeons (M9) are a first slice: a data-driven route and a boss-clear rule on top of the scenario director; the sample Ragefire Chasm route is approximate, no run has been done on the sim, there is no crowd control, boss mechanics or walk to the portal (`doc/dungeons.md`).
 - Layout 13 (protocol 7) is what the module is built against: the bot's auras, the pet, `casting_target`, vendor/repair/auctioneer guids, money and free bag slots, and `last_target_lost_reason`. A core that still runs layout 12 refuses the module at attach, so the core has to move first. What the module does with them is in `src/bot_policy.cpp` (`AuraRunning`, `PetOf`, the `kPetCommand` actions, the avoid of a leashed creature); a target's DOTs are still a coarse `aura_mask`, whose bit assignment the core has not published, so a DOT on a target is still estimated.
-- The rotation spec uses the Forever abilities that could be verified in the client data (Holy Strike, Divine Storm, Chaos Bolt and others; `doc/rotations.md`). Abilities that need special handling or whose effect could not be verified (Demonic Brand, rogue finishers, forms, channels) are not used yet.
-- A hunter's pet is handled by spell casts only (Call Pet 883, Revive Pet 982, Mend Pet 136, its state guessed from accepted and
-  refused casts): the snapshot has no pet and the core has no pet command action, so the pet's health and presence are not seen and
-  the pet is not sent to attack the bot's target (it acts on its own AI). See doc/rotations.md, Limits, for the core/SDK change
-  needed. Auto Shot is tracked and not re-cast while active. Rend's bleed is estimated (21 s per accepted cast) because the
-  snapshot has no auras. A fleeing target is not detected.
+- The rotation spec uses the Forever abilities that could be verified in the client data (Holy Strike, Seal of Fury, Summon Hawk, Conflagrate and others; `doc/rotations.md`). Abilities that need special handling or whose effect could not be verified (Demonic Brand, rogue finishers, forms, channels) are not used yet.
+- A pet is read from the snapshot (layout 13: `pet_state`) and sent at the fight's target; Call Pet 883, Revive Pet 982 and Mend Pet 136 are the policy's own logic, and a hunter without a pet tames one (Tame Beast, 20 s channel).
+  Call Pet must be a spell the hunter knows (a trainer row in the world database); a hunter without it cannot tame. Auto Shot is tracked and not re-cast while active. Rend's bleed is estimated (21 s per accepted cast) for a
+  bot with no aura list. A fleeing target is not detected.
 - Hub positions come from the sim's quest-giver clusters and may sit in rock; a bot that cannot reach one gives up after 3 minutes.
 - Classes 6 and 10 are not spawned.
 - **Not yet built on layout 13:** vendor buying (`client.BuyItem`, needs an item list to buy from and the Tier 1 action sent from the `Run()` thread), the auction house (`client.AuctionHouse` plus `PlayerScript.OnAuctionResult`), and crafting and gathering (`client.Craft`, `client.Gather`, which need recipe and node data). The SDK has all of it; the module does not use it yet.
@@ -231,7 +231,9 @@ trainer spells or talents, and it cannot be played while it is a bot. Alts are n
 through its objectives. Once the bot has it in its log, the bot completes it with its reward at once, wherever it stands, as the GM command
 `.quest reward <id>` does (core action `kQuest`, operation 4). Only bots send it; player characters are not touched. It applies on prod as well as the sim.
 
-**Rotations.** With `RotationFile` set, the classes use rows from a file (levels 1 to 60, damage-over-time lengths, and upkeep buffs such as Power Word: Fortitude, armor spells and Battle Shout cast out of combat, on the bot or its whole group). The file is made from a spec of spell names and the core's ability dump by `tools/make_rotations.py`; see `doc/rotations.md`.
+**Rotations.** Since 0.33.0 the classes use the rows of `data/rotations.txt` (`RotationFile`, default `data/rotations.txt` beside the module's executable; `RotationFile = ""` uses the built-in rank 1 rows): levels 1 to 60, damage-over-time lengths, procs and stacks (`self_aura_*`), upkeep buffs such as Power Word: Fortitude, armor spells, Battle Shout and the warrior's Defensive Stance cast out of combat, and a warlock's demon (`no_pet`). A class has a block per spec (`class 3 spec bm`); a bot's spec is the third field of its scenario roster entry (`ScenarioRoster = "1:1:prot,1:5:holy,1:8:arcane,3:3:bm,7:9:demonology"`), else the default of its class and role. The file is made from `data/rotation_spec.txt` (spell names) and the abilities per class by `tools/make_rotations.py` (`tools/abilities_from_db2.py` builds the abilities from the client files and a trainer export, no restart needed); see `doc/rotations.md`.
+
+**Hunter and warlock pets.** A warlock's demon is an upkeep row (Succubus, else Voidwalker, else Imp, re-summoned when it is gone). A hunter of level 10 or more with no pet and not in a party walks to a beast of `data/tame_beasts.txt` (`TameBeastFile`) and tames it with Tame Beast; in a scenario, `ScenarioTameSpot.<dungeon> = "map x y z"` adds a Taming phase that takes the hunters there and back before the party forms. The scenario gives a hunter without ammunition a stack (200) of what its weapon takes (`ScenarioAmmo`) and a warlock 10 Soul Shards (`ScenarioClassSupplies`); see `doc/rotations.md`.
 
 **Grind spots.** With `GrindFile` set, an idle bot walks to a place that suits its level (nearest first, not back to the last two) instead of the hubs of its map. The file is made from the world database with `tools/make_grind_spots.py`; see `doc/grind-spots.md`.
 
@@ -242,7 +244,8 @@ most) when it first appears and after every `AutoGearEveryLevels` levels. With i
 **Scenarios.** A scenario is a repeatable test situation: `Scenario = <name>` with a roster, a staging place, an entry, a route and a
 duration (see `config/modules.d/forever-bots.conf.example`). The module spawns the roster at the staging place, dresses it (auto gear,
 or the class's `ScenarioGear<class>` list), waits for the party to form, teleports the leader to the entry and then the members, and
-lets the leader walk the route (it waits for members more than 30 yards behind and while its health is under 80%). One result line is
+lets the leader walk the route (it waits for members more than 30 yards behind and while its health is under 80%). The dressing grants the classes their supplies (food, drink, ammunition, Soul Shards) and, since 0.35.3, keeps ammunition, food and drink
+topped up for the whole run, not just once (`ScenarioSupplies`, `ScenarioAmmo`; see `doc/rotations.md`); with `ScenarioTameSpot` a Taming phase gives its hunters a pet. One result line is
 written when it ends: `scenario <name>: outcome=<complete|wipe|timeout|enter_failed> furthest=3/7 deaths=2 alive=3/5 run=412s`.
 `tests/scenario_test.cpp` covers the director, the route and the settings.
 

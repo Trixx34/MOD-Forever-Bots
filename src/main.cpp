@@ -36,8 +36,10 @@
 #include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <cstdio>
 #include <ctime>
 #include <exception>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -84,6 +86,23 @@ constexpr std::uint32_t kBagSlotsAssumed = 16;      // the snapshot gives free s
 constexpr std::size_t kAuctionItemsPerBot = 200;    // looted items kept per bot for listing
 constexpr std::uint32_t kItemClassWeapon = 2;       // ITEM_CLASS_WEAPON
 constexpr std::uint32_t kItemClassArmor = 4;        // ITEM_CLASS_ARMOR
+// A relative data path (the defaults of RotationFile and TameBeastFile are "data/...") is looked up beside the module's executable first, since the core starts a module
+// from a working directory of its own; a path that exists nowhere else is returned as given, so the load reports it.
+std::string BesideTheModule(std::string const& path)
+{
+    if (path.empty() || path.front() == '/')
+        return path;
+    std::error_code ec;
+    std::filesystem::path const exe = std::filesystem::read_symlink("/proc/self/exe", ec);
+    if (!ec)
+    {
+        std::filesystem::path const candidate = exe.parent_path() / path;
+        if (std::filesystem::exists(candidate, ec))
+            return candidate.string();
+    }
+    return path;
+}
+
 constexpr std::uint32_t kItemClassQuest = 12;       // ITEM_CLASS_QUEST
 
 // Vendor sales (sell_policy.h, doc/economy.md): the white items a bot loots are kept for its next vendor visit, and a bot sells from a vendor in reach.
@@ -162,6 +181,7 @@ struct RunContext
     std::uint64_t BackoffUntilMs = 0;
     bool StopLogged = false;
     bool Halted = false; // a fixed race and class with no valid combination: nothing is spawned
+    pick::SpecTable Specs; // the spec of each scenario bot whose roster entry names one (race:class:spec)
 };
 
 forever_module::SpawnParams ParamsFor(RaceClass const& combo)
@@ -315,6 +335,8 @@ struct AuctionBot
     std::uint32_t FreeSlots = 0;
     std::uint64_t AuctioneerGuid = 0;
     bool Idle = false;
+    std::uint64_t Copper = 0;   // for the budget of a purchase (AuctionBuy)
+    std::uint32_t Level = 0;
 };
 
 struct AuctionFeed
@@ -573,7 +595,8 @@ void ScenarioSpawnTick(RunContext& run, std::size_t& spawned)
     }
     ++spawned;
     run.Roster.NoteRequestSent(0);
-    run.Client.RequestControl(0, params, [&run, combo, &spawned](forever_module::ControlResponse const& reply)
+    std::string const spec = slot.Spec;
+    run.Client.RequestControl(0, params, [&run, combo, spec, &spawned](forever_module::ControlResponse const& reply)
     {
         if (!reply.granted())
         {
@@ -589,8 +612,23 @@ void ScenarioSpawnTick(RunContext& run, std::size_t& spawned)
         run.Roster.OnGranted(0, guid);
         run.Classes.Set(guid, combo.Class);
         run.Races.Set(guid, combo.Race);
-        std::cerr << "forever-bots: scenario bot " << guid << " race " << combo.Race << " class " << combo.Class << "\n";
+        if (!spec.empty())
+        {
+            if (rotation::SpecRole(combo.Class, spec) != 0)
+                run.Specs.Set(guid, spec);
+            else
+                std::cerr << "forever-bots: scenario bot " << guid << ": class " << combo.Class << " has no spec '" << spec << "'; it plays the default spec\n";
+        }
+        std::cerr << "forever-bots: scenario bot " << guid << " race " << combo.Race << " class " << combo.Class << (spec.empty() ? "" : " spec " + spec) << "\n";
     });
+}
+
+// Actions per tick with one decimal ("0.4"), so a rate under 1 does not print as 0.
+std::string ActionsPerTick(std::uint64_t actions, std::uint64_t ticks)
+{
+    char text[32];
+    std::snprintf(text, sizeof text, "%.1f", ticks ? double(actions) / double(ticks) : 0.0);
+    return text;
 }
 
 void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& running, PolicyOptions options,
@@ -656,6 +694,8 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
                 telemetryFile->WriteLine(BotTelemetry::Header());
             BotTelemetry::Options telemetryOptions;
             telemetryOptions.SummaryEveryMs = std::uint64_t(settings.TelemetrySummarySec) * 1000;
+            telemetryOptions.ClassOf = options.ClassOf;
+            telemetryOptions.RaceOf = options.RaceOf;
             telemetry = std::make_unique<BotTelemetry>(
                 [file = telemetryFile.get()](std::string const& line) { file->WriteLine(line); }, telemetryOptions);
             std::cerr << "forever-bots: telemetry to " << telemetryPath << " (summary every " << settings.TelemetrySummarySec
@@ -818,6 +858,11 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
                     auto const at = partyOf.find(guid);
                     return at != partyOf.end() && directors[at->second].RouteActive();
                 });
+                policy.SetTamingFor([&directors, &partyOf](std::uint64_t guid)
+                {
+                    auto const at = partyOf.find(guid);
+                    return at != partyOf.end() && directors[at->second].Taming();
+                });
                 policy.SetKilledBossesFor([&directors, &partyOf](std::uint64_t guid) -> std::set<std::uint32_t> const&
                 {
                     static std::set<std::uint32_t> const none;
@@ -907,7 +952,7 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
                 {
                     if ((extras.Alts && extras.Alts->Has(bot.guid)) || bot.group_role != 0)
                         continue;
-                    list.push_back({ bot.guid, bot.bag_free_slots, bot.auctioneer_guid, bot.life_state == 0 && bot.in_combat == 0 });
+                    list.push_back({ bot.guid, bot.bag_free_slots, bot.auctioneer_guid, bot.life_state == 0 && bot.in_combat == 0, bot.copper, bot.level });
                 }
                 std::lock_guard<std::mutex> lock(extras.Auction->Lock);
                 extras.Auction->Bots.swap(list);
@@ -929,7 +974,7 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
                 // The scenario's progress, in the module's log: each phase as it starts, and every teleport the director sends.
                 if (!phaseLogged[k] || director.Phase() != lastPhases[k])
                 {
-                    static char const* const names[] = { "waiting for the roster", "dressing", "grouping", "entering", "running", "done" };
+                    static char const* const names[] = { "waiting for the roster", "dressing", "taming", "grouping", "entering", "running", "done" };
                     std::cerr << "forever-bots: scenario " << name << ": phase " << names[int(director.Phase())] << " ("
                               << partyView.bots.size() << " bots in view)\n";
                     lastPhases[k] = director.Phase();
@@ -994,7 +1039,7 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
         if (now - reportedAt >= kPumpReportMs && ticks > 0)
         {
             std::cerr << "forever-bots: pump: " << lastBotCount << " bots, decide avg " << decideTotalUs / ticks << " us, max "
-                      << decideMaxUs << " us over " << ticks << " ticks, " << actionsTotal / ticks << " actions per tick\n";
+                      << decideMaxUs << " us over " << ticks << " ticks, " << ActionsPerTick(actionsTotal, ticks) << " actions per tick\n";
             reportedAt = now;
             ticks = 0;
             decideTotalUs = 0;
@@ -1439,7 +1484,7 @@ int main(int argc, char** argv)
             talents.swap(commands->Talents);
         }
         for (BotPolicy::TalentOrder const& order : talents)
-            client.SpendBotTalents(order.Bot, static_cast<forever_module::ModuleClient::TalentRole>(order.Role), [commands, bot = order.Bot](forever_module::ActionReply const& reply)
+            client.SpendBotTalents(order.Bot, static_cast<forever_module::ModuleClient::TalentRole>(order.Role), static_cast<forever_module::TalentSpec>(order.Spec), [commands, bot = order.Bot](forever_module::ActionReply const& reply)
             {
                 if (!reply.success())
                 {
@@ -1490,7 +1535,7 @@ int main(int argc, char** argv)
         roster.SetMaxBots(std::min<std::uint32_t>(ScenarioBotCount(settings.Scenarios), maxBots));
         for (ScenarioSettings const& scenario : settings.Scenarios)
             std::cerr << "forever-bots: scenario " << scenario.Name << ": " << scenario.Parties << " part" << (scenario.Parties == 1 ? "y" : "ies") << " of " << scenario.Roster.size() << " bots at level "
-                      << scenario.Level << ", route of " << scenario.Route.size() << " point(s), " << scenario.DurationSec << " s\n";
+                      << scenario.Level << ", route of " << scenario.Route.size() << " point(s), " << scenario.DurationSec << " s" << (scenario.Raid ? " (raid, 8 subgroups)" : "") << "\n";
         if (settings.Scenarios.size() > 1)
             std::cerr << "forever-bots: scenario of " << settings.Scenarios.size() << " dungeons: " << ScenarioPartyCount(settings.Scenarios) << " parties, "
                       << ScenarioBotCount(settings.Scenarios) << " bots\n";
@@ -1534,6 +1579,7 @@ int main(int argc, char** argv)
     policyOptions.TacticHeal = settings.TacticHeal;
     policyOptions.TacticRest = settings.TacticRest;
     policyOptions.TacticRecover = settings.TacticRecover;
+    policyOptions.TacticCc = settings.TacticCc;
     policyOptions.DungeonHealBelowPct = settings.DungeonHealBelowPct;
     policyOptions.DungeonTankHealBelowPct = settings.DungeonTankHealBelowPct;
     policyOptions.HealerDpsManaPct = settings.HealerDpsManaPct;
@@ -1601,6 +1647,18 @@ int main(int argc, char** argv)
         std::cerr << "forever-bots: tank lead knows " << policyOptions.DungeonsByMap.size() << " dungeon(s)\n";
     }
     policyOptions.Taxi = settings.Taxi;
+    if (settings.Taxi.Enabled)
+    {
+        // The city named in the taxi journal lines comes from the capitals' trainer table (ErrandTrainerFile); without it every city is "unknown".
+        std::ifstream in(settings.ErrandTrainerFile);
+        if (in)
+        {
+            std::ostringstream text;
+            text << in.rdbuf();
+            std::vector<std::string> ignored;
+            policyOptions.TaxiPlaces = std::make_shared<std::vector<taxi::Place>>(errand::CityPlaces(errand::ParseTrainerTable(text.str(), ignored)));
+        }
+    }
     policyOptions.PartySize = settings.PartySize;
     policyOptions.PartyCount = settings.PartyCount;
     policyOptions.PartyPercent = settings.PartyPercent;
@@ -1619,13 +1677,23 @@ int main(int argc, char** argv)
         policyOptions.Quests = std::move(quests);
     }
     policyOptions.QuestTeleport = settings.QuestTeleport;
+    if (!settings.TameBeastFile.empty())
+    {
+        std::vector<std::string> tameWarnings;
+        auto beasts = std::make_shared<tame::TameBeasts>(tame::LoadTameBeasts(BesideTheModule(settings.TameBeastFile), tameWarnings));
+        for (std::string const& warning : tameWarnings)
+            std::cerr << "forever-bots: " << warning << "\n";
+        std::cerr << "forever-bots: tame beasts: " << beasts->ByEntry.size() << " from " << BesideTheModule(settings.TameBeastFile) << "\n";
+        if (!beasts->ByEntry.empty())
+            policyOptions.TameBeasts = std::move(beasts);
+    }
     if (!settings.RotationFile.empty())
     {
         std::vector<std::string> rotationWarnings;
-        auto rotations = std::make_shared<rotation::RotationData>(rotation::LoadRotationData(settings.RotationFile, rotationWarnings));
+        auto rotations = std::make_shared<rotation::RotationData>(rotation::LoadRotationData(BesideTheModule(settings.RotationFile), rotationWarnings));
         for (std::string const& warning : rotationWarnings)
             std::cerr << "forever-bots: " << warning << "\n";
-        std::cerr << "forever-bots: rotations for " << rotations->ByClass.size() << " class(es) from " << settings.RotationFile << "\n";
+        std::cerr << "forever-bots: rotations for " << rotations->ByClass.size() << " class(es) and " << rotations->BySpec.size() << " spec(s) from " << BesideTheModule(settings.RotationFile) << "\n";
         policyOptions.Rotations = std::move(rotations);
     }
     if (!settings.SpellCostFile.empty())
@@ -1658,6 +1726,7 @@ int main(int argc, char** argv)
         return SideOfRace(race);
     };
     policyOptions.ClassOf = [&classes](std::uint64_t botGuid) { return classes.Get(botGuid); };
+    policyOptions.SpecOf = [&run](std::uint64_t botGuid) { return run.Specs.Get(botGuid); };
     policyOptions.AutoGearing = settings.AutoGearing;
     policyOptions.AcceptInvites = settings.ChatCommands;
     policyOptions.IsAlt = [alts](std::uint64_t guid) { return alts->Has(guid); };
@@ -1782,6 +1851,55 @@ int main(int argc, char** argv)
                 return;
             auction::CallBudget budget(settings.Auction.MaxCallsPerTick);
             budget.NewTick();
+            // AuctionBuy (off by default): when the bot's buy visit is due and it has money to spend, browse the next equipment slot for upgrades
+            // (the core scores the listings for this bot) and buy out the best upgrade per copper that the budget allows. One browse per visit; the
+            // buyout follows from the browse's reply, so it is not counted again in this tick's budget.
+            auto const buyVisit = [&client, &settings, &budget, now](AuctionBot const& bot, auction::Standing& standing)
+            {
+                if (!settings.Auction.BuyEnabled || !auction::BuyVisitDue(settings.Auction, standing, now))
+                    return;
+                std::uint64_t const spend = auction::BuyBudget(settings.Auction, bot.Copper, bot.Level);
+                if (spend == 0 || !budget.Take())
+                    return;
+                standing.LastBuyMs = now;
+                forever_module::ModuleClient::AuctionBrowseFilter filter;
+                filter.inventoryType = auction::BrowseSlot(standing.BuyCursor++);
+                filter.maxLevel = bot.Level;
+                filter.maxBuyout = auction::BuyoutBound(spend);
+                filter.onlyUpgrades = true;
+                std::uint64_t const botGuid = bot.Guid;
+                std::uint64_t const auctioneer = bot.AuctioneerGuid;
+                client.AuctionBrowseByFilterForBot(botGuid, auctioneer, filter,
+                                                   [&client, &settings, botGuid, auctioneer, spend](forever_module::ActionReply const& reply)
+                {
+                    if (!reply.success())
+                        return;
+                    std::vector<auction::Offer> offers;
+                    for (forever_module::AuctionListingEvent const& listing : reply.listings())
+                    {
+                        auction::Offer offer;
+                        offer.AuctionGuid = listing.auction_guid();
+                        offer.Entry = listing.item_entry();
+                        offer.Count = listing.count() ? listing.count() : 1;
+                        offer.Bid = listing.bid();
+                        offer.Buyout = listing.buyout();
+                        offer.Upgrade = listing.upgrade_score();
+                        offers.push_back(offer);
+                    }
+                    std::optional<auction::Offer> const pick = auction::ChooseBuy(settings.Auction, spend, offers, auction::UpgradeOf);
+                    if (!pick)
+                        return;
+                    auction::Offer const offer = *pick;
+                    client.AuctionHouseForBot(botGuid, forever_module::ModuleClient::AuctionHouseOp::kBuyout, auctioneer, 0, offer.AuctionGuid, offer.Entry, 0, 0,
+                                              static_cast<std::uint32_t>(offer.Buyout), [botGuid, offer](forever_module::ActionReply const& bought)
+                    {
+                        if (bought.success())
+                            std::cerr << "forever-bots: " << auction::BoughtLine(botGuid, offer, bought.copper_spent() ? bought.copper_spent() : offer.Buyout) << "\n";
+                        else
+                            std::cerr << "forever-bots: " << auction::BuyFailedLine(botGuid, offer, bought.reason()) << "\n";
+                    });
+                });
+            };
             for (AuctionBot const& bot : list)
             {
                 if (!bot.Idle || bot.AuctioneerGuid == 0)
@@ -1792,7 +1910,10 @@ int main(int argc, char** argv)
                 standing.ListedNow = static_cast<std::uint32_t>(ends.size());
                 auction::Bags const bags{ kBagSlotsAssumed, kBagSlotsAssumed - std::min(bot.FreeSlots, kBagSlotsAssumed) };
                 if (!auction::VisitDue(settings.Auction, bags, standing, false, now))
+                {
+                    buyVisit(bot, standing);
                     continue;
+                }
                 standing.LastVisitMs = now;
 
                 std::vector<auction::Candidate> items;
@@ -1812,19 +1933,23 @@ int main(int argc, char** argv)
                             book->Ends[botGuid].push_back(nowMs() + std::uint64_t(listing.RunMinutes) * 60000u);
                             book->Standing[botGuid].Attempts[listing.ItemGuid] = listing.Attempt;
                             items.erase(listing.ItemGuid);
-                            std::cerr << "forever-bots: auction: bot " << botGuid << " listed item " << listing.ItemGuid << " for " << listing.Bid
-                                      << " copper (buyout " << listing.Buyout << ")\n";
+                            std::cerr << "forever-bots: " << auction::ListedLine(botGuid, listing, 1) << "\n";
                             return;
                         }
+                        std::cerr << "forever-bots: " << auction::ListRefusedLine(botGuid, listing, reply.reason()) << "\n";
                         // A refusal for the place or the money is tried again on a later visit; a refusal about the item drops it.
                         if (auction::ClassifyListFailure(reply.reason()) == auction::ListFailure::Skip)
                             items.erase(listing.ItemGuid);
                     });
                 }
+                buyVisit(bot, standing);
             }
         });
         std::cerr << "forever-bots: auction house is on: a listing visit every " << settings.Auction.EveryMs / 1000 << " s per bot, at most "
                   << settings.Auction.PerVisit << " items per visit\n";
+        if (settings.Auction.BuyEnabled)
+            std::cerr << "forever-bots: auction buying is on: an upgrade browse (one equipment slot) every " << settings.Auction.EveryMs / 1000
+                      << " s per bot, a purchase costs at most " << settings.Auction.BuyMaxPct << " percent of the money above the reserve\n";
     }
     if (settings.Errand.Enabled && !scenarioOn)
     {
@@ -1848,8 +1973,9 @@ int main(int argc, char** argv)
             auto feed = std::make_shared<ErrandFeed>();
             extras.Errand = feed;
             auto scheduler = std::make_shared<errand::Scheduler>(settings.Errand);
+            auto journal = std::make_shared<errand::Journal>(errand::CityName); // the event lines (errand_policy.h)
             std::shared_ptr<CommandQueue> queue = commands;
-            client.AddTimer(kErrandInterval, [feed, scheduler, trainers, queue, book, &settings]
+            client.AddTimer(kErrandInterval, [feed, scheduler, journal, trainers, queue, book, &settings]
             {
                 std::uint64_t const now = nowMs();
                 std::vector<ErrandBot> list;
@@ -1862,7 +1988,11 @@ int main(int argc, char** argv)
                     fedAt = feed->AtMs;
                 }
                 for (auto const& [guid, outcome] : outcomes)
+                {
                     scheduler->Finish(guid, now); // done or failed: the trip is over either way
+                    if (auto const line = journal->OnEnd(guid, errand::EndReason::kDone, outcome == ErrandOutcome::kFailed, now))
+                        std::cerr << "forever-bots: event " << *line << "\n";
+                }
                 if (fedAt == 0 || now - fedAt > kPresenceStaleMs)
                     return;
 
@@ -1902,6 +2032,11 @@ int main(int argc, char** argv)
                 }
 
                 errand::Decisions const decisions = scheduler->Tick(now, bots);
+                for (errand::End const& end : decisions.Ends) // before the starts: a bot may start again in the same tick
+                {
+                    if (auto const line = journal->OnEnd(end.Guid, end.Why, false, now))
+                        std::cerr << "forever-bots: event " << *line << "\n";
+                }
                 std::vector<CommandQueue::ErrandItem> items;
                 for (errand::End const& end : decisions.Ends)
                 {
@@ -1925,6 +2060,7 @@ int main(int argc, char** argv)
                         item.Order.Auction = true;
                         items.push_back(item);
                         std::cerr << "forever-bots: errand: bot " << start.Guid << " to the auctioneer (city " << start.City << ")\n";
+                        std::cerr << "forever-bots: event " << journal->OnStart(start, now) << "\n";
                         continue;
                     }
                     auto const pick = errand::ChooseTrainer(*trainers, bot.Side, bot.Skill, start.City, bot.Map, bot.X, bot.Y, bot.Z);
@@ -1939,6 +2075,7 @@ int main(int argc, char** argv)
                     item.Order.Entry = trainer.Entry;
                     items.push_back(item);
                     std::cerr << "forever-bots: errand: bot " << start.Guid << " to " << trainer.Name << " (" << trainer.Subname << ") in city " << start.City << "\n";
+                    std::cerr << "forever-bots: event " << journal->OnStart(start, now) << "\n";
                 }
                 if (!items.empty() && queue)
                 {
@@ -1947,7 +2084,9 @@ int main(int argc, char** argv)
                         queue->Errands.push_back(std::move(item));
                 }
                 for (errand::End const& end : decisions.Ends)
+                {
                     std::cerr << "forever-bots: errand: bot " << end.Guid << " ended (reason " << int(end.Why) << ")\n";
+                }
             });
             std::cerr << "forever-bots: town errands are on: a check every " << kErrandInterval.count() / 1000 << " s\n";
         }
@@ -1963,6 +2102,11 @@ int main(int argc, char** argv)
         policyOptions.Crafting = false;
         policyOptions.ServiceEveryMs = 0;
         policyOptions.AutoGearing = false;
+        // 40-man raid support (doc 108): a raid scenario's roster is one raid group of 8 subgroups, not a flat party (bot_policy.cpp's
+        // party-formation already cuts one party of PartySize bots regardless of size; Raid only changes how that one party is
+        // handled once formed). settings.Scenarios front is used the same way policyOptions.PartySize already is above, since a raid
+        // runs on its own schedule (doc 108), never mixed into the dungeon list.
+        policyOptions.Raid = settings.Scenarios.empty() ? false : settings.Scenarios.front().Raid;
         for (ScenarioSettings const& scenario : settings.Scenarios)
         {
             PolicyOptions::ScenarioRoute route;
@@ -1978,6 +2122,7 @@ int main(int argc, char** argv)
             ScenarioPlan plan;
             plan.Name = scenario.Name;
             plan.RosterSize = std::uint32_t(scenario.Roster.size());
+            plan.Raid = scenario.Raid;
             plan.EntryMap = static_cast<std::uint32_t>(scenario.Entry[0]);
             plan.Entry = { scenario.Entry[1], scenario.Entry[2], scenario.Entry[3] };
             for (auto const& point : scenario.Route)
@@ -1985,8 +2130,15 @@ int main(int argc, char** argv)
             plan.DurationMs = std::uint64_t(scenario.DurationSec) * 1000;
             plan.Gear = scenario.Gear;
             plan.Supplies = scenario.Supplies;
+            plan.ClassSupplies = scenario.ClassSupplies;
+            plan.ClassQuests = scenario.ClassQuests;
+            plan.AmmoCount = scenario.Ammo;
             plan.Bosses = scenario.Bosses;
             plan.ClassOf = policyOptions.ClassOf;
+            plan.RaceOf = policyOptions.RaceOf;
+            plan.TameEnabled = scenario.HasTameSpot;
+            plan.TameMap = static_cast<std::uint32_t>(scenario.TameSpot[0]);
+            plan.TameSpot = { scenario.TameSpot[1], scenario.TameSpot[2], scenario.TameSpot[3] };
             plan.WipeRecovery = scenario.WipeRecovery;
             plan.WipeRecoveryMs = std::uint64_t(scenario.WipeRecoverySec) * 1000;
             plan.RequireBosses = scenario.RequireBosses;

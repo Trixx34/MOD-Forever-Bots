@@ -30,7 +30,7 @@
     { "x": 133.1, "y": 16.5, "z": -27.0 },
     { "x": 133.1, "y": 38.9, "z": -33.9 },
     { "x": 154.1, "y": 42.9, "z": -34.7 },
-    { "x": 160.1, "y": 45.7, "z": -34.8, "boss": 1720 },  // boss: Bruegal Ironknuckle
+    { "x": 160.1, "y": 45.7, "z": -34.8 },
     { "x": 134.9, "y": 45.1, "z": -34.7 },
     { "x": 137.1, "y": 62.7, "z": -33.9 },
     { "x": 145.1, "y": 91.7, "z": -33.9 },
@@ -55,12 +55,6 @@
       // Targorr the Dread (creature entry 1696)
       "entry": 1696,
       "name": "Targorr the Dread",
-      "strategy": {}
-    },
-    {
-      // Bruegal Ironknuckle (creature entry 1720)
-      "entry": 1720,
-      "name": "Bruegal Ironknuckle",
       "strategy": {}
     },
     {

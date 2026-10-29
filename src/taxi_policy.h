@@ -5,6 +5,8 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
+#include <vector>
 
 namespace taxi {
 
@@ -42,5 +44,59 @@ enum class Move : std::uint8_t
 // just sent may still be on its way.
 Move Decide(Settings const& settings, Facts const& facts, float destX, float destY, std::uint64_t nowMs, std::uint64_t blockedUntilMs,
             std::uint64_t waitUntilMs);
+
+
+// ---- the journal lines (OnEvent text, key=value; the "taxi:" line keeps its keys and order, new keys are appended) ----
+
+// A flight that was ordered and has not ended yet. Zero OrderedMs: none.
+struct Flight
+{
+    std::uint64_t OrderedMs = 0;
+    std::uint64_t TookOffMs = 0;                // first time the bot was seen in flight (0: not yet)
+    float DestX = 0.0f;
+    float DestY = 0.0f;
+    std::uint64_t Master = 0;                   // guid of the flight master the order named
+    std::string Place;                          // the city the destination lies in (PlaceName), empty: unknown
+};
+
+enum class Progress : std::uint8_t
+{
+    None,           // nothing to say
+    Landed,         // was in flight and is not any more
+    NeverStarted,   // no flight showed within WaitMs of the order
+    TooLong         // in flight for longer than MaxFlightMs
+};
+
+constexpr std::uint64_t kMaxFlightMs = 1800000;  // 30 minutes: longer than any flight; then the flight is written off
+
+// Advances `flight` with what the snapshot shows now and says whether it ended (the caller then clears it). Call once per tick per bot.
+Progress Track(Flight& flight, bool inFlight, std::uint64_t nowMs, std::uint64_t waitMs, std::uint64_t maxFlightMs = kMaxFlightMs);
+
+// Whole seconds from `fromMs` to `toMs` (0 when toMs is earlier).
+std::uint64_t Seconds(std::uint64_t fromMs, std::uint64_t toMs);
+
+// A named spot on a map (a capital's centre), for naming where a flight goes. The module has no flight-point table of its own, only the trainer table.
+struct Place
+{
+    std::string Name;
+    std::uint32_t Map = 0;
+    float X = 0.0f;
+    float Y = 0.0f;
+};
+
+constexpr float kPlaceMaxYards = 800.0f;        // a destination farther than this from every place is "unknown"
+
+// The name of the nearest place on `map` within `maxYards` of (x, y), else "unknown".
+std::string PlaceName(std::vector<Place> const& places, std::uint32_t map, float x, float y, float maxYards = kPlaceMaxYards);
+
+// "taxi: bot=G level=L map=M walk=D" and the appended keys " to_x=X to_y=Y master=GUID city=NAME" (city is "unknown" when Flight::Place is empty).
+// The landed and timeout lines end with the same " city=NAME".
+std::string OrderLine(std::uint64_t bot, std::uint32_t level, std::uint32_t map, int walkYards, Flight const& flight);
+// "taxi_landed: bot=G map=M x=X y=Y to_x=DX to_y=DY took_s=N" (took_s counts from the order).
+std::string LandedLine(std::uint64_t bot, std::uint32_t map, float x, float y, Flight const& flight, std::uint64_t nowMs);
+// "taxi_timeout: bot=G map=M reason=not_started|too_long waited_s=N"
+std::string TimeoutLine(std::uint64_t bot, std::uint32_t map, Progress why, Flight const& flight, std::uint64_t nowMs);
+// "taxi_refused: bot=G map=M status=NAME" (the core refused the order; the bot walks)
+std::string RefusedLine(std::uint64_t bot, std::uint32_t map, char const* status);
 
 } // namespace taxi

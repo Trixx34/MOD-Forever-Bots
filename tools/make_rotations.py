@@ -58,7 +58,7 @@ def resolve(cls_spells, token, warnings, where):
     if not ids:
         warnings.append(f"{where}: no spell named '{token}' for this class in the dump")
         return None, None, None
-    rank1 = min(ids)
+    rank1 = min(ids, key=lambda sid: (ids[sid], sid))   # the rank learned first; a later rank may carry a lower id (Consecration 26573 at 20, 20116 at 30)
     return rank1, ids[rank1], sorted(ids)
 
 
@@ -74,6 +74,7 @@ def main():
     out = ["# Rotations. Made by tools/make_rotations.py from the spec and the core's ability dump. Format: src/combat_rotation.h"]
     warnings = []
     cls = 0
+    spec_key = ""        # the spec of the current block (class N spec KEY); empty: the class default
     pending = []          # the records of the current class, resolved at its end
     supersede = []        # (old name, new name)
 
@@ -82,7 +83,7 @@ def main():
         if cls == 0:
             return
         out.append("")
-        out.append(f"class {cls}")
+        out.append(f"class {cls}" + (f" spec {spec_key}" if spec_key else ""))
         levels = {}
         for kind, tokens, name_token in pending:
             sid, level, ranks = resolve(spells.get(cls, {}), name_token, warnings, f"class {cls}")
@@ -114,6 +115,7 @@ def main():
             if words[0] == "class":
                 flush()
                 cls = int(words[1])
+                spec_key = words[3] if len(words) == 4 and words[2] == "spec" else ""
                 continue
             if words[0] == "supersede" and len(words) == 4 and words[2] == "by":
                 supersede.append((words[1], words[3]))

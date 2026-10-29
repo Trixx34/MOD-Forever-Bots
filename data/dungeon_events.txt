@@ -38,3 +38,17 @@ use 16398 -107.6 -659.7 7.2 item 5397
 wait 4
 timeout 150
 end
+
+# Shadowfang Keep (map 33). The Courtyard Door 18895 (-242.6 2159.0 90.6), just past Rethilgore's room, blocks the rest of the dungeon. In classic play a
+# caged prisoner (creature 3849 Deathstalker Adamant or 3850 Sorcerer Ashcrombe, both spawned in this fork right by Rethilgore's room) is freed and runs to
+# open it; the world database's own lever for it (gameobject 101812, next to the door) is unwired to the door in this fork (checked 2026-10-27: its
+# smart_scripts row is a placeholder commented "no script"), and the prisoners' gossip does not run a working escape on this core either. The bots module
+# has no "talk to an NPC" step, and building one is a core and SDK change, not a one-file fix (doc/dungeon-events.md). The door is an ordinary door
+# (gameobject_template type 0, like the Deadmines' Heavy Doors above, which open the same way with no lever at all), with no item or quest lock recorded
+# against it, so it is opened directly here, the way a player would click it open by hand if the lever did not work.
+
+event 33 courtyard-door Courtyard Door (used directly: the escape script that should open it is unwired in this fork's world database)
+near -242.6 2159.0 90.6 30
+use 18895 -242.6 2159.0 90.6
+end
+

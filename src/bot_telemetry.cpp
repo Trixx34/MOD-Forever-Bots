@@ -1,6 +1,9 @@
 #include "bot_telemetry.h"
 
+#include <algorithm>
 #include <cmath>
+#include <cstring>
+#include <set>
 #include <span>
 #include <sstream>
 
@@ -32,7 +35,7 @@ std::string Field(std::string text)
 char const* BotTelemetry::Header()
 {
     return "time_ms,kind,bot,level,health_pct,power_pct,in_fight,fights,targets_gone,deaths,casts_applied,refusals,"
-           "stuck_episodes,longest_fight_ms,health_lost,detail";
+           "stuck_episodes,longest_fight_ms,health_lost,detail,class,race,copper";
 }
 
 void BotTelemetry::Observe(WorldTickSnapshotView const& view, std::uint64_t nowMs)
@@ -96,6 +99,8 @@ void BotTelemetry::Observe(WorldTickSnapshotView const& view, std::uint64_t nowM
             record.CorpseY = bot.corpse_y;
             record.CorpseZ = bot.corpse_z;
         }
+
+        CheckQuests(record, bot, nowMs);
 
         if (bot.level != 0 && bot.level != record.Level)
         {
@@ -207,6 +212,14 @@ void BotTelemetry::EndFight(Record& record, BotSnapshot const& bot, std::uint64_
     std::ostringstream detail;
     detail << "reason " << reason << " target " << record.Target << " duration_ms " << duration << " health_lost " << lost
            << " lost " << LostReasonName(bot.last_target_lost_reason);
+    // A stuck episode ends with the fight as well: without a line for it, an episode that ended with the target killed (a long fight in which a
+    // healthy bot stood still, 27 of the 36 "never unstuck" episodes of the 2026-10-28 soak) was counted as never recovered.
+    if (record.Stuck)
+    {
+        std::ostringstream ended;
+        ended << "fight_end " << reason << " lost " << LostReasonName(bot.last_target_lost_reason);
+        Write("unstuck", bot, record, nowMs, ended.str());
+    }
     record.Target = 0;
     record.Stuck = false;
     Write("fight_end", bot, record, nowMs, detail.str());
@@ -235,8 +248,43 @@ void BotTelemetry::CheckStuck(Record& record, BotSnapshot const& bot, std::uint6
         record.Stuck = true;
         record.StuckEpisodes++;
         std::ostringstream detail;
-        detail << "no change for " << (nowMs - record.LastChangeMs) << " ms against target " << record.Target;
+        // The position goes after the old text, in the same form as the death line, so a stuck cluster can be put on a map (the soak of
+        // 2026-10-28 had to estimate it from the pull events).
+        detail << "no change for " << (nowMs - record.LastChangeMs) << " ms against target " << record.Target << " map=" << bot.map_id
+               << " x=" << std::lround(bot.pos_x) << " y=" << std::lround(bot.pos_y) << " z=" << std::lround(bot.pos_z);
         Write("stuck", bot, record, nowMs, detail.str());
+    }
+}
+
+// A quest is handed in when it is complete (status 2) and then leaves the log; the planner does the same to mark it done. The
+// quest is written once, when it leaves: a complete quest seen on many snapshots is one entry, and a quest taken again later
+// is counted again. A quest done before the module started (or during a restart's gap) never shows as complete here, so it is
+// not counted.
+void BotTelemetry::CheckQuests(Record& record, BotSnapshot const& bot, std::uint64_t nowMs)
+{
+    std::set<std::uint32_t> inLog;
+    std::size_t const count = std::min<std::size_t>(bot.quest_count, forever_module::kMaxQuestLog);
+    for (std::size_t i = 0; i < count; ++i)
+    {
+        forever_module::QuestEntry const& entry = bot.quests[i];
+        if (entry.quest_id == 0)
+            continue;
+        inLog.insert(entry.quest_id);
+        if (entry.status == 2)
+            record.CompleteInLog.insert(entry.quest_id);
+    }
+
+    for (auto it = record.CompleteInLog.begin(); it != record.CompleteInLog.end();)
+    {
+        if (inLog.count(*it))
+        {
+            ++it;
+            continue;
+        }
+        std::ostringstream detail;
+        detail << "quest " << *it;
+        Write("quest_done", bot, record, nowMs, detail.str());
+        it = record.CompleteInLog.erase(it);
     }
 }
 
@@ -246,6 +294,9 @@ void BotTelemetry::Write(char const* kind, BotSnapshot const& bot, Record const&
     line << nowMs << ',' << kind << ',' << bot.guid << ',' << record.Level << ',' << Percent(bot.health, bot.max_health) << ','
          << Percent(bot.power, bot.max_power) << ',' << (record.Target != 0 ? 1 : 0) << ',' << record.Fights << ','
          << record.TargetsGone << ',' << record.Deaths << ',' << record.CastsApplied << ',' << record.Refusals << ','
-         << record.StuckEpisodes << ',' << record.LongestFightMs << ',' << record.HealthLost << ',' << Field(detail);
+         << record.StuckEpisodes << ',' << record.LongestFightMs << ',' << record.HealthLost << ',' << Field(detail) << ','
+         << (_options.ClassOf ? _options.ClassOf(bot.guid) : 0) << ',' << (_options.RaceOf ? _options.RaceOf(bot.guid) : 0) << ',';
+    if (std::strcmp(kind, "summary") == 0)
+        line << bot.copper;
     _sink(line.str());
 }

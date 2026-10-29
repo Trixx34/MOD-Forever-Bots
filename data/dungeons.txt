@@ -5,6 +5,14 @@
 # Made by tools/make_dungeons_from_db.py from the world database: the doors, the spawns and the bosses are real; the ORDER of each route is a
 # nearest-next guess (see the tool). None of these routes has been walked on a sim. Check each one and edit the `go` lines that are wrong.
 
+# OPEN ITEM (2026-10-29, docs/108-onyxia-raid-job.md): Onyxia's Lair (map 249, boss entry 10184) has NO block here and NO data/dungeons/249-onyxias-lair.json
+# yet. tools/make_dungeons_from_db.py now has an "onyxia" entry in its DUNGEONS dict (map 249, level 60, boss name "Onyxia"), but nobody has run that script
+# against the real world database for it, so there is no real entrance/spawn/route data to add to this file or to a JSON file. This file's own format has no
+# precedent for a "not yet walked" or "no data yet" dungeon block: every block below already has real entrance coordinates from the database, so a block
+# cannot honestly be added here until the generator is actually run. Do not hand-write a block for onyxia; run the generator with DB access first
+# (`make_dungeons_from_db.py world.sqlite --only onyxia`), then `tools/convert_dungeons.py --map 249` into data/dungeons/249-onyxias-lair.json, review it,
+# and only then should this file possibly gain a fallback block for it (or not, per the JSON-first precedence above).
+
 # The routes below were planned over the navmesh by tools/replan_dungeons.py (tools/mmap_check --plan): boss to boss along the walkable path, nearest boss first.
 # The order of the bosses is a guess (nearest first); the corners of the path are on the mesh. None of it has been walked by a bot party on a sim yet.
 
@@ -260,7 +268,7 @@ go 133.3 5.1 -25.4
 go 133.1 16.5 -27.0
 go 133.1 38.9 -33.9
 go 154.1 42.9 -34.7
-boss 1720 160.1 45.7 -34.8 Bruegal Ironknuckle
+go 160.1 45.7 -34.8
 go 134.9 45.1 -34.7
 go 137.1 62.7 -33.9
 go 145.1 91.7 -33.9

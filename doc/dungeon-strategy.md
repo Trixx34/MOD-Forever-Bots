@@ -104,9 +104,13 @@ The damage dealers of the party (not the tank and not the healer) fight the best
 nothing listed they assist the tank's target as before. The setting `ScenarioKillPriority` (a comma list) does the same from the config and wins over the file. It needs the
 `focus` tactic (below).
 
+Two summoners are built in (they do not need the tactic): the Deadmines Goblin Engineer (622) once a Remote-Controlled Golem (2520) is in view, and, since the Ragefire fix,
+the Searing Blade Warlock (11324) once its Voidwalker Minion (8996) is in view. Each is taken first by the damage dealers because the summoned creature goes away when its
+owner dies. The Warlock is taken from up to 35 yards from the tank's target (it stands back and casts), the engineer from the usual 12.
+
 ### Dungeon tactics (`Module.forever-bots.DungeonTactics`)
 
-A comma list of `focus`, `interrupt`, `heal`, `rest`, or `all` / `none` (default: none, until a sim run shows a gain). Each is a rule of a dungeon party that can be measured on its own:
+A comma list of `focus`, `interrupt`, `heal`, `rest`, `cc`, or `all` / `none` (default: none, until a sim run shows a gain). Each is a rule of a dungeon party that can be measured on its own:
 
 | Tactic | What it does |
 |---|---|
@@ -114,6 +118,7 @@ A comma list of `focus`, `interrupt`, `heal`, `rest`, or `all` / `none` (default
 | `interrupt` | a paladin, rogue, shaman or mage turns on a unit of the tank's pack that is casting, so its rotation's interrupt (Hammer of Justice, Kick, Earth Shock, Counterspell) fires; one bot at a time |
 | `heal` | a healer heals a party member below 75 % health (60 % without the tactic); the tank first, as before |
 | `rest` | the leader pulls the next pack only when every member has 90 % health and 80 % mana (80 / 60 without the tactic) |
+| `cc` | a rogue (Sap), mage (Polymorph) or warlock (Banish) holds one extra member of the tank's pack that nobody has engaged yet and that is not the dungeon's own `kill_priority`; one bot, one unit at a time, the same rule `interrupt` uses. Sap and Polymorph only affect a Humanoid; Banish only a Demon or Elemental; a pack with nothing of a type the party's classes can hold does nothing, not an error. Sap and Polymorph are learned well under either shipped dungeon's spawn level (Deadmines 23, Ragefire Chasm 18); Banish is not (it needs level 28) and today has no Demon or Elemental to use it on in either dungeon either -- kept for a later, higher-level dungeon |
 
 Always on, not a tactic: a dungeon party's dead wait 60 s for the healer before they release their spirit (20 s in other parties; 90 s before 0.31.0). The route leader also waits for every mana user of the party to have 80% mana (`route_hold why=mana`, 150 s at most).
 

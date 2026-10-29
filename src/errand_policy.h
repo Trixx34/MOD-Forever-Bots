@@ -8,7 +8,11 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
+#include <optional>
+#include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace errand {
@@ -100,6 +104,35 @@ private:
     std::unordered_map<std::uint64_t, Running> _active;
     std::unordered_map<std::uint64_t, std::uint64_t> _lastEndMs;
     std::vector<Record> _records;
+};
+
+// The journal lines for the errands (one per transition, "key=value" with no commas, logged as "forever-bots: event <line>"; the Grafana errand panels
+// count them). Remembers each errand's start so an end can say the city, the kind and how long it took. Pure: the module passes the time in.
+//   errand_start bot=<guid> city=<name> kind=train|auction
+//   errand_done bot=<guid> city=<name> kind=<kind> took_s=<n>
+//   errand_timeout bot=<guid> city=<name> kind=<kind> took_s=<n>
+//   errand_abandoned reason=called|unavailable|failed bot=<guid> city=<name> kind=<kind> took_s=<n>
+class Journal
+{
+public:
+    using CityName = std::function<std::string(std::uint32_t)>;
+
+    explicit Journal(CityName cityName) : _cityName(std::move(cityName)) {}
+
+    std::string OnStart(Start const& start, std::uint64_t nowMs);
+    // The end of an errand: the scheduler's End (time limit, called, unavailable) or a done/failed outcome from the walk. Empty when none was started here.
+    std::optional<std::string> OnEnd(std::uint64_t guid, EndReason why, bool failed, std::uint64_t nowMs);
+
+private:
+    struct Open
+    {
+        Kind What = Kind::kTrain;
+        std::uint32_t City = 0;
+        std::uint64_t StartMs = 0;
+    };
+
+    CityName _cityName;
+    std::unordered_map<std::uint64_t, Open> _open;
 };
 
 } // namespace errand

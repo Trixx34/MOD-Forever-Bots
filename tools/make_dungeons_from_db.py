@@ -25,11 +25,22 @@ DUNGEONS = {
     "wc": (43, "Wailing Caverns", 15, 25, ["Lady Anacondra", "Lord Cobrahn", "Kresh", "Lord Pythas", "Skum", "Lord Serpentis", "Verdan the Everliving", "Mutanus the Devourer"]),
     "dm": (36, "Deadmines", 18, 23, ["Rhahk'Zor", "Sneed's Shredder", "Gilnid", "Mr. Smite", "Cookie", "Captain Greenskin", "Edwin VanCleef"]),
     "sfk": (33, "Shadowfang Keep", 22, 30, ["Rethilgore", "Razorclaw the Butcher", "Baron Silverlaine", "Commander Springvale", "Odo the Blindwatcher", "Fenrus the Devourer", "Wolf Master Nandos", "Archmage Arugal"]),
-    "stockade": (34, "Stormwind Stockades", 24, 32, ["Targorr the Dread", "Kam Deepfury", "Hamhock", "Bazil Thredd", "Dextren Ward", "Bruegal Ironknuckle"]),
+    # Bruegal Ironknuckle (1720) is left out on purpose: rare spawn in a 15% spawn pool, absent from ~85% of instances, so requiring him ended runs bosses_missing.
+    "stockade": (34, "Stormwind Stockades", 24, 32, ["Targorr the Dread", "Kam Deepfury", "Hamhock", "Bazil Thredd", "Dextren Ward"]),
     "bfd": (48, "Blackfathom Deeps", 24, 32, ["Ghamoo-ra", "Lady Sarevess", "Gelihast", "Baron Aquanis", "Twilight Lord Kelris", "Old Serra'kis", "Aku'mai"]),
     "gnomer": (90, "Gnomeregan", 29, 38, ["Grubbis", "Viscous Fallout", "Electrocutioner 6000", "Crowd Pummeler 9-60", "Dark Iron Ambassador", "Mekgineer Thermaplugg"]),
     "rfk": (47, "Razorfen Kraul", 29, 38, ["Aggem Thorncurse", "Death Speaker Jargba", "Overlord Ramtusk", "Agathelos the Raging", "Charlga Razorflank"]),
     "rfd": (129, "Razorfen Downs", 37, 46, ["Tuten'kash", "Mordresh Fire Eye", "Glutton", "Ragglesnout", "Amnennar the Coldbringer"]),
+    # Onyxia's Lair (map 249), level 60 RAID (not a five-man): wired in 2026-10-29 per docs/108-onyxia-raid-job.md so that this script produces a correct
+    # generator INPUT for whoever next runs it with DB access. Boss found by name match against creature_template, same as every entry above: "Onyxia"
+    # is creature_template entry 10184 in the live world database (per the brief; not independently re-verified against a database from this sandbox,
+    # which has no DB access). NOT YET RUN: nobody has executed this script against the real world database for this entry, so there is no
+    # data/dungeons/249-onyxias-lair.json yet and none should be hand-written -- the entrance coordinates and spawn/route data below only exist once a
+    # session with real database access runs `make_dungeons_from_db.py world.sqlite --only onyxia > /tmp/onyxia.txt` and converts the result with
+    # `convert_dungeons.py`. The --roster default (ROSTER, a five-bot tank/healer/dps string) is almost certainly wrong for a 40-bot raid: Onyxia's
+    # file, once generated, needs its "roster"/roster-size handling redone to fit whatever raid-roster schema the parallel raid-support effort lands
+    # (see docs/108-onyxia-raid-job.md) -- this dungeon-data entry describes the encounter only; it does not implement raid grouping.
+    "onyxia": (249, "Onyxia's Lair", 60, 60, ["Onyxia"]),
 }
 ROSTER = "2:1,5:5,8:8,2:9,5:4"              # tank first, healer second: orc warrior, undead priest, troll mage, orc warlock, undead rogue
 STAGING = ("1", "1629", "-4373", "31")      # Orgrimmar, Valley of Strength

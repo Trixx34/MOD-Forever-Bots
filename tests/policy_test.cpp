@@ -1522,6 +1522,273 @@ void ACasterOfThePackIsTargetedForAnInterrupt()
     CHECK(targets(off, tankTarget.guid));
 }
 
+// The 2026-10-27 Ragefire Chasm soak: kMaxDungeonEngaged caps the pack-focus widening once the party is already fighting two distinct
+// hostiles, so it does not reach for a third, *unlisted* one nobody has engaged yet. It still reaches for any of the dungeon file's own
+// kill_priority entries whatever the count already engaged (the Searing Blade Warlock must still be reachable even with two lower-priority
+// trash already in the fight: a follow-up investigation found its "summon" is a one-time, out-of-combat cast, not a mid-fight resummon --
+// see TheVoidwalkerCompanionStaysReachablePastTheEngagementCapToo below for the actual fourth pack member this cap must also reach).
+void ADamageDealerDoesNotWidenPastTwoAlreadyEngagedHostiles()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.PartyCount = 1;
+    options.ClassOf = [](std::uint64_t guid) { return guid == 12 ? 1u : guid == 11 ? 8u : 5u; }; // bot 11 is the mage, 12 the warrior, the rest priests
+    options.KillPriority = { { 11324, 0 } }; // the Searing Blade Warlock only: the Cultist and an unlisted trash below are not in the list
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+
+    // The tank (12) is already fighting the Cultist, and a priest (13) is already fighting an unlisted trash (11999): two distinct hostiles engaged.
+    NearbyUnit cultist = Hostile(7, 2.0f, 100);
+    cultist.guid = MakeUnitRef(8, 11322, 7);
+    view.bots[2].in_combat = 1;
+    view.bots[2].threat_target_guid = cultist.guid;
+    NearbyUnit trash = Hostile(8, 6.0f, 100);
+    trash.guid = MakeUnitRef(8, 11999, 8);
+    view.bots[3].in_combat = 1;
+    view.bots[3].threat_target_guid = trash.guid;
+    // A second unlisted trash stands within kFocusPackYards of the tank's target, but nobody has engaged it yet: not reachable past the cap.
+    NearbyUnit unlistedAdd = Hostile(9, 10.0f, 100);
+    unlistedAdd.guid = MakeUnitRef(8, 12000, 9);
+    // The Warlock (kill_priority rank 0) is in the same spot, also unengaged: it must stay reachable regardless of the cap.
+    NearbyUnit warlock = Hostile(10, 10.0f, 100);
+    warlock.guid = MakeUnitRef(8, 11324, 10);
+    AddNearby(view, 1, cultist);
+    AddNearby(view, 1, trash);
+    AddNearby(view, 1, unlistedAdd);
+    AddNearby(view, 1, warlock);
+
+    bool onUnlistedAdd = false, onWarlock = false, onTrash = false;
+    for (std::uint64_t at = 0; at < 6000; at += 500)
+        for (BotAction const& action : policy.Decide(view, at))
+            if (action.bot_guid == 11)
+            {
+                onUnlistedAdd = onUnlistedAdd || action.target_guid == unlistedAdd.guid;
+                onWarlock = onWarlock || action.target_guid == warlock.guid;
+                onTrash = onTrash || action.target_guid == trash.guid;
+            }
+    CHECK(!onUnlistedAdd); // an unlisted hostile nobody has engaged yet is not pulled in once two others already are
+    CHECK(onWarlock);      // the dungeon's own kill_priority still reaches past the cap, whatever is already engaged
+    CHECK(!onTrash);       // (the mage prefers the Warlock over re-targeting the already engaged, unlisted trash: rank 0 beats rank 1000)
+}
+
+// 2026-10-27 follow-up to the test above: the Searing Blade Warlock's "Summon Voidwalker" turned out to be SmartAI event UPDATE_OOC with no
+// repeat timer (this fork's own smart_scripts: entryorguid 11324, a one-time out-of-combat cast, spell 12746) -- it fires once before the party
+// ever reaches the pack, not as a resummon mid-fight, and entry 8996 (Voidwalker Minion) has no spawn of its own anywhere in the world
+// database. The Voidwalker is really a fourth, passive pack member that already exists when the party arrives and simply joins the melee late
+// (the 2026-10-26 soak's combat log: the tank fought the Cultist and the Enforcer for 30+ seconds before the Voidwalker engaged too, and died 3
+// seconds later). 389-ragefire-chasm.json now lists 8996 in kill_priority for exactly the reason the test above exists: without it, a late-
+// joining, unengaged Voidwalker is just as "unlisted" as any other trash once two pack members are already fought, and kMaxDungeonEngaged would
+// keep the party from ever turning on it.
+void TheVoidwalkerCompanionStaysReachablePastTheEngagementCapToo()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.PartyCount = 1;
+    options.ClassOf = [](std::uint64_t guid) { return guid == 12 ? 1u : guid == 11 ? 8u : 5u; }; // bot 11 is the mage, 12 the warrior, the rest priests
+    options.KillPriority = { { 11324, 0 }, { 8996, 1 }, { 11322, 2 }, { 11323, 3 } }; // the shipped dungeon file's order
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+
+    // The party is already fighting the Cultist and the Enforcer (two distinct hostiles engaged, the cap), the same as a tank-and-two-adds
+    // fight already 30+ seconds in.
+    NearbyUnit cultist = Hostile(7, 2.0f, 100);
+    cultist.guid = MakeUnitRef(8, 11322, 7);
+    view.bots[2].in_combat = 1;
+    view.bots[2].threat_target_guid = cultist.guid;
+    NearbyUnit enforcer = Hostile(8, 6.0f, 100);
+    enforcer.guid = MakeUnitRef(8, 11323, 8);
+    view.bots[3].in_combat = 1;
+    view.bots[3].threat_target_guid = enforcer.guid;
+    // The Voidwalker joins late: unengaged, standing near the pack, the same as the soak's combat log.
+    NearbyUnit voidwalker = Hostile(9, 10.0f, 100);
+    voidwalker.guid = MakeUnitRef(8, 8996, 9);
+    // An unlisted trash in the same spot must still not be reached, same as the test above: the cap is not simply lifted outright.
+    NearbyUnit unlistedAdd = Hostile(10, 10.0f, 100);
+    unlistedAdd.guid = MakeUnitRef(8, 12001, 10);
+    AddNearby(view, 1, cultist);
+    AddNearby(view, 1, enforcer);
+    AddNearby(view, 1, voidwalker);
+    AddNearby(view, 1, unlistedAdd);
+
+    bool onVoidwalker = false, onUnlistedAdd = false;
+    for (std::uint64_t at = 0; at < 6000; at += 500)
+        for (BotAction const& action : policy.Decide(view, at))
+            if (action.bot_guid == 11)
+            {
+                onVoidwalker = onVoidwalker || action.target_guid == voidwalker.guid;
+                onUnlistedAdd = onUnlistedAdd || action.target_guid == unlistedAdd.guid;
+            }
+    CHECK(onVoidwalker);    // the Voidwalker (kill_priority rank 1) is reached past the cap once it joins, same as the Warlock
+    CHECK(!onUnlistedAdd);  // an unrelated unlisted hostile in the same spot is still not pulled in: only the dungeon's own list is exempt
+}
+
+// Ragefire Chasm, the Searing Blade camp (2026-10-28 soak data): the Voidwalker Minion (8996) is a level 47 guardian of the Searing Blade Warlock (11324) and
+// is unsummoned when the Warlock dies. The Warlock stands about 25 yards behind the tank's target, past the 12 yard pack reach, so the damage dealers
+// used to turn on the Voidwalker (kill_priority rank 1) and never on the Warlock. With the Voidwalker in view, the Warlock is taken first from up to 35
+// yards; without a Voidwalker nothing changes (a distant Warlock is left alone).
+void ADamageDealerTakesTheWarlockWhoseVoidwalkerIsUp()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.PartyCount = 1;
+    options.ClassOf = [](std::uint64_t guid) { return guid == 12 ? 1u : guid == 11 ? 8u : 5u; }; // bot 11 is the mage, 12 the warrior, the rest priests
+    options.TacticInterrupt = false;
+    options.KillPriority = { { 11324, 0 }, { 8996, 1 }, { 11322, 2 }, { 11323, 3 } }; // the shipped dungeon file's order
+    NearbyUnit enforcer = Hostile(7, 2.0f, 100);
+    enforcer.guid = MakeUnitRef(8, 11323, 7);         // the tank's own target
+    NearbyUnit voidwalker = Hostile(8, 5.0f, 100);
+    voidwalker.guid = MakeUnitRef(8, 8996, 8);        // joined the melee at the tank
+    NearbyUnit warlock = Hostile(9, 27.0f, 100);
+    warlock.guid = MakeUnitRef(8, 11324, 9);          // behind, outside the 12 yard pack reach
+    auto const run = [&](bool withVoidwalker, bool tacticFocus, std::uint64_t& onWarlock, std::uint64_t& onEnforcer, std::uint64_t& onVoidwalker)
+    {
+        options.TacticFocus = tacticFocus;
+        BotPolicy policy(options);
+        policy.SetRouteActive(true);
+        WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+        view.bots[2].in_combat = 1;
+        view.bots[2].threat_target_guid = enforcer.guid;
+        AddNearby(view, 1, enforcer);
+        if (withVoidwalker)
+            AddNearby(view, 1, voidwalker);
+        AddNearby(view, 1, warlock);
+        onWarlock = onEnforcer = onVoidwalker = 0;
+        for (std::uint64_t at = 0; at < 6000; at += 500)
+            for (BotAction const& action : policy.Decide(view, at))
+                if (action.bot_guid == 11)
+                {
+                    onWarlock += action.target_guid == warlock.guid;
+                    onEnforcer += action.target_guid == enforcer.guid;
+                    onVoidwalker += action.target_guid == voidwalker.guid;
+                }
+    };
+    std::uint64_t onWarlock = 0, onEnforcer = 0, onVoidwalker = 0;
+    run(true, true, onWarlock, onEnforcer, onVoidwalker);
+    CHECK(onWarlock > 0);       // the Warlock first, 25 yards from the tank's target
+    CHECK(onVoidwalker == 0);   // not the Voidwalker (rank 1) that stood nearer
+    CHECK(onEnforcer == 0);
+    run(true, false, onWarlock, onEnforcer, onVoidwalker); // not a tactic: it holds with focus off, as the golem's engineer does
+    CHECK(onWarlock > 0);
+    run(false, true, onWarlock, onEnforcer, onVoidwalker); // no Voidwalker up: the distant Warlock is outside the pack reach as before
+    CHECK(onWarlock == 0);
+    CHECK(onEnforcer > 0);
+}
+
+// Cc: a mage (Polymorph, spell 118) holds one extra, unengaged Humanoid member of the tank's pack -- not the tank's own target,
+// which is already engaged.
+void CcHoldsAnUnengagedHumanoidPackMember()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.PartyCount = 1;
+    options.ClassOf = [](std::uint64_t guid) { return guid == 12 ? 1u : guid == 11 ? 8u : 5u; };
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    NearbyUnit tankTarget = Hostile(7, 2.0f, 100);
+    tankTarget.guid = MakeUnitRef(8, 598, 7);   // the tank's own target, already engaged: never a cc candidate
+    NearbyUnit evoker = Hostile(8, 8.0f, 100);
+    evoker.guid = MakeUnitRef(8, 1729, 8);      // a Defias Evoker of the same pack: Humanoid, Polymorph can hold it
+    view.bots[2].in_combat = 1;
+    view.bots[2].threat_target_guid = tankTarget.guid;
+    AddNearby(view, 1, tankTarget);
+    AddNearby(view, 1, evoker);
+    bool onEvoker = false, onTankTarget = false;
+    for (std::uint64_t at = 0; at < 6000; at += 500)
+        for (BotAction const& action : policy.Decide(view, at))
+            if (action.bot_guid == 11 && action.type == ActionType::kCastSpell && action.spell_id == 118)
+            {
+                onEvoker = onEvoker || action.target_guid == evoker.guid;
+                onTankTarget = onTankTarget || action.target_guid == tankTarget.guid;
+            }
+    CHECK(onEvoker);
+    CHECK(!onTankTarget);
+}
+
+// Cc: a creature type with no spell to hold it (Mechanical: the Remote-Controlled Golem, 2520) is never tried -- the policy does
+// nothing instead of risking a cast the server would refuse (and recast every tick for ever).
+void CcDoesNotHoldACreatureTypeItHasNoSpellFor()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.PartyCount = 1;
+    options.ClassOf = [](std::uint64_t guid) { return guid == 12 ? 1u : guid == 11 ? 8u : 5u; };
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    NearbyUnit tankTarget = Hostile(7, 2.0f, 100);
+    tankTarget.guid = MakeUnitRef(8, 622, 7);  // Goblin Engineer, Humanoid: the tank's own target, already engaged
+    NearbyUnit golem = Hostile(8, 8.0f, 100);
+    golem.guid = MakeUnitRef(8, 2520, 8);      // Remote-Controlled Golem: Mechanical, Polymorph cannot hold it
+    view.bots[2].in_combat = 1;
+    view.bots[2].threat_target_guid = tankTarget.guid;
+    AddNearby(view, 1, tankTarget);
+    AddNearby(view, 1, golem);
+    bool anyCc = false;
+    for (std::uint64_t at = 0; at < 6000; at += 500)
+        for (BotAction const& action : policy.Decide(view, at))
+            if (action.bot_guid == 11 && action.type == ActionType::kCastSpell && action.spell_id == 118)
+                anyCc = true;
+    CHECK(!anyCc);
+}
+
+// Cc: the dungeon's own kill_priority unit is never held -- the point of cc is one fewer attacker, not a delay on the one the
+// party means to kill first.
+void CcNeverHoldsTheKillPriorityTarget()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.PartyCount = 1;
+    options.ClassOf = [](std::uint64_t guid) { return guid == 12 ? 1u : guid == 11 ? 8u : 5u; };
+    options.KillPriority = { { 1729, 0 } }; // the Defias Evoker is the one to kill first, not to hold
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    NearbyUnit tankTarget = Hostile(7, 2.0f, 100);
+    tankTarget.guid = MakeUnitRef(8, 598, 7);
+    NearbyUnit evoker = Hostile(8, 8.0f, 100);
+    evoker.guid = MakeUnitRef(8, 1729, 8); // Humanoid, and otherwise eligible, but it is the kill_priority unit
+    view.bots[2].in_combat = 1;
+    view.bots[2].threat_target_guid = tankTarget.guid;
+    AddNearby(view, 1, tankTarget);
+    AddNearby(view, 1, evoker);
+    bool onEvoker = false;
+    for (std::uint64_t at = 0; at < 6000; at += 500)
+        for (BotAction const& action : policy.Decide(view, at))
+            if (action.bot_guid == 11 && action.type == ActionType::kCastSpell && action.spell_id == 118 && action.target_guid == evoker.guid)
+                onEvoker = true;
+    CHECK(!onEvoker);
+}
+
+// Cc: with the tactic off (the default when DungeonTactics does not list cc) no hold is attempted, whatever the pack holds.
+void CcTacticOffMeansNoHold()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.PartyCount = 1;
+    options.ClassOf = [](std::uint64_t guid) { return guid == 12 ? 1u : guid == 11 ? 8u : 5u; };
+    options.TacticCc = false;
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    NearbyUnit tankTarget = Hostile(7, 2.0f, 100);
+    tankTarget.guid = MakeUnitRef(8, 598, 7);
+    NearbyUnit evoker = Hostile(8, 8.0f, 100);
+    evoker.guid = MakeUnitRef(8, 1729, 8);
+    view.bots[2].in_combat = 1;
+    view.bots[2].threat_target_guid = tankTarget.guid;
+    AddNearby(view, 1, tankTarget);
+    AddNearby(view, 1, evoker);
+    bool anyCc = false;
+    for (std::uint64_t at = 0; at < 6000; at += 500)
+        for (BotAction const& action : policy.Decide(view, at))
+            if (action.bot_guid == 11 && action.type == ActionType::kCastSpell && action.spell_id == 118)
+                anyCc = true;
+    CHECK(!anyCc);
+}
+
 void NoPartyActionsInCombat()
 {
     WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
@@ -2636,15 +2903,15 @@ void AMemberThatLostItsLeaderIsPutNextToIt()
     view.bots[0].pos_x = -200.0f;                                     // bot 10 is far away
     CHECK(!TeleportOf(policy.Decide(view, 1000), 10).has_value());    // not at once
     CHECK(!TeleportOf(policy.Decide(view, 10000), 10).has_value());
-    std::optional<BotAction> back = TeleportOf(policy.Decide(view, 22000), 10);
+    std::optional<BotAction> back = TeleportOf(policy.Decide(view, 32000), 10);      // after kLostLeaderMs (30 s)
     CHECK(back.has_value() && back->dest_x == -3.0f);                 // next to the leader (3 yards behind it)
-    CHECK(!TeleportOf(policy.Decide(view, 23000), 10).has_value());   // and not again at once
+    CHECK(!TeleportOf(policy.Decide(view, 33000), 10).has_value());   // and not again at once
     // A member stuck past the distance the leader waits at (30 yards), but not far, is put back too: the leader would wait for it for good.
     BotPolicy near(options);
     near.SetRouteActive(true);
     view.bots[0].pos_x = -45.0f;
     near.Decide(view, 1000);
-    std::optional<BotAction> close = TeleportOf(near.Decide(view, 22000), 10);
+    std::optional<BotAction> close = TeleportOf(near.Decide(view, 32000), 10);
     CHECK(close.has_value() && close->dest_x == -3.0f);
     // Off, nothing happens.
     PolicyOptions off = options;
@@ -2691,6 +2958,58 @@ void ALeaderRevivedAtTheEntranceGoesToItsParty()
     CHECK(!member.has_value());                                       // the members are not sent to the entrance
 }
 
+// The Stockade's revived tank (2026-10-28 sim: 31 of 96 tank deaths came within 120 s of the same tank's last one, 24 of 60 leader_recover teleports ended in its death):
+// a leader revived at the entrance at half health rests there until it is fit to walk (80 %), at most two minutes, and the members deep in the dungeon do not walk back to it.
+void ARevivedLeaderRestsAtTheEntranceBeforeItGoesToItsParty()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.ClassOf = WarriorLeads;
+    options.DungeonTeleport = true;
+    options.Route = { Point{ 220.0f, 0.0f, 0.0f }, Point{ 260.0f, 0.0f, 0.0f } };
+    PolicyOptions::DungeonRoute dungeon;
+    dungeon.HasEntry = true;
+    dungeon.Entry = Point{ 0.0f, 0.0f, 0.0f };
+    options.DungeonsByMap[36] = dungeon;
+    std::vector<std::string> events;
+    options.OnEvent = [&events](std::string const& line) { events.push_back(line); };
+    auto const hurtLeaderView = [](std::uint32_t health)
+    {
+        WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+        for (BotSnapshot& bot : view.bots)
+        {
+            bot.map_id = 36;
+            bot.pos_x = 200.0f;                                       // the party, deep in
+        }
+        view.bots[2].pos_x = 2.0f;                                    // the leader (12), just revived at the entrance
+        view.bots[2].health = health;                                 // of 1000
+        return view;
+    };
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    WorldTickSnapshotView hurt = hurtLeaderView(490);
+    bool followedTheLeader = false;
+    for (std::uint64_t now : { 1000ull, 5000ull, 30000ull, 100000ull })
+    {
+        std::vector<BotAction> const actions = policy.Decide(hurt, now);
+        CHECK(!TeleportOf(actions, 12).has_value());                  // it rests at the entrance first
+        for (BotAction const& action : actions)
+            followedTheLeader = followedTheLeader || (action.type == ActionType::kFollow && action.bot_guid != 12 && action.target_guid == PlayerOf(12));
+    }
+    CHECK(!followedTheLeader);                                        // and the members stay where they are
+    bool waited = false;
+    for (std::string const& line : events)
+        waited = waited || line.rfind("leader_recover_wait: bot=12", 0) == 0;
+    CHECK(waited);
+    std::optional<BotAction> gaveUp = TeleportOf(policy.Decide(hurt, 122000), 12);   // it cannot recover: after kLeaderRecoverMaxWaitMs it goes in all the same
+    CHECK(gaveUp.has_value() && gaveUp->dest_x == 197.0f);
+    // Fit (80 % or more): at once, as before.
+    BotPolicy fit(options);
+    fit.SetRouteActive(true);
+    std::optional<BotAction> now = TeleportOf(fit.Decide(hurtLeaderView(850), 1000), 12);
+    CHECK(now.has_value() && now->dest_x == 197.0f);
+}
+
 // A leader whose walk along the route goes nowhere sends it again and counts the point as refused (route_stall); a leader that waits says why (route_hold).
 void ALeaderThatDoesNotMoveIsNoticed()
 {
@@ -2727,6 +3046,118 @@ void ALeaderThatDoesNotMoveIsNoticed()
     for (std::string const& line : events)
         named = named || (line.rfind("route_hold: bot=12", 0) == 0 && line.find(" farthest=10 ") != std::string::npos);
     CHECK(named);
+}
+
+// Regroup (0.35.0): a member out of range for kRegroupStuckMs is stuck. The leader holds for it until then, then walks on without it, and the
+// regroup ends when the party is ready again after the member is back.
+void ARegroupStopsWaitingForAStuckMember()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.ClassOf = WarriorLeads;
+    options.Route = { Point{ 100.0f, 0.0f, 0.0f }, Point{ 140.0f, 0.0f, 0.0f } };
+    std::vector<std::string> events;
+    options.OnEvent = [&events](std::string const& line) { events.push_back(line); };
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    for (BotSnapshot& bot : view.bots)
+        bot.pos_x = 50.0f;                                            // together at 50
+    view.bots[0].pos_x = 0.0f;                                        // bot 10 stays 50 yards behind
+    auto const has = [&events](std::string const& prefix)
+    {
+        for (std::string const& line : events)
+            if (line.rfind(prefix, 0) == 0)
+                return true;
+        return false;
+    };
+    CHECK(LeaderWalk(policy.Decide(view, 1000)) == -1.0f);            // the party is not together: no walk
+    CHECK(has("regroup_start: leader=12 reason=member_far far=1"));
+    CHECK(LeaderWalk(policy.Decide(view, 10000)) == -1.0f);           // not stuck yet (9 s out of range)
+    CHECK(LeaderWalk(policy.Decide(view, 22000)) == 100.0f);          // stuck (21 s): the leader walks on without it
+    CHECK(has("regroup_stuck: leader=12 bot=10 "));
+    policy.Decide(view, 23000);
+    CHECK(!has("regroup_done:"));                                     // the regroup stays on while a member is out of range
+    view.bots[0].pos_x = 50.0f;                                       // bot 10 catches up
+    policy.Decide(view, 24000);
+    policy.Decide(view, 40000);                                       // the party has been ready for the clearing time
+    bool done = false;
+    for (std::string const& line : events)
+        done = done || (line.rfind("regroup_done: leader=12 ", 0) == 0 && line.find(" stuck=1") != std::string::npos);
+    CHECK(done);
+}
+
+// Regroup (0.36.2): a member that trails the leader at the edge of the wait distance does not flip the stuck flag. It is logged once per regroup, stays stuck
+// until it is back inside kRegroupClearYards, and the leader keeps walking.
+void AStuckMemberAtTheBoundaryIsLoggedOnce()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.ClassOf = WarriorLeads;
+    options.Route = { Point{ 100.0f, 0.0f, 0.0f }, Point{ 140.0f, 0.0f, 0.0f } };
+    std::vector<std::string> events;
+    options.OnEvent = [&events](std::string const& line) { events.push_back(line); };
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    for (BotSnapshot& bot : view.bots)
+        bot.pos_x = 0.0f;
+    auto const count = [&events](std::string const& prefix)
+    {
+        int found = 0;
+        for (std::string const& line : events)
+            found += line.rfind(prefix, 0) == 0;
+        return found;
+    };
+    // Bot 10 is 31 yards behind until it is stuck (22 s), then steps in and out of range (29 and 31 yards) every second for a minute.
+    bool walked = false;                                              // the walk order is sent when it changes, so look for it over the minute
+    for (std::uint64_t now = 1000; now <= 60000; now += 1000)
+    {
+        view.bots[0].pos_x = (now > 22000 && (now / 1000) % 2 == 0) ? -29.0f : -31.0f;
+        walked = LeaderWalk(policy.Decide(view, now)) == 100.0f || walked;
+    }
+    CHECK(count("regroup_stuck: leader=12 bot=10 ") == 1);            // one line, not one per step in and out of range
+    CHECK(walked);                                                    // the leader walked on once it was stuck
+    // Back to 25 yards: inside the wait distance, but not inside the clearing distance, so it is still stuck and the regroup goes on.
+    view.bots[0].pos_x = -25.0f;
+    policy.Decide(view, 61000);
+    CHECK(count("regroup_stuck: leader=12 bot=10 ") == 1);
+    view.bots[0].pos_x = -31.0f;
+    policy.Decide(view, 90000);
+    policy.Decide(view, 120000);
+    CHECK(count("regroup_stuck: leader=12 bot=10 ") == 1);            // the same regroup: not logged again
+    CHECK(count("regroup_done:") == 0);
+}
+
+// Regroup (0.36.2): member_recover waits longer than the stuck flag, so the leader has walked on before the member is put next to it.
+void MemberRecoverDoesNotFireWithTheStuckEvent()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.ClassOf = WarriorLeads;
+    options.DungeonTeleport = true;
+    options.Route = { Point{ 100.0f, 0.0f, 0.0f }, Point{ 140.0f, 0.0f, 0.0f } };
+    std::uint64_t now = 0;
+    std::uint64_t stuckAt = 0;
+    std::uint64_t recoverAt = 0;
+    options.OnEvent = [&](std::string const& line)
+    {
+        if (line.rfind("regroup_stuck:", 0) == 0 && stuckAt == 0)
+            stuckAt = now;
+        if (line.rfind("member_recover: bot=10", 0) == 0 && recoverAt == 0)
+            recoverAt = now;
+    };
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    for (BotSnapshot& bot : view.bots)
+        bot.pos_x = 0.0f;
+    view.bots[0].pos_x = -31.0f;                                      // bot 10 trails at the edge
+    for (now = 1000; now <= 60000 && recoverAt == 0; now += 500)
+        policy.Decide(view, now);
+    CHECK(stuckAt != 0 && recoverAt != 0);
+    CHECK(recoverAt > stuckAt);                                       // never in the same tick
+    CHECK(recoverAt - stuckAt >= 5000);                               // the party has had time to move on
 }
 
 // The default stance is defensive: a bot does not pull what is in range on its own, and it fights what attacks it.
@@ -2873,21 +3304,21 @@ void MembersDoNotPullInADungeon()
     CHECK(!CastsSpell(actions, 10, 585));
 }
 
-// The party pulls a dungeon pack of three at most. A pack of four 20 yards off is left alone; a pack of three is pulled.
-void ADungeonPackOfFourIsNotPulled()
+// The party pulls a dungeon pack of four at most. A pack of five 20 yards off is left alone; a pack of four is pulled. (The view holds 4 nearby units per bot by
+// default: it is widened to 8 so that five fit.)
+void ADungeonPackOfFiveIsNotPulled()
 {
-    WorldTickSnapshotView four = DungeonView({ 10, 11, 12, 13, 14 });
-    AddNearby(four, 2, Unit(8, 7, 20.0f, true));
-    AddNearby(four, 2, Unit(8, 8, 21.0f, true));
-    AddNearby(four, 2, Unit(8, 9, 22.0f, true));
-    AddNearby(four, 2, Unit(8, 10, 22.5f, true));
-    CHECK(!HasAction(DungeonPolicy().Decide(four, 0), 12, ActionType::kFollow, MakeUnitRef(8, 1, 7)));
-
-    WorldTickSnapshotView three = DungeonView({ 10, 11, 12, 13, 14 });
-    AddNearby(three, 2, Unit(8, 7, 20.0f, true));
-    AddNearby(three, 2, Unit(8, 8, 21.0f, true));
-    AddNearby(three, 2, Unit(8, 9, 22.0f, true));
-    CHECK(HasAction(DungeonPolicy().Decide(three, 0), 12, ActionType::kFollow, MakeUnitRef(8, 1, 7)));
+    auto const packView = [](int mobs)
+    {
+        WorldTickSnapshotView view = DungeonView({ 10, 11, 12, 13, 14 });
+        view.max_nearby_units = 8;
+        view.nearby.assign(view.bots.size() * view.max_nearby_units, NearbyUnit{});
+        for (int i = 0; i < mobs; ++i)
+            AddNearby(view, 2, Unit(8, 7 + i, 20.0f + float(i), true));
+        return view;
+    };
+    CHECK(!HasAction(DungeonPolicy().Decide(packView(5), 0), 12, ActionType::kFollow, MakeUnitRef(8, 1, 7)));
+    CHECK(HasAction(DungeonPolicy().Decide(packView(4), 0), 12, ActionType::kFollow, MakeUnitRef(8, 1, 7)));
 }
 
 // Members defend themselves: bot 10 is a rogue here, since the healer holds its range instead (HealerDoesNotMelee).
@@ -3057,16 +3488,83 @@ void ACorpseIsRevivedByTheQuietLeaderAfterAFewSeconds()
     CHECK(!HasAction(fighting.Decide(busy(), 9500), 13, ActionType::kRevive));
 }
 
-// A dungeon party's dead wait much longer for the healer (60 s, not 20 s): releasing early left the tank standing at the graveyard outside, killed again and again.
-void ADungeonCorpseWaitsLongerForARezzer()
+// A dungeon party's dead wait for a rezzer no longer than a leveling party's: 20 s (0.36.2; the 60 s of 0.34 left ghosts for whole fights, 44-87 s in the sim's Ragefire Chasm).
+void ADungeonCorpseWaitsTwentySecondsForARezzer()
 {
     BotPolicy policy(DeadOptions(nullptr));
     policy.SetRouteActive(true);
     auto const build = [] { WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 }); Corpse(v.bots[3], 10.0f); return v; };
     CHECK(!HasAction(policy.Decide(build(), 1000), 13, ActionType::kReleaseSpirit));
-    CHECK(!HasAction(policy.Decide(build(), 21500), 13, ActionType::kReleaseSpirit));
-    CHECK(!HasAction(policy.Decide(build(), 50000), 13, ActionType::kReleaseSpirit));
-    CHECK(HasAction(policy.Decide(build(), 65000), 13, ActionType::kReleaseSpirit));
+    CHECK(!HasAction(policy.Decide(build(), 15000), 13, ActionType::kReleaseSpirit));
+    CHECK(HasAction(policy.Decide(build(), 21500), 13, ActionType::kReleaseSpirit));
+}
+
+// No rezzer in the party (all warriors): the corpse is released at once, a fight in the party or not, and well inside the 20 s.
+void ADungeonCorpseWithoutARezzerIsReleasedWithinTwentySeconds()
+{
+    std::vector<std::string> events;
+    BotPolicy policy(DeadOptions(&events, AllWarriors));
+    policy.SetRouteActive(true);
+    auto const build = [] { WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 }); Corpse(v.bots[3], 10.0f); return v; };
+    CHECK(HasAction(policy.Decide(build(), 1000), 13, ActionType::kReleaseSpirit));
+    CHECK(LoggedWith(events, "reason=release_no_rezzer"));
+    CHECK(LoggedWith(events, "waited_ms=0"));
+}
+
+// A fight elsewhere in the party does not hold a release (the core refuses it only for a corpse in combat): the regroup loop started from ghosts held 44-87 s.
+void AFightInThePartyDoesNotHoldADungeonRelease()
+{
+    std::vector<std::string> events;
+    BotPolicy policy(DeadOptions(&events, AllWarriors));
+    policy.SetRouteActive(true);
+    auto const build = [](bool ownCombat)
+    {
+        WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 });
+        Corpse(v.bots[3], 10.0f);
+        v.bots[1].in_combat = 1;
+        v.bots[3].in_combat = ownCombat ? 1 : 0;
+        return v;
+    };
+    CHECK(HasAction(policy.Decide(build(false), 1000), 13, ActionType::kReleaseSpirit));
+    CHECK(!Logged(events, "release_held:"));
+    BotPolicy own(DeadOptions(&events, AllWarriors));                                   // a corpse in combat itself is still held, as the core wants
+    own.SetRouteActive(true);
+    CHECK(!HasAction(own.Decide(build(true), 1000), 13, ActionType::kReleaseSpirit));
+    CHECK(Logged(events, "release_held:"));
+}
+
+// After the release, a ghost of a dungeon party that is out of combat is teleported to its leader (the tank), not left at the graveyard or sent to its corpse.
+bool LoggedTeleportToLeader(std::vector<BotAction> const& actions)
+{
+    std::optional<BotAction> const teleport = TeleportOf(actions, 13);
+    return teleport.has_value() && teleport->spell_id == 36 && teleport->dest_x != 50.0f; // 50 is the corpse and the entrance, not a leader
+}
+
+void AReleasedDungeonGhostIsTeleportedToTheLeader()
+{
+    std::vector<std::string> events;
+    BotPolicy policy(DeadOptions(&events, AllWarriors));
+    policy.SetRouteActive(true);
+    WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 });
+    for (BotSnapshot& bot : v.bots)
+        bot.map_id = 36;
+    Ghost(v.bots[3], 0.0f, 36, 50.0f);
+    v.bots[3].map_id = 0;                                                               // the ghost is outside, at the graveyard
+    std::optional<BotAction> const teleport = TeleportOf(policy.Decide(v, 1000), 13);
+    CHECK(teleport.has_value());
+    if (teleport)
+    {
+        bool atALeader = false;                                                         // the destination is a living member's spot, on the instance map
+        for (BotSnapshot const& bot : v.bots)
+            atALeader = atALeader || (bot.guid != 13 && bot.pos_x == teleport->dest_x && bot.pos_y == teleport->dest_y && bot.pos_z == teleport->dest_z);
+        CHECK(teleport->spell_id == 36 && atALeader);
+    }
+    CHECK(Logged(events, "party_teleport:"));
+    // with a fight going on the ghost is not sent to the leader: it waits for the quiet
+    BotPolicy busy(DeadOptions(nullptr, AllWarriors));
+    busy.SetRouteActive(true);
+    v.bots[1].in_combat = 1;
+    CHECK(!LoggedTeleportToLeader(busy.Decide(v, 1000)));
 }
 
 // A ghost whose run takes too long is put at its corpse once, and the run starts over; it does not stay a ghost for good.
@@ -3220,7 +3718,7 @@ void ReleaseIsHeldInCombatUpToTheCap()
 {
     std::vector<std::string> events;
     BotPolicy policy(DeadOptions(&events, AllWarriors));
-    auto const build = [] { WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 }); Corpse(v.bots[3], 10.0f); v.bots[1].in_combat = 1; return v; };
+    auto const build = [] { WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 }); Corpse(v.bots[3], 10.0f); v.bots[3].in_combat = 1; return v; };
     CHECK(!HasAction(policy.Decide(build(), 1000), 13, ActionType::kReleaseSpirit));
     CHECK(!HasAction(policy.Decide(build(), 30000), 13, ActionType::kReleaseSpirit));
     CHECK(Logged(events, "release_held:"));
@@ -3295,7 +3793,7 @@ void ADeadMemberIsRevivedByItsLeaderInsideTheDungeon()
     CHECK(HasAction(policy.Decide(v, 22000), 13, ActionType::kRevive));                   // third try
     std::vector<BotAction> given = policy.Decide(v, 33000);
     CHECK(!HasAction(given, 13, ActionType::kRevive));                                    // given up after three tries
-    CHECK(HasAction(given, 13, ActionType::kMoveTo));                                     // the corpse run goes on
+    CHECK(!HasAction(given, 13, ActionType::kMoveTo));                                    // and it stays by the leader: no corpse run (0.34.3)
 
     BotPolicy busy(options);
     busy.SetRouteActive(true);
@@ -3307,7 +3805,7 @@ void ADeadMemberIsRevivedByItsLeaderInsideTheDungeon()
 }
 
 // A ghost of a dungeon party still on the outside map is not revived there (it stood up at the graveyard and died outside the dungeon);
-// it walks to the instance door, whatever the leader is doing.
+// out of combat it is teleported to its leader inside the instance (0.34.3); it is still not revived outside.
 void AGhostOnTheOutsideMapIsNotRevivedBeforeItEnters()
 {
     std::vector<std::string> events;
@@ -3319,13 +3817,14 @@ void AGhostOnTheOutsideMapIsNotRevivedBeforeItEnters()
     WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 });
     Ghost(v.bots[3], 0.0f, 36, 50.0f);
     v.bots[3].map_id = 0;                                                                 // the graveyard outside
+    v.bots[2].map_id = 36;                                                                // the leader (bot 12) is inside the instance
     std::vector<BotAction> first = policy.Decide(v, 1000);
     CHECK(!HasAction(first, 13, ActionType::kRevive));
     CHECK(!Logged(events, "revive_out_of_combat:"));
-    bool towardPortal = false;
+    bool toLeader = false;
     for (BotAction const& action : first)
-        towardPortal = towardPortal || (action.type == ActionType::kMoveTo && action.bot_guid == 13 && action.dest_x == 500.0f);
-    CHECK(towardPortal);                                                                 // to the instance door
+        toLeader = toLeader || (action.type == ActionType::kTeleport && action.bot_guid == 13 && action.spell_id == 36);
+    CHECK(toLeader);                                                                     // teleported to the leader in the instance
     CHECK(!HasAction(policy.Decide(v, 12000), 13, ActionType::kRevive));                 // still outside: still not revived
 }
 
@@ -3589,6 +4088,42 @@ void UnseenThreatIsGivenUp()
     CHECK(!HasAction(given, 10, ActionType::kAttackTarget, threat));
     CHECK(!HasAction(given, 10, ActionType::kFollow, threat));
     CHECK(!HasAction(policy.Decide(view(), 50000), 10, ActionType::kAttackTarget, threat));
+}
+
+// A hostile almost on top of the bot in the plane but 20 yards above it (a patrol on a wall walk: the Shadowfang Keep courtyard's Tormented Officers) is
+// not pulled: the bot would stand under it, its follow order finds no way and its spells have no line of sight. A hostile a short climb above, a gentle slope
+// away, or one that is already attacking the bot, is still fought.
+void HostileOnAnotherLevelIsNotPulled()
+{
+    auto const act = [](NearbyUnit const& unit, bool attacked)
+    {
+        WorldTickSnapshotView view = PartyView({ 10 });
+        view.bots[0].in_combat = attacked ? 1 : 0;
+        AddNearby(view, 0, unit);
+        BotPolicy policy(AggressiveOptions());
+        auto const actions = policy.Decide(view, 0);
+        return HasAction(actions, 10, ActionType::kAttackTarget, unit.guid) || HasAction(actions, 10, ActionType::kFollow, unit.guid);
+    };
+    NearbyUnit above = Hostile(7, 3.0f, 100);
+    above.pos_z = 20.0f;               // 3 yards along the ground, 20 up
+    CHECK(!act(above, false));
+    CHECK(act(above, true));           // it is attacking the bot: the stall watchdog and the approach timeout deal with it, not this rule
+
+    NearbyUnit farAbove = Hostile(8, 30.0f, 100);
+    farAbove.pos_z = 20.0f;            // 20 up over 30 along: steeper than 0.5
+    CHECK(!act(farAbove, false));
+
+    NearbyUnit stairs = Hostile(9, 30.0f, 100);
+    stairs.pos_z = 12.0f;              // 12 up over 30 along: a stair or a ramp
+    CHECK(act(stairs, false));
+
+    NearbyUnit step = Hostile(10, 3.0f, 100);
+    step.pos_z = 8.0f;                 // a short climb
+    CHECK(act(step, false));
+
+    NearbyUnit below = Hostile(11, 4.0f, 100);
+    below.pos_z = -18.0f;              // the floor under the bot counts the same
+    CHECK(!act(below, false));
 }
 
 // A creature far enough below the bot gives no experience: it is not pulled, and its presence does not keep the bot from walking on.
@@ -4423,6 +4958,10 @@ void PetIsSentAtTheTargetAndCalledBack()
     over.bots[0].pet_state = 1;
     auto const after = policy.Decide(over, 5000);
     CHECK(HasAction(after, kBot, ActionType::kPetCommand)); // called back
+    bool follows = false;
+    for (BotAction const& action : after)
+        follows = follows || (action.type == ActionType::kPetCommand && action.spell_id == 2);   // to follow its owner, not to stay where the fight was
+    CHECK(follows);
     CHECK(!HasAction(policy.Decide(over, 6000), kBot, ActionType::kPetCommand)); // once, not every tick
 }
 
@@ -5005,13 +5544,154 @@ void FlightsAreOffByDefaultAndNotForPartyMembers()
     CHECK(!FirstOf(off.Decide(there, 30000), ActionType::kTaxi).has_value());
 }
  
+
+// --- The Holy priest of the level 30 guide: Renew on the tank, Binding Heal, Prayer of Healing, no shield on a rage user; a roster spec sets the role ---
+
+WorldTickSnapshotView LeveledDungeonView(std::uint32_t level, std::function<std::uint32_t(std::uint64_t)> classOf = nullptr)
+{
+    WorldTickSnapshotView view = DungeonView({ 10, 11, 12, 13, 14 }, classOf);
+    for (BotSnapshot& bot : view.bots)
+        bot.level = level;
+    return view;
+}
+
+void RenewKeepsUpOnTheFightingTankEveryFifteenSeconds()
+{
+    BotPolicy policy = DungeonPolicy();
+    WorldTickSnapshotView view = LeveledDungeonView(40);
+    view.bots[2].in_combat = 1;                          // the tank (bot 12) fights, at full health
+    view.bots[2].threat_target_guid = MakeUnitRef(8, 1, 7);
+    CHECK(CastsSpell(policy.Decide(view, 1000), 10, 139, PlayerOf(12)));
+    CHECK(!CastsSpell(policy.Decide(view, 8000), 10, 139, PlayerOf(12)));      // it still runs
+    CHECK(CastsSpell(policy.Decide(view, 17000), 10, 139, PlayerOf(12)));      // run out: again
+    // Not before level 8, and not while the tank is out of the fight.
+    BotPolicy low = DungeonPolicy();
+    WorldTickSnapshotView young = LeveledDungeonView(6);
+    young.bots[2].in_combat = 1;
+    CHECK(!CastsSpell(low.Decide(young, 1000), 10, 139, PlayerOf(12)));
+    BotPolicy calm = DungeonPolicy();
+    CHECK(!CastsSpell(calm.Decide(LeveledDungeonView(40), 1000), 10, 139, PlayerOf(12)));
+}
+
+void BindingHealWhenThePriestAndTheTankAreBothHurt()
+{
+    BotPolicy policy = DungeonPolicy();
+    WorldTickSnapshotView view = LeveledDungeonView(40);
+    view.bots[0].health = 500;                           // the priest at 50%
+    view.bots[2].health = 500;                           // the tank at 50%, fighting
+    view.bots[2].in_combat = 1;
+    view.bots[2].threat_target_guid = MakeUnitRef(8, 1, 7);
+    CHECK(CastsSpell(policy.Decide(view, 1000), 10, 1240770, PlayerOf(12)));
+    // The priest unhurt: a plain heal of the tank. Below the spell's level: a plain heal as well.
+    BotPolicy fine = DungeonPolicy();
+    WorldTickSnapshotView healthy = LeveledDungeonView(40);
+    healthy.bots[2].health = 500;
+    healthy.bots[2].in_combat = 1;
+    healthy.bots[2].threat_target_guid = MakeUnitRef(8, 1, 7);
+    CHECK(!CastsSpell(fine.Decide(healthy, 1000), 10, 1240770, PlayerOf(12)) && CastsSpell(DungeonPolicy().Decide(healthy, 1000), 10, 2054, PlayerOf(12)));
+    BotPolicy young = DungeonPolicy();
+    WorldTickSnapshotView below = LeveledDungeonView(30);
+    below.bots[0].health = 500;
+    below.bots[2].health = 500;
+    below.bots[2].in_combat = 1;
+    below.bots[2].threat_target_guid = MakeUnitRef(8, 1, 7);
+    CHECK(!CastsSpell(young.Decide(below, 1000), 10, 1240770, PlayerOf(12)));
+}
+
+void PrayerOfHealingOnlyWhenMostOfThePartyIsLow()
+{
+    BotPolicy policy = DungeonPolicy();
+    WorldTickSnapshotView view = LeveledDungeonView(40);
+    view.bots[1].health = 400;                           // three members under half
+    view.bots[3].health = 400;
+    view.bots[4].health = 400;
+    CHECK(CastsSpell(policy.Decide(view, 1000), 10, 596));
+    BotPolicy two = DungeonPolicy();
+    WorldTickSnapshotView fewer = LeveledDungeonView(40);
+    fewer.bots[1].health = 400;
+    fewer.bots[3].health = 400;
+    CHECK(!CastsSpell(two.Decide(fewer, 1000), 10, 596));
+    BotPolicy young = DungeonPolicy();
+    WorldTickSnapshotView below = LeveledDungeonView(28);
+    below.bots[1].health = 400;
+    below.bots[3].health = 400;
+    below.bots[4].health = 400;
+    CHECK(!CastsSpell(young.Decide(below, 1000), 10, 596));
+}
+
+void NoShieldOnAWarriorOrADruid()
+{
+    // Bot 12 is a warrior at 40% and in a fight with no target of its own: a shield candidate for any other class. For a warrior (rage) it is not.
+    BotPolicy policy = DungeonPolicy();
+    WorldTickSnapshotView view = LeveledDungeonView(40);
+    view.bots[2].health = 400;
+    view.bots[2].in_combat = 1;
+    CHECK(!CastsSpell(policy.Decide(view, 1000), 10, 17, PlayerOf(12)));
+    // The same member as a priest is shielded.
+    auto const allPriests = [](std::uint64_t) { return 5u; };
+    BotPolicy priests = DungeonPolicy(allPriests);
+    WorldTickSnapshotView same = LeveledDungeonView(40, allPriests);
+    same.bots[2].health = 400;
+    same.bots[2].in_combat = 1;
+    CHECK(CastsSpell(priests.Decide(same, 1000), 10, 17, PlayerOf(12)));
+    // And a druid is not shielded either.
+    auto const druidTwelve = [](std::uint64_t guid) { return guid == 12 ? 11u : 5u; };
+    BotPolicy druid = DungeonPolicy(druidTwelve);
+    WorldTickSnapshotView drood = LeveledDungeonView(40, druidTwelve);
+    drood.bots[2].health = 400;
+    drood.bots[2].in_combat = 1;
+    CHECK(!CastsSpell(druid.Decide(drood, 1000), 10, 17, PlayerOf(12)));
+}
+
+// Weakened Soul keeps a second shield off the same member for 15 s: the priest heals the hurt member meanwhile (the Stockade priest ordered 15 shields in a row on a mage held at 44 %).
+void NoSecondShieldOnTheSameMemberWhileWeakenedSoulHolds()
+{
+    BotPolicy policy = DungeonPolicy();
+    WorldTickSnapshotView view = LeveledDungeonView(40);
+    view.bots[3].health = 440;                           // bot 13 (a priest, as the rest) at 44 %, in the fight
+    view.bots[3].in_combat = 1;
+    CHECK(CastsSpell(policy.Decide(view, 1000), 10, 17, PlayerOf(13)));        // shielded
+    std::vector<BotAction> const next = policy.Decide(view, 4000);
+    CHECK(!CastsSpell(next, 10, 17, PlayerOf(13)));                            // not again at once
+    CHECK(CastsSpell(next, 10, 2054, PlayerOf(13)));                           // it gets the plain heal instead
+    CHECK(CastsSpell(policy.Decide(view, 17000), 10, 17, PlayerOf(13)));       // the lock has run out: shielded again
+}
+
+void ARosterSpecSetsTheRoleOfAPriest()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.PartyCount = 1;
+    options.ClassOf = WarriorLeads;
+    options.SpecOf = [](std::uint64_t guid) { return guid == 10 ? std::string("shadow") : std::string(); };
+    BotPolicy shadow(options);
+    shadow.SetRouteActive(true);
+    WorldTickSnapshotView view = DungeonView({ 10, 11, 12, 13, 14 });
+    view.bots[3].health = 300; // bot 13 is hurt
+    CHECK(!CastsSpell(shadow.Decide(view, 0), 10, 2050, PlayerOf(13)));        // a shadow priest does not heal
+    options.SpecOf = [](std::uint64_t guid) { return guid == 10 ? std::string("holy") : std::string(); };
+    BotPolicy holy(options);
+    holy.SetRouteActive(true);
+    CHECK(CastsSpell(holy.Decide(view, 0), 10, 2050, PlayerOf(13)));           // a holy priest does
+}
+
 int main()
 {
+    RenewKeepsUpOnTheFightingTankEveryFifteenSeconds();
+    BindingHealWhenThePriestAndTheTankAreBothHurt();
+    PrayerOfHealingOnlyWhenMostOfThePartyIsLow();
+    NoShieldOnAWarriorOrADruid();
+    NoSecondShieldOnTheSameMemberWhileWeakenedSoulHolds();
+    ARosterSpecSetsTheRoleOfAPriest();
     ShortOfAmmoWalksToTheAmmoVendor();
     AFlippingPartyDoesNotHoldTheLeaderForever();
+    ARegroupStopsWaitingForAStuckMember();
+    AStuckMemberAtTheBoundaryIsLoggedOnce();
+    MemberRecoverDoesNotFireWithTheStuckEvent();
     ALeaderWithNoRouteIsPutBackOnTheRouteOnce();
     AMemberThatLostItsLeaderIsPutNextToIt();
     ALeaderRevivedAtTheEntranceGoesToItsParty();
+    ARevivedLeaderRestsAtTheEntranceBeforeItGoesToItsParty();
     ALeaderThatDoesNotMoveIsNoticed();
     TankLeadParsesAsAnOrderOfTheTank();
     TheTankLeadsTheGroupAlongTheRoute();
@@ -5058,7 +5738,7 @@ int main()
     LeaderDoesNotPullWhileAMemberIsHurt();
     LeaderPullsWhenThePartyIsReady();
     LeaderPullsAfterWaitingTooLong();
-    ADungeonPackOfFourIsNotPulled();
+    ADungeonPackOfFiveIsNotPulled();
     MembersDoNotPullInADungeon();
     MembersAttackedInADungeonDefendThemselves();
     MembersWaitForTheTankToHoldTheTarget();
@@ -5073,6 +5753,7 @@ int main()
     NoLootForACorpseItDidNotFight();
     NoLootForADistantCorpse();
     BotDoesNotPullAboveItsLevel();
+    HostileOnAnotherLevelIsNotPulled();
     BotDoesNotPullAnElite();
     CreatureAttackingTheBotIsFoughtWhateverItsLevel();
     RepeatedlyAvoidedTargetIsLeftLonger();
@@ -5120,6 +5801,13 @@ int main()
     ADamageDealerFightsThePriorityCasterOfThePack();
     ADamageDealerFocusesTheEngineerWhenAGolemIsUp();
     ACasterOfThePackIsTargetedForAnInterrupt();
+    ADamageDealerDoesNotWidenPastTwoAlreadyEngagedHostiles();
+    TheVoidwalkerCompanionStaysReachablePastTheEngagementCapToo();
+    ADamageDealerTakesTheWarlockWhoseVoidwalkerIsUp();
+    CcHoldsAnUnengagedHumanoidPackMember();
+    CcDoesNotHoldACreatureTypeItHasNoSpellFor();
+    CcNeverHoldsTheKillPriorityTarget();
+    CcTacticOffMeansNoHold();
     NoPartyActionsInCombat();
     SealIsNotRecastWhileUp();
     EviscerateAtFivePoints();
@@ -5175,7 +5863,10 @@ int main()
     AWipedPartysGhostsArePutAtTheirCorpsesAfterAMinute();
     DeathLoopMovesTheBotToAGrindSpot();
     CorpseWaitsForARezzerThenReleases();
-    ADungeonCorpseWaitsLongerForARezzer();
+    ADungeonCorpseWaitsTwentySecondsForARezzer();
+    ADungeonCorpseWithoutARezzerIsReleasedWithinTwentySeconds();
+    AFightInThePartyDoesNotHoldADungeonRelease();
+    AReleasedDungeonGhostIsTeleportedToTheLeader();
     ACorpseIsRevivedByTheQuietLeaderAfterAFewSeconds();
     CorpseReleasesAtOnceWithoutARezzer();
     CorpseReleasesWhenTheWholePartyIsDown();

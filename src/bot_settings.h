@@ -49,9 +49,14 @@ struct ScenarioSettings
 {
     std::string Name;                                    // empty: no scenario
     std::vector<std::array<std::uint32_t, 2>> Roster;    // race, class
+    std::vector<std::string> RosterSpec;                  // the spec of each roster entry (race:class:spec), "" for none; the same size as Roster
     std::uint32_t Level = 18;
     bool HasStaging = false;
     std::array<float, 4> Staging{};                      // map, x, y, z
+    // Where a hunter without a pet goes to tame one before the party forms (ScenarioTameSpot = "0 -10439 929 39": map x y z, a place with tameable beasts near the hunters' level,
+    // such as Westfall); the hunters are taken there after the dressing and back. Without it hunters without a pet stay where they are.
+    bool HasTameSpot = false;
+    std::array<float, 4> TameSpot{};
     bool HasEntry = false;
     std::array<float, 4> Entry{};
     std::uint32_t DurationSec = 1200;
@@ -59,6 +64,12 @@ struct ScenarioSettings
     std::map<std::uint32_t, std::vector<std::uint32_t>> Gear;
     // Food and drink (and anything else) every bot of the scenario is given, after its gear: item entry and count (ScenarioSupplies = "4540:5,1205:5").
     std::vector<std::pair<std::uint32_t, std::uint32_t>> Supplies;
+    // Per class (ScenarioClassSupplies = "9:6265:10": class:item:count, comma separated; ScenarioClassQuests = "9:1504,3:6061": class:quest). The defaults give a
+    // warlock Soul Shards (the Voidwalker and Succubus summons use one each). ScenarioClassQuests (off by default: the core refuses a quest that is not in the log, and the
+    // refusals paused the bots' quest planning) sends core quest operation 4. ScenarioAmmo is the count of ammunition a hunter without any is given per grant (0 = none; at most 200, a stack).
+    std::map<std::uint32_t, std::vector<std::pair<std::uint32_t, std::uint32_t>>> ClassSupplies{ { 9, { { 6265, 10 } } } };
+    std::map<std::uint32_t, std::vector<std::uint32_t>> ClassQuests;
+    std::uint32_t Ammo = 200;
     std::vector<std::pair<std::uint32_t, std::string>> Bosses; // creature entry, name
     std::vector<std::pair<std::uint32_t, std::uint32_t>> BossAt; // route point (0-based) and the boss entry standing there (ScenarioBossAt)
     std::string ResultFile = "scenario-results.log";
@@ -74,6 +85,11 @@ struct ScenarioSettings
     std::vector<std::uint32_t> KillPriority;
     bool HasPortal = false;
     std::array<float, 4> Portal{};                       // map, x, y, z: the instance door, outside
+    // ScenarioRaid (0 or 1, default 0; doc 108): a raid scenario's roster may go up to 40 instead of 5, formed into one raid group of
+    // 8 subgroups of 5 instead of a flat party (bot_policy.cpp). A five-man scenario (ScenarioRaid unset or 0) is capped at 5 exactly as
+    // before -- this flag, not a universal cap raise, is what tells ReadOneScenario and the policy a roster is a raid. The roster is
+    // expected to be 8 repeats of the dungeon-style tank/healer/dps composition, one repeat per subgroup, in ScenarioRoster order.
+    bool Raid = false;
 };
 
 struct BotSettings
@@ -126,7 +142,10 @@ struct BotSettings
     // Grind spots (config key GrindFile, see grind_data.h): the places idle bots walk to for their level. Empty turns it off (hubs are used).
     std::string GrindFile;
     // Rotations (config key RotationFile, see combat_rotation.h): fight rows and upkeep buffs per class from a file. Empty = the built-in rotations.
-    std::string RotationFile;
+    // RotationFile and TameBeastFile default to the data folder beside the module's executable (a relative path is looked up there first); an empty value (RotationFile = "") uses the
+    // built-in rows, an empty TameBeastFile switches taming off.
+    std::string RotationFile = "data/rotations.txt";
+    std::string TameBeastFile = "data/tame_beasts.txt";
     // Spell costs (config key SpellCostFile, see spell_costs.h): what each spell costs in mana, rage or energy, so a bot does not try a cast it cannot pay for.
     // Empty = no check (the core refuses the cast instead).
     std::string SpellCostFile;
@@ -163,10 +182,10 @@ struct BotSettings
     // Crafting = 1 (default): a bot with nothing to fight makes bandages from its cloth and cooks its meat (kSkillUp, SDK 0.17; the core must have the action), which
     // raises First Aid and Cooking and uses up what fills its bags. 0 turns it off.
     bool Crafting = true;
-    // DungeonTactics = "focus,interrupt,heal,rest,recover" or "all" or "none" (default: none): which of the dungeon party's tactics are on (bot_policy.h). In the first sim
+    // DungeonTactics = "focus,interrupt,heal,rest,recover,cc" or "all" or "none" (default: none): which of the dungeon party's tactics are on (bot_policy.h). In the first sim
     // runs (docs/99-deadmines-runs.md) all of them on did slightly worse than none (2.0 bosses and 36 deaths against 2.25 and 14), and no single tactic is proven yet, so they
     // are off until each has a run of its own that shows a gain.
-    bool TacticFocus = false, TacticInterrupt = false, TacticHeal = false, TacticRest = false, TacticRecover = false;
+    bool TacticFocus = false, TacticInterrupt = false, TacticHeal = false, TacticRest = false, TacticRecover = false, TacticCc = false;
     // Bounded policy-lab knobs; defaults match the built-in dungeon policy.
     std::uint32_t DungeonHealBelowPct = 55;
     std::uint32_t DungeonTankHealBelowPct = 75;
@@ -199,9 +218,9 @@ struct BotSettings
     // Flight points (layout 17; config keys Taxi, TaxiMinWalkYards, TaxiMasterMaxYards, TaxiBlockedSec; off by default): a bot that is not in a party replaces a walk
     // of at least TaxiMinWalkYards with a flight from a flight master within TaxiMasterMaxYards that lies on the way. Needs Bot.Taxi.Enabled in the core (on by default).
     taxi::Settings Taxi;
-    // Auction House (doc/economy.md; config keys Auction, AuctionSellPctGreen, AuctionSellPctBlue, AuctionSellPctEpic, AuctionBuyoutPct, AuctionRelistPct,
+    // Auction House (doc/economy.md; config keys Auction, AuctionBuy (a bot also buys upgrades), AuctionSellPctGreen, AuctionSellPctBlue, AuctionSellPctEpic, AuctionBuyoutPct, AuctionRelistPct,
     // AuctionRunHours (2 only: the core runs every auction 2 hours), AuctionMinVendorCopper, AuctionBagFullPct, AuctionPerVisit, AuctionListedMax,
-    // AuctionEverySec, AuctionBuyMaxPct, AuctionBrowsePerVisit, AuctionCallsPerTick; off by default). main.cpp drives the listing visits.
+    // AuctionEverySec, AuctionBuyMaxPct, AuctionBrowsePerVisit, AuctionCallsPerTick; off by default). main.cpp drives the listing and buy visits.
     auction::Settings Auction;
     // Vendor sales (sell policy; config keys SellVendor, SellEverySec, SellPerVisit; off by default). main.cpp sends the sales on a vendor visit.
     sell::Settings Sell;
@@ -248,6 +267,7 @@ struct ScenarioSlot
     std::size_t Party = 0;
     std::uint32_t Race = 0;
     std::uint32_t Class = 0;
+    std::string Spec;      // the roster entry's spec (race:class:spec), "" when it has none
 };
 ScenarioSlot ScenarioSlotOf(std::vector<ScenarioSettings> const& scenarios, std::size_t slot);
 

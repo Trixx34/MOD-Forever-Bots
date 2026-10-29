@@ -4,7 +4,8 @@
 //
 // Phases, in order:
 //   Waiting  until the whole roster is in the world and alive
-//   Dressing one grant per bot per tick for each item of its class's gear list, then an equip service, then a pause
+//   Dressing one grant per bot per tick for each item of its class's gear list, then an equip service, then a pause. Ammunition and
+//            supplies (food, drink) are granted and kept topped up for the whole run from here on, alongside the phases, not gating them.
 //   Grouping until the policy's party logic has put everyone in one party (or kGroupingTimeoutMs)
 //   Entering the leader teleports to the entry; kMembersDelayMs after it arrives the members follow; all there -> Running
 //   Running  the route is active; ends on the time limit, a wipe (all bots down; see WipeRecovery), or the leader reaching the last waypoint
@@ -32,14 +33,37 @@ struct ScenarioPlan
 {
     std::string Name;
     std::uint32_t RosterSize = 5;
+    // 40-man raid support (doc 108): Raid on allows RosterSize up to 40 instead of 5 (see bot_settings.cpp's ScenarioRaid key).
+    // A raid roster is formed into one raid group of GroupSubgroups subgroups of 5, not a flat party: the roster is expected to
+    // be GroupSubgroups repeats of the same tank/healer/dps class composition a 5-man scenario's roster would use, one repeat per
+    // subgroup (bot_policy.cpp assigns subgroup = roster position / 5, so the ordering in ScenarioRoster matters). The result line
+    // carries raid=1 groups=<GroupSubgroups> so dashboards can tell a raid result from a dungeon one.
+    bool Raid = false;
+    std::uint32_t GroupSubgroups = 8; // MAX_RAID_SUBGROUPS in TrinityCore's Group.h; informational only when Raid is off
     std::uint32_t EntryMap = 0;
     ScenarioPoint Entry;
     std::vector<ScenarioPoint> Route;
     std::uint64_t DurationMs = 1200000;
     std::map<std::uint32_t, std::vector<std::uint32_t>> Gear; // class id -> item entries to grant and equip
-    std::vector<std::pair<std::uint32_t, std::uint32_t>> Supplies; // item entry and count granted to every bot after its gear (food, drink)
+    // Item entry and count granted to every bot after its gear: index 0 is food, index 1 is drink (the order the config doc asks for; an
+    // index beyond that is granted once, in the dressing, and not tracked further -- the snapshot has no bag count for it to watch). The
+    // first grant of food and drink is in the dressing, like gear; after that each is kept topped up for the whole run the same way as
+    // ammunition (see AmmoCount below) -- a bot with fewer than half of its index's count is given that many more of it (BotSnapshot's
+    // food_count or drink_count says how many it carries; there is no per-item-entry count), at most kSupplyGrantsMax times and never
+    // closer together than kSupplyRetryMs. A grant that does not raise the total, kSupplyUselessMax times running, stops that one of the
+    // two being retried; the other is unaffected.
+    std::vector<std::pair<std::uint32_t, std::uint32_t>> Supplies;
+    // Per class, after the gear: items (a warlock's Soul Shards, which the Voidwalker and Succubus summons use up) and class quests completed with their
+    // reward (core quest operation 4, the quests that teach the pets' spells). A quest the core refuses (not in the log, wrong race) is not tried again.
+    std::map<std::uint32_t, std::vector<std::pair<std::uint32_t, std::uint32_t>>> ClassSupplies;
+    std::map<std::uint32_t, std::vector<std::uint32_t>> ClassQuests;
+    // A hunter whose ranged weapon takes ammunition and who carries none is given this many of the ammunition the snapshot names (ammo_entry), in every phase
+    // from the dressing on, and again when the count falls below kAmmoLow (an hour of Auto Shot is about 1800 shots: 40 grants of a stack are 8000). 0 = no ammunition is granted.
+    // A grant is one stack at most, kAmmoStackMax (200): the core refuses a larger count.
+    std::uint32_t AmmoCount = 200;
     std::vector<std::pair<std::uint32_t, std::string>> Bosses; // creature entry and name of each boss; one seen dead counts as killed
     std::function<std::uint32_t(std::uint64_t)> ClassOf;      // bot guid -> class id
+    std::function<std::uint32_t(std::uint64_t)> RaceOf;       // bot guid -> race id (for the roster in the result line)
     // Dead-bot recovery. With WipeRecovery on, an all-down state starts a timer of WipeRecoveryMs: if a bot is alive again before it ends,
     // the wipe is cancelled and counted in Wipes; else the run ends as "wipe". Off (default): all down ends the run at once.
     bool WipeRecovery = false;
@@ -52,12 +76,18 @@ struct ScenarioPlan
     // not when the leader touches the last waypoint; a leader at the last waypoint with bosses still alive gets kBossGraceMs more, then the
     // run ends as "bosses_missing".
     bool RequireBosses = false;
+    // Taming (the Taming phase, between the dressing and the grouping): the hunters of the roster that have no pet are taken to TameSpot (map TameMap), where the policy walks them to a
+    // beast and tames it, and taken back to where they stood. The phase ends when every such hunter has a pet or after kTameTimeoutMs; a hunter that failed stays in the party without one.
+    bool TameEnabled = false;
+    std::uint32_t TameMap = 0;
+    ScenarioPoint TameSpot;
 };
 
 enum class ScenarioPhase
 {
     Waiting,
     Dressing,
+    Taming,
     Grouping,
     Entering,
     Running,
@@ -79,12 +109,31 @@ struct ScenarioResult
     std::uint32_t Ghosts = 0;       // bots that are ghosts at the end
     std::uint32_t RosterSize = 0;
     bool PartyFormed = true;        // false when the grouping phase timed out
+    // 40-man raid support (doc 108): Raid and Groups mirror ScenarioPlan::Raid/GroupSubgroups, so FormatScenarioResult can print
+    // "raid=1 groups=8" for a raid scenario and nothing extra for a dungeon one.
+    bool Raid = false;
+    std::uint32_t Groups = 0;
     std::uint32_t BossesTotal = 0;  // bosses the plan lists
     std::vector<std::string> BossesKilled; // names of the ones seen dead, in the order they were seen
+    std::vector<std::pair<std::uint32_t, std::uint32_t>> Party; // race and class id of each member, in the order first seen
 };
 
 constexpr std::uint64_t kDressPauseMs = 1500;
 constexpr std::uint64_t kEquipPauseMs = 3000;
+constexpr std::uint64_t kTameTimeoutMs = 300000;    // the Taming phase gives the hunters this long to get a pet
+constexpr std::uint64_t kTameRetryMs = 6000;        // a teleport that was refused (in combat) is sent again after this
+constexpr std::uint64_t kTameBackMs = 20000;        // the hunters are given this long to be back before the grouping starts anyway
+constexpr float kTameArrivedYards = 150.0f;         // a hunter this close to the spot has arrived
+constexpr float kTameHomeYards = 40.0f;             // and one this close to where it stood is back
+constexpr std::uint32_t kTameMinLevel = 10;         // the hunter pet quest is given at level 10
+constexpr std::uint32_t kAmmoLow = 100;             // below this many pieces of its ammunition a hunter is given more
+constexpr std::uint64_t kAmmoRetryMs = 5000;        // a bot is given ammunition at most this often (the snapshot needs a moment to show it)
+constexpr std::uint32_t kAmmoGrantsMax = 40;        // per bot and run
+constexpr std::uint32_t kAmmoStackMax = 200;        // a grant is at most one stack (the core refuses a count above the item's stack size: 200 for arrows and shot)
+constexpr std::uint32_t kAmmoUselessMax = 3;        // grants in a row after which the count did not grow: the bot is left alone (the core refuses for another reason)
+constexpr std::uint64_t kSupplyRetryMs = 5000;      // a bot is given more of a supply item at most this often (the snapshot needs a moment to show it)
+constexpr std::uint32_t kSupplyGrantsMax = 40;       // per bot and item, per run (on top of the dressing's first grant)
+constexpr std::uint32_t kSupplyUselessMax = 3;       // grants in a row after which neither total grew: the bot is left alone for that item
 constexpr std::uint64_t kGroupingTimeoutMs = 120000;
 constexpr std::uint64_t kMembersDelayMs = 3000;
 constexpr std::uint64_t kEnterRetryMs = 10000;
@@ -99,6 +148,12 @@ constexpr std::uint64_t kReenterDelayMs = 20000;
 constexpr std::uint64_t kUnderstrengthGraceMs = 180000; // fewer than MinAlive alive this long: the run is given up
 constexpr std::uint64_t kBossGraceMs = 120000;          // RequireBosses: time allowed after the last waypoint for the remaining bosses to die
 constexpr float kRoutePointReachYards = 15.0f; // the leader counts as having reached a waypoint this close to it
+// ...and only this far above or below it (a different storey of the same tower is not "reached"). Shadowfang Keep's own route (2026-10-27) puts its
+// courtyard-floor waypoints (points 4, 9, 10: around the Rethilgore gate) within kRoutePointReachYards in X/Y of its topmost waypoints (points 35, 36:
+// Odo the Blindwatcher, a storey above, on the tower roof) with only 9.3 yards of Z between them: a bot standing at the gate, nowhere near the roof,
+// was credited with "reached" the dungeon's last point this way (bots 0.36.2 and earlier: furthest=37/37, bosses=0/5). 8 yards keeps that pair apart
+// while staying well above the under-one-yard Z gaps between a waypoint and the very next one that are meant to count as the same spot.
+constexpr float kRouteReachMaxZYards = 8.0f;
 
 // The part of a snapshot that holds the bots in `keep` (guids), with their nearby slots: the director of one party of several sees only its own bots. The nearby units are
 // stored per bot position (max_nearby_units slots each), so they are copied along with the bots, else a director would read another party's creatures.
@@ -113,6 +168,7 @@ public:
     void Decide(forever_module::WorldTickSnapshotView const& view, std::uint64_t nowMs, std::vector<forever_module::BotAction>& actions);
 
     ScenarioPhase Phase() const { return _phase; }
+    bool Taming() const { return _phase == ScenarioPhase::Taming; }
     bool RouteActive() const { return _phase == ScenarioPhase::Running; }
 
     // The result, once, after the scenario has ended.
@@ -132,7 +188,28 @@ private:
     std::uint64_t _phaseSinceMs = 0;
     bool _phaseStarted = false;
     std::map<std::uint64_t, std::size_t> _nextGrant;   // bot -> index of the next gear item to grant
-    std::map<std::uint64_t, std::size_t> _nextSupply;  // bot -> index of the next supply to grant
+    std::map<std::uint64_t, std::size_t> _nextSupply;  // bot -> index of the next supply beyond food and drink (index 2+) to grant once
+    std::map<std::uint64_t, std::size_t> _nextClassSupply; // bot -> index of the next class supply to grant
+    std::map<std::uint64_t, std::size_t> _nextClassQuest;  // bot -> index of the next class quest to send
+    std::map<std::uint64_t, std::uint64_t> _ammoAtMs;      // bot -> when it was last given ammunition
+    std::map<std::uint64_t, std::uint32_t> _ammoGrants;    // bot -> how often
+    std::map<std::uint64_t, std::uint32_t> _ammoSeen;      // bot -> its ammunition count when it was last given some
+    std::map<std::uint64_t, std::uint32_t> _ammoPeak;      // bot -> the highest count it showed since then
+    std::map<std::uint64_t, std::uint32_t> _ammoUseless;   // bot -> grants in a row that did not raise its count
+    // Supplies 0 (food) and 1 (drink) of _plan.Supplies, kept topped up the same way as ammunition: these are the only two the snapshot
+    // gives a bag count for (BotSnapshot::food_count, drink_count; a count per item entry does not exist). Keyed by (bot guid, index) so
+    // that one of the two having bag trouble never stops the other being granted to the same bot.
+    using SupplyKey = std::pair<std::uint64_t, std::size_t>;
+    std::map<SupplyKey, std::uint64_t> _supplyAtMs;     // when the item was last granted
+    std::map<SupplyKey, std::uint32_t> _supplyGrants;   // how often
+    std::map<SupplyKey, std::uint32_t> _supplySeen;     // its total (food_count or drink_count) when it was last granted
+    std::map<SupplyKey, std::uint32_t> _supplyPeak;     // the highest total shown since then
+    std::map<SupplyKey, std::uint32_t> _supplyUseless;  // grants in a row that did not raise it
+    struct Home { std::uint32_t Map = 0; float X = 0, Y = 0, Z = 0; };
+    std::map<std::uint64_t, Home> _tameHome;               // hunter -> where it stood when the Taming phase began
+    std::map<std::uint64_t, std::uint64_t> _tameSentAtMs;  // hunter -> when it was last sent to the spot or back
+    std::uint64_t _tameStartMs = 0;
+    std::uint64_t _tameBackMs = 0;                         // when the hunters were first sent back (0 = not yet)
     bool _equipSent = false;
     std::uint64_t _outsideSinceMs = 0;     // since when the living leader has been outside the dungeon map in the Running phase (0 = not outside)
     std::uint64_t _lastReenterMs = 0;
@@ -143,6 +220,7 @@ private:
     std::uint64_t _routeDoneMs = 0;        // when the leader first touched the last waypoint (RequireBosses grace)
     std::set<std::uint32_t> _bossKilledEntries;
     std::map<std::uint64_t, bool> _everDead;
+    std::vector<std::uint64_t> _members;               // bot guids in the order first seen
     std::map<std::uint64_t, bool> _wasDown;            // bot -> down at the last tick (a bot never seen counts as up)
     std::uint32_t _deathEvents = 0;
     std::uint32_t _revived = 0;
@@ -162,5 +240,7 @@ private:
     std::uint64_t _lastTick = ~0ull;
 };
 
-// One line of text for the log: "scenario <name>: outcome=... furthest=3/7 deaths=2 alive=3/5 events=3 revived=1 wipes=0 ghosts=0 run=412s".
+// One line of text for the log: "scenario <name>: outcome=... furthest=3/7 deaths=2 alive=3/5 events=3 revived=1 wipes=0 ghosts=0 run=412s",
+// then " raid=1 groups=8" for a raid scenario (doc 108; nothing for a dungeon one), then ' | roster=<race>:<class>,... classes=<sorted ids>
+// combo=<sorted ids joined by -> ' when the party is known.
 std::string FormatScenarioResult(ScenarioResult const& result);

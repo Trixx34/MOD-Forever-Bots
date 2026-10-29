@@ -2,6 +2,7 @@
 #include "errand_policy.h"
 
 #include <cstdio>
+#include <string>
 
 using namespace errand;
 
@@ -165,6 +166,51 @@ void AbsentBotIsNotStarted()
 
 } // namespace
 
+std::string TestCity(std::uint32_t city)
+{
+    return city == 1 ? "Stormwind" : "city" + std::to_string(city);
+}
+
+void JournalLines()
+{
+    Journal journal(TestCity);
+    CHECK(journal.OnStart(Start{ 7, Kind::kTrain, 1 }, 1000) == "errand_start bot=7 city=Stormwind kind=train");
+    auto const done = journal.OnEnd(7, EndReason::kDone, false, 91000);
+    CHECK(done && *done == "errand_done bot=7 city=Stormwind kind=train took_s=90");
+    CHECK(!journal.OnEnd(7, EndReason::kDone, false, 92000)); // one end per start
+
+    journal.OnStart(Start{ 8, Kind::kAuction, 2 }, 0);
+    auto const timeout = journal.OnEnd(8, EndReason::kTimeLimit, false, 3600000);
+    CHECK(timeout && *timeout == "errand_timeout bot=8 city=city2 kind=auction took_s=3600");
+
+    journal.OnStart(Start{ 9, Kind::kTrain, 1 }, 0);
+    auto const called = journal.OnEnd(9, EndReason::kCalled, false, 5000);
+    CHECK(called && *called == "errand_abandoned reason=called bot=9 city=Stormwind kind=train took_s=5");
+    journal.OnStart(Start{ 9, Kind::kTrain, 1 }, 0);
+    auto const gone = journal.OnEnd(9, EndReason::kUnavailable, false, 5000);
+    CHECK(gone && gone->find("errand_abandoned reason=unavailable bot=9") == 0);
+    journal.OnStart(Start{ 9, Kind::kTrain, 1 }, 0);
+    auto const failed = journal.OnEnd(9, EndReason::kDone, true, 5000);
+    CHECK(failed && failed->find("errand_abandoned reason=failed bot=9") == 0);
+
+    CHECK(!journal.OnEnd(99, EndReason::kCalled, false, 1)); // never started here: no line
+}
+
+void JournalFollowsTheScheduler()
+{
+    Scheduler scheduler(On());
+    Journal journal(TestCity);
+    Decisions d = scheduler.Tick(0, { Free(1, true, false, { 1 }) });
+    CHECK(d.Starts.size() == 1);
+    CHECK(journal.OnStart(d.Starts[0], 0) == "errand_start bot=1 city=Stormwind kind=train");
+    Bot called = Free(1, true, false, { 1 });
+    called.Called = true;
+    d = scheduler.Tick(kMin, { called });
+    CHECK(d.Ends.size() == 1);
+    auto const line = journal.OnEnd(d.Ends[0].Guid, d.Ends[0].Why, false, kMin);
+    CHECK(line && *line == "errand_abandoned reason=called bot=1 city=Stormwind kind=train took_s=60");
+}
+
 int main()
 {
     TrainingBeforeTheHouse();
@@ -179,6 +225,8 @@ int main()
     GapBetweenErrands();
     DailyBudgetResetsAfterADay();
     AbsentBotIsNotStarted();
+    JournalLines();
+    JournalFollowsTheScheduler();
     if (failures == 0)
         std::printf("errand_test: all passed\n");
     return failures == 0 ? 0 : 1;

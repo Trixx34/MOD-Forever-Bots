@@ -36,6 +36,9 @@ constexpr std::size_t kCastsApplied = 10;
 constexpr std::size_t kRefusals = 11;
 constexpr std::size_t kStuckEpisodes = 12;
 constexpr std::size_t kDetail = 15;
+constexpr std::size_t kClass = 16;
+constexpr std::size_t kRace = 17;
+constexpr std::size_t kCopper = 18;
 
 std::vector<std::string> Split(std::string const& line)
 {
@@ -208,6 +211,49 @@ void StuckFightIsReportedOnce()
     CHECK(rec.Count("stuck") == 1);
 }
 
+// The stuck line says where the bot stands (map, x, y, z in yards, as on a death line), after the old text.
+void StuckLineCarriesThePosition()
+{
+    Recorder rec(Quiet());
+    auto const at = [](std::uint32_t health)
+    {
+        BotSnapshot bot = Bot(health, 12.0f, kEnemy);
+        bot.map_id = 34;
+        bot.pos_y = -25.4f;
+        bot.pos_z = 7.6f;
+        return bot;
+    };
+    rec.telemetry.Observe(View(Bot(1000)), 0);
+    rec.telemetry.Observe(View(at(1000), { Enemy(3.0f) }), 1000);
+    rec.telemetry.Observe(View(at(1000), { Enemy(3.0f) }), 61000);
+    CHECK(rec.Count("stuck") == 1);
+    CHECK(rec.Last("stuck").find("no change for ") != std::string::npos); // the old text is still first
+    CHECK(rec.Last("stuck").find("against target " + std::to_string(kEnemy) + " map=34 x=12 y=-25 z=8") != std::string::npos);
+}
+
+// A stuck fight that ends (the target dies or the threat drops) closes its episode with an unstuck line that says how it ended.
+void StuckEpisodeEndsWithTheFight()
+{
+    Recorder rec(Quiet());
+    rec.telemetry.Observe(View(Bot(1000)), 0);
+    rec.telemetry.Observe(View(Bot(1000, 0, kEnemy), { Enemy(3.0f) }), 1000);
+    rec.telemetry.Observe(View(Bot(1000, 0, kEnemy), { Enemy(3.0f) }), 61000);
+    CHECK(rec.Count("stuck") == 1);
+    CHECK(rec.Count("unstuck") == 0);
+
+    BotSnapshot gone = Bot(1000);
+    gone.last_target_lost_reason = 1;
+    rec.telemetry.Observe(View(gone), 70000);
+    CHECK(rec.Count("unstuck") == 1);
+    CHECK(rec.Last("unstuck").find("fight_end target_gone lost killed") != std::string::npos);
+    CHECK(rec.Count("fight_end") == 1);
+
+    // A fight that was never stuck writes no unstuck line.
+    rec.telemetry.Observe(View(Bot(1000, 0, kEnemy), { Enemy(3.0f) }), 71000);
+    rec.telemetry.Observe(View(Bot(1000)), 72000);
+    CHECK(rec.Count("unstuck") == 1);
+}
+
 void CountsCastsAndRefusals()
 {
     BotTelemetry::Options options = Quiet();
@@ -254,9 +300,40 @@ void SummaryIsWrittenOnItsInterval()
     CHECK(rec.Count("summary") == 1);
 }
 
-void HeaderHasSixteenFields()
+void HeaderHasClassRaceAndCopperAfterDetail()
 {
-    CHECK(Split(BotTelemetry::Header()).size() == 16);
+    std::vector<std::string> const header = Split(BotTelemetry::Header());
+    CHECK(header.size() == 19);
+    CHECK(header[kDetail] == "detail" && header[kClass] == "class" && header[kRace] == "race" && header[kCopper] == "copper");
+}
+
+// Class and race come from the lookups, copper only on summary lines; every shape keeps its kind column.
+void ClassRaceAndCopperColumns()
+{
+    BotTelemetry::Options options = Quiet();
+    options.SummaryEveryMs = 1000;
+    options.ClassOf = [](std::uint64_t guid) { return guid == kBot ? 8u : 0u; };
+    options.RaceOf = [](std::uint64_t guid) { return guid == kBot ? 10u : 0u; };
+    Recorder rec(options);
+    BotSnapshot bot = Bot(1000);
+    bot.copper = 12345;
+    rec.telemetry.Observe(View(bot), 0);
+    rec.telemetry.Observe(View(Bot(1000, 0, kEnemy), { Enemy(3.0f) }), 500);
+    bot.level = 11;
+    rec.telemetry.Observe(View(bot), 1000);
+    std::vector<std::string> const summary = Split(rec.Last("summary"));
+    CHECK(summary.size() == 19);
+    CHECK(summary[kClass] == "8" && summary[kRace] == "10" && summary[kCopper] == "12345");
+    std::vector<std::string> const start = Split(rec.Last("fight_start"));
+    CHECK(start.size() == 19 && start[kClass] == "8" && start[kCopper].empty());
+    CHECK(rec.Last("level").rfind("1000,level,", 0) == 0);
+    CHECK(rec.Last("summary").rfind("1000,summary,", 0) == 0);
+
+    // No lookups: unknown (0).
+    Recorder plain(Quiet());
+    plain.telemetry.Observe(View(Bot(1000)), 0);
+    plain.telemetry.Observe(View(Bot(1000, 0, kEnemy), { Enemy(3.0f) }), 1000);
+    CHECK(Split(plain.Last("fight_start"))[kClass] == "0");
 }
 
 } // namespace
@@ -274,14 +351,53 @@ void RevivalIsLoggedAfterAGhost()
     CHECK(rec.Count("alive") == 1);
 }
 
+// A quest handed in is one quest_done line, however many snapshots show the quest complete or gone.
+void QuestDoneOnceWhenHandedIn()
+{
+    // A bot with one quest in its log (quest 0 = empty log).
+    auto const withQuest = [](std::uint32_t quest, std::uint8_t status)
+    {
+        BotSnapshot bot = Bot(1000);
+        if (quest != 0)
+        {
+            bot.quests[0].quest_id = quest;
+            bot.quests[0].status = status;
+            bot.quest_count = 1;
+        }
+        return bot;
+    };
+
+    Recorder rec(Quiet());
+    rec.telemetry.Observe(View(withQuest(500, 1)), 0);
+    rec.telemetry.Observe(View(withQuest(500, 2)), 1000);
+    rec.telemetry.Observe(View(withQuest(500, 2)), 2000); // complete, still in the log
+    CHECK(rec.Count("quest_done") == 0);
+    rec.telemetry.Observe(View(withQuest(0, 0)), 3000); // handed in: it left the log
+    rec.telemetry.Observe(View(withQuest(0, 0)), 4000); // still out of the log: no second line
+    CHECK(rec.Count("quest_done") == 1);
+    CHECK(rec.Last("quest_done").find("quest 500") != std::string::npos);
+    CHECK(Split(rec.Last("quest_done")).size() == 19);
+
+    // Taken and handed in again: counted again. A quest that leaves the log while not complete (abandoned) is not.
+    rec.telemetry.Observe(View(withQuest(500, 2)), 5000);
+    rec.telemetry.Observe(View(withQuest(0, 0)), 6000);
+    rec.telemetry.Observe(View(withQuest(501, 1)), 7000);
+    rec.telemetry.Observe(View(withQuest(0, 0)), 8000);
+    CHECK(rec.Count("quest_done") == 2);
+}
+
 int main()
 {
-    HeaderHasSixteenFields();
+    HeaderHasClassRaceAndCopperAfterDetail();
+    ClassRaceAndCopperColumns();
     FightLifecycle();
     LostTargetReasonIsOnTheFightEndLine();
     DeathEndsTheFight();
     RevivalIsLoggedAfterAGhost();
+    QuestDoneOnceWhenHandedIn();
     StuckFightIsReportedOnce();
+    StuckLineCarriesThePosition();
+    StuckEpisodeEndsWithTheFight();
     CountsCastsAndRefusals();
     LevelChangeIsRecorded();
     SummaryIsWrittenOnItsInterval();

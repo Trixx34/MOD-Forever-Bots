@@ -30,6 +30,11 @@ enum class Cond : std::uint8_t
     Opener,            // Param: seconds from the start of the fight
     TargetStrong,      // the target is elite, or Param or more levels above the bot
     ComboPointsAtLeast, // Param: combo points the bot holds on its target, counted from its own Sinister Strikes
+    EnemiesBelow,      // Param: fewer hostile units close to the bot than this (a single-target spell: 'enemies_below 2')
+    InParty,           // the bot is in a group (a warrior in a party holds Defensive Stance)
+    NoPet,             // the snapshot reports no pet (pet_state 0): a summon spell is due. A dead pet (state 2) is not 'no pet'
+    SelfAuraBelow,     // Param: aura spell id, Param2: stacks. The bot has fewer stacks of the aura than this (0 stacks when it is missing)
+    SelfAuraAtLeast,   // Param: aura spell id, Param2: stacks. The bot carries the aura with this many stacks or more (a proc such as Missile Barrage)
 };
 
 // What a rule reads. Built from a snapshot by FactsFor().
@@ -45,12 +50,18 @@ struct Facts
     std::int32_t TargetLevelDiff = 0;
     std::uint64_t FightMs = 0;
     std::int32_t ComboPoints = 0;
+    bool InParty = false;
+    std::uint32_t PetState = 0;                   // the snapshot's pet_state: 0 none, 1 alive, 2 dead
+    std::uint32_t AuraCount = 0;                  // the bot's own auras (layout 13), as many as the snapshot lists
+    std::uint32_t AuraSpell[16] = {};
+    std::uint32_t AuraStacks[16] = {};
 };
 
 struct Rule
 {
     Cond Condition = Cond::Always;
     std::int32_t Param = 0;
+    std::int32_t Param2 = 0;
 };
 
 bool Allowed(Rule const& rule, Facts const& facts);
@@ -73,15 +84,37 @@ struct Row
 };
 
 // Rotations read from a file (data/rotations.txt, made by tools/make_rotations.py), per class id. A class missing from the file keeps the built-in rows.
-//   class <id>
+//   class <id> [spec <key>]            the rows below belong to the class, or to one spec of it (a spec with no block uses the class's)
 //   row <spell> [level <n>] [maxlevel <n>] [duration <sec>] <condition> self|target [range <min> <max>]       a fight spell, in priority order
 //   buff <spell> [level <n>] [maxlevel <n>] duration <sec> self|party                                        an upkeep spell, cast out of combat when it has run out
 // Conditions: always | target_hp_above N | target_hp_below N | self_hp_below N | self_power_below N | self_power_above N | enemies N |
-// target_casting | opener N | target_strong N | combo N.
+// target_casting | opener N | target_strong N | combo N | enemies_below N | in_party | no_pet | self_aura_below <spell> <stacks> | self_aura_at_least <spell> <stacks>.
 struct RotationData
 {
-    std::map<std::uint32_t, std::vector<Row>> ByClass;
+    std::map<std::uint32_t, std::vector<Row>> ByClass;                          // `class <id>`: the class's default rows, and the fallback for a spec with no block
+    std::map<std::pair<std::uint32_t, std::string>, std::vector<Row>> BySpec;   // `class <id> spec <key>`: the rows of one spec
 };
+
+// Rows for a class and spec, in priority order: the spec's block, else the class's default block, else nullptr (the caller uses the built-in rows). An empty spec is the default.
+std::vector<Row> const* RowsFor(RotationData const& data, std::uint32_t classId, std::string const& spec);
+
+// Specs. A bot's spec is the optional third field of its scenario roster entry (race:class:spec); the keys are the SDK's spec keys, lower case. Role 1 tank, 2 healer, 3 dps.
+//   hunter bm mm sv; warrior arms fury prot; paladin holy prot ret; priest disc holy shadow; shaman ele enh resto; mage arcane fire frost;
+//   warlock affliction demonology destruction; rogue assassination combat subtlety; druid balance feral_tank feral_cat resto
+// SpecRole is 0 for a key the class does not have. DefaultSpec is what a bot of the class and role plays without a spec in its roster entry:
+//   tank: warrior prot, paladin prot, druid feral_tank; healer: priest holy, paladin holy, shaman resto, druid resto;
+//   dps: warrior arms, paladin ret, hunter bm, rogue combat, priest shadow, shaman enh, mage arcane, warlock demonology, druid feral_cat. Empty for a class with no such role.
+std::uint32_t SpecRole(std::uint32_t classId, std::string const& spec);
+std::string DefaultSpec(std::uint32_t classId, std::uint32_t role);
+
+// What a spec wants from its gear, as a small id the core's autogear scoring turns into a stat list (ModuleBotActions.cpp's
+// PreferredStats): 0 strength+stamina (warrior/paladin dps), 1 agility+stamina (hunter, rogue, enhancement shaman, and a
+// feral dps druid), 2 intellect+spirit+stamina (a caster role this table has no more specific answer for), 3 intellect+crit
+// (a caster dps: balance druid, shadow priest, elemental shaman, mage, warlock), 4 intellect+spirit+haste (a healer: holy
+// paladin/priest, discipline priest, restoration shaman/druid), 5 strength+stamina+dodge+parry+defense+block (a shield tank:
+// protection warrior/paladin), 6 agility+stamina+dodge+defense (a feral tank druid -- no shield, so no block/parry gear stat
+// to chase). Unknown class+spec falls back to 2.
+std::uint32_t GearProfileFor(std::uint32_t classId, std::string const& spec);
 
 RotationData ParseRotationData(std::istream& in, std::vector<std::string>& warnings);
 RotationData LoadRotationData(std::string const& path, std::vector<std::string>& warnings);

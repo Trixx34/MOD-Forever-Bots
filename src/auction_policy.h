@@ -7,6 +7,7 @@
 // ModuleActions.cpp), so in practice these are pieces of equipment.
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <optional>
@@ -22,6 +23,7 @@ enum Quality : std::uint8_t { kPoor = 0, kCommon = 1, kUncommon = 2, kRare = 3, 
 struct Settings
 {
     bool Enabled = false;                       // config key Auction (off by default)
+    bool BuyEnabled = false;                    // config key AuctionBuy (off by default): a bot also buys upgrades; only with Enabled
     // Listing price as a percent of the vendor sell price, by quality (config keys AuctionSellPctGreen, AuctionSellPctBlue, AuctionSellPctEpic). The vendor price
     // is the floor the house cannot fall under: nobody pays less for it than a vendor does.
     std::uint32_t SellPctGreen = 300;
@@ -87,6 +89,8 @@ struct Standing
     std::uint32_t ListedNow = 0;
     std::unordered_map<std::uint64_t, std::uint32_t> Attempts;   // item guid -> times listed
     std::uint64_t LastVisitMs = 0;                               // 0: never
+    std::uint64_t LastBuyMs = 0;                                 // the last browse for an upgrade; 0: never
+    std::uint32_t BuyCursor = 0;                                 // which slot the next buy visit looks at (BrowseSlot)
 };
 
 // Whether this bot may go to the house now: it is switched on, enough bag slots are used (or it has a relisting due), and the last visit is long enough ago.
@@ -118,17 +122,46 @@ struct Offer
     std::uint64_t Bid = 0;
     std::uint64_t Buyout = 0;                   // 0: no buyout, so it cannot be bought outright
     bool OwnListing = false;                    // the bot's own
+    std::uint32_t Upgrade = 0;                  // the core's upgrade_score for this bot: 0 = no upgrade
 };
 
 // How much better the item is for the bot than what it wears in that place, as one number (> 0 is an upgrade). The caller supplies it from the same score
 // the core's AutoGear uses; this module does not know item stats.
 using UpgradeScore = std::function<double(Offer const&)>;
+// The score the core worked out and put on the offer (AuctionListingEvent.upgrade_score).
+double UpgradeOf(Offer const& offer);
+
+// Whether this bot looks for an upgrade now: AuctionBuy and Auction are on, and the last browse was at least EveryMs ago (the same pace as a listing visit,
+// but without the bag condition: a bot with empty bags still buys). Money is judged by the caller, with BuyBudget.
+bool BuyVisitDue(Settings const& settings, Standing const& standing, std::uint64_t nowMs);
+
+// The inventory types (the game's InventoryType) a bot looks through, one per buy visit, in turn: the slots with equipment that has stats a class
+// compares (no shirts, tabards, bags, ammunition, trinkets or held items). BrowseSlot(cursor) wraps around.
+std::size_t BrowseSlotCount();
+std::uint32_t BrowseSlot(std::uint32_t cursor);
+
+// The buyout bound to send with a browse: the budget, as the wire's 32 bits.
+std::uint32_t BuyoutBound(std::uint64_t budget);
 
 // The money a bot may spend on the house: its money less the reserve for its level, and at most BuyMaxPct of that for one purchase.
 std::uint64_t BuyBudget(Settings const& settings, std::uint64_t copper, std::uint32_t level);
 
 // The offer to buy outright, or none: the best upgrade per copper among the offers it can afford with the budget. A tie goes to the lower buyout.
 std::optional<Offer> ChooseBuy(Settings const& settings, std::uint64_t budget, std::vector<Offer> const& offers, UpgradeScore const& score);
+
+// ---- the journal lines (after "forever-bots: "; key=value, no spaces or commas inside a value) ----
+
+// A free-text reason as one token: spaces become '_', commas and other characters outside [A-Za-z0-9_.:-] are dropped, cut at 40 characters; empty gives "unknown".
+std::string LogToken(std::string const& text);
+// "auction: bot G listed item I for B copper (buyout X) entry=E count=N price=B": the text before " entry=" is the original line that dashboards read.
+std::string ListedLine(std::uint64_t bot, Listing const& listing, std::uint32_t count);
+// "auction: bot G list_refused item I entry=E price=B reason=TOKEN class=retry|skip"
+std::string ListRefusedLine(std::uint64_t bot, Listing const& listing, std::string const& reason);
+
+// "auction: bot G bought item A entry=E count=N price=P" (A is the auction id; P is the copper the core took)
+std::string BoughtLine(std::uint64_t bot, Offer const& offer, std::uint64_t paid);
+// "auction: bot G buy_failed item A entry=E price=P reason=TOKEN" (P is the buyout asked)
+std::string BuyFailedLine(std::uint64_t bot, Offer const& offer, std::string const& reason);
 
 // ---- pace ----
 

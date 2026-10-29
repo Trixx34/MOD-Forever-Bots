@@ -79,7 +79,8 @@ Module.forever-bots.TelemetrySummarySec = 60
 #
 # Rotations from a file: fight rows and upkeep buffs for all classes up to level 60, with the real spell ids from the core's ability dump
 # (tools/make_rotations.py, doc/rotations.md). Without it the built-in rank 1 rotations are used.
-# RotationFile = "data/rotations.txt"
+# RotationFile = "data/rotations.txt"        # the default (a relative path is looked up beside the module executable); "" uses the built-in rank 1 rows
+# TameBeastFile = "data/tame_beasts.txt"      # the beasts a hunter may tame (Tame Beast); "" = hunters do not tame
 #
 # Grind spots (leveling): idle bots walk to the spots that suit their level instead of their map's hubs. The file is made from the world database
 # (tools/make_grind_spots.py, doc/grind-spots.md).
@@ -132,7 +133,11 @@ Module.forever-bots.TelemetrySummarySec = 60
 # AuctionPerVisit = 5           (items listed per visit, 1..20)
 # AuctionListedMax = 10         (listings a bot has at once, 1..50)
 # AuctionEverySec = 1800        (at most one visit per bot this often, 60..86400)
-# AuctionBuyMaxPct = 40         (not used yet: the most of a bot's spendable money one purchase may cost, 1..100)
+# AuctionBuy = 0                (off by default; needs Auction = 1 and a core with protocol 19. A bot also looks for upgrades: every AuctionEverySec it
+#                                browses one equipment slot of the house in turn, the core says which listings beat what the bot wears (its AutoGear score),
+#                                and the bot buys out the best upgrade per copper it can afford. Never in a scenario run. The item arrives by mail, which the
+#                                core collects for bots.)
+# AuctionBuyMaxPct = 40         (the most of a bot's spendable money (above the reserve) one purchase may cost, 1..100; used with AuctionBuy)
 # AuctionBrowsePerVisit = 3     (not used yet: item entries a bot looks up per visit, 1..20)
 # AuctionCallsPerTick = 4       (house calls the whole module makes per tick, 1..50)
 
@@ -141,7 +146,7 @@ Module.forever-bots.TelemetrySummarySec = 60
 # ScenarioResultFile: how it ended (complete, wipe, timeout, enter_failed), the furthest route point, deaths. The core needs
 # Bot.Actions.Teleport = 1 for it. Use MaxBots >= the roster size; the ramp and the saved bots are not used while a scenario is set.
 # Scenario = deadmines_a
-# ScenarioRoster = 1:1,1:5,7:8,7:8,1:4          # race:class: Human warrior, Human priest, Gnome mage x2, Human rogue
+# ScenarioRoster = 1:1,1:5,7:8,7:8,1:4          # race:class: Human warrior, Human priest, Gnome mage x2, Human rogue; race:class:spec picks the spec (1:1:prot,3:3:bm,7:9:demonology)
 # ScenarioLevel = 18
 # ScenarioStaging = 0 -8913.2 554.5 93.8        # map x y z: where the bots log in (a city, so nothing attacks them)
 # ScenarioEntry = 36 -14.57 -385.48 62.46       # map x y z: where the party enters the dungeon
@@ -152,12 +157,28 @@ Module.forever-bots.TelemetrySummarySec = 60
 # ScenarioRoute3 = -177.4 -574.5 19.3
 # ScenarioGear1 = 1234,5678                     # optional: items granted to a class instead of auto gear (needs Bot.Actions.Grant)
 # ScenarioResultFile = scenario-results.log
+# 40-man raid support (doc 108): ScenarioRaid = 1 lets ScenarioRoster go up to 40 (TrinityCore's MAX_RAID_SIZE) and forms the roster into
+# one raid group of 8 subgroups of 5 (Group::ConvertToRaid, Group::ChangeMembersGroup), instead of the flat 5-member party above. Without
+# it ScenarioRoster is still capped at 5 exactly as before -- a raid is a distinct, opt-in mode, not a universal cap raise. List the roster
+# as 8 repeats of the same tank/healer/dps composition a 5-man roster would use (one repeat per subgroup, in order): bot_policy.cpp assigns
+# subgroup = roster position / 5, so a warrior at position 0, 5, 10, ... lands as each subgroup's tank the same way the single-party case
+# already makes every warrior in a PartySize-roster its tank. (Example only -- a raid's own ScenarioEntry/ScenarioBosses/route for a given
+# raid instance, e.g. Onyxia's Lair, are set up separately; not shown here.)
+# Scenario = my_raid
+# ScenarioRaid = 1
+# ScenarioRoster = 1:1,1:5,1:4,1:4,1:4,1:1,1:5,1:4,1:4,1:4,1:1,1:5,1:4,1:4,1:4,1:1,1:5,1:4,1:4,1:4,1:1,1:5,1:4,1:4,1:4,1:1,1:5,1:4,1:4,1:4,1:1,1:5,1:4,1:4,1:4,1:1,1:5,1:4,1:4,1:4
+# ScenarioLevel = 60
+# ScenarioDurationSec = 5400
 # Several dungeons in one run (0.29.0): a list of dungeon ids of the dungeon files, each with its parties (20 in all); "<key>.<id>" sets a key for one dungeon.
 # The plain dungeon keys above (roster, level, staging, entry, portal, route, bosses, parties) are ignored with a list; the others apply to every dungeon.
 # Scenario = dm:10,rfc:10
 # ScenarioRoster.dm = 1:1,1:5,1:8,3:3,7:9
 # ScenarioLevel.dm = 18
 # ScenarioStaging.dm = 0 -8913 554 94
+# ScenarioTameSpot.dm = 0 -10439.4 929.2 38.9   # map x y z: hunters without a pet are taken here to tame one (Westfall), and back, before the party forms
+# ScenarioAmmo = 200                            # ammunition given to a hunter that has none, per grant, one stack at most (0 = none)
+# ScenarioClassSupplies = 9:6265:10             # class:item:count after the gear (default: a warlock gets 10 Soul Shards)
+# ScenarioClassQuests = 9:1504,3:6061           # off by default: class:quest completed with its reward in the dressing (core quest operation 4; the core refuses a quest not in the log)
 # ScenarioLevel.rfc = 17
 # Offline policy lab: each candidate applies to all ScenarioParties in that run. Defaults preserve current behavior;
 # bounded parameter ranges are validated by the module. See tools/dungeon_learning/README.md.

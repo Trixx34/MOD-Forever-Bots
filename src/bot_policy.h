@@ -34,6 +34,7 @@
 #include "ground_avoid.h"
 #include "quest_planner.h"
 #include "spell_costs.h"
+#include "tame_beasts.h"
 #include "crafting_foci.h"
 #include "bot_random.h"
 #include "chat_say.h"
@@ -83,6 +84,9 @@ struct PolicyOptions
     std::uint32_t ClassId = 0;
     // The class of each bot, when bots differ (random picks). Unset, or returning 0, falls back to ClassId.
     std::function<std::uint32_t(std::uint64_t botGuid)> ClassOf;
+    // The spec of a scenario bot (the third field of its roster entry, race:class:spec; "" = none): the rotation file's block of that spec is its rotation, and it sets the role
+    // of a bot that has none (a shadow priest does not heal). A bot without one plays the default spec of its class and role (rotation::DefaultSpec).
+    std::function<std::string(std::uint64_t botGuid)> SpecOf;
     // Vendor visits and trainer checks for an idle bot (M3, M4). A level-up checks the trainer at once. Zero turns that
     // service off; the module turns them on from its settings.
     std::uint64_t ServiceEveryMs = 0;
@@ -91,6 +95,10 @@ struct PolicyOptions
     // leader is its first warrior, else its lowest-guid bot. PartySize 0 turns parties off.
     std::uint32_t PartySize = 0;
     std::uint32_t PartyCount = 1;
+    // 40-man raid support (doc 108): with Raid on, the one party PartySize/PartyCount form (unchanged above) is raid-converted and
+    // its members assigned to 8 subgroups of 5 by roster position, instead of staying a flat party (which the server refuses past
+    // 5 members). Five-man scenarios and the plain PartySize/PartyCount feature never set this; only a raid scenario does (main.cpp).
+    bool Raid = false;
     // Randomness (bot_random.h). RandomSeed makes a run repeatable. RandomPct is how much the bots' timers and thresholds vary from bot to bot and from time
     // to time (+- this many percent); 0 turns the variation off (the tests). PartyPercent is the share of the bots that take part in the parties at all
     // (the others stay on their own); the parties are then of random sizes from 2 up to PartySize. The defaults keep the old behavior: no variation, every bot partied.
@@ -162,6 +170,11 @@ struct PolicyOptions
     bool TacticRest = true;
     // Recover: the leader of a dungeon party stands a dead member up at its side (the core's revive order) a few seconds after the fight, once it is up and quiet.
     bool TacticRecover = true;
+    // Cc: a rogue (Sap), mage (Polymorph) or warlock (Banish) holds one extra member of the tank's pack that nobody has engaged yet and that is not the
+    // dungeon's own kill priority, of a creature type its spell can affect (CreatureTypeOf in bot_policy.cpp; Sap and Polymorph are Humanoid only, Banish
+    // Demon or Elemental only); one bot, one unit, the same "one at a time" rule as interrupt. Maintained for as long as the fight runs (recast a little
+    // before the hold would run out); nothing to hold (no learned spell, or no pack member of a type it affects) does nothing, not an error.
+    bool TacticCc = true;
     // Bounded knobs for offline dungeon-policy experiments; defaults preserve current behavior.
     std::uint32_t DungeonHealBelowPct = 55;
     std::uint32_t DungeonTankHealBelowPct = 75;
@@ -185,6 +198,9 @@ struct PolicyOptions
     // Rotations from a file (data/rotations.txt, tools/make_rotations.py): the fight rows and the upkeep buffs of the classes it lists. A class it does
     // not list keeps the built-in rows.
     std::shared_ptr<rotation::RotationData const> Rotations;
+    // The beasts a hunter may tame (data/tame_beasts.txt). With it, a hunter of level 10 or more who has no pet and is not in a party walks to the nearest of them its level allows,
+    // casts Tame Beast on it and waits out the 20 second channel; the core creates the pet. Without it (or empty) hunters do not tame.
+    std::shared_ptr<tame::TameBeasts const> TameBeasts;
     // What spells cost (data/spell_costs.txt, made by the core): with it a bot does not try a spell it cannot pay for. Unset, every cast is tried.
     std::shared_ptr<spell_cost::SpellCostData const> SpellCosts;
     // Chat commands: a bot accepts a party invite from a player (a human leader), so the player can bring bots into a group and command them.
@@ -216,12 +232,13 @@ struct PolicyOptions
     std::uint64_t CorpseRunTimeoutMs = 240000;  // a ghost that has not reached its corpse by then gives up
     // A corpse run that takes longer than this (config CorpseRunTeleportSec, 0 = off) puts the ghost at its corpse (the CorpseRunTimeoutMs teleport, brought forward).
     std::uint64_t CorpseRunTeleportMs = 60000;
-    std::uint64_t WaitForRezMs = 90000;         // the party waits this long for a corpse to be resurrected
+    std::uint64_t WaitForRezMs = 20000;         // the party waits this long for a corpse to be resurrected (20 s: a rez that has not come by then is not coming)
     std::uint64_t WaitForGhostMs = 180000;      // and this long after the ghost entered the corpse's map
     // Supplies (layout 15): a bot short of ammunition, food or drink walks to a vendor that sells it and buys, and eats or drinks while resting.
     supply::Settings Supplies;
     // Flight points (layout 17, taxi_policy.h): a long walk becomes a flight from the nearest flight master. Off by default.
     taxi::Settings Taxi;
+    std::shared_ptr<std::vector<taxi::Place>> TaxiPlaces;   // where flights go, to name the city in the taxi journal lines (unset: "unknown")
 };
 
 // Name of an action status, for logs.
@@ -239,6 +256,9 @@ public:
     // Parallel parties: the route is active per bot (the director of the bot's own party says), and each party has its own killed bosses (a boss dead in one instance is
     // alive in the next). With these set, SetRouteActive and SetKilledBosses are not used.
     void SetRouteActiveFor(std::function<bool(std::uint64_t)> fn) { _routeActiveFn = std::move(fn); }
+    // The scenario's Taming phase is on for this bot's party: a hunter without a pet tames even though the party has formed already (it would otherwise follow its leader, who stays at
+    // the staging place, and the scenario's teleport to the tame spot is undone at once), and stands still when there is nothing to tame in view.
+    void SetTamingFor(std::function<bool(std::uint64_t)> fn) { _tamingFn = std::move(fn); }
     void SetKilledBossesFor(std::function<std::set<std::uint32_t> const&(std::uint64_t)> fn) { _killedBossesFn = std::move(fn); }
     // Several dungeons: the route, events, kill priority and portal of the bot's own party's dungeon. A bot it returns nullptr for (or without it) uses the
     // options' own Route, Events, KillPriority and portal, as a single-dungeon scenario does.
@@ -293,6 +313,7 @@ public:
     {
         std::uint64_t Bot = 0;
         std::uint32_t Role = 0;
+        std::uint32_t Spec = 0;   // forever_module::TalentSpec of the bot's spec (protocol 18), 0 = none: the core falls back to the role's profile
     };
     std::vector<TalentOrder> TakeTalentOrders();
     void TalentOrderFailed(std::uint64_t bot, std::uint64_t nowMs);
@@ -337,6 +358,12 @@ private:
         std::uint64_t PetRetryAtMs = 0;                  // no pet cast out of combat before this
         std::uint64_t PetProbeAtMs = 0;                  // below level 12 (no Mend Pet) a Call Pet probe is not sent before this
         std::uint64_t PetMendAtMs = 0;                   // no Mend Pet in a fight before this
+        // Taming (Tame Beast on a beast of data/tame_beasts.txt): the hold lasts through the channel, during which the bot stands still and casts nothing else.
+        std::uint64_t TameUntilMs = 0;                   // the hold ends here (0 = not taming)
+        std::uint64_t TameCastAtMs = 0;                  // when Tame Beast was sent
+        std::uint64_t TameTarget = 0;                    // the beast being tamed or approached
+        std::uint64_t TameRetryAtMs = 0;                 // no search or cast before this
+        std::uint32_t TameFailures = 0;                  // casts that ended with no pet; the hunter gives up for a while at kTameMaxFailures
         bool PetCommanded = false;                       // the pet has been sent at this fight's target (layout 13)
         bool Sitting = false;                            // sat down to rest; stands before it moves or fights
         std::uint64_t RestRetryAtMs = 0;                 // a refused sit is not tried again before this
@@ -404,6 +431,13 @@ private:
         Point ExploreTarget;
         std::uint64_t InviteAcceptAtMs = 0;              // a player's invite is not answered again before this
         std::uint64_t PartyRetryAtMs = 0;                // a party action is not sent again before this
+        // 40-man raid support (doc 108), leader-side only. RaidConvertRetryAtMs paces the repeated ConvertToRaid asks (its success is
+        // not visible in the snapshot -- no is_raid field -- so it is simply retried at a slow pace, harmless once already a raid).
+        // RaidSubgroupSent/RaidAssignRetryAtMs remember, per member, the subgroup last asked for and when it may be asked again, so a
+        // confirmed member is not re-sent every tick.
+        std::uint64_t RaidConvertRetryAtMs = 0;
+        std::unordered_map<std::uint64_t, std::uint8_t> RaidSubgroupSent;
+        std::unordered_map<std::uint64_t, std::uint64_t> RaidAssignRetryAtMs;
         std::unordered_map<std::uint64_t, std::uint64_t> AvoidUntilMs; // unit -> until when the bot picks another target
         std::unordered_map<std::uint64_t, std::uint32_t> AvoidCount;   // unit -> how many times it has been avoided
         bool Approaching = false;                        // walking to its target, not yet in range
@@ -438,6 +472,7 @@ private:
         std::size_t RouteRecoveredAt = std::size_t(-1);  // the route point the leader was last put back on the route for (once per point)
         std::uint64_t LostSinceMs = 0;                   // a member has been far from its leader since this time (0 = not lost)
         std::uint64_t NextRecoverMs = 0;                 // no teleport back to the leader before this
+        std::uint64_t LeaderRecoverWaitSinceMs = 0;      // a revived leader at the entrance, resting before it goes to its party: since when (0 = not waiting)
         std::uint64_t RouteBossSinceMs = 0;              // when the leader began to wait at a boss point (0 = not waiting)
         std::uint64_t MoveWhyLoggedMs = 0;               // when the policy last logged why a party bot moves (move_why)
         Point MoveWhyDest{};
@@ -449,6 +484,7 @@ private:
         std::uint64_t RouteHoldLoggedMs = 0;             // when the leader last logged why it does not walk on (route_hold)
         std::uint64_t TaxiBlockedUntilMs = 0;            // the core refused a flight: walk until this
         std::uint64_t TaxiWaitUntilMs = 0;               // a flight was ordered: give it time to show
+        taxi::Flight TaxiFlight;                         // the flight ordered and not ended yet (for the landing and timeout log lines)
         std::uint64_t NextPotionMs = 0;                  // no potion before this (the game shares one cooldown between potions)
         std::uint64_t TravelStartMs = 0;                 // when this walk began; it is dropped after kTravelTimeoutMs
         std::unordered_set<std::uint32_t> CastTimeSpells; // spells the core refused because the bot was moving: they need it standing
@@ -458,6 +494,7 @@ private:
         enum class Stance : std::uint8_t { Aggressive, Defensive, Passive };
         Stance Stance_ = Stance::Defensive;              // aggressive: fights what the group fights or meets; defensive: only what attacks it or the group; passive: only what attacks it
         enum class Role : std::uint8_t { Auto, Tank, Healer, Dps };
+        bool SpecRoleApplied = false;                    // the role was set from the roster spec once
         Role Role_ = Role::Auto;                         // overrides what the class gives (tank pulls and leads, dps does not heal on its own)
         std::uint64_t FocusMissingMs = 0;                // since when the focus target has not been in view
         std::uint64_t Focus = 0;                         // the creature attacked first in a fight
@@ -482,8 +519,13 @@ private:
         std::uint64_t LosRepositionTarget = 0;            // target of a healer DPS cast refused for LoS; move to clear it before retrying
         std::uint64_t HoldLastNotReadyMs = 0;            // the last tick the party was not ready (the pull hold ends after kPullHoldClearMs of readiness)
         std::uint64_t HoldSinceMs = 0;                   // the party leader waits for the party to be ready since this time (0 = not waiting)
+        std::uint64_t RegroupSinceMs = 0;                // the party leader's regroup started at this time (a member dead or out of range; 0 = none)
+        std::map<std::uint64_t, std::uint64_t> RegroupFarSinceMs; // member guid -> the time it was first out of range (cleared once it is back or dead)
+        std::set<std::uint64_t> RegroupStuck;            // members out of range for kRegroupStuckMs in this regroup: the party does not wait for them
+        std::uint32_t RegroupStuckCount = 0;             // how many members were stuck in this regroup (for the regroup_done line)
         std::uint32_t TalentLevel = 0;                   // the level and role (1 to 3) of the last talent order sent for this bot (0 = none yet)
         std::uint32_t TalentRole = 0;
+        std::uint32_t TalentSpec = 0;     // the spec the last talent order carried (a changed spec orders again)
         std::uint64_t TalentRetryMs = 0;                 // no talent order before this time (after a refusal)
         std::uint32_t GearedAtLevel = 0;                 // the level at the last auto gear (0 = not yet)
         bool GearRequested = false;                      // the .autogear command asked for it
@@ -527,10 +569,12 @@ private:
         std::unordered_map<std::uint64_t, std::uint32_t> RezRefusals;  // dead member -> refusals in a row
     };
 
-    // The rows of a class's rotation: from the rotation file when it lists the class, else the built-in ones.
-    std::span<rotation::Row const> RowsFor(std::uint32_t classId) const;
+    // The rows of a class's rotation: from the rotation file's block of the spec when it has one, else the class's block, else the built-in rows.
+    std::span<rotation::Row const> RowsFor(std::uint32_t classId, std::string const& spec = {}) const;
+    // The spec a bot plays: its roster entry's, else the default of its class and role (the role the policy gives it: set, or from the class).
+    std::string SpecFor(std::uint64_t botGuid, std::uint32_t classId) const;
     // How long a spell's effect lasts, for the dot and buff upkeep: from the rotation file, else the built-in table (0 = not tracked).
-    std::uint64_t DurationMsOf(std::uint32_t classId, std::uint32_t spell) const;
+    std::uint64_t DurationMsOf(std::uint32_t classId, std::uint32_t spell, std::string const& spec = {}) const;
 
     void ReadResult(BotState& state, forever_module::BotSnapshot const& bot, std::uint64_t nowMs);
 
@@ -577,6 +621,7 @@ private:
     std::function<PolicyOptions::ScenarioRoute const*(std::uint64_t)> _scenarioRouteFn;
     bool _routeActive = false;
     std::function<bool(std::uint64_t)> _routeActiveFn;
+    std::function<bool(std::uint64_t)> _tamingFn;
     std::function<std::set<std::uint32_t> const&(std::uint64_t)> _killedBossesFn;
     std::map<std::uint32_t, std::set<std::uint32_t>> _tankKilled;   // map -> bosses seen dead during a "tank lead" run
     std::set<std::uint32_t> _killedBosses;

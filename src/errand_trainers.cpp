@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <limits>
+#include <map>
 
 namespace errand {
 
@@ -67,6 +68,28 @@ bool ParseFloat(std::string_view text, float& value)
 }
 
 } // namespace
+
+std::string CityName(std::uint32_t city)
+{
+    switch (city)
+    {
+        case kStormwind:
+            return "Stormwind";
+        case kIronforge:
+            return "Ironforge";
+        case kDarnassus:
+            return "Darnassus";
+        case kUndercity:
+            return "Undercity";
+        case kOrgrimmar:
+            return "Orgrimmar";
+        case kThunderBluff:
+            return "ThunderBluff";
+        default:
+            break;
+    }
+    return "city" + std::to_string(city);
+}
 
 std::uint32_t CityOf(std::string_view name)
 {
@@ -198,6 +221,28 @@ std::optional<std::size_t> ChooseTrainer(std::vector<Trainer> const& trainers, s
         }
     }
     return best;
+}
+
+std::vector<taxi::Place> CityPlaces(std::vector<Trainer> const& trainers)
+{
+    struct Sum
+    {
+        double X = 0.0;
+        double Y = 0.0;
+        std::size_t Count = 0;
+    };
+    std::map<std::pair<std::uint32_t, std::uint32_t>, Sum> sums;    // (city, map) -> sum of the trainer positions
+    for (Trainer const& trainer : trainers)
+    {
+        Sum& sum = sums[{ trainer.City, trainer.Map }];
+        sum.X += trainer.X;
+        sum.Y += trainer.Y;
+        ++sum.Count;
+    }
+    std::vector<taxi::Place> places;
+    for (auto const& [key, sum] : sums)
+        places.push_back(taxi::Place{ CityName(key.first), key.second, float(sum.X / double(sum.Count)), float(sum.Y / double(sum.Count)) });
+    return places;
 }
 
 } // namespace errand

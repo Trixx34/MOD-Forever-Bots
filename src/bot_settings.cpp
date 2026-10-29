@@ -127,13 +127,27 @@ void ReadOneScenario(std::unordered_map<std::string, std::string> const& config,
         std::string item;
         while (std::getline(list, item, ','))
         {
+            // race:class or race:class:spec (the spec is a lower case key such as bm, prot, shadow; whether the class has it is checked where the bot is spawned)
             auto const colon = item.find(':');
+            auto const second = colon == std::string::npos ? std::string::npos : item.find(':', colon + 1);
             std::uint32_t race = 0, cls = 0;
-            if (colon != std::string::npos && std::from_chars(item.data(), item.data() + colon, race).ec == std::errc{} &&
-                std::from_chars(item.data() + colon + 1, item.data() + item.size(), cls).ec == std::errc{} && race > 0 && cls > 0)
+            std::string spec;
+            bool ok = colon != std::string::npos && std::from_chars(item.data(), item.data() + colon, race).ec == std::errc{} &&
+                      std::from_chars(item.data() + colon + 1, item.data() + (second == std::string::npos ? item.size() : second), cls).ec == std::errc{} && race > 0 && cls > 0;
+            if (ok && second != std::string::npos)
+            {
+                spec = item.substr(second + 1);
+                while (!spec.empty() && std::isspace(static_cast<unsigned char>(spec.back())))
+                    spec.pop_back();
+                ok = !spec.empty() && std::all_of(spec.begin(), spec.end(), [](char c) { return (c >= 'a' && c <= 'z') || c == '_'; });
+            }
+            if (ok)
+            {
                 scenario.Roster.push_back({ race, cls });
+                scenario.RosterSpec.push_back(spec);
+            }
             else
-                warnings.push_back("Module.forever-bots.ScenarioRoster: '" + item + "' is not race:class; ignored.");
+                warnings.push_back("Module.forever-bots.ScenarioRoster: '" + item + "' is not race:class or race:class:spec; ignored.");
         }
     }
     if (scenario.Roster.empty())
@@ -142,8 +156,12 @@ void ReadOneScenario(std::unordered_map<std::string, std::string> const& config,
         scenario.Name.clear();
         return;
     }
-    if (scenario.Roster.size() > 5)
-        scenario.Roster.resize(5);
+    // ScenarioRaid (doc 108): a raid roster may go up to 40 (TrinityCore's MAX_RAID_SIZE); a five-man scenario (unset, the
+    // default) keeps the existing cap of 5 exactly as before -- this is a distinct mode, not a universal cap raise.
+    ReadBool(config, "ScenarioRaid", scenario.Raid, warnings);
+    std::uint32_t const rosterCap = scenario.Raid ? 40 : 5;
+    if (scenario.Roster.size() > rosterCap)
+        scenario.Roster.resize(rosterCap);
 
     ReadKey(config, "ScenarioLevel", 1, 60, scenario.Level, warnings);
     if (auto const it = config.find("ScenarioKillPriority"); it != config.end())
@@ -163,6 +181,8 @@ void ReadOneScenario(std::unordered_map<std::string, std::string> const& config,
     ReadKey(config, "ScenarioDurationSec", 30, 86400, scenario.DurationSec, warnings);
     if (auto const it = config.find("ScenarioStaging"); it != config.end())
         scenario.HasStaging = ParseNumbers(it->second, scenario.Staging.data(), 4);
+    if (auto const it = config.find("ScenarioTameSpot"); it != config.end())
+        scenario.HasTameSpot = ParseNumbers(it->second, scenario.TameSpot.data(), 4);
     if (auto const it = config.find("ScenarioEntry"); it != config.end())
         scenario.HasEntry = ParseNumbers(it->second, scenario.Entry.data(), 4);
     if (!scenario.HasEntry)
@@ -243,6 +263,43 @@ void ReadOneScenario(std::unordered_map<std::string, std::string> const& config,
                     warnings.push_back("Module.forever-bots.ScenarioSupplies: '" + item + "' is not item:count; ignored.");
             }
         }
+        else if (key == "ScenarioClassSupplies" || key == "ScenarioClassQuests")
+        {
+            // The first mention replaces the defaults; an empty value switches the kind off.
+            bool const supplies = key == "ScenarioClassSupplies";
+            if (supplies)
+                scenario.ClassSupplies.clear();
+            else
+                scenario.ClassQuests.clear();
+            std::istringstream list(value);
+            std::string item;
+            while (std::getline(list, item, ','))
+            {
+                std::istringstream parts(item);
+                std::string a, b, c;
+                std::getline(parts, a, ':');
+                std::getline(parts, b, ':');
+                std::getline(parts, c, ':');
+                auto const num = [](std::string const& text, std::uint32_t& out)
+                { return !text.empty() && std::from_chars(text.data(), text.data() + text.size(), out).ec == std::errc{} && out > 0; };
+                std::uint32_t classId = 0, first = 0, second = 0;
+                bool const ok = supplies ? num(a, classId) && num(b, first) && num(c, second) : num(a, classId) && num(b, first);
+                if (!ok)
+                    warnings.push_back("Module.forever-bots." + key + ": '" + item + "' is not " + (supplies ? "class:item:count" : "class:quest") + "; ignored.");
+                else if (supplies)
+                    scenario.ClassSupplies[classId].emplace_back(first, second);
+                else
+                    scenario.ClassQuests[classId].push_back(first);
+            }
+        }
+        else if (key == "ScenarioAmmo")
+        {
+            std::uint32_t n = 0;
+            if (std::from_chars(value.data(), value.data() + value.size(), n).ec == std::errc{} && n <= 2000)
+                scenario.Ammo = n;
+            else
+                warnings.push_back("Module.forever-bots.ScenarioAmmo: not a count from 0 to 2000; ignored.");
+        }
         else if (key.rfind("ScenarioGear", 0) == 0)
         {
             std::uint32_t classId = 0;
@@ -282,7 +339,7 @@ bool OneFaction(ScenarioSettings const& scenario)
 bool IsPlainDungeonKey(std::string const& key)
 {
     static char const* const keys[] = { "Dungeon", "ScenarioRoster", "ScenarioLevel", "ScenarioStaging", "ScenarioEntry", "ScenarioPortal",
-                                        "ScenarioBosses", "ScenarioBossAt", "ScenarioKillPriority", "ScenarioParties" };
+                                        "ScenarioBosses", "ScenarioBossAt", "ScenarioKillPriority", "ScenarioParties", "ScenarioTameSpot", "ScenarioRaid" };
     if (key.find('.') != std::string::npos)
         return false;
     for (char const* plain : keys)
@@ -458,6 +515,8 @@ ScenarioSlot ScenarioSlotOf(std::vector<ScenarioSettings> const& scenarios, std:
             where.Party = party + slot / size;
             where.Race = scenarios[d].Roster[slot % size][0];
             where.Class = scenarios[d].Roster[slot % size][1];
+            if (slot % size < scenarios[d].RosterSpec.size())
+                where.Spec = scenarios[d].RosterSpec[slot % size];
             return where;
         }
         slot -= bots;
@@ -574,7 +633,7 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadBool(config, "AggressiveStart", settings.AggressiveStart, warnings);
     if (auto const it = config.find("DungeonTactics"); it != config.end())
     {
-        settings.TacticFocus = settings.TacticInterrupt = settings.TacticHeal = settings.TacticRest = settings.TacticRecover = false;
+        settings.TacticFocus = settings.TacticInterrupt = settings.TacticHeal = settings.TacticRest = settings.TacticRecover = settings.TacticCc = false;
         std::istringstream list(it->second);
         std::string item;
         while (std::getline(list, item, ','))
@@ -584,7 +643,7 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
             while (!item.empty() && item.back() == ' ')
                 item.pop_back();
             if (item == "all")
-                settings.TacticFocus = settings.TacticInterrupt = settings.TacticHeal = settings.TacticRest = settings.TacticRecover = true;
+                settings.TacticFocus = settings.TacticInterrupt = settings.TacticHeal = settings.TacticRest = settings.TacticRecover = settings.TacticCc = true;
             else if (item == "focus")
                 settings.TacticFocus = true;
             else if (item == "interrupt")
@@ -595,8 +654,10 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
                 settings.TacticRest = true;
             else if (item == "recover")
                 settings.TacticRecover = true;
+            else if (item == "cc")
+                settings.TacticCc = true;
             else if (item != "none" && !item.empty())
-                warnings.push_back("Module.forever-bots.DungeonTactics: '" + item + "' is not focus, interrupt, heal, rest, recover, all or none; ignored.");
+                warnings.push_back("Module.forever-bots.DungeonTactics: '" + item + "' is not focus, interrupt, heal, rest, recover, cc, all or none; ignored.");
         }
     }
     ReadBool(config, "Crafting", settings.Crafting, warnings);
@@ -662,6 +723,7 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
         settings.Taxi.BlockedMs = std::uint64_t(blockedSec) * 1000;
     }
     ReadBool(config, "Auction", settings.Auction.Enabled, warnings);
+    ReadBool(config, "AuctionBuy", settings.Auction.BuyEnabled, warnings);
     ReadKey(config, "AuctionSellPctGreen", 100, 2000, settings.Auction.SellPctGreen, warnings);
     ReadKey(config, "AuctionSellPctBlue", 100, 2000, settings.Auction.SellPctBlue, warnings);
     ReadKey(config, "AuctionSellPctEpic", 100, 2000, settings.Auction.SellPctEpic, warnings);
@@ -713,6 +775,8 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadScenarios(config, settings, warnings);
     if (auto const it = config.find("RotationFile"); it != config.end())
         settings.RotationFile = it->second;
+    if (auto const it = config.find("TameBeastFile"); it != config.end())
+        settings.TameBeastFile = it->second;
     if (auto const it = config.find("SpellCostFile"); it != config.end())
         settings.SpellCostFile = it->second;
     if (auto const it = config.find("GrindFile"); it != config.end())

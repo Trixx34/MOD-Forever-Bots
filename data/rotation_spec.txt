@@ -1,58 +1,196 @@
-# Rotation spec: spells by name, resolved to real ids and levels by tools/make_rotations.py (python3 -I tools/make_rotations.py --dump Server.log --spec
-# data/rotation_spec.txt > data/rotations.txt). Rows are in priority order; buffs are upkeep spells cast out of combat when they have run out.
-# Durations are the rank 1 lengths in seconds (a longer real duration only means a recast earlier than needed). Conditions: always, target_hp_below N,
-# self_hp_below N, self_power_below N, self_power_above N, enemies N, target_casting, opener N, target_strong N, combo N.
-# Left out on purpose: stances and forms, pets, totems that need placing, crowd control and anything that needs a target's target, the aura of a
-# creature or a position behind a target. The party heals are done by the policy itself (heal block), not here.
-# Rows marked "Forever" are abilities of this fork's client data (the Classic beta's Spell/SkillLineAbility/SpellEffect tables: class skill line, cost,
-# cooldown, range and effects were read from them) that the vanilla kits lack. They are spells by name like the others: a name that the core's ability
-# dump does not show for the class is dropped with a warning, so a bot never gets a guessed id. See doc/rotations.md for what was not added and why.
+# Rotation spec: spells by name, resolved to real ids and levels by tools/make_rotations.py (python3 -I tools/make_rotations.py --dump abilities.log --spec
+# data/rotation_spec.txt > data/rotations.txt; the dump comes from tools/abilities_from_db2.py or the core's Bot.Dump.Abilities). Rows are in priority order; buffs are upkeep spells
+# cast out of combat when they have run out. Durations are the rank 1 lengths in seconds (a longer real duration only means a recast earlier than needed).
+# Conditions: always, target_hp_above N, target_hp_below N, self_hp_below N, self_power_below N, self_power_above N, enemies N, enemies_below N, target_casting, opener N,
+# target_strong N, combo N, in_party, no_pet, self_aura_below <spell> <stacks>, self_aura_at_least <spell> <stacks>.
+#
+# A class has a default block (`class N`) and one block per spec (`class N spec KEY`): a bot plays the block of its spec (the third field of its scenario roster entry,
+# race:class:spec; without one the default spec of its class and role, see rotation::DefaultSpec), and a spec with no block plays the class default. The rows come from the
+# Wowhead Forever level 30 spec guides (docs/102-wowhead-class-rotations.md in forever-ops) and the rotations the owner pasted; each block says what it could not do.
+# Left out on purpose: crowd control, totems that need placing (Searing Totem is cast at the fight's start), a position behind a target (Backstab, Shred from behind), and anything
+# that needs a target's target (the snapshot has none: Taunt is cast against two or more enemies). See doc/rotations.md for what was not added and why.
+# Rows marked "Forever" are abilities of this fork's client data. A name that the ability dump does not show for the class is dropped with a warning, so a bot never gets a guessed id.
 
 class 1
+# The default warrior: the protection rows, which a warrior in a party needs (a solo warrior stays in Battle Stance and keeps Execute).
+row "Execute" self_aura_below 71 1 target range 0 5    # not while in Defensive Stance: the core refuses it there
+row "Taunt" enemies 2 target range 0 5
+row "Bloodrage" self_power_below 20 self
+row "Charge" opener 8 target range 8 25
+row "Shield Block" duration 5 always self
+row "Revenge" always target range 0 5
+row "Thunder Clap" enemies 2 self
+row "Retaliation" enemies 3 self
+row "Demoralizing Shout" enemies 3 self duration 30
+row "Sunder Armor" in_party target range 0 5
+row "Cleave" enemies 2 target range 0 5
+row "Rend" duration 21 always target range 0 5
+row "Heroic Strike" self_power_above 40 target range 0 5
+buff "Battle Shout" duration 120 self
+buff "Defensive Stance" duration 120 self in_party
+
+class 1 spec prot
+# Protection (tank). Charge on engage, Shield Block liberally (rage-neutral with Shield Specialization) to proc Revenge, Thunder Clap in Defensive Stance, Sunder Armor in a group,
+# Rend only late (the guide: when already high on threat), Heroic Strike with spare rage. Taunt against two or more enemies. Retaliation against several.
+row "Execute" self_aura_below 71 1 target range 0 5
+row "Taunt" enemies 2 target range 0 5
+row "Bloodrage" self_power_below 20 self
+row "Charge" opener 8 target range 8 25
+row "Shield Block" duration 5 always self
+row "Revenge" always target range 0 5
+row "Thunder Clap" enemies 2 self
+row "Shockwave" enemies 2 self                         # Forever: frontal stun, 20 s cooldown
+row "Retaliation" enemies 3 self
+row "Demoralizing Shout" enemies 3 self duration 30
+row "Sunder Armor" in_party target range 0 5
+row "Spearing Strike" self_power_above 30 target range 0 5   # Forever: 20 s cooldown, instant weapon strike
+row "Cleave" enemies 2 target range 0 5
+row "Rend" duration 21 always target range 0 5
+row "Heroic Strike" self_power_above 40 target range 0 5
+buff "Battle Shout" duration 120 self
+buff "Defensive Stance" duration 120 self in_party
+
+class 1 spec arms
+# Arms (damage). Sweeping Strikes against two, Overpower after a dodge (refused otherwise), Mortal Strike from level 48, Rend, Sunder Armor in a group, Execute at the end.
+# Berserker Stance comes from the level 30 class quest and is not cast; the warrior stays in Battle Stance.
 row "Execute" target_hp_below 20 target range 0 5
 row "Bloodrage" self_power_below 20 self
 row "Charge" opener 8 target range 8 25
+row 12292 level 30 enemies 2 duration 10 self      # Sweeping Strikes (the talent spell; 12723 is its effect)
+row "Mortal Strike" always target range 0 5
+row "Overpower" always target range 0 5
 row "Thunder Clap" enemies 2 self
-row "Shockwave" enemies 2 self                      # Forever: frontal stun, 20 s cooldown
-row "Demoralizing Shout" enemies 3 self duration 30
-row "Sunder Armor" target_strong 2 target range 0 5
+row "Sunder Armor" in_party target range 0 5
 row "Rend" duration 21 always target range 0 5
-row "Spearing Strike" self_power_above 30 target range 0 5   # Forever: 20 s cooldown, instant weapon strike
+row "Spearing Strike" self_power_above 30 target range 0 5   # Forever
 row "Cleave" enemies 2 target range 0 5
 row "Heroic Strike" self_power_above 40 target range 0 5
 buff "Battle Shout" duration 120 self
 
+class 1 spec fury
+# Fury (damage). Death Wish and Bloodthirst (talents: refused until learned), Execute, Overpower (rage-efficient), Sunder Armor as a debuff; Cleave and Heroic Strike only with
+# lots of rage (the guide calls them rage-inefficient). Whirlwind and Berserker Rage need Berserker Stance and are not cast.
+row "Execute" target_hp_below 20 target range 0 5
+row "Bloodrage" self_power_below 20 self
+row "Charge" opener 8 target range 8 25
+row "Death Wish" target_strong 1 self
+row "Bloodthirst" always target range 0 5
+row "Overpower" always target range 0 5
+row "Sunder Armor" in_party target range 0 5
+row "Cleave" enemies 3 self_power_above 70 target range 0 5
+row "Heroic Strike" self_power_above 70 target range 0 5
+buff "Battle Shout" duration 120 self
+
 class 2
+# The default paladin (no spec): seals, judgement and strikes.
 row "Rebuke" target_casting target range 0 5          # Forever: melee interrupt, 15 s cooldown
 row "Hammer of Justice" target_casting target range 0 10
 row "Holy Light" self_hp_below 50 self
 row "Consecration" enemies 3 self
 row "Seal of Righteousness" duration 30 always self
-row "Holy Strike" always target range 0 5            # Forever: 10 s cooldown, 9 mana, weapon strike
-row "Divine Storm" always self                      # Forever: 10 s cooldown, hits the enemies around the paladin
-row "Hammer of the Righteous" always target range 0 5   # Forever: 6 s cooldown melee
+row "Holy Strike" always target range 0 5            # Forever: 10 s cooldown, weapon strike
 row "Judgement" always target range 0 10
 buff "Devotion Aura" duration 3600 self
+buff "Retribution Aura" duration 3600 self
 buff "Blessing of Might" duration 300 party
+supersede "Devotion Aura" by "Retribution Aura"
+
+class 2 spec prot
+# Protection (tank, S tier at level 30): Righteous Fury and Retribution Aura before the pull, Seal of Fury kept up, Consecration for packs (first rank 26573, level 20), Holy Strike and
+# Judgement as extra buttons, Exorcism is left out (it needs an undead or demon target).
+row "Rebuke" target_casting target range 0 5
+row "Hammer of Justice" target_casting target range 0 10
+row "Holy Light" self_hp_below 50 self
+row "Consecration" enemies 3 self
+row "Seal of Fury" duration 30 always self            # Forever
+row "Holy Strike" always target range 0 5
+row "Hammer of the Righteous" always target range 0 5   # Forever: 6 s cooldown melee
+row "Judgement" always target range 0 10
+buff "Righteous Fury" duration 1800 self in_party
+buff "Devotion Aura" duration 3600 self
+buff "Retribution Aura" duration 3600 self
+buff "Blessing of Might" duration 300 party
+supersede "Devotion Aura" by "Retribution Aura"
+
+class 2 spec holy
+# Holy (healer): the policy's heal block heals (Holy Light); these rows are the little it fights with. One aura always, Blessing of Wisdom for the casters.
+row "Hammer of Justice" target_casting target range 0 10
+row "Seal of Righteousness" duration 30 always self
+row "Judgement" always target range 0 10
+buff "Devotion Aura" duration 3600 self
+buff "Retribution Aura" duration 3600 self
+buff "Blessing of Wisdom" duration 300 party
+supersede "Devotion Aura" by "Retribution Aura"
+
+class 2 spec ret
+# Retribution (damage): Judgement of the Crusader with the first Judgement, Seal of Righteousness, Holy Strike on cooldown, Consecration for three or more, Hammer of Wrath to finish.
+row "Rebuke" target_casting target range 0 5
+row "Hammer of Justice" target_casting target range 0 10
+row "Holy Light" self_hp_below 50 self
+row "Hammer of Wrath" target_hp_below 20 target range 0 30
+row "Consecration" enemies 3 self
+row "Seal of Righteousness" duration 30 always self
+row "Judgement of the Crusader" duration 20 always target range 0 10
+row "Holy Strike" always target range 0 5
+row "Judgement" always target range 0 10
+buff "Devotion Aura" duration 3600 self
+buff "Retribution Aura" duration 3600 self
+buff "Blessing of Might" duration 300 party
+supersede "Devotion Aura" by "Retribution Aura"
 
 class 3
-row "Bestial Wrath" target_strong 2 self             # Forever: burst cooldown (Beast Mastery only; refused and skipped for other specs)
+# The default hunter is Beast Mastery.
 row "Hunter's Mark" duration 120 always target range 0 35
-row "Serpent Sting" duration 15 always target range 0 35
-row "Black Arrow" duration 30 always target range 0 35   # Forever: 30 s damage over time
-row "Chimera Shot" always target range 0 35         # Forever: instant, 6 s cooldown
-row "Mongoose Bite" always target range 0 5          # Survival only (needs a dodge/Expose Prey proc; refused and skipped otherwise)
-row "Counterattack" always target range 0 5          # Survival only (needs a parry; refused and skipped otherwise)
-row "Strider Kick" always target range 0 5           # Forever: Survival melee, 3 s movement speed boost (not an interrupt)
+row 1293241 level 25 duration 18 always self       # Summon Hawk (no trainer teaches rank 1: the core refuses it until the bot has it)
 row "Multi-Shot" enemies 2 target range 0 35
 row "Aimed Shot" always target range 0 35
 row "Arcane Shot" always target range 0 35
 row "Raptor Strike" always target range 0 5
 row "Auto Shot" always target range 0 35
 buff "Aspect of the Hawk" duration 3600 self
-buff "Call Pet" duration 120 self
+
+class 3 spec bm
+# Beast Mastery (level 30 guide): before Summon Hawk (level 25) Aimed Shot (one target) or Multi-Shot (several) and Arcane Shot on cooldown; with the Hawk, a guardian for 18 s:
+# Hawk, Aimed/Multi, Hawk, Aimed/Multi, Arcane. The Hawk is cast whenever it is ready (a cooldown refusal skips it). With no ammunition the policy leaves the ranged rows out and
+# Raptor Strike is what remains. The pet is the policy's own logic (Tame Beast, then Call Pet), not a row.
+row "Hunter's Mark" duration 120 always target range 0 35
+row 1293241 level 25 duration 18 always self       # Summon Hawk (rank 1; no trainer teaches it: the core refuses it until the bot has it)
+row "Multi-Shot" enemies 2 target range 0 35
+row "Aimed Shot" always target range 0 35
+row "Arcane Shot" always target range 0 35
+row "Raptor Strike" always target range 0 5
+row "Auto Shot" always target range 0 35
+buff "Aspect of the Hawk" duration 3600 self
+
+class 3 spec mm
+# Marksmanship: Hunter's Mark, Aimed Shot and Arcane Shot on cooldown, Multi-Shot on cooldown for several targets, Trueshot Aura (Forever, level 32). Auto Shot has no cast time.
+row "Hunter's Mark" duration 120 always target range 0 35
+row "Rapid Fire" target_strong 1 self
+row "Multi-Shot" enemies 2 target range 0 35
+row "Aimed Shot" always target range 0 35
+row "Arcane Shot" always target range 0 35
+row "Raptor Strike" always target range 0 5
+row "Auto Shot" always target range 0 35
+buff "Aspect of the Hawk" duration 3600 self
+buff "Trueshot Aura" duration 3600 self
+
+class 3 spec sv
+# Survival: ranged rows first (Serpent Sting, Arcane Shot, Aimed Shot), and the melee rows (Raptor Strike, then Mongoose Bite, Strider Kick, Counterattack) for a target that is within
+# five yards. The bot does not walk in to weave melee: the policy keeps a hunter at range, so the melee rows fire only for a mob that reached it.
+row "Hunter's Mark" duration 120 always target range 0 35
+row "Strider Kick" target_casting target range 0 5     # Forever: melee interrupt
+row "Counterattack" always target range 0 5
+row "Mongoose Bite" always target range 0 5
+row "Raptor Strike" always target range 0 5
+row "Serpent Sting" duration 15 always target range 0 35
+row "Multi-Shot" enemies 2 target range 0 35
+row "Aimed Shot" always target range 0 35
+row "Arcane Shot" always target range 0 35
+row "Auto Shot" always target range 0 35
+buff "Aspect of the Hawk" duration 3600 self
 
 class 4
+# The default rogue: Combat.
 row "Kick" target_casting target range 0 5
 row "Evasion" self_hp_below 40 self
 row "Slice and Dice" combo 2 duration 20 self
@@ -60,41 +198,212 @@ row "Eviscerate" combo 5 target range 0 5
 row "Saber Slash" duration 12 always target range 0 5   # Forever: 12 s bleed and one combo point (the policy counts it like Sinister Strike)
 row "Sinister Strike" always target range 0 5
 
+class 4 spec combat
+# Combat: Kick to interrupt, Blade Flurry against several, Expose Armor on a strong target, Slice and Dice, Rupture (high armor) or Eviscerate at five points, Sinister Strike.
+row "Kick" target_casting target range 0 5
+row "Evasion" self_hp_below 40 self
+row "Blade Flurry" enemies 2 duration 15 self
+row "Expose Armor" target_strong 1 duration 30 target range 0 5
+row "Slice and Dice" combo 2 duration 20 self
+row "Eviscerate" combo 5 target range 0 5
+row "Saber Slash" duration 12 always target range 0 5   # Forever
+row "Sinister Strike" always target range 0 5
+
+class 4 spec assassination
+# Assassination: Mutilate (level 40, two combo points) as the builder, the same finishers. Below level 40 Sinister Strike builds. Cold Blood and the poisons are not cast.
+row "Kick" target_casting target range 0 5
+row "Evasion" self_hp_below 40 self
+row "Slice and Dice" combo 2 duration 20 self
+row "Eviscerate" combo 5 target range 0 5
+row "Mutilate" always target range 0 5
+row "Sinister Strike" always target range 0 5
+
+class 4 spec subtlety
+# Subtlety: Hemorrhage (level 30) as the builder, the same finishers; Garrote and the opener need Stealth and are not cast.
+row "Kick" target_casting target range 0 5
+row "Evasion" self_hp_below 40 self
+row "Slice and Dice" combo 2 duration 20 self
+row "Eviscerate" combo 5 target range 0 5
+row "Hemorrhage" duration 15 always target range 0 5
+row "Sinister Strike" always target range 0 5
+
 class 5
+# The default priest. The heals are the policy's heal block (Renew on the tank, Heal, Flash Heal, Binding Heal, Prayer of Healing, Power Word: Shield except on a warrior or
+# druid); these rows are what it casts when it fights: Holy Fire opens from level 20, then Pain, Mind Blast, Smite.
 row "Power Word: Shield" self_hp_below 50 duration 30 self
+row "Holy Fire" opener 3 target range 0 30
 row "Shadow Word: Pain" duration 18 always target range 0 30
-row "Void Plague" duration 18 always target range 0 30   # Forever: 18 s damage over time
-row "Vampiric Touch" duration 15 always target range 0 30 # Forever: 15 s damage over time
 row "Mind Blast" always target range 0 30
 row "Smite" always target range 0 30
 buff "Power Word: Fortitude" duration 1800 party
 buff "Inner Fire" duration 600 self
 buff "Divine Spirit" duration 1800 party
 
+class 5 spec holy
+# Holy (healer): the heal block heals; Holy Fire, Mind Blast, Pain and Smite are the questing rotation (the wand when the party is healthy is not cast).
+row "Power Word: Shield" self_hp_below 50 duration 30 self
+row "Holy Fire" opener 3 target range 0 30
+row "Shadow Word: Pain" duration 18 always target range 0 30
+row "Mind Blast" always target range 0 30
+row "Smite" always target range 0 30
+buff "Power Word: Fortitude" duration 1800 party
+buff "Inner Fire" duration 600 self
+buff "Divine Spirit" duration 1800 party
+
+class 5 spec disc
+# Discipline (healer): the same dungeon rotation as Holy; Penance (level 40) is a heal and left to the heal block.
+row "Power Word: Shield" self_hp_below 50 duration 30 self
+row "Holy Fire" opener 3 target range 0 30
+row "Shadow Word: Pain" duration 18 always target range 0 30
+row "Mind Blast" always target range 0 30
+row "Smite" always target range 0 30
+buff "Power Word: Fortitude" duration 1800 party
+buff "Inner Fire" duration 600 self
+buff "Divine Spirit" duration 1800 party
+
+class 5 spec shadow
+# Shadow (damage): Power Word: Shield and Inner Fire before the pull, Pain on the target, Mind Blast on cooldown, Devouring Plague only if the mob lives (above half health), Mind Flay (level 28),
+# Smite as the filler (the wand is not cast), Vampiric Embrace. Shadowform is not before level 40 and is not cast.
+row "Power Word: Shield" self_hp_below 50 duration 30 self
+row "Shadow Word: Pain" duration 18 always target range 0 30
+row "Void Plague" duration 18 always target range 0 30   # Forever: 18 s damage over time
+row "Vampiric Touch" duration 15 always target range 0 30 # Forever: 15 s damage over time
+row "Mind Blast" always target range 0 30
+row "Devouring Plague" duration 24 target_hp_above 50 target range 0 30
+row "Mind Flay" always target range 0 30
+row "Smite" always target range 0 30
+buff "Power Word: Fortitude" duration 1800 party
+buff "Inner Fire" duration 600 self
+buff "Vampiric Embrace" duration 60 self
+
 class 7
+# The default shaman: Enhancement.
 row "Earth Shock" target_casting target range 0 20
-row "Stormstrike" always target range 0 5            # Forever: Enhancement melee, learned at 40; refused and skipped by other specs until then
 row "Healing Wave" self_hp_below 40 self
 row "Searing Totem" duration 55 always self
 row "Flame Shock" duration 12 always target range 0 20
-row "Fire Nova" enemies 2 self                       # Forever: self-targeted pulse, like Thunder Clap
 row "Lava Burst" always target range 0 30          # Forever: 10 s cooldown
 row "Lightning Bolt" always target range 0 30
 buff "Lightning Shield" duration 600 self
 buff "Water Shield" duration 600 self               # Forever
 supersede "Lightning Shield" by "Water Shield"
 buff "Rockbiter Weapon" duration 300 self
-# Windfury Weapon is not added: it and Rockbiter Weapon are both self buffs with no "pick one" mechanism in this DSL,
-# and adding both would have the bot alternate between the two enchants every time either expires.
+
+class 7 spec enh
+# Enhancement (damage): Stormstrike now and then (level 40), Earth Shock to interrupt, Searing Totem and Fire Nova for groups, Lightning Shield between pulls, Windfury Weapon from level 30
+# (it retires Rockbiter). The shaman fights at range in the policy, so the melee rows fire only for a mob that reached it; Lightning Bolt is the filler.
+row "Earth Shock" target_casting target range 0 20
+row "Healing Wave" self_hp_below 40 self
+row "Stormstrike" always target range 0 5
+row "Searing Totem" duration 55 always self
+row "Fire Nova" enemies 2 self
+row "Flame Shock" duration 12 always target range 0 20
+row "Lightning Bolt" always target range 0 30
+buff "Lightning Shield" duration 600 self
+buff "Rockbiter Weapon" duration 300 self
+buff "Windfury Weapon" duration 300 self
+supersede "Rockbiter Weapon" by "Windfury Weapon"
+
+class 7 spec ele
+# Elemental (damage): shocks, Fire Nova on cooldown, a fire totem (Searing, Magma against three), Chain Lightning for three or more, Lightning Bolt. Water Shield first (Forever, level 20).
+row "Earth Shock" target_casting target range 0 20
+row "Healing Wave" self_hp_below 40 self
+row "Searing Totem" duration 55 always self
+row "Magma Totem" enemies 3 duration 20 self
+row "Fire Nova" enemies 2 self
+row "Flame Shock" duration 12 always target range 0 20
+row "Chain Lightning" enemies 3 target range 0 30
+row "Lightning Bolt" always target range 0 30
+buff "Lightning Shield" duration 600 self
+buff "Water Shield" duration 600 self               # Forever
+supersede "Lightning Shield" by "Water Shield"
+
+class 7 spec resto
+# Restoration (healer): the heal block casts Healing Wave on the tank; Searing Totem and Flame Shock when damage is low, Lightning Bolt to pool mana by fighting. Water Shield first.
+row "Earth Shock" target_casting target range 0 20
+row "Healing Wave" self_hp_below 40 self
+row "Searing Totem" duration 55 always self
+row "Flame Shock" duration 12 always target range 0 20
+row "Lightning Bolt" always target range 0 30
+buff "Lightning Shield" duration 600 self
+buff "Water Shield" duration 600 self               # Forever
+supersede "Lightning Shield" by "Water Shield"
 
 class 8
+# The default mage: Arcane (below).
 row "Counterspell" target_casting target range 0 30
 row "Frost Nova" enemies 2 self
 row "Evocation" self_power_below 15 self
 row "Fire Blast" target_hp_below 25 target range 0 20
-row "Fireball" opener 3 target range 0 30
-row "Icy Veins" target_strong 2 self               # Forever: 3 minute cooldown haste
-row "Ice Lance" self_power_above 60 target range 0 30   # Forever: instant
+row "Flamestrike" enemies 3 duration 8 target range 0 30
+row "Arcane Explosion" enemies 3 self
+row "Arcane Missiles" self_aura_at_least 400588 1 target range 0 30
+row "Fire Blast" self_aura_at_least 400573 2 target range 0 20
+row 400574 level 20 maxlevel 29 self_aura_below 400573 2 target range 0 30   # Arcane Blast as the guide has it at level 20: no trainer teaches this id, so the core refuses it and Fireball carries levels 20 to 29
+row "Arcane Blast" self_aura_below 400573 2 target range 0 30   # the rank a trainer teaches (1239696, level 30)
+row "Fireball" always target range 0 30
+buff "Frost Armor" duration 1800 self
+buff "Ice Armor" duration 1800 self
+buff "Mage Armor" duration 1800 self
+buff "Arcane Intellect" duration 1800 party
+supersede "Frost Armor" by "Ice Armor"
+supersede "Ice Armor" by "Mage Armor"
+supersede "Fireball" by "Arcane Blast"
+
+class 8 spec arcane
+# Arcane (level 30 guide). Fireball until Arcane Blast (the guide: level 20; the sim's trainers teach it from 30). Then Arcane Blast while fewer than two stacks (the guide: never above two
+# unless a boss; the stack aura is read as 400573), Arcane Missiles on a Missile Barrage proc (aura 400588), Fire Blast to reset the stacks when no proc came, AoE Flamestrike then Arcane
+# Explosion. Both aura ids are the spell names' ids in the client data; whether the bot's aura list reports them under these ids is checked on the sim.
+row "Counterspell" target_casting target range 0 30
+row "Frost Nova" enemies 2 self
+row "Evocation" self_power_below 15 self
+row "Fire Blast" target_hp_below 25 target range 0 20
+row "Flamestrike" enemies 3 duration 8 target range 0 30
+row "Arcane Explosion" enemies 3 self
+row "Arcane Missiles" self_aura_at_least 400588 1 target range 0 30
+row "Fire Blast" self_aura_at_least 400573 2 target range 0 20
+row 400574 level 20 maxlevel 29 self_aura_below 400573 2 target range 0 30   # Arcane Blast as the guide has it at level 20: no trainer teaches this id, so the core refuses it and Fireball carries levels 20 to 29
+row "Arcane Blast" self_aura_below 400573 2 target range 0 30   # the rank a trainer teaches (1239696, level 30)
+row "Fireball" always target range 0 30
+buff "Frost Armor" duration 1800 self
+buff "Ice Armor" duration 1800 self
+buff "Mage Armor" duration 1800 self
+buff "Arcane Intellect" duration 1800 party
+supersede "Frost Armor" by "Ice Armor"
+supersede "Ice Armor" by "Mage Armor"
+supersede "Fireball" by "Arcane Blast"
+
+class 8 spec fire
+# Fire: Scorch (up to five, on a healthy target), Pyroblast when Heating Up has stacked (aura 400624), Fireball, Fire Blast to finish, Flamestrike then Arcane Explosion for packs.
+row "Counterspell" target_casting target range 0 30
+row "Frost Nova" enemies 2 self
+row "Evocation" self_power_below 15 self
+row "Flamestrike" enemies 3 duration 8 target range 0 30
+row "Arcane Explosion" enemies 3 self
+row "Fire Blast" target_hp_below 25 target range 0 20
+row "Pyroblast" self_aura_at_least 400624 2 target range 0 30
+row "Scorch" duration 30 target_hp_above 70 target range 0 30
+row "Fireball" always target range 0 30
+buff "Frost Armor" duration 1800 self
+buff "Ice Armor" duration 1800 self
+buff "Mage Armor" duration 1800 self
+buff "Arcane Intellect" duration 1800 party
+supersede "Frost Armor" by "Ice Armor"
+supersede "Ice Armor" by "Mage Armor"
+
+class 8 spec frost
+# Frost: Frostbolt, Ice Lance on a Fingers of Frost proc (aura 400647), Frost Nova then run, Cone of Cold against several, Icy Veins on a strong target, Blizzard or Flamestrike and
+# Arcane Explosion for packs, Counterspell.
+row "Counterspell" target_casting target range 0 30
+row "Frost Nova" enemies 2 self
+row "Evocation" self_power_below 15 self
+row "Icy Veins" target_strong 2 self               # Forever
+row "Flamestrike" enemies 4 duration 8 target range 0 30
+row "Blizzard" enemies 4 target range 0 30
+row "Arcane Explosion" enemies 3 self
+row "Cone of Cold" enemies 2 self
+row "Ice Lance" self_aura_at_least 400647 1 target range 0 30   # Forever
+row "Fire Blast" target_hp_below 25 target range 0 20
 row "Frostbolt" always target range 0 30
 buff "Frost Armor" duration 1800 self
 buff "Ice Armor" duration 1800 self
@@ -104,28 +413,76 @@ supersede "Frost Armor" by "Ice Armor"
 supersede "Ice Armor" by "Mage Armor"
 
 class 9
+# The default warlock: Demonology (below).
 row "Life Tap" self_power_below 25 self
 row "Corruption" duration 18 always target range 0 30
-row "Bane of Agony" duration 24 always target range 0 30     # Forever renamed the classic curse DoTs to "Bane of ..." (confirmed in the ability dump)
-row "Immolate" duration 15 always target range 0 30
-row "Siphon Life" duration 30 always target range 0 30      # Forever: Affliction life-drain dot; refused and skipped by other specs
-row "Conflagrate" always target range 0 30                  # Destruction only (needs Immolate up); refused and skipped otherwise
-row "Shadowburn" target_hp_below 20 target range 0 30       # Destruction execute; refused and skipped otherwise
-row "Searing Pain" always target range 0 30                 # Demonology filler; refused and skipped otherwise
-row "Incinerate" always target range 0 30                    # Destruction filler, needs 30 Destruction points; refused below that
-row "Wrack" duration 6 always target range 0 30      # Forever: instant damage over time
-row "Chaos Bolt" always target range 0 30           # Forever: 12 s cooldown
+row "Bane of Agony" duration 24 target_hp_above 70 target range 0 30
+row "Searing Pain" always target range 0 30
 row "Drain Life" always target range 0 30
-row "Drain Soul" always target range 0 30
 row "Shadow Bolt" always target range 0 30
 buff "Demon Skin" duration 1800 self
 buff "Demon Armor" duration 1800 self
 buff "Fel Armor" duration 1800 self                 # Forever
-buff "Summon Imp" duration 3600 self
+buff "Summon Succubus" duration 3600 self no_pet
+buff "Summon Voidwalker" duration 3600 self no_pet
+buff "Summon Imp" duration 3600 self no_pet
+supersede "Demon Skin" by "Demon Armor"
+supersede "Demon Armor" by "Fel Armor"
+
+class 9 spec demonology
+# Demonology (level 30 guide): the demon does most of the damage. Corruption, Bane of Agony on a mob with a lot of health, Searing Pain, Drain Life as the filler, Life Tap when low, Shadow Bolt
+# below level 14. The demon is a buff row with no_pet: Succubus (level 20 quest), else Voidwalker (level 10 quest), else Imp; a summon the bot has not learned is refused and the next one is
+# tried after a minute. Voidwalker and Succubus use a Soul Shard each.
+row "Life Tap" self_power_below 25 self
+row "Corruption" duration 18 always target range 0 30
+row "Bane of Agony" duration 24 target_hp_above 70 target range 0 30
+row "Searing Pain" always target range 0 30
+row "Drain Life" always target range 0 30
+row "Shadow Bolt" always target range 0 30
+buff "Demon Skin" duration 1800 self
+buff "Demon Armor" duration 1800 self
+buff "Fel Armor" duration 1800 self                 # Forever
+buff "Summon Succubus" duration 3600 self no_pet
+buff "Summon Voidwalker" duration 3600 self no_pet
+buff "Summon Imp" duration 3600 self no_pet
+supersede "Demon Skin" by "Demon Armor"
+supersede "Demon Armor" by "Fel Armor"
+
+class 9 spec affliction
+# Affliction: Corruption, Bane of Agony, Immolate, Drain Life as the filler, Life Tap when low, Shadow Bolt below level 14. The Voidwalker holds threat (the Succubus does not), so it is the demon.
+row "Life Tap" self_power_below 25 self
+row "Corruption" duration 18 always target range 0 30
+row "Bane of Agony" duration 24 always target range 0 30
+row "Immolate" duration 15 always target range 0 30
+row "Drain Life" always target range 0 30
+row "Shadow Bolt" always target range 0 30
+buff "Demon Skin" duration 1800 self
+buff "Demon Armor" duration 1800 self
+buff "Fel Armor" duration 1800 self                 # Forever
+buff "Summon Voidwalker" duration 3600 self no_pet
+buff "Summon Imp" duration 3600 self no_pet
+supersede "Demon Skin" by "Demon Armor"
+supersede "Demon Armor" by "Fel Armor"
+
+class 9 spec destruction
+# Destruction: Bane of Agony and Immolate kept up, Conflagrate (Forever, level 32) before Immolate runs out, Shadowburn to finish, Shadow Bolt, Life Tap when low. The Voidwalker is the demon.
+row "Life Tap" self_power_below 25 self
+row "Shadowburn" target_hp_below 20 target range 0 20
+row "Conflagrate" always target range 0 30
+row "Bane of Agony" duration 24 always target range 0 30
+row "Immolate" duration 15 always target range 0 30
+row "Corruption" duration 18 always target range 0 30
+row "Shadow Bolt" always target range 0 30
+buff "Demon Skin" duration 1800 self
+buff "Demon Armor" duration 1800 self
+buff "Fel Armor" duration 1800 self                 # Forever
+buff "Summon Voidwalker" duration 3600 self no_pet
+buff "Summon Imp" duration 3600 self no_pet
 supersede "Demon Skin" by "Demon Armor"
 supersede "Demon Armor" by "Fel Armor"
 
 class 11
+# The default druid: Balance caster rows.
 row "Healing Touch" self_hp_below 40 self
 row "Rejuvenation" self_hp_below 70 duration 12 self
 row "Moonfire" duration 12 always target range 0 30
@@ -134,3 +491,51 @@ row "Sunfire" duration 12 always target range 0 30  # Forever: instant damage ov
 row "Wrath" always target range 0 30
 buff "Mark of the Wild" duration 1800 party
 buff "Thorns" duration 600 party
+
+class 11 spec balance
+# Balance (damage): Entangling Roots on a pull, Moonfire and Insect Swarm on the target, Starfire and Wrath, Starsurge and Sunfire (Forever), Thorns and Rejuvenation on the druid.
+row "Healing Touch" self_hp_below 40 self
+row "Rejuvenation" self_hp_below 70 duration 12 self
+row "Moonfire" duration 12 always target range 0 30
+row "Insect Swarm" duration 12 always target range 0 30
+row "Starsurge" always target range 0 30            # Forever
+row "Sunfire" duration 12 always target range 0 30  # Forever
+row "Starfire" always target range 0 30
+row "Wrath" always target range 0 30
+buff "Mark of the Wild" duration 1800 party
+buff "Thorns" duration 600 party
+
+class 11 spec feral_tank
+# Feral tank (Bear Form from level 10): Faerie Fire to pull, Growl against two or more, Demoralizing Roar and Swipe for several, Maul as the rage spender, Thorns for threat. The form is an upkeep
+# buff that is cast only when the bot's aura list does not show it (a form cast while in the form would end it): check on the sim that the snapshot reports the form aura.
+row "Growl" enemies 2 target range 0 5
+row "Enrage" self_power_below 20 self
+row "Faerie Fire" duration 40 opener 3 target range 0 30
+row "Demoralizing Roar" enemies 3 self duration 30
+row "Swipe" enemies 2 self
+row "Maul" self_power_above 30 target range 0 5
+buff "Bear Form" duration 600 self self_aura_below 5487 1
+buff "Thorns" duration 600 party
+buff "Mark of the Wild" duration 1800 party
+
+class 11 spec feral_cat
+# Feral DPS (Cat Form from level 20): Tiger's Fury, Rake, Shred and Claw (Shred needs the position behind the target and is refused from the front), Faerie Fire. Combo points are not counted for a
+# druid (Rip and Ferocious Bite are left out). The form is an upkeep buff cast only when the aura list does not show it (see feral_tank).
+row "Tiger's Fury" target_strong 1 self
+row "Faerie Fire" duration 40 opener 3 target range 0 30
+row "Rake" duration 9 always target range 0 5
+row "Shred" always target range 0 5
+row "Claw" always target range 0 5
+buff "Cat Form" duration 600 self self_aura_below 768 1
+buff "Thorns" duration 600 party
+buff "Mark of the Wild" duration 1800 party
+
+class 11 spec resto
+# Restoration (healer): the heal block casts Healing Touch, Rejuvenation on the tank is its own rows' business; Thorns and Mark of the Wild upkeep; Wrath and Moonfire when mana is comfortable.
+row "Healing Touch" self_hp_below 40 self
+row "Rejuvenation" self_hp_below 70 duration 12 self
+row "Moonfire" duration 12 always target range 0 30
+row "Wrath" always target range 0 30
+buff "Mark of the Wild" duration 1800 party
+buff "Thorns" duration 600 party
+
