@@ -4587,7 +4587,8 @@ void HealerBandStandSkipsAHazard()
         found = true;
         float const hx = move.dest_x + 3.0f, hy = move.dest_y;
         CHECK(std::sqrt(hx * hx + hy * hy) > 7.0f);             // outside the hazard and its margin
-        CHECK(std::fabs(move.dest_x - boss.pos_x) >= 21.0f && std::fabs(move.dest_x - boss.pos_x) <= 25.0f);
+        float const bx = move.dest_x - boss.pos_x, by = move.dest_y - boss.pos_y;   // the band is a distance, so measure the whole offset, not its x part
+        CHECK(std::sqrt(bx * bx + by * by) >= 21.0f && std::sqrt(bx * bx + by * by) <= 25.0f);
     }
     CHECK(found);
 }
