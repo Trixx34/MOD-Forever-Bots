@@ -35,6 +35,19 @@ constexpr float kAoeKiteSpreadDegrees = 4.0f;  // each bot takes its own bearing
 constexpr float kAoeKiteRetryDegrees = 30.0f;  // and a kite point the core found no route to is tried again this much further round
 constexpr std::uint64_t kHealLosMoveMs = 4000; // after a heal refused for line of sight a healer may leave its stand-off to find the target, for this long
 constexpr std::uint32_t kOnyxianWarderEntry = 12129;
+constexpr std::uint32_t kOnyxiaBossEntry = 10184;   // Onyxia herself, the lair's last boss (data/dungeons/249-onyxias-lair.json)
+// Explicit stand-off bands from Onyxia (the boss, not the Warder), in yards from her: a bot walks in to Max and kites back out when it is closer than Min. Healers
+// 21-25, ranged 23-29, melee 2-9 (the Karrz repo's RaidEncounterData_ONY). The Warder's Fire Nova (kAoeStandYards) is not in these bands: they are for the boss only.
+struct StandBand
+{
+    float Min;
+    float Max;
+    float Mid() const { return (Min + Max) / 2.0f; }
+};
+constexpr StandBand kHealerBand{ 21.0f, 25.0f };
+constexpr StandBand kRangedBand{ 23.0f, 29.0f };
+constexpr StandBand kMeleeBand{ 2.0f, 9.0f };
+constexpr float kBandStepDegrees = 15.0f;     // a stand point that a hazard covers is tried this far round the bot's bearing, up to 4 steps either side
 constexpr float kReviveWarderYards = 25.0f;  // a ghost of a dungeon party is not brought back (entrance teleport, leader's revive, corpse reclaim) while a live Warder is this close to its corpse or to a living party member
 constexpr std::uint64_t kReviveWarderLogMs = 30000;
 constexpr float kFleeYards = 15.0f;          // below 30% health: flees while a threat is this close
@@ -770,6 +783,65 @@ Point AoeKitePoint(BotSnapshot const& bot, NearbyUnit const& warder, int retry, 
     float const c = std::cos(angle);
     float const s = std::sin(angle);
     return Point{ warder.pos_x + (dx * c - dy * s) * kAoeStandYards, warder.pos_y + (dx * s + dy * c) * kAoeStandYards, bot.pos_z };
+}
+
+// The ground effects that harm a bot on this map: the snapshot's hostile ones, the avoid table's spells, the dungeon's own spells, and its zones. The same circles as the
+// walk out of a harmful area (AvoidGroundEffects); a stand point inside one of them is not a place to move to.
+std::vector<ground_avoid::Circle> HazardCircles(PolicyOptions const& options, BotSnapshot const& bot)
+{
+    std::vector<ground_avoid::Circle> circles;
+    auto const dungeon = options.DungeonsByMap.find(bot.map_id);
+    bool const hasDungeon = dungeon != options.DungeonsByMap.end();
+    for (std::size_t i = 0; i < bot.ground_effect_count && i < forever_module::kMaxGroundEffects; ++i)
+    {
+        forever_module::GroundEffect const& effect = bot.ground_effects[i];
+        bool harmful = effect.hostile != 0;
+        float radius = effect.radius;
+        if (options.AvoidSpells && options.AvoidSpells->Contains(effect.spell_id))
+        {
+            harmful = true;
+            if (radius <= 0.0f)
+                radius = options.AvoidSpells->Radius(effect.spell_id);
+        }
+        if (!harmful && hasDungeon)
+            harmful = std::find(dungeon->second.AvoidSpells.begin(), dungeon->second.AvoidSpells.end(), effect.spell_id) != dungeon->second.AvoidSpells.end();
+        if (!harmful)
+            continue;
+        circles.push_back(ground_avoid::Circle{ effect.x, effect.y, radius > 0.0f ? radius : ground_avoid::kDefaultRadiusYards });
+    }
+    if (hasDungeon)
+        circles.insert(circles.end(), dungeon->second.AvoidZones.begin(), dungeon->second.AvoidZones.end());
+    return circles;
+}
+
+// A stand point `yards` from the target, on the bot's own bearing from it. A point a hazard covers is not moved to: the bearing is turned round by up to four steps
+// of kBandStepDegrees either side (0, +1, -1, +2, ...), and nullopt when every step is covered.
+std::optional<Point> BandStandPoint(BotSnapshot const& bot, NearbyUnit const& target, float yards, std::vector<ground_avoid::Circle> const& hazards)
+{
+    float dx = bot.pos_x - target.pos_x;
+    float dy = bot.pos_y - target.pos_y;
+    float const length = std::sqrt(dx * dx + dy * dy);
+    if (length > 0.01f)
+    {
+        dx /= length;
+        dy /= length;
+    }
+    else
+    {
+        dx = 1.0f;
+        dy = 0.0f;
+    }
+    for (int step = 0; step <= 8; ++step)
+    {
+        int const turn = step == 0 ? 0 : (step % 2 == 1 ? (step + 1) / 2 : -(step / 2));
+        float const angle = float(turn) * kBandStepDegrees * 3.14159265f / 180.0f;
+        float const c = std::cos(angle);
+        float const s = std::sin(angle);
+        Point const point{ target.pos_x + (dx * c - dy * s) * yards, target.pos_y + (dx * s + dy * c) * yards, bot.pos_z };
+        if (!ground_avoid::InsideAny(point.X, point.Y, hazards))
+            return point;
+    }
+    return std::nullopt;
 }
 
 // A player's unit reference, from its character guid counter (the same reference the core's party actions take).
@@ -2200,28 +2272,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         // dungeon's list (AvoidSpells of the route).
         if (_options.AvoidGroundEffects && bot.life_state == 0 && bot.in_flight == 0)
         {
-            std::vector<ground_avoid::Circle> circles;
-            auto const dungeon = _options.DungeonsByMap.find(bot.map_id);
-            bool const hasDungeon = dungeon != _options.DungeonsByMap.end();
-            for (std::size_t i = 0; i < bot.ground_effect_count && i < forever_module::kMaxGroundEffects; ++i)
-            {
-                forever_module::GroundEffect const& effect = bot.ground_effects[i];
-                bool harmful = effect.hostile != 0;
-                float radius = effect.radius;
-                if (_options.AvoidSpells && _options.AvoidSpells->Contains(effect.spell_id))
-                {
-                    harmful = true;
-                    if (radius <= 0.0f)
-                        radius = _options.AvoidSpells->Radius(effect.spell_id);
-                }
-                if (!harmful && hasDungeon)
-                    harmful = std::find(dungeon->second.AvoidSpells.begin(), dungeon->second.AvoidSpells.end(), effect.spell_id) != dungeon->second.AvoidSpells.end();
-                if (!harmful)
-                    continue;
-                circles.push_back(ground_avoid::Circle{ effect.x, effect.y, radius > 0.0f ? radius : ground_avoid::kDefaultRadiusYards });
-            }
-            if (hasDungeon)
-                circles.insert(circles.end(), dungeon->second.AvoidZones.begin(), dungeon->second.AvoidZones.end());
+            std::vector<ground_avoid::Circle> const circles = HazardCircles(_options, bot);
             bool walking = false;
             if (!circles.empty())
             {
@@ -3554,12 +3605,14 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             // An Onyxian Warder is near (kAoeStandYards, in combat or not): every party member other than the tank (the leader) gets out of its Fire Nova, whatever it is fighting or healing (the 2026-10-29 wipe:
             // only a bot whose own target was the Warder kited). Each bot has its own point round the circle; one the core has no route to is given up for the next one
             // round, and with none left the bot stands and works from where it is.
+            // A kite point that a hazard covers (a ground effect the bot would walk into) is given up for the next one too.
             wanted = Decision{ ActionType::kStop, 0 };
+            std::vector<ground_avoid::Circle> const hazards = HazardCircles(_options, bot);
             for (int retry = 0; retry < 6; ++retry)
             {
                 Point const kite = AoeKitePoint(bot, *aoeWarder, retry, kiteEntry);
                 bool const blocked = nowMs < state.NoRouteUntilMs && std::hypot(kite.X - state.NoRouteDest.X, kite.Y - state.NoRouteDest.Y) < kNoRouteSameYards;
-                if (!blocked)
+                if (!blocked && !ground_avoid::InsideAny(kite.X, kite.Y, hazards))
                 {
                     wanted = Decision{ ActionType::kMoveTo, 0, kite };
                     moveWhy = "kite";
@@ -3618,6 +3671,13 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             bool const aoeTarget = partyMember && targetUnit && forever_module::UnitRefEntry(targetUnit->guid) == kOnyxianWarderEntry;
             if (aoeTarget)
                 approach = std::max(approach, kAoeStandYards);
+            // Onyxia herself: the bot's role band (healer, ranged or melee) sets how close it comes. It closes to the band's far edge, and a healer or ranged bot
+            // that is nearer than the band's near edge kites back to its middle. A melee bot's band is its close range (2-9), so it only closes.
+            bool const bossTarget = partyMember && targetUnit && forever_module::UnitRefEntry(targetUnit->guid) == kOnyxiaBossEntry;
+            StandBand const band = healerSupport ? kHealerBand : rotation::ApproachYards(classId) <= kMeleeApproachYards + 0.5f ? kMeleeBand : kRangedBand;
+            bool const bossBandKite = bossTarget && band.Min > kMeleeBand.Max;
+            if (bossTarget)
+                approach = std::min(approach, band.Max);
             if (distance <= approach)
             {
                 // A ranged bot that has walked into casting range stops there: the core's follow keeps running it into the target,
@@ -3637,7 +3697,19 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 // The exception is a target with a big area attack around it (the Onyxian Warder): only the tank, the party leader, stands in it,
                 // and every other party member, melee class or not, backs off past its radius and casts from there.
                 float const kiteYards = aoeTarget ? kAoeStandYards : kRangedKiteYards;
-                if (((partyLeader == 0 && approach > kMeleeApproachYards + 0.5f) || aoeTarget) && targetUnit && distance < kiteYards)
+                if (bossBandKite && distance < band.Min)
+                {
+                    // Back to the middle of the band, on a point no hazard covers; with none the bot holds where it is.
+                    std::optional<Point> const stand = BandStandPoint(bot, *targetUnit, band.Mid(), HazardCircles(_options, bot));
+                    if (stand)
+                    {
+                        wanted = Decision{ ActionType::kMoveTo, 0, *stand };
+                        moveWhy = "band_kite";
+                    }
+                    else
+                        wanted = Decision{ ActionType::kStop, 0 };
+                }
+                else if (((partyLeader == 0 && approach > kMeleeApproachYards + 0.5f) || aoeTarget) && targetUnit && distance < kiteYards)
                 {
                     float const dx = bot.pos_x - targetUnit->pos_x;
                     float const dy = bot.pos_y - targetUnit->pos_y;
@@ -3647,13 +3719,27 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                         Point kite{ targetUnit->pos_x + dx / dist * kiteYards,
                                     targetUnit->pos_y + dy / dist * kiteYards,
                                     bot.pos_z };
+                        bool hold = false;
                         if (aoeTarget)
                         {
-                            kite = AoeKitePoint(bot, *targetUnit, 0, kiteEntry);   // the bot's own bearing, as in the branch above
-                            kiteRetry = 0;
+                            // The bot's own bearing, as in the branch above; a point a hazard covers is passed over for the next retry, and with none clear the bot holds.
+                            std::vector<ground_avoid::Circle> const hazards = HazardCircles(_options, bot);
+                            bool found = false;
+                            for (int retry = 0; retry < 6 && !found; ++retry)
+                            {
+                                kite = AoeKitePoint(bot, *targetUnit, retry, kiteEntry);
+                                found = !ground_avoid::InsideAny(kite.X, kite.Y, hazards);
+                                kiteRetry = retry;
+                            }
+                            hold = !found;
                         }
-                        wanted = Decision{ ActionType::kMoveTo, 0, kite };
-                        moveWhy = "kite";
+                        if (hold)
+                            wanted = Decision{ ActionType::kStop, 0 };
+                        else
+                        {
+                            wanted = Decision{ ActionType::kMoveTo, 0, kite };
+                            moveWhy = "kite";
+                        }
                     }
                     else
                         wanted = Decision{ ActionType::kAttackTarget, targetRef };

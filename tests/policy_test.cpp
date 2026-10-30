@@ -4461,6 +4461,137 @@ void PartyCasterDoesNotKite()
     CHECK(casts > 0);
 }
 
+// Onyxia (10184) bands by role: a healer nearer than 21 yards backs off to the middle of its 21-25 band (23).
+void HealerKitesToOnyxiaBand()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 3;
+    options.PartyCount = 1;
+    options.WanderWhenIdle = false;
+    options.ClassOf = [](std::uint64_t guid) { return guid == 10 ? 1u : guid == 11 ? 5u : 4u; };   // 10 the warrior tank, 11 a priest, 12 a rogue
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12 });
+    NearbyUnit boss = Hostile(2, 20.0f, 100);
+    boss.guid = MakeUnitRef(8, 10184, 2);
+    for (std::size_t i = 0; i < 3; ++i)
+    {
+        view.bots[i].threat_target_guid = boss.guid;
+        view.bots[i].in_combat = 1;
+        AddNearby(view, i, boss);
+    }
+    float healerAt = -1.0f;
+    for (std::uint64_t at = 1000; at < 3000; at += 100)
+    {
+        view.tick_number = at / 100;
+        for (BotAction const& action : policy.Decide(view, at))
+            if (action.bot_guid == 11 && action.type == ActionType::kMoveTo && action.target_guid == 0)
+                healerAt = std::fabs(action.dest_x - boss.pos_x);
+    }
+    CHECK(healerAt >= 22.0f && healerAt <= 24.0f);
+}
+
+// A ranged band is 23-29 yards: a caster already inside it holds, and one nearer than 23 kites to the middle (26).
+void RangedBandHoldsInsideOnyxiaBand()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 3;
+    options.PartyCount = 1;
+    options.WanderWhenIdle = false;
+    options.ClassOf = [](std::uint64_t guid) { return guid == 10 ? 1u : guid == 11 ? 8u : 4u; };   // 10 the warrior tank, 11 a mage, 12 a rogue
+    for (float const yards : { 25.0f, 20.0f })
+    {
+        BotPolicy policy(options);
+        WorldTickSnapshotView view = PartyView({ 10, 11, 12 });
+        NearbyUnit boss = Hostile(2, yards, 100);
+        boss.guid = MakeUnitRef(8, 10184, 2);
+        for (std::size_t i = 0; i < 3; ++i)
+        {
+            view.bots[i].threat_target_guid = boss.guid;
+            view.bots[i].in_combat = 1;
+            AddNearby(view, i, boss);
+        }
+        float mageAt = -1.0f;
+        for (std::uint64_t at = 1000; at < 3000; at += 100)
+        {
+            view.tick_number = at / 100;
+            for (BotAction const& action : policy.Decide(view, at))
+                if (action.bot_guid == 11 && action.type == ActionType::kMoveTo && action.target_guid == 0)
+                    mageAt = std::fabs(action.dest_x - boss.pos_x);
+        }
+        if (yards > 23.0f)
+            CHECK(mageAt < 0.0f);                       // inside the band: no move
+        else
+            CHECK(mageAt >= 25.0f && mageAt <= 27.0f);  // kites to the middle, 26
+    }
+}
+
+// A melee band is 2-9 yards and never kites: a rogue at 5 yards holds no kite move.
+void MeleeDoesNotKiteFromOnyxia()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 3;
+    options.PartyCount = 1;
+    options.WanderWhenIdle = false;
+    options.ClassOf = [](std::uint64_t guid) { return guid == 10 ? 1u : guid == 11 ? 8u : 4u; };   // 10 the warrior tank, 11 a mage, 12 a rogue
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12 });
+    NearbyUnit boss = Hostile(2, 5.0f, 100);
+    boss.guid = MakeUnitRef(8, 10184, 2);
+    for (std::size_t i = 0; i < 3; ++i)
+    {
+        view.bots[i].threat_target_guid = boss.guid;
+        view.bots[i].in_combat = 1;
+        AddNearby(view, i, boss);
+    }
+    for (std::uint64_t at = 1000; at < 3000; at += 100)
+    {
+        view.tick_number = at / 100;
+        for (BotAction const& action : policy.Decide(view, at))
+            CHECK(!(action.bot_guid == 12 && action.type == ActionType::kMoveTo && action.target_guid == 0));
+    }
+}
+
+// The healer's band stand point skips a hazard: a hostile ground effect over the bearing-0 point (3 yards behind the bot, 23 from Onyxia)
+// sends it to the next clear point on the same 23-yard arc, outside the hazard and its 1-yard margin.
+void HealerBandStandSkipsAHazard()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 3;
+    options.PartyCount = 1;
+    options.WanderWhenIdle = false;
+    options.AvoidGroundEffects = true;
+    options.ClassOf = [](std::uint64_t guid) { return guid == 10 ? 1u : guid == 11 ? 5u : 4u; };   // 10 the warrior tank, 11 a priest, 12 a rogue
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12 });
+    NearbyUnit boss = Hostile(2, 20.0f, 100);
+    boss.guid = MakeUnitRef(8, 10184, 2);
+    for (std::size_t i = 0; i < 3; ++i)
+    {
+        view.bots[i].threat_target_guid = boss.guid;
+        view.bots[i].in_combat = 1;
+        AddNearby(view, i, boss);
+    }
+    view.bots[1].ground_effect_count = 1;                       // the hazard is on the priest (bot 11)
+    view.bots[1].ground_effects[0] = forever_module::GroundEffect{};
+    view.bots[1].ground_effects[0].spell_id = 11829;
+    view.bots[1].ground_effects[0].x = -3.0f;
+    view.bots[1].ground_effects[0].y = 0.0f;
+    view.bots[1].ground_effects[0].radius = 6.0f;
+    view.bots[1].ground_effects[0].kind = 1;
+    view.bots[1].ground_effects[0].hostile = 1;
+    bool found = false;
+    for (BotAction const& move : policy.Decide(view, 1000))
+    {
+        if (move.bot_guid != 11 || move.type != ActionType::kMoveTo || move.target_guid != 0)
+            continue;
+        found = true;
+        float const hx = move.dest_x + 3.0f, hy = move.dest_y;
+        CHECK(std::sqrt(hx * hx + hy * hy) > 7.0f);             // outside the hazard and its margin
+        CHECK(std::fabs(move.dest_x - boss.pos_x) >= 21.0f && std::fabs(move.dest_x - boss.pos_x) <= 25.0f);
+    }
+    CHECK(found);
+}
+
 // Onyxian Warder (12129): its Fire Nova hits everything within 20 yards, so a ranged raid member backs off to 21+ yards and only the tank melees it, every other member backs off, melee classes too.
 void RaidCasterKitesOutOfWarderNova()
 {
@@ -6090,6 +6221,10 @@ int main()
     FighterWithoutManaDoesNotDrink();
     RangedBotKitesACloseTarget();
     PartyCasterDoesNotKite();
+    HealerKitesToOnyxiaBand();
+    RangedBandHoldsInsideOnyxiaBand();
+    MeleeDoesNotKiteFromOnyxia();
+    HealerBandStandSkipsAHazard();
     RaidCasterKitesOutOfWarderNova();
     RaidMemberOnAnotherTargetKitesOutOfWarderNova();
     NonTankOutOfCombatKitesWhenWarderIsWithinMargin();
