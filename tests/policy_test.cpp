@@ -4515,8 +4515,15 @@ void RangedBandHoldsInsideOnyxiaBand()
         {
             view.tick_number = at / 100;
             for (BotAction const& action : policy.Decide(view, at))
+            {
+                // Diagnostic (temporary): every action the mage is given, so a failing run shows what the policy sent it.
+                if (action.bot_guid == 11)
+                    std::printf("diag mage yards=%.0f tick=%llu action=%d target=%llu dest=(%.1f,%.1f) spell=%u\n", yards,
+                                (unsigned long long)at, int(action.type), (unsigned long long)action.target_guid,
+                                action.dest_x, action.dest_y, action.spell_id);
                 if (action.bot_guid == 11 && action.type == ActionType::kMoveTo && action.target_guid == 0)
                     mageAt = std::fabs(action.dest_x - boss.pos_x);
+            }
         }
         if (yards > 23.0f)
             CHECK(mageAt < 0.0f);                       // inside the band: no move
