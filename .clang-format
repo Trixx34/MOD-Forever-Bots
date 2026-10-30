@@ -1,0 +1,19 @@
+---
+# Matches the existing style of this codebase: 4-space indent, Allman braces,
+# PascalCase types/public members, kPascalCase constants (not auto-renamed by
+# clang-format, enforced by review). This locks in layout only.
+BasedOnStyle: Microsoft
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 160
+BreakBeforeBraces: Allman
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortLambdasOnASingleLine: Inline
+IndentCaseLabels: false
+PointerAlignment: Left
+ReferenceAlignment: Left
+SpaceBeforeParens: ControlStatements
+NamespaceIndentation: None
+SortIncludes: false

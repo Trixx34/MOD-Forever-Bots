@@ -110,9 +110,9 @@ constexpr std::uint32_t kItemClassQuest = 12;       // ITEM_CLASS_QUEST
 constexpr std::size_t kSellItemsPerBot = 200;       // looted white items kept per bot for selling
 constexpr float kSellReachYards = 4.0f;             // a bot this close to its vendor can sell to it (the core allows 5)
 
-char const* ActionTypeName(std::uint8_t type)
+char const* ActionTypeName(forever_module::ActionType type)
 {
-    switch (static_cast<forever_module::ActionType>(type))
+    switch (type)
     {
         case forever_module::ActionType::kCastSpell: return "cast";
         case forever_module::ActionType::kMoveTo: return "move";
@@ -748,7 +748,7 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
                         continue;
                     serviceNoticeMs[bot.guid] = now;
                 }
-                std::cerr << "forever-bots: bot " << bot.guid << " " << ActionTypeName(bot.last_action_type)
+                std::cerr << "forever-bots: bot " << bot.guid << " " << ActionTypeName(static_cast<forever_module::ActionType>(bot.last_action_type))
                           << (bot.last_action_spell ? " spell " + std::to_string(bot.last_action_spell) : std::string())
                           << " not done: " << ActionStatusName(bot.last_action_status) << "\n";
             }
@@ -1088,6 +1088,11 @@ int main(int argc, char** argv)
     // Config is delivered right after the handshake, so the first callback has already run when OnConfig returns. A later
     // re-delivery (a core reload) updates the ramp, the random picks and the cap, on the Run() thread. The telemetry file
     // and the test spell take effect at restart.
+    // Ordering note: settings/roster/alts/commands below are captured by reference into the OnConfig/OnControlRevoked/
+    // OnRequest callbacks registered further down this function. Each callback's captures must outlive the ModuleClient
+    // (they do: client, settings, roster and the shared_ptr registries are all declared in this same main() frame and
+    // destructed in reverse order after client, so there is no dangling-reference risk), but it does mean a callback must
+    // not be registered before the state it captures is constructed. Keep new captured state declared above its callback.
     BotSettings settings;
     bool configured = false;
     BotRoster roster(0); // the cap is set once the settings are known
@@ -1170,7 +1175,7 @@ int main(int argc, char** argv)
         if (text == "bots" || text.rfind("bots ", 0) == 0)
         {
             std::string const rest = text.size() > 5 ? text.substr(5) : std::string();
-            auto const set = [&reply](bool ok, std::string const& message)
+            auto const setReply = [&reply](bool ok, std::string const& message)
             {
                 reply.mutable_command()->set_success(ok);
                 reply.mutable_command()->set_result_text(message);
@@ -1178,7 +1183,7 @@ int main(int argc, char** argv)
             // .bots alt add <name> | alt remove <name> | alt list, .bots spawn <race> <class> [level], .bots list. The answer comes back as a message
             // to the player when the core has decided.
             std::uint64_t const issuerCounter = request.command().issuer_guid() & forever_module::kUnitRefCounterMask;
-            auto const words = [&rest]
+            auto const commandWords = [&rest]
             {
                 std::vector<std::string> out;
                 std::istringstream in(rest);
@@ -1187,30 +1192,33 @@ int main(int argc, char** argv)
                     out.push_back(word);
                 return out;
             }();
-            auto const tell = [&run, issuerCounter](std::string const& text) { run.Client.SendPlayerMessage(issuerCounter, text); };
-            if (!words.empty() && words[0] == "alt")
+            auto const tellIssuer = [&run, issuerCounter](std::string const& text) { run.Client.SendPlayerMessage(issuerCounter, text); };
+            // alt/spawn/list/autogear below are always available regardless of ChatOrders/ChatControl: they manage which
+            // characters play as bots at all (fleet administration), not in-fight orders to bots already playing, so they
+            // are intentionally not gated the same way ParseChatCommand's verbs are a few lines down.
+            if (!commandWords.empty() && commandWords[0] == "alt")
             {
-                if (words.size() == 2 && words[1] == "list")
+                if (commandWords.size() == 2 && commandWords[1] == "list")
                 {
                     std::lock_guard<std::mutex> lock(alts->Lock);
                     std::string names;
                     for (auto const& [name, guid] : alts->ByName)
                         names += (names.empty() ? "" : ", ") + name;
-                    set(true, names.empty() ? "No alts are playing as bots." : "Alts as bots: " + names);
+                    setReply(true, names.empty() ? "No alts are playing as bots." : "Alts as bots: " + names);
                     return reply;
                 }
-                if (words.size() >= 3 && words[1] == "add")
+                if (commandWords.size() >= 3 && commandWords[1] == "add")
                 {
-                    std::string const name = JoinWords(words, 2);
+                    std::string const name = JoinWords(commandWords, 2);
                     // An alt does not use up the bot cap, so it is not refused for it (BotRoster::OnAltGranted).
                     forever_module::SpawnParams params;
                     params.set_alt_name(name);
                     params.set_owner_guid(issuerCounter);
-                    run.Client.RequestControl(0, params, [&run, alts, tell, name](forever_module::ControlResponse const& response)
+                    run.Client.RequestControl(0, params, [&run, alts, tellIssuer, name](forever_module::ControlResponse const& response)
                     {
                         if (!response.granted())
                         {
-                            tell("Cannot make " + name + " a bot: " + response.reason());
+                            tellIssuer("Cannot make " + name + " a bot: " + response.reason());
                             return;
                         }
                         std::uint64_t const guid = response.bot_guid();
@@ -1225,14 +1233,14 @@ int main(int argc, char** argv)
                             alts->ByGuid[guid] = LowerCopy(name);
                         }
                         std::cerr << "forever-bots: alt " << name << " is bot " << guid << "\n";
-                        tell(name + " is logging in as a bot. Invite it to your group to command it.");
+                        tellIssuer(name + " is logging in as a bot. Invite it to your group to command it.");
                     });
-                    set(true, "Asking the server to log " + name + " in as a bot.");
+                    setReply(true, "Asking the server to log " + name + " in as a bot.");
                     return reply;
                 }
-                if (words.size() >= 3 && words[1] == "remove")
+                if (commandWords.size() >= 3 && commandWords[1] == "remove")
                 {
-                    std::string const name = JoinWords(words, 2);
+                    std::string const name = JoinWords(commandWords, 2);
                     std::uint64_t guid = 0;
                     {
                         std::lock_guard<std::mutex> lock(alts->Lock);
@@ -1246,45 +1254,45 @@ int main(int argc, char** argv)
                     }
                     if (guid == 0)
                     {
-                        set(false, name + " is not an alt playing as a bot.");
+                        setReply(false, name + " is not an alt playing as a bot.");
                         return reply;
                     }
                     run.Roster.OnRevoked(guid, "alt removed");
                     run.Client.ReleaseControl(guid); // the core logs an alt out when the module lets it go
-                    set(true, name + " is being logged out.");
+                    setReply(true, name + " is being logged out.");
                     return reply;
                 }
-                set(false, "Usage: .bots alt add <name> | alt remove <name> | alt list");
+                setReply(false, "Usage: .bots alt add <name> | alt remove <name> | alt list");
                 return reply;
             }
-            if (!words.empty() && words[0] == "spawn")
+            if (!commandWords.empty() && commandWords[0] == "spawn")
             {
                 std::uint32_t race = 0, cls = 0, level = 0;
                 auto const number = [](std::string const& text, std::uint32_t& out)
                 {
                     return std::from_chars(text.data(), text.data() + text.size(), out).ec == std::errc{};
                 };
-                if (words.size() < 3 || words.size() > 4 || !number(words[1], race) || !number(words[2], cls) || (words.size() == 4 && !number(words[3], level)) ||
+                if (commandWords.size() < 3 || commandWords.size() > 4 || !number(commandWords[1], race) || !number(commandWords[2], cls) || (commandWords.size() == 4 && !number(commandWords[3], level)) ||
                     race == 0 || cls == 0)
                 {
-                    set(false, "Usage: .bots spawn <race id> <class id> [level]");
+                    setReply(false, "Usage: .bots spawn <race id> <class id> [level]");
                     return reply;
                 }
                 if (!run.Roster.CanRequest())
                 {
-                    set(false, "The module cannot take another bot (its bot limit is reached).");
+                    setReply(false, "The module cannot take another bot (its bot limit is reached).");
                     return reply;
                 }
                 forever_module::SpawnParams params = ParamsFor(RaceClass{ race, cls });
                 if (level != 0)
                     params.set_level(level);
                 run.Roster.NoteRequestSent(0);
-                run.Client.RequestControl(0, params, [&run, tell, race, cls](forever_module::ControlResponse const& response)
+                run.Client.RequestControl(0, params, [&run, tellIssuer, race, cls](forever_module::ControlResponse const& response)
                 {
                     if (!response.granted())
                     {
                         run.Roster.OnDenied(0);
-                        tell("Spawn refused: " + response.reason());
+                        tellIssuer("Spawn refused: " + response.reason());
                         return;
                     }
                     std::uint64_t const guid = response.bot_guid();
@@ -1292,14 +1300,14 @@ int main(int argc, char** argv)
                     run.Classes.Set(guid, cls);
                     run.Races.Set(guid, race);
                     run.Client.StoreSet(bot_store::KeyFor(guid), std::to_string(race) + " " + std::to_string(cls));
-                    tell("Spawned bot " + std::to_string(guid) + " (race " + std::to_string(race) + ", class " + std::to_string(cls) + ").");
+                    tellIssuer("Spawned bot " + std::to_string(guid) + " (race " + std::to_string(race) + ", class " + std::to_string(cls) + ").");
                 });
-                set(true, "Spawning a bot.");
+                setReply(true, "Spawning a bot.");
                 return reply;
             }
-            if (words.size() == 1 && words[0] == "list")
+            if (commandWords.size() == 1 && commandWords[0] == "list")
             {
-                set(true, "This module controls " + std::to_string(run.Roster.Owned().size()) + " bot(s), " + std::to_string(run.Roster.PendingCount()) +
+                setReply(true, "This module controls " + std::to_string(run.Roster.Owned().size()) + " bot(s), " + std::to_string(run.Roster.PendingCount()) +
                               " request(s) pending (limit " + std::to_string(run.Roster.MaxBots()) + ").");
                 return reply;
             }
@@ -1309,12 +1317,12 @@ int main(int argc, char** argv)
                     std::lock_guard<std::mutex> lock(commands->Lock);
                     commands->AutoGear.push_back(request.command().issuer_guid());
                 }
-                set(true, "Your party's bots are being dressed for their level.");
+                setReply(true, "Your party's bots are being dressed for their level.");
                 return reply;
             }
             if (!settings.ChatCommands)
             {
-                set(false, "Bot commands are off (ChatCommands = 0 in the module's config).");
+                setReply(false, "Bot commands are off (ChatCommands = 0 in the module's config).");
                 return reply;
             }
             if (rest == "help")
@@ -1323,13 +1331,13 @@ int main(int argc, char** argv)
                 for (std::string const& line : ChatHelpLines(settings.ChatOrders, settings.ChatControl))
                     text += "\n" + line;
                 text += "\nAlso: .bots list | autogear | alt add|remove|list <name> | spawn <race> <class> [level].";
-                set(true, text);
+                setReply(true, text);
                 return reply;
             }
             auto const parsed = ParseChatCommand(rest, settings.ChatOrders, settings.ChatControl);
             if (!parsed)
             {
-                set(false, "Usage: .bots [all|tank|healer|dps|<class>] follow [off] | stay [off] | release | status | autogear" +
+                setReply(false, "Usage: .bots [all|tank|healer|dps|<class>] follow [off] | stay [off] | release | status | autogear" +
                                std::string(settings.ChatOrders ? " | stop | passive | aggressive | summon | revive | mount | dismount" : "") +
                                std::string(settings.ChatControl ? " | role <tank|healer|dps|auto> | stance <aggressive|defensive|passive> | distance <yards>|default" : "") +
                                ". goto here, pull, heal, focus and train: say them in party chat.");
@@ -1338,7 +1346,7 @@ int main(int argc, char** argv)
             if (parsed->Verb == ChatVerb::GotoHere || parsed->Verb == ChatVerb::Pull || parsed->Verb == ChatVerb::Heal ||
                 parsed->Verb == ChatVerb::Focus || parsed->Verb == ChatVerb::Train)
             {
-                set(false, std::string(ChatVerbName(parsed->Verb)) + " needs your position or target: say it in party chat.");
+                setReply(false, std::string(ChatVerbName(parsed->Verb)) + " needs your position or target: say it in party chat.");
                 return reply;
             }
             CommandQueue::ChatItem item;
@@ -1355,7 +1363,7 @@ int main(int argc, char** argv)
                 if (commands->Chat.size() < 64)
                     commands->Chat.push_back(std::move(item));
             }
-            set(true, "Sent to your group's bots.");
+            setReply(true, "Sent to your group's bots.");
             return reply;
         }
         if (text != "autogear")
