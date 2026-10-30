@@ -4470,7 +4470,7 @@ void HealerKitesToOnyxiaBand()
     options.WanderWhenIdle = false;
     options.ClassOf = [](std::uint64_t guid) { return guid == 10 ? 1u : guid == 11 ? 5u : 4u; };   // 10 the warrior tank, 11 a priest, 12 a rogue
     BotPolicy policy(options);
-    WorldTickSnapshotView view = PartyView({ 10, 11, 12 });
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12 }, options.ClassOf);
     NearbyUnit boss = Hostile(2, 20.0f, 100);
     boss.guid = MakeUnitRef(8, 10184, 2);
     for (std::size_t i = 0; i < 3; ++i)
@@ -4501,7 +4501,7 @@ void RangedBandHoldsInsideOnyxiaBand()
     for (float const yards : { 25.0f, 20.0f })
     {
         BotPolicy policy(options);
-        WorldTickSnapshotView view = PartyView({ 10, 11, 12 });
+        WorldTickSnapshotView view = PartyView({ 10, 11, 12 }, options.ClassOf);
         NearbyUnit boss = Hostile(2, yards, 100);
         boss.guid = MakeUnitRef(8, 10184, 2);
         for (std::size_t i = 0; i < 3; ++i)
@@ -4516,11 +4516,6 @@ void RangedBandHoldsInsideOnyxiaBand()
             view.tick_number = at / 100;
             for (BotAction const& action : policy.Decide(view, at))
             {
-                // Diagnostic (temporary): every action the mage is given, so a failing run shows what the policy sent it.
-                if (action.bot_guid == 11)
-                    std::printf("diag mage yards=%.0f tick=%llu action=%d target=%llu dest=(%.1f,%.1f) spell=%u\n", yards,
-                                (unsigned long long)at, int(action.type), (unsigned long long)action.target_guid,
-                                action.dest_x, action.dest_y, action.spell_id);
                 if (action.bot_guid == 11 && action.type == ActionType::kMoveTo && action.target_guid == 0)
                     mageAt = std::fabs(action.dest_x - boss.pos_x);
             }
@@ -4541,7 +4536,7 @@ void MeleeDoesNotKiteFromOnyxia()
     options.WanderWhenIdle = false;
     options.ClassOf = [](std::uint64_t guid) { return guid == 10 ? 1u : guid == 11 ? 8u : 4u; };   // 10 the warrior tank, 11 a mage, 12 a rogue
     BotPolicy policy(options);
-    WorldTickSnapshotView view = PartyView({ 10, 11, 12 });
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12 }, options.ClassOf);
     NearbyUnit boss = Hostile(2, 5.0f, 100);
     boss.guid = MakeUnitRef(8, 10184, 2);
     for (std::size_t i = 0; i < 3; ++i)
@@ -4569,7 +4564,7 @@ void HealerBandStandSkipsAHazard()
     options.AvoidGroundEffects = true;
     options.ClassOf = [](std::uint64_t guid) { return guid == 10 ? 1u : guid == 11 ? 5u : 4u; };   // 10 the warrior tank, 11 a priest, 12 a rogue
     BotPolicy policy(options);
-    WorldTickSnapshotView view = PartyView({ 10, 11, 12 });
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12 }, options.ClassOf);
     NearbyUnit boss = Hostile(2, 20.0f, 100);
     boss.guid = MakeUnitRef(8, 10184, 2);
     for (std::size_t i = 0; i < 3; ++i)
@@ -4583,7 +4578,7 @@ void HealerBandStandSkipsAHazard()
     view.bots[1].ground_effects[0].spell_id = 11829;
     view.bots[1].ground_effects[0].x = -3.0f;
     view.bots[1].ground_effects[0].y = 0.0f;
-    view.bots[1].ground_effects[0].radius = 6.0f;
+    view.bots[1].ground_effects[0].radius = 1.5f;
     view.bots[1].ground_effects[0].kind = 1;
     view.bots[1].ground_effects[0].hostile = 1;
     bool found = false;
@@ -4593,7 +4588,7 @@ void HealerBandStandSkipsAHazard()
             continue;
         found = true;
         float const hx = move.dest_x + 3.0f, hy = move.dest_y;
-        CHECK(std::sqrt(hx * hx + hy * hy) > 7.0f);             // outside the hazard and its margin
+        CHECK(std::sqrt(hx * hx + hy * hy) > 2.5f);             // outside the hazard (radius 1.5) and its 1-yard margin
         float const bx = move.dest_x - boss.pos_x, by = move.dest_y - boss.pos_y;   // the band is a distance, so measure the whole offset, not its x part
         CHECK(std::sqrt(bx * bx + by * by) >= 21.0f && std::sqrt(bx * bx + by * by) <= 25.0f);
     }
