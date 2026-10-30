@@ -120,5 +120,16 @@
       "name": "Charlga Razorflank",
       "strategy": {}
     }
+  ],
+  "events": [
+    {
+      // The ward (door 21099 at (2060.4, 2015.7, 62.4)), 5 yards from route point 45, opened by a click on the door itself like the Deadmines' Heavy Doors. Not run on the sim yet.
+      "id": "ward",
+      "name": "Ward (door)",
+      "trigger": { "type": "near", "x": 2060.4, "y": 2015.7, "z": 62.4, "radius": 30 },
+      "steps": [
+        { "type": "use", "object": 21099, "x": 2060.4, "y": 2015.7, "z": 62.4 }
+      ]
+    }
   ]
 }

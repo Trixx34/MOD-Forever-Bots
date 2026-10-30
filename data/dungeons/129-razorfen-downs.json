@@ -145,5 +145,19 @@
       "name": "Mordresh Fire Eye",
       "strategy": {}
     }
+  ],
+  "events": [
+    {
+      // The Gong (goober 148917 at (2552.4, 857.0, 51.5)): ringing it summons Tuten'kash. It is 96 yards from the nearest route point, so the event walks there once Glutton is
+      // dead; the route goes on afterwards. Tuten'kash is not a required boss. Not run on the sim yet.
+      "id": "gong",
+      "name": "Gong (summons Tuten'kash)",
+      "trigger": { "type": "after_boss", "boss": 8567 },
+      "steps": [
+        { "type": "use", "object": 148917, "x": 2552.4, "y": 857.0, "z": 51.5 },
+        { "type": "wait", "seconds": 6 }
+      ],
+      "timeout_sec": 240
+    }
   ]
 }

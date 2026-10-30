@@ -106,5 +106,35 @@
       "name": "Aku'mai",
       "strategy": {}
     }
+  ],
+  "events": [
+    {
+      // Fire of Aku'mai x4 (objects 21118-21121, buttons around (-818, -164, -24.5)): each click starts an ambush of Twilight Aqua Magi; the fire is lit when it is beaten, and the
+      // Portal of Aku'Mai (door 21117 at (-818.4, -200.6, -25.8)) opens when all four burn. The four are clicked in turn with a wait for the fight after each (the event pauses
+      // while the party fights). The order and the waits are a guess from the world database: not run on the sim yet.
+      "id": "aku-mai-fires",
+      "name": "Fires of Aku'mai (four buttons, then the Portal of Aku'Mai opens)",
+      "trigger": { "type": "near", "x": -818.5, "y": -164.5, "z": -24.5, "radius": 30 },
+      "steps": [
+        { "type": "use", "object": 21120, "x": -824.0, "y": -170.4, "z": -24.5 },
+        { "type": "wait", "seconds": 40 },
+        { "type": "use", "object": 21119, "x": -813.6, "y": -170.5, "z": -24.5 },
+        { "type": "wait", "seconds": 40 },
+        { "type": "use", "object": 21121, "x": -823.9, "y": -158.5, "z": -24.5 },
+        { "type": "wait", "seconds": 40 },
+        { "type": "use", "object": 21118, "x": -813.5, "y": -158.5, "z": -24.5 },
+        { "type": "wait", "seconds": 40 }
+      ],
+      "timeout_sec": 600
+    },
+    {
+      // Altar of the Deeps (button 103016) beside Twilight Lord Kelris. Not run on the sim yet.
+      "id": "altar-of-the-deeps",
+      "name": "Altar of the Deeps (Twilight Lord Kelris)",
+      "trigger": { "type": "near", "x": -839.6, "y": -477.9, "z": -33.7, "radius": 30 },
+      "steps": [
+        { "type": "use", "object": 103016, "x": -839.6, "y": -477.9, "z": -33.7 }
+      ]
+    }
   ]
 }

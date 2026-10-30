@@ -52,3 +52,50 @@ near -242.6 2159.0 90.6 30
 use 18895 -242.6 2159.0 90.6
 end
 
+
+# Blackfathom Deeps (map 48). The four Fires of Aku'mai (buttons 21118-21121); each click starts an ambush, and the Portal of Aku'Mai (door 21117) opens when all four burn.
+# Not run on the sim yet. The Altar of the Deeps (button 103016) is beside Twilight Lord Kelris.
+
+event 48 aku-mai-fires Fires of Aku'mai (four buttons, then the Portal of Aku'Mai opens)
+near -818.5 -164.5 -24.5 30
+use 21120 -824.0 -170.4 -24.5
+wait 40
+use 21119 -813.6 -170.5 -24.5
+wait 40
+use 21121 -823.9 -158.5 -24.5
+wait 40
+use 21118 -813.5 -158.5 -24.5
+wait 40
+timeout 600
+end
+
+event 48 altar-of-the-deeps Altar of the Deeps (Twilight Lord Kelris)
+near -839.6 -477.9 -33.7 30
+use 103016 -839.6 -477.9 -33.7
+end
+
+# Razorfen Downs (map 129). The Gong (goober 148917) summons Tuten'kash; it is 96 yards from the route, so the event walks there once Glutton is dead.
+event 129 gong Gong (summons Tuten'kash)
+after_boss 8567
+use 148917 2552.4 857.0 51.5
+wait 6
+timeout 240
+end
+
+# Gnomeregan (map 90). The Explosive Charges (goobers 144065) beside the Cave In doors 146085 and 146086; the event runs at the start and walks there.
+event 90 cave-ins Cave Ins (Explosive Charges)
+at_start
+use 144065 -503.9 -97.2 -151.0
+wait 5
+use 144065 -506.6 -88.8 -151.1
+wait 5
+use 144065 -535.2 -105.6 -156.0
+wait 5
+timeout 300
+end
+
+# Razorfen Kraul (map 47). The ward (door 21099), opened by a click on the door itself.
+event 47 ward Ward (door)
+near 2060.4 2015.7 62.4 30
+use 21099 2060.4 2015.7 62.4
+end
