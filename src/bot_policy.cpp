@@ -92,6 +92,8 @@ constexpr std::uint64_t kBuffFailBaseMs = 5000;         // an upkeep buff (or a 
 constexpr std::uint64_t kSpellFailMaxMs = 600000;
 constexpr std::uint32_t kGatherFailDoublings = 5;       // nothing to gather near the bot, again: 90 s, 3, 6, 12, 24, 48 minutes at most
 constexpr std::uint64_t kNoRoutePauseMs = 5000;        // the first pause after a move got "no route"; it doubles with each refusal in a row (up to 6 doublings is 2.7 minutes)
+constexpr std::uint64_t kRefusedPlaceMs = 20000;        // a place the core found no route to is not tried again by the Warder kite for this long
+constexpr std::size_t kRefusedPlacesKept = 8;           // how many such places a bot remembers
 constexpr float kNoRouteSameYards = 12.0f;               // a destination this close to the refused one is the same place
 constexpr std::uint64_t kSkillUpCastMs = 4000;        // after a craft was sent: the cast takes a few seconds, the answer decides what comes next
 constexpr std::uint64_t kSkillUpNextMs = 3500;        // a craft that started: the next one is tried when the cast is done
@@ -1152,6 +1154,12 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
                 state.NoRouteStreak = same ? std::min<std::uint32_t>(state.NoRouteStreak + 1, 6) : 1;
                 state.NoRouteDest = state.Last->Dest;
                 state.NoRouteUntilMs = nowMs + (kNoRoutePauseMs << (state.NoRouteStreak - 1));
+                // The kite tries one point after another, and only the last refusal blocked: with two points it went back and forth between them (2026-10-30: 91,000 refusals in
+                // 15 minutes). Every refused point is kept for a while, so the circle is walked through and the bot then stands.
+                std::erase_if(state.RefusedPlaces, [nowMs](auto const& place) { return place.second <= nowMs; });
+                if (state.RefusedPlaces.size() >= kRefusedPlacesKept)
+                    state.RefusedPlaces.erase(state.RefusedPlaces.begin());
+                state.RefusedPlaces.emplace_back(state.Last->Dest, nowMs + kRefusedPlaceMs);
             }
         }
         state.QuestTeleportSent = false;
@@ -3623,7 +3631,10 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             for (int retry = 0; retry < 6; ++retry)
             {
                 Point const kite = AoeKitePoint(bot, *aoeWarder, retry, kiteEntry);
-                bool const blocked = nowMs < state.NoRouteUntilMs && std::hypot(kite.X - state.NoRouteDest.X, kite.Y - state.NoRouteDest.Y) < kNoRouteSameYards;
+                bool blocked = nowMs < state.NoRouteUntilMs && std::hypot(kite.X - state.NoRouteDest.X, kite.Y - state.NoRouteDest.Y) < kNoRouteSameYards;
+                for (auto const& place : state.RefusedPlaces)
+                    if (nowMs < place.second && std::hypot(kite.X - place.first.X, kite.Y - place.first.Y) < kNoRouteSameYards)
+                        blocked = true;
                 if (!blocked && !ground_avoid::InsideAny(kite.X, kite.Y, hazards))
                 {
                     wanted = Decision{ ActionType::kMoveTo, 0, kite };

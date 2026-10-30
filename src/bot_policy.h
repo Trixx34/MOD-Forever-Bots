@@ -406,6 +406,7 @@ private:
         Point NoRouteDest{};                             // the destination of the last move the core found no route to
         std::uint64_t NoRouteUntilMs = 0;                // a move to (about) that place is not sent before this time
         std::uint32_t NoRouteStreak = 0;                 // no-route answers in a row for that place: the pause doubles each time
+        std::vector<std::pair<Point, std::uint64_t>> RefusedPlaces;   // the last few places the core found no route to, each with the time it is forgotten (the Warder kite steps past all of them, not only the last)
         std::uint64_t ReclaimDangerSinceMs = 0;          // since when a live hostile has stood near the ghost at its corpse (0 = none)
         std::uint64_t FocusLoggedFor = 0;                // the unit a focus event was last written for (once per target)
         ground_avoid::Point2 AvoidDest{};                // where the bot is walking to get out of a ground effect, kept for a few seconds so the point does not shift every tick

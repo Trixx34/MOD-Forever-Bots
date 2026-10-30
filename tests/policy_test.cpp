@@ -4767,6 +4767,13 @@ void KiteRetreatsAlongTheEntryRouteAndFallsBackToTheCircle()
     CHECK(found);
     CHECK(std::hypot(fallback.X - retreat.X, fallback.Y - retreat.Y) >= 12.0f);   // not the refused place
     CHECK(std::hypot(fallback.X - warder.pos_x, fallback.Y - warder.pos_y) >= 29.0f);
+
+    // A second refusal: the third point is neither of the two refused ones (it used to go back to the first, 91,000 refusals in 15 minutes on 2026-10-30).
+    view.bots[1].last_action_sequence = 2;
+    Point const third = kiteOf(3000, found);
+    CHECK(found);
+    CHECK(std::hypot(third.X - retreat.X, third.Y - retreat.Y) >= 12.0f);
+    CHECK(std::hypot(third.X - fallback.X, third.Y - fallback.Y) >= 12.0f);
 }
 
 // A party member on low health keeps fighting: its healer needs it to hold still, and a fleeing bot drags the pack onto the party.
