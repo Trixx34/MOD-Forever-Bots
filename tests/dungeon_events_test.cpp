@@ -224,6 +224,74 @@ void TheLeaderFightsFirst()
     CHECK(runner.Next(f, 300).Do == Command::What::Hold);
 }
 
+// The Wailing Caverns escort: after the four Lords of the Fang are dead, talk to the Disciple of Naralex at the start, follow him, then stand through the waves.
+void TheNaralexEscortRuns()
+{
+    char const* text = R"(event 43 naralex Disciple of Naralex (escort)
+after_bosses 3671 3669 3670 3673
+talk 3678 0 -135 125.4 -78.1
+follow 3678 60
+wait 20
+timeout 600
+end
+
+event 43 bridge Bridge to the Lord's cave
+at_start
+teleport -285 2 -64
+end
+
+event 43 badbosses Nothing listed
+after_bosses
+wait 1
+end
+
+event 43 badtalk Missing option
+at_start
+talk 3678 -135 125.4 -78.1
+end
+)";
+    std::vector<std::string> warnings;
+    std::vector<Event> const all = Parse(text, warnings);
+    CHECK(all.size() == 2 && warnings.size() == 2);
+    CHECK(all[0].When == Event::Trigger::AfterAllBosses && all[0].Bosses.size() == 4 && all[0].Bosses[3] == 3673 && all[0].TimeoutSec == 600);
+    CHECK(all[0].Steps.size() == 3 && all[0].Steps[0].What == Step::Kind::Talk && all[0].Steps[0].Creature == 3678 && all[0].Steps[0].Option == 0);
+    CHECK(all[0].Steps[1].What == Step::Kind::Follow && all[0].Steps[1].Creature == 3678 && all[0].Steps[1].WaitSec == 60);
+    CHECK(all[1].Steps[0].What == Step::Kind::Teleport && all[1].Steps[0].X == -285.0f && all[1].Steps[0].Z == -64.0f);
+
+    // the escort alone (the bridge is for another leader)
+    Runner runner({ all[0] });
+    std::set<std::uint32_t> killed{ 3671, 3669, 3670 };
+    Facts f;
+    f.X = -40;
+    f.Y = 300;
+    f.KilledBosses = &killed;
+    std::uint64_t now = 0;
+    CHECK(runner.Next(f, now).Do == Command::What::Nothing && !runner.Active());       // three of the four are not enough
+    killed.insert(3673);
+    Command const walk = runner.Next(f, now += 1000);
+    CHECK(runner.Active() && walk.Do == Command::What::MoveTo && walk.X == -135.0f && walk.Y == 125.4f);
+    f.X = -133;
+    f.Y = 125;                                                                          // within 4 yards of the Disciple
+    Command const talk = runner.Next(f, now += 20000);
+    CHECK(talk.Do == Command::What::Talk && talk.Creature == 3678 && talk.Option == 0);
+    CHECK(runner.Next(f, now += 500).Do == Command::What::Hold);                        // the answer is awaited
+    runner.OnUseResult(UseResult::Applied, now);
+    Command const follow = runner.Next(f, now += 100);
+    CHECK(follow.Do == Command::What::Follow && follow.Creature == 3678);
+    f.InCombat = true;
+    CHECK(runner.Next(f, now += 5000).Do == Command::What::Hold);                      // a fight on the way is fought first
+    f.InCombat = false;
+    CHECK(runner.Next(f, now += 5000).Do == Command::What::Follow);
+    CHECK(runner.Next(f, now += 60000).Do == Command::What::Hold);                      // the follow time is over: the wait step
+    CHECK(runner.Next(f, now += 20000).Do == Command::What::Nothing && !runner.Active());
+
+    Runner bridge({ all[1] });
+    Facts g;
+    Command const jump = bridge.Next(g, 0);
+    CHECK(jump.Do == Command::What::Teleport && jump.X == -285.0f && jump.Y == 2.0f && jump.Z == -64.0f);
+    CHECK(bridge.Next(g, 100).Do == Command::What::Nothing && !bridge.Active());        // a teleport has no answer to wait for
+}
+
 } // namespace
 
 int main()
@@ -235,6 +303,7 @@ int main()
     AFailedEventRetriesWithBackoffThenGivesUpForGood();
     ATimedOutEventRetriesThenCanSucceed();
     TheLeaderFightsFirst();
+    TheNaralexEscortRuns();
     if (failures == 0)
         std::printf("dungeon_events_test: all passed\n");
     return failures == 0 ? 0 : 1;

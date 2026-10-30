@@ -91,8 +91,8 @@ Same behaviour as before (`doc/dungeon-events.md`): the leader runs an event as 
 |---|---|
 | `id` | required, one word, unique in the file |
 | `name` | free text |
-| `trigger.type` | `near` (with `x`, `y`, `z`, `radius`: when the leader comes within `radius` yards), `after_boss` (with `boss`: the creature entry, once it is dead) or `at_start` |
-| `steps[]` | at least one: `{ "type": "use", "object": <entry>, "x","y","z", "item": <item entry, optional> }` walks to within 4 yards and clicks the object (or uses the item on it); `{ "type": "wait", "seconds": 0-600 }` stands still |
+| `trigger.type` | `near` (with `x`, `y`, `z`, `radius`: when the leader comes within `radius` yards), `after_boss` (with `boss`: the creature entry, once it is dead), `after_bosses` (with `bosses`: a list of creature entries, once every one is dead; bots 0.42.0) or `at_start` |
+| `steps[]` | at least one: `{ "type": "use", "object": <entry>, "x","y","z", "item": <item entry, optional> }` walks to within 4 yards and clicks the object (or uses the item on it); `{ "type": "talk", "creature": <entry>, "option": <n from 0>, "x","y","z" }` walks to within 4 yards of the place and talks to that creature, picking gossip option n (kGossip, needs `Bot.Actions.Gossip` in the core; bots 0.42.0); `{ "type": "follow", "creature": <entry>, "seconds": 1-600 }` follows that creature (an escort NPC) for that long, a fight holding the step; `{ "type": "teleport", "x","y","z" }` puts the leader at the place (a scenario tool, needs `DungeonTeleport`; for a place the navmesh does not join to the rest); `{ "type": "wait", "seconds": 0-600 }` stands still |
 | `timeout_sec` | 5 to 3600, default 120: the event is given up after this long |
 
 Events with the same trigger run one after another in file order.

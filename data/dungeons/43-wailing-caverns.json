@@ -74,7 +74,53 @@
     { "x": -66.7, "y": 473.1, "z": -61.6 },
     { "x": -82.7, "y": 466.9, "z": -67.4 },
     { "x": -109.6, "y": 428.8, "z": -73.0 },
-    { "x": -151.1, "y": 414.4, "z": -72.6, "boss": 3669 }  // boss: Lord Cobrahn
+    { "x": -151.1, "y": 414.4, "z": -72.6, "boss": 3669 },  // boss: Lord Cobrahn
+    // From Cobrahn back through the cave and down to Lord Pythas (the corners of the navmesh path, about 45 yards apart), then Lord Serpentis and Mutanus the Devourer.
+    // Lord Serpentis stands on a piece of navmesh that no path joins to the rest (the Wailing Caverns mesh has 182 islands): the event "serpentis-bridge" puts the party there
+    // when Lord Pythas is dead. Mutanus the Devourer has no spawn: the escort event (below) makes him appear at Naralex.
+    { "x": -115.5, "y": 415.4, "z": -73.6 },
+    { "x": -96.7, "y": 454.7, "z": -71.4 },
+    { "x": -68.9, "y": 481.3, "z": -61.6 },
+    { "x": -24.5, "y": 497.9, "z": -53.8 },
+    { "x": 20.7, "y": 496.4, "z": -61.2 },
+    { "x": 40.1, "y": 464.1, "z": -66.6 },
+    { "x": 60.8, "y": 433.5, "z": -64.0 },
+    { "x": 32.9, "y": 405.5, "z": -60.3 },
+    { "x": -2.2, "y": 418.4, "z": -66.0 },
+    { "x": 13.7, "y": 450.9, "z": -79.8 },
+    { "x": 11.5, "y": 469.0, "z": -88.6 },
+    { "x": -24.0, "y": 460.3, "z": -98.3 },
+    { "x": -53.7, "y": 434.2, "z": -105.1 },
+    { "x": -62.5, "y": 382.2, "z": -105.2 },
+    { "x": -73.6, "y": 337.9, "z": -105.7 },
+    { "x": -47.3, "y": 307.7, "z": -105.7 },
+    { "x": -26.3, "y": 271.2, "z": -105.0 },
+    { "x": -22.9, "y": 224.1, "z": -102.3 },
+    { "x": -23.5, "y": 169.1, "z": -104.2 },
+    { "x": -33.4, "y": 118.6, "z": -105.3 },
+    { "x": -67.0, "y": 90.0, "z": -104.5 },
+    { "x": -105.9, "y": 65.1, "z": -105.8 },
+    { "x": -151.4, "y": 62.9, "z": -105.8 },
+    { "x": -188.4, "y": 40.2, "z": -104.9 },
+    { "x": -227.8, "y": 14.7, "z": -104.9 },
+    { "x": -276.2, "y": 8.0, "z": -105.8 },
+    { "x": -314.9, "y": 25.9, "z": -102.8 },
+    { "x": -316.3, "y": 55.2, "z": -94.9 },
+    { "x": -280.5, "y": 31.4, "z": -88.7 },
+    { "x": -246.2, "y": 47.2, "z": -84.4 },
+    { "x": -203.7, "y": 67.5, "z": -81.8 },
+    { "x": -167.1, "y": 82.0, "z": -76.1 },
+    { "x": -145.3, "y": 41.5, "z": -76.0 },
+    { "x": -153.1, "y": 4.4, "z": -75.8 },
+    { "x": -158.1, "y": -55.4, "z": -75.6 },
+    { "x": -151.5, "y": -96.6, "z": -66.6 },
+    { "x": -120.2, "y": -117.5, "z": -75.6 },
+    { "x": -83.8, "y": -138.0, "z": -78.9 },
+    { "x": -32.9, "y": -164.6, "z": -74.0 },
+    { "x": 10.5, "y": -182.8, "z": -82.1 },
+    { "x": 36.8, "y": -241.1, "z": -79.5, "boss": 3670 },  // boss: Lord Pythas
+    { "x": -120.2, "y": -24.6, "z": -28.6, "boss": 3673 },  // boss: Lord Serpentis
+    { "x": 115.4, "y": 240.0, "z": -94.0, "boss": 3654 }  // boss: Mutanus the Devourer
   ],
   // The bosses, in the order the route meets them. "strategy" holds the tactics for each boss: pull, tank_position, interrupt, dispel, avoid, avoid_spells, kill_order,
   // notes. Fields the bots act on today are listed in doc/dungeon-strategy.md ("what bots do today"); the others are kept but not used yet.
@@ -96,6 +142,52 @@
       "entry": 3669,
       "name": "Lord Cobrahn",
       "strategy": {}
+    },
+    {
+      // Lord Pythas (creature entry 3670)
+      "entry": 3670,
+      "name": "Lord Pythas",
+      "strategy": {}
+    },
+    {
+      // Lord Serpentis (creature entry 3673)
+      "entry": 3673,
+      "name": "Lord Serpentis",
+      "strategy": {}
+    },
+    {
+      // Mutanus the Devourer (creature entry 3654): summoned by the Naralex event once the four Lords of the Fang are dead
+      "entry": 3654,
+      "name": "Mutanus the Devourer",
+      "strategy": {}
+    }
+  ],
+  // The Naralex event (optional in the game, here required: Mutanus is a boss of the route). Not run on the sim yet.
+  "events": [
+    {
+      // Lord Serpentis stands on a navmesh island no path reaches. When Lord Pythas is dead the leader is put next to him (the party follows by the member recovery).
+      "id": "serpentis-bridge",
+      "name": "Bridge to Lord Serpentis (the navmesh has no path)",
+      "trigger": { "type": "after_boss", "boss": 3670 },
+      "steps": [
+        { "type": "teleport", "x": -103.8, "y": -31.9, "z": -28.2 },
+        { "type": "wait", "seconds": 5 }
+      ]
+    },
+    {
+      // The Naralex awakening: with the four Lords of the Fang dead (Anacondra, Cobrahn, Pythas, Serpentis), the Disciple of Naralex (creature 3678, at the start of the
+      // instance) offers a gossip option (menu 202, option 0) that starts his escort to Naralex (creature 3679 at (115.4, 240.0, -94.0)). The leader goes back to him, talks, follows him
+      // while the party fights what comes, and waits through the waves; Mutanus the Devourer comes after the second wave. The escort and the waves are the core's script.
+      "id": "naralex-escort",
+      "name": "Naralex awakening (talk to the Disciple, escort him)",
+      "trigger": { "type": "after_bosses", "bosses": [3671, 3669, 3670, 3673] },
+      "steps": [
+        { "type": "teleport", "x": -130.0, "y": 127.0, "z": -78.0 },
+        { "type": "talk", "creature": 3678, "option": 0, "x": -135.0, "y": 125.4, "z": -78.1 },
+        { "type": "follow", "creature": 3678, "seconds": 360 },
+        { "type": "wait", "seconds": 120 }
+      ],
+      "timeout_sec": 1200
     }
   ]
 }

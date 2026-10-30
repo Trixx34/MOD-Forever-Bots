@@ -357,12 +357,13 @@ end
 
 void SameEvent(dungeon_events::Event const& a, dungeon_events::Event const& b)
 {
-    CHECK(a.Map == b.Map && a.Id == b.Id && a.Name == b.Name && a.When == b.When && a.Boss == b.Boss);
+    CHECK(a.Map == b.Map && a.Id == b.Id && a.Name == b.Name && a.When == b.When && a.Boss == b.Boss && a.Bosses == b.Bosses);
     CHECK(a.X == b.X && a.Y == b.Y && a.Z == b.Z && a.Radius == b.Radius && a.TimeoutSec == b.TimeoutSec);
     CHECK(a.Steps.size() == b.Steps.size());
     for (std::size_t i = 0; i < a.Steps.size() && i < b.Steps.size(); ++i)
     {
         CHECK(a.Steps[i].What == b.Steps[i].What && a.Steps[i].Object == b.Steps[i].Object && a.Steps[i].Item == b.Steps[i].Item);
+        CHECK(a.Steps[i].Creature == b.Steps[i].Creature && a.Steps[i].Option == b.Steps[i].Option);
         CHECK(a.Steps[i].X == b.Steps[i].X && a.Steps[i].Y == b.Steps[i].Y && a.Steps[i].Z == b.Steps[i].Z && a.Steps[i].WaitSec == b.Steps[i].WaitSec);
     }
 }

@@ -1063,13 +1063,14 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
     }
 
     // A click or an item used on a door, a lever or a charge (dungeon events): the answer goes to the event that sent it.
-    if (bot.last_action_type == uint8_t(ActionType::kUseObject) && state.Events)
+    if ((bot.last_action_type == uint8_t(ActionType::kUseObject) || bot.last_action_type == uint8_t(ActionType::kGossip)) && state.Events)
     {
         state.Events->OnUseResult(bot.last_action_status == BotActionStatus::kApplied ? dungeon_events::UseResult::Applied
                                   : bot.last_action_status == BotActionStatus::kOutOfRange ? dungeon_events::UseResult::OutOfRange
                                                                                           : dungeon_events::UseResult::Failed, nowMs);
         if (_options.OnEvent && bot.last_action_status != BotActionStatus::kApplied)
-            _options.OnEvent("use_object_refused: bot=" + std::to_string(bot.guid) + " status=" + ActionStatusName(bot.last_action_status));
+            _options.OnEvent(std::string(bot.last_action_type == uint8_t(ActionType::kGossip) ? "gossip_refused" : "use_object_refused") + ": bot=" + std::to_string(bot.guid) +
+                             " status=" + ActionStatusName(bot.last_action_status));
         return;
     }
 
@@ -4078,6 +4079,48 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                             eventBusy = true;
                             break;
                         }
+                        case dungeon_events::Command::What::Talk:
+                        {
+                            // Talk to the creature and pick a gossip option (kGossip, SDK 0.24): the Disciple of Naralex starts his escort this way.
+                            BotAction talk;
+                            talk.bot_guid = bot.guid;
+                            talk.type = ActionType::kGossip;
+                            talk.spell_id = command.Creature;
+                            talk.dest_x = float(command.Option);
+                            talk.dest_y = command.Y;
+                            talk.dest_z = command.Z;
+                            actions.push_back(talk);
+                            wanted = Decision{ ActionType::kStop, 0 };
+                            eventBusy = true;
+                            break;
+                        }
+                        case dungeon_events::Command::What::Follow:
+                        {
+                            // Follow an escort NPC: the creature of that entry nearest in view. Out of view the leader stands, and the party with it.
+                            NearbyUnit const* escort = nullptr;
+                            float escortDistance = std::numeric_limits<float>::max();
+                            for (NearbyUnit const& unit : nearby)
+                                if (forever_module::UnitRefEntry(unit.guid) == command.Creature && unit.health > 0)
+                                {
+                                    float const distance = rotation::DistanceYards(bot, unit);
+                                    if (distance < escortDistance)
+                                    {
+                                        escort = &unit;
+                                        escortDistance = distance;
+                                    }
+                                }
+                            wanted = escort ? Decision{ ActionType::kFollow, escort->guid } : Decision{ ActionType::kStop, 0 };
+                            moveWhy = "event_escort";
+                            eventBusy = true;
+                            break;
+                        }
+                        case dungeon_events::Command::What::Teleport:
+                            if (_options.DungeonTeleport)
+                                wanted = Decision{ ActionType::kTeleport, 0, Point{ command.X, command.Y, command.Z }, bot.map_id };
+                            else
+                                wanted = Decision{ ActionType::kStop, 0 };
+                            eventBusy = true;
+                            break;
                     }
                     if (eventBusy)
                         routeBusy = true;

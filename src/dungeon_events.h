@@ -6,9 +6,14 @@
 //   event <map> <id> <name...>      starts an event; <id> is a word, <name> free text
 //   after_boss <entry>              trigger: once that boss is dead (the creature entry)
 //   near <x> <y> <z> <radius>       trigger: when the leader comes within <radius> yards (2D) of the place
+//   after_bosses <entry> <entry> ...  trigger: once every one of those bosses is dead (Wailing Caverns: the four Lords of the Fang)
 //   at_start                        trigger: at once, when the dungeon run starts
 //   use <object entry> <x> <y> <z> [item <item entry>]   step: walk to within 4 yards of the place, then click the object (nothing happens to one that
 //                                   is open already) or, with `item`, use that item on it
+//   talk <creature entry> <option> <x> <y> <z>   step: walk to within 4 yards of the place, then talk to the creature and pick gossip option <option>
+//                                   (counted from 0), which starts a scripted event such as an escort (kGossip, SDK 0.24)
+//   follow <creature entry> <seconds>   step: follow that creature (an escort walking to its goal) for that long; a fight in the meantime holds the step
+//   teleport <x> <y> <z>            step: put the leader at the place (a scenario tool: DungeonTeleport, for a place the navmesh does not connect)
 //   wait <seconds>                  step: stand still
 //   timeout <seconds>               the event is given up after this long (default 120)
 //   end
@@ -26,22 +31,25 @@ namespace dungeon_events {
 
 struct Step
 {
-    enum class Kind : std::uint8_t { Use, Wait };
+    enum class Kind : std::uint8_t { Use, Wait, Talk, Follow, Teleport };
     Kind What = Kind::Use;
+    std::uint32_t Creature = 0;   // Talk, Follow: the creature's entry
+    std::uint32_t Option = 0;     // Talk: the gossip option, counted from 0
     std::uint32_t Object = 0;     // Use: the object's entry
     std::uint32_t Item = 0;       // Use: 0 = a click, else an item entry used on the object
     float X = 0.0f, Y = 0.0f, Z = 0.0f;
-    std::uint32_t WaitSec = 0;
+    std::uint32_t WaitSec = 0;    // Wait, Follow
 };
 
 struct Event
 {
-    enum class Trigger : std::uint8_t { AtStart, AfterBoss, Near };
+    enum class Trigger : std::uint8_t { AtStart, AfterBoss, Near, AfterAllBosses };
     std::uint32_t Map = 0;
     std::string Id;
     std::string Name;
     Trigger When = Trigger::AtStart;
     std::uint32_t Boss = 0;
+    std::vector<std::uint32_t> Bosses;   // AfterAllBosses: every one of these must be dead
     float X = 0.0f, Y = 0.0f, Z = 0.0f, Radius = 0.0f;
     std::vector<Step> Steps;
     std::uint32_t TimeoutSec = 120;
@@ -70,14 +78,19 @@ struct Command
         Hold,       // an event is running but nothing is to be sent now: stand still
         MoveTo,     // walk to (X, Y, Z)
         Use,        // send kUseObject: Object, Item, with the place (X, Y, Z)
+        Talk,       // send kGossip: Creature, Option, with the place (X, Y, Z)
+        Follow,     // follow the creature Creature (kFollow); stand still when it is not in view
+        Teleport,   // put the leader at (X, Y, Z)
     };
     What Do = What::Nothing;
     float X = 0.0f, Y = 0.0f, Z = 0.0f;
     std::uint32_t Object = 0;
     std::uint32_t Item = 0;
+    std::uint32_t Creature = 0;
+    std::uint32_t Option = 0;
 };
 
-// The result of a kUseObject that was sent.
+// The result of a kUseObject or kGossip that was sent.
 enum class UseResult : std::uint8_t { Applied, OutOfRange, Failed };
 
 class Runner

@@ -99,3 +99,20 @@ event 47 ward Ward (door)
 near 2060.4 2015.7 62.4 30
 use 21099 2060.4 2015.7 62.4
 end
+
+# Wailing Caverns (map 43). Lord Serpentis stands on a navmesh island no path reaches: when Lord Pythas is dead the leader is put next to him.
+event 43 serpentis-bridge Bridge to Lord Serpentis (the navmesh has no path)
+after_boss 3670
+teleport -103.8 -31.9 -28.2
+wait 5
+end
+
+# The Naralex awakening: with Anacondra, Cobrahn, Pythas and Serpentis dead, talk to the Disciple of Naralex (3678) at the start and escort him; Mutanus comes after the second wave.
+event 43 naralex-escort Naralex awakening (talk to the Disciple, escort him)
+after_bosses 3671 3669 3670 3673
+teleport -130.0 127.0 -78.0
+talk 3678 0 -135.0 125.4 -78.1
+follow 3678 360
+wait 120
+timeout 1200
+end

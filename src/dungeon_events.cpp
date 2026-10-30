@@ -108,6 +108,28 @@ std::vector<Event> Parse(std::string_view text, std::vector<std::string>& warnin
                 bad = true;
             }
         }
+        else if (w[0] == "after_bosses")
+        {
+            current.Bosses.clear();
+            bool ok = w.size() >= 2;
+            for (std::size_t i = 1; ok && i < w.size(); ++i)
+            {
+                std::uint32_t entry = 0;
+                ok = ToUint(w[i], entry) && entry != 0;
+                if (ok)
+                    current.Bosses.push_back(entry);
+            }
+            if (ok)
+            {
+                current.When = Event::Trigger::AfterAllBosses;
+                hasTrigger = true;
+            }
+            else
+            {
+                warn("after_bosses needs one or more creature entries");
+                bad = true;
+            }
+        }
         else if (w[0] == "near")
         {
             if (w.size() == 5 && ToFloat(w[1], current.X) && ToFloat(w[2], current.Y) && ToFloat(w[3], current.Z) && ToFloat(w[4], current.Radius) && current.Radius > 0)
@@ -135,6 +157,43 @@ std::vector<Event> Parse(std::string_view text, std::vector<std::string>& warnin
             else
             {
                 warn("use needs <object> <x> <y> <z> [item <entry>]");
+                bad = true;
+            }
+        }
+        else if (w[0] == "talk")
+        {
+            Step step;
+            step.What = Step::Kind::Talk;
+            if (w.size() == 6 && ToUint(w[1], step.Creature) && step.Creature != 0 && ToUint(w[2], step.Option) && ToFloat(w[3], step.X) && ToFloat(w[4], step.Y) &&
+                ToFloat(w[5], step.Z))
+                current.Steps.push_back(step);
+            else
+            {
+                warn("talk needs <creature> <option> <x> <y> <z>");
+                bad = true;
+            }
+        }
+        else if (w[0] == "follow")
+        {
+            Step step;
+            step.What = Step::Kind::Follow;
+            if (w.size() == 3 && ToUint(w[1], step.Creature) && step.Creature != 0 && ToUint(w[2], step.WaitSec) && step.WaitSec >= 1 && step.WaitSec <= 600)
+                current.Steps.push_back(step);
+            else
+            {
+                warn("follow needs <creature> and 1 to 600 seconds");
+                bad = true;
+            }
+        }
+        else if (w[0] == "teleport")
+        {
+            Step step;
+            step.What = Step::Kind::Teleport;
+            if (w.size() == 4 && ToFloat(w[1], step.X) && ToFloat(w[2], step.Y) && ToFloat(w[3], step.Z))
+                current.Steps.push_back(step);
+            else
+            {
+                warn("teleport needs <x> <y> <z>");
                 bad = true;
             }
         }
@@ -266,6 +325,12 @@ Command Runner::Next(Facts const& facts, std::uint64_t nowMs)
                 case Event::Trigger::AtStart: fires = true; break;
                 case Event::Trigger::AfterBoss: fires = facts.KilledBosses && facts.KilledBosses->count(event.Boss) != 0; break;
                 case Event::Trigger::Near: fires = Dist2d(facts.X, facts.Y, event.X, event.Y) <= event.Radius; break;
+                case Event::Trigger::AfterAllBosses:
+                    fires = facts.KilledBosses != nullptr && !event.Bosses.empty();
+                    for (std::uint32_t const boss : event.Bosses)
+                        if (!facts.KilledBosses || facts.KilledBosses->count(boss) == 0)
+                            fires = false;
+                    break;
             }
             if (!fires)
                 continue;
@@ -311,7 +376,32 @@ Command Runner::Next(Facts const& facts, std::uint64_t nowMs)
         return { Command::What::Hold };
     }
 
-    // Use: be at the place first, then send it; the answer is waited for.
+    if (step.What == Step::Kind::Follow)
+    {
+        if (nowMs - _stepSinceMs >= std::uint64_t(step.WaitSec) * 1000)
+        {
+            ++_step;
+            _stepSinceMs = nowMs;
+            return Next(facts, nowMs);
+        }
+        Command follow;
+        follow.Do = Command::What::Follow;
+        follow.Creature = step.Creature;
+        return follow;
+    }
+    if (step.What == Step::Kind::Teleport)
+    {
+        Command teleport;
+        teleport.Do = Command::What::Teleport;
+        teleport.X = step.X;
+        teleport.Y = step.Y;
+        teleport.Z = step.Z;
+        ++_step;                  // a teleport has no answer to wait for
+        _stepSinceMs = nowMs;
+        return teleport;
+    }
+
+    // Use or Talk: be at the place first, then send it; the answer is waited for.
     float const reach = _close ? kCloseYards : kApproachYards;
     if (Dist2d(facts.X, facts.Y, step.X, step.Y) > reach)
     {
@@ -334,12 +424,14 @@ Command Runner::Next(Facts const& facts, std::uint64_t nowMs)
         }
     }
     Command use;
-    use.Do = Command::What::Use;
+    use.Do = step.What == Step::Kind::Talk ? Command::What::Talk : Command::What::Use;
     use.X = step.X;
     use.Y = step.Y;
     use.Z = step.Z;
     use.Object = step.Object;
     use.Item = step.Item;
+    use.Creature = step.Creature;
+    use.Option = step.Option;
     _sent = true;
     _sentMs = nowMs;
     return use;

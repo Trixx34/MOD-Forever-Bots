@@ -15,6 +15,10 @@ file. Format (`src/dungeon_events.h`):
     event <map> <id> <name...>
     after_boss <entry>                  trigger: once that boss is seen dead      (or)  near <x> <y> <z> <radius>   (or)  at_start
     use <object entry> <x> <y> <z> [item <item entry>]    walk to within 4 yards of the place, then click the object, or use the item on it
+    talk <creature entry> <option> <x> <y> <z>   (bots 0.42.0) walk to within 4 yards, then talk to the creature and pick gossip option <option> (from 0): kGossip
+    follow <creature entry> <seconds>   (bots 0.42.0) follow that creature (an escort) for that long
+    teleport <x> <y> <z>                (bots 0.42.0) put the leader at the place (DungeonTeleport)
+    after_bosses <entry> <entry> ...    trigger (bots 0.42.0): once every one of those bosses is dead
     wait <seconds>
     timeout <seconds>                   given up after this long (default 120)
     end

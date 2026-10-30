@@ -230,7 +230,7 @@ dungeon_events::Event ReadEvent(Reader const& r, Value const& value, std::string
     std::string const triggerAt = at + ".trigger";
     Value const* type = trigger.Find("type");
     if (!type)
-        r.Fail(triggerAt, "the key 'type' is missing (near, after_boss or at_start)");
+        r.Fail(triggerAt, "the key 'type' is missing (near, after_boss, after_bosses or at_start)");
     std::string const kind = r.String(*type, triggerAt + ".type", 16);
     if (kind == "at_start")
     {
@@ -242,6 +242,17 @@ dungeon_events::Event ReadEvent(Reader const& r, Value const& value, std::string
         r.CheckKeys(trigger, triggerAt, { "type", "boss" });
         e.When = Event::Trigger::AfterBoss;
         e.Boss = r.Uint(trigger, triggerAt, "boss", 1, 10000000);
+    }
+    else if (kind == "after_bosses")
+    {
+        r.CheckKeys(trigger, triggerAt, { "type", "bosses" });
+        e.When = Event::Trigger::AfterAllBosses;
+        Value const* bosses = trigger.Find("bosses");
+        if (!bosses)
+            r.Fail(triggerAt, "the key 'bosses' is missing");
+        e.Bosses = r.UintList(*bosses, triggerAt + ".bosses", 20);
+        if (e.Bosses.empty())
+            r.Fail(triggerAt + ".bosses", "must list at least one creature entry");
     }
     else if (kind == "near")
     {
@@ -255,7 +266,7 @@ dungeon_events::Event ReadEvent(Reader const& r, Value const& value, std::string
             r.Fail(triggerAt + ".radius", "must be more than 0");
     }
     else
-        r.Fail(triggerAt + ".type", "'" + kind + "' is not near, after_boss or at_start");
+        r.Fail(triggerAt + ".type", "'" + kind + "' is not near, after_boss, after_bosses or at_start");
 
     Value const* steps = value.Find("steps");
     if (!steps || !steps->IsArray() || steps->Items.empty())
@@ -267,10 +278,10 @@ dungeon_events::Event ReadEvent(Reader const& r, Value const& value, std::string
         Value const& step = steps->Items[i];
         std::string const stepAt = at + ".steps[" + std::to_string(i) + "]";
         if (!step.IsObject())
-            r.Fail(stepAt, "must be an object { \"type\": \"use\" .. } or { \"type\": \"wait\" .. }");
+            r.Fail(stepAt, "must be an object { \"type\": \"use\" .. }, talk, follow, teleport or wait");
         Value const* stepType = step.Find("type");
         if (!stepType)
-            r.Fail(stepAt, "the key 'type' is missing (use or wait)");
+            r.Fail(stepAt, "the key 'type' is missing (use, talk, follow, teleport or wait)");
         std::string const stepKind = r.String(*stepType, stepAt + ".type", 16);
         Step s;
         if (stepKind == "use")
@@ -284,6 +295,31 @@ dungeon_events::Event ReadEvent(Reader const& r, Value const& value, std::string
             if (Value const* item = step.Find("item"))
                 s.Item = r.UintOf(*item, stepAt + ".item", 1, 100000000);
         }
+        else if (stepKind == "talk")
+        {
+            r.CheckKeys(step, stepAt, { "type", "creature", "option", "x", "y", "z" });
+            s.What = Step::Kind::Talk;
+            s.Creature = r.Uint(step, stepAt, "creature", 1, 100000000);
+            s.Option = r.Uint(step, stepAt, "option", 0, 50);
+            s.X = r.Float(step, stepAt, "x");
+            s.Y = r.Float(step, stepAt, "y");
+            s.Z = r.Float(step, stepAt, "z");
+        }
+        else if (stepKind == "follow")
+        {
+            r.CheckKeys(step, stepAt, { "type", "creature", "seconds" });
+            s.What = Step::Kind::Follow;
+            s.Creature = r.Uint(step, stepAt, "creature", 1, 100000000);
+            s.WaitSec = r.Uint(step, stepAt, "seconds", 1, 600);
+        }
+        else if (stepKind == "teleport")
+        {
+            r.CheckKeys(step, stepAt, { "type", "x", "y", "z" });
+            s.What = Step::Kind::Teleport;
+            s.X = r.Float(step, stepAt, "x");
+            s.Y = r.Float(step, stepAt, "y");
+            s.Z = r.Float(step, stepAt, "z");
+        }
         else if (stepKind == "wait")
         {
             r.CheckKeys(step, stepAt, { "type", "seconds" });
@@ -291,7 +327,7 @@ dungeon_events::Event ReadEvent(Reader const& r, Value const& value, std::string
             s.WaitSec = r.Uint(step, stepAt, "seconds", 0, 600);
         }
         else
-            r.Fail(stepAt + ".type", "'" + stepKind + "' is not use or wait");
+            r.Fail(stepAt + ".type", "'" + stepKind + "' is not use, talk, follow, teleport or wait");
         e.Steps.push_back(s);
     }
     if (Value const* timeout = value.Find("timeout_sec"))
