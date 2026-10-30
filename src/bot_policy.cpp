@@ -3457,6 +3457,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
 
         Decision wanted;
         char const* moveWhy = ""; // which part of the policy chose a kMoveTo (logged for a party in a dungeon run, move_why)
+        int kiteRetry = -1;       // the AoeKitePoint retry that picked a kite move: 0 is the entry retreat (with an entry), more is the circle (move_why)
         // An Onyxian Warder close to a party member (not its leader, the tank): the nearest one in view that is alive, and where a healer may step to see a member it could not heal.
         // Not tied to the bot's own in_combat: the 2026-10-29 pull left the non-tank bots out of combat for 55 s, standing 5 yards from the Warder.
         NearbyUnit const* aoeWarder = nullptr;
@@ -3562,6 +3563,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 {
                     wanted = Decision{ ActionType::kMoveTo, 0, kite };
                     moveWhy = "kite";
+                    kiteRetry = retry;
                     break;
                 }
             }
@@ -3646,7 +3648,10 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                                     targetUnit->pos_y + dy / dist * kiteYards,
                                     bot.pos_z };
                         if (aoeTarget)
+                        {
                             kite = AoeKitePoint(bot, *targetUnit, 0, kiteEntry);   // the bot's own bearing, as in the branch above
+                            kiteRetry = 0;
+                        }
                         wanted = Decision{ ActionType::kMoveTo, 0, kite };
                         moveWhy = "kite";
                     }
@@ -5019,7 +5024,9 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             state.MoveWhyDest = wanted.Dest;
             _options.OnEvent("move_why: bot=" + std::to_string(bot.guid) + " why=" + (*moveWhy ? moveWhy : "other") + " type=" + std::to_string(int(wanted.Type)) + " target=" + std::to_string(wanted.Target) + " to=" + std::to_string(int(wanted.Dest.X)) + "," +
                              std::to_string(int(wanted.Dest.Y)) + "," + std::to_string(int(wanted.Dest.Z)) + " from=" + std::to_string(int(bot.pos_x)) + "," +
-                             std::to_string(int(bot.pos_y)) + "," + std::to_string(int(bot.pos_z)) + " leader=" + (partyLeaderBot ? "1" : "0") + " combat=" + std::to_string(bot.in_combat));
+                             std::to_string(int(bot.pos_y)) + "," + std::to_string(int(bot.pos_z)) + " leader=" + (partyLeaderBot ? "1" : "0") + " combat=" + std::to_string(bot.in_combat) +
+                             " kite_retry=" + std::to_string(kiteRetry) + " kite_entry=" + (kiteEntry ? "1" : "0") +
+                             (aoeWarder ? " warder=" + std::to_string(int(aoeWarder->pos_x)) + "," + std::to_string(int(aoeWarder->pos_y)) : std::string(" warder=-")));
         }
         // A move to a place the core found no route to a moment ago is not sent again yet.
         bool const blockedMove = wanted.Type == ActionType::kMoveTo && nowMs < state.NoRouteUntilMs &&
