@@ -74,17 +74,17 @@ near -839.6 -477.9 -33.7 30
 use 103016 -839.6 -477.9 -33.7
 end
 
-# Razorfen Downs (map 129). The Gong (goober 148917) summons Tuten'kash; it is 96 yards from the route, so the event walks there once Glutton is dead.
+# Razorfen Downs (map 129). The Gong (goober 148917) summons Tuten'kash; it is 96 yards from the route, so the event walks there once Mordresh (the last boss) is dead.
 event 129 gong Gong (summons Tuten'kash)
-after_boss 8567
+after_boss 7357
 use 148917 2552.4 857.0 51.5
 wait 6
 timeout 240
 end
 
-# Gnomeregan (map 90). The Explosive Charges (goobers 144065) beside the Cave In doors 146085 and 146086; the event runs at the start and walks there.
+# Gnomeregan (map 90). The Explosive Charges (goobers 144065) beside the Cave In doors 146085 and 146086; the event runs after the last boss (Dark Iron Ambassador) and walks there.
 event 90 cave-ins Cave Ins (Explosive Charges)
-at_start
+after_boss 6228
 use 144065 -503.9 -97.2 -151.0
 wait 5
 use 144065 -506.6 -88.8 -151.1

@@ -132,11 +132,12 @@
   "events": [
     {
       // Cave In doors 146085 (-505.1, -94.0, -147.8) and 146086 (-541.6, -105.4, -151.8) are blown open by the Explosive Charges (goobers 144065) beside them: three
-      // charges at (-503.9, -97.2, -151.0), (-506.6, -88.8, -151.1) and (-535.2, -105.6, -156.0). They are 140 to 170 yards from the first route point, so the event runs at the
-      // start and walks there. The Workshop Door (90858 at (-758.5, 260.4, -273.0)) has no switch in the world database and is left out. Not run on the sim yet.
+      // charges at (-503.9, -97.2, -151.0), (-506.6, -88.8, -151.1) and (-535.2, -105.6, -156.0). They are 140 to 170 yards from the first route point and the route does not
+      // pass them: run at the start (2026-10-31 sim, 29 starts in 16 runs) the lone leader walked through the Caverndeep and died, 19 timeouts, 6 bosses of 32. It now runs
+      // after the last boss (Dark Iron Ambassador). The Workshop Door (90858 at (-758.5, 260.4, -273.0)) has no switch in the world database and is left out. Not run on the sim yet.
       "id": "cave-ins",
       "name": "Cave Ins (Explosive Charges)",
-      "trigger": { "type": "at_start" },
+      "trigger": { "type": "after_boss", "boss": 6228 },
       "steps": [
         { "type": "use", "object": 144065, "x": -503.9, "y": -97.2, "z": -151.0 },
         { "type": "wait", "seconds": 5 },

@@ -148,11 +148,12 @@
   ],
   "events": [
     {
-      // The Gong (goober 148917 at (2552.4, 857.0, 51.5)): ringing it summons Tuten'kash. It is 96 yards from the nearest route point, so the event walks there once Glutton is
-      // dead; the route goes on afterwards. Tuten'kash is not a required boss. Not run on the sim yet.
+      // The Gong (goober 148917 at (2552.4, 857.0, 51.5)): ringing it summons Tuten'kash. It is 96 yards from the nearest route point. Tuten'kash is not a required boss, so the
+      // event runs once Mordresh Fire Eye (the last boss of the route) is dead. Triggered after Glutton (2026-10-31 sim, 8 runs) the lone leader walked to the gong through the
+      // Skeletal Servants around (2520, 930-990), died there about 150 times, was put back at the entrance each time, and 6 of 8 runs gave up the event after 5 attempts.
       "id": "gong",
       "name": "Gong (summons Tuten'kash)",
-      "trigger": { "type": "after_boss", "boss": 8567 },
+      "trigger": { "type": "after_boss", "boss": 7357 },
       "steps": [
         { "type": "use", "object": 148917, "x": 2552.4, "y": 857.0, "z": 51.5 },
         { "type": "wait", "seconds": 6 }
