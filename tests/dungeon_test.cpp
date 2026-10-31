@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Unit tests for the dungeon data file (dungeon_data.h) and the dungeon-clear rule of the scenario director (RequireBosses). No core needed.
 #include "bot_settings.h"
 #include "dungeon_data.h"

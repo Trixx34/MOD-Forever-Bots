@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Builds data/grind_spots.txt from an export of creature spawns (see doc/grind-spots.md).
 
 Input: a tab-separated file, one creature spawn per line, with these columns (a header line is skipped):

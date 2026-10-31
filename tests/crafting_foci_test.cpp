@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // The crafting focus table: parsing, the focus of a skill, the nearest object and the reach (src/crafting_foci.h).
 #include "crafting_foci.h"
 

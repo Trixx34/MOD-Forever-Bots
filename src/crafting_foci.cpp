@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 #include "crafting_foci.h"
 
 #include "text_split.h"

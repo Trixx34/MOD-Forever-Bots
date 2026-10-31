@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Unit tests for hunter taming: the beast list, the choice of the beast to tame, and the policy's routine (walk up, cast Tame Beast, stand still through the channel, give up).
 #include "bot_policy.h"
 #include "tame_beasts.h"

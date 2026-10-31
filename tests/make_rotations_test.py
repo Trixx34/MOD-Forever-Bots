@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Checks tools/make_rotations.py against data/rotation_spec.txt with a made-up ability dump: the Forever-specific rows of the spec must resolve to the
 real spell ids (ids as in the Forever client data) in the right priority order, and a dump without those spells must give warnings and no rows (no guessed ids).
 

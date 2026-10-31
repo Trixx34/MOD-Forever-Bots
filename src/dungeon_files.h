@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Per-dungeon strategy files (doc/dungeon-strategy.md): one JSON file per dungeon, data/dungeons/<map id>-<name>.json, holding the entrance, the route, the events
 // (doors, levers) and a block per boss. This library reads them, checks them, and lets a folder of your own override the shipped ones by map id. No SDK
 // dependency; the pure checks are tested in tests/dungeon_files_test.cpp.

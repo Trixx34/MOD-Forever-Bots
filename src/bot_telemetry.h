@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // BotTelemetry: a record of what each controlled bot did, written as CSV lines for runs that are read afterwards (overnight
 // tests). Pure logic: it reads snapshots and hands lines to a sink, so it is unit-tested with hand-built snapshots
 // (tests/telemetry_test.cpp).

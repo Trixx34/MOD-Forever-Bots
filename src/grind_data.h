@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Grind spots (leveling 1 to 60): places where creatures of a given level range live, so an idle bot walks to the ones that suit its level instead
 // of waiting at its start. Read from a text file; the file is made from the world database (tools/make_grind_spots.py, doc 20). Pure data and
 // parsing, unit-tested in tests/grind_test.cpp.

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Quest data (M5): the starter quests a bot can do, per start, read from a text file. Pure data and parsing, unit-tested in
 // tests/quest_test.cpp.
 //

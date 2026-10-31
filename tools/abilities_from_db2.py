@@ -1,4 +1,5 @@
 #!/usr/bin/python3 -I
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Writes BotAbilities lines (the core's Bot.Dump.Abilities format) from the client's DB2 files and a trainer export, for tools/make_rotations.py.
 
 Why: the dump needs a sim restart with Bot.Dump.Abilities = 1 and a bot of every class. This reads what the game's own files say instead:

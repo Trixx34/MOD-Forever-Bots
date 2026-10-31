@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Unit tests for the per-bot randomness helpers: repeatable, spread over the range, and different for different bots, uses and counters.
 #include "bot_random.h"
 

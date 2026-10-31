@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Chat commands for the bots (party chat, raid chat, or a whisper to one bot). The party leader types
 //   [selector] <verb> [args]
 // and the bots of the leader's group that the selector names obey. Pure parsing, unit-tested in tests/chat_test.cpp; BotPolicy applies them.

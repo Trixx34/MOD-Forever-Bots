@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Ground effects a bot should step out of (SDK 0.19, layout 21): the spells of data/avoid_spells.txt, and the geometry of getting out. Pure logic: no core, no clock, no
 // file access. The module reads the file and passes its text to ParseAvoidSpells; the policy asks EscapePoint where to go (tests/ground_avoid_test.cpp).
 #pragma once

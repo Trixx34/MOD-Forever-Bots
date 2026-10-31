@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Unit tests for grind spots: the file parser, the spot choice, and an idle bot walking to a spot. No core needed.
 #include "bot_policy.h"
 #include "grind_data.h"

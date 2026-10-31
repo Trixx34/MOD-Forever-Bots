@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // A last line of defence against refused moves sent again and again. The core answers a move it cannot path with "no route", and some source (the policy,
 // the vendor-sale pump) sent the same move on every tick: 140 bots refused 5,000 times a minute. This gate sits between all the sources and the core:
 // it remembers the last move sent to each bot, and when the bot's answer is "no route" it holds back moves to (about) that place for a pause that doubles

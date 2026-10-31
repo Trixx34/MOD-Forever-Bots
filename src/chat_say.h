@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // What a bot says out loud when it takes a chat order (chat_commands.h). Pure logic, unit-tested in tests/chat_say_test.cpp. BotPolicy collects
 // the bots that accepted an order, main.cpp sends the lines as /say through the core (BotSpeak, kind 0).
 //

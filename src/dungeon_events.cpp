@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 #include "dungeon_events.h"
 
 #include "text_number.h"

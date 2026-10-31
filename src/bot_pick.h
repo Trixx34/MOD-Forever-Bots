@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Random race and class for spawned bots. Pure logic: the seeded stream and the pick, unit-tested in tests/pick_test.cpp.
 //
 // The combinations are the ones the Forever server offers (the Wowhead "Forever" race and class table, patch 1.60.1).

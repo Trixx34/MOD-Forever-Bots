@@ -1,4 +1,5 @@
 #!/usr/bin/python3 -I
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Make data/avoid_spells.txt: the spells of the creatures of the Classic dungeons that leave something harmful on the ground, which a bot should step out of.
 
     python3 -I tools/gen_avoid_spells.py --dbc /srv/forever/data/dbc/enUS --out data/avoid_spells.txt \\

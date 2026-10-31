@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-2.0-or-later
 # Prepare the data files and config for a bots soak run on the sim.
 #
 #   tools/prepare_soak.sh data        grind spots and world quests, from the world database

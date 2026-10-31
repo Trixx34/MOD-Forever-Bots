@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Unit tests for the supply decisions (src/supply_policy.h). No core or SDK needed.
 #include "supply_policy.h"
 

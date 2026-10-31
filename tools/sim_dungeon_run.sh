@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-2.0-or-later
 # The sim helper of the dungeon tactics loop (needs ssh to forever-test, sudo there):
 # sim_dungeon_run.sh start N [tactics] [seconds] [seed] [heal-pct] [tank-heal-pct] [dps-mana-pct] [los-yards] | report | leveling | status
 set -u

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Unit tests for the ground-effect avoidance logic (src/ground_avoid.h) and for data/avoid_spells.txt.
 #include "ground_avoid.h"
 

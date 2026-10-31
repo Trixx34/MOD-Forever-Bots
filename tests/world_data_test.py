@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Tests for tools/dump_to_sqlite.py and tools/export_world_quests.py on a tiny made-up mysqldump (no real database needed)."""
 import gzip
 import os

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 #include "bot_settings.h"
 
 #include "bot_pick.h"

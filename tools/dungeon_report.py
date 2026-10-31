@@ -1,4 +1,5 @@
 #!/usr/bin/python3 -I
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Report of a dungeon scenario run from the module's log (the sim worldserver journal).
 
     sudo journalctl -u forever-sim --since "18:00" --no-pager -q | python3 -I tools/dungeon_report.py [--names names.tsv] [--bosses 7]

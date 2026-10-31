@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Reads some tables out of a mysqldump file (.sql or .sql.gz) into a SQLite file, so the queries in doc/*.md can be run without a MySQL server.
 
     python3 -I tools/dump_to_sqlite.py forever_test_world.sql.gz world.sqlite creature creature_template quest_template ...

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Writes the five exports that tools/make_world_quests.py reads (doc/world-quests.md) from a SQLite file made by tools/dump_to_sqlite.py, so no
 MySQL server is needed. The tables needed: quest_template, quest_template_addon, quest_template_classic_level, quest_objectives, creature,
 creature_queststarter, creature_questender, creature_loot_template, reference_loot_template.

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Unit tests for the bot store row keys. No core needed.
 #include "bot_store.h"
 

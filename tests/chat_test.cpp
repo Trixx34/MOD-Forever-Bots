@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Unit tests for the chat commands: the parser (chat_commands.h) and BotPolicy::ApplyChat. No core needed.
 #include "bot_policy.h"
 #include "chat_commands.h"

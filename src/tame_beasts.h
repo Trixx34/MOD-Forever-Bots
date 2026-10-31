@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // The beasts a hunter may tame (Tame Beast), read from data/tame_beasts.txt (tools/make_tame_beasts.py), and the choice of the one to tame. Pure logic over
 // Tier 2 snapshot types, unit-tested in tests/tame_test.cpp.
 //

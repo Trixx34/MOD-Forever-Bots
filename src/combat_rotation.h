@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Class rotations of the bots (milestone M2). The rule evaluator is ported from the forever branch's BotRotation
 // (src/server/game/Bots/BotRotation.{h,cpp}, pure part, GPL-2.0-or-later as in TrinityCore). The warrior rows are the
 // forever spell table's warrior rows, rank 1 ids; the core casts the highest rank the bot knows.

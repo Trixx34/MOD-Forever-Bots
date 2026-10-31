@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // RotatingFile: an append-only text file that is rotated when it would pass a size limit. The current file is `path`;
 // rotated files are `path.1` (newest) to `path.<keep>` (oldest, deleted on the next rotation). Lines are flushed as they
 // are written, so a crash loses at most the line being written. Used for the telemetry CSV (tests/rotating_file_test.cpp).

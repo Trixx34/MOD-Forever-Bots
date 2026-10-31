@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // The bot ramp: how many bots the module wants at a given time into the run, and when the run stops. Pure logic that takes
 // elapsed time as input, so it is unit-tested without a clock (tests/ramp_test.cpp).
 //

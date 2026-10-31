@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Store rows for the bots this module controls (doc 15, module store). Each controlled bot has a row bot/<guid>, so a
 // restarted module can take its bots back. Pure key handling, unit-tested in tests/bot_store_test.cpp.
 #pragma once

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Unit tests for BotTelemetry, on hand-built snapshots. No core needed.
 #include "bot_telemetry.h"
 

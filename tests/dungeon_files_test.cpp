@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Unit tests for the per-dungeon JSON files (dungeon_files.h, mini_json.h): the reader, the checks, the override folder, and that the shipped files say what
 // the old text files said. No core needed.
 #include "dungeon_data.h"

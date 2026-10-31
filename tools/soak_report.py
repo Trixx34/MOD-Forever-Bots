@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Summarises a long run from the module's telemetry CSV and, optionally, the module's stderr log (ws-err.txt) and the core's Server.log.
 
     soak_report.py --telemetry forever-bots-telemetry.csv [--stderr ws-err.txt] [--server-log Server.log] [--hours 8]

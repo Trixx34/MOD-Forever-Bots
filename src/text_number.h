@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Shared single-token numeric parsing for the module's plain-text data files (rotations, grind lists,
 // tamed-beast lists, dungeon events, ground-avoid tables). Every one of these formats is whitespace-split
 // into tokens first, then each token is parsed as a whole number or a decimal: this header is the one

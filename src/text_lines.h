@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Shared line-tokenizer for the module's whitespace-separated plain-text data files (rotations, grind
 // spots, tamed-beast lists): strips a trailing "# ..." comment, splits the rest on whitespace, and skips
 // blank/comment-only lines. combat_rotation.cpp, grind_data.cpp and tame_beasts.cpp each had their own

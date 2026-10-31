@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // What a spell costs in power (mana, rage, energy), from the file the core writes at startup (worldserver.conf: Bot.Dump.SpellCosts = <file>; the module
 // reads it as SpellCostFile, data/spell_costs.txt). With it the policy does not try a cast the bot cannot pay for: about 22,000 casts in 20 minutes
 // were refused as "not enough power" on 300 bots (a warrior has no rage out of combat, so Battle Shout was tried every two seconds, for ever).

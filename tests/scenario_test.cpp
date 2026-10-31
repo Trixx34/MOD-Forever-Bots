@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Unit tests for the scenario director, the leader's route and auto gear (doc 19). No core needed.
 #include "bot_policy.h"
 #include "bot_settings.h"

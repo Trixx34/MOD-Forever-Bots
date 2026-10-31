@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Scale test: the pump at the 1500-bot ceiling. It builds that many bots with a full nearby list, in 300 parties, and
 // decides for as many ticks as a short run would need. No core needed.
 //

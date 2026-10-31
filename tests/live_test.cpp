@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Unit tests for BotLive: the JSON for a hand-built snapshot, the unit cap and de-duplication, and the atomic file write.
 #include "bot_live.h"
 

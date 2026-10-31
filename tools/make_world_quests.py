@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Builds a whole-world quest file (src/quest_data.h format, with 'req' records) from exports of the world database. See doc/world-quests.md.
 
 Inputs (tab-separated, one record per line, a header line is skipped; see the doc for the queries that make them):

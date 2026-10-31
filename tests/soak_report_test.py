@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Tests for tools/soak_report.py: runs whose clock starts again are not merged, and counters that reset at a restart are added up."""
 import os
 import subprocess

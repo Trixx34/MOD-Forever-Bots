@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Unit tests for the errand trainer table, the training-due rule and the per-bot trainer choice (src/errand_trainers.h). No core needed.
 #include "errand_trainers.h"
 

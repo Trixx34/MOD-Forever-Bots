@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Unit tests for the shared plain-text parsing helpers (text_number.h, text_split.h, text_case.h, text_lines.h).
 #include "text_case.h"
 #include "text_lines.h"

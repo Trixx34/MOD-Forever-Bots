@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Small standard-library checks for the offline dungeon learning analyzer."""
 import importlib.util
 from pathlib import Path

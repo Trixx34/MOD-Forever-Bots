@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 #include "trade_policy.h"
 
 #include "text_case.h"

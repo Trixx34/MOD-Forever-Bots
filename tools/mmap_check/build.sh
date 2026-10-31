@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-2.0-or-later
 # Builds mmap_check against the Detour library of the core's source tree (DETOUR_DIR, default the core checkout on the build server).
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"

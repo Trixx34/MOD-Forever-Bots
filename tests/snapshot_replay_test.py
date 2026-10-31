@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Tests for tools/snapshot_replay.py: each open finding of the sim handoff is reported from a hand-built telemetry file."""
 import os
 import subprocess

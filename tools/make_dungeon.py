@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Builds one dungeon block for data/dungeons.txt from an export of creature spawns (see doc/dungeons.md).
 
 Input: a tab-separated file of the dungeon map's spawns, one per line, with these columns (a header line is skipped):

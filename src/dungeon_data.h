@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Dungeon routes (M9): a data file describes dungeons (where to enter, the party, the bosses, the route), and the module runs one as a
 // scenario (scenario.h). This library parses the file and turns a chosen dungeon into the scenario's config keys; the director, the
 // tank-led pulls, healing, rest, loot and corpse run are the existing scenario and policy code. No SDK dependency. Format: doc/dungeons.md.

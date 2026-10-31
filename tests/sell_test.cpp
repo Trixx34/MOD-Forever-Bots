@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Unit tests for the vendor sale decisions (src/sell_policy.h). No core or SDK needed.
 #include "sell_policy.h"
 

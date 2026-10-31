@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // The move gate (src/move_gate.h): a move to a place the core found no route to waits, longer each time; other moves pass.
 #include <cstdio>
 #include <vector>

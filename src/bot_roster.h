@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // BotRoster: which bots this module controls, which requests are waiting for the core, and what was taken back.
 // Pure bookkeeping with no SDK dependency, so it is unit-tested on its own (tests/roster_test.cpp).
 #pragma once

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-2.0-or-later
 # Self-service test-sim experiment runner. It never deploys to production.
 set -euo pipefail
 

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Unit tests for the spell cost data: the file parser and the cost of the highest rank a bot of a level can know. No core needed.
 #include "spell_costs.h"
 

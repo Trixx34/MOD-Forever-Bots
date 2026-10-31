@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 #include "errand_trainers.h"
 
 #include "text_split.h"

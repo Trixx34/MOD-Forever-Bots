@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 #include "bot_policy.h"
 
 #include "forever_module/talent_spec.h"

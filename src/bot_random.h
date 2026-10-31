@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Per-bot randomness for the policy. Every bot has a bit of it: which bots form parties and how big the parties are, how long a bot idles before it
 // walks, which grind spot it picks and where exactly it stands there. Without it all the bots follow the same rules in the same order and move as one
 // crowd (the parties were cut from the guid order, every bot walked to the nearest spot after exactly 30 s).

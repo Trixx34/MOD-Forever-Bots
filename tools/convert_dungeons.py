@@ -1,4 +1,5 @@
 #!/usr/bin/python3 -I
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Turn the old text files (data/dungeons.txt, data/dungeon_events.txt) into the per-dungeon JSON files (data/dungeons/<map id>-<name>.json, schema 1).
 
     python3 -I tools/convert_dungeons.py                       # reads data/dungeons.txt and data/dungeon_events.txt, writes data/dungeons/

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Bot trade (plan: .opencode/docs/plan-bot-trade.md). The decisions of a trade with a bot, with no SDK dependency so they are unit-tested
 // on their own (tests/trade_test.cpp). main.cpp feeds it the trade events, the bag list and the whispers, and carries out the steps it
 // returns. Everything here runs on the client thread (the thread of the SDK callbacks), so there is no locking.

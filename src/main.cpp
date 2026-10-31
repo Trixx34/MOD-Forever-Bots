@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // forever-bots: asks the core for bots, then drives the ones it controls from Tier 2 snapshots.
 //
 // Usage: forever-bots <tier1-endpoint>. The core passes the endpoint when it spawns the module.

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Unit tests for the presence scheduler (src/bot_presence.h). No core or SDK needed.
 #include "bot_presence.h"
 

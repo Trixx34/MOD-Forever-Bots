@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Unit tests for rotations read from a file: the parser, fight rows with levels and durations, and out-of-combat buffs. No core needed.
 #include "bot_policy.h"
 #include "combat_rotation.h"

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Town errands for bots: when an idle bot may fly to a capital for profession training or an Auction House visit, and when it must come back. Pure logic
 // that takes the time as input, so it is unit-tested without a clock (tests/errand_test.cpp). Nothing here talks to the core: the module feeds it the
 // bots that are free and due, and carries out the starts and ends it returns.

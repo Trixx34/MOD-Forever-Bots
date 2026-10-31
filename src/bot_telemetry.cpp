@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 #include "bot_telemetry.h"
 
 #include <algorithm>

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Unit tests for 40-man raid support (doc 108): raid-convert and subgroup assignment on top of the existing party-formation
 // logic (bot_policy.cpp's "Parties (M8)" block, unchanged), and that it leaves five-man scenarios untouched. No core needed:
 // kGroup spell_id 4 (ConvertToRaid) and 5 (AssignSubgroup) are asserted the same way policy_test.cpp asserts spell_id 1-3.

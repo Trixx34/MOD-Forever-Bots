@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Unit tests for the bot ramp schedule and the stop time. No clock needed: elapsed time is an input.
 #include "bot_ramp.h"
 

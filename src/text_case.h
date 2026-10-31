@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // A single lower-casing helper, shared so the module does not keep reimplementing the same
 // std::transform/tolower loop (main.cpp's LowerCopy and trade_policy.cpp's Lower were identical).
 #pragma once

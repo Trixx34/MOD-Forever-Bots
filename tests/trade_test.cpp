@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Unit tests for the bot trade decisions (src/trade_policy.h). No core or SDK needed.
 #include "trade_policy.h"
 

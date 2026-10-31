@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Replays a telemetry run and answers the open findings of the sim handoff, one section per finding.
 
     snapshot_replay.py --telemetry forever-bots-telemetry.csv [--stderr ws-err.txt] [--hours 5]

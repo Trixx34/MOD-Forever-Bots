@@ -1,4 +1,5 @@
 #!/usr/bin/python3 -I
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Makes data/tame_beasts.txt: the beasts a hunter may tame (Tame Beast), from a read-only export of the world database.
 
     ssh forever-test sudo -n mysql -N -B forever_test_world -e "<the query below>" > tame_all.tsv

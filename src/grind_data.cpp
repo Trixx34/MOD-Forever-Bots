@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 #include "grind_data.h"
 
 #include "text_lines.h"

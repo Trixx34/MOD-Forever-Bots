@@ -1,4 +1,5 @@
 #!/usr/bin/python3 -I
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Make data/crafting_foci.txt: the anvils, forges and cooking fires in the capitals, for the bots that must stand at one to craft.
 
     mysql forever_test_world -N -B -e "select g.map,round(g.position_x,1),round(g.position_y,1),round(g.position_z,1),t.Data0,t.Data1,t.entry,

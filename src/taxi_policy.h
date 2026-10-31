@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Flight points (layout 17): when a bot's long walk is replaced by a flight. Pure logic with no SDK dependency, unit-tested in tests/taxi_test.cpp.
 // Bots know every flight node and fly free (the core's Bot.Taxi.*), so the only questions are whether the walk is long enough to be worth it, whether a
 // flight master is close enough to be on the way, and when to give up after the core refused a flight. The core makes the last decision (a flight

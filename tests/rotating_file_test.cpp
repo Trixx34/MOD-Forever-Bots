@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Unit tests for RotatingFile, in a scratch directory.
 #include "rotating_file.h"
 

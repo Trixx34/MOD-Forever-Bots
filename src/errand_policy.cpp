@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 #include "errand_policy.h"
 
 #include <algorithm>

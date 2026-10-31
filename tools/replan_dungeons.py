@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Replaces the route of every dungeon in a dungeons file with one planned over the navmesh (tools/mmap_check --plan): boss to boss, along the corridors.
 
     tools/mmap_check/build.sh /tmp/mmap_check

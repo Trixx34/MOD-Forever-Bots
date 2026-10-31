@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 """A small reader for the client's DB2 files (format WDC5): whole tables of numbers and text.
 
 A copy of the forever-dashboard reader (same author) with three additions for tools/gen_avoid_spells.py: skip_encrypted=True leaves the encrypted sections out

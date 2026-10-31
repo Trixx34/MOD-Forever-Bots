@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // A single string_view-splitter, shared so the module does not keep reimplementing the same
 // find/substr loop for its delimited plain-text data files (crafting_foci.cpp and errand_trainers.cpp
 // had byte-for-byte identical copies).

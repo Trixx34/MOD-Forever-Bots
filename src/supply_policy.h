@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Bot supplies (layout 15 and 16): when a bot is short of ammunition, food, drink, health or mana potions or bandages, where it shops, what it asks the vendor for, and how a failed trip
 // backs off. Pure logic with no SDK dependency, unit-tested in tests/supply_test.cpp. BotPolicy feeds it the snapshot facts and sends the
 // kVendor buy action and the kConsume action; the core chooses the items from the vendor's stock.

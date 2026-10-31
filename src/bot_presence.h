@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Bot presence: which of the module's ordinary bots are online, simulated like players who come and go. Each bot plays a session of a random
 // length, logs off, stays away for a random time and comes back; how many are around follows the time of day. Pure logic that takes the time as
 // input, so it is unit-tested without a clock (tests/presence_test.cpp). The module acts on its decisions: a log off is a ReleaseControl (the

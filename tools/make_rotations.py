@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Builds data/rotations.txt from a rotation spec (spells by NAME) and the core's ability dump, so every spell id and level is the real one.
 
 Why: spell ids differ between versions and a wrong id fails silently. The core can log what each class gets at each level (Bot.Dump.Abilities = 1 in

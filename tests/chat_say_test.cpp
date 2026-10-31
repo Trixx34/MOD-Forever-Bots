@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Unit tests for the say-back lines (src/chat_say.h). No core or SDK needed.
 #include "chat_say.h"
 

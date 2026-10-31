@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // QuestPlanner (M5): what a bot should do about quests, from its quest log in the snapshot and the quest data. Pure logic: it
 // reads the snapshot and the bot's memory and returns a step; the policy turns the step into actions. Unit-tested in
 // tests/quest_test.cpp.

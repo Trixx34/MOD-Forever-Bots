@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Scenario (doc 19): a repeatable test situation for the bots. A fixed roster is spawned at a staging place, dressed with a given
 // gear list, formed into a party, teleported into a dungeon, and let loose on a route of waypoints for a set time. The result is one
 // line: how far the party got, how many died, how it ended. Pure logic over snapshots, unit-tested in tests/scenario_test.cpp.

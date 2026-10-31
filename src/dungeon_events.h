@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Dungeon events: the things a party must do to get on in a dungeon, kept in one table for every dungeon (data/dungeon_events.txt), not in code per
 // dungeon. A door that only a lever opens, a cannon fired with a charge of powder to blow another, a gate that opens when a boss dies. The leader of a
 // dungeon party performs an event as a short list of steps: walk to a place, click an object (or use an item on it), wait. Pure logic with no SDK

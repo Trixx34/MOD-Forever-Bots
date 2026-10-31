@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Writes data/dungeons.txt blocks for the classic five-man dungeons from a SQLite file made by tools/dump_to_sqlite.py (doc/dungeons.md).
 
     python3 -I tools/dump_to_sqlite.py world.sql.gz world.sqlite creature creature_template areatrigger_teleport world_safe_locs

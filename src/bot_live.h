@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // BotLive: a small JSON picture of where the controlled bots are and what is near them, rewritten in place every second or
 // so, for a live map (the dashboard reads it). Pure logic plus one atomic file write; unit-tested in tests/live_test.cpp.
 //

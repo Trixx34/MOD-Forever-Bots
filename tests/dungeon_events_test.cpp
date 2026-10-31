@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Unit tests for the dungeon event table and its runner (src/dungeon_events.h). No core or SDK needed.
 #include "dungeon_events.h"
 

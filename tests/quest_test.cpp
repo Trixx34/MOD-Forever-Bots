@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Unit tests for the quest data parser, the planner and the policy's use of them (M5). No core needed.
 #include "bot_policy.h"
 #include "quest_data.h"

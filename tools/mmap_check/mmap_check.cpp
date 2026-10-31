@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // mmap_check: asks the navmesh files (mmaps) whether a dungeon route can be walked. A route point the mesh cannot reach was refused by the core as "no route"
 // and stopped the leader (doc/dungeons.md). This uses the same Detour library and the same file layout as the worldserver, but not its movement code, so it
 // tells which points are off the mesh or cut off from the previous point, not exactly where the worldserver's pathfinder would give up.

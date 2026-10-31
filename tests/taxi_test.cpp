@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Unit tests for the flight decision (src/taxi_policy.h). No core or SDK needed.
 #include "taxi_policy.h"
 #include "errand_trainers.h"

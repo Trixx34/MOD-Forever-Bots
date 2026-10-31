@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Anvils, forges and cooking fires in the capitals (data/crafting_foci.txt): where a bot must stand to craft a recipe that asks for a spell focus.
 // Pure logic: no core, no clock, no file access. The module reads the file and passes its text to ParseFociTable (tests/crafting_foci_test.cpp).
 //

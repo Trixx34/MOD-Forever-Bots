@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Bots and the Auction House (doc/economy.md): what a bot lists, at what price, when it goes to the house, and which listing it buys. Pure logic with no SDK
 // dependency, unit-tested in tests/auction_test.cpp. Nothing here talks to the core: the module feeds it facts (the bag contents the core describes, the
 // listings a browse returned) and carries out the plan it returns.

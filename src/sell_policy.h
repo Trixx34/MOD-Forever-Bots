@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Bots and the vendors (doc/economy.md): which items a bot sells to a vendor on a visit, and how often it visits. Pure logic with no SDK dependency,
 // unit-tested in tests/sell_test.cpp. Nothing here talks to the core: the module feeds it the items it has seen the bot loot and carries out the sales
 // it returns with kSellToVendor.

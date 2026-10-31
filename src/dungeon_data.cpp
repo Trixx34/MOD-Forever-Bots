@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 #include "dungeon_data.h"
 #include "dungeon_files.h"
 #include "bot_settings.h"

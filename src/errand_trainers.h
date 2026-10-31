@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Profession trainers in the capitals for the town errands (data/errand_trainers.txt), the training-due rule and the per-bot choice of a trainer.
 // Pure logic: no core, no clock, no file access. The module reads the file and passes its text to ParseTrainerTable (tests/errand_trainers_test.cpp).
 #pragma once

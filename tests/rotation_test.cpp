@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Unit tests for the class rotation rules and facts (combat_rotation.h). No core needed.
 #include "combat_rotation.h"
 

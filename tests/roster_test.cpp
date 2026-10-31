@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Unit tests for BotRoster. No core or SDK needed.
 #include "bot_roster.h"
 
