@@ -299,6 +299,37 @@ void ScenarioSpawnTick(RunContext& run, std::size_t& spawned);
 // Actions per tick with one decimal ("0.4"), so a rate under 1 does not print as 0.
 std::string ActionsPerTick(std::uint64_t actions, std::uint64_t ticks);
 
+// main(), step by step: the callbacks and timers it registers and the policy options it builds. main.cpp: WatchConfig to StartSpawns; main_commands.cpp:
+// CommandScriptReply to SetUpChat; main_options.cpp: PolicyFromSettings to SetUpScenario; main_feeds.cpp: SetUpPresence to SetUpErrands. A reference
+// argument is main()'s own object: the callbacks capture it, so it must live until client.Run() returns (it does, in main()'s frame).
+void WatchConfig(forever_module::ModuleClient& client, BotSettings& settings, bool& configured, BotRoster& roster, bool tier2Granted, std::uint32_t grantedBots,
+                 std::shared_ptr<DungeonReloadBox> const& dungeonBox);
+void WatchRevocations(forever_module::ModuleClient& client, BotRoster& roster, std::shared_ptr<AltRegistry> const& alts);
+void ReclaimBot(RunContext& run, std::uint64_t guid);
+void StartSpawns(forever_module::ModuleClient& client, RunContext& run, BotRoster& roster, BotSettings& settings, std::uint32_t maxBots, bool scenarioOn,
+                 std::size_t& scenarioSpawned);
+forever_module::EventReply CommandScriptReply(forever_module::EventRequest const& request, std::shared_ptr<CommandQueue> const& commands,
+                                              std::shared_ptr<AltRegistry> const& alts, RunContext& run, BotSettings& settings);
+void BotsAltCommand(forever_module::EventReply& reply, std::vector<std::string> const& commandWords, std::uint64_t issuerCounter,
+                    std::shared_ptr<AltRegistry> const& alts, RunContext& run);
+void BotsSpawnCommand(forever_module::EventReply& reply, std::vector<std::string> const& commandWords, std::uint64_t issuerCounter, RunContext& run);
+void SetUpTrade(forever_module::ModuleClient& client, std::shared_ptr<trade::TradeBook> const& trades, std::shared_ptr<std::function<void(std::vector<trade::Step> const&)>> const& runTrade,
+                std::shared_ptr<CommandQueue> const& commands);
+void SetUpChat(forever_module::ModuleClient& client, std::shared_ptr<CommandQueue> const& commands, BotSettings& settings, std::shared_ptr<trade::TradeBook> const& trades,
+               std::shared_ptr<std::function<void(std::vector<trade::Step> const&)>> const& runTrade);
+void PolicyFromSettings(PolicyOptions& policyOptions, BotSettings& settings);
+std::vector<dungeon_events::Event> LoadDungeons(PolicyOptions& policyOptions, BotSettings& settings, std::shared_ptr<DungeonReloadBox> const& dungeonBox);
+void LoadPolicyTables(PolicyOptions& policyOptions, BotSettings& settings);
+void ConnectPolicyLookups(PolicyOptions& policyOptions, BotSettings& settings, pick::ClassTable& races, pick::ClassTable& classes, RunContext& run,
+                          std::shared_ptr<AltRegistry> const& alts);
+void SetUpScenario(PolicyOptions& policyOptions, PumpExtras& extras, BotSettings& settings, std::vector<dungeon_events::Event> const& allEvents);
+void SetUpPresence(forever_module::ModuleClient& client, RunContext& run, BotSettings& settings, PumpExtras& extras, std::shared_ptr<trade::TradeBook> const& trades);
+void SetUpLootBooks(forever_module::ModuleClient& client, RunContext& run, BotSettings& settings, std::shared_ptr<AuctionBook> const& book,
+                    std::shared_ptr<SellBook> const& sells, PumpExtras& extras);
+void SetUpAuction(forever_module::ModuleClient& client, RunContext& run, BotSettings& settings, std::shared_ptr<AuctionBook> const& book, PumpExtras& extras);
+void SetUpErrands(forever_module::ModuleClient& client, BotSettings& settings, std::shared_ptr<CommandQueue> const& commands, std::shared_ptr<AuctionBook> const& book,
+                  PumpExtras& extras);
+
 // Defined in main_pump.cpp.
 void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& running, PolicyOptions options,
                std::string const& telemetryPath, BotSettings const& settings, PumpExtras extras);
