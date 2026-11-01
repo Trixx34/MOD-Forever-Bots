@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
-// Private to bot_policy*.cpp: the helpers and tuning constants that were an anonymous namespace in bot_policy.cpp, now shared by its split files.
+// Private to bot_policy*.cpp: the tuning constants and the declarations of the helpers that were an anonymous namespace in bot_policy.cpp, now shared by its
+// split files. The helpers are defined in bot_policy_spells.cpp (spell, class and snapshot facts) and bot_policy_units.cpp (units, distances and places).
 #include "bot_policy.h"
 
 #include "forever_module/talent_spec.h"
@@ -115,12 +116,7 @@ constexpr std::uint64_t kCraftWalkFailMs = 1800000;   // after a walk that faile
 constexpr float kCraftWalkMaxYards = 900.0f;          // farther than this a bot does not walk for a recipe's focus
 
 // Whether the bot has the profession of a craft or gather line: First Aid and Cooking every bot may learn, the others are its two primary professions.
-inline bool HasLine(BotSnapshot const& bot, std::uint32_t line)
-{
-    if (line == 129 || line == 185)
-        return true;
-    return (bot.profession_skill[0] == line && bot.profession_value[0] != 0) || (bot.profession_skill[1] == line && bot.profession_value[1] != 0);
-}
+bool HasLine(BotSnapshot const& bot, std::uint32_t line);
 constexpr std::uint32_t kServiceSellJunk = 1024;   // SDK 0.16: also sell white junk (trade goods, spare bags, miscellaneous items)
 constexpr std::uint32_t kBagsLowSlots = 4;         // a vendor visit of a bot with this many free slots or fewer also sells the white junk
 constexpr std::uint32_t kServiceBuyAmmo = 8;     // layout 15: buy ammunition (dest_x = the count to carry), food (dest_y), drink (dest_z)
@@ -166,12 +162,7 @@ constexpr std::uint32_t kRupture = 1943;
 constexpr std::uint32_t kSliceAndDice = 5171;
 
 // Combo points a rogue spell adds on its target when it lands, 0 for any other spell.
-inline std::uint32_t ComboPointsGained(std::uint32_t spell)
-{
-    if (spell == kMutilate)
-        return 2;
-    return spell == kSinisterStrike || spell == kSaberSlash || spell == kHemorrhage ? 1 : 0;
-}
+std::uint32_t ComboPointsGained(std::uint32_t spell);
 // A ranged bot below this share of its power walks to melee range and fights there, since its spells are spent.
 constexpr std::uint32_t kOutOfPowerPct = 15;
 constexpr float kMeleeApproachYards = 5.0f;
@@ -382,63 +373,24 @@ constexpr float kReclaimYards = 35.0f;               // the core allows 39 yards
 
 // A cast or channel is in progress. cast_remaining_ms is no test: it is 0 while a spell is in flight (a Fireball after the cast, state
 // "delayed"), which the core still counts as casting and refuses every other cast for ("bot is casting spell N").
-inline bool IsCasting(BotSnapshot const& bot)
-{
-    return bot.casting_spell != 0;
-}
+bool IsCasting(BotSnapshot const& bot);
 
 // Spells with a cast time (or a channel), which cannot be started while moving. The core's refusals add to the bot's own list, so a
 // spell missing here is learned after its first refusal.
-inline bool KnownCastTimeSpell(std::uint32_t spell)
-{
-    switch (spell)
-    {
-        case 686: case 585: case 133: case 116: case 5176: case 5185: case 403: case 331: case 2050: case 2054: case 2060: case 635:
-        case 8092: case 348: case 707: case 172: case 1120: case 689: case 5676: case 5143: case 8004: case 421: case 1064: case 14914:
-        case 15407: case 2948: case 5019: case 8921: case 19750: case 2006: case 7328: case 2008:
-            return true;
-        default:
-            return false;
-    }
-}
+bool KnownCastTimeSpell(std::uint32_t spell);
 
 // The spell a healer class heals an ally with (rank 1 id, or the next spell once the bot has the level), 0 for a class that does not heal.
-inline std::uint32_t HealSpellFor(std::uint32_t classId, std::uint32_t level)
-{
-    switch (classId)
-    {
-        case 5: return level >= 16 ? 2054 : 2050; // priest: Heal, or Lesser Heal
-        case 2: return 635;                       // paladin: Holy Light
-        case 7: return 331;                       // shaman: Healing Wave
-        case 11: return 5185;                     // druid: Healing Touch
-        default: return 0;
-    }
-}
+std::uint32_t HealSpellFor(std::uint32_t classId, std::uint32_t level);
 
 // The spell a class resurrects a dead ally with, 0 for a class that cannot or whose level is too low. A druid's Rebirth (20484, level 20)
 // needs a reagent the bots are not given, so a druid is not a rezzer. A level of 0 is unknown and not judged.
-inline std::uint32_t ResurrectSpellFor(std::uint32_t classId, std::uint32_t level)
-{
-    switch (classId)
-    {
-        case 5: return level == 0 || level >= 10 ? kResurrection : 0;    // priest
-        case 2: return level == 0 || level >= 12 ? kRedemption : 0;      // paladin
-        case 7: return level == 0 || level >= 12 ? kAncestralSpirit : 0; // shaman
-        default: return 0;
-    }
-}
+std::uint32_t ResurrectSpellFor(std::uint32_t classId, std::uint32_t level);
 
-inline bool IsResurrectSpell(std::uint32_t spell)
-{
-    return spell == kResurrection || spell == kRedemption || spell == kAncestralSpirit;
-}
+bool IsResurrectSpell(std::uint32_t spell);
 
 // The spells that stop a cast in progress (rotation rows with Cond::TargetCasting). When several party members know one, only
 // one may use it on the same cast: a second kick lands on nothing and both casts are wasted.
-inline bool IsInterruptSpell(std::uint32_t spell)
-{
-    return spell == 853 || spell == 1766 || spell == 8042; // Hammer of Justice, Kick, Earth Shock
-}
+bool IsInterruptSpell(std::uint32_t spell);
 
 // The creature type the cc tactic needs (world database's creature_template.type) to pick a spell that can affect a pack member.
 // The snapshot has no such field (forever_module::NearbyUnit, tier2_layout.h): the core does not report a unit's creature type at
@@ -448,181 +400,51 @@ inline bool IsInterruptSpell(std::uint32_t spell)
 // tried on it: a wider table for a dungeon added later belongs here, the same way a new dungeon's kill_priority needs its own list.
 enum class CreatureType : std::uint8_t { kUnknown = 0, kHumanoid, kDemon, kElemental, kMechanical };
 
-inline CreatureType CreatureTypeOf(std::uint32_t entry)
-{
-    switch (entry)
-    {
-        // Deadmines (36): the Defias Brotherhood and its goblins, all Humanoid.
-        case 622:    // Goblin Engineer
-        case 634:    // Defias Overseer
-        case 639:    // Edwin VanCleef
-        case 644:    // Rhahk'Zor
-        case 645:    // Cookie
-        case 646:    // Mr. Smite
-        case 647:    // Captain Greenskin
-        case 1729:   // Defias Evoker
-        case 1731:   // Goblin Craftsman
-        case 1732:   // Defias Squallshaper
-        case 1763:   // Gilnid
-        case 4418:   // Defias Wizard
-        // Ragefire Chasm (389): orcs, trolls and goblins of the Searing Blade camp and the bosses, all Humanoid.
-        case 11322:  // Searing Blade Cultist
-        case 11323:  // Searing Blade Enforcer
-        case 11324:  // Searing Blade Warlock
-        case 11517:  // Oggleflint
-        case 11518:  // Jergosh the Invoker
-        case 11519:  // Bazzalan
-        case 11520:  // Taragaman the Hungerer
-            return CreatureType::kHumanoid;
-        case 642:    // Sneed's Shredder: Mechanical (and a boss: never a cc target anyway, see the elite check below)
-        case 2520:   // Remote-Controlled Golem: Mechanical
-            return CreatureType::kMechanical;
-        default:
-            return CreatureType::kUnknown;
-    }
-}
+CreatureType CreatureTypeOf(std::uint32_t entry);
 
 // The cc spell a class has at all, whatever the target: 0 for a class with none. Sap (rogue), Polymorph (mage), Banish (warlock);
 // no other class has a single-target hold in this module's scope today (a priest's Shackle Undead, a hunter's Freezing Trap and a
 // druid's Entangling Roots are not: this change is scoped to the three the task names).
-inline std::uint32_t CcSpellForClass(std::uint32_t classId)
-{
-    switch (classId)
-    {
-        case 4: return kSapSpell;        // rogue
-        case 8: return kPolymorphSpell;  // mage
-        case 9: return kBanishSpell;     // warlock
-        default: return 0;
-    }
-}
+std::uint32_t CcSpellForClass(std::uint32_t classId);
 
 // The level the Forever trainers teach a cc spell at (trainer_spell, verified 2026-10-27 against the test world database; the same
 // levels as this file's SpellCostFile dump, data/spell_costs.txt). Sap and Polymorph are both well below either shipped dungeon's
 // spawn level (Deadmines 23, Ragefire Chasm 18); Banish is not reached by either (it needs 28) -- kept here regardless, since cc is a
 // general, dungeon-wide feature and a later, higher-level dungeon with a Demon or Elemental pack can use it once its roster is.
-inline std::uint32_t CcLearnLevel(std::uint32_t spell)
-{
-    switch (spell)
-    {
-        case kSapSpell: return 10;
-        case kPolymorphSpell: return 8;
-        case kBanishSpell: return 28;
-        default: return 0;
-    }
-}
+std::uint32_t CcLearnLevel(std::uint32_t spell);
 
 // Whether a cc spell can affect this creature type at all (classic's type restrictions: Sap and Polymorph are Humanoid only,
 // Banish is Demon or Elemental only). kUnknown never matches: the policy does not try a type-restricted spell on a creature it
 // cannot place (see CreatureTypeOf above).
-inline bool CcAffects(std::uint32_t spell, CreatureType type)
-{
-    switch (spell)
-    {
-        case kSapSpell:
-        case kPolymorphSpell: return type == CreatureType::kHumanoid;
-        case kBanishSpell: return type == CreatureType::kDemon || type == CreatureType::kElemental;
-        default: return false;
-    }
-}
+bool CcAffects(std::uint32_t spell, CreatureType type);
 
 // Layout 13: whether the bot carries this aura right now. The aura list replaces the module's own buff timers, so a buff
 // another player cast over the bot, or one it lost to a death, is the fact it is. An aura with no duration reports a large
 // remaining_ms and runs for ever; a reported aura with 0 left is one that just expired.
-inline bool AuraRunning(BotSnapshot const& bot, std::uint32_t spell)
-{
-    for (std::uint32_t i = 0; i < bot.aura_count && i < forever_module::kMaxAuras; ++i)
-        if (bot.auras[i].spell_id == spell)
-            return bot.auras[i].remaining_ms != 0;
-    return false;
-}
+bool AuraRunning(BotSnapshot const& bot, std::uint32_t spell);
 
 // Layout 13: the bot's pet, from the snapshot, instead of what refused casts imply. pet_state is 0 none, 1 alive, 2 dead.
 // A core that does not report pets leaves it 0, and the inference from refused casts below is the fallback.
 enum class PetKnown : std::uint8_t { kNone, kOut, kDead };
 
-inline PetKnown PetOf(BotSnapshot const& bot)
-{
-    switch (bot.pet_state)
-    {
-        case 1: return PetKnown::kOut;
-        case 2: return PetKnown::kDead;
-        default: return PetKnown::kNone;
-    }
-}
+PetKnown PetOf(BotSnapshot const& bot);
 
 // Duration of the damage-over-time effect a spell leaves on its target, or 0 for spells the policy does not track. Rank 1
 // durations: while the effect runs, the policy does not recast the spell on the same target.
-inline std::uint64_t DotDurationMs(std::uint32_t spell)
-{
-    switch (spell)
-    {
-        case kRend: return kRendDurationMs;
-        case 172: return 18000;  // Corruption
-        case 707: return 15000;  // Immolate
-        case 589: return 18000;  // Shadow Word: Pain
-        case 1978: return 15000; // Serpent Sting
-        case 8050: return 12000; // Flame Shock
-        case 8921: return 12000; // Moonfire
-        case 21084: return 30000; // Seal of Righteousness (self)
-        case 17: return 30000;    // Power Word: Shield (self)
-        // The cc tactic's holds (SpellDuration.db2 of this server's own client data, read 2026-10-27): the same record keeps the
-        // policy from recasting a hold that is still running, same as a dot.
-        case kSapSpell: return 25000;        // Sap
-        case kPolymorphSpell: return 20000;  // Polymorph
-        case kBanishSpell: return 20000;     // Banish
-        default: return 0;
-    }
-}
+std::uint64_t DotDurationMs(std::uint32_t spell);
 
-inline float DistanceBetween(NearbyUnit const& a, NearbyUnit const& b)
-{
-    float const dx = a.pos_x - b.pos_x;
-    float const dy = a.pos_y - b.pos_y;
-    return std::sqrt(dx * dx + dy * dy);
-}
+float DistanceBetween(NearbyUnit const& a, NearbyUnit const& b);
 
-inline bool IsLiveMob(NearbyUnit const& unit);
 
 // The level difference at which a creature gives no experience at all (the classic "grey" rule: GetZeroDifference). Whether this fork
 // changes it is not known; the vanilla table is used.
-inline std::uint32_t ZeroExpDifference(std::uint32_t level)
-{
-    if (level < 8)
-        return 5;
-    if (level < 10)
-        return 6;
-    if (level < 12)
-        return 7;
-    if (level < 16)
-        return 8;
-    if (level < 20)
-        return 9;
-    if (level < 30)
-        return 11;
-    if (level < 40)
-        return 12;
-    if (level < 45)
-        return 13;
-    if (level < 50)
-        return 14;
-    if (level < 55)
-        return 15;
-    if (level < 60)
-        return 16;
-    return 17;
-}
+std::uint32_t ZeroExpDifference(std::uint32_t level);
 
 // A creature far enough below the bot that killing it gives no experience: not worth pulling. (A level of 0 is unknown and not judged.)
-inline bool IsGrey(BotSnapshot const& bot, NearbyUnit const& unit)
-{
-    return bot.level != 0 && unit.level != 0 && unit.level < bot.level && bot.level - unit.level >= ZeroExpDifference(bot.level);
-}
+bool IsGrey(BotSnapshot const& bot, NearbyUnit const& unit);
 
 // A unit's share of its health (0..1), or 1 when its maximum is unknown. A pull prefers the weakest, so a kill comes sooner.
-inline float HealthShare(NearbyUnit const& unit)
-{
-    return unit.max_health ? float(unit.health) / float(unit.max_health) : 1.0f;
-}
+float HealthShare(NearbyUnit const& unit);
 
 // The live hostile this bot should pull, or nullptr. A group is the hostiles within kPullRadius of the candidate, the candidate
 // included. Units already attacking the bot are not chosen here; the policy fights its threat target whatever the group size.
@@ -632,293 +454,69 @@ inline float HealthShare(NearbyUnit const& unit)
 // walked to from here: the flat distance says "in reach" while the way there is somewhere else, so the bot stands under it, its follow order finds no path
 // and its spells have no line of sight. The 2026-10-28 soak: the Tormented Officers (entry 3873) patrol 20 yards above Shadowfang Keep's courtyard, the
 // route's first point is right under them, and 34 stuck episodes (about 77 bot-minutes, fights of up to 12 minutes) all came from pulling them.
-inline bool OnOtherLevel(BotSnapshot const& bot, NearbyUnit const& unit)
-{
-    float const height = std::fabs(unit.pos_z - bot.pos_z);
-    return height >= kOtherLevelHeight && height > kOtherLevelSlope * rotation::DistanceYards(bot, unit);
-}
+bool OnOtherLevel(BotSnapshot const& bot, NearbyUnit const& unit);
 
-inline NearbyUnit const* PullTarget(BotSnapshot const& bot, std::span<NearbyUnit const> units,
+NearbyUnit const* PullTarget(BotSnapshot const& bot, std::span<NearbyUnit const> units,
                             std::function<bool(std::uint64_t)> const& avoided, bool defending,
-                            std::vector<std::uint32_t> const& onlyEntries = {}, bool dungeon = false)
-{
-    NearbyUnit const* best = nullptr;
-    float bestHealth = 0.0f;
-    float bestDist = 0.0f;
-    for (NearbyUnit const& candidate : units)
-    {
-        if (!IsLiveMob(candidate) || avoided(candidate.guid))
-            continue;
-        // A creature on another level is not pulled (one that attacks the bot is: `defending`, and the stall watchdog deals with it if it cannot be reached).
-        if (!defending && OnOtherLevel(bot, candidate))
-            continue;
-        // A bot hunting for a quest pulls only the creatures the quest wants (unless it is already being attacked).
-        if (!defending && !onlyEntries.empty() &&
-            std::find(onlyEntries.begin(), onlyEntries.end(), forever_module::UnitRefEntry(candidate.guid)) == onlyEntries.end())
-            continue;
-        // Nothing to gain from a grey creature (no experience): left alone, so the bot goes looking for something that levels it. Not when
-        // hunting for a quest (the quest wants it), nor in a dungeon, nor when the bot is already being attacked.
-        if (!defending && !dungeon && onlyEntries.empty() && IsGrey(bot, candidate))
-            continue;
-        // Not worth pulling: well above the bot's level, or an elite. (A level of 0 is unknown and not judged.) A bot that is already
-        // in combat is being attacked, and the snapshot does not say by what: it fights the closest creature, whatever its level, since
-        // standing still until it dies is worse. The same goes for the pack-size rule below.
-        // In a dungeon (the route is active) elites, bosses and higher levels are the content: the party fights what it meets.
-        if (!defending && !dungeon && bot.level != 0 &&
-            ((candidate.level != 0 && candidate.level > bot.level + kMaxLevelAbove) || candidate.elite))
-            continue;
-        float const health = HealthShare(candidate);
-        float const dist = rotation::DistanceYards(bot, candidate);
-        if (best && !(health < bestHealth || (health == bestHealth && dist < bestDist)))
-            continue;
-
-        std::size_t group = 0;
-        for (NearbyUnit const& other : units)
-            if (IsLiveMob(other) && DistanceBetween(candidate, other) <= kPullRadius)
-                ++group;
-        if (!defending && group > (dungeon ? kMaxDungeonPull : kMaxPull))
-            continue;
-
-        best = &candidate;
-        bestHealth = health;
-        bestDist = dist;
-    }
-    return best;
-}
+                            std::vector<std::uint32_t> const& onlyEntries = {}, bool dungeon = false);
 
 // The closest unit in `units` that satisfies `wanted`, or nullptr.
-inline NearbyUnit const* Closest(BotSnapshot const& bot, std::span<NearbyUnit const> units, bool (*wanted)(NearbyUnit const&))
-{
-    NearbyUnit const* best = nullptr;
-    float bestDist = std::numeric_limits<float>::max();
-    for (NearbyUnit const& unit : units)
-    {
-        if (!wanted(unit))
-            continue;
-        float const dist = rotation::DistanceYards(bot, unit);
-        if (dist < bestDist)
-        {
-            bestDist = dist;
-            best = &unit;
-        }
-    }
-    return best;
-}
+NearbyUnit const* Closest(BotSnapshot const& bot, std::span<NearbyUnit const> units, bool (*wanted)(NearbyUnit const&));
 
 // A live creature the bot may pick as its own target. Players are never picked: bots of the other faction would otherwise
 // fight each other, and a player that attacks the bot still comes in as the threat target.
-inline bool IsLiveMob(NearbyUnit const& unit)
-{
-    return unit.is_hostile && unit.health > 0 && forever_module::UnitRefType(unit.guid) == 8;
-}
+bool IsLiveMob(NearbyUnit const& unit);
 
 // A friendly player the bot may follow. A hostile player is not followed: it would lead the bot into a fight.
-inline bool IsPlayer(NearbyUnit const& unit)
-{
-    return forever_module::UnitRefType(unit.guid) == 2 && unit.health > 0 && !unit.is_hostile;
-}
+bool IsPlayer(NearbyUnit const& unit);
 
 // Avoids a unit for kAvoidMs, doubled for each earlier time it was avoided, so a unit that keeps coming back (a trainer the
 // bot cannot attack) is left alone for longer each time.
-inline void AvoidUnit(std::unordered_map<std::uint64_t, std::uint64_t>& avoidUntil, std::unordered_map<std::uint64_t, std::uint32_t>& count,
-               std::uint64_t ref, std::uint64_t nowMs)
-{
-    std::uint32_t const times = ++count[ref];
-    std::uint32_t const doublings = std::min<std::uint32_t>(times - 1, kMaxAvoidDoublings);
-    avoidUntil[ref] = nowMs + (kAvoidMs << doublings);
-}
+void AvoidUnit(std::unordered_map<std::uint64_t, std::uint64_t>& avoidUntil, std::unordered_map<std::uint64_t, std::uint32_t>& count,
+               std::uint64_t ref, std::uint64_t nowMs);
 
 // A stalled fight (nothing lost on either side): the target is left alone much longer than a refused one, more each time, because it is
 // out of reach or bugged, and the bot has nothing to gain by coming back to it every two minutes (a mage did that for an hour and a half).
-inline void AvoidStalledUnit(std::unordered_map<std::uint64_t, std::uint64_t>& avoidUntil, std::unordered_map<std::uint64_t, std::uint32_t>& count,
-                      std::uint64_t ref, std::uint64_t nowMs)
-{
-    std::uint32_t const times = ++count[ref];
-    std::uint32_t const doublings = std::min<std::uint32_t>(times - 1, kMaxStallDoublings);
-    avoidUntil[ref] = nowMs + (kStallAvoidMs << doublings);
-}
+void AvoidStalledUnit(std::unordered_map<std::uint64_t, std::uint64_t>& avoidUntil, std::unordered_map<std::uint64_t, std::uint32_t>& count,
+                      std::uint64_t ref, std::uint64_t nowMs);
 
 // The live creature in `units` with this reference, or nullptr.
-inline NearbyUnit const* FindLiveMob(std::span<NearbyUnit const> units, std::uint64_t guid)
-{
-    for (NearbyUnit const& unit : units)
-        if (unit.guid == guid && IsLiveMob(unit))
-            return &unit;
-    return nullptr;
-}
+NearbyUnit const* FindLiveMob(std::span<NearbyUnit const> units, std::uint64_t guid);
 
 // The point the kite goes to. The module has no navmesh or path query of its own (the core finds the path, and refuses a move with "no route"), so a point on a raw circle
 // round the Warder may be a wall: 5,800 such refusals on 2026-10-29. When the dungeon's entry is known, retry 0 is therefore the retreat along the entry route: the
 // point kAoeStandYards from the Warder on the line toward the entry the party walked in by, on the bot's own bearing (a few degrees either side, so a raid does not queue
 // up on one point). Only when the core refuses that point (or the entry is unknown or nearer than the stand distance) does the circle come: the point kAoeStandYards from
 // the Warder on the bot's own bearing from it, turned round by retry steps (0, +1, -1, +2, -2 times kAoeKiteRetryDegrees).
-inline Point AoeKitePoint(BotSnapshot const& bot, NearbyUnit const& warder, int retry, std::optional<Point> const& entry = std::nullopt)
-{
-    if (entry && std::hypot(entry->X - warder.pos_x, entry->Y - warder.pos_y) > kAoeStandYards)
-    {
-        if (retry == 0)
-        {
-            float ex = entry->X - warder.pos_x;
-            float ey = entry->Y - warder.pos_y;
-            float const elength = std::hypot(ex, ey);
-            ex /= elength;
-            ey /= elength;
-            float const slotAngle = float(int((bot.guid * 7) % 11) - 5) * kAoeKiteSpreadDegrees * 3.14159265f / 180.0f;
-            float const ec = std::cos(slotAngle);
-            float const es = std::sin(slotAngle);
-            return Point{ warder.pos_x + (ex * ec - ey * es) * kAoeStandYards, warder.pos_y + (ex * es + ey * ec) * kAoeStandYards, bot.pos_z };
-        }
-        --retry;
-    }
-    float dx = bot.pos_x - warder.pos_x;
-    float dy = bot.pos_y - warder.pos_y;
-    float const length = std::sqrt(dx * dx + dy * dy);
-    if (length > 0.01f)
-    {
-        dx /= length;
-        dy /= length;
-    }
-    else
-    {
-        dx = 1.0f;
-        dy = 0.0f;
-    }
-    int const slot = int((bot.guid * 7) % 11) - 5;   // -5..5, fixed per bot
-    int const turn = retry == 0 ? 0 : (retry % 2 == 1 ? (retry + 1) / 2 : -(retry / 2));
-    float const angle = (float(slot) * kAoeKiteSpreadDegrees + float(turn) * kAoeKiteRetryDegrees) * 3.14159265f / 180.0f;
-    float const c = std::cos(angle);
-    float const s = std::sin(angle);
-    return Point{ warder.pos_x + (dx * c - dy * s) * kAoeStandYards, warder.pos_y + (dx * s + dy * c) * kAoeStandYards, bot.pos_z };
-}
+Point AoeKitePoint(BotSnapshot const& bot, NearbyUnit const& warder, int retry, std::optional<Point> const& entry = std::nullopt);
 
 // The ground effects that harm a bot on this map: the snapshot's hostile ones, the avoid table's spells, the dungeon's own spells, and its zones. The same circles as the
 // walk out of a harmful area (AvoidGroundEffects); a stand point inside one of them is not a place to move to.
-inline std::vector<ground_avoid::Circle> HazardCircles(PolicyOptions const& options, BotSnapshot const& bot)
-{
-    std::vector<ground_avoid::Circle> circles;
-    auto const dungeon = options.DungeonsByMap.find(bot.map_id);
-    bool const hasDungeon = dungeon != options.DungeonsByMap.end();
-    for (std::size_t i = 0; i < bot.ground_effect_count && i < forever_module::kMaxGroundEffects; ++i)
-    {
-        forever_module::GroundEffect const& effect = bot.ground_effects[i];
-        bool harmful = effect.hostile != 0;
-        float radius = effect.radius;
-        if (options.AvoidSpells && options.AvoidSpells->Contains(effect.spell_id))
-        {
-            harmful = true;
-            if (radius <= 0.0f)
-                radius = options.AvoidSpells->Radius(effect.spell_id);
-        }
-        if (!harmful && hasDungeon)
-            harmful = std::find(dungeon->second.AvoidSpells.begin(), dungeon->second.AvoidSpells.end(), effect.spell_id) != dungeon->second.AvoidSpells.end();
-        if (!harmful)
-            continue;
-        circles.push_back(ground_avoid::Circle{ effect.x, effect.y, radius > 0.0f ? radius : ground_avoid::kDefaultRadiusYards });
-    }
-    if (hasDungeon)
-        circles.insert(circles.end(), dungeon->second.AvoidZones.begin(), dungeon->second.AvoidZones.end());
-    return circles;
-}
+std::vector<ground_avoid::Circle> HazardCircles(PolicyOptions const& options, BotSnapshot const& bot);
 
 // A stand point `yards` from the target, on the bot's own bearing from it. A point a hazard covers is not moved to: the bearing is turned round by up to four steps
 // of kBandStepDegrees either side (0, +1, -1, +2, ...), and nullopt when every step is covered.
-inline std::optional<Point> BandStandPoint(BotSnapshot const& bot, NearbyUnit const& target, float yards, std::vector<ground_avoid::Circle> const& hazards)
-{
-    float dx = bot.pos_x - target.pos_x;
-    float dy = bot.pos_y - target.pos_y;
-    float const length = std::sqrt(dx * dx + dy * dy);
-    if (length > 0.01f)
-    {
-        dx /= length;
-        dy /= length;
-    }
-    else
-    {
-        dx = 1.0f;
-        dy = 0.0f;
-    }
-    for (int step = 0; step <= 8; ++step)
-    {
-        int const turn = step == 0 ? 0 : (step % 2 == 1 ? (step + 1) / 2 : -(step / 2));
-        float const angle = float(turn) * kBandStepDegrees * 3.14159265f / 180.0f;
-        float const c = std::cos(angle);
-        float const s = std::sin(angle);
-        Point const point{ target.pos_x + (dx * c - dy * s) * yards, target.pos_y + (dx * s + dy * c) * yards, bot.pos_z };
-        if (!ground_avoid::InsideAny(point.X, point.Y, hazards))
-            return point;
-    }
-    return std::nullopt;
-}
+std::optional<Point> BandStandPoint(BotSnapshot const& bot, NearbyUnit const& target, float yards, std::vector<ground_avoid::Circle> const& hazards);
 
 // A player's unit reference, from its character guid counter (the same reference the core's party actions take).
-inline std::uint64_t PlayerRef(std::uint64_t counter)
-{
-    return forever_module::MakeUnitRef(static_cast<std::uint8_t>(kPlayerType), 0, counter);
-}
+std::uint64_t PlayerRef(std::uint64_t counter);
 
-inline float Distance2d(BotSnapshot const& a, BotSnapshot const& b)
-{
-    float const dx = a.pos_x - b.pos_x;
-    float const dy = a.pos_y - b.pos_y;
-    return std::sqrt(dx * dx + dy * dy);
-}
+float Distance2d(BotSnapshot const& a, BotSnapshot const& b);
 
-inline float DistanceTo(BotSnapshot const& bot, Point const& point)
-{
-    float const dx = bot.pos_x - point.X;
-    float const dy = bot.pos_y - point.Y;
-    return std::sqrt(dx * dx + dy * dy);
-}
+float DistanceTo(BotSnapshot const& bot, Point const& point);
 
 // The class of a bot: its own from the class table, else the configured class (0 = none).
-inline std::uint32_t ClassFor(PolicyOptions const& options, std::uint64_t guid)
-{
-    if (options.ClassOf)
-        if (std::uint32_t const own = options.ClassOf(guid))
-            return own;
-    return options.ClassId;
-}
+std::uint32_t ClassFor(PolicyOptions const& options, std::uint64_t guid);
 
 // A hunter whose ranged weapon uses ammunition and who carries none (layout 15: the core fills ammo_entry and ammo_count).
-inline bool NoAmmo(BotSnapshot const& bot, std::uint32_t classId)
-{
-    return classId == kHunterClass && bot.ammo_entry != 0 && bot.ammo_count == 0;
-}
+bool NoAmmo(BotSnapshot const& bot, std::uint32_t classId);
 
 // False when the cost file says the spell costs more power than the bot has now: the core would refuse the cast, so it is not tried. A spell the file
 // does not price (no file, an unknown spell, a percent cost) or a cost in another power than the bot's main one (a druid in a form) is always tried.
-inline bool CanPay(spell_cost::SpellCostData const* costs, std::uint32_t spell, BotSnapshot const& bot)
-{
-    if (!costs)
-        return true;
-    auto const payment = costs->CostAtLevel(spell, bot.level);
-    if (!payment || payment->PowerType != std::int32_t(bot.power_type))
-        return true;
-    return bot.power >= payment->Cost;
-}
+bool CanPay(spell_cost::SpellCostData const* costs, std::uint32_t spell, BotSnapshot const& bot);
 
 // The snapshot facts the supply logic reads (supply_policy.h).
-inline supply::Facts FactsOf(BotSnapshot const& bot)
-{
-    supply::Facts facts;
-    facts.AmmoEntry = bot.ammo_entry;
-    facts.AmmoCount = bot.ammo_count;
-    facts.FoodCount = bot.food_count;
-    facts.DrinkCount = bot.drink_count;
-    facts.ManaUser = bot.power_type == 0 && bot.max_power > 0;
-    facts.Copper = bot.copper;
-    facts.FreeSlots = bot.bag_free_slots;
-    facts.AmmoVendor = bot.ammo_vendor_valid != 0;
-    facts.FoodVendor = bot.food_vendor_valid != 0;
-    facts.HealthPotions = bot.health_potion_count;
-    facts.ManaPotions = bot.mana_potion_count;
-    facts.Bandages = bot.bandage_count;
-    facts.GoodsVendor = bot.goods_vendor_valid != 0;
-    facts.ReagentEntry = bot.reagent_entry;
-    facts.ReagentCount = bot.reagent_count;
-    facts.ReagentVendor = bot.reagent_vendor_valid != 0;
-    return facts;
-}
+supply::Facts FactsOf(BotSnapshot const& bot);
 
 } // namespace bot_policy_detail
 
