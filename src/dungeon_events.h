@@ -92,7 +92,8 @@ struct Command
 };
 
 // The result of a kUseObject or kGossip that was sent.
-enum class UseResult : std::uint8_t { Applied, OutOfRange, Failed };
+// Unclear: the core refused a Talk, but the creature's script may have run all the same (the Disciple of Naralex walks off); GoneAway: invalid target, the creature moved away.
+enum class UseResult : std::uint8_t { Applied, OutOfRange, Failed, Unclear, GoneAway };
 
 class Runner
 {

@@ -473,6 +473,8 @@ private:
         bool TankLead = false;                           // told "tank lead": this bot walks its group through the dungeon of its map
         std::shared_ptr<dungeon_events::Runner> Events;  // the events of the dungeon, run by the bot that leads the route
         std::uint32_t EventsMap = 0;                     // the map those events are for
+        float GossipX = 0.0f;                            // where the last dungeon-event talk was sent (for the gossip_refused line)
+        float GossipY = 0.0f;
         std::size_t RouteRecoveredAt = std::size_t(-1);  // the route point the leader was last put back on the route for (once per point)
         std::uint64_t LostSinceMs = 0;                   // a member has been far from its leader since this time (0 = not lost)
         std::uint64_t NextRecoverMs = 0;                 // no teleport back to the leader before this

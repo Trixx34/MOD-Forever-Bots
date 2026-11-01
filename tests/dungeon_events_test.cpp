@@ -293,6 +293,45 @@ end
     CHECK(bridge.Next(g, 100).Do == Command::What::Nothing && !bridge.Active());        // a teleport has no answer to wait for
 }
 
+// A refused first talk may have started the escort: on to the follow. A second refusal is a failure; an invalid target after a try goes on too.
+void ARefusedNaralexTalkMovesOnToTheFollow()
+{
+    char const* text = R"(event 43 naralex Disciple of Naralex (escort)
+at_start
+talk 3678 0 -135 125.4 -78.1
+follow 3678 60
+wait 20
+end
+)";
+    std::vector<std::string> warnings;
+    std::vector<Event> const all = Parse(text, warnings);
+    CHECK(all.size() == 1);
+    Facts f;
+    f.X = -135;
+    f.Y = 125.4f;
+    std::uint64_t now = 0;
+    {
+        Runner runner({ all[0] });
+        CHECK(runner.Next(f, now).Do == Command::What::Talk);
+        runner.OnUseResult(UseResult::Unclear, now += 100);
+        CHECK(runner.Next(f, now += 100).Do == Command::What::Follow);
+    }
+    {
+        Runner runner({ all[0] });
+        CHECK(runner.Next(f, now += 1000).Do == Command::What::Talk);
+        runner.OnUseResult(UseResult::GoneAway, now += 100);
+        CHECK(runner.Next(f, now += 100).Do == Command::What::Follow);
+    }
+    {
+        Runner runner({ all[0] });
+        CHECK(runner.Next(f, now += 1000).Do == Command::What::Talk);
+        runner.OnUseResult(UseResult::Failed, now += 100);                              // a real failure: the talk is tried again
+        CHECK(runner.Next(f, now += 100).Do == Command::What::Talk);
+        runner.OnUseResult(UseResult::Unclear, now += 100);                             // not the first time: counted as a failure
+        CHECK(runner.Next(f, now += 100).Do == Command::What::Talk);
+    }
+}
+
 } // namespace
 
 int main()
@@ -305,6 +344,7 @@ int main()
     ATimedOutEventRetriesThenCanSucceed();
     TheLeaderFightsFirst();
     TheNaralexEscortRuns();
+    ARefusedNaralexTalkMovesOnToTheFollow();
     if (failures == 0)
         std::printf("dungeon_events_test: all passed\n");
     return failures == 0 ? 0 : 1;

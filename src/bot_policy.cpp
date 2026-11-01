@@ -212,6 +212,7 @@ constexpr float kLostLeaderYards = 30.0f;
 constexpr float kLostLeaderHeight = 25.0f;        // ... or this far above or below it (another level of the dungeon)
 constexpr std::uint64_t kLostLeaderMs = 30000;    // for this long, then it is put next to the leader (DungeonTeleport). Longer than kRegroupStuckMs: the leader has
                                                   // flagged the member and walked on by then, so the teleport is not in the same second as the regroup_stuck line (0.36.2)
+constexpr float kRouteFarYards = 150.0f;           // a leader this far from a waypoint it gets no route to is not at the point: it is put back on the route instead of skipping
 constexpr std::uint32_t kRouteNoRouteSkip = 3;     // refusals in a row (no route) after which a dungeon waypoint is skipped
 constexpr std::uint32_t kRepairBelowPct = 50;    // worn gear below this durability sends the bot to a repairman, not just any vendor
 // The fights draw the leader past route points: when it is this close to the next point, the one it was heading for (not a boss point) is dropped, so it never walks back
@@ -1066,12 +1067,16 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
     // A click or an item used on a door, a lever or a charge (dungeon events): the answer goes to the event that sent it.
     if ((bot.last_action_type == uint8_t(ActionType::kUseObject) || bot.last_action_type == uint8_t(ActionType::kGossip)) && state.Events)
     {
+        bool const talk = bot.last_action_type == uint8_t(ActionType::kGossip);
         state.Events->OnUseResult(bot.last_action_status == BotActionStatus::kApplied ? dungeon_events::UseResult::Applied
                                   : bot.last_action_status == BotActionStatus::kOutOfRange ? dungeon_events::UseResult::OutOfRange
+                                  : talk && bot.last_action_status == BotActionStatus::kRefused ? dungeon_events::UseResult::Unclear
+                                  : talk && bot.last_action_status == BotActionStatus::kInvalidTarget ? dungeon_events::UseResult::GoneAway
                                                                                           : dungeon_events::UseResult::Failed, nowMs);
         if (_options.OnEvent && bot.last_action_status != BotActionStatus::kApplied)
             _options.OnEvent(std::string(bot.last_action_type == uint8_t(ActionType::kGossip) ? "gossip_refused" : "use_object_refused") + ": bot=" + std::to_string(bot.guid) +
-                             " status=" + ActionStatusName(bot.last_action_status));
+                             " status=" + ActionStatusName(bot.last_action_status) +
+                             (talk ? " spot_distance=" + std::to_string(int(std::hypot(bot.pos_x - state.GossipX, bot.pos_y - state.GossipY))) : std::string()));
         return;
     }
 
@@ -3957,8 +3962,24 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 {
                     // Off the mesh, on another level, or cut off: put the leader back on the route (the point before, or the first point) once; the same point failing again
                     // after that is skipped (or blocks, for a boss).
-                    std::size_t const back = state.RouteIndex > 0 ? state.RouteIndex - 1 : 0;
-                    state.RouteRecoveredAt = state.RouteIndex;
+                    std::size_t back = state.RouteIndex > 0 ? state.RouteIndex - 1 : 0;
+                    bool const far = DistanceTo(bot, (*routePoints)[state.RouteIndex]) > kRouteFarYards;
+                    if (far)
+                    {
+                        // Too far for the core's pathfinder (a revived leader at the entrance): the point before is no nearer. Back to the point nearest the leader (at or before this one).
+                        float best = DistanceTo(bot, (*routePoints)[0]);
+                        back = 0;
+                        for (std::size_t i = 1; i <= state.RouteIndex; ++i)
+                            if (float const d = DistanceTo(bot, (*routePoints)[i]); d < best)
+                            {
+                                best = d;
+                                back = i;
+                            }
+                        if (_options.OnEvent)
+                            _options.OnEvent("route_rewind: bot=" + std::to_string(bot.guid) + " from=" + std::to_string(state.RouteIndex) + " to=" + std::to_string(back));
+                        state.RouteIndex = back;
+                    }
+                    state.RouteRecoveredAt = far ? std::size_t(-1) : state.RouteIndex;   // a far leader is rewound again if it needs it
                     state.RouteNoRoute = 0;
                     if (_options.OnEvent)
                         _options.OnEvent("route_recover: bot=" + std::to_string(bot.guid) + " point=" + std::to_string(state.RouteIndex) + "/" + std::to_string(routePoints->size()) +
@@ -4090,6 +4111,8 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                             talk.dest_x = float(command.Option);
                             talk.dest_y = command.Y;
                             talk.dest_z = command.Z;
+                            state.GossipX = command.X;
+                            state.GossipY = command.Y;
                             actions.push_back(talk);
                             wanted = Decision{ ActionType::kStop, 0 };
                             eventBusy = true;

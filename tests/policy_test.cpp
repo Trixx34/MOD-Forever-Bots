@@ -2854,6 +2854,46 @@ std::optional<BotAction> TeleportOf(std::vector<BotAction> const& actions, std::
     return std::nullopt;
 }
 
+// A leader far from the point it gets no route to (revived at the entrance) is rewound to the nearest point, not skipped past it.
+void AFarLeaderWithNoRouteIsRewoundNotSkipped()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.ClassOf = WarriorLeads;
+    options.DungeonTeleport = true;
+    options.Route = { Point{ 100.0f, 0.0f, 0.0f }, Point{ 600.0f, 0.0f, 0.0f }, Point{ 1000.0f, 0.0f, 0.0f } };
+    std::vector<std::string> events;
+    options.OnEvent = [&events](std::string const& line) { events.push_back(line); };
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    for (BotSnapshot& bot : view.bots)
+        bot.pos_x = 95.0f;
+    policy.Decide(view, 0);                                           // at the first point: on to the second
+    for (BotSnapshot& bot : view.bots)
+        bot.pos_x = 0.0f;                                             // killed and revived at the entrance
+    policy.Decide(view, 500);
+    std::optional<BotAction> teleport;
+    for (std::uint32_t refusal = 1; refusal <= 3; ++refusal)
+    {
+        view.bots[2].last_action_sequence = refusal;
+        view.bots[2].last_action_type = uint8_t(ActionType::kMoveTo);
+        view.bots[2].last_action_status = BotActionStatus::kNoRoute;
+        if (auto const found = TeleportOf(policy.Decide(view, 1000 * refusal), 12))
+            teleport = found;
+    }
+    CHECK(teleport.has_value() && teleport->dest_x == 100.0f);
+    bool rewound = false;
+    bool skipped = false;
+    for (std::string const& line : events)
+    {
+        rewound = rewound || line.rfind("route_rewind: bot=12 from=1 to=0", 0) == 0;
+        skipped = skipped || line.rfind("route_skip:", 0) == 0;
+    }
+    CHECK(rewound);
+    CHECK(!skipped);
+}
+
 void ALeaderWithNoRouteIsPutBackOnTheRouteOnce()
 {
     PolicyOptions options = AggressiveOptions();
@@ -6020,6 +6060,7 @@ int main()
     ARegroupStopsWaitingForAStuckMember();
     AStuckMemberAtTheBoundaryIsLoggedOnce();
     MemberRecoverDoesNotFireWithTheStuckEvent();
+    AFarLeaderWithNoRouteIsRewoundNotSkipped();
     ALeaderWithNoRouteIsPutBackOnTheRouteOnce();
     AMemberThatLostItsLeaderIsPutNextToIt();
     ALeaderRevivedAtTheEntranceGoesToItsParty();

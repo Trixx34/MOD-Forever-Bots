@@ -289,6 +289,19 @@ void Runner::OnUseResult(UseResult result, std::uint64_t nowMs)
         case UseResult::OutOfRange:
             _close = true;      // come closer and try again; this is not a failure of the object
             break;
+        case UseResult::Unclear:
+        case UseResult::GoneAway:
+            // A Talk that was refused the first time may have started the escort; an invalid target after a try means the creature walked off. Go on to the next step
+            // (a follow stands still when the creature is out of view). Any other case counts as a failure.
+            if (_events[_active].Steps[_step].What == Step::Kind::Talk && (result == UseResult::GoneAway || _failures == 0))
+            {
+                ++_step;
+                _stepSinceMs = nowMs;
+                _failures = 0;
+                _close = false;
+                break;
+            }
+            [[fallthrough]];
         case UseResult::Failed:
             if (++_failures >= kMaxFailures)
                 Finish("event_failed", nowMs, /*success=*/false);
