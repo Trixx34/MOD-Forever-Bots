@@ -442,6 +442,94 @@ void ShippedFilesEqualTheOldTextFiles()
     CHECK(set.Dungeons.size() == oldDungeons.size() && set.Events.size() == oldEvents.size());
 }
 
+// ---- bosses on a navmesh island no path reaches: a teleport event puts the leader on the island, a second one brings it back --------------------
+
+// Lady Sarevess and Old Serra'kis (Blackfathom Deeps, islands 5 and 2 of the map-48 mesh) and Electrocutioner 6000 (Gnomeregan, island 3 of map 90). The place on the
+// island is a walkable point of the island next to the gap to the main mesh (read from the navmesh when the events were written); the way back is the route point of the
+// boss before them. The checks here are about the data and the runner; whether the points are on the mesh was checked with the navmesh tools.
+struct CutOff
+{
+    std::uint32_t Map;
+    char const* BridgeId;
+    std::uint32_t After;     // the boss whose death starts the bridge
+    float BX, BY, BZ;        // where the leader is put
+    char const* BackId;
+    std::uint32_t Boss;      // the cut-off boss
+};
+
+void CheckOneCutOffBoss(std::vector<Dungeon> const& json, CutOff const& c)
+{
+    using namespace dungeon_events;
+    Dungeon const* d = nullptr;
+    for (Dungeon const& x : json)
+        if (x.MapId() == c.Map)
+            d = &x;
+    CHECK(d != nullptr);
+    if (!d)
+        return;
+    Event const* bridge = nullptr;
+    Event const* back = nullptr;
+    for (Event const& e : d->Events)
+    {
+        if (e.Id == c.BridgeId)
+            bridge = &e;
+        if (e.Id == c.BackId)
+            back = &e;
+    }
+    CHECK(bridge != nullptr && back != nullptr);
+    if (!bridge || !back)
+        return;
+
+    // the route: the cut-off boss point comes right after the boss that starts the bridge
+    std::size_t at = d->Route.size();
+    for (std::size_t i = 0; i < d->Route.size(); ++i)
+        if (d->Route[i].BossEntry == c.After)
+            at = i;
+    CHECK(at + 1 < d->Route.size() && d->Route[at + 1].BossEntry == c.Boss);
+
+    CHECK(bridge->When == Event::Trigger::AfterBoss && bridge->Boss == c.After);
+    CHECK(bridge->Steps.size() == 2 && bridge->Steps[0].What == Step::Kind::Teleport && bridge->Steps[1].What == Step::Kind::Wait);
+    CHECK(bridge->Steps[0].X == c.BX && bridge->Steps[0].Y == c.BY && bridge->Steps[0].Z == c.BZ);
+    CHECK(back->When == Event::Trigger::AfterBoss && back->Boss == c.Boss);
+    CHECK(back->Steps.size() == 2 && back->Steps[0].What == Step::Kind::Teleport && back->Steps[1].What == Step::Kind::Wait);
+    if (at + 1 < d->Route.size())
+        CHECK(back->Steps[0].X == d->Route[at].X && back->Steps[0].Y == d->Route[at].Y && back->Steps[0].Z == d->Route[at].Z);
+
+    // the runner: nothing before the boss is dead, then one teleport to the island, then the event is over
+    Runner there({ *bridge });
+    std::set<std::uint32_t> killed;
+    Facts f;
+    f.KilledBosses = &killed;
+    std::uint64_t now = 0;
+    CHECK(there.Next(f, now).Do == Command::What::Nothing && !there.Active());
+    killed.insert(c.After);
+    Command const jump = there.Next(f, now += 1000);
+    CHECK(jump.Do == Command::What::Teleport && jump.X == c.BX && jump.Y == c.BY && jump.Z == c.BZ);
+    CHECK(there.Next(f, now += 60000).Do == Command::What::Nothing && !there.Active());
+
+    // and back: only after the cut-off boss is dead
+    Runner home({ *back });
+    std::set<std::uint32_t> killed2{ c.After };
+    f.KilledBosses = &killed2;
+    now = 0;
+    CHECK(home.Next(f, now).Do == Command::What::Nothing && !home.Active());
+    killed2.insert(c.Boss);
+    Command const ret = home.Next(f, now += 1000);
+    CHECK(ret.Do == Command::What::Teleport && ret.X == back->Steps[0].X && ret.Y == back->Steps[0].Y && ret.Z == back->Steps[0].Z);
+    CHECK(home.Next(f, now += 60000).Do == Command::What::Nothing && !home.Active());
+}
+
+void CutOffBossesAreBridgedByTeleportEvents()
+{
+    std::string const root = FOREVER_BOTS_SOURCE_DIR;
+    std::vector<std::string> warnings;
+    std::vector<Dungeon> const json = LoadDungeonDir(root + "/data/dungeons", true, warnings);
+    CHECK(warnings.empty());
+    CheckOneCutOffBoss(json, { 48, "sarevess-bridge", 4887, -355.5f, 295.5f, -55.8f, "sarevess-back", 4831 });
+    CheckOneCutOffBoss(json, { 48, "serrakis-bridge", 4832, -831.7f, -109.6f, -35.2f, "serrakis-back", 4830 });
+    CheckOneCutOffBoss(json, { 90, "electrocutioner-bridge", 7079, -537.9f, 528.3f, -216.1f, "electrocutioner-back", 6235 });
+}
+
 void ConfigKeysNameTheFolders()
 {
     DungeonSources const s = SourcesFromConfig({ { "DungeonFile", "data/dungeons.txt" }, { "DungeonDir", "/my/dungeons" }, { "DungeonDataDir", "/ship" }, { "DungeonEventsFile", "e.txt" } });
@@ -475,6 +563,7 @@ int main()
     FolderLoadingAndOverrides();
     OldTextFilesStayAFallback();
     ShippedFilesEqualTheOldTextFiles();
+    CutOffBossesAreBridgedByTeleportEvents();
     ConfigKeysNameTheFolders();
     if (failures != 0)
     {

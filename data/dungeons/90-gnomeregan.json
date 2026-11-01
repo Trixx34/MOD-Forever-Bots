@@ -42,6 +42,8 @@
     { "x": -548.3, "y": 149.3, "z": -201.9 },
     { "x": -530.1, "y": 115.5, "z": -204.3 },
     { "x": -430.2, "y": 42.5, "z": -208.7, "boss": 7079 },  // boss: Viscous Fallout
+    // Electrocutioner 6000 stands on a navmesh island no path reaches (island 3): the event "electrocutioner-bridge" puts the party on it when Viscous Fallout is dead, "electrocutioner-back" brings it back.
+    { "x": -552.0, "y": 502.9, "z": -216.7, "boss": 6235 },  // boss: Electrocutioner 6000
     { "x": -455.7, "y": 62.4, "z": -210.7 },
     { "x": -448.3, "y": 193.9, "z": -207.8 },
     { "x": -448.3, "y": 239.5, "z": -207.8 },
@@ -111,6 +113,12 @@
       "strategy": {}
     },
     {
+      // Electrocutioner 6000 (creature entry 6235)
+      "entry": 6235,
+      "name": "Electrocutioner 6000",
+      "strategy": {}
+    },
+    {
       // Crowd Pummeler 9-60 (creature entry 6229)
       "entry": 6229,
       "name": "Crowd Pummeler 9-60",
@@ -147,6 +155,26 @@
         { "type": "wait", "seconds": 5 }
       ],
       "timeout_sec": 300
+    },
+    {
+      // Electrocutioner 6000 is on island 3 of the map-90 mesh, 1.4 yards from the main mesh: the leader is put on the island side of the gap.
+      "id": "electrocutioner-bridge",
+      "name": "Bridge to Electrocutioner 6000 (his island has no navmesh link)",
+      "trigger": { "type": "after_boss", "boss": 7079 },
+      "steps": [
+        { "type": "teleport", "x": -537.9, "y": 528.3, "z": -216.1 },
+        { "type": "wait", "seconds": 5 }
+      ]
+    },
+    {
+      // Back to the route point of Viscous Fallout.
+      "id": "electrocutioner-back",
+      "name": "Back from Electrocutioner 6000 (to Viscous Fallout)",
+      "trigger": { "type": "after_boss", "boss": 6235 },
+      "steps": [
+        { "type": "teleport", "x": -430.2, "y": 42.5, "z": -208.7 },
+        { "type": "wait", "seconds": 5 }
+      ]
     }
   ]
 }

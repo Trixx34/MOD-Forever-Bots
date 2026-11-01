@@ -74,6 +74,32 @@ near -839.6 -477.9 -33.7 30
 use 103016 -839.6 -477.9 -33.7
 end
 
+# Blackfathom Deeps: Lady Sarevess and Old Serra'kis stand on navmesh islands no path reaches (islands 5 and 2 of map 48; the gap to the main mesh is 15.8 and 3.8 yards).
+# When the boss before them in the route is dead the leader is put on the island side of that gap (a walkable point on the island, from the navmesh), and back at that boss's route point once they are dead.
+event 48 sarevess-bridge Bridge to Lady Sarevess (her island has no navmesh link)
+after_boss 4887
+teleport -355.5 295.5 -55.8
+wait 5
+end
+
+event 48 sarevess-back Back from Lady Sarevess (to Ghamoo-ra)
+after_boss 4831
+teleport -442.4 211.8 -52.6
+wait 5
+end
+
+event 48 serrakis-bridge Bridge to Old Serra'kis (his island has no navmesh link)
+after_boss 4832
+teleport -831.7 -109.6 -35.2
+wait 5
+end
+
+event 48 serrakis-back Back from Old Serra'kis (to Twilight Lord Kelris)
+after_boss 4830
+teleport -818.8 -155.6 -25.8
+wait 5
+end
+
 # Razorfen Downs (map 129). The Gong (goober 148917) summons Tuten'kash; it is 96 yards from the route, so the event walks there once Mordresh (the last boss) is dead.
 event 129 gong Gong (summons Tuten'kash)
 after_boss 7357
@@ -115,4 +141,17 @@ talk 3678 0 -135.0 125.4 -78.1
 follow 3678 360
 wait 120
 timeout 1200
+end
+
+# Gnomeregan: Electrocutioner 6000 stands on a navmesh island no path reaches (island 3 of map 90, 1.4 yards from the main mesh). After Viscous Fallout the leader is put on the island side of the gap, and back at Fallout's route point once he is dead.
+event 90 electrocutioner-bridge Bridge to Electrocutioner 6000 (his island has no navmesh link)
+after_boss 7079
+teleport -537.9 528.3 -216.1
+wait 5
+end
+
+event 90 electrocutioner-back Back from Electrocutioner 6000 (to Viscous Fallout)
+after_boss 6235
+teleport -430.2 42.5 -208.7
+wait 5
 end
