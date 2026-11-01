@@ -54,7 +54,7 @@ file(READ "${CMAKE_CURRENT_SOURCE_DIR}/module.json" FOREVER_MODULE_JSON)
 string(JSON FOREVER_MODULE_VERSION GET "${FOREVER_MODULE_JSON}" version)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/module.json")
 
-add_executable(forever-bots src/main.cpp)
+add_executable(forever-bots src/main.cpp src/main_pump.cpp)
 target_compile_definitions(forever-bots PRIVATE FOREVER_MODULE_VERSION="${FOREVER_MODULE_VERSION}")
 target_link_libraries(forever-bots PRIVATE forever_bots_live forever_bots_trade forever_bots_roster forever_bots_policy forever_bots_settings forever_bots_store forever_bots_telemetry forever_bots_files forever_module_sdk Threads::Threads)
 
