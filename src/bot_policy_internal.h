@@ -521,3 +521,89 @@ supply::Facts FactsOf(BotSnapshot const& bot);
 } // namespace bot_policy_detail
 
 using namespace bot_policy_detail;
+
+// Decide's shared state (bot_policy.h: DecideBot and the Turn* steps). DecideTick is what every bot's turn of one Decide call shares: the view, the
+// clock, the actions sent, and the parties. ForParty is a template, so it is defined here.
+struct BotPolicy::DecideTick
+{
+    WorldTickSnapshotView const& view;
+    std::uint64_t nowMs;
+    std::vector<BotAction>& actions;
+    std::unordered_set<std::uint64_t>& present;
+    std::unordered_map<std::uint64_t, std::size_t> const& indexOf;            // bot guid -> index in view.bots
+    std::unordered_map<std::uint64_t, std::uint64_t>& leaderOf;                // bot guid -> its party's leader
+    std::unordered_map<std::uint64_t, std::vector<std::uint64_t>>& membersOf;  // leader guid -> the other members
+    std::unordered_set<std::uint64_t> const& tankLed;                         // the tanks leading their group ("tank lead")
+
+    // A leader or inviter reference that is one of this module's bots, as against a human player (both are players to the core).
+    bool IsOurBot(std::uint64_t ref) const;
+
+    // The party of a leader: the leader and its members that are online.
+    template <typename Fn>
+    void ForParty(std::uint64_t leaderGuid, Fn&& fn) const
+    {
+        if (auto const at = indexOf.find(leaderGuid); at != indexOf.end())
+            fn(view.bots[at->second]);
+        auto const members = membersOf.find(leaderGuid);
+        if (members == membersOf.end())
+            return;
+        for (std::uint64_t member : members->second)
+            if (auto const at = indexOf.find(member); at != indexOf.end())
+                fn(view.bots[at->second]);
+    }
+};
+
+// One bot's turn: the bot, its state, and what one step works out for the steps after it (the locals of Decide's per-bot loop, in the order that
+// loop declared them). A field is set by the step named beside it before any later step reads it.
+struct BotPolicy::BotTurn
+{
+    std::size_t const i;                                  // the bot's index in the view
+    BotSnapshot const& bot;
+    BotState& state;
+    std::uint64_t const nowMs;
+
+    // Whether the bot leaves this unit alone for now (its AvoidUntilMs), and the same as a function for PullTarget.
+    bool Avoided(std::uint64_t ref) const;
+    std::function<bool(std::uint64_t)> AvoidedFn() const;
+
+    bool stagingHold = false;                             // TurnBegin
+    std::span<NearbyUnit const> nearby{};                 // TurnTargetMemory
+    std::uint64_t deadParty = 0;
+    bool lowHealth = false;                               // TurnRevivedAndRoles
+    std::uint32_t classId = 0;
+    std::string spec{};
+    std::uint64_t partyLeader = 0;
+    bool partyLeaderBot = false;
+    bool partyMember = false;
+    bool routeOn = false;
+    PolicyOptions::ScenarioRoute const* scenario = nullptr;
+    bool returningToDungeon = false;
+    std::uint64_t leaderRef = 0;
+    BotSnapshot const* leaderSnap = nullptr;
+    std::uint64_t followRef = 0;
+    std::uint8_t deadWaitKind = 0;
+    QuestStep questStep{};                                // TurnQuestsAndHold
+    bool routeBusy = false;
+    std::vector<std::uint32_t> const noEntries{};
+    std::vector<std::uint32_t> const* huntEntries = nullptr;
+    bool dungeonHold = false;
+    bool tankHeadStart = false;
+    NearbyUnit const* targetUnit = nullptr;               // TurnTargeting
+    std::uint64_t targetRef = 0;
+    bool noSelfPull = false;
+    bool hasTarget = false;                               // TurnTaming
+    float distance = 0.0f;                                // TurnFightWatch
+    Decision wanted{};                                    // TurnMoveSetup
+    char const* moveWhy = "";
+    int kiteRetry = -1;
+    NearbyUnit const* aoeWarder = nullptr;
+    std::optional<Point> healLosPoint{};
+    std::optional<Point> kiteEntry{};
+    bool enemyNear = false;                               // TurnIdle
+    bool idle = false;
+    supply::Facts supplyFacts{};                          // TurnShopping
+    bool manaUser = false;                                // TurnWander
+    bool manaResting = false;
+    bool healthy = false;
+    bool grindMode = false;
+};
