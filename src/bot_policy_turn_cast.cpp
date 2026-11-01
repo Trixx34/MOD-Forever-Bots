@@ -43,347 +43,211 @@ BotPolicy::TurnFlow BotPolicy::TurnForcedHeal(DecideTick& tick, BotTurn& turn)
 
 BotPolicy::TurnFlow BotPolicy::TurnPartySupport(DecideTick& tick, BotTurn& turn)
 {
-    WorldTickSnapshotView const& view = tick.view;
     std::uint64_t nowMs = tick.nowMs;
-    std::vector<BotAction>& actions = tick.actions;
-    auto const& indexOf = tick.indexOf;
-    auto& leaderOf = tick.leaderOf;
     BotSnapshot const& bot = turn.bot;
     BotState& state = turn.state;
-    auto& nearby = turn.nearby;
-    auto const& classId = turn.classId;
     auto const& partyLeader = turn.partyLeader;
-    auto& hasTarget = turn.hasTarget;
 
     // Healing: a healer class in a party heals the party member (itself included) with the least health, below kHealBelowPct, in range.
     // Dungeon priorities: emergency Flash Heal (< 30%) > shield preemptive (< 50% and took damage) > normal Heal (< 75%) > tank at 90%.
     // Allow healing in a dungeon run even before the party is fully formed (the first tick sends invites).
     if ((partyLeader != 0 || IsRouteActive(bot.guid)) && nowMs >= state.NextCastMs && !(IsCasting(bot)))
     {
-        std::uint32_t const healSpell = state.Role_ == BotState::Role::Dps ? 0u : HealSpellFor(classId, bot.level);
-        auto const retry = healSpell != 0 ? state.RetryAtMs.find(healSpell) : state.RetryAtMs.end();
-        // Payment is checked per spell below, so a cheaper heal is not held back by the one this healer cannot afford yet.
-        if (healSpell != 0 && (retry == state.RetryAtMs.end() || nowMs >= retry->second))
+        if (PartyHeal(tick, turn) == TurnFlow::kSkip)
+            return TurnFlow::kSkip;
+        if (PartyHealerDps(tick, turn) == TurnFlow::kSkip)
+            return TurnFlow::kSkip;
+        if (PartyResurrect(tick, turn) == TurnFlow::kSkip)
+            return TurnFlow::kSkip;
+    }
+    return TurnFlow::kNext;
+}
+
+// TurnPartySupport: the heal of the party member that needs it most (an emergency, the tank, a shield, Renew, Prayer of Healing, a top-up).
+BotPolicy::TurnFlow BotPolicy::PartyHeal(DecideTick& tick, BotTurn& turn)
+{
+    WorldTickSnapshotView const& view = tick.view;
+    std::uint64_t nowMs = tick.nowMs;
+    std::vector<BotAction>& actions = tick.actions;
+    auto& leaderOf = tick.leaderOf;
+    BotSnapshot const& bot = turn.bot;
+    BotState& state = turn.state;
+    auto const& classId = turn.classId;
+    auto const& partyLeader = turn.partyLeader;
+    std::uint32_t const healSpell = state.Role_ == BotState::Role::Dps ? 0u : HealSpellFor(classId, bot.level);
+    auto const retry = healSpell != 0 ? state.RetryAtMs.find(healSpell) : state.RetryAtMs.end();
+    // Payment is checked per spell below, so a cheaper heal is not held back by the one this healer cannot afford yet.
+    if (healSpell != 0 && (retry == state.RetryAtMs.end() || nowMs >= retry->second))
+    {
+        std::uint64_t const healGroup = partyLeader != 0 ? partyLeader : bot.guid;
+        if (_healClaims.size() > 64)
+            for (auto it = _healClaims.begin(); it != _healClaims.end();)
+                it = nowMs >= it->second.UntilMs ? _healClaims.erase(it) : std::next(it);
+        BotSnapshot const* hurt = nullptr;
+        std::uint64_t hurtPct = (IsRouteActive(bot.guid) && _options.TacticHeal) ? _options.DungeonHealBelowPct : kHealBelowPct;
+        BotSnapshot const* leaderHurt = nullptr;   // the tank with a target: healed first, whatever its share
+        std::uint64_t leaderHurtPct = _options.DungeonTankHealBelowPct;
+        BotSnapshot const* leaderTopUp = nullptr;  // the route leader out of a fight, below kRouteTopUpPct
+        // Emergency target: anyone under kEmergencyHealBelowPct gets Flash Heal first.
+        BotSnapshot const* emergencyHurt = nullptr;
+        // Shield target: a member under kShieldBelowPct that took damage recently (health dropped since last tick).
+        BotSnapshot const* shieldHurt = nullptr;
+        BotSnapshot const* tankMember = nullptr;   // the party leader, who tanks: Renew keeps a heal over time on it, Binding Heal pairs it with the priest
+        std::uint64_t tankPct = 100;
+        std::uint32_t lowCount = 0;                // members under kPrayerBelowPct (Prayer of Healing)
+        auto const ready = [&](std::uint32_t spell)
         {
-            std::uint64_t const healGroup = partyLeader != 0 ? partyLeader : bot.guid;
-            if (_healClaims.size() > 64)
-                for (auto it = _healClaims.begin(); it != _healClaims.end();)
-                    it = nowMs >= it->second.UntilMs ? _healClaims.erase(it) : std::next(it);
-            BotSnapshot const* hurt = nullptr;
-            std::uint64_t hurtPct = (IsRouteActive(bot.guid) && _options.TacticHeal) ? _options.DungeonHealBelowPct : kHealBelowPct;
-            BotSnapshot const* leaderHurt = nullptr;   // the tank with a target: healed first, whatever its share
-            std::uint64_t leaderHurtPct = _options.DungeonTankHealBelowPct;
-            BotSnapshot const* leaderTopUp = nullptr;  // the route leader out of a fight, below kRouteTopUpPct
-            // Emergency target: anyone under kEmergencyHealBelowPct gets Flash Heal first.
-            BotSnapshot const* emergencyHurt = nullptr;
-            // Shield target: a member under kShieldBelowPct that took damage recently (health dropped since last tick).
-            BotSnapshot const* shieldHurt = nullptr;
-            BotSnapshot const* tankMember = nullptr;   // the party leader, who tanks: Renew keeps a heal over time on it, Binding Heal pairs it with the priest
-            std::uint64_t tankPct = 100;
-            std::uint32_t lowCount = 0;                // members under kPrayerBelowPct (Prayer of Healing)
-            auto const ready = [&](std::uint32_t spell)
+            auto const at = state.RetryAtMs.find(spell);
+            return at == state.RetryAtMs.end() || nowMs >= at->second;
+        };
+        auto const consider = [&](BotSnapshot const& member)
+        {
+            if (member.life_state != 0 || member.max_health == 0 || Distance2d(bot, member) > kHealRangeYards)
+                return;
+            // Another healer of this party already has this member: leave it, someone else needs the heal more.
+            if (auto const claim = _healClaims.find(member.guid); claim != _healClaims.end() &&
+                nowMs < claim->second.UntilMs && claim->second.Group == healGroup)
+                return;
+            std::uint64_t const pct = std::uint64_t(member.health) * 100 / member.max_health;
+            if (pct < kPrayerBelowPct)
+                ++lowCount;
+            if (member.guid == partyLeader)
             {
-                auto const at = state.RetryAtMs.find(spell);
-                return at == state.RetryAtMs.end() || nowMs >= at->second;
-            };
-            auto const consider = [&](BotSnapshot const& member)
+                tankMember = &member;
+                tankPct = pct;
+            }
+            // Out of a fight the route leader is healed up: it walks on only at kRouteMinHealthPct, and with creatures in view it cannot sit to get there.
+            // Ragefire Chasm, 2026-10-26: leaders stood between 50 and 79% for half an hour, below the 80% to walk and above the healer's 40%.
+            if (member.guid == partyLeader && member.threat_target_guid == 0 && member.in_combat == 0 && bot.in_combat == 0 && IsRouteActive(bot.guid) &&
+                pct < kRouteTopUpPct && pct >= kEmergencyHealBelowPct)
             {
-                if (member.life_state != 0 || member.max_health == 0 || Distance2d(bot, member) > kHealRangeYards)
-                    return;
-                // Another healer of this party already has this member: leave it, someone else needs the heal more.
-                if (auto const claim = _healClaims.find(member.guid); claim != _healClaims.end() &&
-                    nowMs < claim->second.UntilMs && claim->second.Group == healGroup)
-                    return;
-                std::uint64_t const pct = std::uint64_t(member.health) * 100 / member.max_health;
-                if (pct < kPrayerBelowPct)
-                    ++lowCount;
-                if (member.guid == partyLeader)
+                leaderTopUp = &member;
+                return;
+            }
+            if (member.guid == partyLeader && member.threat_target_guid != 0)
+            {
+                if (pct < leaderHurtPct)
                 {
-                    tankMember = &member;
-                    tankPct = pct;
+                    leaderHurtPct = pct;
+                    leaderHurt = &member;
                 }
-                // Out of a fight the route leader is healed up: it walks on only at kRouteMinHealthPct, and with creatures in view it cannot sit to get there.
-                // Ragefire Chasm, 2026-10-26: leaders stood between 50 and 79% for half an hour, below the 80% to walk and above the healer's 40%.
-                if (member.guid == partyLeader && member.threat_target_guid == 0 && member.in_combat == 0 && bot.in_combat == 0 && IsRouteActive(bot.guid) &&
-                    pct < kRouteTopUpPct && pct >= kEmergencyHealBelowPct)
+                return;
+            }
+            if (pct < kEmergencyHealBelowPct)
+            {
+                // Emergency: Flash Heal is instant-ish (1.5 s) and we can afford it.
+                if (!emergencyHurt || pct < std::uint64_t(emergencyHurt->health) * 100 / emergencyHurt->max_health)
+                    emergencyHurt = &member;
+            }
+            else
+            {
+                // Power Word: Shield is a priest spell; the other healers have no shield to cast.
+                // Not on a warrior or a druid: the absorb starves a rage user of rage (the guide).
+                // Not while Weakened Soul keeps a new shield off it (kShieldLockMs after the last one was ordered): the cast is refused, and with the shield first in the
+                // priority chain the member below 55 % was never healed (Stockade, 2026-10-28: a mage held at 44 % for over 30 s while the priest ordered 15 shields).
+                auto const shielded = state.BuffUntilMs.find({ kPowerWordShield, member.guid == bot.guid ? 0 : PlayerRef(member.guid) });
+                bool const shieldLocked = shielded != state.BuffUntilMs.end() && nowMs < shielded->second;
+                if (pct < kShieldBelowPct && !shieldLocked && classId == 5 && ClassFor(_options, member.guid) != kWarriorClass_ && ClassFor(_options, member.guid) != kDruidClass_)
                 {
-                    leaderTopUp = &member;
-                    return;
+                    // Shield preemptive: check if this member's health dropped since the last tick (took damage).
+                    // The module keeps a short history via state.StallBotHealth etc; here we approximate by checking
+                    // if the member is in combat (taking hits) or was the recent target of a hostile.
+                    bool tookDamage = member.in_combat != 0 || (state.FoughtAtMs.size() && state.FoughtAtMs.count(member.threat_target_guid));
+                    if (tookDamage && (!shieldHurt || pct < std::uint64_t(shieldHurt->health) * 100 / shieldHurt->max_health))
+                        shieldHurt = &member;
                 }
-                if (member.guid == partyLeader && member.threat_target_guid != 0)
+                // A member between the emergency and the shield threshold is still a normal heal target when no shield
+                // applies (it has not been hit yet): the old else-if chain left it with no heal at all, which the
+                // 2026-10-23 run showed as a priest at 34 % never receiving a direct heal.
+                if (pct < hurtPct)
                 {
-                    if (pct < leaderHurtPct)
-                    {
-                        leaderHurtPct = pct;
-                        leaderHurt = &member;
-                    }
-                    return;
+                    hurtPct = pct;
+                    hurt = &member;
                 }
-                if (pct < kEmergencyHealBelowPct)
+            }
+        };
+        consider(bot);
+        auto const lead = leaderOf.find(bot.guid);
+        for (BotSnapshot const& other : view.bots)
+            if (other.guid != bot.guid && leaderOf.count(other.guid) && leaderOf[other.guid] == lead->second)
+                consider(other);
+        // Priority: emergency > tank holding aggro > shield > normal
+        std::uint32_t spellToCast = 0;
+        BotSnapshot const* target = nullptr;
+        std::string note;
+        bool const priest = classId == 5;
+        bool const prayer = priest && lowCount >= kPrayerMinLow && bot.level >= kPrayerOfHealingLevel && ready(kPrayerOfHealing);
+        // Renew on the tank: while it fights and the last Renew has run out. The priest sees only its own auras, so the timer is the module's.
+        bool const renewDue = priest && tankMember && tankMember->in_combat != 0 && bot.level >= kRenewLevel && ready(kRenew) &&
+                              !(state.BuffUntilMs.count({ kRenew, PlayerRef(tankMember->guid) }) && nowMs < state.BuffUntilMs[{ kRenew, PlayerRef(tankMember->guid) }]);
+        if (prayer)
+        {
+            spellToCast = kPrayerOfHealing; // a party heal around the priest: most of the party is low
+            target = &bot;
+            hurtPct = std::uint64_t(bot.health) * 100 / std::max<std::uint32_t>(bot.max_health, 1);
+            note = "party";
+        }
+        else if (emergencyHurt)
+        {
+            // Flash Heal is a priest spell; the other healers answer an emergency with their own heal.
+            spellToCast = classId == 5 ? kFlashHeal : healSpell;
+            target = emergencyHurt;
+            note = "emergency";
+        }
+        else if (leaderHurt)
+        {
+            spellToCast = healSpell;
+            target = leaderHurt;
+            hurtPct = leaderHurtPct;
+            note = "tank";
+        }
+        else if (shieldHurt)
+        {
+            spellToCast = kPowerWordShield;
+            target = shieldHurt;
+            hurtPct = std::uint64_t(shieldHurt->health) * 100 / shieldHurt->max_health;
+            note = "shield";
+        }
+        else if (renewDue)
+        {
+            spellToCast = kRenew;
+            target = tankMember;
+            hurtPct = tankPct;
+            note = "renew";
+        }
+        else if (hurt)
+        {
+            spellToCast = healSpell;
+            target = hurt;
+            note = "";
+        }
+        else if (leaderTopUp)
+        {
+            spellToCast = healSpell;
+            target = leaderTopUp;
+            hurtPct = std::uint64_t(leaderTopUp->health) * 100 / leaderTopUp->max_health;
+            note = "top_up";
+        }
+        // Binding Heal heals the priest and the tank together: when both are hurt and the chosen heal is for the tank.
+        if (priest && target && target != &bot && target == tankMember && spellToCast != kPrayerOfHealing && spellToCast != kRenew && bot.level >= kBindingHealLevel &&
+            ready(kBindingHeal) && std::uint64_t(bot.health) * 100 / std::max<std::uint32_t>(bot.max_health, 1) < kBindingBelowPct && tankPct < kBindingBelowPct)
+        {
+            spellToCast = kBindingHeal;
+            note = note.empty() ? "binding" : note + " binding";
+        }
+        if (target)
+        {
+            // Check we can pay for the chosen spell, so a cheaper heal is used when the healer is low on mana.
+            auto const spellRetry = state.RetryAtMs.find(spellToCast);
+            if ((spellRetry == state.RetryAtMs.end() || nowMs >= spellRetry->second) && CanPay(_options.SpellCosts.get(), spellToCast, bot))
+            {
+                // If we recently lost LoS to the target and are still moving to regain it, wait for movement instead of retrying the cast.
+                if (state.CloserUntilMs > nowMs)
                 {
-                    // Emergency: Flash Heal is instant-ish (1.5 s) and we can afford it.
-                    if (!emergencyHurt || pct < std::uint64_t(emergencyHurt->health) * 100 / emergencyHurt->max_health)
-                        emergencyHurt = &member;
-                }
-                else
-                {
-                    // Power Word: Shield is a priest spell; the other healers have no shield to cast.
-                    // Not on a warrior or a druid: the absorb starves a rage user of rage (the guide).
-                    // Not while Weakened Soul keeps a new shield off it (kShieldLockMs after the last one was ordered): the cast is refused, and with the shield first in the
-                    // priority chain the member below 55 % was never healed (Stockade, 2026-10-28: a mage held at 44 % for over 30 s while the priest ordered 15 shields).
-                    auto const shielded = state.BuffUntilMs.find({ kPowerWordShield, member.guid == bot.guid ? 0 : PlayerRef(member.guid) });
-                    bool const shieldLocked = shielded != state.BuffUntilMs.end() && nowMs < shielded->second;
-                    if (pct < kShieldBelowPct && !shieldLocked && classId == 5 && ClassFor(_options, member.guid) != kWarriorClass_ && ClassFor(_options, member.guid) != kDruidClass_)
-                    {
-                        // Shield preemptive: check if this member's health dropped since the last tick (took damage).
-                        // The module keeps a short history via state.StallBotHealth etc; here we approximate by checking
-                        // if the member is in combat (taking hits) or was the recent target of a hostile.
-                        bool tookDamage = member.in_combat != 0 || (state.FoughtAtMs.size() && state.FoughtAtMs.count(member.threat_target_guid));
-                        if (tookDamage && (!shieldHurt || pct < std::uint64_t(shieldHurt->health) * 100 / shieldHurt->max_health))
-                            shieldHurt = &member;
-                    }
-                    // A member between the emergency and the shield threshold is still a normal heal target when no shield
-                    // applies (it has not been hit yet): the old else-if chain left it with no heal at all, which the
-                    // 2026-10-23 run showed as a priest at 34 % never receiving a direct heal.
-                    if (pct < hurtPct)
-                    {
-                        hurtPct = pct;
-                        hurt = &member;
-                    }
-                }
-            };
-            consider(bot);
-            auto const lead = leaderOf.find(bot.guid);
-            for (BotSnapshot const& other : view.bots)
-                if (other.guid != bot.guid && leaderOf.count(other.guid) && leaderOf[other.guid] == lead->second)
-                    consider(other);
-            // Priority: emergency > tank holding aggro > shield > normal
-            std::uint32_t spellToCast = 0;
-            BotSnapshot const* target = nullptr;
-            std::string note;
-            bool const priest = classId == 5;
-            bool const prayer = priest && lowCount >= kPrayerMinLow && bot.level >= kPrayerOfHealingLevel && ready(kPrayerOfHealing);
-            // Renew on the tank: while it fights and the last Renew has run out. The priest sees only its own auras, so the timer is the module's.
-            bool const renewDue = priest && tankMember && tankMember->in_combat != 0 && bot.level >= kRenewLevel && ready(kRenew) &&
-                                  !(state.BuffUntilMs.count({ kRenew, PlayerRef(tankMember->guid) }) && nowMs < state.BuffUntilMs[{ kRenew, PlayerRef(tankMember->guid) }]);
-            if (prayer)
-            {
-                spellToCast = kPrayerOfHealing; // a party heal around the priest: most of the party is low
-                target = &bot;
-                hurtPct = std::uint64_t(bot.health) * 100 / std::max<std::uint32_t>(bot.max_health, 1);
-                note = "party";
-            }
-            else if (emergencyHurt)
-            {
-                // Flash Heal is a priest spell; the other healers answer an emergency with their own heal.
-                spellToCast = classId == 5 ? kFlashHeal : healSpell;
-                target = emergencyHurt;
-                note = "emergency";
-            }
-            else if (leaderHurt)
-            {
-                spellToCast = healSpell;
-                target = leaderHurt;
-                hurtPct = leaderHurtPct;
-                note = "tank";
-            }
-            else if (shieldHurt)
-            {
-                spellToCast = kPowerWordShield;
-                target = shieldHurt;
-                hurtPct = std::uint64_t(shieldHurt->health) * 100 / shieldHurt->max_health;
-                note = "shield";
-            }
-            else if (renewDue)
-            {
-                spellToCast = kRenew;
-                target = tankMember;
-                hurtPct = tankPct;
-                note = "renew";
-            }
-            else if (hurt)
-            {
-                spellToCast = healSpell;
-                target = hurt;
-                note = "";
-            }
-            else if (leaderTopUp)
-            {
-                spellToCast = healSpell;
-                target = leaderTopUp;
-                hurtPct = std::uint64_t(leaderTopUp->health) * 100 / leaderTopUp->max_health;
-                note = "top_up";
-            }
-            // Binding Heal heals the priest and the tank together: when both are hurt and the chosen heal is for the tank.
-            if (priest && target && target != &bot && target == tankMember && spellToCast != kPrayerOfHealing && spellToCast != kRenew && bot.level >= kBindingHealLevel &&
-                ready(kBindingHeal) && std::uint64_t(bot.health) * 100 / std::max<std::uint32_t>(bot.max_health, 1) < kBindingBelowPct && tankPct < kBindingBelowPct)
-            {
-                spellToCast = kBindingHeal;
-                note = note.empty() ? "binding" : note + " binding";
-            }
-            if (target)
-            {
-                // Check we can pay for the chosen spell, so a cheaper heal is used when the healer is low on mana.
-                auto const spellRetry = state.RetryAtMs.find(spellToCast);
-                if ((spellRetry == state.RetryAtMs.end() || nowMs >= spellRetry->second) && CanPay(_options.SpellCosts.get(), spellToCast, bot))
-                {
-                    // If we recently lost LoS to the target and are still moving to regain it, wait for movement instead of retrying the cast.
-                    if (state.CloserUntilMs > nowMs)
-                    {
-                        state.NextCastMs = nowMs + 1000;
-                        return TurnFlow::kSkip;
-                    }
-                    if (bot.moving != 0 && (KnownCastTimeSpell(spellToCast) || state.CastTimeSpells.count(spellToCast)))
-                    {
-                        BotAction stop;
-                        stop.bot_guid = bot.guid;
-                        stop.type = ActionType::kStop;
-                        actions.push_back(stop);
-                        state.Last = Decision{ ActionType::kStop, 0 };
-                        state.Approaching = false;
-                    }
-                    else
-                    {
-                        BotAction heal;
-                        heal.bot_guid = bot.guid;
-                        heal.type = ActionType::kCastSpell;
-                        heal.spell_id = spellToCast;
-                        heal.target_guid = target->guid == bot.guid ? 0 : PlayerRef(target->guid);
-                        actions.push_back(heal);
-                        state.CastTarget[spellToCast] = heal.target_guid;
-                        if (spellToCast == kRenew)
-                            state.BuffUntilMs[{ kRenew, PlayerRef(target->guid) }] = nowMs + kRenewMs;
-                        if (spellToCast == kPowerWordShield)
-                            state.BuffUntilMs[{ kPowerWordShield, heal.target_guid }] = nowMs + kShieldLockMs;
-                        _healClaims[target->guid] = HealClaim{ healGroup, nowMs + kHealClaimMs };
-                        if (_options.OnEvent)
-                            _options.OnEvent("heal: healer=" + std::to_string(bot.guid) + " spell=" + std::to_string(spellToCast) +
-                                             " target=" + std::to_string(target->guid) + " target_hp_pct=" + std::to_string(hurtPct) +
-                                             (note.empty() ? "" : " " + note));
-                        state.NextCastMs = nowMs + kGlobalCooldownMs;
-                    }
+                    state.NextCastMs = nowMs + 1000;
                     return TurnFlow::kSkip;
                 }
-            }
-        }
-
-        // Healer DPS window: when nobody needs healing and healer has mana, cast offensive spells.
-        // Only for priest (class 5): Smite, Mind Blast, Shadow Word: Pain. Only in a dungeon party,
-        // only out of combat or when the party is not taking damage, and only when healer mana > 40%.
-        if (partyLeader != 0 && classId == 5 && bot.in_combat == 0 && PartyFighting(tick, partyLeader) &&
-            (state.LosRepositionTarget != 0 ||
-             std::uint64_t(bot.power) * 100 >= std::uint64_t(bot.max_power) * _options.HealerDpsManaPct))
-        {
-            if (state.LosRepositionTarget != 0 && _options.OnEvent)
-                _options.OnEvent("healer_dps_los_pending: healer=" + std::to_string(bot.guid) +
-                                 " target=" + std::to_string(state.LosRepositionTarget));
-            // Check if anyone in party needs healing
-            bool anyoneHurt = false;
-            tick.ForParty(partyLeader, [&](BotSnapshot const& member)
-            {
-                if (member.life_state != 0 || member.max_health == 0)
-                    return;
-                std::uint64_t const pct = std::uint64_t(member.health) * 100 / member.max_health;
-                if (pct < (member.guid == partyLeader ? 80 : 60))
-                    anyoneHurt = true;
-            });
-            if (!anyoneHurt && nowMs >= state.NextCastMs && !(IsCasting(bot)))
-            {
-                // Try Smite first (30 yd range, no cooldown), then SWP (DoT), then Mind Blast (high damage, cooldown, needs LoS).
-                // Smite and SWP are safer when LoS is uncertain.
-                static constexpr std::uint32_t kSmite = 585;
-                static constexpr std::uint32_t kSWP = 589;
-                static constexpr std::uint32_t kMindBlast = 8092;
-                std::uint32_t dpsSpell = 0;
-                // Prefer Smite (always works at 30 yd), then SWP, then Mind Blast (needs clear LoS).
-                // If a previous priest DPS cast lost LoS, reposition to its target before retrying any spell.
-                bool const losBlocked = state.CloserUntilMs > nowMs || state.LosRepositionTarget != 0;
-                if (CanPay(_options.SpellCosts.get(), kSmite, bot) &&
-                    (state.RetryAtMs.find(kSmite) == state.RetryAtMs.end() || nowMs >= state.RetryAtMs[kSmite]))
-                    dpsSpell = kSmite;
-                else if (CanPay(_options.SpellCosts.get(), kSWP, bot) &&
-                         (state.RetryAtMs.find(kSWP) == state.RetryAtMs.end() || nowMs >= state.RetryAtMs[kSWP]))
-                    dpsSpell = kSWP;
-                else if (!losBlocked && CanPay(_options.SpellCosts.get(), kMindBlast, bot) &&
-                         (state.RetryAtMs.find(kMindBlast) == state.RetryAtMs.end() || nowMs >= state.RetryAtMs[kMindBlast]))
-                    dpsSpell = kMindBlast;
-                if (dpsSpell != 0)
-                {
-                    // Healer DPS is only on the tank's engaged target; never self-pull a nearby pack.
-                    std::uint64_t targetGuid = 0;
-                    auto const lead = indexOf.find(partyLeader);
-                    if (lead != indexOf.end() && view.bots[lead->second].threat_target_guid != 0)
-                    {
-                        for (NearbyUnit const& unit : nearby)
-                            if (unit.guid == view.bots[lead->second].threat_target_guid && unit.is_hostile && unit.health != 0)
-                            {
-                                targetGuid = unit.guid;
-                                break;
-                            }
-                    }
-                    if (targetGuid != 0)
-                    {
-                        BotAction dps;
-                        dps.bot_guid = bot.guid;
-                        dps.type = ActionType::kCastSpell;
-                        dps.spell_id = dpsSpell;
-                        dps.target_guid = targetGuid;
-                        actions.push_back(dps);
-                        state.CastTarget[dpsSpell] = targetGuid;
-                        state.NextCastMs = nowMs + kGlobalCooldownMs;
-                        if (_options.OnEvent)
-                            _options.OnEvent("healer_dps: healer=" + std::to_string(bot.guid) + " spell=" + std::to_string(dpsSpell) +
-                                             " target=" + std::to_string(forever_module::UnitRefEntry(targetGuid)));
-                        return TurnFlow::kSkip;
-                    }
-                }
-            }
-        }
-
-        // Resurrect (after the heals): a priest, paladin or shaman out of combat with the party quiet resurrects the dead member in range
-        // that it is closest to (healers first, then the tank), once the 10 s cast is affordable. A refusal retries after a few seconds.
-        std::uint32_t const rezSpell = ResurrectSpellFor(classId, bot.level);
-        bool const manaOk = bot.power_type != 0 || bot.max_power == 0 ||
-                            std::uint64_t(bot.power) * 100 >= std::uint64_t(bot.max_power) * kRezManaPct;
-        if (rezSpell != 0 && bot.in_combat == 0 && !hasTarget && manaOk && !PartyFighting(tick, partyLeader))
-        {
-            BotSnapshot const* pick = nullptr;
-            int pickRank = 99;
-            float pickDist = 0.0f;
-            tick.ForParty(partyLeader, [&](BotSnapshot const& dead)
-            {
-                if (dead.life_state == 0 || dead.map_id != bot.map_id || dead.resurrect_from != 0)
-                    return;
-                float const dist = Distance2d(bot, dead);
-                if (dist > kRezRangeYards)
-                    return;
-                auto const retry = state.RezRetryAtMs.find(PlayerRef(dead.guid));
-                if (retry != state.RezRetryAtMs.end() && nowMs < retry->second)
-                    return;
-                // Only the closest eligible rezzer casts on a target (a tie: the lowest guid).
-                bool otherCloser = false;
-                tick.ForParty(partyLeader, [&](BotSnapshot const& other)
-                {
-                    if (other.guid == bot.guid || !IsRezzer(other) || other.in_combat != 0 || other.map_id != bot.map_id)
-                        return;
-                    float const otherDist = Distance2d(other, dead);
-                    if (otherDist <= kRezRangeYards && (otherDist < dist || (otherDist == dist && other.guid < bot.guid)))
-                        otherCloser = true;
-                });
-                if (otherCloser)
-                    return;
-                std::uint32_t const deadClass = ClassFor(_options, dead.guid);
-                int const rank = HealSpellFor(deadClass, 99) != 0 ? 0 : deadClass == kWarriorClass ? 1 : 2;
-                if (!pick || rank < pickRank || (rank == pickRank && dist < pickDist))
-                {
-                    pick = &dead;
-                    pickRank = rank;
-                    pickDist = dist;
-                }
-            });
-            if (pick)
-            {
-                if (bot.moving != 0)
+                if (bot.moving != 0 && (KnownCastTimeSpell(spellToCast) || state.CastTimeSpells.count(spellToCast)))
                 {
                     BotAction stop;
                     stop.bot_guid = bot.guid;
@@ -394,20 +258,193 @@ BotPolicy::TurnFlow BotPolicy::TurnPartySupport(DecideTick& tick, BotTurn& turn)
                 }
                 else
                 {
-                    BotAction rez;
-                    rez.bot_guid = bot.guid;
-                    rez.type = ActionType::kCastSpell;
-                    rez.spell_id = rezSpell;
-                    rez.target_guid = PlayerRef(pick->guid);
-                    actions.push_back(rez);
-                    state.CastTarget[rezSpell] = rez.target_guid;
-                    state.NextCastMs = nowMs + kGlobalCooldownMs;
+                    BotAction heal;
+                    heal.bot_guid = bot.guid;
+                    heal.type = ActionType::kCastSpell;
+                    heal.spell_id = spellToCast;
+                    heal.target_guid = target->guid == bot.guid ? 0 : PlayerRef(target->guid);
+                    actions.push_back(heal);
+                    state.CastTarget[spellToCast] = heal.target_guid;
+                    if (spellToCast == kRenew)
+                        state.BuffUntilMs[{ kRenew, PlayerRef(target->guid) }] = nowMs + kRenewMs;
+                    if (spellToCast == kPowerWordShield)
+                        state.BuffUntilMs[{ kPowerWordShield, heal.target_guid }] = nowMs + kShieldLockMs;
+                    _healClaims[target->guid] = HealClaim{ healGroup, nowMs + kHealClaimMs };
                     if (_options.OnEvent)
-                        _options.OnEvent("rez_cast: rezzer=" + std::to_string(bot.guid) + " spell=" + std::to_string(rezSpell) + " target=" +
-                                         std::to_string(pick->guid) + " dist=" + std::to_string(int(pickDist)) + " life=" + std::to_string(pick->life_state));
+                        _options.OnEvent("heal: healer=" + std::to_string(bot.guid) + " spell=" + std::to_string(spellToCast) +
+                                         " target=" + std::to_string(target->guid) + " target_hp_pct=" + std::to_string(hurtPct) +
+                                         (note.empty() ? "" : " " + note));
+                    state.NextCastMs = nowMs + kGlobalCooldownMs;
                 }
                 return TurnFlow::kSkip;
             }
+        }
+    }
+    return TurnFlow::kNext;
+}
+
+BotPolicy::TurnFlow BotPolicy::PartyHealerDps(DecideTick& tick, BotTurn& turn)
+{
+    WorldTickSnapshotView const& view = tick.view;
+    std::uint64_t nowMs = tick.nowMs;
+    std::vector<BotAction>& actions = tick.actions;
+    auto const& indexOf = tick.indexOf;
+    BotSnapshot const& bot = turn.bot;
+    BotState& state = turn.state;
+    auto& nearby = turn.nearby;
+    auto const& classId = turn.classId;
+    auto const& partyLeader = turn.partyLeader;
+    // Healer DPS window: when nobody needs healing and healer has mana, cast offensive spells.
+    // Only for priest (class 5): Smite, Mind Blast, Shadow Word: Pain. Only in a dungeon party,
+    // only out of combat or when the party is not taking damage, and only when healer mana > 40%.
+    if (partyLeader != 0 && classId == 5 && bot.in_combat == 0 && PartyFighting(tick, partyLeader) &&
+        (state.LosRepositionTarget != 0 ||
+         std::uint64_t(bot.power) * 100 >= std::uint64_t(bot.max_power) * _options.HealerDpsManaPct))
+    {
+        if (state.LosRepositionTarget != 0 && _options.OnEvent)
+            _options.OnEvent("healer_dps_los_pending: healer=" + std::to_string(bot.guid) +
+                             " target=" + std::to_string(state.LosRepositionTarget));
+        // Check if anyone in party needs healing
+        bool anyoneHurt = false;
+        tick.ForParty(partyLeader, [&](BotSnapshot const& member)
+        {
+            if (member.life_state != 0 || member.max_health == 0)
+                return;
+            std::uint64_t const pct = std::uint64_t(member.health) * 100 / member.max_health;
+            if (pct < (member.guid == partyLeader ? 80 : 60))
+                anyoneHurt = true;
+        });
+        if (!anyoneHurt && nowMs >= state.NextCastMs && !(IsCasting(bot)))
+        {
+            // Try Smite first (30 yd range, no cooldown), then SWP (DoT), then Mind Blast (high damage, cooldown, needs LoS).
+            // Smite and SWP are safer when LoS is uncertain.
+            static constexpr std::uint32_t kSmite = 585;
+            static constexpr std::uint32_t kSWP = 589;
+            static constexpr std::uint32_t kMindBlast = 8092;
+            std::uint32_t dpsSpell = 0;
+            // Prefer Smite (always works at 30 yd), then SWP, then Mind Blast (needs clear LoS).
+            // If a previous priest DPS cast lost LoS, reposition to its target before retrying any spell.
+            bool const losBlocked = state.CloserUntilMs > nowMs || state.LosRepositionTarget != 0;
+            if (CanPay(_options.SpellCosts.get(), kSmite, bot) &&
+                (state.RetryAtMs.find(kSmite) == state.RetryAtMs.end() || nowMs >= state.RetryAtMs[kSmite]))
+                dpsSpell = kSmite;
+            else if (CanPay(_options.SpellCosts.get(), kSWP, bot) &&
+                     (state.RetryAtMs.find(kSWP) == state.RetryAtMs.end() || nowMs >= state.RetryAtMs[kSWP]))
+                dpsSpell = kSWP;
+            else if (!losBlocked && CanPay(_options.SpellCosts.get(), kMindBlast, bot) &&
+                     (state.RetryAtMs.find(kMindBlast) == state.RetryAtMs.end() || nowMs >= state.RetryAtMs[kMindBlast]))
+                dpsSpell = kMindBlast;
+            if (dpsSpell != 0)
+            {
+                // Healer DPS is only on the tank's engaged target; never self-pull a nearby pack.
+                std::uint64_t targetGuid = 0;
+                auto const lead = indexOf.find(partyLeader);
+                if (lead != indexOf.end() && view.bots[lead->second].threat_target_guid != 0)
+                {
+                    for (NearbyUnit const& unit : nearby)
+                        if (unit.guid == view.bots[lead->second].threat_target_guid && unit.is_hostile && unit.health != 0)
+                        {
+                            targetGuid = unit.guid;
+                            break;
+                        }
+                }
+                if (targetGuid != 0)
+                {
+                    BotAction dps;
+                    dps.bot_guid = bot.guid;
+                    dps.type = ActionType::kCastSpell;
+                    dps.spell_id = dpsSpell;
+                    dps.target_guid = targetGuid;
+                    actions.push_back(dps);
+                    state.CastTarget[dpsSpell] = targetGuid;
+                    state.NextCastMs = nowMs + kGlobalCooldownMs;
+                    if (_options.OnEvent)
+                        _options.OnEvent("healer_dps: healer=" + std::to_string(bot.guid) + " spell=" + std::to_string(dpsSpell) +
+                                         " target=" + std::to_string(forever_module::UnitRefEntry(targetGuid)));
+                    return TurnFlow::kSkip;
+                }
+            }
+        }
+    }
+    return TurnFlow::kNext;
+}
+
+BotPolicy::TurnFlow BotPolicy::PartyResurrect(DecideTick& tick, BotTurn& turn)
+{
+    std::uint64_t nowMs = tick.nowMs;
+    std::vector<BotAction>& actions = tick.actions;
+    BotSnapshot const& bot = turn.bot;
+    BotState& state = turn.state;
+    auto const& classId = turn.classId;
+    auto const& partyLeader = turn.partyLeader;
+    auto& hasTarget = turn.hasTarget;
+    // Resurrect (after the heals): a priest, paladin or shaman out of combat with the party quiet resurrects the dead member in range
+    // that it is closest to (healers first, then the tank), once the 10 s cast is affordable. A refusal retries after a few seconds.
+    std::uint32_t const rezSpell = ResurrectSpellFor(classId, bot.level);
+    bool const manaOk = bot.power_type != 0 || bot.max_power == 0 ||
+                        std::uint64_t(bot.power) * 100 >= std::uint64_t(bot.max_power) * kRezManaPct;
+    if (rezSpell != 0 && bot.in_combat == 0 && !hasTarget && manaOk && !PartyFighting(tick, partyLeader))
+    {
+        BotSnapshot const* pick = nullptr;
+        int pickRank = 99;
+        float pickDist = 0.0f;
+        tick.ForParty(partyLeader, [&](BotSnapshot const& dead)
+        {
+            if (dead.life_state == 0 || dead.map_id != bot.map_id || dead.resurrect_from != 0)
+                return;
+            float const dist = Distance2d(bot, dead);
+            if (dist > kRezRangeYards)
+                return;
+            auto const retry = state.RezRetryAtMs.find(PlayerRef(dead.guid));
+            if (retry != state.RezRetryAtMs.end() && nowMs < retry->second)
+                return;
+            // Only the closest eligible rezzer casts on a target (a tie: the lowest guid).
+            bool otherCloser = false;
+            tick.ForParty(partyLeader, [&](BotSnapshot const& other)
+            {
+                if (other.guid == bot.guid || !IsRezzer(other) || other.in_combat != 0 || other.map_id != bot.map_id)
+                    return;
+                float const otherDist = Distance2d(other, dead);
+                if (otherDist <= kRezRangeYards && (otherDist < dist || (otherDist == dist && other.guid < bot.guid)))
+                    otherCloser = true;
+            });
+            if (otherCloser)
+                return;
+            std::uint32_t const deadClass = ClassFor(_options, dead.guid);
+            int const rank = HealSpellFor(deadClass, 99) != 0 ? 0 : deadClass == kWarriorClass ? 1 : 2;
+            if (!pick || rank < pickRank || (rank == pickRank && dist < pickDist))
+            {
+                pick = &dead;
+                pickRank = rank;
+                pickDist = dist;
+            }
+        });
+        if (pick)
+        {
+            if (bot.moving != 0)
+            {
+                BotAction stop;
+                stop.bot_guid = bot.guid;
+                stop.type = ActionType::kStop;
+                actions.push_back(stop);
+                state.Last = Decision{ ActionType::kStop, 0 };
+                state.Approaching = false;
+            }
+            else
+            {
+                BotAction rez;
+                rez.bot_guid = bot.guid;
+                rez.type = ActionType::kCastSpell;
+                rez.spell_id = rezSpell;
+                rez.target_guid = PlayerRef(pick->guid);
+                actions.push_back(rez);
+                state.CastTarget[rezSpell] = rez.target_guid;
+                state.NextCastMs = nowMs + kGlobalCooldownMs;
+                if (_options.OnEvent)
+                    _options.OnEvent("rez_cast: rezzer=" + std::to_string(bot.guid) + " spell=" + std::to_string(rezSpell) + " target=" +
+                                     std::to_string(pick->guid) + " dist=" + std::to_string(int(pickDist)) + " life=" + std::to_string(pick->life_state));
+            }
+            return TurnFlow::kSkip;
         }
     }
     return TurnFlow::kNext;

@@ -607,3 +607,18 @@ struct BotPolicy::BotTurn
     bool healthy = false;
     bool grindMode = false;
 };
+
+// The dungeon route leader's walk in one tick (MoveWithoutTarget and the Route* parts, bot_policy_turn_move.cpp): the route, its boss points and
+// events, the bosses dead, and what one part works out for the next.
+struct BotPolicy::RouteLeg
+{
+    std::vector<Point> const* routePoints;
+    std::map<std::size_t, std::uint32_t> const* routeBoss;
+    std::vector<dungeon_events::Event> const* routeEvents;
+    std::set<std::uint32_t> const* killedNow;
+    bool together = true;                                 // RouteReadiness
+    bool strong = false;
+    bool manaReady = false;
+    bool recovering = false;                              // RouteReadiness, then RouteLeaderRecover
+    bool eventBusy = false;                               // RouteEvents
+};

@@ -608,6 +608,16 @@ private:
     TurnFlow TurnGroundEffects(DecideTick& tick, BotTurn& turn);
     void TurnTargetMemory(DecideTick& tick, BotTurn& turn);
     TurnFlow TurnDead(DecideTick& tick, BotTurn& turn);
+    // TurnDead's parts, in the order it runs them (bot_policy_turn_dead.cpp).
+    void DeadRecord(DecideTick& tick, BotTurn& turn);
+    TurnFlow DeadAnswerResurrect(DecideTick& tick, BotTurn& turn);
+    TurnFlow DeadCorpse(DecideTick& tick, BotTurn& turn);
+    TurnFlow DeadHeldByWarder(DecideTick& tick, BotTurn& turn);
+    TurnFlow DeadReviveByLeader(DecideTick& tick, BotTurn& turn);
+    void DeadGhostRun(DecideTick& tick, BotTurn& turn);
+    void DeadEmit(DecideTick& tick, BotTurn& turn, Decision const& wantedDead);
+    void DeadRunFailed(DecideTick& tick, BotTurn& turn, char const* why);
+    void LogEvent(std::string const& text) const;
     void TurnRevivedAndRoles(DecideTick& tick, BotTurn& turn);
     void TurnTalentsAndGear(DecideTick& tick, BotTurn& turn);
     void TurnQuestsAndHold(DecideTick& tick, BotTurn& turn);
@@ -617,6 +627,15 @@ private:
     void TurnFightWatch(DecideTick& tick, BotTurn& turn);
     void TurnMoveSetup(DecideTick& tick, BotTurn& turn);
     void TurnMoveChoice(DecideTick& tick, BotTurn& turn);
+    // TurnMoveChoice's parts (bot_policy_turn_move.cpp). RouteLeg (bot_policy_internal.h) is what the parts of the route leader's walk share.
+    struct RouteLeg;
+    void MoveToTarget(DecideTick& tick, BotTurn& turn);
+    void MoveWithoutTarget(DecideTick& tick, BotTurn& turn);
+    void RouteReadiness(DecideTick& tick, BotTurn& turn, RouteLeg& route);
+    void RouteLeaderRecover(DecideTick& tick, BotTurn& turn, RouteLeg& route);
+    void RouteEvents(DecideTick& tick, BotTurn& turn, RouteLeg& route);
+    void RouteWalkOn(DecideTick& tick, BotTurn& turn, RouteLeg& route);
+    void MoveForQuestOrGoto(DecideTick& tick, BotTurn& turn);
     void TurnIdle(DecideTick& tick, BotTurn& turn);
     void TurnShopping(DecideTick& tick, BotTurn& turn);
     void TurnWander(DecideTick& tick, BotTurn& turn);
@@ -626,6 +645,10 @@ private:
     void TurnSendMove(DecideTick& tick, BotTurn& turn);
     TurnFlow TurnForcedHeal(DecideTick& tick, BotTurn& turn);
     TurnFlow TurnPartySupport(DecideTick& tick, BotTurn& turn);
+    // TurnPartySupport's parts (bot_policy_turn_cast.cpp).
+    TurnFlow PartyHeal(DecideTick& tick, BotTurn& turn);
+    TurnFlow PartyHealerDps(DecideTick& tick, BotTurn& turn);
+    TurnFlow PartyResurrect(DecideTick& tick, BotTurn& turn);
     TurnFlow TurnHunterPet(DecideTick& tick, BotTurn& turn);
     void TurnUpkeepBuffs(DecideTick& tick, BotTurn& turn);
     void TurnCraftGather(DecideTick& tick, BotTurn& turn);
