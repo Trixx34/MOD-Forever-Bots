@@ -33,16 +33,16 @@
     { "x": -40.5, "y": 226.4, "z": -94.6 },
     { "x": -37.3, "y": 237.3, "z": -93.0 },
     { "x": -52.5, "y": 267.2, "z": -92.8 },
-    { "x": -54.0, "y": 271.4, "z": -92.8, "boss": 3671 },  // boss: Lady Anacondra
+    { "x": -54.0, "y": 271.4, "z": -92.8 },  // Lady Anacondra spawn candidate (pool of 4, one at a time)
     { "x": -44.3, "y": 296.3, "z": -90.6 },
     { "x": -34.7, "y": 306.4, "z": -90.1 },
-    { "x": 15.3, "y": 297.2, "z": -87.7, "boss": 3671 },  // boss: Lady Anacondra
+    { "x": 15.3, "y": 297.2, "z": -87.7 },  // Lady Anacondra spawn candidate (pool of 4, one at a time)
     { "x": 21.3, "y": 277.3, "z": -87.2 },
     { "x": 42.7, "y": 234.7, "z": -87.4 },
-    { "x": 46.5, "y": 184.0, "z": -89.2, "boss": 3671 },  // boss: Lady Anacondra
+    { "x": 46.5, "y": 184.0, "z": -89.2 },  // Lady Anacondra spawn candidate (pool of 4, one at a time)
     { "x": -24.5, "y": 111.7, "z": -89.6 },
     { "x": -37.1, "y": 113.3, "z": -87.7 },
-    { "x": -67.8, "y": 122.6, "z": -89.9, "boss": 3671 },  // boss: Lady Anacondra
+    { "x": -67.8, "y": 122.6, "z": -89.9, "boss": 3671 },  // boss: Lady Anacondra (last of her 4 spawn candidates; the pool spawns one, the three points before are on the way)
     { "x": -64.0, "y": 149.3, "z": -93.3 },
     { "x": -50.1, "y": 149.9, "z": -94.6 },
     { "x": -42.7, "y": 170.7, "z": -96.2 },
@@ -118,7 +118,9 @@
     { "x": -83.8, "y": -138.0, "z": -78.9 },
     { "x": -32.9, "y": -164.6, "z": -74.0 },
     { "x": 10.5, "y": -182.8, "z": -82.1 },
+    { "x": -285.6, "y": -313.7, "z": -69.2, "boss": 3674 },  // boss: Skum
     { "x": 36.8, "y": -241.1, "z": -79.5, "boss": 3670 },  // boss: Lord Pythas
+    { "x": -81.9, "y": 32.3, "z": -31.0, "boss": 5775 },  // boss: Verdan the Everliving (same cut-off island as Lord Serpentis)
     { "x": -120.2, "y": -24.6, "z": -28.6, "boss": 3673 },  // boss: Lord Serpentis
     { "x": 115.4, "y": 240.0, "z": -94.0, "boss": 3654 }  // boss: Mutanus the Devourer
   ],
@@ -144,9 +146,21 @@
       "strategy": {}
     },
     {
+      // Skum (creature entry 3674)
+      "entry": 3674,
+      "name": "Skum",
+      "strategy": {}
+    },
+    {
       // Lord Pythas (creature entry 3670)
       "entry": 3670,
       "name": "Lord Pythas",
+      "strategy": {}
+    },
+    {
+      // Verdan the Everliving (creature entry 5775)
+      "entry": 5775,
+      "name": "Verdan the Everliving",
       "strategy": {}
     },
     {
