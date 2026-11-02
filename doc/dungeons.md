@@ -137,8 +137,24 @@ Limits, not built or not verified: the core lets a bot invite only bots, so **th
 is on); the human walks into the dungeon itself (the tank waits for it). The core has to report the General and Trade channels to the module (the SDK's `PlayerChatEvent.channel`
 documents 1 party, 2 raid, 3 whisper; the module treats 4 and 5 as the public channels). The speaker's own class is unknown, so it counts as one member with no role.
 
+## Clear reliability (feature 6)
+
+- **Config guard** (`ScenarioConfigGuard = 1`, off by default). The director sends one teleport probe to a living bot, to its own spot,
+  and holds the dressing until the core applies it. A refused probe three times in a row, or grants refused for two bots with none applied,
+  ends the run as `config_refused`. No applied probe within 60 s ends it as `config_unknown`. Both mean the core's `Bot.Actions.Teleport` or
+  `Bot.Actions.Grant` is zero (or refuses the action), so the run would have been in the wrong place. The check is by the core's answer,
+  not by reading the core's config: the module cannot see the core's keys.
+- **Summons** (`DungeonSummons = dm,rfc`, off by default; the names are the scenario names). The dungeon file's `summons` key lists the creature
+  entries its summoners make (Deadmines: the golem 2520 and the Squallshaper 1732; Ragefire: the Voidwalker minion 8996). Where the scenario is
+  listed, a live summon in view is the party's first target with focus on or off, and it is engaged from past the engagement cap. This
+  changes the pick and the reach only; it does not change how the party is pulled.
+- **Boss kill times.** The result line has `boss_ms=<name>:<ms>,...` after `killed=`: the time into the run each boss was first seen dead.
+- **Pull config** (`strategy.pull` in the dungeon file): no code reads it. It is left in the files, unused.
+
 ## Not verified, not built
 
+- The clear-reliability changes (feature 6) have not been compiled or run: they are covered by `tests/dungeon_clear_test.cpp` only
+  (added to CMake as `dungeon_clear`), and that test has not run either.
 - Nothing has run on the sim: entry by teleport, the route walk through an instance, pulls, heals, loot, wipe recovery in a dungeon, the corpse run
   through the door are all covered by unit tests with hand-built snapshots only.
 - A boss counts as dead when a bot sees its corpse (health 0). A boss killed out of every bot's sight, or despawned, is missed.

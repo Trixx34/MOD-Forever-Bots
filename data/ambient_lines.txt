@@ -1,0 +1,181 @@
+# Ambient chat lines (src/ambient_chat.h). channels|min level|max level|event|text
+# channels: g General, t Trade, * both. Level band 0|0 = any level. Event "-" = ambient; "level" = said when the bot gains a level.
+# Fill-ins: {zone} (continent or map name), {level}, {class}. Lines over 255 bytes are skipped.
+
+# --- General, any level ---
+g|0|0|-|Anyone around {zone} know a good place to grind right now?
+g|0|0|-|This road is quieter than I expected today.
+g|0|0|-|Just finished a long pull, my legs need a break.
+g|0|0|-|Did the sun always come up this slowly in {zone}?
+g|0|0|-|Who else is heading out past the last bridge tonight?
+g|0|0|-|Nice weather for it, honestly. Good day for a walk.
+g|0|0|-|Has anyone seen the wolves near the mill lately?
+g|0|0|-|My bags are getting heavy. Time to find a vendor.
+g|0|0|-|Anyone else lose track of time out here?
+g|0|0|-|Quiet night in {zone}. I kind of like it.
+g|0|0|-|Heading back to the inn, the road is too dark.
+g|0|0|-|Somebody's been pulling the same camp for an hour. Rude.
+g|0|0|-|Watch your step at the river crossing, the bank is slick.
+g|0|0|-|Does the ferry still run this late?
+g|0|0|-|Got a question for the locals: what's worth seeing in {zone}?
+g|0|0|-|Long trip ahead. Anyone want to walk part of it together?
+g|0|0|-|I keep forgetting where the flight master is around here.
+g|0|0|-|Stopped to rest. Don't mind me.
+g|0|0|-|That hill has a view worth the climb, trust me.
+g|0|0|-|Who's been leaving the shiny rocks by the gate? Thanks, whoever it was.
+g|0|0|-|The guards here walk faster than I do.
+g|0|0|-|I think I took a wrong turn somewhere back there.
+g|0|0|-|Anyone else hear that howling from the north?
+g|0|0|-|It is a good time to be alive in {zone}.
+g|0|0|-|Coffee would be nice right now. Or a warm bed.
+g|0|0|-|My pack is full of grey items again. Vendor run, sorry.
+g|0|0|-|Patience is the real skill out here.
+g|0|0|-|If you see a lost sheep near the farm, point it my way.
+g|0|0|-|Swapping stories at the campfire later? Bring a good one.
+g|0|0|-|That was closer than I'd like. Still standing, though.
+g|0|0|-|Who taught the guards to whistle that tune?
+g|0|0|-|Trying to remember which stable master is the friendly one.
+g|0|0|-|Small world, big roads. Good luck out there, everyone.
+g|0|0|-|Thought I saw a bear over the ridge. Maybe it was a rock.
+g|0|0|-|My shoes have seen better days. Still going, though.
+g|0|0|-|Anyone else notice the mail carriers never seem to stop?
+g|0|0|-|The bells in {zone} are louder at this hour.
+g|0|0|-|Sorry for the noise, I was talking to my pet again.
+g|0|0|-|Found a good spot for the herbs near the old tower.
+g|0|0|-|Remember to drink water between fights, friends.
+g|0|0|-|This is the third time I've walked past the same tree today.
+g|0|0|-|Let's hope the next tavern has a decent stew.
+g|0|0|-|Who else is hoping the weather holds for the trip north?
+g|0|0|-|The blacksmith here sure knows how to haggle.
+g|0|0|-|Nothing like a quiet road and a full waterskin.
+g|0|0|-|I have a spare bandage if anyone needs one, just ask.
+g|0|0|-|That gnoll camp is bigger than the map said.
+g|0|0|-|The stars look different out here than they do back home.
+g|0|0|-|Who wants to split the cost of the next repair? Joking. Mostly.
+g|0|0|-|Heard there's a fair in {zone} this week. Anyone going?
+g|0|0|-|Steady pace, steady hands. That's my motto today.
+g|0|0|-|Picked a fight with a boar and lost. Lesson learned.
+g|0|0|-|Thanks to whoever cleared the path near the crossroads.
+g|0|0|-|I wonder who first decided to build a road through the swamp.
+g|0|0|-|Making good progress, and only a little lost.
+g|0|0|-|The guard tower on the hill is a nice landmark.
+g|0|0|-|Anyone know the password for the old gate? Sorry, wrong channel.
+
+# --- General, by level band ---
+g|1|10|-|First levels are the hardest. I'm still learning the ropes.
+g|1|10|-|Is it normal for the murlocs to be this stubborn?
+g|1|10|-|Still getting used to fighting two at once. Sorry, mom.
+g|1|10|-|Anyone want to see me fall off a ledge again? No? Fine.
+g|11|20|-|The wolves get tougher around here. Keep an eye out.
+g|11|20|-|Found a good camp of boars, if anyone needs the xp.
+g|11|20|-|Half my bags are quest items and I can't remember which ones.
+g|21|30|-|The road to the next zone is longer than it looked on the map.
+g|21|30|-|Anyone else thinking about the next mount? Saving up for it.
+g|31|40|-|These elites really want to test my patience today.
+g|31|40|-|Anyone run into the bandits near the old lighthouse?
+g|41|50|-|Good to see the familiar faces still around {zone}.
+g|41|50|-|Trying to decide whether to head into the next dungeon or grind more.
+g|51|60|-|Feels strange to have so much room left to grow, even now.
+g|51|60|-|Looking for a group for the next instance, anyone free?
+g|55|60|-|Almost at the top. The last levels are a grind, no doubt.
+
+# --- Class flavour (any level) ---
+g|0|0|-|As a {class}, I still love this part of {zone}.
+g|0|0|-|Being a {class} means I always know where the exits are.
+g|0|0|-|Every {class} has a favorite pull. Mine is a bit reckless.
+g|0|0|-|Another day as a {class} in {zone}. Could be worse.
+g|0|0|-|My {class} training keeps saying to be patient. I'm listening.
+
+# --- Trade, any level (cities only: the core refuses it elsewhere) ---
+t|0|0|-|LF someone to buy some spare ore, paying a fair price.
+t|0|0|-|Selling cloth scraps and linen, cheap, come see me.
+t|0|0|-|Looking for a bag upgrade. Will trade a few herbs for it.
+t|0|0|-|WTB reagents for a healing trinket, whisper a price.
+t|0|0|-|Got spare leather to sell, reasonable offers only.
+t|0|0|-|Anyone have an extra bandage to spare? Happy to pay.
+t|0|0|-|Selling some grey gear, all vendor-grade and clean.
+t|0|0|-|Buying herbs in bulk, quality doesn't matter much.
+t|0|0|-|Looking for a cooking fire to borrow for a minute, please.
+t|0|0|-|Trade offers welcome for a spare set of gloves.
+t|0|0|-|Anyone selling fish for the cookpot? Paying in coin.
+t|0|0|-|Free: a couple of old swords, first come first served.
+t|0|0|-|LF a skinning knife, will pay in silver.
+t|0|0|-|Selling extra mining picks, good condition, cheap.
+t|0|0|-|Does anyone have a spare hearthstone recipe to swap?
+t|0|0|-|Looking for a tailor willing to mend a cloak for coin.
+t|0|0|-|Will trade a stack of linen for a few copper bars.
+t|0|0|-|Anyone need a box of torches? I have too many.
+t|0|0|-|Clearing out my bags, anything reasonable goes.
+t|0|0|-|Buying enchanting scrolls, whisper me your prices.
+t|0|0|-|Selling spare reagents, bulk discount for big orders.
+t|0|0|-|Spare runecloth available, looking for gold or herbs.
+t|0|0|-|Wanted: a strong bow, will pay a decent sum.
+t|0|0|-|Need a pair of boots, low level is fine, paying cash.
+t|0|0|-|Selling a few quest items I no longer need, ask me.
+t|0|0|-|Anyone craft leather armor? I have the hides.
+t|0|0|-|Trading ore for food, come find me by the bank.
+t|0|0|-|Selling a few healing potions, cheap and fresh.
+t|0|0|-|Buying mage food in bulk, whisper me a stack size.
+t|0|0|-|Looking to buy a shield, anything above grey.
+
+# --- Level-up (event line, said once per bot and level event) ---
+g|0|0|level|Level {level}! That's another step closer to the top.
+g|0|0|level|Level {level} now. My {class} legs feel a little steadier.
+g|0|0|level|Up to level {level}. Feels good to see the number move.
+g|0|0|level|Level {level}, and only a little more lost than before.
+g|0|0|level|Another level, {level}. The grind pays off, slowly.
+g|0|0|level|Level {level}! Who's up for a celebratory pull?
+g|0|0|level|Level {level}, and my gear is starting to look outdated.
+g|0|0|level|Hit level {level}. Time to check the trainer for new spells.
+g|0|0|level|Level {level} reached. Thanks to everyone who kept me alive.
+g|0|0|level|Up to {level}, finally. This {class} has been waiting for that.
+t|0|0|level|Level {level}! Anyone selling a shinier weapon for it?
+t|0|0|level|Level {level} now, time to upgrade the gear in my bags.
+
+# --- More General lines ---
+g|0|0|-|The bridge to the north looks sturdier than it sounds.
+g|0|0|-|Somebody left a lantern burning by the road, nice of them.
+g|0|0|-|If the rain holds off, I'll finish this route before dark.
+g|0|0|-|Anyone else smell the bakery from the far side of the square?
+g|0|0|-|Tavern food is better than trail rations, just saying.
+g|0|0|-|Keep your potions handy, the roads are busier than usual.
+g|0|0|-|Who's selling the good bread today? Asking for a friend.
+g|0|0|-|The stable boy here is very serious about his horses.
+g|0|0|-|Found a pocket of herbs under the old oak. Share and share alike.
+g|0|0|-|Waiting on a boat that's late, as usual. Anyone else?
+g|0|0|-|Should have brought a second waterskin. Lesson noted.
+g|0|0|-|Heard a rumor about a hidden cave in {zone}. Worth checking?
+g|0|0|-|The wind is picking up. Hope the banners hold.
+g|0|0|-|Who is the best cook in {zone}? I need a recommendation.
+g|0|0|-|Walking the long way today, just to look at the scenery.
+g|0|0|-|I miss the smell of the forest near the capital, honestly.
+g|0|0|-|Quick question: is the far road still closed for repairs?
+g|0|0|-|I'd say good luck to anyone heading into the mines, but you'll need it.
+g|0|0|-|Nothing beats a clear sky over {zone} after a long fight.
+g|0|0|-|The lanterns by the gate are lit early tonight.
+g|0|0|-|Who knew the local hens were so aggressive? Learned that one the hard way.
+g|0|0|-|That merchant's prices are high, but the goods are good.
+g|0|0|-|Any news from the north? I haven't been that way in ages.
+
+# --- More General, by level band ---
+g|1|10|-|Still no idea how the flight paths work. Teach me someday?
+g|1|10|-|Got lost twice already, but the scenery is nice at least.
+g|11|20|-|Starting to recognize the names on the quest boards now.
+g|21|30|-|My armor is finally a step up from grey. Small victories.
+g|31|40|-|These mobs are no joke at this level. Careful out there.
+g|41|50|-|Anyone else tired of the same three camps in {zone}? Me too.
+g|51|60|-|The endgame grind is real. Ready for a long night.
+
+# --- More Trade, any level ---
+t|0|0|-|Buying silk thread in stacks, whisper your price.
+t|0|0|-|Selling some spare gems, good cut, fair price.
+t|0|0|-|Looking for a leather bag, will pay in silver or trade herbs.
+t|0|0|-|Anyone have a spare carrot to trade? Hunting for a recipe.
+t|0|0|-|Spare mageweave for sale, cheap, no haggling please.
+t|0|0|-|LF someone with a free bag slot, can pay for the space.
+t|0|0|-|Selling a stack of Lesser Mana Potions, fresh batch.
+t|0|0|-|Wanted: copper bars, paying a little above vendor.
+t|0|0|-|Trading a few bolts of cloth for a decent bow string.
+t|0|0|-|Free: a bundle of bandages, come grab them before they go.
+t|0|0|-|Buying old armor pieces, any condition, whisper me.
+t|0|0|-|Selling a few mining nodes' worth of ore, bulk price is fine.

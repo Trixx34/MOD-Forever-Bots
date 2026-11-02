@@ -85,7 +85,8 @@ public:
 
     // A trade event for a bot. Requested opens the bot's side and asks for the bags; PartnerAccepted presses Accept; Cancelled and
     // Completed end the trade (Completed thanks the player and asks for a gear pass: the bot may have been given something to wear).
-    std::vector<Step> OnEvent(std::uint64_t bot, std::uint64_t partner, Status status, std::uint64_t nowMs);
+    // A non-empty busyLine refuses a request: the line is whispered to the partner and the trade is cancelled (a bot that is busy, WhisperReplies).
+    std::vector<Step> OnEvent(std::uint64_t bot, std::uint64_t partner, Status status, std::uint64_t nowMs, std::string const& busyLine = std::string());
 
     // The core's list-bags reply: whispers the items as pages.
     std::vector<Step> OnBagList(std::uint64_t bot, std::vector<BagItem> items, std::uint64_t nowMs);

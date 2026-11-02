@@ -40,6 +40,10 @@ constexpr std::size_t kDetail = 15;
 constexpr std::size_t kClass = 16;
 constexpr std::size_t kRace = 17;
 constexpr std::size_t kCopper = 18;
+constexpr std::size_t kMap = 19;
+constexpr std::size_t kNoRoute = 20;
+constexpr std::size_t kStallEpisodes = 21;
+constexpr std::size_t kAlive = 22;
 
 std::vector<std::string> Split(std::string const& line)
 {
@@ -315,10 +319,57 @@ void SummaryIsWrittenOnItsInterval()
     CHECK(rec.Count("summary") == 1);
 }
 
+// A bot that does nothing (no move, no level, no money, no applied action, out of combat) is stalled once after StallAfterMs, and
+// unstalled when it moves again. Without StallAfterMs nothing is written.
+void StallIsReportedOnceAndClearsOnProgress()
+{
+    BotTelemetry::Options options = Quiet();
+    options.StallAfterMs = 60000;
+    Recorder rec(options);
+    rec.telemetry.Observe(View(Bot(1000)), 0);
+    rec.telemetry.Observe(View(Bot(1000)), 30000);
+    CHECK(rec.Count("stalled") == 0);
+    rec.telemetry.Observe(View(Bot(1000)), 60000);
+    rec.telemetry.Observe(View(Bot(1000)), 90000);
+    CHECK(rec.Count("stalled") == 1);
+    CHECK(Split(rec.Last("stalled"))[kStallEpisodes] == "1");
+    CHECK(Split(rec.Last("stalled"))[kAlive] == "1");
+    rec.telemetry.Observe(View(Bot(1000, 10.0f)), 100000);
+    CHECK(rec.Count("unstalled") == 1);
+    // Idle again for StallAfterMs after the move: a second episode, counted in the same column.
+    rec.telemetry.Observe(View(Bot(1000, 10.0f)), 200000);
+    CHECK(rec.Count("stalled") == 2);
+    CHECK(Split(rec.Last("stalled"))[kStallEpisodes] == "2");
+
+    Recorder off(Quiet());
+    off.telemetry.Observe(View(Bot(1000)), 0);
+    off.telemetry.Observe(View(Bot(1000)), 600000);
+    CHECK(off.Count("stalled") == 0);
+}
+
+// The no_route column counts refusals for no route, once per sequence; the map and alive columns are on every line.
+void NoRouteAndMapColumns()
+{
+    BotTelemetry::Options options = Quiet();
+    options.SummaryEveryMs = 1000;
+    Recorder rec(options);
+    BotSnapshot bot = Bot(1000);
+    bot.map_id = 389;
+    bot.last_action_sequence = 1;
+    bot.last_action_status = BotActionStatus::kNoRoute;
+    rec.telemetry.Observe(View(bot), 0);
+    rec.telemetry.Observe(View(bot), 500);
+    bot.last_action_sequence = 2;
+    rec.telemetry.Observe(View(bot), 1000);
+    std::vector<std::string> const summary = Split(rec.Last("summary"));
+    CHECK(summary.size() == 23);
+    CHECK(summary[kNoRoute] == "2" && summary[kMap] == "389" && summary[kAlive] == "1");
+}
+
 void HeaderHasClassRaceAndCopperAfterDetail()
 {
     std::vector<std::string> const header = Split(BotTelemetry::Header());
-    CHECK(header.size() == 19);
+    CHECK(header.size() == 23);
     CHECK(header[kDetail] == "detail" && header[kClass] == "class" && header[kRace] == "race" && header[kCopper] == "copper");
 }
 
@@ -337,10 +388,10 @@ void ClassRaceAndCopperColumns()
     bot.level = 11;
     rec.telemetry.Observe(View(bot), 1000);
     std::vector<std::string> const summary = Split(rec.Last("summary"));
-    CHECK(summary.size() == 19);
+    CHECK(summary.size() == 23);
     CHECK(summary[kClass] == "8" && summary[kRace] == "10" && summary[kCopper] == "12345");
     std::vector<std::string> const start = Split(rec.Last("fight_start"));
-    CHECK(start.size() == 19 && start[kClass] == "8" && start[kCopper].empty());
+    CHECK(start.size() == 23 && start[kClass] == "8" && start[kCopper].empty());
     CHECK(rec.Last("level").rfind("1000,level,", 0) == 0);
     CHECK(rec.Last("summary").rfind("1000,summary,", 0) == 0);
 
@@ -391,7 +442,7 @@ void QuestDoneOnceWhenHandedIn()
     rec.telemetry.Observe(View(withQuest(0, 0)), 4000); // still out of the log: no second line
     CHECK(rec.Count("quest_done") == 1);
     CHECK(rec.Last("quest_done").find("quest 500") != std::string::npos);
-    CHECK(Split(rec.Last("quest_done")).size() == 19);
+    CHECK(Split(rec.Last("quest_done")).size() == 23);
 
     // Taken and handed in again: counted again. A quest that leaves the log while not complete (abandoned) is not.
     rec.telemetry.Observe(View(withQuest(500, 2)), 5000);
@@ -417,6 +468,8 @@ int main()
     CountsCastsAndRefusals();
     LevelChangeIsRecorded();
     SummaryIsWrittenOnItsInterval();
+    StallIsReportedOnceAndClearsOnProgress();
+    NoRouteAndMapColumns();
 
     if (failures == 0)
         std::printf("telemetry_test: all checks passed\n");

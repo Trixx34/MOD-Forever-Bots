@@ -16,6 +16,7 @@ struct ChatAck
 {
     std::uint64_t Bot = 0;     // the bot's character guid counter
     std::string Text;
+    std::uint64_t Player = 0;  // 0 = said out loud; else whispered to this player's guid counter (LFG fill offers)
 };
 
 // The line this bot says for this verb, or "" when the verb gets none (status already answers by whisper). The wording varies per bot.

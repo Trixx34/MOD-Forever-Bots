@@ -9,12 +9,15 @@
 
 #include "bot_pick.h"
 #include "bot_policy.h"
+#include "chat_reply.h"
+#include "bot_brackets.h"
 #include "bot_ramp.h"
 #include "bot_roster.h"
 #include "trade_policy.h"
 #include "bot_settings.h"
 #include "bot_presence.h"
 #include "auction_policy.h"
+#include "gather_nodes.h"
 #include "sell_policy.h"
 #include "move_gate.h"
 #include "errand_policy.h"
@@ -27,6 +30,7 @@
 #include "dungeon_events.h"
 #include "dungeon_files.h"
 #include "scenario.h"
+#include "ambient_chat.h"
 #include "text_case.h"
 
 #include "forever_module/module_client.h"
@@ -49,6 +53,7 @@
 #include <map>
 #include <mutex>
 #include <optional>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -106,6 +111,7 @@ std::string BesideTheModule(std::string const& path)
 }
 
 constexpr std::uint32_t kItemClassQuest = 12;       // ITEM_CLASS_QUEST
+constexpr std::uint32_t kItemClassTradeGoods = 7;    // ITEM_CLASS_TRADE_GOODS: herbs, ore, cloth, leather, reagents (the goods listings)
 
 // Vendor sales (sell_policy.h, doc/economy.md): the white items a bot loots are kept for its next vendor visit, and a bot sells from a vendor in reach.
 constexpr std::size_t kSellItemsPerBot = 200;       // looted white items kept per bot for selling
@@ -184,6 +190,7 @@ struct RunContext
     bool StopLogged = false;
     bool Halted = false; // a fixed race and class with no valid combination: nothing is spawned
     pick::SpecTable Specs; // the spec of each scenario bot whose roster entry names one (race:class:spec)
+    std::shared_ptr<PresenceFeed> Levels; // set when Presence is on: the bracket counts (brackets need it)
 };
 
 forever_module::SpawnParams ParamsFor(RaceClass const& combo)
@@ -231,6 +238,15 @@ void RampTick(RunContext& run)
         return;
 
     std::uint32_t const target = std::min(RampTarget(run.Settings.Ramp, elapsed), run.Roster.MaxBots());
+    // Brackets: the counts of the bots the feed has seen, and each spawn below adds to them, so one tick does not fill one bracket.
+    bool const bracketed = run.Settings.Brackets.Enabled && run.Levels;
+    brackets::Counts counts{};
+    if (bracketed)
+    {
+        std::lock_guard<std::mutex> lock(run.Levels->Lock);
+        for (auto const& [guid, level] : run.Levels->Levels)
+            ++counts[brackets::BracketOf(level)];
+    }
     std::uint32_t spawned = 0;
     while (spawned < kSpawnsPerRampTick && run.Roster.SpawnedCount() + run.Roster.PendingCount() < target &&
            run.Roster.CanRequest())
@@ -244,9 +260,20 @@ void RampTick(RunContext& run)
             return;
         }
 
+        forever_module::SpawnParams params = ParamsFor(combo);
+        if (bracketed)
+        {
+            std::size_t const bracket = brackets::NextBracket(run.Settings.Brackets.Targets, counts);
+            if (bracket < brackets::kCount)
+            {
+                params.set_level(brackets::LevelIn(bracket, double(run.Rng.Below(1000000)) / 1000000.0));
+                ++counts[bracket];
+            }
+        }
+
         ++spawned;
         run.Roster.NoteRequestSent(0);
-        run.Client.RequestControl(0, ParamsFor(combo), [&run, combo](forever_module::ControlResponse const& reply)
+        run.Client.RequestControl(0, params, [&run, combo](forever_module::ControlResponse const& reply)
         {
             if (!reply.granted())
             {
@@ -290,8 +317,26 @@ struct CommandQueue
     };
     std::vector<ErrandItem> Errands;
     std::vector<ChatAck> Says;                                  // lines a bot says out loud for an order it took (ChatSay)
-    std::vector<BotPolicy::TalentOrder> Talents;                // talent orders for the Run() thread to send (SpendBotTalents)
+    // Ambient lines for the Run() thread to say on General or Trade (AmbientChat); the pump thread picks them.
+    struct AmbientLine
+    {
+        std::uint64_t Bot = 0;
+        bool Trade = false; // the Trade channel, else General
+        std::string Text;
+    };
+    std::vector<AmbientLine> Ambient;
+                // talent orders for the Run() thread to send (SpendBotTalents)
     std::vector<std::uint64_t> TalentRefused;                   // bots the core refused a talent order, for the pump thread to retry
+    // Whispers that are not orders (WhisperReplies): read on the Run() thread, answered on the pump thread, sent from the timer.
+    struct WhisperItem
+    {
+        std::uint64_t Player = 0;
+        std::uint64_t Recipient = 0;
+        std::string Text;
+    };
+    std::vector<WhisperItem> Whispers;
+    std::vector<BotPolicy::WhisperReply> WhisperReplies;        // the answers the pump thread decided, sent from the timer
+    std::set<std::uint64_t> BusyBots;                           // bots busy now: a trade request to one of them is refused (pump thread writes, Run() reads)
 };
 
 // The words from index `from` on, joined with single spaces: a character name can have a last name ("Tinky Winky").
@@ -327,6 +372,8 @@ struct PresenceFeed
     std::mutex Lock;
     std::vector<presence::Online> Bots;
     std::uint64_t AtMs = 0;
+    // The level of each ordinary bot seen in the feed, kept after it goes offline: the brackets count every bot, online or not (bot_brackets.h).
+    std::unordered_map<std::uint64_t, std::uint32_t> Levels;
 };
 
 // One ordinary bot as the auction visit needs it: idle (alive and out of combat), its free bag slots and the auctioneer NPC the core found.
@@ -378,6 +425,7 @@ struct AuctionBook
     std::unordered_map<std::uint64_t, std::unordered_map<std::uint64_t, auction::Candidate>> Items; // bot -> item guid -> what it looted
     std::unordered_map<std::uint64_t, auction::Standing> Standing;                                    // bot -> attempts, last visit
     std::unordered_map<std::uint64_t, std::vector<std::uint64_t>> Ends;                             // bot -> when its listings run out
+    std::unordered_map<std::uint64_t, std::vector<std::pair<std::uint64_t, std::uint32_t>>> GoodsEnds; // bot -> (when a goods listing runs out, its item entry)
 };
 
 // The loot event as a listing candidate. A weapon or a piece of armour is marked Needed: the module does not know what a bot wears or keeps
@@ -393,6 +441,7 @@ auction::Candidate CandidateOf(forever_module::PlayerItemLootedEvent const& even
     item.QuestItem = event.item_class() == kItemClassQuest;
     item.Needed = event.item_class() == kItemClassWeapon || event.item_class() == kItemClassArmor;
     item.Stackable = item.Count != 1;   // the core lists single items only
+    item.Goods = event.item_class() == kItemClassTradeGoods;
     return item;
 }
 
@@ -674,6 +723,29 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
     std::unordered_map<std::uint64_t, std::uint32_t> seenSequence;
     std::unordered_map<std::uint64_t, std::uint64_t> serviceNoticeMs; // bot -> when a service refusal was last logged
     std::unordered_set<std::uint32_t> unknownSpellsReported; // spell ids the core does not know, reported once each
+    // Ambient chat (AmbientChat, off by default): the line pool is read once here; a missing or empty file turns it off.
+    std::optional<ambient::Speaker> ambientSpeaker;
+    std::unordered_map<std::uint64_t, std::uint32_t> ambientLevel; // bot guid -> the level last seen, for the level-up line
+    std::uint64_t ambientMs = 0;                                    // when the last ambient line was scheduled
+    std::size_t ambientCursor = 0;                                  // the bot the next ambient line is tried for
+    std::uint32_t ambientTurn = 0;                                  // alternates General and Trade when both are on
+    if (settings.AmbientChat)
+    {
+        std::string const path = BesideTheModule(settings.AmbientFile);
+        std::ifstream file(path);
+        std::size_t errors = 0;
+        std::vector<ambient::LineDef> lines = ambient::ParseLines(file, errors);
+        std::cerr << "forever-bots: ambient chat: " << lines.size() << " line(s) from " << path << ", " << errors << " bad\n";
+        if (lines.empty())
+            std::cerr << "forever-bots: ambient chat: no lines, off\n";
+        else
+        {
+            ambient::Limits limits;
+            limits.PerMinute = settings.AmbientPerMin;
+            limits.BotCooldownMs = std::uint64_t(settings.AmbientBotCooldownSec) * 1000;
+            ambientSpeaker.emplace(std::move(lines), limits);
+        }
+    }
 
     // Timing of the policy, reported once a minute so the cost at the current bot count is in the log.
     std::uint64_t reportedAt = nowMs();
@@ -699,6 +771,7 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
                 telemetryFile->WriteLine(BotTelemetry::Header());
             BotTelemetry::Options telemetryOptions;
             telemetryOptions.SummaryEveryMs = std::uint64_t(settings.TelemetrySummarySec) * 1000;
+            telemetryOptions.StallAfterMs = std::uint64_t(settings.StallAfterMinutes) * 60000;
             telemetryOptions.ClassOf = options.ClassOf;
             telemetryOptions.RaceOf = options.RaceOf;
             telemetry = std::make_unique<BotTelemetry>(
@@ -848,7 +921,61 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
                             extras.Commands->Says.push_back(std::move(ack));
                 }
             }
-            if (!directors.empty())
+            // Ambient chat: a bot that gained a level gets its level line; otherwise one bot a second, alive and out of combat, may say an
+            // ambient line. The Speaker decides which line and whether the rate allows it. The lines go to the Run() thread to send.
+            if (ambientSpeaker && extras.Commands)
+            {
+                std::uint64_t const at = nowMs();
+                auto const contextOf = [&options](forever_module::BotSnapshot const& bot, std::string event)
+                {
+                    ambient::Context ctx;
+                    ctx.Level = bot.level;
+                    ctx.Zone = ambient::ZoneName(bot.map_id);
+                    std::uint32_t classId = options.ClassId;
+                    if (options.ClassOf)
+                        if (std::uint32_t const own = options.ClassOf(bot.guid))
+                            classId = own;
+                    ctx.Class = ambient::ClassName(classId);
+                    ctx.Event = std::move(event);
+                    return ctx;
+                };
+                auto const channelFor = [&settings](std::uint32_t turn) -> ambient::Channel
+                {
+                    if (settings.AmbientChannels == 3)
+                        return turn % 2 ? ambient::Channel::Trade : ambient::Channel::General;
+                    return settings.AmbientChannels == 2 ? ambient::Channel::Trade : ambient::Channel::General;
+                };
+                std::vector<CommandQueue::AmbientLine> picks;
+                for (forever_module::BotSnapshot const& bot : view.bots)
+                {
+                    auto const seen = ambientLevel.find(bot.guid);
+                    bool const gained = seen != ambientLevel.end() && bot.level > seen->second;
+                    ambientLevel[bot.guid] = bot.level;
+                    if (!gained || bot.life_state != 0)
+                        continue;
+                    ambient::Channel const chan = channelFor(ambientTurn++);
+                    if (auto line = ambientSpeaker->Pick(bot.guid, chan, contextOf(bot, "level"), at))
+                        picks.push_back({ bot.guid, chan == ambient::Channel::Trade, std::move(*line) });
+                }
+                if (!view.bots.empty() && at - ambientMs >= 1000)
+                {
+                    ambientMs = at;
+                    forever_module::BotSnapshot const& bot = view.bots[ambientCursor++ % view.bots.size()];
+                    if (bot.life_state == 0 && bot.in_combat == 0)
+                    {
+                        ambient::Channel const chan = channelFor(ambientTurn++);
+                        if (auto line = ambientSpeaker->Pick(bot.guid, chan, contextOf(bot, ""), at))
+                            picks.push_back({ bot.guid, chan == ambient::Channel::Trade, std::move(*line) });
+                    }
+                }
+                if (!picks.empty())
+                {
+                    std::lock_guard<std::mutex> lock(extras.Commands->Lock);
+                    for (CommandQueue::AmbientLine& line : picks)
+                        if (extras.Commands->Ambient.size() < 64)
+                            extras.Commands->Ambient.push_back(std::move(line));
+                }
+            }
             {
                 std::vector<std::uint64_t> guids;
                 guids.reserve(view.bots.size());
@@ -889,8 +1016,43 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
                     });
             }
             std::vector<forever_module::BotAction> actions = policy.Decide(view, nowMs());
+            // Talent respecs (TalentRespec): one kRespecTalents per bot, spec in spell_id and role in dest_x; the core does the reset and the spend.
+            for (BotPolicy::TalentOrder const& order : policy.TakeRespecOrders())
+            {
+                if (actions.size() >= session.MaxActions())
+                    break;
+                forever_module::BotAction respec;
+                respec.bot_guid = order.Bot;
+                respec.type = forever_module::ActionType::kRespecTalents;
+                respec.spell_id = order.Spec;
+                respec.dest_x = static_cast<float>(order.Role);
+                actions.push_back(respec);
+            }
             if (extras.Commands)
             {
+                // Whispers from the Run() thread: the policy decides the answers (and the refusals it queued); busy bots are shared back for trade requests.
+                std::vector<CommandQueue::WhisperItem> whispers;
+                {
+                    std::lock_guard<std::mutex> lock(extras.Commands->Lock);
+                    whispers.swap(extras.Commands->Whispers);
+                }
+                std::vector<BotPolicy::WhisperReply> answers;
+                for (CommandQueue::WhisperItem const& item : whispers)
+                {
+                    std::vector<BotPolicy::WhisperReply> made = policy.ApplyWhisper(view, item.Player, item.Recipient, item.Text, nowMs());
+                    answers.insert(answers.end(), made.begin(), made.end());
+                }
+                std::vector<BotPolicy::WhisperReply> queued = policy.TakeWhisperReplies();
+                answers.insert(answers.end(), queued.begin(), queued.end());
+                std::vector<std::uint64_t> const busy = policy.BusyBots(view);
+                {
+                    std::lock_guard<std::mutex> lock(extras.Commands->Lock);
+                    extras.Commands->BusyBots.clear();
+                    extras.Commands->BusyBots.insert(busy.begin(), busy.end());
+                    for (BotPolicy::WhisperReply& answer : answers)
+                        if (extras.Commands->WhisperReplies.size() < 64)
+                            extras.Commands->WhisperReplies.push_back(std::move(answer));
+                }
                 std::vector<BotPolicy::TalentOrder> talentOrders = policy.TakeTalentOrders();
                 std::lock_guard<std::mutex> lock(extras.Commands->Lock);
                 for (std::uint64_t const bot : extras.Commands->TalentRefused)
@@ -899,6 +1061,11 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
                 for (BotPolicy::TalentOrder const& order : talentOrders)
                     if (extras.Commands->Talents.size() < 256)
                         extras.Commands->Talents.push_back(order);
+                // LFG fill offers: whispers to the human leader (ChatAck::Player set), sent with the chat lines below.
+                std::vector<ChatAck> offers = policy.TakeWhispers();
+                for (ChatAck& offer : offers)
+                    if (extras.Commands->Says.size() < 64)
+                        extras.Commands->Says.push_back(std::move(offer));
             }
             if (extras.Presence && nowMs() - presenceFedMs >= kPresenceFeedMs)
             {
@@ -910,9 +1077,11 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
                 {
                     if ((extras.Alts && extras.Alts->Has(bot.guid)) || bot.group_role != 0)
                         continue;
-                    list.push_back({ bot.guid, policy.SafeToLogOut(bot) });
+                    list.push_back({ bot.guid, policy.SafeToLogOut(bot), bot.level });
                 }
                 std::lock_guard<std::mutex> lock(extras.Presence->Lock);
+                for (presence::Online const& online : list)
+                    extras.Presence->Levels[online.Guid] = online.Level;
                 extras.Presence->Bots.swap(list);
                 extras.Presence->AtMs = presenceFedMs;
             }
@@ -1448,14 +1617,22 @@ int main(int argc, char** argv)
             }
         }
     };
-    client.OnNotify("PlayerScript.OnBotTrade", [trades, runTrade](forever_module::EventNotify const& notify)
+    client.OnNotify("PlayerScript.OnBotTrade", [trades, runTrade, commands](forever_module::EventNotify const& notify)
     {
         if (notify.event_payload_case() != forever_module::EventNotify::kBotTrade)
             return;
         forever_module::BotTradeEvent const& event = notify.bot_trade();
         if (event.status() > static_cast<std::uint32_t>(trade::Status::Completed))
             return;
-        (*runTrade)(trades->OnEvent(event.bot_guid(), event.partner_guid(), static_cast<trade::Status>(event.status()), nowMs()));
+        // A busy bot refuses a trade request with its reason (WhisperReplies); the refusal is cancelled on the Run() thread.
+        std::string busyLine;
+        if (event.status() == static_cast<std::uint32_t>(trade::Status::Requested))
+        {
+            std::lock_guard<std::mutex> lock(commands->Lock);
+            if (commands->BusyBots.count(event.bot_guid()))
+                busyLine = BusyLine(event.bot_guid(), BusyKind::None);
+        }
+        (*runTrade)(trades->OnEvent(event.bot_guid(), event.partner_guid(), static_cast<trade::Status>(event.status()), nowMs(), busyLine));
     });
     // A trade nobody is working on is cancelled.
     client.AddTimer(std::chrono::seconds(5), [trades, runTrade] { (*runTrade)(trades->OnIdle(nowMs())); });
@@ -1470,6 +1647,14 @@ int main(int argc, char** argv)
             if (whisper.channel() == 3 && trades->PartnerOf(whisper.recipient_guid()) == whisper.player_guid())
             {
                 (*runTrade)(trades->OnWhisper(whisper.player_guid(), whisper.recipient_guid(), whisper.text(), nowMs()));
+                return;
+            }
+            // A whisper that is not an order may get a reply from the bot (WhisperReplies; the pump thread decides it).
+            if (settings.ChatWhisperReplies && whisper.channel() == 3 && !ParseChatCommand(whisper.text(), settings.ChatOrders, settings.ChatControl))
+            {
+                std::lock_guard<std::mutex> lock(commands->Lock);
+                if (commands->Whispers.size() < 64)
+                    commands->Whispers.push_back({ whisper.player_guid(), whisper.recipient_guid(), whisper.text() });
                 return;
             }
         }
@@ -1505,12 +1690,18 @@ int main(int argc, char** argv)
         std::vector<std::pair<std::uint64_t, std::string>> replies;
         std::vector<ChatAck> says;
         std::vector<BotPolicy::TalentOrder> talents;
+        std::vector<CommandQueue::AmbientLine> ambientLines;
+        std::vector<BotPolicy::WhisperReply> whispers;
         {
             std::lock_guard<std::mutex> lock(commands->Lock);
             replies.swap(commands->Replies);
             says.swap(commands->Says);
             talents.swap(commands->Talents);
+            whispers.swap(commands->WhisperReplies);
+            ambientLines.swap(commands->Ambient);
         }
+        for (BotPolicy::WhisperReply const& whisper : whispers)
+            client.BotSpeak(whisper.Bot, forever_module::ModuleClient::SpeakKind::kWhisper, whisper.Player, whisper.Text);
         for (BotPolicy::TalentOrder const& order : talents)
             client.SpendBotTalents(order.Bot, static_cast<forever_module::ModuleClient::TalentRole>(order.Role), static_cast<forever_module::TalentSpec>(order.Spec), [commands, bot = order.Bot](forever_module::ActionReply const& reply)
             {
@@ -1523,7 +1714,14 @@ int main(int argc, char** argv)
         for (auto const& [player, text] : replies)
             client.SendPlayerMessage(player, text);
         for (ChatAck const& say : says)
-            client.BotSpeak(say.Bot, forever_module::ModuleClient::SpeakKind::kSay, 0, say.Text);
+        {
+            if (say.Player != 0)
+                client.BotSpeak(say.Bot, forever_module::ModuleClient::SpeakKind::kWhisper, say.Player, say.Text);
+            else
+                client.BotSpeak(say.Bot, forever_module::ModuleClient::SpeakKind::kSay, 0, say.Text);
+        }
+        for (CommandQueue::AmbientLine const& line : ambientLines)
+            client.BotSpeakChannel(line.Bot, line.Trade ? forever_module::ModuleClient::SpeakChannel::kTrade : forever_module::ModuleClient::SpeakChannel::kGeneral, line.Text);
     });
 
     // Bots from last run are rows in the module store (bot/<guid>). Each row's value is "race class", read before the
@@ -1599,6 +1797,7 @@ int main(int argc, char** argv)
     policyOptions.DungeonTeleport = settings.DungeonTeleport;
     policyOptions.LevelDungeons = settings.LevelDungeons && settings.Scenarios.empty();   // a scenario run drives its own parties
     policyOptions.LevelDungeonRuns = settings.LevelDungeonRuns;
+    policyOptions.LfgFill = settings.LfgFill;
     policyOptions.DungeonReviveOutOfCombat = settings.DungeonReviveOutOfCombat;
     policyOptions.CorpseRunTeleportMs = std::uint64_t(settings.CorpseRunTeleportSec) * 1000;
     policyOptions.AggressiveStart = settings.AggressiveStart;
@@ -1629,6 +1828,24 @@ int main(int argc, char** argv)
         else
             std::cerr << "forever-bots: crafting foci: " << foci->size() << " object(s) from " << settings.CraftingFociFile << "\n";
         policyOptions.Foci = std::move(foci);
+    }
+    if (settings.GatherWalk && !settings.GatherNodesFile.empty())
+    {
+        std::ifstream nodesFile(settings.GatherNodesFile);
+        std::stringstream nodesText;
+        nodesText << nodesFile.rdbuf();
+        std::vector<std::string> nodeErrors;
+        auto nodes = std::make_shared<std::vector<gather::NodePoint>>(gather::ParseNodeTable(nodesText.str(), nodeErrors));
+        for (std::string const& error : nodeErrors)
+            std::cerr << "forever-bots: GatherNodesFile: " << error << "\n";
+        if (!nodesFile || nodes->empty())
+            std::cerr << "forever-bots: GatherNodesFile: cannot read '" << settings.GatherNodesFile << "' (or it holds no node); gatherers do not walk to nodes\n";
+        else
+        {
+            std::cerr << "forever-bots: gather nodes: " << nodes->size() << " node(s) from " << settings.GatherNodesFile << "\n";
+            policyOptions.GatherWalk = true;
+            policyOptions.GatherNodes = std::move(nodes);
+        }
     }
     policyOptions.AvoidGroundEffects = settings.AvoidGroundEffects;
     if (settings.AvoidGroundEffects)
@@ -1758,7 +1975,11 @@ int main(int argc, char** argv)
     policyOptions.ClassOf = [&classes](std::uint64_t botGuid) { return classes.Get(botGuid); };
     policyOptions.SpecOf = [&run](std::uint64_t botGuid) { return run.Specs.Get(botGuid); };
     policyOptions.AutoGearing = settings.AutoGearing;
+    policyOptions.TalentRespec = settings.TalentRespec;
     policyOptions.AcceptInvites = settings.ChatCommands;
+    policyOptions.WhisperReplies = settings.ChatWhisperReplies;
+    policyOptions.WhisperCooldownMs = settings.WhisperCooldownMs;
+    policyOptions.WhisperMaxPerMin = settings.WhisperMaxPerMin;
     policyOptions.IsAlt = [alts](std::uint64_t guid) { return alts->Has(guid); };
     policyOptions.OnEvent = [](std::string const& line) { std::cerr << "forever-bots: event " << line << "\n"; };
     policyOptions.AutoGearEveryLevels = settings.AutoGearEveryLevels;
@@ -1770,6 +1991,7 @@ int main(int argc, char** argv)
     {
         auto feed = std::make_shared<PresenceFeed>();
         extras.Presence = feed;
+        run.Levels = feed;
         auto scheduler = std::make_shared<presence::Scheduler>(settings.Presence, settings.RandomSeed ^ 0x9e3779b97f4a7c15ull);
         client.AddTimer(kPresenceInterval, [&run, feed, scheduler, trades]
         {
@@ -1846,9 +2068,13 @@ int main(int argc, char** argv)
                     items[event.item_guid()] = sold;
                 }
             }
-            if (!settings.Auction.Enabled || event.quality() < auction::kUncommon)
+            if (!settings.Auction.Enabled)
                 return;
             auction::Candidate const item = CandidateOf(event);
+            // Goods (AuctionGoodsSell) are listed from white quality up; the rest from uncommon, as before.
+            bool const goods = settings.Auction.GoodsSell && item.Goods;
+            if (!goods && event.quality() < auction::kUncommon)
+                return;
             if (item.Needed || item.QuestItem || item.ItemGuid == 0)
                 return;
             auto& items = book->Items[event.player_guid()];
@@ -1938,6 +2164,11 @@ int main(int argc, char** argv)
                 std::vector<std::uint64_t>& ends = book->Ends[bot.Guid];
                 auction::PruneExpired(ends, now);
                 standing.ListedNow = static_cast<std::uint32_t>(ends.size());
+                auto& goodsEnds = book->GoodsEnds[bot.Guid];
+                goodsEnds.erase(std::remove_if(goodsEnds.begin(), goodsEnds.end(), [now](auto const& g) { return g.first <= now; }), goodsEnds.end());
+                standing.GoodsListed.clear();
+                for (auto const& [end, entry] : goodsEnds)
+                    ++standing.GoodsListed[entry];
                 auction::Bags const bags{ kBagSlotsAssumed, kBagSlotsAssumed - std::min(bot.FreeSlots, kBagSlotsAssumed) };
                 if (!auction::VisitDue(settings.Auction, bags, standing, false, now))
                 {
@@ -1971,6 +2202,31 @@ int main(int argc, char** argv)
                         if (auction::ClassifyListFailure(reply.reason()) == auction::ListFailure::Skip)
                             items.erase(listing.ItemGuid);
                     });
+                }
+                if (settings.Auction.GoodsSell)
+                {
+                    for (auction::GoodsListing const& goods : auction::PlanGoods(settings.Auction, standing, items))
+                    {
+                        if (!budget.Take())
+                            break;
+                        std::uint64_t const botGuid = bot.Guid;
+                        client.AuctionHouseForBot(botGuid, forever_module::ModuleClient::AuctionHouseOp::kListCommodity, bot.AuctioneerGuid, goods.ItemGuid, 0,
+                                                  goods.Entry, goods.Count, goods.UnitPrice, 0, [book, botGuid, goods](forever_module::ActionReply const& reply)
+                        {
+                            auto& items = book->Items[botGuid];
+                            if (reply.success())
+                            {
+                                book->GoodsEnds[botGuid].emplace_back(nowMs() + 7200000u, goods.Entry); // the core runs every auction 2 hours
+                                std::cerr << "forever-bots: " << auction::GoodsListedLine(botGuid, goods) << "\n";
+                                items.erase(goods.ItemGuid);
+                                return;
+                            }
+                            auction::Listing const refused{ goods.ItemGuid, goods.Entry, goods.UnitPrice, 0, 120, 1 };
+                            std::cerr << "forever-bots: " << auction::ListRefusedLine(botGuid, refused, reply.reason()) << "\n";
+                            if (auction::ClassifyListFailure(reply.reason()) == auction::ListFailure::Skip)
+                                items.erase(goods.ItemGuid);
+                        });
+                    }
                 }
                 buyVisit(bot, standing);
             }
@@ -2148,6 +2404,9 @@ int main(int argc, char** argv)
             route.RouteMap = static_cast<std::uint32_t>(scenario.Entry[0]);
             for (std::size_t i = 0; i < scenario.KillPriority.size(); ++i)
                 route.KillPriority.emplace(scenario.KillPriority[i], std::uint32_t(i));
+            // The dungeon's summons only where DungeonSummons lists this scenario (off by default: the route then looks as it did before).
+            if (std::find(settings.DungeonSummons.begin(), settings.DungeonSummons.end(), scenario.Name) != settings.DungeonSummons.end())
+                route.Summons = scenario.Summons;
 
             ScenarioPlan plan;
             plan.Name = scenario.Name;
@@ -2172,6 +2431,7 @@ int main(int argc, char** argv)
             plan.WipeRecovery = scenario.WipeRecovery;
             plan.WipeRecoveryMs = std::uint64_t(scenario.WipeRecoverySec) * 1000;
             plan.RequireBosses = scenario.RequireBosses;
+            plan.VerifyConfig = settings.ScenarioConfigGuard;
             plan.MinAlive = scenario.MinAlive;
             plan.LeaderDeadAbandonMs = std::uint64_t(scenario.LeaderDeadAbandonSec) * 1000;
             if (scenario.HasPortal)
@@ -2190,6 +2450,7 @@ int main(int argc, char** argv)
         policyOptions.Events = first.Events;
         policyOptions.RouteMap = first.RouteMap;
         policyOptions.KillPriority = first.KillPriority;
+        policyOptions.Summons = first.Summons;
         policyOptions.HasPortal = first.HasPortal;
         policyOptions.PortalMap = first.PortalMap;
         policyOptions.PortalPoint = first.PortalPoint;

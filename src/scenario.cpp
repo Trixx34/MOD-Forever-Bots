@@ -53,6 +53,7 @@ void ScenarioDirector::Finish(std::string outcome, std::uint64_t nowMs)
     result.Groups = _plan.Raid ? _plan.GroupSubgroups : 0;
     result.BossesTotal = std::uint32_t(_plan.Bosses.size());
     result.BossesKilled = _bossKills;
+    result.BossKillMs = _bossKillMs;
     for (auto const& [guid, dead] : _everDead)
         if (dead)
             ++result.Deaths;
@@ -63,6 +64,86 @@ void ScenarioDirector::Finish(std::string outcome, std::uint64_t nowMs)
         result.Party.emplace_back(_plan.RaceOf ? _plan.RaceOf(guid) : 0, _plan.ClassOf ? _plan.ClassOf(guid) : 0);
     _result = result;
     _phase = ScenarioPhase::Done;
+}
+
+void ScenarioDirector::CheckConfig(forever_module::WorldTickSnapshotView const& view, std::uint64_t nowMs, std::vector<BotAction>& actions)
+{
+    std::vector<BotSnapshot> const& bots = view.bots;
+    constexpr auto kGrantType = static_cast<std::uint8_t>(ActionType::kGrant);
+    constexpr auto kTeleportType = static_cast<std::uint8_t>(ActionType::kTeleport);
+
+    // The dressing's grants. A bot is baselined the first time it is seen (its results so far are not this run's), so only a later sequence is judged.
+    for (BotSnapshot const& bot : bots)
+    {
+        auto const [seen, fresh] = _grantSeqSeen.try_emplace(bot.guid, bot.last_action_sequence);
+        if (fresh || bot.last_action_type != kGrantType || seen->second == bot.last_action_sequence)
+            continue;
+        seen->second = bot.last_action_sequence;
+        if (bot.last_action_status == forever_module::BotActionStatus::kApplied)
+            _grantOk = true;
+        else if (bot.last_action_status == forever_module::BotActionStatus::kRefused)
+            _grantRefusedBy.insert(bot.guid);
+    }
+    // Two bots refused and none applied: the core is not granting (its grant key is zero or it refuses the whole class of action).
+    if (!_grantOk && _grantRefusedBy.size() >= 2)
+    {
+        Finish("config_refused", nowMs);
+        return;
+    }
+    if (_teleportOk)
+        return;
+
+    // The probe: a teleport of a living bot to its own spot. Its answer is a new sequence whose last action is the teleport.
+    if (_probeSent)
+    {
+        for (BotSnapshot const& bot : bots)
+        {
+            if (bot.guid != _probeGuid || bot.last_action_sequence == _probeBaseline || bot.last_action_type != kTeleportType)
+                continue;
+            if (bot.last_action_status == forever_module::BotActionStatus::kApplied)
+            {
+                _teleportOk = true;
+                _probeRefusals = 0;
+                return;
+            }
+            if (bot.last_action_status == forever_module::BotActionStatus::kRefused)
+            {
+                if (++_probeRefusals >= kConfigProbeRefusalsMax)
+                {
+                    Finish("config_refused", nowMs);
+                    return;
+                }
+            }
+            _probeSent = false; // answered without applying: sent again below
+        }
+    }
+    if (_probeSent && nowMs - _probeSentMs < kConfigProbeRetryMs)
+        return;
+    if (_probeFirstMs != 0 && nowMs - _probeFirstMs >= kConfigProbeTimeoutMs)
+    {
+        Finish("config_unknown", nowMs);
+        return;
+    }
+    for (BotSnapshot const& bot : bots)
+    {
+        if (bot.life_state != 0)
+            continue;
+        BotAction probe;
+        probe.bot_guid = bot.guid;
+        probe.type = ActionType::kTeleport;
+        probe.spell_id = bot.map_id;
+        probe.dest_x = bot.pos_x;
+        probe.dest_y = bot.pos_y;
+        probe.dest_z = bot.pos_z;
+        actions.push_back(probe);
+        _probeSent = true;
+        _probeGuid = bot.guid;
+        _probeBaseline = bot.last_action_sequence;
+        _probeSentMs = nowMs;
+        if (_probeFirstMs == 0)
+            _probeFirstMs = nowMs;
+        return;
+    }
 }
 
 std::vector<std::string> ScenarioDirector::TakeNewBossKills()
@@ -229,6 +310,12 @@ void ScenarioDirector::Decide(forever_module::WorldTickSnapshotView const& view,
 
         case ScenarioPhase::Dressing:
         {
+            if (_plan.VerifyConfig)
+            {
+                CheckConfig(view, nowMs, actions);
+                if (_phase == ScenarioPhase::Done)
+                    break;
+            }
             // One grant per bot per tick, in the order of its class's list.
             bool pending = false;
             for (BotSnapshot const& bot : bots)
@@ -332,9 +419,10 @@ void ScenarioDirector::Decide(forever_module::WorldTickSnapshotView const& view,
                 _equipSent = true;
                 _phaseSinceMs = nowMs;
             }
-            else if (_equipSent && nowMs - _phaseSinceMs >= kEquipPauseMs)
+            else if (_equipSent && nowMs - _phaseSinceMs >= kEquipPauseMs && (!_plan.VerifyConfig || _teleportOk))
             {
-                // Hunters without a pet are sent to tame one first (when the plan has a place for it).
+                // Hunters without a pet are sent to tame one first (when the plan has a place for it). With the config guard on, the dressing ends only once a
+                // teleport has been applied (CheckConfig), so the party cannot reach the entry with a teleport the core refuses.
                 bool tamers = false;
                 if (_plan.TameEnabled)
                     for (BotSnapshot const& bot : bots)
@@ -562,7 +650,10 @@ void ScenarioDirector::Decide(forever_module::WorldTickSnapshotView const& view,
                             {
                                 _bossKilledEntries.insert(entry);
                                 if (std::find(_bossKills.begin(), _bossKills.end(), name) == _bossKills.end())
+                                {
                                     _bossKills.push_back(name);
+                                    _bossKillMs.emplace_back(name, _runStartMs != 0 && nowMs >= _runStartMs ? nowMs - _runStartMs : 0);
+                                }
                             }
                     }
             }
@@ -669,6 +760,13 @@ std::string FormatScenarioResult(ScenarioResult const& result)
             out << (i ? "," : "") << result.BossesKilled[i];
         if (result.BossesKilled.empty())
             out << "none";
+        // The time into the run each boss was seen dead (ms), in the order of the killed= list: how long a clear took, boss by boss.
+        if (!result.BossKillMs.empty())
+        {
+            out << " boss_ms=";
+            for (std::size_t i = 0; i < result.BossKillMs.size(); ++i)
+                out << (i ? "," : "") << result.BossKillMs[i].first << ":" << result.BossKillMs[i].second;
+        }
     }
     if (!result.Party.empty())
     {

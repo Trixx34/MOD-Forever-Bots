@@ -1,0 +1,2 @@
+# spell|minLevel|skill|copper|name
+# Riding ranks for RidingTraining (src/riding_training.h). Empty until the stable masters' spells and costs are checked against the world DB.

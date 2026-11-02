@@ -256,6 +256,13 @@ std::unordered_map<std::string, std::string> MergeOne(std::unordered_map<std::st
             order += (order.empty() ? "" : ",") + std::to_string(entry);
         set("ScenarioKillPriority", order);
     }
+    if (!d.Summons.empty())
+    {
+        std::string entries;
+        for (std::uint32_t entry : d.Summons)
+            entries += (entries.empty() ? "" : ",") + std::to_string(entry);
+        set("ScenarioSummons", entries);
+    }
 
     std::string bosses;
     for (DungeonWaypoint const& point : d.Route)

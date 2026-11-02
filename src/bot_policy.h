@@ -30,6 +30,7 @@
 
 #include "forever_module/tier2_session.h"
 #include "chat_commands.h"
+#include "chat_reply.h"
 #include "combat_rotation.h"
 #include "grind_data.h"
 #include "level_dungeon.h"
@@ -38,6 +39,7 @@
 #include "spell_costs.h"
 #include "tame_beasts.h"
 #include "crafting_foci.h"
+#include "gather_nodes.h"
 #include "bot_random.h"
 #include "chat_say.h"
 #include "dungeon_events.h"
@@ -119,6 +121,9 @@ struct PolicyOptions
     // the gathering profession it has (Mining, Herbalism, Skinning).
     bool Gathering = false;
     std::shared_ptr<std::vector<crafting::FocusPoint> const> Foci;
+    // GatherWalk (off by default; with Gathering): a gatherer with no node in reach walks to the nearest node of its skill in GatherNodes (data/gather_nodes.txt).
+    bool GatherWalk = false;
+    std::shared_ptr<std::vector<gather::NodePoint> const> GatherNodes;
     std::uint32_t RandomPct = 0;
     std::uint32_t PartyPercent = 100;
     // Hubs (M7): the places an idle bot walks to when it has seen nothing for a while, per map, in order. The bot's map
@@ -171,8 +176,14 @@ struct PolicyOptions
     // tests); the module turns it on by its config default.
     bool LevelDungeons = false;
     std::uint32_t LevelDungeonRuns = 2;
+    // LFG fill (config LfgFill, lfg_fill.h): a human's party short of a tank or a healer gets a free bot sent next to it, which whispers its offer to the leader.
+    // Off by default. Needs PartySize and a level for the party.
+    bool LfgFill = false;
     // Creature entry -> rank (0 first): the dungeon's kill priority. The damage dealers of a dungeon party fight the best-ranked live hostile next to the tank's target.
     std::map<std::uint32_t, std::uint32_t> KillPriority;
+    // The dungeon's summons (ScenarioSummons, on where DungeonSummons lists the dungeon): creature entries a summoner makes, which the party fights first, as an
+    // engineer's golem is (see ScenarioRoute::Summons). Empty: none.
+    std::vector<std::uint32_t> Summons;
     // Dungeon tactics (the DungeonTactics setting), each on its own so a run can show what it is worth. Focus: the damage dealers take the pack's priority caster first
     // (KillPriority). Interrupt: a bot with an interrupt in its rotation turns on a casting hostile of the tank's pack, one bot at a time. Heal: a healer heals a member
     // below 75 % (not 60). Rest: the party holds a pull until every member has 90 % health and 80 % mana (not 80 and 60).
@@ -194,6 +205,8 @@ struct PolicyOptions
     std::uint32_t HealerLosMoveYards = 6;
     // Auto gear (AutoGearing setting): every bot is dressed for its level when it first appears, and again after AutoGearEveryLevels levels.
     bool AutoGearing = false;
+    // Talent respec (TalentRespec setting, see talent_respec.h): a role or spec change after points were spent takes them back (kRespecTalents).
+    bool TalentRespec = false;
     // Receives one line per notable decision (a heal cast, a pull held back or released), for the run logs. Unset = silent.
     std::function<void(std::string const&)> OnEvent;
     std::uint32_t AutoGearEveryLevels = 5;
@@ -217,6 +230,11 @@ struct PolicyOptions
     std::shared_ptr<spell_cost::SpellCostData const> SpellCosts;
     // Chat commands: a bot accepts a party invite from a player (a human leader), so the player can bring bots into a group and command them.
     bool AcceptInvites = false;
+    // Whisper replies (chat_reply.h, config ChatWhisperReplies): a bot answers a whisper that is not a command, and a busy bot refuses an invite
+    // with a line saying so. Off here. A player gets at most WhisperMaxPerMin replies a minute, and one per bot every WhisperCooldownMs.
+    bool WhisperReplies = false;
+    std::uint64_t WhisperCooldownMs = 60000;
+    std::uint32_t WhisperMaxPerMin = 6;
     // Alts (a player's own characters playing as bots): never dressed by the module.
     std::function<bool(std::uint64_t botGuid)> IsAlt;
     // Dead-bot recovery. Portal: the instance door on the outside map (PortalMap) that leads to PortalInsideMap; a ghost released outside walks
@@ -234,6 +252,9 @@ struct PolicyOptions
         std::map<std::size_t, std::uint32_t> RouteBossAt;
         std::vector<dungeon_events::Event> Events;
         std::map<std::uint32_t, std::uint32_t> KillPriority;
+        // The dungeon's summons (ScenarioSummons): a live one in view is the party's first target (with focus on or off) and turns the engagement block on, from past the
+        // engagement cap; empty unless DungeonSummons lists the scenario.
+        std::vector<std::uint32_t> Summons;
         bool HasPortal = false;
         std::uint32_t PortalMap = 0;
         Point PortalPoint;
@@ -259,7 +280,8 @@ char const* ActionStatusName(forever_module::BotActionStatus status);
 class BotPolicy
 {
 public:
-    explicit BotPolicy(PolicyOptions options = {}) : _options(options), _quests(options.Quests), _scenarioRoute(ScenarioRouteOf(options)) {}
+    explicit BotPolicy(PolicyOptions options = {}) : _options(options), _quests(options.Quests), _scenarioRoute(ScenarioRouteOf(options)),
+                                                     _whispers(options.WhisperCooldownMs, options.WhisperMaxPerMin) {}
 
     // Actions for the bots in `view`. nowMs is a monotonic clock in milliseconds (cooldowns, retries, fight time).
     // Decisions are sent only when they change; casts follow the rotation, the global cooldown and the retries.
@@ -320,6 +342,9 @@ public:
 
     std::vector<forever_module::BotAction> Decide(forever_module::WorldTickSnapshotView const& view, std::uint64_t nowMs = 0);
 
+    // LFG fill offers made by the last Decide (ChatAck::Player is the leader's player counter): the bot whispers the line to the leader. Taken once.
+    std::vector<ChatAck> TakeWhispers();
+
     // Talent orders: a bot that is due to spend talent points by its role's profile (core setting Bot.Talents.Profiles). `Role` is what the
     // core's SpendBotTalentsAction takes: 1 tank, 2 healer, 3 dps. Decide queues them (once per level and per role change, out of combat,
     // never for an alt); the caller takes them and sends the actions. If the core refuses (in combat), TalentOrderFailed asks again later.
@@ -330,6 +355,23 @@ public:
         std::uint32_t Spec = 0;   // forever_module::TalentSpec of the bot's spec (protocol 18), 0 = none: the core falls back to the role's profile
     };
     std::vector<TalentOrder> TakeTalentOrders();
+    // Respec orders (TalentRespec): a bot whose role or spec changed after it spent points. The caller sends them as kRespecTalents actions.
+    std::vector<TalentOrder> TakeRespecOrders();
+
+    // A whisper to a bot that is not a chat command (main.cpp sends the other kind to ApplyChat) and not from a trade partner. Answers it when the
+    // bot is free to talk (chat_reply.h): a line, or nothing. Our own bots never get a reply. Pump thread.
+    struct WhisperReply
+    {
+        std::uint64_t Bot = 0;
+        std::uint64_t Player = 0;
+        std::string Text;
+    };
+    std::vector<WhisperReply> ApplyWhisper(forever_module::WorldTickSnapshotView const& view, std::uint64_t player, std::uint64_t bot,
+                                           std::string const& text, std::uint64_t nowMs);
+    // The refusals Decide queued (an invite to a busy bot). Pump thread.
+    std::vector<WhisperReply> TakeWhisperReplies();
+    // The bots that are busy now: a trade request to one of them is refused (main.cpp). Empty unless WhisperReplies.
+    std::vector<std::uint64_t> BusyBots(forever_module::WorldTickSnapshotView const& view) const;
     void TalentOrderFailed(std::uint64_t bot, std::uint64_t nowMs);
 
 private:
@@ -442,6 +484,10 @@ private:
         std::uint32_t CraftSent = 0;                     // the line of the last kSkillUp sent: its answer is for that line, whatever spell the core reports
         std::uint64_t GatherRetryAtMs[3] = { 0, 0, 0 };  // Mining, Herbalism, Skinning: no kGather for the skill before this time
         std::uint32_t GatherSent = 0;                    // the line of the last kGather sent
+        bool GatherWalking = false;                      // walking to a gathering node (GatherWalk) after the core answered that nothing is in reach
+        std::uint32_t GatherWalkLine = 0;                // the kGather line the walk is for (an index into kGatherLines)
+        std::uint32_t GatherWalkIndex = 0;               // the node, an index into GatherNodes
+        std::uint64_t GatherWalkStartMs = 0;
         bool CraftWalking = false;                       // walking to an anvil, forge or fire because a recipe needs one (kNeedsFocus)
         std::uint32_t CraftWalkLine = 0;                 // the craft line whose recipes need it
         std::uint32_t CraftWalkIndex = 0;                // the object, an index into Foci
@@ -555,6 +601,7 @@ private:
         std::uint32_t TalentLevel = 0;                   // the level and role (1 to 3) of the last talent order sent for this bot (0 = none yet)
         std::uint32_t TalentRole = 0;
         std::uint32_t TalentSpec = 0;     // the spec the last talent order carried (a changed spec orders again)
+        std::uint64_t RespecNotBeforeMs = 0; // no respec for this bot before this time (TalentRespec: one an hour)
         std::uint64_t TalentRetryMs = 0;                 // no talent order before this time (after a refusal)
         std::uint32_t GearedAtLevel = 0;                 // the level at the last auto gear (0 = not yet)
         bool GearRequested = false;                      // the .autogear command asked for it
@@ -629,6 +676,12 @@ private:
 
     std::unordered_map<std::uint64_t, BotState> _bots; // bot guid -> state
     std::vector<TalentOrder> _talentOrders;            // queued by Decide, taken by TakeTalentOrders
+    std::vector<TalentOrder> _respecOrders;            // queued by Decide (TalentRespec), taken by TakeRespecOrders
+    std::vector<WhisperReply> _whisperReplies;         // queued by Decide (busy refusals), taken by TakeWhisperReplies
+    WhisperLimiter _whispers;                          // replies to players (ApplyWhisper and the refusals)
+    // Why the bot cannot take an invite or a trade now (chat_reply.h); None when it is free. Uses the snapshot and the module state for the bot.
+    BusyKind BusyOf(forever_module::BotSnapshot const& bot) const;
+    BotActivity ActivityOf(forever_module::BotSnapshot const& bot) const;
     // Corpses a bot has sent a loot for -> the looter's group (its leader's reference, else its own guid) and when the claim ends. The
     // core loots a whole corpse for a group at once, so a second member's loot is refused ("no right to loot": already looted).
     struct LootClaim
@@ -680,6 +733,10 @@ private:
     void DriveLevelDungeons(forever_module::WorldTickSnapshotView const& view, std::unordered_map<std::uint64_t, std::size_t> const& indexOf,
                             std::unordered_map<std::uint64_t, std::vector<std::uint64_t>> const& membersOf, std::uint64_t nowMs,
                             std::vector<forever_module::BotAction>& actions);
+    // LFG fill (config LfgFill): a human's party short of a tank or a healer is offered free bots (lfg_fill.h). Each offer sends the bot next to the party and
+    // queues its whisper (TakeWhispers).
+    void DriveLfgFill(forever_module::WorldTickSnapshotView const& view, std::unordered_map<std::uint64_t, std::size_t> const& indexOf, std::uint64_t nowMs,
+                      std::vector<forever_module::BotAction>& actions);
     struct LevelDungeonRun
     {
         enum class Phase : std::uint8_t { Entering, Running } Phase_ = Phase::Entering;
@@ -704,6 +761,9 @@ private:
         bool Entered = false;               // the group was sent to the entry
     };
     std::map<std::uint64_t, LfgOrder> _lfgOrders;               // speaker's player reference -> order
+    std::map<std::uint64_t, std::uint64_t> _lfgFillPartyMs;     // human party (leader's player reference) -> when it was last offered a bot (lfg_fill.h)
+    std::map<std::uint64_t, std::uint64_t> _lfgFillBotMs;       // bot guid -> when it was last offered to a party
+    std::vector<ChatAck> _lfgFillWhispers;                      // LFG fill offers for TakeWhispers
     std::vector<std::string> ApplyLfg(forever_module::WorldTickSnapshotView const& view, ChatContext const& chat, ChatCommand const& command, std::uint64_t nowMs);
     std::set<std::uint32_t> _killedBosses;
 };

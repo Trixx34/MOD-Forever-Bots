@@ -218,13 +218,19 @@ std::uint64_t TradeBook::PartnerOf(std::uint64_t bot) const
     return it == _sessions.end() ? 0 : it->second.Partner;
 }
 
-std::vector<Step> TradeBook::OnEvent(std::uint64_t bot, std::uint64_t partner, Status status, std::uint64_t nowMs)
+std::vector<Step> TradeBook::OnEvent(std::uint64_t bot, std::uint64_t partner, Status status, std::uint64_t nowMs, std::string const& busyLine)
 {
     std::vector<Step> steps;
     switch (status)
     {
         case Status::Requested:
         {
+            if (!busyLine.empty())
+            {
+                steps.push_back(Whisper(bot, partner, busyLine));
+                steps.push_back(Plain(Step::Kind::Cancel, bot));
+                break;
+            }
             Session session;
             session.Partner = partner;
             session.LastMs = nowMs;

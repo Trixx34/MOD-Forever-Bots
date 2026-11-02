@@ -303,6 +303,79 @@ void TheBuyJournalLinesAreKeyValue()
 
 } // namespace
 
+void GoodsAreOffTillSwitchedOnAndPricedPerUnit()
+{
+    auction::Settings settings;
+    settings.Enabled = true;
+    auction::Standing standing;
+    auction::Candidate herb;
+    herb.ItemGuid = 7;
+    herb.Entry = 2453;
+    herb.Count = 40;
+    herb.Quality = auction::kCommon;
+    herb.VendorSellCopper = 400; // 10 copper a unit at the vendor
+    herb.Stackable = true;
+    herb.Goods = true;
+    CHECK(auction::PlanGoods(settings, standing, { herb }).empty()); // GoodsSell off
+    settings.GoodsSell = true;
+    auto const plan = auction::PlanGoods(settings, standing, { herb });
+    CHECK(plan.size() == 1);
+    if (plan.size() == 1)
+    {
+        CHECK(plan[0].Count == 20);            // GoodsStackMax
+        CHECK(plan[0].UnitPrice == 15);        // 150% of 10 copper
+        CHECK(plan[0].Entry == 2453 && plan[0].ItemGuid == 7);
+    }
+}
+
+void GoodsSkipNeededGreyAndSingleItems()
+{
+    auction::Settings settings;
+    settings.Enabled = true;
+    settings.GoodsSell = true;
+    auction::Standing standing;
+    auction::Candidate base;
+    base.ItemGuid = 1;
+    base.Entry = 100;
+    base.Count = 10;
+    base.VendorSellCopper = 500;
+    base.Stackable = true;
+    base.Goods = true;
+    auction::Candidate needed = base;
+    needed.Needed = true;
+    auction::Candidate grey = base;
+    grey.Quality = auction::kPoor;
+    auction::Candidate single = base;
+    single.Count = 1;
+    auction::Candidate notGoods = base;
+    notGoods.Goods = false;
+    CHECK(auction::PlanGoods(settings, standing, { needed, grey, single, notGoods }).empty());
+}
+
+void GoodsRespectTheEntryCapAndTheVisitLimit()
+{
+    auction::Settings settings;
+    settings.Enabled = true;
+    settings.GoodsSell = true;
+    settings.GoodsPerEntryMax = 1;
+    auction::Standing standing;
+    standing.GoodsListed[500] = 1;
+    auction::Candidate capped;
+    capped.ItemGuid = 1;
+    capped.Entry = 500;
+    capped.Count = 5;
+    capped.VendorSellCopper = 500;
+    capped.Stackable = true;
+    capped.Goods = true;
+    auction::Candidate other = capped;
+    other.ItemGuid = 2;
+    other.Entry = 501;
+    CHECK(auction::PlanGoods(settings, standing, { capped, other }).size() == 1);
+    CHECK(auction::PlanGoods(settings, standing, { capped, other })[0].Entry == 501);
+    standing.ListedNow = settings.ListedMax; // no room on the house
+    CHECK(auction::PlanGoods(settings, standing, { other }).empty());
+}
+
 int main()
 {
     TheListingsThatRanOutAreDropped();
@@ -321,6 +394,9 @@ int main()
     TheBrowseSlotsTurnAndWrap();
     TheCoresUpgradeScoreDecidesWhatIsBought();
     TheBuyJournalLinesAreKeyValue();
+    GoodsAreOffTillSwitchedOnAndPricedPerUnit();
+    GoodsSkipNeededGreyAndSingleItems();
+    GoodsRespectTheEntryCapAndTheVisitLimit();
     if (failures == 0)
         std::printf("auction_test: all passed\n");
     return failures == 0 ? 0 : 1;

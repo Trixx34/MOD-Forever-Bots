@@ -3,7 +3,11 @@
 
 #include "forever_module/talent_spec.h"
 
+#include "chat_reply.h"
 #include "combat_rotation.h"
+#include "route_triage.h"
+#include "lfg_fill.h"
+#include "talent_respec.h"
 
 #include <algorithm>
 #include <cmath>
@@ -111,6 +115,9 @@ constexpr std::uint64_t kGatherRefusedMs = 300000;    // any other refusal (no s
 constexpr std::uint64_t kCraftWalkTimeoutMs = 150000; // a walk to an anvil, forge or fire that has not arrived by now is over
 constexpr std::uint64_t kCraftWalkFailMs = 1800000;   // after a walk that failed, or when no object of the focus is on the map or near enough: half an hour
 constexpr float kCraftWalkMaxYards = 900.0f;          // farther than this a bot does not walk for a recipe's focus
+constexpr std::uint64_t kGatherWalkTimeoutMs = 150000; // a walk to a gathering node that has not arrived by now is over
+constexpr float kGatherWalkMaxYards = 900.0f;        // farther than this a bot does not walk for a node
+constexpr float kGatherReachYards = 25.0f;           // the core gathers within 30 yards: a bot within 25 of the node has arrived
 
 // Whether the bot has the profession of a craft or gather line: First Aid and Cooking every bot may learn, the others are its two primary professions.
 bool HasLine(BotSnapshot const& bot, std::uint32_t line)
@@ -933,6 +940,73 @@ bool BotPolicy::SafeToLogOut(BotSnapshot const& bot) const
     return !state.ChatStay && state.ChatFollow == 0 && !state.Traveling && !state.SupplyTrip && state.SupplyCheckAtMs == 0 && !state.ServiceUrgent;
 }
 
+BusyKind BotPolicy::BusyOf(BotSnapshot const& bot) const
+{
+    auto const found = _bots.find(bot.guid);
+    bool const travelling = found != _bots.end() && (found->second.Traveling || found->second.SupplyTrip);
+    bool const inDungeon = _options.DungeonsByMap.count(bot.map_id) != 0;
+    return BusyReason(bot.in_combat != 0, bot.life_state != 0, inDungeon, travelling);
+}
+
+BotActivity BotPolicy::ActivityOf(BotSnapshot const& bot) const
+{
+    if (bot.in_combat != 0)
+        return BotActivity::Fighting;
+    if (_options.DungeonsByMap.count(bot.map_id) != 0)
+        return BotActivity::Dungeon;
+    auto const found = _bots.find(bot.guid);
+    if (found == _bots.end())
+        return BotActivity::Grinding;
+    BotState const& state = found->second;
+    if (state.ChatFollow != 0)
+        return BotActivity::Following;
+    if (state.ChatStay)
+        return BotActivity::Holding;
+    if (state.Traveling || state.SupplyTrip)
+        return BotActivity::Travelling;
+    return BotActivity::Grinding;
+}
+
+std::vector<BotPolicy::WhisperReply> BotPolicy::ApplyWhisper(WorldTickSnapshotView const& view, std::uint64_t player, std::uint64_t bot,
+                                                             std::string const& text, std::uint64_t nowMs)
+{
+    if (!_options.WhisperReplies || _bots.count(player) != 0) // our own bots never get an answer (nor is a bot's whisper to a bot answered)
+        return {};
+    BotSnapshot const* snapshot = nullptr;
+    for (BotSnapshot const& b : view.bots)
+        if (b.guid == bot)
+        {
+            snapshot = &b;
+            break;
+        }
+    if (snapshot == nullptr)
+        return {};
+    WhisperIntent const intent = ClassifyWhisper(text);
+    if (intent == WhisperIntent::Other || !_whispers.Allow(player, bot, nowMs))
+        return {};
+    BusyKind const busy = BusyOf(*snapshot);
+    std::string line = intent == WhisperIntent::NeedGroup && busy != BusyKind::None ? BusyLine(bot, busy) : ReplyLine(intent, bot, ActivityOf(*snapshot));
+    return { WhisperReply{ bot, player, ClampReply(std::move(line)) } };
+}
+
+std::vector<BotPolicy::WhisperReply> BotPolicy::TakeWhisperReplies()
+{
+    std::vector<WhisperReply> out;
+    out.swap(_whisperReplies);
+    return out;
+}
+
+std::vector<std::uint64_t> BotPolicy::BusyBots(WorldTickSnapshotView const& view) const
+{
+    std::vector<std::uint64_t> busy;
+    if (!_options.WhisperReplies)
+        return busy;
+    for (BotSnapshot const& bot : view.bots)
+        if (BusyOf(bot) != BusyKind::None)
+            busy.push_back(bot.guid);
+    return busy;
+}
+
 char const* ActionStatusName(BotActionStatus status)
 {
     switch (status)
@@ -1139,6 +1213,10 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
             what += " wanted=" + std::to_string(int(state.LastMove->Type)) + " target=" + std::to_string(state.LastMove->Target) + " target_entry=" +
                     std::to_string(state.LastMove->Target ? forever_module::UnitRefEntry(state.LastMove->Target) : 0) + " dest=" + std::to_string(int(state.LastMove->Dest.X)) + "," +
                     std::to_string(int(state.LastMove->Dest.Y)) + "," + std::to_string(int(state.LastMove->Dest.Z));
+        // Triage (route_triage.h): what the bot was doing, so the refusals can be split by cause (cause=arrived|combat|to_unit|to_point|no_move).
+        float const toDest = state.LastMove ? std::hypot(bot.pos_x - state.LastMove->Dest.X, bot.pos_y - state.LastMove->Dest.Y) : 0.0f;
+        what += std::string(" cause=") + route_triage::Name(route_triage::Classify(bot.in_combat != 0, state.LastMove.has_value(),
+                                                                                  state.LastMove && state.LastMove->Target != 0, toDest));
         if (state.Last)
             what += " last_sent=" + std::to_string(int(state.Last->Type));
         _options.OnEvent("no_route: bot=" + std::to_string(bot.guid) + " " + what + " pos=" + std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) + "," +
@@ -1354,6 +1432,7 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
         {
             state.GatherRetryAtMs[index] = nowMs + kSkillUpNextMs;
             state.GatherFails[index] = 0;
+            state.GatherWalking = false;
         }
         else if (bot.last_action_status == BotActionStatus::kBusy || bot.last_action_status == BotActionStatus::kMoving)
             state.GatherRetryAtMs[index] = nowMs + kSkillUpBusyMs;
@@ -1361,6 +1440,23 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
         {
             // "nothing to gather within 30 yards" is the normal answer where the bot stands, and the module does not look for nodes: the pause doubles with every
             // answer in a row (90 s up to 48 minutes), and starts again after a gather that worked.
+            // GatherWalk: nothing in reach, and the table has a node of this skill on the bot's map that is not too far: the bot walks to it (the idle logic does the walk).
+            if (bot.last_action_status == BotActionStatus::kRefused && _options.GatherWalk && _options.GatherNodes)
+            {
+                std::optional<std::size_t> const node = gather::NearestNode(*_options.GatherNodes, kGatherLines[index], bot.map_id, bot.pos_x, bot.pos_y);
+                if (node && std::hypot(bot.pos_x - (*_options.GatherNodes)[*node].X, bot.pos_y - (*_options.GatherNodes)[*node].Y) <= kGatherWalkMaxYards)
+                {
+                    state.GatherWalking = true;
+                    state.GatherWalkLine = std::uint32_t(index);
+                    state.GatherWalkIndex = std::uint32_t(*node);
+                    state.GatherWalkStartMs = nowMs;
+                    state.GatherRetryAtMs[index] = nowMs + kGatherWalkTimeoutMs; // held while the walk runs; its end sets the time
+                    if (_options.OnEvent)
+                        _options.OnEvent("gather_walk: bot=" + std::to_string(bot.guid) + " skill=" + std::to_string(kGatherLines[index]) + " node=" +
+                                         std::to_string((*_options.GatherNodes)[*node].Entry));
+                    return;
+                }
+            }
             std::uint64_t base = bot.last_action_status == BotActionStatus::kRefused ? kGatherNothingMs : kGatherRefusedMs;
             if (bot.last_action_status == BotActionStatus::kRefused)
             {
@@ -2183,6 +2279,141 @@ void BotPolicy::DriveLevelDungeons(WorldTickSnapshotView const& view, std::unord
     }
 }
 
+std::vector<ChatAck> BotPolicy::TakeWhispers()
+{
+    std::vector<ChatAck> out;
+    out.swap(_lfgFillWhispers);
+    return out;
+}
+
+void BotPolicy::DriveLfgFill(WorldTickSnapshotView const& view, std::unordered_map<std::uint64_t, std::size_t> const& indexOf, std::uint64_t nowMs,
+                             std::vector<BotAction>& actions)
+{
+    auto const event = [&](std::string const& text)
+    {
+        if (_options.OnEvent)
+            _options.OnEvent(text);
+    };
+    auto const isOurBot = [&indexOf](std::uint64_t ref) { return ref != 0 && indexOf.count(ref & forever_module::kUnitRefCounterMask) != 0; };
+    // A bot's role: the one a chat order gave it, else its class (an unknown class counts as a damage dealer).
+    auto const roleOf = [this](std::uint64_t guid) -> level_dungeon::Role
+    {
+        if (auto const state = _bots.find(guid); state != _bots.end())
+        {
+            switch (state->second.Role_)
+            {
+                case BotState::Role::Tank: return level_dungeon::Role::Tank;
+                case BotState::Role::Healer: return level_dungeon::Role::Healer;
+                case BotState::Role::Dps: return level_dungeon::Role::Dps;
+                default: break;
+            }
+        }
+        std::uint32_t const classId = ClassFor(_options, guid);
+        return classId == 0 ? level_dungeon::Role::Dps : level_dungeon::RoleOfClass(classId);
+    };
+    auto const sideOf = [this](std::uint64_t guid) -> std::uint8_t
+    {
+        if (_options.PartySideOf)
+            return _options.PartySideOf(guid);
+        return _options.SideOf ? _options.SideOf(guid) : std::uint8_t(0);
+    };
+    // A bot a levelling order or an LFG order has, or a bot with a chat order or a dungeon run, is not free.
+    auto const busy = [this, nowMs](std::uint64_t guid) -> bool
+    {
+        auto const state = _bots.find(guid);
+        if (state == _bots.end())
+            return false;
+        BotState const& s = state->second;
+        return s.Traveling || s.SupplyTrip || s.ChatStay || s.ChatFollow != 0 || s.LevelRun || s.TankLead || s.LevelHoldUntilMs > nowMs;
+    };
+    std::set<std::uint64_t> summoned; // bots an LFG order of a speaker has asked for
+    for (auto const& order : _lfgOrders)
+        summoned.insert(order.second.Asked.begin(), order.second.Asked.end());
+
+    // The human parties: their members, by the leader's player reference (a leader that is not one of this module's bots).
+    std::map<std::uint64_t, std::vector<BotSnapshot const*>> parties;
+    for (BotSnapshot const& bot : view.bots)
+        if (bot.group_role != 0 && bot.group_leader_guid != 0 && !isOurBot(bot.group_leader_guid))
+            parties[bot.group_leader_guid].push_back(&bot);
+
+    for (auto const& [leaderRef, members] : parties)
+    {
+        // A speaker's LFG order fills its own group. A party with a member in a fight, dead, or in a dungeon is left alone.
+        if (_lfgOrders.count(leaderRef) != 0 || members.empty())
+            continue;
+        bool calm = true;
+        std::uint32_t partyLevel = 0, tanks = 0, healers = 0;
+        for (BotSnapshot const* member : members)
+        {
+            if (member->life_state != 0 || member->in_combat != 0 || _options.DungeonsByMap.count(member->map_id) != 0)
+            {
+                calm = false;
+                break;
+            }
+            partyLevel = std::max(partyLevel, member->level);
+            switch (roleOf(member->guid))
+            {
+                case level_dungeon::Role::Tank: ++tanks; break;
+                case level_dungeon::Role::Healer: ++healers; break;
+                default: break;
+            }
+        }
+        auto const lastParty = _lfgFillPartyMs.find(leaderRef);
+        if (!calm || !lfg_fill::PartyDue(lastParty == _lfgFillPartyMs.end() ? 0 : lastParty->second, nowMs))
+            continue;
+
+        // The free bots: alone, out of combat and in the world, of the party's side, in its level band, not offered to a party lately.
+        std::vector<lfg_fill::Candidate> candidates;
+        for (BotSnapshot const& bot : view.bots)
+        {
+            if (bot.group_role != 0 || bot.group_invite_from != 0 || bot.life_state != 0 || bot.in_combat != 0 || bot.in_flight != 0 || bot.level == 0)
+                continue;
+            if ((_options.IsAlt && _options.IsAlt(bot.guid)) || _options.DungeonsByMap.count(bot.map_id) != 0 || busy(bot.guid) || summoned.count(bot.guid) != 0)
+                continue;
+            if (sideOf(bot.guid) != sideOf(members.front()->guid))
+                continue;
+            auto const lastBot = _lfgFillBotMs.find(bot.guid);
+            if (!lfg_fill::BotDue(lastBot == _lfgFillBotMs.end() ? 0 : lastBot->second, nowMs))
+                continue;
+            candidates.push_back(lfg_fill::Candidate{ bot.guid, bot.level, roleOf(bot.guid) });
+        }
+
+        std::vector<lfg_fill::Offer> const offers = lfg_fill::PickOffers(std::uint32_t(members.size() + 1), tanks, healers, partyLevel, candidates);
+        if (offers.empty())
+            continue;
+        // The bots go next to the party's first member (the leader is a human and its place is not in the snapshot).
+        BotSnapshot const& anchor = *members.front();
+        std::uint64_t const playerCounter = leaderRef & forever_module::kUnitRefCounterMask;
+        std::string roles;
+        for (lfg_fill::Offer const& offer : offers)
+        {
+            BotSnapshot const& bot = view.bots[indexOf.at(offer.Bot)];
+            BotAction action;
+            action.bot_guid = bot.guid;
+            action.type = ActionType::kTeleport;
+            action.spell_id = anchor.map_id;
+            action.dest_x = anchor.pos_x;
+            action.dest_y = anchor.pos_y;
+            action.dest_z = anchor.pos_z;
+            actions.push_back(action);
+            BotState& state = StateOf(bot.guid);
+            state.Last.reset();
+            state.GotoActive = false;
+            state.LevelHoldUntilMs = nowMs + kLevelHoldMs;
+            _lfgFillBotMs[bot.guid] = nowMs;
+            ChatAck whisper;
+            whisper.Bot = bot.guid;
+            whisper.Text = lfg_fill::OfferText(offer.RoleOf);
+            whisper.Player = playerCounter;
+            _lfgFillWhispers.push_back(whisper);
+            roles += (roles.empty() ? "" : ",") + std::string(level_dungeon::RoleName(offer.RoleOf));
+        }
+        _lfgFillPartyMs[leaderRef] = nowMs;
+        event("lfg_fill: party=" + std::to_string(playerCounter) + " members=" + std::to_string(members.size() + 1) + " offers=" + std::to_string(offers.size()) +
+              " roles=" + roles);
+    }
+}
+
 std::vector<std::string> BotPolicy::ApplyLfg(WorldTickSnapshotView const& view, ChatContext const& chat, ChatCommand const& command, std::uint64_t nowMs)
 {
     KnownDungeons const known = KnownDungeonsOf(_options);
@@ -2287,6 +2518,13 @@ std::vector<BotPolicy::TalentOrder> BotPolicy::TakeTalentOrders()
     return orders;
 }
 
+std::vector<BotPolicy::TalentOrder> BotPolicy::TakeRespecOrders()
+{
+    std::vector<TalentOrder> orders;
+    orders.swap(_respecOrders);
+    return orders;
+}
+
 // The core refused the order (the bot was in combat): forget that it was sent and look again in a few seconds.
 void BotPolicy::TalentOrderFailed(std::uint64_t bot, std::uint64_t nowMs)
 {
@@ -2305,6 +2543,7 @@ PolicyOptions::ScenarioRoute BotPolicy::ScenarioRouteOf(PolicyOptions const& opt
     route.RouteBossAt = options.RouteBossAt;
     route.Events = options.Events;
     route.KillPriority = options.KillPriority;
+    route.Summons = options.Summons;
     route.HasPortal = options.HasPortal;
     route.PortalMap = options.PortalMap;
     route.PortalPoint = options.PortalPoint;
@@ -2436,6 +2675,10 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
     // Level dungeons and LFG: sends parties into their dungeon and back, and starts the tank lead once they are in (it sets TankLead, which the loop below reads).
     if (_options.LevelDungeons || !_lfgOrders.empty())
         DriveLevelDungeons(view, indexOf, membersOf, nowMs, actions);
+
+    // LFG fill: free bots are offered to human parties that lack a tank or a healer (whispers come from TakeWhispers).
+    if (_options.LfgFill)
+        DriveLfgFill(view, indexOf, nowMs, actions);
 
     // "tank lead" (chat): the tank bot walks its group through the dungeon. For the dungeon rules the group becomes a party with the tank as its leader: the
     // tank pulls when the party is ready, the others follow it and join the fight. A tank that left the dungeon (its map has no route) stops leading.
@@ -3360,7 +3603,20 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                                        : (classId == kWarriorClass && _options.PartySize != 0) ? 1u : HealSpellFor(classId, bot.level) != 0 ? 2u : 3u;
             // The spec (roster field race:class:spec, else the default of the class and role) picks the (class, spec) profile first in the core.
             std::uint32_t const spec = static_cast<std::uint32_t>(forever_module::TalentSpecFromKey(classId, SpecFor(bot.guid, classId)));
-            if (state.TalentLevel != bot.level || state.TalentRole != role || state.TalentSpec != spec)
+            RespecInputs const respec{ _options.TalentRespec, bot.level, bot.life_state == 0, bot.in_combat != 0, state.TalentLevel != 0,
+                                       state.TalentRole, state.TalentSpec, role, spec, nowMs, state.RespecNotBeforeMs };
+            if (RespecDue(respec))
+            {
+                // The core takes the spent points back and spends them by the new role or spec (kRespecTalents, sent with the actions): no talent
+                // order for this change. A refused respec (no gold) leaves the points as they are; the next level-up's order spends the new points.
+                state.TalentLevel = bot.level;
+                state.TalentRole = role;
+                state.TalentSpec = spec;
+                state.RespecNotBeforeMs = nowMs + kRespecIntervalMs;
+                if (_respecOrders.size() < 256)
+                    _respecOrders.push_back({ bot.guid, role, spec });
+            }
+            else if (state.TalentLevel != bot.level || state.TalentRole != role || state.TalentSpec != spec)
             {
                 state.TalentLevel = bot.level;
                 state.TalentRole = role;
@@ -3633,12 +3889,25 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                         voidwalkerNearby = true;
                         break;
                     }
-                auto const isSummonerToKill = [golemNearby, voidwalkerNearby](NearbyUnit const& unit)
+                // The dungeon's summons (ScenarioSummons, where DungeonSummons lists the dungeon): a live one in view is the same kind of target as the summoner
+                // above, fought first with focus off too and from past the engagement cap. Empty for every dungeon not listed, so nothing changes there.
+                auto const isSummon = [&scenario](NearbyUnit const& unit)
+                {
+                    return unit.health != 0 && std::find(scenario.Summons.begin(), scenario.Summons.end(), forever_module::UnitRefEntry(unit.guid)) != scenario.Summons.end();
+                };
+                bool summonNearby = false;
+                for (NearbyUnit const& unit : nearby)
+                    if (unit.is_hostile && isSummon(unit))
+                    {
+                        summonNearby = true;
+                        break;
+                    }
+                auto const isSummonerToKill = [golemNearby, voidwalkerNearby, &isSummon](NearbyUnit const& unit)
                 {
                     std::uint32_t const entry = forever_module::UnitRefEntry(unit.guid);
-                    return (golemNearby && entry == kGoblinEngineerEntry) || (voidwalkerNearby && entry == kSearingBladeWarlockEntry);
+                    return (golemNearby && entry == kGoblinEngineerEntry) || (voidwalkerNearby && entry == kSearingBladeWarlockEntry) || isSummon(unit);
                 };
-                if (routeOn && HealSpellFor(classId, bot.level) == 0 && ((_options.TacticFocus && !scenario.KillPriority.empty()) || interruptNow || golemNearby || voidwalkerNearby))
+                if (routeOn && HealSpellFor(classId, bot.level) == 0 && ((_options.TacticFocus && !scenario.KillPriority.empty()) || interruptNow || golemNearby || voidwalkerNearby || summonNearby))
                 {
                     auto const rankOf = [this, &scenario](NearbyUnit const& unit)
                     {
@@ -5114,6 +5383,25 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         };
         // Walking to the anvil, forge or fire a recipe needs (SDK 0.18, after kNeedsFocus): nothing in view and healthy, the bot goes there; arrived, it asks the core again; a walk
         // with no route, or too long, is over and the skill waits half an hour.
+        // Walking to a gathering node (GatherWalk, after the core answered that nothing is in reach): healthy and idle, the bot goes there; within reach of it, the
+        // next kGather asks for the node. A walk with no route, or too long, is over and that line waits a minute and a half.
+        if (state.GatherWalking && _options.GatherNodes && state.GatherWalkIndex < _options.GatherNodes->size() && idle && healthy)
+        {
+            gather::NodePoint const& node = (*_options.GatherNodes)[state.GatherWalkIndex];
+            bool const arrived = node.Map == bot.map_id && std::hypot(node.X - bot.pos_x, node.Y - bot.pos_y) <= kGatherReachYards;
+            bool const blocked = state.WalkBlockedAtMs != 0 && state.WalkBlockedAtMs >= state.GatherWalkStartMs;
+            if (arrived || blocked || nowMs - state.GatherWalkStartMs > kGatherWalkTimeoutMs)
+            {
+                state.GatherWalking = false;
+                state.GatherRetryAtMs[state.GatherWalkLine] = arrived ? nowMs : nowMs + kGatherNothingMs;
+            }
+            else
+            {
+                wanted = Decision{ ActionType::kMoveTo, 0, Point{ node.X, node.Y, node.Z } };
+                moveWhy = "gather_walk";
+                idle = false;
+            }
+        }
         if (state.CraftWalking && _options.Foci && state.CraftWalkIndex < _options.Foci->size() && idle && healthy)
         {
             crafting::FocusPoint const& point = (*_options.Foci)[state.CraftWalkIndex];
@@ -5405,15 +5693,28 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         // A player's party invite is accepted (AcceptInvites, from the chat command switch): the player then commands the bot in chat. An invite
         // from one of this module's bots is not a player's: the party code above answers those (a second accept here was refused as "no pending
         // invite", and a leader even tried to accept the party it leads).
-        if (_options.AcceptInvites && bot.group_invite_from != 0 && !isOurBot(bot.group_invite_from) && bot.in_combat == 0 &&
-            nowMs >= state.InviteAcceptAtMs && forever_module::UnitRefType(bot.group_invite_from) == kPlayerType)
+        // With WhisperReplies a busy bot (dead, in a fight, in a dungeon, travelling) does not accept: it whispers the inviter why (once per
+        // player and bot, the limiter), and the invite times out in the core.
+        if (_options.AcceptInvites && bot.group_invite_from != 0 && !isOurBot(bot.group_invite_from) && nowMs >= state.InviteAcceptAtMs &&
+            forever_module::UnitRefType(bot.group_invite_from) == kPlayerType)
         {
-            BotAction accept;
-            accept.bot_guid = bot.guid;
-            accept.type = ActionType::kGroup;
-            accept.spell_id = kGroupAccept;
-            actions.push_back(accept);
-            state.InviteAcceptAtMs = nowMs + kAcceptInviteRetryMs;
+            BusyKind const busy = _options.WhisperReplies ? BusyOf(bot) : BusyKind::None;
+            if (busy != BusyKind::None)
+            {
+                std::uint64_t const player = bot.group_invite_from & forever_module::kUnitRefCounterMask;
+                if (_whispers.Allow(player, bot.guid, nowMs))
+                    _whisperReplies.push_back({ bot.guid, player, ClampReply(BusyLine(bot.guid, busy)) });
+                state.InviteAcceptAtMs = nowMs + kAcceptInviteRetryMs;
+            }
+            else if (bot.in_combat == 0)
+            {
+                BotAction accept;
+                accept.bot_guid = bot.guid;
+                accept.type = ActionType::kGroup;
+                accept.spell_id = kGroupAccept;
+                actions.push_back(accept);
+                state.InviteAcceptAtMs = nowMs + kAcceptInviteRetryMs;
+            }
         }
 
         // Party actions (M8), out of combat. The leader invites each member that is not in its party yet, and invites a
@@ -6272,7 +6573,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
 
         // Gathering (SDK 0.18, off by default): a bot with Mining, Herbalism or Skinning asks the core to gather what is within 30 yards of it: a vein or herb its skill allows, or a
         // corpse it can skin. The core walks the bot there and casts; the next ask takes the loot.
-        if (_options.Gathering && calm)
+        if (_options.Gathering && calm && !state.GatherWalking)
         {
             bool gathered = false;
             for (std::size_t index = 0; index < kGatherLineCount && !gathered; ++index)

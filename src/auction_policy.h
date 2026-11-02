@@ -42,6 +42,13 @@ struct Settings
     std::uint32_t ReserveCopperPerLevel = 5;    // as the core's Bot.Supplies.ReserveCopperPerLevel: what a bot keeps back
     std::uint32_t BrowsePerVisit = 3;           // item entries a bot looks up on one visit
     std::uint32_t MaxCallsPerTick = 4;          // house calls the whole module makes in one tick (a browse walks the house's lists in the core)
+    // Goods (config keys AuctionGoodsSell, AuctionGoodsPct, AuctionGoodsStackMax, AuctionGoodsPerEntryMax, AuctionGoodsMinQuality; off by default): stacks of
+    // trade goods (herbs, ore, cloth, leather, reagents) listed as commodities, one unit price for the stack (the core's kListCommodity).
+    bool GoodsSell = false;                     // needs Enabled
+    std::uint32_t GoodsPct = 150;               // the unit price is this percent of the vendor's price for one unit
+    std::uint32_t GoodsStackMax = 20;           // a listing sells at most this many units
+    std::uint32_t GoodsPerEntryMax = 1;         // listings of one item kind on the house at once
+    std::uint8_t GoodsMinQuality = kCommon;     // white or better
 };
 
 // One item in a bot's bags as the core describes it for selling.
@@ -56,6 +63,7 @@ struct Candidate
     bool QuestItem = false;
     bool Needed = false;                        // the bot uses it: equipped, a better piece than what it wears, a reagent or supply it needs
     bool Stackable = false;                     // the core's kList takes single items only
+    bool Goods = false;                         // trade goods: a stack for a commodity listing when Stackable (see PlanGoods)
 };
 
 struct Listing
@@ -92,6 +100,7 @@ struct Standing
     std::uint64_t LastVisitMs = 0;                               // 0: never
     std::uint64_t LastBuyMs = 0;                                 // the last browse for an upgrade; 0: never
     std::uint32_t BuyCursor = 0;                                 // which slot the next buy visit looks at (BrowseSlot)
+    std::unordered_map<std::uint32_t, std::uint32_t> GoodsListed; // item entry -> commodity listings on the house now
 };
 
 // Whether this bot may go to the house now: it is switched on, enough bag slots are used (or it has a relisting due), and the last visit is long enough ago.
@@ -100,6 +109,20 @@ bool VisitDue(Settings const& settings, Bags const& bags, Standing const& standi
 // The listings to make this visit, most valuable first: at most PerVisit, and ListedMax minus what is listed already. An item listed twice before is left
 // for a vendor (the caller sells it).
 std::vector<Listing> PlanListings(Settings const& settings, Bags const& bags, Standing const& standing, std::vector<Candidate> const& items);
+
+// A commodity listing: `Count` units of one stack at one unit price (the core's kListCommodity).
+struct GoodsListing
+{
+    std::uint64_t ItemGuid = 0;
+    std::uint32_t Entry = 0;
+    std::uint32_t Count = 0;
+    std::uint32_t UnitPrice = 0;                // copper per unit
+};
+
+// The commodity listings to make this visit: goods stacks of at least GoodsMinQuality that the bot does not need, each at GoodsPct of the vendor's unit
+// price (at least 1 copper), at most GoodsStackMax units, and at most GoodsPerEntryMax listings per item kind. The same PerVisit and ListedMax limits as
+// PlanListings apply. A stack whose vendor value is under MinVendorCopper is left for a vendor. Empty when GoodsSell is off.
+std::vector<GoodsListing> PlanGoods(Settings const& settings, Standing const& standing, std::vector<Candidate> const& items);
 
 // Items that ran their course on the house and go to a vendor now: listed `attempts` times already (the second listing is the last).
 std::vector<std::uint64_t> ForVendor(Settings const& settings, Standing const& standing, std::vector<Candidate> const& items);
@@ -157,6 +180,9 @@ std::string LogToken(std::string const& text);
 // "auction: bot G listed item I for B copper (buyout X) entry=E count=N price=B": the text before " entry=" is the original line that dashboards read.
 std::string ListedLine(std::uint64_t bot, Listing const& listing, std::uint32_t count);
 // "auction: bot G list_refused item I entry=E price=B reason=TOKEN class=retry|skip"
+// The commodity listing line, in the style of ListedLine.
+std::string GoodsListedLine(std::uint64_t bot, GoodsListing const& listing);
+
 std::string ListRefusedLine(std::uint64_t bot, Listing const& listing, std::string const& reason);
 
 // "auction: bot G bought item A entry=E count=N price=P" (A is the auction id; P is the copper the core took)

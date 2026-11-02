@@ -1,0 +1,2 @@
+# map|x|y|z|radius|name
+# Water spots for Fishing (src/fishing.h). Empty until spots are taken from the world DB (gameobject pools near water).

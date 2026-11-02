@@ -12,6 +12,9 @@ Module.forever-bots.Class = 1
 # Leave TelemetryFile empty to turn it off. TelemetrySummarySec is the seconds between summary lines per bot (1..3600).
 Module.forever-bots.TelemetryFile = forever-bots-telemetry.csv
 Module.forever-bots.TelemetrySummarySec = 60
+# Stall watch (tagging only): a bot that is alive, out of combat and has not moved, levelled, changed its money or had an action applied for
+# this many minutes writes a "stalled" telemetry line (and "unstalled" when it moves again). 0 (default) turns it off.
+#   Module.forever-bots.StallAfterMinutes = 10
 
 # Scale run (1500 bots): Race and Class may be "random" (a seeded pick over the valid combinations; see src/bot_pick.h).
 # RandomSeed makes the same bots come back for the same seed.
@@ -77,6 +80,10 @@ Module.forever-bots.TelemetrySummarySec = 60
 # player in a party can type .autogear to dress the bots that player leads.
 # AutoGearing = 0
 #
+# Talent respec. 1 = a bot whose role or spec changed after it spent talent points has them taken back and spent by the new role (at most
+# once an hour per bot). Needs Bot.Talents.Respec = 1 in the core's worldserver.conf, which pays the reset cost from the bot's gold. Off by default.
+# TalentRespec = 0
+#
 # Rotations from a file: fight rows and upkeep buffs for all classes up to level 60, with the real spell ids from the core's ability dump
 # (tools/make_rotations.py, doc/rotations.md). Without it the built-in rank 1 rotations are used.
 # RotationFile = "data/rotations.txt"        # the default (a relative path is looked up beside the module executable); "" uses the built-in rank 1 rows
@@ -97,6 +104,32 @@ Module.forever-bots.TelemetrySummarySec = 60
 #   alt add <name> | alt remove <name> | alt list (alts need Bot.Alt.Enabled = 1 in the core's worldserver.conf).
 # ChatSay = 0        (a bot that takes an order answers with a short /say line; ChatSayMax caps how many bots of a group speak for one order, a whispered bot always answers)
 # ChatSayMax = 3
+
+# AmbientChat = 0    (ambient chat: a bot says a short line on General or Trade now and then, and a level-up gets a line; the core must allow it too,
+#                     Bot.Chat.Ambient.Enabled in worldserver.conf. Trade is refused outside the capitals.)
+# AmbientPerMin = 2  (lines a minute over all bots, module side; keep it at or under Bot.Chat.Ambient.GlobalPerMin)
+# AmbientBotCooldownSec = 300  (the least time between two lines of one bot)
+# AmbientChannels = 1  (1 General, 2 Trade, 3 both)
+# AmbientFile = data/ambient_lines.txt  (the line pool; see the header of that file for its format)
+# ChatWhisperReplies = 0  (a bot answers a whisper that asks hello, its status, where it is, or for a group, and says why it is busy when an invite or trade comes in)
+# WhisperCooldownMs = 60000  (per player and bot; 0 to 600000)
+# WhisperMaxPerMin = 6       (per player, over all bots; 1 to 60)
+# LfgFill = 0        (a human's party short of a tank or a healer is offered free bots: they teleport over and whisper their role to the leader, who invites them;
+#                     offers go to a party at most every 5 minutes and to a bot at most every 10 minutes; bots within 5 levels of the party's highest level only)
+# Second-list features, all off by default. The decisions are logged as *_gap events until the SDK has the actions.
+# Duels = 0
+# DuelMinLevel = 10
+# DuelCooldownMin = 30
+# Battlegrounds = 0
+# BattlegroundMinLevel = 10
+# BattlegroundMaxWaitMin = 10
+# InnDowntime = 0
+# InnHealthBelowPct = 50
+# InnPowerBelowPct = 30
+# InnMaxRestMin = 10
+# GuildJoin = 0
+# MailGifts = 0
+# MailGiftDailyCap = 1
 # AutoGearEveryLevels = 5
 #
 # Supplies (layout 15, off by default): a bot short of ammunition, food or drink walks to the nearest vendor that sells what it can use and buys,
@@ -132,6 +165,13 @@ Module.forever-bots.TelemetrySummarySec = 60
 # AuctionBagFullPct = 60        (a visit happens when this share of the bag is used, 1..100; the module assumes 16 bag slots)
 # AuctionPerVisit = 5           (items listed per visit, 1..20)
 # AuctionListedMax = 10         (listings a bot has at once, 1..50)
+# AuctionGoodsSell = 1         (off by default: stacks of trade goods, white or better, that a bot does not need are listed as commodities at AuctionGoodsPct
+#                              percent of the vendor's unit price, up to AuctionGoodsStackMax units a listing, AuctionGoodsPerEntryMax listings of one item,
+#                              from AuctionGoodsMinQuality (1 white .. 4 epic); needs Auction = 1)
+# AuctionGoodsPct = 150
+# AuctionGoodsStackMax = 20
+# AuctionGoodsPerEntryMax = 1
+# AuctionGoodsMinQuality = 1
 # AuctionEverySec = 1800        (at most one visit per bot this often, 60..86400)
 # AuctionBuy = 0                (off by default; needs Auction = 1 and a core with protocol 19. A bot also looks for upgrades: every AuctionEverySec it
 #                                browses one equipment slot of the house in turn, the core says which listings beat what the bot wears (its AutoGear score),
@@ -216,3 +256,19 @@ Module.forever-bots.TelemetrySummarySec = 60
 # data/crafting_foci.txt lists the capitals' objects). Gathering = 1 makes a bot with Mining, Herbalism or Skinning gather what is within 30 yards (off by default).
 # Module.forever-bots.CraftingFociFile = /srv/forever/sim/modules_runtime/forever-bots/data/crafting_foci.txt
 # Module.forever-bots.Gathering = 1
+# GatherWalk = 1 (off by default; needs Gathering = 1): a gatherer with no node in sight walks to the nearest one of its skill in GatherNodesFile
+# (absolute path; data/gather_nodes.txt is generated by tools/gen_gather_nodes.py from the world DB).
+# Module.forever-bots.GatherWalk = 1
+# Module.forever-bots.GatherNodesFile = /srv/forever/sim/modules_runtime/forever-bots/data/gather_nodes.txt
+
+# Second-list features, all off by default (each reads a data file that ships empty until its entries are checked against the world DB).
+# RidingTraining = 1 learns the riding ranks of RidingRankFile; WeaponTraining = 1 learns the class weapon skills at the class trainer.
+# Fishing = 1 walks a bot with a pole to the nearest spot of FishingSpotFile (the cast needs a core action: doc/fishing.md).
+# RareHunts = 1 fights the rare creatures of RareHuntFile in range of their levels. Tradeskill training is the errand trainer walk (Errands = 1).
+# Module.forever-bots.RidingTraining = 0
+# Module.forever-bots.RidingRankFile = /srv/forever/sim/modules_runtime/forever-bots/data/riding_ranks.txt
+# Module.forever-bots.WeaponTraining = 0
+# Module.forever-bots.Fishing = 0
+# Module.forever-bots.FishingSpotFile = /srv/forever/sim/modules_runtime/forever-bots/data/fishing_spots.txt
+# Module.forever-bots.RareHunts = 0
+# Module.forever-bots.RareHuntFile = /srv/forever/sim/modules_runtime/forever-bots/data/rare_hunts.txt

@@ -174,6 +174,19 @@ void ReadOneScenario(std::unordered_map<std::string, std::string> const& config,
                 warnings.push_back("Module.forever-bots.ScenarioKillPriority: '" + item + "' is not a creature entry; ignored.");
         }
     }
+    if (auto const it = config.find("ScenarioSummons"); it != config.end())
+    {
+        std::istringstream list(it->second);
+        std::string item;
+        while (std::getline(list, item, ','))
+        {
+            std::uint32_t entry = 0;
+            if (std::from_chars(item.data(), item.data() + item.size(), entry).ec == std::errc{} && entry != 0)
+                scenario.Summons.push_back(entry);
+            else
+                warnings.push_back("Module.forever-bots.ScenarioSummons: '" + item + "' is not a creature entry; ignored.");
+        }
+    }
     ReadKey(config, "ScenarioParties", 1, 20, scenario.Parties, warnings);
     ReadKey(config, "ScenarioDurationSec", 30, 86400, scenario.DurationSec, warnings);
     if (auto const it = config.find("ScenarioStaging"); it != config.end())
@@ -336,7 +349,7 @@ bool OneFaction(ScenarioSettings const& scenario)
 bool IsPlainDungeonKey(std::string const& key)
 {
     static char const* const keys[] = { "Dungeon", "ScenarioRoster", "ScenarioLevel", "ScenarioStaging", "ScenarioEntry", "ScenarioPortal",
-                                        "ScenarioBosses", "ScenarioBossAt", "ScenarioKillPriority", "ScenarioParties", "ScenarioTameSpot", "ScenarioRaid" };
+                                        "ScenarioBosses", "ScenarioBossAt", "ScenarioKillPriority", "ScenarioSummons", "ScenarioParties", "ScenarioTameSpot", "ScenarioRaid" };
     if (key.find('.') != std::string::npos)
         return false;
     for (char const* plain : keys)
@@ -571,6 +584,20 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadKey(config, "BotsCap", 1, kMaxBotsCeiling, settings.Ramp.Cap, warnings);
     ReadStopTime(config, settings.Ramp.StopSecOfDay, warnings);
 
+    // Brackets: the default split unless BracketTargets says otherwise (see bot_brackets.h).
+    ReadBool(config, "BracketsEnabled", settings.Brackets.Enabled, warnings);
+    ReadKey(config, "BracketSpotCap", 0, 1000, settings.Brackets.SpotCap, warnings);
+    ReadKey(config, "BracketStalledMinutes", 0, 1440, settings.Brackets.StalledMinutes, warnings);
+    ReadBool(config, "BracketMoveDown", settings.Brackets.MoveDown, warnings);
+    {
+        std::string error;
+        brackets::ParseTargets(brackets::kDefaultTargets, settings.Brackets.Targets, error);
+        if (auto const it = config.find("BracketTargets"); it != config.end() && !brackets::ParseTargets(it->second, settings.Brackets.Targets, error))
+            warnings.push_back("BracketTargets: " + error + "; the default split is kept");
+        if (auto const it = config.find("RetireLevel60"); it != config.end() && !brackets::ParseRetire(it->second, settings.Brackets.RetireLevel60, error))
+            warnings.push_back("RetireLevel60: " + error);
+    }
+
     if (auto const it = config.find("TelemetryFile"); it != config.end())
         settings.TelemetryFile = it->second;
     if (auto const it = config.find("LiveFile"); it != config.end())
@@ -579,6 +606,7 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadKey(config, "TelemetryMaxMB", 1, 10240, settings.TelemetryMaxMB, warnings);
     ReadKey(config, "TelemetryKeep", 0, 50, settings.TelemetryKeep, warnings);
     ReadKey(config, "TelemetrySummarySec", 1, 3600, settings.TelemetrySummarySec, warnings);
+    ReadKey(config, "StallAfterMinutes", 0, 1440, settings.StallAfterMinutes, warnings);
     ReadKey(config, "ServiceEverySec", 60, 86400, settings.ServiceEverySec, warnings);
     if (auto const train = config.find("TrainEverySec"); train != config.end() && train->second == "0")
         settings.TrainEverySec = 0; // explicitly off
@@ -590,12 +618,44 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadKey(config, "RandomPct", 0, 90, settings.RandomPct, warnings);
     ReadHubs(config, settings.Hubs, warnings);
     ReadBool(config, "AutoGearing", settings.AutoGearing, warnings);
+    ReadBool(config, "TalentRespec", settings.TalentRespec, warnings);
     ReadBool(config, "QuestTeleport", settings.QuestTeleport, warnings);
     ReadBool(config, "ChatCommands", settings.ChatCommands, warnings);
     ReadBool(config, "ChatOrders", settings.ChatOrders, warnings);
     ReadBool(config, "ChatControl", settings.ChatControl, warnings);
     ReadBool(config, "ChatSay", settings.ChatSay, warnings);
     ReadKey(config, "ChatSayMax", 0, 50, settings.ChatSayMax, warnings);
+    ReadBool(config, "AmbientChat", settings.AmbientChat, warnings);
+    ReadKey(config, "AmbientPerMin", 0, 30, settings.AmbientPerMin, warnings);
+    ReadKey(config, "AmbientBotCooldownSec", 0, 3600, settings.AmbientBotCooldownSec, warnings);
+    ReadKey(config, "AmbientChannels", 1, 3, settings.AmbientChannels, warnings);
+    if (auto const it = config.find("AmbientFile"); it != config.end())
+        settings.AmbientFile = it->second;
+    ReadBool(config, "ChatWhisperReplies", settings.ChatWhisperReplies, warnings);
+    ReadKey(config, "WhisperCooldownMs", 0, 600000, settings.WhisperCooldownMs, warnings);
+    ReadKey(config, "WhisperMaxPerMin", 1, 60, settings.WhisperMaxPerMin, warnings);
+    ReadBool(config, "Duels", settings.Duels.Enabled, warnings);
+    ReadKey(config, "DuelMinLevel", 1, 80, settings.Duels.MinLevel, warnings);
+    ReadKey(config, "DuelCooldownMin", 1, 1440, settings.Duels.CooldownMin, warnings);
+    ReadBool(config, "Battlegrounds", settings.Battlegrounds.Enabled, warnings);
+    ReadKey(config, "BattlegroundMinLevel", 1, 80, settings.Battlegrounds.MinLevel, warnings);
+    ReadKey(config, "BattlegroundMaxWaitMin", 1, 60, settings.Battlegrounds.MaxWaitMin, warnings);
+    ReadBool(config, "InnDowntime", settings.InnDowntime.Enabled, warnings);
+    ReadBool(config, "ScenarioConfigGuard", settings.ScenarioConfigGuard, warnings);
+    if (auto const it = config.find("DungeonSummons"); it != config.end())
+    {
+        std::istringstream list(it->second);
+        std::string item;
+        while (std::getline(list, item, ','))
+            if (!item.empty())
+                settings.DungeonSummons.push_back(item);
+    }
+    ReadKey(config, "InnHealthBelowPct", 1, 100, settings.InnDowntime.HealthBelowPct, warnings);
+    ReadKey(config, "InnPowerBelowPct", 0, 100, settings.InnDowntime.PowerBelowPct, warnings);
+    ReadKey(config, "InnMaxRestMin", 1, 120, settings.InnDowntime.MaxRestMin, warnings);
+    ReadBool(config, "GuildJoin", settings.GuildJoin.Enabled, warnings);
+    ReadBool(config, "MailGifts", settings.MailGifts.Enabled, warnings);
+    ReadKey(config, "MailGiftDailyCap", 0, 20, settings.MailGifts.DailyCap, warnings);
     ReadBool(config, "Supplies", settings.Supplies.Enabled, warnings);
     ReadKey(config, "SupplyAmmoLow", 0, 1000, settings.Supplies.AmmoLow, warnings);
     ReadKey(config, "SupplyAmmoTarget", 1, 2000, settings.Supplies.AmmoTarget, warnings);
@@ -622,6 +682,7 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadKey(config, "LevelDungeonRuns", 0, 1000, settings.LevelDungeonRuns, warnings);
     settings.LevelDungeonRuns = std::clamp<std::uint32_t>(settings.LevelDungeonRuns, 1, 5);
     ReadBool(config, "LfgCommand", settings.LfgCommand, warnings);
+    ReadBool(config, "LfgFill", settings.LfgFill, warnings);
     ReadBool(config, "DungeonReviveOutOfCombat", settings.DungeonReviveOutOfCombat, warnings);
     if (auto const teleport = config.find("CorpseRunTeleportSec"); teleport != config.end() && teleport->second == "0")
         settings.CorpseRunTeleportSec = 0; // explicitly off: the ghost walks on, and is put at its corpse after CorpseRunTimeoutMs
@@ -670,6 +731,9 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
         settings.AvoidSpellsFile = it->second;
     if (auto const it = config.find("CraftingFociFile"); it != config.end())
         settings.CraftingFociFile = it->second;
+    ReadBool(config, "GatherWalk", settings.GatherWalk, warnings);
+    if (auto const it = config.find("GatherNodesFile"); it != config.end())
+        settings.GatherNodesFile = it->second;
     if (auto const it = config.find("DungeonFile"); it != config.end())
         settings.DungeonFile = it->second;
     if (auto const it = config.find("DungeonDataDir"); it != config.end())
@@ -753,6 +817,15 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadKey(config, "AuctionBuyMaxPct", 1, 100, settings.Auction.BuyMaxPct, warnings);
     ReadKey(config, "AuctionBrowsePerVisit", 1, 20, settings.Auction.BrowsePerVisit, warnings);
     ReadKey(config, "AuctionCallsPerTick", 1, 50, settings.Auction.MaxCallsPerTick, warnings);
+    ReadBool(config, "AuctionGoodsSell", settings.Auction.GoodsSell, warnings);
+    ReadKey(config, "AuctionGoodsPct", 50, 1000, settings.Auction.GoodsPct, warnings);
+    ReadKey(config, "AuctionGoodsStackMax", 1, 200, settings.Auction.GoodsStackMax, warnings);
+    ReadKey(config, "AuctionGoodsPerEntryMax", 1, 10, settings.Auction.GoodsPerEntryMax, warnings);
+    {
+        std::uint32_t minQuality = settings.Auction.GoodsMinQuality;
+        ReadKey(config, "AuctionGoodsMinQuality", 1, 4, minQuality, warnings);
+        settings.Auction.GoodsMinQuality = static_cast<std::uint8_t>(minQuality);
+    }
     ReadBool(config, "SellVendor", settings.Sell.Enabled, warnings);
     {
         std::uint32_t everySec = static_cast<std::uint32_t>(settings.Sell.EveryMs / 1000);
@@ -761,6 +834,16 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     }
     ReadKey(config, "SellPerVisit", 1, 20, settings.Sell.MaxSalesPerVisit, warnings);
     ReadBool(config, "Errands", settings.Errand.Enabled, warnings);
+    ReadBool(config, "RidingTraining", settings.RidingTraining, warnings);
+    if (auto const it = config.find("RidingRankFile"); it != config.end())
+        settings.RidingRankFile = it->second;
+    ReadBool(config, "WeaponTraining", settings.WeaponTraining, warnings);
+    ReadBool(config, "Fishing", settings.Fishing, warnings);
+    if (auto const it = config.find("FishingSpotFile"); it != config.end())
+        settings.FishingSpotFile = it->second;
+    ReadBool(config, "RareHunts", settings.RareHunts, warnings);
+    if (auto const it = config.find("RareHuntFile"); it != config.end())
+        settings.RareHuntFile = it->second;
     ReadKey(config, "ErrandDailyMin", 1, 1440, settings.Errand.DailyMinutes, warnings);
     ReadKey(config, "ErrandGapMin", 0, 1440, settings.Errand.GapMinutes, warnings);
     ReadKey(config, "ErrandMaxMin", 5, 240, settings.Errand.MaxMinutes, warnings);

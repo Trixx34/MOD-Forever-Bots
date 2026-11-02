@@ -78,6 +78,7 @@
   // already two-mob fight unopposed. Order: the Warlock first (an interruptible Shadow Bolt caster, spell 20791), then the Voidwalker once it
   // joins, then the Cultist (a caster), then the Enforcer (melee, the tank holds it).
   "kill_priority": [11324, 8996, 11322, 11323],
+  "summons": [8996],
   // The bosses, in the order the route meets them. "strategy" holds the tactics for each boss: pull, tank_position, interrupt, dispel, avoid, avoid_spells, kill_order,
   // notes. Fields the bots act on today are listed in doc/dungeon-strategy.md ("what bots do today"); the others are kept but not used yet.
   "bosses": [

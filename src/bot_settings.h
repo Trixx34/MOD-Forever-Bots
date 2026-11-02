@@ -3,8 +3,14 @@
 // prefix removed; see modules.d/forever-bots.conf.example). Pure logic, unit-tested in tests/settings_test.cpp.
 #pragma once
 
+#include "battlegrounds.h"
+#include "duels.h"
 #include "errand_policy.h"
+#include "guild_join.h"
+#include "inn_downtime.h"
+#include "mail_gifts.h"
 #include "auction_policy.h"
+#include "bot_brackets.h"
 #include "bot_presence.h"
 #include "bot_ramp.h"
 #include "sell_policy.h"
@@ -84,6 +90,8 @@ struct ScenarioSettings
     std::uint32_t Parties = 1;
     // ScenarioKillPriority = "entry,entry,..": creature entries in the order the party kills them (the dungeon file's kill_priority).
     std::vector<std::uint32_t> KillPriority;
+    // ScenarioSummons = "entry,entry,..": the creature entries this dungeon's summoners make (the dungeon file's summons). Used only when DungeonSummons lists the dungeon.
+    std::vector<std::uint32_t> Summons;
     bool HasPortal = false;
     std::array<float, 4> Portal{};                       // map, x, y, z: the instance door, outside
     // ScenarioRaid (0 or 1, default 0; doc 108): a raid scenario's roster may go up to 40 instead of 5, formed into one raid group of
@@ -118,6 +126,9 @@ struct BotSettings
     std::uint32_t LiveEveryMs = 1000;
     // Seconds between summary lines per bot (config key TelemetrySummarySec, 1..3600).
     std::uint32_t TelemetrySummarySec = 60;
+    // Minutes without progress before an alive, idle bot is tagged as stalled in telemetry (config key StallAfterMinutes, 0..1440;
+    // 0 = off, the default). Tagging only.
+    std::uint32_t StallAfterMinutes = 0;
     // Seconds between vendor visits (sell grey, repair, equip), for an idle bot (config key ServiceEverySec, 60..86400). The
     // trainer check (config key TrainEverySec, 60..86400, also at once after a level-up) is off by default (0): bots learn
     // their spells on level-up, so they do not need a trainer.
@@ -153,6 +164,9 @@ struct BotSettings
     // Auto gear (config key AutoGearing, 0 or 1): the core dresses every bot for its level when it first appears and after it gains
     // AutoGearEveryLevels levels. Off by default; when it is off, the .autogear command in a party does it for that party's bots.
     bool AutoGearing = false;
+    // Talent respec (config key TalentRespec, 0 or 1, off by default): a bot whose role or spec changed after it spent talent points gets them back and
+    // spent by the new role (the core's Bot.Talents.Respec must be on too, since it is what pays the reset). See talent_respec.h.
+    bool TalentRespec = false;
     // Chat commands (config keys ChatCommands and ChatOrders, 0 or 1, both off by default; see chat_commands.h). ChatCommands turns on the basic
     // verbs (follow, stay, goto here, release, status) typed by a group leader in party or raid chat or whispered to a bot; ChatOrders adds
     // stop, pull, heal, passive and aggressive. Only the bots of the speaker's own group obey.
@@ -163,6 +177,22 @@ struct BotSettings
     // ChatSayMax caps how many bots of a group speak for one order, so a big group does not drown the chat; a bot that was whispered always answers.
     bool ChatSay = false;
     std::uint32_t ChatSayMax = 3;
+    // Ambient chat (feature 4; config keys AmbientChat 0 or 1, off by default; AmbientPerMin 0..30 lines a minute over all bots, default 2;
+    // AmbientBotCooldownSec 0..3600 between two lines of one bot, default 300; AmbientChannels 1 General, 2 Trade, 3 both, default 1;
+    // AmbientFile, the line pool, default "data/ambient_lines.txt"). The core must allow it too (Bot.Chat.Ambient.Enabled, see worldserver.conf.dist).
+    bool AmbientChat = false;
+    std::uint32_t AmbientPerMin = 2;
+    std::uint32_t AmbientBotCooldownSec = 300;
+    std::uint32_t AmbientChannels = 1;
+    std::string AmbientFile = "data/ambient_lines.txt";
+    // Second-list features (off by default; the decisions are pure logic, the SDK has no action for them yet, so the policy logs them as *_gap):
+    // Duels, DuelMinLevel, DuelCooldownMin; Battlegrounds, BattlegroundMinLevel, BattlegroundMaxWaitMin; InnDowntime, InnHealthBelowPct,
+    // InnPowerBelowPct, InnMaxRestMin; GuildJoin; MailGifts, MailGiftDailyCap.
+    duels::Settings Duels;
+    battlegrounds::Settings Battlegrounds;
+    inn::Settings InnDowntime;
+    guild::Settings GuildJoin;
+    gifts::Settings MailGifts;
     // Supplies (layout 15, config keys Supplies, SupplyAmmoLow, SupplyAmmoTarget, SupplyFoodLow, SupplyFoodTarget, SupplyDrinkLow, SupplyDrinkTarget,
     // SupplyTripSec; off by default): bots buy ammunition, food and drink at vendors that sell what they can use, and eat and drink while resting.
     // Layout 16, each off by default: SupplyPotions (health and mana potions, drunk in a fight below UseHealthPotionBelowPct and
@@ -174,14 +204,26 @@ struct BotSettings
     // PresenceMaxOnline, PresenceDayPercent; off by default): bots log off and on like players, see bot_presence.h. Needs Bot.Presence.LogoutOnRelease
     // in the core, or a released bot stays in the world.
     presence::Settings Presence;
+    // Brackets (bot_brackets.h; config keys BracketsEnabled, BracketTargets, BracketSpotCap, BracketStalledMinutes, BracketMoveDown,
+    // RetireLevel60; off by default). The ramp places each new bot in the level bracket furthest short of its share. The level counts come from the
+    // presence feed, so brackets need Presence on.
+    brackets::Settings Brackets;
     // Dungeons (doc/dungeons.md): DungeonFile = the routes (data/dungeons.txt); with it set, "tank lead" works in every dungeon of the file. DungeonEventsFile = the
     // events table for all dungeons (data/dungeon_events.txt, dungeon_events.h): doors to open, charges to fire.
     bool DungeonTeleport = false;   // DungeonTeleport = 1: lost dungeon bots are put back by teleport (tests and scenarios; needs Bot.Actions.Teleport in the core)
+    // DungeonSummons = "dm,rfc" (off by default): the scenarios (by their names) whose summons the policy puts first: a summoner's adds (the Deadmines' golem and Squallshapers,
+    // Ragefire's Voidwalker minion) are engaged past the engagement cap and the party turns on them once they are in view, as with focus off. Needs the dungeon file's summons.
+    std::vector<std::string> DungeonSummons;
+    // ScenarioConfigGuard = 1 (off by default): a scenario holds its dressing until the core has applied a teleport the module sent (ScenarioPlan::VerifyConfig); a
+    // config the core refuses (Bot.Actions.Teleport or Bot.Actions.Grant off) ends the run as config_refused instead of running in the wrong place.
+    bool ScenarioConfigGuard = false;
     // Level dungeons (doc/dungeons.md): a levelling bot party runs each dungeon of the dungeon file when its level reaches the dungeon's max level (LevelDungeons, on by
     // default), at most LevelDungeonRuns times per dungeon (1..5, default 2). LfgCommand: "LFG <dungeon>" in the General or Trade channel brings free bots to the speaker.
     bool LevelDungeons = true;
     std::uint32_t LevelDungeonRuns = 2;
     bool LfgCommand = true;
+    // LfgFill = 1 (default 0): a human's party that lacks a tank or a healer is offered free bots, which whisper their role to the leader (lfg_fill.h).
+    bool LfgFill = false;
     // AggressiveStart = 1: bots start Aggressive, so a bot on its own pulls the creatures of its level and levels. The default stance is defensive (a bot fights only
     // what attacks it, or what its group fights); a bot that only defends itself earns almost no experience: on the 300-bot soak the deaths equalled the kills.
     bool AggressiveStart = false;
@@ -204,9 +246,27 @@ struct BotSettings
     std::uint32_t MountMinLevel = 40;
     // Gathering = 1: a bot with Mining, Herbalism or Skinning asks the core to gather what is near it (kGather, SDK 0.18). Off by default.
     bool Gathering = false;
+    // Riding (RidingTraining = 1, off by default): a bot learns the riding ranks of RidingRankFile (data/riding_ranks.txt) from a stable master
+    // when its level and gold allow (riding_training.h). The table ships empty until the stable masters' spells and costs are checked.
+    bool RidingTraining = false;
+    std::string RidingRankFile = "data/riding_ranks.txt";
+    // Weapon skills (WeaponTraining = 1, off by default): a bot learns its class's weapon skills at its class trainer (weapon_training.h).
+    bool WeaponTraining = false;
+    // Fishing (Fishing = 1, off by default): a bot with a pole walks to the nearest spot of FishingSpotFile (data/fishing_spots.txt) and fishes there
+    // (fishing.h). The cast needs a core action that targets the water (doc/fishing.md).
+    bool Fishing = false;
+    std::string FishingSpotFile = "data/fishing_spots.txt";
+    // Rare hunts (RareHunts = 1, off by default): a bot fights the rare creatures of RareHuntFile (data/rare_hunts.txt) in range of its level
+    // (rare_hunts.h). Its entries join the fight filter while a hunt is on.
+    bool RareHunts = false;
+    std::string RareHuntFile = "data/rare_hunts.txt";
     // CraftingFociFile (data/crafting_foci.txt): the anvils, forges and cooking fires of the capitals. With it, a bot whose recipes need a focus (kNeedsFocus) walks to
     // the nearest one on its map; without it the skill just waits. Use an absolute path: the worldserver's working directory is not the module's.
     std::string CraftingFociFile;
+    // GatherWalk = 1 (off by default; with Gathering): a bot that wants to gather and has no node in sight walks to the nearest one of its skill in
+    // GatherNodesFile (data/gather_nodes.txt; an absolute path). Without the file the walk does nothing.
+    bool GatherWalk = false;
+    std::string GatherNodesFile;
     // AvoidGroundEffects = 1 (off by default): a bot standing inside a harmful ground effect (SDK 0.19: the core must have Bot.Snapshot.GroundEffects = 1) walks out of it.
     // AvoidSpellsFile (absolute path, data/avoid_spells.txt): the Classic dungeons' spells that leave one; a spell in it counts as harmful even if the caster is not
     // known to be hostile. The dungeon files' bosses[].strategy.avoid_spells and avoid (fixed zones) add to it for their map.

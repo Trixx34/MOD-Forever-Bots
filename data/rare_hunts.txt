@@ -1,0 +1,2 @@
+# entry|name|map|x|y|z|minLevel|maxLevel|radius
+# Rare hunts for RareHunts (src/rare_hunts.h). Empty until rare spawns are taken from the world DB.

@@ -9,6 +9,8 @@
 // Columns 16 on: detail (free text, commas replaced by ';'), then class and race (ids, 0 = unknown), then copper (the bot's
 // money; only on summary lines, empty on the others). Appended after detail so the first 15 columns and the detail position
 // keep their meaning for existing readers.
+// Columns 19 on (appended after copper, so every older column keeps its place): map (the bot's map id), no_route (refusals for no route
+// so far), stall_episodes (see StallAfterMs), alive (1 or 0). Copper is empty on the non-summary lines, so their line has an empty field there.
 // Summary lines are written every SummaryEveryMs per bot, so a run that stops writing has stopped.
 #pragma once
 
@@ -33,6 +35,10 @@ public:
         // Class and race ids by bot guid, for the class and race columns (0 = unknown, also when unset).
         std::function<std::uint32_t(std::uint64_t botGuid)> ClassOf;
         std::function<std::uint32_t(std::uint64_t botGuid)> RaceOf;
+        // Stall watch (config key StallAfterMinutes): an alive bot out of combat that has not moved, levelled, changed its money or had an
+        // action applied for this long is reported once per episode ("stalled", then "unstalled"). Tagging only, nothing is done about it.
+        // 0 (default) turns it off.
+        std::uint64_t StallAfterMs = 0;
     };
 
     BotTelemetry(Sink sink, Options options) : _sink(std::move(sink)), _options(options) {}
@@ -79,10 +85,22 @@ private:
         std::uint32_t StuckEpisodes = 0;
         std::uint64_t LongestFightMs = 0;
         std::uint64_t HealthLost = 0;
+        std::uint32_t NoRoutes = 0;
+        std::uint32_t StallEpisodes = 0;
+
+        // Stall watch: the last time the bot made progress, and what it was then.
+        std::uint64_t ProgressMs = 0;
+        float ProgressX = 0.0f;
+        float ProgressY = 0.0f;
+        std::uint32_t ProgressLevel = 0;
+        std::uint64_t ProgressCopper = 0;
+        bool Stalled = false;
     };
 
     void Seed(Record& record, forever_module::BotSnapshot const& bot, std::uint64_t nowMs);
-    void ReadResult(Record& record, forever_module::BotSnapshot const& bot);
+    // Returns true when an action's result was counted (applied or refused) by this snapshot.
+    bool ReadResult(Record& record, forever_module::BotSnapshot const& bot);
+    void CheckStall(Record& record, forever_module::BotSnapshot const& bot, std::uint64_t nowMs, bool appliedAction);
     void EndFight(Record& record, forever_module::BotSnapshot const& bot, std::uint64_t nowMs, char const* reason, bool targetPresent);
     void CheckStuck(Record& record, forever_module::BotSnapshot const& bot, std::uint64_t nowMs);
     void CheckQuests(Record& record, forever_module::BotSnapshot const& bot, std::uint64_t nowMs);

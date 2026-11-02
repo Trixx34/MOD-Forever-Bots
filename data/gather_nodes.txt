@@ -1,0 +1,3 @@
+# Gathering nodes (src/gather_nodes.h): "skill map x y z entry", one per line.
+# Generated from the world DB by tools/gen_gather_nodes.py. Not yet generated: the world DB was not reachable when this file was made,
+# so the table is empty and the gather walk does nothing until it is generated.

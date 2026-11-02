@@ -111,6 +111,54 @@ std::vector<Listing> PlanListings(Settings const& settings, Bags const&, Standin
     return plan;
 }
 
+std::vector<GoodsListing> PlanGoods(Settings const& settings, Standing const& standing, std::vector<Candidate> const& items)
+{
+    std::vector<GoodsListing> plan;
+    if (!settings.Enabled || !settings.GoodsSell || standing.ListedNow >= settings.ListedMax)
+        return plan;
+
+    struct Ranked
+    {
+        GoodsListing Listing;
+        std::uint64_t Value; // copper the whole listing is worth at the unit price
+    };
+    std::vector<Ranked> ranked;
+    for (Candidate const& item : items)
+    {
+        if (!item.Goods || !item.Stackable || item.ItemGuid == 0 || item.Bound || item.QuestItem || item.Needed || item.Count < 2)
+            continue;
+        if (item.Quality < settings.GoodsMinQuality || item.VendorSellCopper == 0)
+            continue;
+        if (item.VendorSellCopper < settings.MinVendorCopper)
+            continue;
+        auto const listed = standing.GoodsListed.find(item.Entry);
+        if (listed != standing.GoodsListed.end() && listed->second >= settings.GoodsPerEntryMax)
+            continue;
+        std::uint64_t const vendorUnit = item.VendorSellCopper / item.Count;
+        std::uint64_t unitPrice = vendorUnit * settings.GoodsPct / 100;
+        if (unitPrice == 0)
+            unitPrice = 1;
+        std::uint32_t const count = std::min<std::uint32_t>(item.Count, settings.GoodsStackMax);
+        if (count == 0 || unitPrice > 0xFFFFFFFFu)
+            continue;
+        ranked.push_back({ { item.ItemGuid, item.Entry, count, std::uint32_t(unitPrice) }, unitPrice * count });
+    }
+    // The dearest first, as PlanListings does.
+    std::sort(ranked.begin(), ranked.end(), [](Ranked const& a, Ranked const& b)
+    {
+        return a.Value != b.Value ? a.Value > b.Value : a.Listing.ItemGuid < b.Listing.ItemGuid;
+    });
+    std::uint32_t const room = settings.ListedMax - standing.ListedNow;
+    std::uint32_t const take = std::min(room, settings.PerVisit);
+    for (Ranked const& entry : ranked)
+    {
+        if (plan.size() >= take)
+            break;
+        plan.push_back(entry.Listing);
+    }
+    return plan;
+}
+
 std::vector<std::uint64_t> ForVendor(Settings const& settings, Standing const& standing, std::vector<Candidate> const& items)
 {
     std::vector<std::uint64_t> sell;
@@ -207,6 +255,12 @@ std::string ListedLine(std::uint64_t bot, Listing const& listing, std::uint32_t 
 {
     return "auction: bot " + std::to_string(bot) + " listed item " + std::to_string(listing.ItemGuid) + " for " + std::to_string(listing.Bid) + " copper (buyout " +
            std::to_string(listing.Buyout) + ") entry=" + std::to_string(listing.Entry) + " count=" + std::to_string(count) + " price=" + std::to_string(listing.Bid);
+}
+
+std::string GoodsListedLine(std::uint64_t bot, GoodsListing const& listing)
+{
+    return "auction: bot " + std::to_string(bot) + " listed goods item " + std::to_string(listing.ItemGuid) + " entry=" + std::to_string(listing.Entry) +
+           " count=" + std::to_string(listing.Count) + " unit_price=" + std::to_string(listing.UnitPrice);
 }
 
 std::string ListRefusedLine(std::uint64_t bot, Listing const& listing, std::string const& reason)

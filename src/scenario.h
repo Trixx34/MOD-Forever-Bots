@@ -82,6 +82,10 @@ struct ScenarioPlan
     bool TameEnabled = false;
     std::uint32_t TameMap = 0;
     ScenarioPoint TameSpot;
+    // The config guard (ScenarioConfigGuard, off by default): the dressing does not end until the core has applied a teleport that the director sends a living bot
+    // (to its own spot). A refused teleport, or grants refused for two bots with none applied, ends the run as "config_refused"; no applied teleport within
+    // kConfigProbeTimeoutMs ends it as "config_unknown". Without the guard a core with its teleport or grant switched off ran the whole scenario in the wrong place.
+    bool VerifyConfig = false;
 };
 
 enum class ScenarioPhase
@@ -98,7 +102,7 @@ enum class ScenarioPhase
 struct ScenarioResult
 {
     std::string Name;
-    std::string Outcome;            // complete, wipe, timeout, enter_failed, understrength, abandoned_dead_leader, bosses_missing
+    std::string Outcome;            // complete, wipe, timeout, enter_failed, understrength, abandoned_dead_leader, bosses_missing, config_refused, config_unknown
     std::uint64_t RunMs = 0;        // time spent in Running
     std::uint32_t Furthest = 0;     // route points the leader reached (0..RouteSize)
     std::uint32_t RouteSize = 0;
@@ -116,6 +120,8 @@ struct ScenarioResult
     std::uint32_t Groups = 0;
     std::uint32_t BossesTotal = 0;  // bosses the plan lists
     std::vector<std::string> BossesKilled; // names of the ones seen dead, in the order they were seen
+    // The same bosses with the time into the run they were seen dead (ms), in that order: boss_ms=Name:ms in the result line, so a clear's pace is in the log.
+    std::vector<std::pair<std::string, std::uint64_t>> BossKillMs;
     std::vector<std::pair<std::uint32_t, std::uint32_t>> Party; // race and class id of each member, in the order first seen
 };
 
@@ -138,6 +144,9 @@ constexpr std::uint32_t kSupplyUselessMax = 3;       // grants in a row after wh
 // The roster is complete (every bot in view) but one of them is already dead: the run starts anyway this long after the last one came into view. A bot that
 // died before the 40th was spawned (2026-10-29 22:31: the first tank, killed by Emberstrife while the roster was still spawning) held Waiting for good.
 constexpr std::uint64_t kRosterDeadGraceMs = 30000;
+constexpr std::uint64_t kConfigProbeRetryMs = 6000;   // a config probe the core has not answered (or answered without applying) is sent again after this
+constexpr std::uint64_t kConfigProbeTimeoutMs = 60000; // no applied probe in this long: the run ends as config_unknown
+constexpr std::uint32_t kConfigProbeRefusalsMax = 3;   // refusals in a row (a teleport refused in combat is not the config) that end the run as config_refused
 constexpr std::uint64_t kGroupingTimeoutMs = 120000;
 constexpr std::uint64_t kMembersDelayMs = 3000;
 constexpr std::uint64_t kEnterRetryMs = 10000;
@@ -198,8 +207,21 @@ public:
 
 private:
     void Finish(std::string outcome, std::uint64_t nowMs);
+    // The config guard (ScenarioPlan::VerifyConfig): reads the grant results of the dressing, and sends the teleport probe until the core applies one.
+    void CheckConfig(forever_module::WorldTickSnapshotView const& view, std::uint64_t nowMs, std::vector<forever_module::BotAction>& actions);
 
     ScenarioPlan _plan;
+    bool _teleportOk = false;                              // the core applied a probe teleport
+    bool _grantOk = false;                                 // the core applied a dressing grant
+    bool _probeSent = false;                               // a probe is out and not yet answered
+    std::uint64_t _probeGuid = 0;                          // the living bot the last probe teleport was sent to
+    std::uint64_t _probeFirstMs = 0;                       // when the first probe was sent (the timeout counts from it)
+    std::uint64_t _probeSentMs = 0;                        // when the last probe was sent
+    std::uint32_t _probeBaseline = 0;                      // that bot's last_action_sequence before the last probe
+    std::uint32_t _probeRefusals = 0;                      // probe teleports the core refused in a row
+    std::map<std::uint64_t, std::uint32_t> _grantSeqSeen; // bot -> last_action_sequence of the last grant result looked at
+    std::set<std::uint64_t> _grantRefusedBy;               // bots whose dressing grant the core refused
+    std::vector<std::pair<std::string, std::uint64_t>> _bossKillMs; // boss name and ms into the run, in the order seen dead
     ScenarioPhase _phase = ScenarioPhase::Waiting;
     std::uint64_t _phaseSinceMs = 0;
     bool _phaseStarted = false;

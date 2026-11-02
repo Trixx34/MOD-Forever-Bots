@@ -41,6 +41,7 @@ struct Online
 {
     std::uint64_t Guid = 0;
     bool Idle = true;     // nothing that a log off would cut short: no fight, party, command, trade, walk to a vendor
+    std::uint32_t Level = 0; // the bot's level (the brackets count it; 0 = unknown)
 };
 
 struct Decisions

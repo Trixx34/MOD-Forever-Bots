@@ -36,7 +36,7 @@ std::string Field(std::string text)
 char const* BotTelemetry::Header()
 {
     return "time_ms,kind,bot,level,health_pct,power_pct,in_fight,fights,targets_gone,deaths,casts_applied,refusals,"
-           "stuck_episodes,longest_fight_ms,health_lost,detail,class,race,copper";
+           "stuck_episodes,longest_fight_ms,health_lost,detail,class,race,copper,map,no_route,stall_episodes,alive";
 }
 
 void BotTelemetry::Observe(WorldTickSnapshotView const& view, std::uint64_t nowMs)
@@ -48,7 +48,7 @@ void BotTelemetry::Observe(WorldTickSnapshotView const& view, std::uint64_t nowM
         if (!record.Seeded)
             Seed(record, bot, nowMs);
 
-        ReadResult(record, bot);
+        bool const appliedAction = ReadResult(record, bot);
 
         // Death and revival. A death ends the fight in progress.
         if (bot.life_state != 0 && record.Alive)
@@ -165,6 +165,8 @@ void BotTelemetry::Observe(WorldTickSnapshotView const& view, std::uint64_t nowM
                 CheckStuck(record, bot, nowMs);
         }
 
+        CheckStall(record, bot, nowMs, appliedAction);
+
         if (nowMs >= record.NextSummaryMs)
         {
             record.NextSummaryMs = nowMs + _options.SummaryEveryMs;
@@ -184,18 +186,63 @@ void BotTelemetry::Seed(Record& record, BotSnapshot const& bot, std::uint64_t no
     record.LastX = bot.pos_x;
     record.LastY = bot.pos_y;
     record.LastChangeMs = nowMs;
+    record.ProgressMs = nowMs;
+    record.ProgressX = bot.pos_x;
+    record.ProgressY = bot.pos_y;
+    record.ProgressLevel = bot.level;
+    record.ProgressCopper = bot.copper;
 }
 
-// Counts the result of the bot's last action, once per sequence number.
-void BotTelemetry::ReadResult(Record& record, BotSnapshot const& bot)
+// Counts the result of the bot's last action, once per sequence number. Returns true when that result was applied.
+bool BotTelemetry::ReadResult(Record& record, BotSnapshot const& bot)
 {
     if (bot.last_action_sequence == 0 || bot.last_action_sequence == record.LastSequence)
-        return;
+        return false;
     record.LastSequence = bot.last_action_sequence;
     if (bot.last_action_status == BotActionStatus::kApplied)
+    {
         record.CastsApplied++;
-    else if (bot.last_action_status != BotActionStatus::kNone)
+        return true;
+    }
+    if (bot.last_action_status == BotActionStatus::kNoRoute)
+        record.NoRoutes++;
+    if (bot.last_action_status != BotActionStatus::kNone)
         record.Refusals++;
+    return false;
+}
+
+// Stall watch: progress is a move, a level, a change of money, time in combat, an applied action, or being dead (a dead bot waits on
+// someone else). A bot without any for StallAfterMs is stalled, once per episode.
+void BotTelemetry::CheckStall(Record& record, BotSnapshot const& bot, std::uint64_t nowMs, bool appliedAction)
+{
+    if (_options.StallAfterMs == 0)
+        return;
+    bool const moved = std::fabs(bot.pos_x - record.ProgressX) > kMovedYards || std::fabs(bot.pos_y - record.ProgressY) > kMovedYards;
+    bool const progressed = moved || appliedAction || bot.in_combat != 0 || !record.Alive || bot.level != record.ProgressLevel ||
+                            bot.copper != record.ProgressCopper;
+    if (progressed)
+    {
+        record.ProgressMs = nowMs;
+        record.ProgressX = bot.pos_x;
+        record.ProgressY = bot.pos_y;
+        record.ProgressLevel = bot.level;
+        record.ProgressCopper = bot.copper;
+        if (record.Stalled)
+        {
+            record.Stalled = false;
+            Write("unstalled", bot, record, nowMs, "");
+        }
+        return;
+    }
+    if (!record.Stalled && nowMs - record.ProgressMs >= _options.StallAfterMs)
+    {
+        record.Stalled = true;
+        record.StallEpisodes++;
+        std::ostringstream detail;
+        detail << "no progress for " << (nowMs - record.ProgressMs) << " ms map=" << bot.map_id << " x=" << std::lround(bot.pos_x)
+               << " y=" << std::lround(bot.pos_y) << " z=" << std::lround(bot.pos_z);
+        Write("stalled", bot, record, nowMs, detail.str());
+    }
 }
 
 // Layout 13: why the bot lost its target (0 none, 1 killed, 2 leashed, 3 despawned, 4 another player). A kill and a leash
@@ -315,5 +362,6 @@ void BotTelemetry::Write(char const* kind, BotSnapshot const& bot, Record const&
          << (_options.ClassOf ? _options.ClassOf(bot.guid) : 0) << ',' << (_options.RaceOf ? _options.RaceOf(bot.guid) : 0) << ',';
     if (std::strcmp(kind, "summary") == 0)
         line << bot.copper;
+    line << ',' << bot.map_id << ',' << record.NoRoutes << ',' << record.StallEpisodes << ',' << (record.Alive ? 1 : 0);
     _sink(line.str());
 }
