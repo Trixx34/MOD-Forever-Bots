@@ -597,6 +597,72 @@ private:
                        std::unordered_map<std::uint64_t, std::uint64_t>& leaderOf,
                        std::unordered_map<std::uint64_t, std::vector<std::uint64_t>>& membersOf) const;
 
+    // Decide, one bot at a time: DecideBot runs the steps of a bot's turn in order (bot_policy.cpp; the steps are in bot_policy_turn_*.cpp). DecideTick
+    // is what all the turns of one Decide call share, BotTurn what one bot's turn carries from one step to the next (both in bot_policy_internal.h). The
+    // steps were cut from a single loop: a step that answers TurnFlow::kSkip ends the bot's turn, as that loop's `continue` did.
+    struct DecideTick;
+    struct BotTurn;
+    enum class TurnFlow : std::uint8_t { kNext, kSkip };
+    void DecideBot(DecideTick& tick, std::size_t i);
+    TurnFlow TurnBegin(DecideTick& tick, BotTurn& turn);
+    TurnFlow TurnGroundEffects(DecideTick& tick, BotTurn& turn);
+    void TurnTargetMemory(DecideTick& tick, BotTurn& turn);
+    TurnFlow TurnDead(DecideTick& tick, BotTurn& turn);
+    // TurnDead's parts, in the order it runs them (bot_policy_turn_dead.cpp).
+    void DeadRecord(DecideTick& tick, BotTurn& turn);
+    TurnFlow DeadAnswerResurrect(DecideTick& tick, BotTurn& turn);
+    TurnFlow DeadCorpse(DecideTick& tick, BotTurn& turn);
+    TurnFlow DeadHeldByWarder(DecideTick& tick, BotTurn& turn);
+    TurnFlow DeadReviveByLeader(DecideTick& tick, BotTurn& turn);
+    void DeadGhostRun(DecideTick& tick, BotTurn& turn);
+    void DeadEmit(DecideTick& tick, BotTurn& turn, Decision const& wantedDead);
+    void DeadRunFailed(DecideTick& tick, BotTurn& turn, char const* why);
+    void LogEvent(std::string const& text) const;
+    void TurnRevivedAndRoles(DecideTick& tick, BotTurn& turn);
+    void TurnTalentsAndGear(DecideTick& tick, BotTurn& turn);
+    void TurnQuestsAndHold(DecideTick& tick, BotTurn& turn);
+    void TurnTargeting(DecideTick& tick, BotTurn& turn);
+    TurnFlow TurnCrowdControl(DecideTick& tick, BotTurn& turn);
+    TurnFlow TurnTaming(DecideTick& tick, BotTurn& turn);
+    void TurnFightWatch(DecideTick& tick, BotTurn& turn);
+    void TurnMoveSetup(DecideTick& tick, BotTurn& turn);
+    void TurnMoveChoice(DecideTick& tick, BotTurn& turn);
+    // TurnMoveChoice's parts (bot_policy_turn_move.cpp). RouteLeg (bot_policy_internal.h) is what the parts of the route leader's walk share.
+    struct RouteLeg;
+    void MoveToTarget(DecideTick& tick, BotTurn& turn);
+    void MoveWithoutTarget(DecideTick& tick, BotTurn& turn);
+    void RouteReadiness(DecideTick& tick, BotTurn& turn, RouteLeg& route);
+    void RouteLeaderRecover(DecideTick& tick, BotTurn& turn, RouteLeg& route);
+    void RouteEvents(DecideTick& tick, BotTurn& turn, RouteLeg& route);
+    void RouteWalkOn(DecideTick& tick, BotTurn& turn, RouteLeg& route);
+    void MoveForQuestOrGoto(DecideTick& tick, BotTurn& turn);
+    void TurnIdle(DecideTick& tick, BotTurn& turn);
+    void TurnShopping(DecideTick& tick, BotTurn& turn);
+    void TurnWander(DecideTick& tick, BotTurn& turn);
+    void TurnRestAndConsume(DecideTick& tick, BotTurn& turn);
+    void TurnTrainAndParty(DecideTick& tick, BotTurn& turn);
+    void TurnLootTaxiMount(DecideTick& tick, BotTurn& turn);
+    void TurnSendMove(DecideTick& tick, BotTurn& turn);
+    TurnFlow TurnForcedHeal(DecideTick& tick, BotTurn& turn);
+    TurnFlow TurnPartySupport(DecideTick& tick, BotTurn& turn);
+    // TurnPartySupport's parts (bot_policy_turn_cast.cpp).
+    TurnFlow PartyHeal(DecideTick& tick, BotTurn& turn);
+    TurnFlow PartyHealerDps(DecideTick& tick, BotTurn& turn);
+    TurnFlow PartyResurrect(DecideTick& tick, BotTurn& turn);
+    TurnFlow TurnHunterPet(DecideTick& tick, BotTurn& turn);
+    void TurnUpkeepBuffs(DecideTick& tick, BotTurn& turn);
+    void TurnCraftGather(DecideTick& tick, BotTurn& turn);
+    TurnFlow TurnRotation(DecideTick& tick, BotTurn& turn);
+    // What the steps ask about the bots of this tick.
+    bool IsRouteActive(std::uint64_t guid) const;
+    std::set<std::uint32_t> const& KilledBossesOf(std::uint64_t guid) const;
+    bool IsRezzer(forever_module::BotSnapshot const& member) const;
+    bool PartyFighting(DecideTick const& tick, std::uint64_t leaderGuid) const;
+    std::set<std::uint64_t> PartyEngagedTargets(DecideTick const& tick, std::uint64_t leaderGuid) const;
+    bool InterruptTaken(DecideTick const& tick, forever_module::BotSnapshot const& bot, std::uint64_t leaderGuid) const;
+    std::uint8_t DeadWait(DecideTick const& tick, std::uint64_t leaderGuid) const;
+    std::uint64_t WanderIdleFor(BotTurn& turn) const;
+
     // The state of a bot, created on first use with the starting stance (PolicyOptions::AggressiveStart).
     BotState& StateOf(std::uint64_t botGuid)
     {
