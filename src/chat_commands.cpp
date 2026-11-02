@@ -132,6 +132,7 @@ char const* ChatVerbName(ChatVerb verb)
         case ChatVerb::LeadOff: return "lead off";
         case ChatVerb::Distance: return "distance";
         case ChatVerb::Help: return "help";
+        case ChatVerb::Lfg: return "lfg";
         case ChatVerb::None: break;
     }
     return "none";
@@ -147,6 +148,7 @@ std::vector<std::string> ChatHelpLines(bool orders, bool control)
     lines.push_back("release - a dead bot releases its spirit now.");
     lines.push_back("status - one line per bot, whispered back.");
     lines.push_back("help - this list.");
+    lines.push_back("lfg <dungeon> - fill your group with the missing roles from the free bots and run that dungeon (the dungeon key, e.g. rfc, or a word of its name).");
     if (orders)
     {
         lines.push_back("stop - drop follow, goto and stay.");
@@ -267,6 +269,15 @@ std::optional<ChatCommand> ParseChatCommand(std::string_view text, bool orders, 
             return std::nullopt;
         command.Value = yards;
         return finish(ChatVerb::Distance);
+    }
+    if (verb == "lfg")
+    {
+        // "lfg <dungeon>": no selector (a selector word first would make "lfg" the verb's argument); the dungeon is one to three words.
+        if (at != 0 || args == 0)
+            return std::nullopt;
+        for (std::size_t i = at + 1; i < words.size(); ++i)
+            command.Arg += (command.Arg.empty() ? "" : " ") + words[i];
+        return finish(ChatVerb::Lfg);
     }
     if (verb == "goto") return args == 1 && arg == "here" ? finish(ChatVerb::GotoHere) : std::nullopt;
     if (args != 0)

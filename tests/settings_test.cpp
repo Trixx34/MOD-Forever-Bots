@@ -44,6 +44,17 @@ void ChatSettings()
     CHECK(on.ChatCommands && on.ChatOrders && on.ChatControl && on.QuestTeleport && warnings.empty());
 }
 
+void LevelDungeonSettings()
+{
+    std::vector<std::string> warnings;
+    BotSettings const defaults = ParseBotSettings({}, warnings);
+    CHECK(defaults.LevelDungeons && defaults.LevelDungeonRuns == 2 && defaults.LfgCommand); // on by default
+    BotSettings const set = ParseBotSettings({ { "LevelDungeons", "0" }, { "LevelDungeonRuns", "4" }, { "LfgCommand", "0" } }, warnings);
+    CHECK(!set.LevelDungeons && set.LevelDungeonRuns == 4 && !set.LfgCommand && warnings.empty());
+    CHECK(ParseBotSettings({ { "LevelDungeonRuns", "0" } }, warnings).LevelDungeonRuns == 1);
+    CHECK(ParseBotSettings({ { "LevelDungeonRuns", "99" } }, warnings).LevelDungeonRuns == 5);
+}
+
 void SayAndSupplySettings()
 {
     std::vector<std::string> warnings;
@@ -475,6 +486,7 @@ int main()
     CorpseRunTeleportSettings();
     ErrandSettings();
     ChatSettings();
+    LevelDungeonSettings();
     SayAndSupplySettings();
     DefaultsWhenEmpty();
     TelemetrySettings();

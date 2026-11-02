@@ -60,6 +60,84 @@ void OrdinaryChatIsNotACommand()
     CHECK(!ParseChatCommand("all", true)); // a selector alone is not a command
 }
 
+void ParsesLfg()
+{
+    auto cmd = ParseChatCommand("LFG rfc", false);
+    CHECK(cmd && cmd->Verb == ChatVerb::Lfg && cmd->Arg == "rfc" && cmd->Selector.All); // no ChatOrders or ChatControl needed
+    cmd = ParseChatCommand("lfg Ragefire Chasm", false);
+    CHECK(cmd && cmd->Verb == ChatVerb::Lfg && cmd->Arg == "ragefire chasm");
+    cmd = ParseChatCommand("  lfg   DM  ", false);
+    CHECK(cmd && cmd->Verb == ChatVerb::Lfg && cmd->Arg == "dm");
+    CHECK(!ParseChatCommand("lfg", true, true));                  // no dungeon
+    CHECK(!ParseChatCommand("tank lfg dm", true, true));          // no selector
+    CHECK(!ParseChatCommand("lfg the deadmines now please", true, true)); // too long: ordinary chat
+    CHECK(!ParseChatCommand("anyone lfg rfc", true, true));
+    CHECK(std::string(ChatVerbName(ChatVerb::Lfg)) == "lfg");
+    CHECK(!IsOrderVerb(ChatVerb::Lfg) && !IsControlVerb(ChatVerb::Lfg));
+}
+
+// LFG: the speaker has a warrior and a priest in its group; the missing roles (two dps) are summoned from the free bots of the dungeon's level range.
+std::uint32_t LfgClassOf(std::uint64_t guid)
+{
+    switch (guid)
+    {
+        case 10: return 1;   // the group's warrior
+        case 11: return 5;   // the group's priest
+        case 20: return 1;   // free: warrior (not needed), priest, mage, rogue, hunter of level 40 (out of range)
+        case 21: return 5;
+        case 22: return 8;
+        case 23: return 4;
+        default: return 3;
+    }
+}
+
+void LfgSummonsTheMissingRolesAndAnswers()
+{
+    PolicyOptions options;
+    options.ClassOf = LfgClassOf;
+    PolicyOptions::DungeonRoute rfc;
+    rfc.Id = "rfc";
+    rfc.Name = "Ragefire Chasm";
+    rfc.MinLevel = 13;
+    rfc.MaxLevel = 18;
+    rfc.HasEntry = true;
+    rfc.Entry = Point{ 1.0f, 2.0f, 3.0f };
+    rfc.Route = { Point{ 1.0f, 2.0f, 3.0f }, Point{ 10.0f, 2.0f, 3.0f } };
+    options.DungeonsByMap[389] = rfc;
+    BotPolicy policy(options);
+
+    WorldTickSnapshotView view;
+    view.tick_number = 1;
+    view.max_nearby_units = 4;
+    for (std::uint64_t guid : { 10, 11, 20, 21, 22, 23, 24 })
+    {
+        BotSnapshot bot;
+        bot.guid = guid;
+        bot.health = 1000;
+        bot.max_health = 1000;
+        bot.level = guid == 24 ? 40 : (guid < 20 ? 20 : 15);
+        bot.map_id = 0;
+        if (guid < 20)
+        {
+            bot.group_role = 1;
+            bot.group_size = 3;
+            bot.group_leader_guid = PlayerRef();
+        }
+        view.bots.push_back(bot);
+    }
+    view.nearby.resize(view.bots.size() * view.max_nearby_units);
+
+    auto const unknown = policy.ApplyChat(view, Ctx(), *ParseChatCommand("lfg zzz", false), 1000);
+    CHECK(unknown.size() == 1 && unknown[0].find("rfc") != std::string::npos);
+
+    auto const lines = policy.ApplyChat(view, Ctx(), *ParseChatCommand("LFG RFC", false), 1100);
+    CHECK(lines.size() == 1 && lines[0].find("LFG rfc: group of 3, filling dps x2") == 0);
+    auto const actions = policy.Decide(view, 1200);
+    CHECK(Has(actions, 22, ActionType::kSummon, PlayerRef()));   // the mage and the rogue; the free priest and the warrior are not needed
+    CHECK(Has(actions, 23, ActionType::kSummon, PlayerRef()));
+    CHECK(!Has(actions, 20, ActionType::kSummon) && !Has(actions, 21, ActionType::kSummon) && !Has(actions, 24, ActionType::kSummon));
+}
+
 void ParsesSelectors()
 {
     auto cmd = ParseChatCommand("healer follow", false);
@@ -823,6 +901,8 @@ int main()
 {
     BotsAnswerAnOrderOutLoudUpToTheCap();
     ParsesBasicVerbs();
+    ParsesLfg();
+    LfgSummonsTheMissingRolesAndAnswers();
     OrdersNeedTheSwitch();
     OrdinaryChatIsNotACommand();
     ParsesSelectors();

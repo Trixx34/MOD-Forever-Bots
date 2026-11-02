@@ -1588,6 +1588,9 @@ std::vector<std::string> BotPolicy::ApplyChat(WorldTickSnapshotView const& view,
     // help needs no bot (any party member can ask for it, led bots or not), and is never said out loud.
     if (command.Verb == ChatVerb::Help)
         return ChatHelpLines(chat.Orders, chat.Control);
+    // lfg works on bots that are not in the speaker's group yet: its own path.
+    if (command.Verb == ChatVerb::Lfg)
+        return ApplyLfg(view, chat, command, nowMs);
 
     std::vector<std::string> lines;
     std::vector<std::uint64_t> accepted; // the bots that took the order, for the say-back
@@ -1651,28 +1654,11 @@ std::vector<std::string> BotPolicy::ApplyChat(WorldTickSnapshotView const& view,
                     refuse("not in a dungeon with a known route");
                     break;
                 }
-                state.TankLead = true;
                 state.ChatFollow = 0;
                 state.ChatStay = false;
                 state.GotoActive = false;
-                state.Events.reset();
-                _tankKilled[bot.map_id].clear();
-                // On from the point nearest to where the tank stands, not from the entrance: it can be told in the middle of a dungeon.
-                std::size_t nearest = 0;
-                float nearestDistance = 1e30f;
-                for (std::size_t i = 0; i < dungeon->second.Route.size(); ++i)
-                {
-                    float const distance = DistanceTo(bot, dungeon->second.Route[i]);
-                    if (distance < nearestDistance)
-                    {
-                        nearestDistance = distance;
-                        nearest = i;
-                    }
-                }
-                state.RouteIndex = nearest;
-                state.RouteNoRoute = 0;
-                state.RouteBossSinceMs = 0;
-                state.Last.reset();
+                state.LevelRun = false;
+                std::size_t const nearest = BeginTankLead(state, bot, dungeon->second);
                 lines.push_back("lead: " + std::to_string(bot.guid) + " leads from point " + std::to_string(nearest + 1) + " of " + std::to_string(dungeon->second.Route.size()) + ".");
                 break;
             }
@@ -1838,6 +1824,7 @@ std::vector<std::string> BotPolicy::ApplyChat(WorldTickSnapshotView const& view,
                 }
                 break;
             case ChatVerb::None:
+            case ChatVerb::Lfg:  // handled above, before this loop
             case ChatVerb::Help: // handled above, before this loop
                 break;
         }
@@ -1870,6 +1857,382 @@ std::vector<std::string> BotPolicy::ApplyChat(WorldTickSnapshotView const& view,
     else if (refused != 0)
         lines.push_back(std::string(ChatVerbName(command.Verb)) + ": " + std::to_string(refused) + " of " + std::to_string(matched) + " bot(s) refused (" + refusal + ").");
     return lines;
+}
+
+std::size_t BotPolicy::BeginTankLead(BotState& state, BotSnapshot const& bot, PolicyOptions::DungeonRoute const& dungeon)
+{
+    state.TankLead = true;
+    state.Events.reset();
+    _tankKilled[bot.map_id].clear();
+    // On from the point nearest to where the tank stands, not from the entrance: it can be told in the middle of a dungeon.
+    std::size_t nearest = 0;
+    float nearestDistance = 1e30f;
+    for (std::size_t i = 0; i < dungeon.Route.size(); ++i)
+    {
+        float const distance = DistanceTo(bot, dungeon.Route[i]);
+        if (distance < nearestDistance)
+        {
+            nearestDistance = distance;
+            nearest = i;
+        }
+    }
+    state.RouteIndex = nearest;
+    state.RouteNoRoute = 0;
+    state.RouteBossSinceMs = 0;
+    state.Last.reset();
+    return nearest;
+}
+
+namespace {
+
+constexpr std::uint32_t kLevelDungeonMinMembers = 3;      // a bot party smaller than this does not go into a dungeon on its own
+constexpr std::uint64_t kLevelHoldMs = 4000;              // after a teleport order a bot takes no other order for this long
+constexpr std::uint64_t kLevelEnterRetryMs = 8000;        // the teleport into the dungeon is sent again to a bot that is not there yet
+constexpr std::uint64_t kLevelEnterTimeoutMs = 40000;     // the party is not in by then: the attempt is given up (and counted)
+constexpr std::uint64_t kLevelRunMaxMs = 45 * 60 * 1000;  // a run that is not over by then is ended (an attempt that did not clear it)
+constexpr std::uint64_t kLfgJoinWaitMs = 60000;           // LFG: how long the speaker has to invite the bots that were brought
+constexpr std::uint64_t kLfgOrderMaxMs = 10 * 60 * 1000;  // LFG: an order nobody finished is dropped after this
+
+// The dungeons of the options that a party can run (a route and an entry), for level_dungeon.h, with the map each is on.
+struct KnownDungeons
+{
+    std::vector<level_dungeon::Dungeon> List;
+    std::vector<PolicyOptions::DungeonRoute const*> Routes;
+};
+
+KnownDungeons KnownDungeonsOf(PolicyOptions const& options)
+{
+    KnownDungeons known;
+    for (auto const& [map, route] : options.DungeonsByMap)
+    {
+        if (route.Id.empty() || route.Route.empty() || !route.HasEntry)
+            continue;
+        known.List.push_back(level_dungeon::Dungeon{ route.Id, route.Name, route.MinLevel, route.MaxLevel, map });
+        known.Routes.push_back(&route);
+    }
+    return known;
+}
+
+} // namespace
+
+void BotPolicy::DriveLevelDungeons(WorldTickSnapshotView const& view, std::unordered_map<std::uint64_t, std::size_t> const& indexOf,
+                                   std::unordered_map<std::uint64_t, std::vector<std::uint64_t>> const& membersOf, std::uint64_t nowMs,
+                                   std::vector<BotAction>& actions)
+{
+    auto const event = [&](std::string const& text)
+    {
+        if (_options.OnEvent)
+            _options.OnEvent(text);
+    };
+    auto const teleport = [&](BotSnapshot const& bot, std::uint32_t map, Point const& to)
+    {
+        BotAction action;
+        action.bot_guid = bot.guid;
+        action.type = ActionType::kTeleport;
+        action.spell_id = map;
+        action.dest_x = to.X;
+        action.dest_y = to.Y;
+        action.dest_z = to.Z;
+        actions.push_back(action);
+        BotState& state = StateOf(bot.guid);
+        state.Last.reset();
+        state.GotoActive = false;
+        state.LevelHoldUntilMs = nowMs + kLevelHoldMs;
+    };
+    auto const snapshotOf = [&](std::uint64_t guid) -> BotSnapshot const*
+    {
+        auto const at = indexOf.find(guid);
+        return at == indexOf.end() ? nullptr : &view.bots[at->second];
+    };
+
+    // ---- Level dungeons: one run per bot party ----
+    if (_options.LevelDungeons)
+    {
+        KnownDungeons const known = KnownDungeonsOf(_options);
+        for (auto const& partyEntry : membersOf)
+        {
+            std::uint64_t const leaderGuid = partyEntry.first;
+            std::vector<std::uint64_t> const& members = partyEntry.second;
+            BotSnapshot const* const leader = snapshotOf(leaderGuid);
+            if (!leader)
+                continue;
+            auto run = _levelRuns.find(leaderGuid);
+            if (run == _levelRuns.end())
+            {
+                // Not in a run: due? Never in combat, never while a member is dead or away, never inside a dungeon, never while the tank leads on a chat order.
+                if (known.List.empty() || members.empty() || members.size() + 1 < kLevelDungeonMinMembers || leader->life_state != 0 || leader->in_combat != 0 ||
+                    leader->group_role != 2 || _options.DungeonsByMap.count(leader->map_id) != 0 || StateOf(leaderGuid).TankLead)
+                    continue;
+                std::uint32_t level = leader->level;
+                bool ready = level != 0;
+                std::vector<BotSnapshot const*> party{ leader };
+                for (std::uint64_t member : members)
+                {
+                    BotSnapshot const* const other = snapshotOf(member);
+                    if (!other || other->life_state != 0 || other->in_combat != 0 || other->in_flight != 0 || other->level == 0 ||
+                        other->group_leader_guid != PlayerRef(leaderGuid) || _options.DungeonsByMap.count(other->map_id) != 0)
+                    {
+                        ready = false;
+                        break;
+                    }
+                    level = std::min(level, other->level);
+                    party.push_back(other);
+                }
+                if (!ready)
+                    continue;
+                level_dungeon::Book& book = _levelBooks[leaderGuid];
+                int const due = level_dungeon::Due(known.List, level, book, _options.LevelDungeonRuns);
+                if (due < 0)
+                    continue;
+                PolicyOptions::DungeonRoute const& dungeon = *known.Routes[std::size_t(due)];
+                level_dungeon::NoteStarted(book, dungeon.Id, level);
+                LevelDungeonRun started;
+                started.Map = known.List[std::size_t(due)].MapId;
+                started.Id = dungeon.Id;
+                started.StartMs = nowMs;
+                started.RetryMs = nowMs + kLevelEnterRetryMs;
+                started.OriginMap = leader->map_id;
+                started.Origin = Point{ leader->pos_x, leader->pos_y, leader->pos_z };
+                started.PartyLevel = level;
+                for (BotSnapshot const* member : party)
+                    teleport(*member, started.Map, dungeon.Entry);
+                _levelRuns[leaderGuid] = started;
+                event("level_dungeon_start: leader=" + std::to_string(leaderGuid) + " dungeon=" + dungeon.Id + " level=" + std::to_string(level) +
+                      " run=" + std::to_string(book.Dungeons[dungeon.Id].Runs) + " members=" + std::to_string(party.size()));
+                continue;
+            }
+
+            // In a run.
+            LevelDungeonRun& current = run->second;
+            auto const route = _options.DungeonsByMap.find(current.Map);
+            BotState& leaderState = StateOf(leaderGuid);
+            auto const sendHome = [&]()
+            {
+                if (leader->life_state == 0 && leader->map_id == current.Map)
+                    teleport(*leader, current.OriginMap, current.Origin);
+                for (std::uint64_t member : members)
+                    if (BotSnapshot const* other = snapshotOf(member); other && other->life_state == 0 && other->map_id == current.Map)
+                        teleport(*other, current.OriginMap, current.Origin);
+            };
+            if (route == _options.DungeonsByMap.end())
+            {
+                leaderState.TankLead = false;
+                leaderState.LevelRun = false;
+                sendHome();
+                event("level_dungeon_end: leader=" + std::to_string(leaderGuid) + " dungeon=" + current.Id + " result=route_gone");
+                _levelRuns.erase(run);
+                continue;
+            }
+            if (current.Phase_ == LevelDungeonRun::Phase::Entering)
+            {
+                if (leader->map_id == current.Map && leader->life_state == 0)
+                {
+                    leaderState.ChatFollow = 0;
+                    leaderState.ChatStay = false;
+                    leaderState.LevelRun = true;
+                    std::size_t const nearest = BeginTankLead(leaderState, *leader, route->second);
+                    current.Phase_ = LevelDungeonRun::Phase::Running;
+                    current.StartMs = nowMs;
+                    event("level_dungeon_in: leader=" + std::to_string(leaderGuid) + " dungeon=" + current.Id + " point=" + std::to_string(nearest + 1) + "/" +
+                          std::to_string(route->second.Route.size()));
+                }
+                else if (nowMs - current.StartMs > kLevelEnterTimeoutMs)
+                {
+                    sendHome();
+                    event("level_dungeon_end: leader=" + std::to_string(leaderGuid) + " dungeon=" + current.Id + " result=not_entered");
+                    _levelRuns.erase(run);
+                }
+                else if (nowMs >= current.RetryMs)
+                {
+                    current.RetryMs = nowMs + kLevelEnterRetryMs;
+                    if (leader->map_id != current.Map && leader->life_state == 0)
+                        teleport(*leader, current.Map, route->second.Entry);
+                    for (std::uint64_t member : members)
+                        if (BotSnapshot const* other = snapshotOf(member); other && other->life_state == 0 && other->map_id != current.Map)
+                            teleport(*other, current.Map, route->second.Entry);
+                }
+                continue;
+            }
+            // Running: over when the route is walked (cleared), the lead was ended (stop, lead off, left the map) or the time is up.
+            bool const cleared = leaderState.TankLead && leaderState.RouteIndex >= route->second.Route.size();
+            bool const ended = !leaderState.TankLead || leader->map_id != current.Map;
+            bool const late = nowMs - current.StartMs > kLevelRunMaxMs;
+            if (cleared || ended || late)
+            {
+                if (cleared)
+                    level_dungeon::NoteCleared(_levelBooks[leaderGuid], current.Id);
+                leaderState.TankLead = false;
+                leaderState.LevelRun = false;
+                leaderState.Events.reset();
+                sendHome();
+                event("level_dungeon_end: leader=" + std::to_string(leaderGuid) + " dungeon=" + current.Id + " result=" + (cleared ? "cleared" : (late ? "timeout" : "ended")) +
+                      " level=" + std::to_string(leader->level));
+                _levelRuns.erase(run);
+            }
+        }
+        // A run whose party is gone (bots logged off, party redrawn) is dropped; its tank flag too.
+        for (auto run = _levelRuns.begin(); run != _levelRuns.end();)
+        {
+            if (membersOf.count(run->first) == 0 || snapshotOf(run->first) == nullptr)
+            {
+                if (auto const state = _bots.find(run->first); state != _bots.end())
+                    state->second.LevelRun = false;
+                run = _levelRuns.erase(run);
+            }
+            else
+                ++run;
+        }
+    }
+
+    // ---- LFG: the group of the speaker goes into the dungeon once the asked bots have joined ----
+    for (auto order = _lfgOrders.begin(); order != _lfgOrders.end();)
+    {
+        std::vector<BotSnapshot const*> group;
+        for (BotSnapshot const& bot : view.bots)
+            if (bot.group_leader_guid == order->first)
+                group.push_back(&bot);
+        LfgOrder& lfg = order->second;
+        auto const route = _options.DungeonsByMap.find(lfg.Map);
+        bool drop = route == _options.DungeonsByMap.end() || nowMs - lfg.StartMs > kLfgOrderMaxMs;
+        if (!drop && !lfg.Entered)
+        {
+            std::size_t joined = 0;
+            for (BotSnapshot const* bot : group)
+                joined += std::find(lfg.Asked.begin(), lfg.Asked.end(), bot->guid) != lfg.Asked.end() ? 1 : 0;
+            bool const waitedEnough = nowMs - lfg.StartMs > kLfgJoinWaitMs;
+            bool const ready = lfg.Asked.empty() ? !group.empty() : (joined == lfg.Asked.size() || (joined > 0 && waitedEnough));
+            if (ready)
+            {
+                for (BotSnapshot const* bot : group)
+                    if (bot->life_state == 0 && bot->in_combat == 0)
+                        teleport(*bot, lfg.Map, route->second.Entry);
+                lfg.Entered = true;
+                lfg.RetryMs = nowMs;
+                event("lfg_enter: speaker=" + std::to_string(order->first) + " dungeon=" + lfg.Id + " bots=" + std::to_string(group.size()));
+            }
+            else if (waitedEnough && joined == 0 && lfg.Asked.size() > 0 && nowMs - lfg.StartMs > 2 * kLfgJoinWaitMs)
+                drop = true; // nobody invited them
+        }
+        else if (!drop)
+        {
+            // Inside: the first tank-class bot of the group in the dungeon leads. No such bot (a human tank): the order is over.
+            bool led = false;
+            for (BotSnapshot const* bot : group)
+            {
+                BotState& state = StateOf(bot->guid);
+                if (bot->map_id != lfg.Map || bot->life_state != 0 || state.TankLead)
+                    continue;
+                if (state.Role_ == BotState::Role::Tank || (state.Role_ == BotState::Role::Auto && ClassFor(_options, bot->guid) == kWarriorClass))
+                {
+                    state.ChatFollow = 0;
+                    state.ChatStay = false;
+                    state.LevelRun = false;
+                    BeginTankLead(state, *bot, route->second);
+                    event("lfg_lead: bot=" + std::to_string(bot->guid) + " dungeon=" + lfg.Id);
+                    led = true;
+                    break;
+                }
+            }
+            if (led || nowMs - lfg.RetryMs > 30000)
+                drop = true;
+        }
+        order = drop ? _lfgOrders.erase(order) : std::next(order);
+    }
+}
+
+std::vector<std::string> BotPolicy::ApplyLfg(WorldTickSnapshotView const& view, ChatContext const& chat, ChatCommand const& command, std::uint64_t nowMs)
+{
+    KnownDungeons const known = KnownDungeonsOf(_options);
+    if (known.List.empty())
+        return { "LFG: no dungeon is known to the module." };
+    int const found = level_dungeon::FindDungeon(known.List, command.Arg);
+    if (found < 0)
+        return { "LFG: I do not know \"" + command.Arg + "\". Known dungeons: " + level_dungeon::KeyList(known.List) + "." };
+    level_dungeon::Dungeon const& dungeon = known.List[std::size_t(found)];
+    std::uint64_t const issuerRef = PlayerRef(chat.Issuer);
+
+    // The group so far: the speaker and the bots of its group. The speaker's own role is not known, so it counts as one member and no role.
+    std::uint32_t size = 1, tanks = 0, healers = 0;
+    for (BotSnapshot const& bot : view.bots)
+    {
+        if (bot.group_leader_guid != issuerRef)
+            continue;
+        ++size;
+        size = std::max(size, bot.group_size);
+        level_dungeon::Role const role = level_dungeon::RoleOfClass(ClassFor(_options, bot.guid));
+        tanks += role == level_dungeon::Role::Tank ? 1 : 0;
+        healers += role == level_dungeon::Role::Healer ? 1 : 0;
+    }
+    std::vector<level_dungeon::Role> const wanted = level_dungeon::MissingRoles(size, tanks, healers);
+
+    // The free bots: not in a group or invited, not in a bot party of the module's, alive and quiet, in the dungeon's level range, outside a dungeon.
+    std::unordered_map<std::uint64_t, std::size_t> indexOf;
+    for (std::size_t i = 0; i < view.bots.size(); ++i)
+        indexOf[view.bots[i].guid] = i;
+    std::unordered_map<std::uint64_t, std::uint64_t> leaderOf;
+    std::unordered_map<std::uint64_t, std::vector<std::uint64_t>> membersOf;
+    BuildParties(view, indexOf, leaderOf, membersOf);
+    std::vector<BotSnapshot const*> freeBots;
+    for (BotSnapshot const& bot : view.bots)
+    {
+        if (bot.group_role != 0 || bot.group_leader_guid != 0 || bot.group_invite_from != 0 || bot.life_state != 0 || bot.in_combat != 0 || bot.in_flight != 0 ||
+            bot.level < dungeon.MinLevel || bot.level > dungeon.MaxLevel || leaderOf.count(bot.guid) != 0 || _options.DungeonsByMap.count(bot.map_id) != 0 ||
+            (_options.IsAlt && _options.IsAlt(bot.guid)))
+            continue;
+        freeBots.push_back(&bot);
+    }
+    // Near the speaker first (same map, then distance), then by guid so the pick is stable.
+    std::sort(freeBots.begin(), freeBots.end(), [&](BotSnapshot const* a, BotSnapshot const* b)
+    {
+        auto const key = [&](BotSnapshot const* bot)
+        {
+            return std::make_pair(bot->map_id == chat.MapId ? DistanceTo(*bot, chat.Pos) : 1e30f, bot->guid);
+        };
+        return key(a) < key(b);
+    });
+
+    LfgOrder order;
+    order.Map = dungeon.MapId;
+    order.Id = dungeon.Id;
+    order.StartMs = nowMs;
+    order.RetryMs = nowMs;
+    std::vector<level_dungeon::Role> filled, unfilled;
+    std::uint32_t index = 0;
+    for (level_dungeon::Role role : wanted)
+    {
+        auto pick = std::find_if(freeBots.begin(), freeBots.end(), [&](BotSnapshot const* bot) { return level_dungeon::RoleOfClass(ClassFor(_options, bot->guid)) == role; });
+        if (pick == freeBots.end())
+        {
+            unfilled.push_back(role);
+            continue;
+        }
+        BotSnapshot const& bot = **pick;
+        // The bot walks (teleports) next to the speaker, who invites it; it accepts an invite from a player (AcceptInvites, ChatCommands).
+        BotState& state = StateOf(bot.guid);
+        forever_module::BotAction summon;
+        summon.bot_guid = bot.guid;
+        summon.type = ActionType::kSummon;
+        summon.target_guid = issuerRef;
+        summon.dest_x = float(index++);
+        state.OrderAction = summon;
+        state.GotoActive = false;
+        state.Last.reset();
+        order.Asked.push_back(bot.guid);
+        filled.push_back(role);
+        freeBots.erase(pick);
+    }
+    _lfgOrders[issuerRef] = order;
+
+    std::string line = "LFG " + dungeon.Id + ": group of " + std::to_string(size);
+    if (!filled.empty())
+        line += ", filling " + level_dungeon::RoleList(filled);
+    else if (wanted.empty())
+        line += ", nothing missing";
+    if (!unfilled.empty())
+        line += "; no free " + level_dungeon::RoleList(unfilled) + " of level " + std::to_string(dungeon.MinLevel) + "-" + std::to_string(dungeon.MaxLevel);
+    if (!filled.empty())
+        line += ". Invite the bots next to you.";
+    return { line };
 }
 
 std::vector<BotPolicy::TalentOrder> BotPolicy::TakeTalentOrders()
@@ -2025,6 +2388,10 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
     std::unordered_map<std::uint64_t, std::vector<std::uint64_t>> membersOf;  // leader guid -> the other members
     BuildParties(view, indexOf, leaderOf, membersOf);
 
+    // Level dungeons and LFG: sends parties into their dungeon and back, and starts the tank lead once they are in (it sets TankLead, which the loop below reads).
+    if (_options.LevelDungeons || !_lfgOrders.empty())
+        DriveLevelDungeons(view, indexOf, membersOf, nowMs, actions);
+
     // "tank lead" (chat): the tank bot walks its group through the dungeon. For the dungeon rules the group becomes a party with the tank as its leader: the
     // tank pulls when the party is ready, the others follow it and join the fight. A tank that left the dungeon (its map has no route) stops leading.
     std::unordered_set<std::uint64_t> tankLed;
@@ -2165,6 +2532,9 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         // 6582 at Emberstrife's den (10321, level 61 elite) and the others grinded the Wyrmbog's Firemanes, 204 pulls and 90 deaths in 15 minutes.
         bool const stagingHold = _stagingHoldFn && _stagingHoldFn(bot.guid);
         ReadResult(state, bot, nowMs);
+        // A level-dungeon or LFG teleport was just ordered: the snapshot still shows the old place, so no other order until it has taken effect.
+        if (nowMs < state.LevelHoldUntilMs)
+            continue;
         if (state.TaxiFlight.OrderedMs != 0)
         {
             taxi::Progress const progress = taxi::Track(state.TaxiFlight, bot.in_flight != 0, nowMs, _options.Taxi.WaitMs);
@@ -3921,7 +4291,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     for (NearbyUnit const& unit : nearby)
                         if (unit.guid == bot.group_leader_guid)
                             playerNear = rotation::DistanceYards(bot, unit) <= kRouteWaitYards;
-                    together = together && playerNear;
+                    together = together && (playerNear || state.LevelRun);   // a level-dungeon party has no human to wait for
                 }
                 together = together && deadWaitKind == 0;
                 bool const strong = bot.max_health == 0 ||

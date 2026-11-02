@@ -20,6 +20,8 @@
 //   not heal on its own). stance: aggressive fights what the group fights or meets, defensive only what attacks it or the group, passive only
 //   what attacks the bot. focus: the speaker's selected target is attacked first in a fight. distance: how far from the speaker a following
 //   bot stops (3 to 40 yards).
+// LFG (LfgCommand = 1, its own switch):  lfg <dungeon>   - the dungeon key (rfc, dm) or a word of its name. Said in the General or Trade channel (or party chat /
+//   whisper): the bots fill the speaker's group with the missing roles and the group runs that dungeon (doc/dungeons.md). Arg = the dungeon words, lower-case.
 // Anything else is ordinary chat: ParseChatCommand returns nothing.
 // help: lists every verb above (gated the same way: an order or control verb is left out when its setting is off).
 // Works both as a party/raid chat verb and as the ".bots help" dot command; needs no selector, position or target.
@@ -59,6 +61,7 @@ enum class ChatVerb : std::uint8_t
     LeadOff,
     Train,
     Help,
+    Lfg,
 };
 
 // Orders need ChatOrders = 1, the control panel ChatControl = 1 (the basic verbs only need ChatCommands = 1).
@@ -81,7 +84,7 @@ struct ChatCommand
 {
     ChatSelector Selector;
     ChatVerb Verb = ChatVerb::None;
-    std::string Arg;       // role / stance: the word; distance: "default" or empty
+    std::string Arg;       // role / stance: the word; distance: "default" or empty; lfg: the dungeon words, lower-case, joined by a space
     float Value = 0.0f;    // distance: the yards
 };
 

@@ -32,6 +32,7 @@
 #include "chat_commands.h"
 #include "combat_rotation.h"
 #include "grind_data.h"
+#include "level_dungeon.h"
 #include "ground_avoid.h"
 #include "quest_planner.h"
 #include "spell_costs.h"
@@ -158,8 +159,18 @@ struct PolicyOptions
         // From the dungeon file's bosses[].strategy: spell ids to avoid (avoid_spells) and fixed zones to stay out of (avoid), the places of a fight a bot must not stand in.
         std::vector<std::uint32_t> AvoidSpells;
         std::vector<ground_avoid::Circle> AvoidZones;
+        // The dungeon file's key, name and level range, for the level dungeons and LFG (level_dungeon.h).
+        std::string Id;
+        std::string Name;
+        std::uint32_t MinLevel = 1;
+        std::uint32_t MaxLevel = 60;
     };
     std::map<std::uint32_t, DungeonRoute> DungeonsByMap;
+    // Level dungeons (config LevelDungeons, LevelDungeonRuns): a bot party that is levelling goes into each dungeon of DungeonsByMap when its level reaches the dungeon's max
+    // level, and its tank leads the route as "tank lead" does; at most LevelDungeonRuns runs per dungeon and party. Needs DungeonsByMap and PartySize. Off here by default (the
+    // tests); the module turns it on by its config default.
+    bool LevelDungeons = false;
+    std::uint32_t LevelDungeonRuns = 2;
     // Creature entry -> rank (0 first): the dungeon's kill priority. The damage dealers of a dungeon party fight the best-ranked live hostile next to the tank's target.
     std::map<std::uint32_t, std::uint32_t> KillPriority;
     // Dungeon tactics (the DungeonTactics setting), each on its own so a run can show what it is worth. Focus: the damage dealers take the pack's priority caster first
@@ -471,6 +482,8 @@ private:
         bool SupplyTrip = false;                         // the walk in progress is a supply trip
         std::uint64_t NextConsumeMs = 0;                 // no eat or drink before this
         bool TankLead = false;                           // told "tank lead": this bot walks its group through the dungeon of its map
+        bool LevelRun = false;                           // the tank lead is a level-dungeon run of a bot party (no human to wait for)
+        std::uint64_t LevelHoldUntilMs = 0;              // a level-dungeon or LFG teleport was just ordered: the bot takes no other order until this time
         std::shared_ptr<dungeon_events::Runner> Events;  // the events of the dungeon, run by the bot that leads the route
         std::uint32_t EventsMap = 0;                     // the map those events are for
         float GossipX = 0.0f;                            // where the last dungeon-event talk was sent (for the gossip_refused line)
@@ -644,5 +657,40 @@ private:
     std::function<bool(std::uint64_t)> _stagingHoldFn;
     std::function<std::set<std::uint32_t> const&(std::uint64_t)> _killedBossesFn;
     std::map<std::uint32_t, std::set<std::uint32_t>> _tankKilled;   // map -> bosses seen dead during a "tank lead" run
+
+    // Starts "tank lead" for a bot in a dungeon with a route, from the route point nearest to it (the chat verb lead and the level dungeons). Returns that point.
+    std::size_t BeginTankLead(BotState& state, forever_module::BotSnapshot const& bot, PolicyOptions::DungeonRoute const& dungeon);
+
+    // Level dungeons and LFG (level_dungeon.h), once per Decide before the per-bot loop: starts a run for a party that is due, walks the pending ones into the dungeon,
+    // ends the finished ones. A run is: teleport the party to the dungeon's entry, "tank lead" from there, teleport back when the route is walked, the time is up
+    // or the lead was ended. The teleports are appended to `actions`.
+    void DriveLevelDungeons(forever_module::WorldTickSnapshotView const& view, std::unordered_map<std::uint64_t, std::size_t> const& indexOf,
+                            std::unordered_map<std::uint64_t, std::vector<std::uint64_t>> const& membersOf, std::uint64_t nowMs,
+                            std::vector<forever_module::BotAction>& actions);
+    struct LevelDungeonRun
+    {
+        enum class Phase : std::uint8_t { Entering, Running } Phase_ = Phase::Entering;
+        std::uint32_t Map = 0;            // the dungeon's instance map
+        std::string Id;
+        std::uint64_t StartMs = 0;
+        std::uint64_t RetryMs = 0;
+        std::uint32_t OriginMap = 0;      // where the party was, to go back there
+        Point Origin;
+        std::uint32_t PartyLevel = 0;
+    };
+    std::map<std::uint64_t, level_dungeon::Book> _levelBooks;   // party leader bot -> what the party has run (kept in memory only)
+    std::map<std::uint64_t, LevelDungeonRun> _levelRuns;               // party leader bot -> its run in progress
+    // LFG: the speaker's order, waiting for the bots it asked for to join its group (the speaker invites them), then for the group to enter the dungeon.
+    struct LfgOrder
+    {
+        std::uint32_t Map = 0;
+        std::string Id;
+        std::uint64_t StartMs = 0;
+        std::uint64_t RetryMs = 0;
+        std::vector<std::uint64_t> Asked;   // the bots summoned next to the speaker
+        bool Entered = false;               // the group was sent to the entry
+    };
+    std::map<std::uint64_t, LfgOrder> _lfgOrders;               // speaker's player reference -> order
+    std::vector<std::string> ApplyLfg(forever_module::WorldTickSnapshotView const& view, ChatContext const& chat, ChatCommand const& command, std::uint64_t nowMs);
     std::set<std::uint32_t> _killedBosses;
 };

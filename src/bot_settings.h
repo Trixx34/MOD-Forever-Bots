@@ -177,6 +177,11 @@ struct BotSettings
     // Dungeons (doc/dungeons.md): DungeonFile = the routes (data/dungeons.txt); with it set, "tank lead" works in every dungeon of the file. DungeonEventsFile = the
     // events table for all dungeons (data/dungeon_events.txt, dungeon_events.h): doors to open, charges to fire.
     bool DungeonTeleport = false;   // DungeonTeleport = 1: lost dungeon bots are put back by teleport (tests and scenarios; needs Bot.Actions.Teleport in the core)
+    // Level dungeons (doc/dungeons.md): a levelling bot party runs each dungeon of the dungeon file when its level reaches the dungeon's max level (LevelDungeons, on by
+    // default), at most LevelDungeonRuns times per dungeon (1..5, default 2). LfgCommand: "LFG <dungeon>" in the General or Trade channel brings free bots to the speaker.
+    bool LevelDungeons = true;
+    std::uint32_t LevelDungeonRuns = 2;
+    bool LfgCommand = true;
     // AggressiveStart = 1: bots start Aggressive, so a bot on its own pulls the creatures of its level and levels. The default stance is defensive (a bot fights only
     // what attacks it, or what its group fights); a bot that only defends itself earns almost no experience: on the 300-bot soak the deaths equalled the kills.
     bool AggressiveStart = false;

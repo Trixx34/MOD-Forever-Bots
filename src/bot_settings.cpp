@@ -618,6 +618,10 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
         settings.Supplies.TripEveryMs = std::uint64_t(tripSec) * 1000;
     }
     ReadBool(config, "DungeonTeleport", settings.DungeonTeleport, warnings);
+    ReadBool(config, "LevelDungeons", settings.LevelDungeons, warnings);
+    ReadKey(config, "LevelDungeonRuns", 0, 1000, settings.LevelDungeonRuns, warnings);
+    settings.LevelDungeonRuns = std::clamp<std::uint32_t>(settings.LevelDungeonRuns, 1, 5);
+    ReadBool(config, "LfgCommand", settings.LfgCommand, warnings);
     ReadBool(config, "DungeonReviveOutOfCombat", settings.DungeonReviveOutOfCombat, warnings);
     if (auto const teleport = config.find("CorpseRunTeleportSec"); teleport != config.end() && teleport->second == "0")
         settings.CorpseRunTeleportSec = 0; // explicitly off: the ghost walks on, and is put at its corpse after CorpseRunTimeoutMs

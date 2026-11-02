@@ -115,6 +115,28 @@ The hand-written sample that was here before (Ragefire Chasm) had the entrance a
 (Oggleflint 11517, Taragaman the Hungerer 11520, Jergosh the Invoker 11518, Bazzalan 11519) are the vanilla values. **The waypoints and the boss
 positions are approximate and were not read from a database or walked.** Regenerate the route before trusting it.
 
+## Level dungeons and LFG
+
+**LevelDungeons** (default `1`, on for all bots) and **LevelDungeonRuns** (default `2`, clamped 1 to 5). A levelling bot party (a party the module cuts itself, `PartySize`; at
+least 3 bots) runs every dungeon of the dungeon file at the **high end** of its level range: when the party's level (its lowest member) has reached the dungeon's
+max level (and is at most 2 levels above it, so a party that out-levelled a dungeon does not catch up on it), the party goes in, once per level. A party runs a dungeon at most
+`LevelDungeonRuns` times in all; a second attempt, after one that did not clear it, waits for the next level; a cleared dungeon is done. The lowest max level goes first. It is
+not started in combat, with a member dead, away or in flight, or while the party is in a dungeon already. `LevelDungeons = 0` keeps the old behaviour; a scenario run turns it off.
+
+The run reuses "tank lead": the party is teleported to the dungeon's `entry`, the tank leads the route as the `lead` chat order does (no human to wait for), and when the route is
+walked (cleared), the lead is ended or 45 minutes are over, the living members are teleported back to where the party was. The counters live in memory (lost on a module
+restart). Log lines: `level_dungeon_start`, `level_dungeon_in`, `level_dungeon_end` (result `cleared`, `ended`, `timeout`, `not_entered`).
+
+**LFG** (`LfgCommand`, default `1`): a player types `LFG <dungeon>` (the key, `rfc`, or a word of the name, `ragefire`, case-insensitive; General or Trade channel, party chat or
+a whisper to a bot also work) and gets one whisper back, e.g. `LFG rfc: group of 3, filling tank, dps x2. Invite the bots next to you.` An unknown dungeon is answered with the known
+keys. The missing roles of the group (up to 5; tank = warrior, healer = priest/paladin/shaman/druid, dps = hunter/rogue/mage/warlock) are taken from the free bots of the
+dungeon's level range (not in a group, not in a bot party), nearest first, and teleported next to the speaker. Once they have joined the group, or after 60 s, the group is
+teleported to the dungeon's entry and a warrior bot starts the tank lead. Only the `LFG` line is parsed from the public channels; every other chat order still needs `ChatCommands`.
+
+Limits, not built or not verified: the core lets a bot invite only bots, so **the speaker has to invite the bots** that stand next to it (they accept a player's invite when `ChatCommands`
+is on); the human walks into the dungeon itself (the tank waits for it). The core has to report the General and Trade channels to the module (the SDK's `PlayerChatEvent.channel`
+documents 1 party, 2 raid, 3 whisper; the module treats 4 and 5 as the public channels). The speaker's own class is unknown, so it counts as one member with no role.
+
 ## Not verified, not built
 
 - Nothing has run on the sim: entry by teleport, the route walk through an instance, pulls, heals, loot, wipe recovery in a dungeon, the corpse run

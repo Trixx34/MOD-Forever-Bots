@@ -538,6 +538,10 @@ std::map<std::uint32_t, PolicyOptions::DungeonRoute> DungeonRoutes(std::vector<D
                 route.BossAt[i] = dungeon.Route[i].BossEntry;
         }
         route.Events = dungeon.Events;
+        route.Id = dungeon.Id;
+        route.Name = dungeon.Name;
+        route.MinLevel = dungeon.MinLevel;
+        route.MaxLevel = dungeon.MaxLevel;
         // The instance entrance (the dungeon file's entry: map x y z), where a ghost of the party is revived.
         route.HasEntry = true;
         route.Entry = { dungeon.Entry[1], dungeon.Entry[2], dungeon.Entry[3] };
@@ -1350,6 +1354,11 @@ int main(int argc, char** argv)
                 setReply(false, std::string(ChatVerbName(parsed->Verb)) + " needs your position or target: say it in party chat.");
                 return reply;
             }
+            if (parsed->Verb == ChatVerb::Lfg && !settings.LfgCommand)
+            {
+                setReply(false, "LFG is off (LfgCommand = 0 in the module's config).");
+                return reply;
+            }
             CommandQueue::ChatItem item;
             item.Command = *parsed;
             item.Context.Issuer = request.command().issuer_guid() & forever_module::kUnitRefCounterMask;
@@ -1464,12 +1473,17 @@ int main(int argc, char** argv)
                 return;
             }
         }
-        if (!settings.ChatCommands || notify.event_payload_case() != forever_module::EventNotify::kPlayerChat)
+        if ((!settings.ChatCommands && !settings.LfgCommand) || notify.event_payload_case() != forever_module::EventNotify::kPlayerChat)
             return;
         forever_module::PlayerChatEvent const& chat = notify.player_chat();
         auto const parsed = ParseChatCommand(chat.text(), settings.ChatOrders, settings.ChatControl);
         if (!parsed)
             return; // ordinary chat
+        // LFG has its own switch (LfgCommand); every other verb needs ChatCommands and is not taken from the General or Trade channel (channel 4 and 5: the core
+        // reports the public channels with these numbers; the SDK's PlayerChatEvent only documents 1 to 3, see doc/dungeons.md).
+        bool const publicChannel = chat.channel() == 4 || chat.channel() == 5;
+        if (parsed->Verb == ChatVerb::Lfg ? !settings.LfgCommand : (!settings.ChatCommands || publicChannel))
+            return;
         CommandQueue::ChatItem item;
         item.Command = *parsed;
         item.Context.Issuer = chat.player_guid();
@@ -1583,6 +1597,8 @@ int main(int argc, char** argv)
     policyOptions.TrainEveryMs = std::uint64_t(settings.TrainEverySec) * 1000;
     policyOptions.Supplies = settings.Supplies;
     policyOptions.DungeonTeleport = settings.DungeonTeleport;
+    policyOptions.LevelDungeons = settings.LevelDungeons && settings.Scenarios.empty();   // a scenario run drives its own parties
+    policyOptions.LevelDungeonRuns = settings.LevelDungeonRuns;
     policyOptions.DungeonReviveOutOfCombat = settings.DungeonReviveOutOfCombat;
     policyOptions.CorpseRunTeleportMs = std::uint64_t(settings.CorpseRunTeleportSec) * 1000;
     policyOptions.AggressiveStart = settings.AggressiveStart;

@@ -53,6 +53,7 @@ std::string AckLine(ChatVerb verb, std::uint64_t botGuid)
         case ChatVerb::Distance: return Pick<2>({ "Distance set.", "I'll keep that distance." }, botGuid, verb);
         case ChatVerb::Status:
         case ChatVerb::Help:
+        case ChatVerb::Lfg:
         case ChatVerb::None:
             break;
     }
