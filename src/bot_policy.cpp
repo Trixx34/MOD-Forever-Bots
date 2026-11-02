@@ -141,6 +141,7 @@ constexpr std::uint64_t kTameHoldMs = 22000;         // the channel (20 s) and a
 constexpr std::uint64_t kTameRetryMs = 20000;        // after a cast that gave no pet, or a search that found nothing
 constexpr std::uint32_t kTameMaxFailures = 4;        // casts with no pet before the hunter stops for kTameGiveUpMs
 constexpr std::uint64_t kTameGiveUpMs = 600000;
+constexpr std::uint64_t kTamePetFirstMs = 90000;      // Call Pet / Revive Pet get this long to deal with a stored pet before taming is tried again
 constexpr std::uint64_t kPetBackoffMs = 30000;       // first wait after a refused revive; doubles per failure
 constexpr std::uint64_t kPetBackoffMaxMs = 300000;
 constexpr std::uint64_t kPetProbeMs = 120000;        // below level 12 a Call Pet check after a fight is sent at most this often
@@ -1397,6 +1398,7 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
         switch (bot.last_action_status)
         {
             case BotActionStatus::kApplied:
+                state.TamePetFirst = false;
                 state.PetMissing = false;
                 state.PetDead = false;
                 state.PetProbe = false;
@@ -1418,6 +1420,7 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
                 {
                     state.PetDead = false; // maybe it was alive after all, or there is no pet: Call Pet is tried again after the backoff
                     state.PetMissing = true;
+                    state.TamePetFirst = false; // neither Call Pet nor Revive Pet finds a stored pet: the refusal of Tame Beast had another cause
                     ++state.PetFailures;
                     std::uint64_t wait = kPetBackoffMs;
                     for (std::uint32_t i = 1; i < state.PetFailures && wait < kPetBackoffMaxMs; ++i)
@@ -1430,8 +1433,12 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
                     state.PetProbe = false;
                 }
                 break;
+            case BotActionStatus::kNotKnown:
+            case BotActionStatus::kUnknownSpell:
+                state.TamePetFirst = false; // the spell is not learned: nothing to call or revive
+                break;
             default:
-                break; // busy, moving, cooldown, no power, out of range, not known: the usual retry below, the pet state is unchanged
+                break; // busy, moving, cooldown, no power, out of range: the usual retry below, the pet state is unchanged
         }
     }
     if (spell == kAutoShot && bot.last_action_status == BotActionStatus::kApplied)
@@ -3731,9 +3738,24 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         // A hunter with no pet that has a beast to tame in view does not pull whatever else is standing there (Westfall's hostile Fleshrippers made the 2026-10-26 hunters fight and get hurt
         // before they ever cast Tame Beast); it tames, and defends itself only when something attacks it. The hold of a cast in progress counts as well.
         bool const tamingPhase = classId == kHunterClass && _tamingFn && _tamingFn(bot.guid);
+        std::vector<std::uint64_t> tameTaken;   // beasts another hunter is taming right now (see _tameClaims)
+        if (classId == kHunterClass)
+        {
+            for (auto it = _tameClaims.begin(); it != _tameClaims.end();)
+            {
+                if (nowMs >= it->second.second)
+                    it = _tameClaims.erase(it);
+                else
+                {
+                    if (it->second.first != bot.guid)
+                        tameTaken.push_back(it->first);
+                    ++it;
+                }
+            }
+        }
         bool const tameNow = classId == kHunterClass && _options.TameBeasts && !_options.TameBeasts->ByEntry.empty() && bot.life_state == 0 && (bot.group_role == 0 || tamingPhase) &&
                              (bot.level == 0 || bot.level >= kTameMinLevel) && bot.in_combat == 0 && PetOf(bot) == PetKnown::kNone &&
-                             (state.TameUntilMs != 0 || (nowMs >= state.TameRetryAtMs && tame::PickTameTarget(bot, nearby, *_options.TameBeasts, kTameSearchYards) != nullptr));
+                             (state.TameUntilMs != 0 || (nowMs >= state.TameRetryAtMs && tame::PickTameTarget(bot, nearby, *_options.TameBeasts, kTameSearchYards, tameTaken) != nullptr));
         if (targetRef != 0)
         {
             for (NearbyUnit const& unit : nearby)
@@ -3765,12 +3787,27 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 {
                     state.TameUntilMs = 0;
                     state.TameFailures = 0;
+                    state.TamePetFirst = false;
+                    _tameClaims.erase(state.TameTarget);
                     if (_options.OnEvent)
                         _options.OnEvent("tame_done: bot=" + std::to_string(bot.guid) + " target=" + std::to_string(state.TameTarget));
                 }
                 else if (hurtInCombat || refusedNow || nowMs >= state.TameUntilMs)
                 {
                     state.TameUntilMs = 0;
+                    _tameClaims.erase(state.TameTarget);
+                    if (refusedNow)
+                    {
+                        // The core refuses Tame Beast (result 32, "too many pets") while a stored pet fills the first slot and Call Pet 2 is not known: that pet is dead, or was
+                        // dismissed with its dead owner. Call Pet (Revive Pet when that is refused) comes before another try.
+                        state.TamePetFirst = true;
+                        state.TamePetUntilMs = nowMs + kTamePetFirstMs;
+                        state.PetMissing = true;
+                        state.PetDead = false;
+                        state.PetRetryAtMs = 0;
+                        state.RetryAtMs.erase(kCallPet);
+                        state.RetryAtMs.erase(kRevivePet);
+                    }
                     ++state.TameFailures;
                     state.TameRetryAtMs = nowMs + (state.TameFailures >= kTameMaxFailures ? kTameGiveUpMs : kTameRetryMs);
                     if (state.TameFailures >= kTameMaxFailures)
@@ -3782,10 +3819,30 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 else
                     continue; // still channelling: stand still, send nothing
             }
-            if (state.TameUntilMs == 0 && !hasTarget && bot.in_combat == 0 && !IsCasting(bot) && !state.Sitting && nowMs >= state.NextCastMs && nowMs >= state.TameRetryAtMs &&
+            if (state.TamePetFirst && (nowMs >= state.TamePetUntilMs || PetOf(bot) != PetKnown::kNone))
+                state.TamePetFirst = false;
+            if (state.TamePetFirst && state.TameUntilMs == 0 && !hasTarget && bot.in_combat == 0 && bot.moving == 0 && !IsCasting(bot) && !state.Sitting)
+            {
+                // A stored pet: call it, or revive it, before trying to tame (the result handler ends this when a cast is accepted or both are refused).
+                std::uint32_t const petSpell = state.PetDead ? kRevivePet : kCallPet;
+                auto const retry = state.RetryAtMs.find(petSpell);
+                if (nowMs >= state.NextCastMs && (retry == state.RetryAtMs.end() || nowMs >= retry->second))
+                {
+                    BotAction pet;
+                    pet.bot_guid = bot.guid;
+                    pet.type = ActionType::kCastSpell;
+                    pet.spell_id = petSpell;
+                    pet.target_guid = 0;
+                    actions.push_back(pet);
+                    state.CastTarget[petSpell] = 0;
+                    state.NextCastMs = nowMs + kGlobalCooldownMs;
+                }
+                continue;
+            }
+            if (state.TameUntilMs == 0 && !state.TamePetFirst && !hasTarget && bot.in_combat == 0 && !IsCasting(bot) && !state.Sitting && nowMs >= state.NextCastMs && nowMs >= state.TameRetryAtMs &&
                 PetOf(bot) == PetKnown::kNone && !(state.RetryAtMs.count(kTameBeast) && nowMs < state.RetryAtMs[kTameBeast]))
             {
-                NearbyUnit const* beast = tame::PickTameTarget(bot, nearby, *_options.TameBeasts, kTameSearchYards);
+                NearbyUnit const* beast = tame::PickTameTarget(bot, nearby, *_options.TameBeasts, kTameSearchYards, tameTaken);
                 if (!beast)
                     state.TameRetryAtMs = nowMs + kTameRetryMs / 2; // nothing to tame in view: look again soon
                 else if (rotation::DistanceYards(bot, *beast) > kTameCastYards)
@@ -3825,6 +3882,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     state.TameTarget = beast->guid;
                     state.TameCastAtMs = nowMs;
                     state.TameUntilMs = nowMs + kTameHoldMs;
+                    _tameClaims[beast->guid] = { bot.guid, nowMs + kTameHoldMs };
                     if (_options.OnEvent)
                         _options.OnEvent("tame: bot=" + std::to_string(bot.guid) + " target=" + std::to_string(beast->guid) + " level=" + std::to_string(beast->level) +
                                          " dist=" + std::to_string(int(rotation::DistanceYards(bot, *beast))));

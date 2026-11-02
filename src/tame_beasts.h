@@ -37,7 +37,8 @@ TameBeasts LoadTameBeasts(std::string const& path, std::vector<std::string>& war
 // The creature to tame, or nullptr: a live creature of the list within maxYards of the bot, of a level at most the bot's (the unit's own level when the snapshot has it,
 // else the list's highest level for the entry). The pet takes the beast's level, so the closest level wins; then a neutral creature over a hostile one (a hostile one
 // attacks the hunter during the 20 second channel), then the families hunters like (cat, wolf, boar, bear), then the closest.
+// `exclude` lists beasts another hunter is already taming: two channels on one beast end with one pet and one "no pet" (the beast is gone for the second).
 forever_module::NearbyUnit const* PickTameTarget(forever_module::BotSnapshot const& bot, std::span<forever_module::NearbyUnit const> nearby,
-                                                 TameBeasts const& beasts, float maxYards);
+                                                 TameBeasts const& beasts, float maxYards, std::span<std::uint64_t const> exclude = {});
 
 } // namespace tame
