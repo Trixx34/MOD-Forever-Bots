@@ -186,6 +186,76 @@ void ARefusedCastEndsTheHoldAtOnce()
     CHECK(!Has(policy.Decide(View(bot, { beast }, 3), 9000), ActionType::kCastSpell, 1515));   // not hammering a refused spell
 }
 
+// The core refuses Tame Beast (result 32) for a hunter whose stored pet fills the first slot: the hunter calls or revives that pet instead of casting Tame Beast again.
+void ARefusedTameCallsOrRevivesTheStoredPetFirst()
+{
+    BotPolicy policy = HunterPolicy();
+    NearbyUnit const beast = Beast(157, 5, 10.0f, 15);
+    BotSnapshot bot = Hunter(20);
+    CHECK(Has(policy.Decide(View(bot, { beast }, 1), 1000), ActionType::kCastSpell, 1515));
+    bot.last_action_type = std::uint8_t(ActionType::kCastSpell);
+    bot.last_action_spell = 1515;
+    bot.last_action_status = forever_module::BotActionStatus::kRefused;
+    bot.last_action_sequence = 1;
+    // The refusal ends the hold; Call Pet is sent, not another Tame Beast.
+    auto actions = policy.Decide(View(bot, { beast }, 2), 4500);
+    CHECK(!Has(actions, ActionType::kCastSpell, 1515));
+    actions = policy.Decide(View(bot, { beast }, 3), 6500);
+    CHECK(Has(actions, ActionType::kCastSpell, 883) && !Has(actions, ActionType::kCastSpell, 1515));
+    // Call Pet is refused (a dead pet): Revive Pet follows.
+    bot.last_action_spell = 883;
+    bot.last_action_sequence = 2;
+    CHECK(!Has(policy.Decide(View(bot, { beast }, 4), 7000), ActionType::kCastSpell, 1515));
+    actions = policy.Decide(View(bot, { beast }, 5), 9000);
+    CHECK(Has(actions, ActionType::kCastSpell, 982) && !Has(actions, ActionType::kCastSpell, 1515));
+    // Revive Pet is accepted: the pet comes back; nothing is tamed.
+    bot.last_action_spell = 982;
+    bot.last_action_status = forever_module::BotActionStatus::kApplied;
+    bot.last_action_sequence = 3;
+    bot.pet_state = 1;
+    CHECK(!Has(policy.Decide(View(bot, { beast }, 6), 12000), ActionType::kCastSpell, 1515));
+}
+
+void BothPetCastsRefusedMeansNoStoredPetAndTamingGoesOn()
+{
+    BotPolicy policy = HunterPolicy();
+    NearbyUnit const beast = Beast(157, 5, 10.0f, 15);
+    BotSnapshot bot = Hunter(20);
+    CHECK(Has(policy.Decide(View(bot, { beast }, 1), 1000), ActionType::kCastSpell, 1515));
+    bot.last_action_type = std::uint8_t(ActionType::kCastSpell);
+    bot.last_action_spell = 1515;
+    bot.last_action_status = forever_module::BotActionStatus::kRefused;
+    bot.last_action_sequence = 1;
+    policy.Decide(View(bot, { beast }, 2), 4500);
+    CHECK(Has(policy.Decide(View(bot, { beast }, 3), 6500), ActionType::kCastSpell, 883));
+    bot.last_action_spell = 883;
+    bot.last_action_sequence = 2;
+    policy.Decide(View(bot, { beast }, 4), 7000);
+    CHECK(Has(policy.Decide(View(bot, { beast }, 5), 9000), ActionType::kCastSpell, 982));
+    bot.last_action_spell = 982;
+    bot.last_action_sequence = 3;
+    policy.Decide(View(bot, { beast }, 6), 9500);
+    // No stored pet at all: after the tame retry pause the hunter tames again.
+    CHECK(Has(policy.Decide(View(bot, { beast }, 7), 30000), ActionType::kCastSpell, 1515));
+}
+
+// Two hunters at the same spot picked the same beast: one pet and one "no pet" (the beast is gone when the second channel ends). The second takes another beast.
+void TwoHuntersDoNotTameTheSameBeast()
+{
+    BotPolicy policy = HunterPolicy();
+    NearbyUnit const near = Beast(157, 5, 10.0f, 15);
+    NearbyUnit const far = Beast(157, 6, 14.0f, 15);
+    BotSnapshot first = Hunter(20);
+    BotSnapshot second = Hunter(20);
+    second.guid = 11;
+    CHECK(Has(policy.Decide(View(first, { near, far }, 1), 1000), ActionType::kCastSpell, 1515, near.guid));
+    CHECK(Has(policy.Decide(View(second, { near, far }, 2), 1500), ActionType::kCastSpell, 1515, far.guid));
+    // Alone in view, the beast is not taken twice either.
+    BotPolicy other = HunterPolicy();
+    CHECK(Has(other.Decide(View(first, { near }, 1), 1000), ActionType::kCastSpell, 1515, near.guid));
+    CHECK(!Has(other.Decide(View(second, { near }, 2), 1500), ActionType::kCastSpell, 1515));
+}
+
 // The scenario forms the party before its Taming phase: the hunter is a member whose leader stays at the staging place.
 WorldTickSnapshotView GroupedView(BotSnapshot hunter, std::vector<NearbyUnit> const& units, std::uint64_t tick)
 {
@@ -339,6 +409,9 @@ int main()
     AHunterWalksToTheBeastCastsAndHoldsStill();
     ANoPetAfterTheChannelIsAFailureWithARetryPause();
     ARefusedCastEndsTheHoldAtOnce();
+    ARefusedTameCallsOrRevivesTheStoredPetFirst();
+    BothPetCastsRefusedMeansNoStoredPetAndTamingGoesOn();
+    TwoHuntersDoNotTameTheSameBeast();
     AGroupedHunterTamesOnlyInTheTamingPhaseAndStaysPut();
     AHunterTamesInsteadOfPullingAHostileMobStandingNearby();
     ACombatDuringTheChannelDoesNotEndTheHoldUntilTheHunterIsHurt();

@@ -4,6 +4,7 @@
 #include "text_lines.h"
 #include "text_number.h"
 
+#include <algorithm>
 #include <cmath>
 #include <fstream>
 #include <limits>
@@ -66,7 +67,7 @@ TameBeasts LoadTameBeasts(std::string const& path, std::vector<std::string>& war
     return ParseTameBeasts(in, warnings);
 }
 
-NearbyUnit const* PickTameTarget(BotSnapshot const& bot, std::span<NearbyUnit const> nearby, TameBeasts const& beasts, float maxYards)
+NearbyUnit const* PickTameTarget(BotSnapshot const& bot, std::span<NearbyUnit const> nearby, TameBeasts const& beasts, float maxYards, std::span<std::uint64_t const> exclude)
 {
     NearbyUnit const* best = nullptr;
     std::uint64_t bestScore = std::numeric_limits<std::uint64_t>::max();
@@ -74,6 +75,8 @@ NearbyUnit const* PickTameTarget(BotSnapshot const& bot, std::span<NearbyUnit co
     {
         if (unit.health == 0 || forever_module::UnitRefType(unit.guid) != 8)
             continue; // a creature that is alive
+        if (std::find(exclude.begin(), exclude.end(), unit.guid) != exclude.end())
+            continue; // another hunter is taming it
         auto const known = beasts.ByEntry.find(forever_module::UnitRefEntry(unit.guid));
         if (known == beasts.ByEntry.end())
             continue;

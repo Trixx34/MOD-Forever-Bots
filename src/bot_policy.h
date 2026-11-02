@@ -378,6 +378,10 @@ private:
         std::uint64_t TameTarget = 0;                    // the beast being tamed or approached
         std::uint64_t TameRetryAtMs = 0;                 // no search or cast before this
         std::uint32_t TameFailures = 0;                  // casts that ended with no pet; the hunter gives up for a while at kTameMaxFailures
+        // Tame Beast was refused (core CheckCast, spell_hun_tame_beast: result 32, "too many pets") for a hunter that holds a stored pet (dead, or dismissed with its dead owner), which
+        // fills the first pet slot: Call Pet (or Revive Pet) comes first, until one is accepted, both are refused (no stored pet), or TamePetUntilMs passes.
+        bool TamePetFirst = false;
+        std::uint64_t TamePetUntilMs = 0;
         bool PetCommanded = false;                       // the pet has been sent at this fight's target (layout 13)
         bool Sitting = false;                            // sat down to rest; stands before it moves or fights
         std::uint64_t RestRetryAtMs = 0;                 // a refused sit is not tried again before this
@@ -637,6 +641,7 @@ private:
         std::uint64_t UntilMs = 0;
     };
     std::map<std::pair<std::uint32_t, std::uint64_t>, BuffClaim> _buffClaims;
+    std::map<std::uint64_t, std::pair<std::uint64_t, std::uint64_t>> _tameClaims;   // beast reference -> (hunter, when its hold ends): one hunter per beast
     // Who is healing which member and until when: two healers of a party must not cast on the same member.
     struct HealClaim
     {
