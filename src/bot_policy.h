@@ -351,6 +351,7 @@ private:
     struct BotState
     {
         std::optional<Decision> Last;                    // the last movement or attack decision sent
+        std::optional<Decision> LastMove;                // the last kMoveTo sent: the walk a no-route result refers to (Last can be a stop sent after it)
         bool InFight = false;
         std::uint64_t FightStartMs = 0;
         std::uint64_t NextCastMs = 0;                    // global cooldown: no rotation cast before this
@@ -434,6 +435,8 @@ private:
         std::uint64_t GrindRetryAtMs = 0;                // no grind spot on this map for this level: explore on foot until this time, then look again
         std::uint32_t HubFailures = 0;                   // hub walks in a row that ended without arriving
         std::uint32_t ExploreStep = 0;                   // random walks made, for the direction of the next
+        std::uint32_t ExploreRefusals = 0;               // explore points refused in a row: each is retried nearer, a few times, before the bot waits again
+        float ExploreScale = 1.0f;                       // the radius scale of the explore walk under way (halved on each retry)
         std::uint64_t CraftRetryAtMs[8] = { 0, 0, 0, 0, 0, 0, 0, 0 }; // per craft line (kCraftLines in bot_policy.cpp): no kSkillUp for the skill before this time
         std::uint32_t CraftTurn = 0;                     // which line is tried first next (they take turns)
         std::uint32_t CraftSent = 0;                     // the line of the last kSkillUp sent: its answer is for that line, whatever spell the core reports
@@ -469,6 +472,7 @@ private:
         bool Wandering = false;                          // walking to a hub
         std::uint64_t WanderStartMs = 0;                 // when this walk began; dropped after kWanderTimeoutMs
         Point GrindTarget;                               // the grind spot being walked to
+        std::size_t GrindSpotIndex = std::size_t(-1);    // the grind spot being walked to (index), -1 when none; a no-route answer is reported against it
         std::vector<std::size_t> GrindVisited;           // the last spots visited (indexes), so the bot moves on instead of going back and forth
         std::size_t NextHub = 0;                         // index of the hub to walk to next, on the bot's map
         Point WalkAnchor;                                // where the bot stood when its quest walk was last seen moving
@@ -651,6 +655,7 @@ private:
     std::unordered_map<std::uint64_t, HealClaim> _healClaims; // member bot guid -> claim
     PolicyOptions _options;
     QuestPlanner _quests;
+    GrindBlocklist _grindBlocks;                     // grind spots no bot can reach, shared by all bots
     // The single-dungeon route of the options, and the per-bot one when several dungeons run (SetScenarioRouteFor).
     static PolicyOptions::ScenarioRoute ScenarioRouteOf(PolicyOptions const& options);
     PolicyOptions::ScenarioRoute const& ScenarioOf(std::uint64_t guid) const;
@@ -665,6 +670,9 @@ private:
 
     // Starts "tank lead" for a bot in a dungeon with a route, from the route point nearest to it (the chat verb lead and the level dungeons). Returns that point.
     std::size_t BeginTankLead(BotState& state, forever_module::BotSnapshot const& bot, PolicyOptions::DungeonRoute const& dungeon);
+
+    // The grind spots for a bot's level. Blocked spots are left out unless that leaves none: then they are used again. None at all is logged as grind_none.
+    std::vector<std::size_t> GrindSpotsForBot(BotState& state, forever_module::BotSnapshot const& bot, std::uint64_t nowMs);
 
     // Level dungeons and LFG (level_dungeon.h), once per Decide before the per-bot loop: starts a run for a party that is due, walks the pending ones into the dungeon,
     // ends the finished ones. A run is: teleport the party to the dungeon's entry, "tank lead" from there, teleport back when the route is walked, the time is up

@@ -296,6 +296,7 @@ constexpr std::uint64_t kStuckCheckMs = 300000;       // every 5 minutes a bot t
 constexpr std::uint64_t kGrindRetryMs = 60000;        // a bot that found no grind spot explores on foot this long before it looks again
 constexpr std::uint64_t kExploreIdleMs = 10000;      // an idle bot with nowhere to go takes a short walk after this long
 constexpr std::uint64_t kExploreTimeoutMs = 60000;
+constexpr std::uint32_t kExploreRetryRefusals = 2; // refused explore points retried nearer (half, then a quarter of the radius) before the bot waits again
 constexpr float kExploreReachYards = 6.0f;
 constexpr std::uint64_t kAcceptInviteRetryMs = 3000; // an invite from a player is answered again after this long if it is still pending
 constexpr std::uint64_t kGotoTimeoutMs = 90000;     // a goto order is dropped after this long
@@ -1133,10 +1134,13 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
     {
         state.NoRouteLoggedMs = nowMs;
         std::string what = "action_type=" + std::to_string(int(bot.last_action_type));
+        // The move the core refused is the last kMoveTo sent (LastMove); Last is the newest decision, often a stop sent after it.
+        if (state.LastMove)
+            what += " wanted=" + std::to_string(int(state.LastMove->Type)) + " target=" + std::to_string(state.LastMove->Target) + " target_entry=" +
+                    std::to_string(state.LastMove->Target ? forever_module::UnitRefEntry(state.LastMove->Target) : 0) + " dest=" + std::to_string(int(state.LastMove->Dest.X)) + "," +
+                    std::to_string(int(state.LastMove->Dest.Y)) + "," + std::to_string(int(state.LastMove->Dest.Z));
         if (state.Last)
-            what += " wanted=" + std::to_string(int(state.Last->Type)) + " target=" + std::to_string(state.Last->Target) + " target_entry=" +
-                    std::to_string(state.Last->Target ? forever_module::UnitRefEntry(state.Last->Target) : 0) + " dest=" + std::to_string(int(state.Last->Dest.X)) + "," +
-                    std::to_string(int(state.Last->Dest.Y)) + "," + std::to_string(int(state.Last->Dest.Z));
+            what += " last_sent=" + std::to_string(int(state.Last->Type));
         _options.OnEvent("no_route: bot=" + std::to_string(bot.guid) + " " + what + " pos=" + std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) + "," +
                          std::to_string(int(bot.pos_z)) + " in_combat=" + std::to_string(bot.in_combat) + " route_index=" + std::to_string(state.RouteIndex));
     }
@@ -1146,7 +1150,7 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
     // A dungeon leader counts these against its current waypoint (kRouteNoRouteSkip). A move to the very place the bot already stands at is refused for lack of a route too (a
     // path of no length), which is an arrival, not a missing route: it is not counted.
     if (noRoute && bot.last_action_sequence != state.NoRouteSequence &&
-        !(state.Last && state.Last->Type == ActionType::kMoveTo && std::hypot(bot.pos_x - state.Last->Dest.X, bot.pos_y - state.Last->Dest.Y) < 6.0f))
+        !(state.LastMove && std::hypot(bot.pos_x - state.LastMove->Dest.X, bot.pos_y - state.LastMove->Dest.Y) < 6.0f))
         ++state.RouteNoRoute;
     if ((noRoute || teleportRefused) && bot.last_action_sequence != state.NoRouteSequence)
     {
@@ -1156,18 +1160,23 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
             state.WalkBlockedAtMs = nowMs;
             // The same refused move must not be sent again every tick (it was 26 times a second for 220 bots): the place is blocked for a pause that
             // doubles with every refusal in a row, 5 s up to 2 minutes.
-            if (state.Last && state.Last->Type == ActionType::kMoveTo)
+            if (state.LastMove)
             {
-                bool const same = state.NoRouteUntilMs != 0 && std::hypot(state.NoRouteDest.X - state.Last->Dest.X, state.NoRouteDest.Y - state.Last->Dest.Y) < kNoRouteSameYards;
+                bool const same = state.NoRouteUntilMs != 0 && std::hypot(state.NoRouteDest.X - state.LastMove->Dest.X, state.NoRouteDest.Y - state.LastMove->Dest.Y) < kNoRouteSameYards;
                 state.NoRouteStreak = same ? std::min<std::uint32_t>(state.NoRouteStreak + 1, 6) : 1;
-                state.NoRouteDest = state.Last->Dest;
+                state.NoRouteDest = state.LastMove->Dest;
                 state.NoRouteUntilMs = nowMs + (kNoRoutePauseMs << (state.NoRouteStreak - 1));
                 // The kite tries one point after another, and only the last refusal blocked: with two points it went back and forth between them (2026-10-30: 91,000 refusals in
                 // 15 minutes). Every refused point is kept for a while, so the circle is walked through and the bot then stands.
                 std::erase_if(state.RefusedPlaces, [nowMs](auto const& place) { return place.second <= nowMs; });
                 if (state.RefusedPlaces.size() >= kRefusedPlacesKept)
                     state.RefusedPlaces.erase(state.RefusedPlaces.begin());
-                state.RefusedPlaces.emplace_back(state.Last->Dest, nowMs + kRefusedPlaceMs);
+                state.RefusedPlaces.emplace_back(state.LastMove->Dest, nowMs + kRefusedPlaceMs);
+                // A walk to a grind spot the core has no route to: reported to the shared list, which blocks the spot for every bot once enough bots agree.
+                if (state.Wandering && state.GrindSpotIndex != std::size_t(-1) && _options.Grind && state.GrindSpotIndex < _options.Grind->Spots.size() &&
+                    std::hypot(state.GrindTarget.X - state.LastMove->Dest.X, state.GrindTarget.Y - state.LastMove->Dest.Y) < 1.0f &&
+                    _grindBlocks.Report(state.GrindSpotIndex, bot.guid, nowMs) && _options.OnEvent)
+                    _options.OnEvent("grind_spot_blocked: spot=" + std::to_string(state.GrindSpotIndex) + " minutes=" + std::to_string(kGrindBlockMs / 60000));
             }
         }
         state.QuestTeleportSent = false;
@@ -1185,6 +1194,14 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
         if (bot.last_action_sequence == state.QuestSeenSeq)
             return;
         state.QuestSeenSeq = bot.last_action_sequence;
+        // The core does not echo the quest in the snapshot (last_action_spell is 0 for a quest action), so the quest is the one the planner sent last.
+        // The planner knows the kind too: a hand-in or reward is its PendingHandIn, anything else is an accept or an abandon.
+        if (_options.OnEvent && state.Quest.LastActionQuest != 0)
+        {
+            std::string const kind = state.Quest.PendingHandIn == state.Quest.LastActionQuest ? "hand_in" : "accept_or_abandon";
+            _options.OnEvent("quest_refused: bot=" + std::to_string(bot.guid) + " quest=" + std::to_string(state.Quest.LastActionQuest) + " kind=" + kind +
+                             " bag_free=" + std::to_string(bot.bag_free_slots) + " bag_room=" + (bot.bag_free_slots > 0 ? "yes" : "no"));
+        }
         if (nowMs - state.QuestWindowMs > kQuestWindowMs)
         {
             state.QuestWindowMs = nowMs;
@@ -1864,6 +1881,25 @@ std::vector<std::string> BotPolicy::ApplyChat(WorldTickSnapshotView const& view,
     else if (refused != 0)
         lines.push_back(std::string(ChatVerbName(command.Verb)) + ": " + std::to_string(refused) + " of " + std::to_string(matched) + " bot(s) refused (" + refusal + ").");
     return lines;
+}
+
+std::vector<std::size_t> BotPolicy::GrindSpotsForBot(BotState& state, BotSnapshot const& bot, std::uint64_t nowMs)
+{
+    std::uint8_t const side = _options.SideOf ? _options.SideOf(bot.guid) : std::uint8_t(0);
+    std::vector<std::size_t> const blocked = _grindBlocks.Blocked(nowMs);
+    std::vector<std::size_t> spots = GrindSpotsFor(*_options.Grind, bot.map_id, bot.level, side, bot.pos_x, bot.pos_y, state.GrindVisited, blocked);
+    // A block keeps a spot out only while another one is left for the level: with none left, the blocked spots are used again rather than leaving the bot idle.
+    if (spots.empty() && !blocked.empty())
+    {
+        spots = GrindSpotsFor(*_options.Grind, bot.map_id, bot.level, side, bot.pos_x, bot.pos_y, state.GrindVisited, {});
+        if (!spots.empty() && _options.OnEvent)
+            _options.OnEvent("grind_blocks_lifted: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id) +
+                             " blocked=" + std::to_string(blocked.size()));
+    }
+    if (spots.empty() && _options.OnEvent)
+        _options.OnEvent("grind_none: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id) +
+                         " blocked=" + std::to_string(blocked.size()));
+    return spots;
 }
 
 std::size_t BotPolicy::BeginTankLead(BotState& state, BotSnapshot const& bot, PolicyOptions::DungeonRoute const& dungeon)
@@ -2625,6 +2661,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                             move.dest_z = dest.Z;
                             actions.push_back(move);
                             state.Last = Decision{ ActionType::kMoveTo, state.LosRepositionTarget, dest };
+                            state.LastMove = state.Last;
                             if (_options.OnEvent)
                                 _options.OnEvent("healer_dps_los: healer=" + std::to_string(bot.guid) +
                                                  " moving_to=" + std::to_string(int(dest.X)) + "," +
@@ -2707,6 +2744,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                     move.dest_z = out.Dest.Z;
                     actions.push_back(move);
                     state.Last = out;
+                    state.LastMove = out;
                 }
                 continue;
             }
@@ -2762,6 +2800,8 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 action.dest_z = wantedDead.Dest.Z;
                 actions.push_back(action);
                 state.Last = wantedDead;
+                if (wantedDead.Type == ActionType::kMoveTo)
+                    state.LastMove = wantedDead;
             };
             if (was == 0)
             {
@@ -3194,8 +3234,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             if (!stagingHold && _options.Grind && !_options.Grind->Spots.empty() && bot.level != 0 && state.DeathTimesMs[0] != 0 &&
                 nowMs - state.DeathTimesMs[0] <= kDeathLoopMs && nowMs >= state.EscapeUntilMs)
             {
-                std::uint8_t const side = _options.SideOf ? _options.SideOf(bot.guid) : std::uint8_t(0);
-                std::vector<std::size_t> const spots = GrindSpotsFor(*_options.Grind, bot.map_id, bot.level, side, bot.pos_x, bot.pos_y, state.GrindVisited);
+                std::vector<std::size_t> const spots = GrindSpotsForBot(state, bot, nowMs);
                 for (std::size_t const index : spots)
                 {
                     GrindSpot const& spot = _options.Grind->Spots[index];
@@ -5114,8 +5153,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             }
             else if (nowMs - state.IdleSinceMs >= wanderIdle())
             {
-                std::uint8_t const side = _options.SideOf ? _options.SideOf(bot.guid) : std::uint8_t(0);
-                std::vector<std::size_t> const spots = GrindSpotsFor(*_options.Grind, bot.map_id, bot.level, side, bot.pos_x, bot.pos_y, state.GrindVisited);
+                std::vector<std::size_t> const spots = GrindSpotsForBot(state, bot, nowMs);
                 if (!spots.empty())
                 {
                     // Not always the nearest spot: with randomness on the bot takes one of the nearest few, and stands somewhere around it, not on the
@@ -5126,6 +5164,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                                                  std::uint32_t(std::min<std::size_t>(spots.size(), kGrindPickAmong)));
                     GrindSpot const& spot = _options.Grind->Spots[spots[pick]];
                     state.GrindTarget = Point{ spot.X, spot.Y, spot.Z };
+                    state.GrindSpotIndex = spots[pick];
                     if (_options.RandomPct > 0)
                     {
                         double const angle = bot_random::Unit(bot_random::Draw(_options.RandomSeed, bot.guid, bot_random::kSaltJitter, std::uint64_t(state.WanderCycles) * 2)) * 6.283185307;
@@ -5200,14 +5239,39 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         // turning direction, and after a few walks tries its hubs again.
         else if (idle && healthy && _options.WanderWhenIdle && (!grindMode || nowMs < state.GrindRetryAtMs) && !partyMember && !state.ChatStay && state.ChatFollow == 0)
         {
+            // Starts a walk to a new random point; scale shortens it (a retry after a refused point). The point is at the bot's own height, so
+            // the core often has no route to it (open ground the navmesh does not cover): a refused point is retried nearer, not after the idle pause.
+            auto const startExploreWalk = [&](float scale) {
+                float const angle = float((bot.guid * 2654435761ull) % 628) * 0.01f + float(state.ExploreStep) * 2.399963f;
+                float radius = (50.0f + 25.0f * float(state.ExploreStep % 3)) * scale;
+                if (_options.RandomPct > 0)
+                    radius = float(bot_random::Vary(std::uint64_t(radius), _options.RandomPct,
+                                                    bot_random::Draw(_options.RandomSeed, bot.guid, bot_random::kSaltJitter, 0x200000000ull + state.ExploreStep)));
+                ++state.ExploreStep;
+                state.ExploreTarget = Point{ bot.pos_x + std::cos(angle) * radius, bot.pos_y + std::sin(angle) * radius, bot.pos_z };
+                state.Wandering = true;
+                state.WanderStartMs = nowMs;
+                wanted = Decision{ ActionType::kMoveTo, 0, state.ExploreTarget };
+                moveWhy = "state.ExploreTarget";
+                idle = false;
+            };
             if (state.Wandering)
             {
                 bool const arrived = DistanceTo(bot, state.ExploreTarget) <= kExploreReachYards;
-                bool const timedOut = nowMs - state.WanderStartMs > kExploreTimeoutMs || (state.WalkBlockedAtMs != 0 && state.WalkBlockedAtMs >= state.WanderStartMs);
-                if (arrived || timedOut)
+                bool const refused = !arrived && state.WalkBlockedAtMs != 0 && state.WalkBlockedAtMs >= state.WanderStartMs;
+                bool const timedOut = nowMs - state.WanderStartMs > kExploreTimeoutMs || refused;
+                if (refused && state.ExploreRefusals < kExploreRetryRefusals)
+                {
+                    ++state.ExploreRefusals;
+                    state.ExploreScale *= 0.5f;
+                    startExploreWalk(state.ExploreScale);
+                }
+                else if (arrived || timedOut)
                 {
                     state.Wandering = false;
                     state.IdleSinceMs = nowMs; // the next walk starts after kExploreIdleMs
+                    state.ExploreRefusals = 0;
+                    state.ExploreScale = 1.0f;
                     if (state.ExploreStep % 8 == 0)
                         state.HubFailures = 0; // try the hubs again now and then
                 }
@@ -5221,18 +5285,9 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             else if (nowMs - state.IdleSinceMs >= bot_random::Vary(kExploreIdleMs, std::min<std::uint32_t>(_options.RandomPct * 2, 90),
                                                                    bot_random::Draw(_options.RandomSeed, bot.guid, bot_random::kSaltIdle, 0x100000000ull + state.ExploreStep)))
             {
-                float const angle = float((bot.guid * 2654435761ull) % 628) * 0.01f + float(state.ExploreStep) * 2.399963f;
-                float radius = 50.0f + 25.0f * float(state.ExploreStep % 3);
-                if (_options.RandomPct > 0)
-                    radius = float(bot_random::Vary(std::uint64_t(radius), _options.RandomPct,
-                                                    bot_random::Draw(_options.RandomSeed, bot.guid, bot_random::kSaltJitter, 0x200000000ull + state.ExploreStep)));
-                ++state.ExploreStep;
-                state.ExploreTarget = Point{ bot.pos_x + std::cos(angle) * radius, bot.pos_y + std::sin(angle) * radius, bot.pos_z };
-                state.Wandering = true;
-                state.WanderStartMs = nowMs;
-                wanted = Decision{ ActionType::kMoveTo, 0, state.ExploreTarget };
-                moveWhy = "state.ExploreTarget";
-                idle = false;
+                state.ExploreRefusals = 0;
+                state.ExploreScale = 1.0f;
+                startExploreWalk(1.0f);
             }
         }
 
@@ -5651,6 +5706,8 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
             action.dest_z = wanted.Dest.Z;
             actions.push_back(action);
             state.Last = wanted;
+            if (wanted.Type == ActionType::kMoveTo)
+                state.LastMove = wanted;
         }
 
         // A heal order: the healer casts its heal on the speaker's selected friend, once.

@@ -90,6 +90,42 @@ void SkipsTheSpotsJustVisited()
     CHECK(spots.size() == 3);
 }
 
+void BlockedSpotsAreLeftOut()
+{
+    std::vector<std::string> warnings;
+    GrindData const data = Parse("spot 0 0 0 0 1 5 0\nspot 0 50 0 0 1 5 0\n", warnings);
+    auto spots = GrindSpotsFor(data, 0, 3, 0, 0.0f, 0.0f, {}, { 0 });
+    CHECK(spots.size() == 1 && spots[0] == 1);
+    spots = GrindSpotsFor(data, 0, 3, 0, 0.0f, 0.0f, {}, { 0, 1 }); // unlike the visited ones, blocked spots stay out
+    CHECK(spots.empty());
+}
+
+void BlocklistNeedsThreeDifferentBots()
+{
+    GrindBlocklist list;
+    CHECK(!list.Report(7, 1, 0));
+    CHECK(!list.Report(7, 1, 1000)); // the same bot again does not count
+    CHECK(!list.Report(7, 2, 2000));
+    CHECK(!list.IsBlocked(7, 2000));
+    CHECK(list.Report(7, 3, 3000));  // the third bot blocks it
+    CHECK(list.IsBlocked(7, 3000) && list.Blocked(3000) == std::vector<std::size_t>{ 7 });
+    CHECK(!list.Report(7, 4, 4000)); // already blocked
+    CHECK(list.IsBlocked(7, 3000 + kGrindBlockMs - 1));
+    CHECK(!list.IsBlocked(7, 3000 + kGrindBlockMs)); // an hour later it is open again
+    CHECK(list.Size() == 0);                         // and forgotten
+}
+
+void BlocklistReportsExpire()
+{
+    GrindBlocklist list;
+    list.Report(5, 1, 0);
+    list.Report(5, 2, 1000);
+    CHECK(!list.Report(5, 3, kGrindBlockWindowMs + 2000)); // the first two are too old to count
+    CHECK(list.Size() == 1);
+    CHECK(list.Report(5, 4, kGrindBlockWindowMs + 3000) == false && list.Report(5, 5, kGrindBlockWindowMs + 4000));
+    CHECK(list.Blocked(kGrindBlockWindowMs * 100).empty() && list.Size() == 0); // pruned: memory stays bounded
+}
+
 void RichSpotsCountAsCloser()
 {
     std::vector<std::string> warnings;
@@ -340,6 +376,9 @@ int main()
     ParsesSpotsAndRejectsBadLines();
     ChoosesByLevelSideAndDistance();
     SkipsTheSpotsJustVisited();
+    BlockedSpotsAreLeftOut();
+    BlocklistNeedsThreeDifferentBots();
+    BlocklistReportsExpire();
     RichSpotsCountAsCloser();
     SidesOfRaces();
     IdleBotWalksToAGrindSpotForItsLevel();

@@ -1997,6 +1997,39 @@ void ANoRouteAnswerEndsTheWalkInsteadOfBeingSentEveryTick()
     CHECK(WalkTo(policy.Decide(view, 80000), 10) == 900.0f);   // after the short pause for a walk that failed: the next hub
 }
 
+// A random explore point the core has no route to (the point is at the bot's height, and often on ground the navmesh does not cover) is retried
+// nearer on the next tick, not after the idle pause.
+void ARefusedExplorePointIsRetriedNearerAtOnce()
+{
+    WorldTickSnapshotView view = PartyView({ 10 });
+    view.bots[0].level = 20;
+    BotPolicy policy; // no hubs, no grind spots: the bot explores on foot
+    policy.Decide(view, 0);
+    BotAction first{};
+    bool started = false;
+    for (BotAction const& action : policy.Decide(view, 11000))
+        if (action.type == ActionType::kMoveTo && action.bot_guid == 10)
+        {
+            first = action;
+            started = true;
+        }
+    CHECK(started);
+    float const firstDistance = std::hypot(first.dest_x - view.bots[0].pos_x, first.dest_y - view.bots[0].pos_y);
+    view.bots[0].last_action_type = std::uint8_t(ActionType::kMoveTo);
+    view.bots[0].last_action_status = BotActionStatus::kNoRoute;
+    view.bots[0].last_action_sequence = 3;
+    BotAction retry{};
+    started = false;
+    for (BotAction const& action : policy.Decide(view, 11100))
+        if (action.type == ActionType::kMoveTo && action.bot_guid == 10)
+        {
+            retry = action;
+            started = true;
+        }
+    CHECK(started);                                                                                    // at once, not after the idle pause
+    CHECK(std::hypot(retry.dest_x - view.bots[0].pos_x, retry.dest_y - view.bots[0].pos_y) < firstDistance); // and nearer
+}
+
 // SDK 0.18: a crafting profession's line is asked for, a recipe that needs an anvil sends the bot to the nearest one, and it asks again there.
 PolicyOptions CraftingWithAnAnvil()
 {
@@ -6136,6 +6169,7 @@ int main()
     IdleBotWandersToAHubAfterAWhile();
     ArrivalMovesOnToTheNextHubAfterAnInterval();
     ANoRouteAnswerEndsTheWalkInsteadOfBeingSentEveryTick();
+    ARefusedExplorePointIsRetriedNearerAtOnce();
     ABlacksmithAsksForItsLineAndWalksToAnAnvilWhenTheRecipeNeedsOne();
     ANeedsFocusAnswerWithNoRouteOrNoTableEndsInAWait();
     AGatheringBotAsksForItsSkillAndBacksOffAfterARefusal();

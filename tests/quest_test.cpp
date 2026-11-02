@@ -191,6 +191,8 @@ void RefusalBlocksTheQuestForAWhile()
     QuestStep step = planner.Next(bot, memory, 10000);
     CHECK(step.Kind == QuestStepKind::WalkTo && step.Quest == 7); // 783 is blocked, the next quest is tried
     step = planner.Next(bot, memory, 1000 + kBlockAfterRefusalMs + 1);
+    CHECK(step.Quest != 783); // still blocked: an hour after a refused accept
+    step = planner.Next(bot, memory, 1000 + kBlockAfterAbandonMs + 1);
     CHECK(step.Quest == 783);
 }
 
@@ -360,15 +362,20 @@ void RefusalsBlockLongerEachTime()
 {
     QuestPlanner planner(World());
     QuestMemory memory;
+    // A refused accept ("cannot take") is blocked for ten minutes at once.
     planner.NoteSent(memory, kQuestAccept, 100, 0);
     planner.NoteRefused(memory, 0);
-    CHECK(memory.BlockedUntilMs[100] == kBlockAfterRefusalMs);
-    planner.NoteSent(memory, kQuestAccept, 100, 100000);
+    CHECK(memory.BlockedUntilMs[100] == kBlockAfterAcceptRefusalMs);
+    // A refused hand-in (most often a full bag) keeps the minute, ten minutes, hour steps.
+    planner.NoteSent(memory, kQuestHandIn, 101, 0);
+    planner.NoteRefused(memory, 0);
+    CHECK(memory.BlockedUntilMs[101] == kBlockAfterRefusalMs);
+    planner.NoteSent(memory, kQuestHandIn, 101, 100000);
     planner.NoteRefused(memory, 100000);
-    CHECK(memory.BlockedUntilMs[100] == 100000 + 10 * kBlockAfterRefusalMs);
-    planner.NoteSent(memory, kQuestAccept, 100, 1000000);
-    planner.NoteRefused(memory, 1000000);
-    CHECK(memory.BlockedUntilMs[100] == 1000000 + kBlockAfterAbandonMs);
+    CHECK(memory.BlockedUntilMs[101] == 100000 + kBlockAfterRefusalMs);
+    planner.NoteSent(memory, kQuestHandIn, 101, 200000);
+    planner.NoteRefused(memory, 200000);
+    CHECK(memory.BlockedUntilMs[101] == 200000 + 10 * kBlockAfterRefusalMs);
 }
 
 

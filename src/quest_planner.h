@@ -12,8 +12,8 @@
 // whenever the bot has no quest in its log (the nearest start on its map that has a quest the bot can take now: level, race and class allow it, it is
 // not done, in the log or blocked), so a bot that has finished a zone moves on to the next one; and a quest whose 'prev' quest is not known to be
 // done is tried after the others. A bot takes new quests while its log has room (kMaxAcceptedQuests).
-// A quest with no progress for kStuckMs is abandoned and left alone for kBlockAfterAbandonMs. A refused accept or hand-in
-// blocks that quest for kBlockAfterRefusalMs.
+// A quest with no progress for kStuckMs is abandoned and left alone for kBlockAfterAbandonMs. A refused accept is blocked for
+// kBlockAfterAcceptRefusalMs; a refused hand-in for kBlockAfterRefusalMs, growing with each refusal.
 #pragma once
 
 #include "quest_data.h"
@@ -62,6 +62,7 @@ struct QuestMemory
     };
     std::map<std::uint32_t, ProgressInfo> Progress;         // quest -> its objective total and since when it has been that
     std::uint32_t LastActionQuest = 0;                  // the quest of the last accept, hand-in or abandon sent
+    bool LastActionAbandon = false;                     // the last action sent was an abandon (its refusal is not a "cannot take")
     std::map<std::uint32_t, std::uint32_t> Refusals;    // quest -> how many accepts or hand-ins the core refused (the block grows with it)
     std::map<std::size_t, std::uint64_t> NoRouteUntilMs; // start index -> not walked to before this (the core found no route to its giver)
     bool WalkingToStart = false;                        // the step from the last Next is the walk to a start's giver
@@ -79,6 +80,7 @@ constexpr float kQuestReachYards = 4.0f;                // the core allows 5 yar
 constexpr float kAreaReachYards = 15.0f;                // a hunting area is searched when the bot is this close
 constexpr std::uint64_t kQuestActionGapMs = 3000;       // wait this long after sending an accept or hand-in
 constexpr std::uint64_t kBlockAfterRefusalMs = 60000;
+constexpr std::uint64_t kBlockAfterAcceptRefusalMs = 600000; // a refused accept: ten minutes (an hour kept bots away from quests they could take once the core allowed it)
 constexpr std::uint64_t kStuckMs = 600000;              // no progress for 10 minutes: abandon
 constexpr std::uint64_t kBlockAfterAbandonMs = 3600000;
 constexpr std::uint64_t kWalkStuckBlockMs = 900000;          // a quest whose walk is stuck (no route to its ender or hunting ground) is left alone this long

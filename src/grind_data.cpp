@@ -61,12 +61,62 @@ GrindData LoadGrindData(std::string const& path, std::vector<std::string>& warni
     return ParseGrindData(in, warnings);
 }
 
+void GrindBlocklist::Prune(std::uint64_t nowMs)
+{
+    for (auto it = _spots.begin(); it != _spots.end();)
+    {
+        Entry& entry = it->second;
+        std::erase_if(entry.Reports, [&](auto const& report) { return nowMs - report.second > kGrindBlockWindowMs; });
+        if (entry.Reports.empty() && entry.BlockedUntilMs <= nowMs)
+            it = _spots.erase(it);
+        else
+            ++it;
+    }
+}
+
+bool GrindBlocklist::Report(std::size_t spot, std::uint64_t bot, std::uint64_t nowMs)
+{
+    Prune(nowMs);
+    Entry& entry = _spots[spot];
+    if (entry.BlockedUntilMs > nowMs)
+        return false;
+    // One report per bot: the same bot refused again does not count twice.
+    auto const same = std::find_if(entry.Reports.begin(), entry.Reports.end(), [bot](auto const& report) { return report.first == bot; });
+    if (same != entry.Reports.end())
+        same->second = nowMs;
+    else
+        entry.Reports.emplace_back(bot, nowMs);
+    if (entry.Reports.size() < kGrindBlockReports)
+        return false;
+    entry.BlockedUntilMs = nowMs + kGrindBlockMs;
+    entry.Reports.clear();
+    return true;
+}
+
+bool GrindBlocklist::IsBlocked(std::size_t spot, std::uint64_t nowMs)
+{
+    Prune(nowMs);
+    auto const it = _spots.find(spot);
+    return it != _spots.end() && it->second.BlockedUntilMs > nowMs;
+}
+
+std::vector<std::size_t> GrindBlocklist::Blocked(std::uint64_t nowMs)
+{
+    Prune(nowMs);
+    std::vector<std::size_t> out;
+    for (auto const& [spot, entry] : _spots)
+        if (entry.BlockedUntilMs > nowMs)
+            out.push_back(spot);
+    return out;
+}
+
 std::vector<std::size_t> GrindSpotsFor(GrindData const& data, std::uint32_t map, std::uint32_t level, std::uint8_t side, float x, float y,
-                                       std::vector<std::size_t> const& skip)
+                                       std::vector<std::size_t> const& skip, std::vector<std::size_t> const& blocked)
 {
     auto const usable = [&](GrindSpot const& spot)
     {
-        return spot.Map == map && (spot.Side == 0 || side == 0 || spot.Side == side);
+        return spot.Map == map && (spot.Side == 0 || side == 0 || spot.Side == side) &&
+               (blocked.empty() || std::find(blocked.begin(), blocked.end(), std::size_t(&spot - data.Spots.data())) == blocked.end());
     };
 
     std::vector<std::size_t> candidates;

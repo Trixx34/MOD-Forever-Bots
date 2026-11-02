@@ -270,6 +270,7 @@ void QuestPlanner::NoteSent(QuestMemory& memory, std::uint32_t operation, std::u
 {
     memory.NextActionMs = nowMs + kQuestActionGapMs;
     memory.LastActionQuest = quest;
+    memory.LastActionAbandon = operation == kQuestAbandon;
     if (operation == kQuestHandIn || operation == kQuestReward)
         memory.PendingHandIn = quest;
     if (operation == kQuestAbandon)
@@ -304,7 +305,10 @@ bool QuestPlanner::NoteRefused(QuestMemory& memory, std::uint64_t nowMs) const
     // hand-in is blocked a minute for its first two refusals.
     std::uint32_t const times = ++memory.Refusals[memory.LastActionQuest];
     std::uint32_t const step = handIn && times > 1 ? times - 1 : times; // a hand-in's second refusal counts as the first
-    std::uint64_t const block = step == 1 ? kBlockAfterRefusalMs : step == 2 ? 10 * kBlockAfterRefusalMs : kBlockAfterAbandonMs;
+    // An accept the core refused ("cannot take": not eligible, a prerequisite missing, done long ago) is blocked ten minutes at once: longer than a hand-in's
+    // minute, but not an hour, which kept bots from quests they could take once the core allowed it. (Without any block the planner walked bots to the
+    // giver of such quests again and again, which fed the no-route flood.)
+    std::uint64_t const block = !handIn && !memory.LastActionAbandon ? kBlockAfterAcceptRefusalMs : step == 1 ? kBlockAfterRefusalMs : step == 2 ? 10 * kBlockAfterRefusalMs : kBlockAfterAbandonMs;
     memory.BlockedUntilMs[memory.LastActionQuest] = nowMs + block;
     if (handIn)
     {
