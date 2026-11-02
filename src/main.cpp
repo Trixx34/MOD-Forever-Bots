@@ -756,6 +756,21 @@ void PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& r
                 std::cerr << "forever-bots: bot " << bot.guid << " " << ActionTypeName(static_cast<forever_module::ActionType>(bot.last_action_type))
                           << (bot.last_action_spell ? " spell " + std::to_string(bot.last_action_spell) : std::string())
                           << " not done: " << ActionStatusName(bot.last_action_status) << "\n";
+                // A quest action the core refused: the module only sees the status (the core's own reason is in the core log), so say what the module
+                // knows -- the operation (1 accept, 2 hand-in, 3 abandon, 4 reward), the quest, the class and the free bag slots (a full bag refuses a reward).
+                // A separate line, so the "not done: <reason>" line above keeps the form the report tools read.
+                if (bot.last_action_type == static_cast<std::uint8_t>(forever_module::ActionType::kQuest))
+                {
+                    std::uint32_t const operation = bot.last_action_spell >> 24;
+                    std::cerr << "forever-bots: quest_refused: bot=" << bot.guid << " op=" << operation
+                              << (operation == 4 ? "(reward)" : operation == 2 ? "(hand_in)" : operation == 1 ? "(accept)" : operation == 3 ? "(abandon)" : "")
+                              << " quest=" << (bot.last_action_spell & 0xFFFFFFu)
+                              << " class=" << (options.ClassOf ? options.ClassOf(bot.guid) : 0u)
+                              << " status=" << ActionStatusName(bot.last_action_status)
+                              << " code=" << unsigned(static_cast<std::uint8_t>(bot.last_action_status))
+                              << " bag_free=" << bot.bag_free_slots
+                              << " bag_room=" << (bot.bag_free_slots > 0 ? "yes" : "no") << "\n";
+                }
             }
         }
 
