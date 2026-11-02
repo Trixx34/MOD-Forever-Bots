@@ -2152,17 +2152,19 @@ std::vector<std::string> BotPolicy::ApplyLfg(WorldTickSnapshotView const& view, 
     std::uint64_t const issuerRef = PlayerRef(chat.Issuer);
 
     // The group so far: the speaker and the bots of its group. The speaker's own role is not known, so it counts as one member and no role.
-    std::uint32_t size = 1, tanks = 0, healers = 0;
+    std::uint32_t members = 0, groupSize = 0, tanks = 0, healers = 0;
     for (BotSnapshot const& bot : view.bots)
     {
         if (bot.group_leader_guid != issuerRef)
             continue;
-        ++size;
-        size = std::max(size, bot.group_size);
+        ++members;
+        groupSize = std::max(groupSize, bot.group_size);
         level_dungeon::Role const role = level_dungeon::RoleOfClass(ClassFor(_options, bot.guid));
         tanks += role == level_dungeon::Role::Tank ? 1 : 0;
         healers += role == level_dungeon::Role::Healer ? 1 : 0;
     }
+    // the speaker plus its bots, or the party size the core reports when that is bigger
+    std::uint32_t const size = std::max(members + 1, groupSize);
     std::vector<level_dungeon::Role> const wanted = level_dungeon::MissingRoles(size, tanks, healers);
 
     // The free bots: not in a group or invited, not in a bot party of the module's, alive and quiet, in the dungeon's level range, outside a dungeon.

@@ -91,52 +91,6 @@ std::uint32_t LfgClassOf(std::uint64_t guid)
     }
 }
 
-void LfgSummonsTheMissingRolesAndAnswers()
-{
-    PolicyOptions options;
-    options.ClassOf = LfgClassOf;
-    PolicyOptions::DungeonRoute rfc;
-    rfc.Id = "rfc";
-    rfc.Name = "Ragefire Chasm";
-    rfc.MinLevel = 13;
-    rfc.MaxLevel = 18;
-    rfc.HasEntry = true;
-    rfc.Entry = Point{ 1.0f, 2.0f, 3.0f };
-    rfc.Route = { Point{ 1.0f, 2.0f, 3.0f }, Point{ 10.0f, 2.0f, 3.0f } };
-    options.DungeonsByMap[389] = rfc;
-    BotPolicy policy(options);
-
-    WorldTickSnapshotView view;
-    view.tick_number = 1;
-    view.max_nearby_units = 4;
-    for (std::uint64_t guid : { 10, 11, 20, 21, 22, 23, 24 })
-    {
-        BotSnapshot bot;
-        bot.guid = guid;
-        bot.health = 1000;
-        bot.max_health = 1000;
-        bot.level = guid == 24 ? 40 : (guid < 20 ? 20 : 15);
-        bot.map_id = 0;
-        if (guid < 20)
-        {
-            bot.group_role = 1;
-            bot.group_size = 3;
-            bot.group_leader_guid = PlayerRef();
-        }
-        view.bots.push_back(bot);
-    }
-    view.nearby.resize(view.bots.size() * view.max_nearby_units);
-
-    auto const unknown = policy.ApplyChat(view, Ctx(), *ParseChatCommand("lfg zzz", false), 1000);
-    CHECK(unknown.size() == 1 && unknown[0].find("rfc") != std::string::npos);
-
-    auto const lines = policy.ApplyChat(view, Ctx(), *ParseChatCommand("LFG RFC", false), 1100);
-    CHECK(lines.size() == 1 && lines[0].find("LFG rfc: group of 3, filling dps x2") == 0);
-    auto const actions = policy.Decide(view, 1200);
-    CHECK(Has(actions, 22, ActionType::kSummon, PlayerRef()));   // the mage and the rogue; the free priest and the warrior are not needed
-    CHECK(Has(actions, 23, ActionType::kSummon, PlayerRef()));
-    CHECK(!Has(actions, 20, ActionType::kSummon) && !Has(actions, 21, ActionType::kSummon) && !Has(actions, 24, ActionType::kSummon));
-}
 
 void ParsesSelectors()
 {
@@ -230,6 +184,53 @@ bool HasLine(std::vector<std::string> const& lines, std::string const& verb)
         if (line.rfind(verb, 0) == 0)
             return true;
     return false;
+}
+
+void LfgSummonsTheMissingRolesAndAnswers()
+{
+    PolicyOptions options;
+    options.ClassOf = LfgClassOf;
+    PolicyOptions::DungeonRoute rfc;
+    rfc.Id = "rfc";
+    rfc.Name = "Ragefire Chasm";
+    rfc.MinLevel = 13;
+    rfc.MaxLevel = 18;
+    rfc.HasEntry = true;
+    rfc.Entry = Point{ 1.0f, 2.0f, 3.0f };
+    rfc.Route = { Point{ 1.0f, 2.0f, 3.0f }, Point{ 10.0f, 2.0f, 3.0f } };
+    options.DungeonsByMap[389] = rfc;
+    BotPolicy policy(options);
+
+    WorldTickSnapshotView view;
+    view.tick_number = 1;
+    view.max_nearby_units = 4;
+    for (std::uint64_t guid : { 10, 11, 20, 21, 22, 23, 24 })
+    {
+        BotSnapshot bot;
+        bot.guid = guid;
+        bot.health = 1000;
+        bot.max_health = 1000;
+        bot.level = guid == 24 ? 40 : (guid < 20 ? 20 : 15);
+        bot.map_id = 0;
+        if (guid < 20)
+        {
+            bot.group_role = 1;
+            bot.group_size = 3;
+            bot.group_leader_guid = PlayerRef();
+        }
+        view.bots.push_back(bot);
+    }
+    view.nearby.resize(view.bots.size() * view.max_nearby_units);
+
+    auto const unknown = policy.ApplyChat(view, Ctx(), *ParseChatCommand("lfg zzz", false), 1000);
+    CHECK(unknown.size() == 1 && unknown[0].find("rfc") != std::string::npos);
+
+    auto const lines = policy.ApplyChat(view, Ctx(), *ParseChatCommand("LFG RFC", false), 1100);
+    CHECK(lines.size() == 1 && lines[0].find("LFG rfc: group of 3, filling dps x2") == 0);
+    auto const actions = policy.Decide(view, 1200);
+    CHECK(Has(actions, 22, ActionType::kSummon, PlayerRef()));   // the mage and the rogue; the free priest and the warrior are not needed
+    CHECK(Has(actions, 23, ActionType::kSummon, PlayerRef()));
+    CHECK(!Has(actions, 20, ActionType::kSummon) && !Has(actions, 21, ActionType::kSummon) && !Has(actions, 24, ActionType::kSummon));
 }
 
 void FollowMakesTheBotsFollowTheSpeaker()
