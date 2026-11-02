@@ -616,8 +616,6 @@ void BotPolicy::TurnUpkeepBuffs(DecideTick& tick, BotTurn& turn)
             if (cast)
                 break;
         }
-        if (cast)
-            continue;
     }
 }
 
@@ -654,8 +652,6 @@ void BotPolicy::TurnCraftGather(DecideTick& tick, BotTurn& turn)
             state.NextCastMs = nowMs + kGlobalCooldownMs;
             crafted = true;
         }
-        if (crafted)
-            continue;
     }
 
     // Gathering (SDK 0.18, off by default): a bot with Mining, Herbalism or Skinning asks the core to gather what is within 30 yards of it: a vein or herb its skill allows, or a
@@ -677,8 +673,6 @@ void BotPolicy::TurnCraftGather(DecideTick& tick, BotTurn& turn)
             state.NextCastMs = nowMs + kGlobalCooldownMs;
             gathered = true;
         }
-        if (gathered)
-            continue;
     }
 }
 
