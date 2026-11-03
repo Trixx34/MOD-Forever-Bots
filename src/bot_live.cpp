@@ -2,6 +2,7 @@
 #include "bot_live.h"
 
 #include <cstdio>
+#include <filesystem>
 #include <iostream>
 #include <set>
 #include <utility>
@@ -122,7 +123,12 @@ bool BotLive::WriteAtomic(std::string const& path, std::string const& text)
         return false;
     bool ok = std::fwrite(text.data(), 1, text.size(), file) == text.size();
     ok = (std::fclose(file) == 0) && ok;
-    if (!ok || std::rename(temp.c_str(), path.c_str()) != 0)
+    // std::filesystem::rename replaces an existing file on every platform; std::rename does not on Windows (it fails when the
+    // destination exists), which made every write after the first fail there (forever-windows-package #31, live_test).
+    std::error_code error;
+    if (ok)
+        std::filesystem::rename(temp, path, error);
+    if (!ok || error)
     {
         std::remove(temp.c_str());
         return false;
