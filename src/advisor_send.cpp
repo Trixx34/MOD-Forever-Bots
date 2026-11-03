@@ -50,4 +50,15 @@ bool Decode(forever_module::EventNotify const& notify, lfg_queue_fill::Queue& ou
     return true;
 }
 
+bool Decode(forever_module::EventNotify const& notify, GuildLevel& out)
+{
+    if (!notify.has_guild_member_level())
+        return false;
+    forever_module::GuildMemberLevelEvent const& event = notify.guild_member_level();
+    out.Guild = event.guild_guid();
+    out.Member = event.member_guid();
+    out.Level = event.new_level();
+    return true;
+}
+
 }  // namespace advisor

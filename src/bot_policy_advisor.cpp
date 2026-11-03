@@ -115,3 +115,27 @@ void BotPolicy::TurnAdvisor(DecideTick& tick, BotTurn& turn)
         }
     }
 }
+
+void BotPolicy::OnGuildMemberLevel(forever_module::WorldTickSnapshotView const& view, std::uint64_t guild, std::uint64_t member, std::uint32_t level,
+                                   std::uint64_t nowMs)
+{
+    if (!_options.GuildMilestone.Enabled || !_options.Pools || _options.Pools->GuildMilestones.empty() || _bots.count(member) != 0)
+        return;   // off, no lines, or the member is one of our bots
+    std::vector<std::uint64_t> members;
+    for (forever_module::BotSnapshot const& bot : view.bots)
+    {
+        auto const known = _botGuild.find(bot.guid);
+        if (known != _botGuild.end() && known->second == guild && bot.life_state == 0 && bot.in_combat == 0)
+            members.push_back(bot.guid);
+    }
+    std::uint64_t const speaker = _guildSpeaker.Pick(_options.GuildMilestone, guild, member, level, members, _options.RandomSeed);
+    if (speaker == 0)
+        return;
+    std::vector<std::string> const& lines = _options.Pools->GuildMilestones;
+    advisor::Order order;
+    order.What = advisor::Kind::GuildSay;
+    order.Bot = speaker;
+    order.Text = advisor::Replace(lines[bot_random::Below(bot_random::Draw(_options.RandomSeed, speaker, 0xE3, nowMs / 1000 + member), std::uint32_t(lines.size()))],
+                                  "level", std::to_string(level));
+    _advisorOrders.push_back(std::move(order));
+}

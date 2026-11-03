@@ -395,6 +395,13 @@ void main_detail::PumpTier2(forever_module::Tier2Session& session, std::atomic<b
                     std::lock_guard<std::mutex> lock(extras.Commands->Lock);
                     lfgQueues.swap(extras.Commands->LfgQueues);
                 }
+                std::vector<advisor::GuildLevel> guildLevels;
+                {
+                    std::lock_guard<std::mutex> lock(extras.Commands->Lock);
+                    guildLevels.swap(extras.Commands->GuildLevels);
+                }
+                for (advisor::GuildLevel const& level : guildLevels)
+                    policy.OnGuildMemberLevel(view, level.Guild, level.Member, level.Level, nowMs());
                 for (lfg_queue_fill::Queue const& queue : lfgQueues)
                     policy.OnLfgQueue(view, queue, nowMs());
                 std::vector<BotPolicy::WhisperReply> answers;

@@ -698,6 +698,10 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
         else
             warnings.push_back("Module.forever-bots.PathJitterYards: '" + it->second + "' is not a number from 0 to 5; using the default.");
     }
+    ReadBool(config, "GuildMilestone", settings.GuildMilestone.Enabled, warnings);
+    ReadKey(config, "GuildMilestoneChancePct", 0, 100, settings.GuildMilestone.ChancePct, warnings);
+    if (auto const it = config.find("GuildMilestoneFile"); it != config.end())
+        settings.GuildMilestoneFile = it->second;
     // ADVISOR-KEYS
     ReadBool(config, "InnDowntime", settings.InnDowntime.Enabled, warnings);
     ReadBool(config, "ScenarioConfigGuard", settings.ScenarioConfigGuard, warnings);

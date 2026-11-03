@@ -138,8 +138,11 @@ void LoadPolicyTables(PolicyOptions& policyOptions, BotSettings& settings)
     policyOptions.PartyMana = settings.PartyMana;
     policyOptions.WhisperMatrix = settings.WhisperMatrix;
     policyOptions.PathJitter = settings.PathJitter;
+    policyOptions.GuildMilestone = settings.GuildMilestone;
     // ADVISOR-COPY
     // ADVISOR-POOLS
+    if (settings.GuildMilestone.Enabled)
+        pools->GuildMilestones = advisor::LoadLines(BesideTheModule(settings.GuildMilestoneFile));
     if (settings.WhisperMatrix.Enabled)
         pools->WhisperReplies = advisor::LoadLines(BesideTheModule(settings.WhisperMatrixFile));
     if (settings.PartyMana.Enabled)
