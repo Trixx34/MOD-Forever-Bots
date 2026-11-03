@@ -36,7 +36,7 @@ warrior in a party tanks, a healer class heals, the rest deal damage). A spec in
 Spec keys (lower case; the SDK's spec keys): hunter `bm mm sv`; warrior `arms fury prot`; paladin `holy prot ret`; priest `disc holy shadow`; shaman `ele enh resto`; mage `arcane fire frost`;
 warlock `affliction demonology destruction`; rogue `assassination combat subtlety`; druid `balance feral_tank feral_cat resto`. A key the class does not have is ignored with a log line.
 
-Talent profiles are still keyed by (class, role), not by spec: the policy passes the role to `SpendBotTalents`.
+Talent profiles are keyed by spec first, then by role (protocol 18): the policy passes the bot's spec (`TalentSpecFromKey`) and its role to `SpendBotTalents`, and the core looks the (class, spec) profile up before the (class, role) one.
 
 What each spec does (the rows are in `data/rotation_spec.txt`, with a comment per block; the source is `docs/102-wowhead-class-rotations.md` in forever-ops):
 
