@@ -149,7 +149,8 @@ int main(int argc, char** argv)
     manifest.requested_max_bots = kMaxBotsCeiling;
     manifest.requested_max_nearby_units = kRequestedNearbyUnits;
     manifest.requested_max_actions = kRequestedActions;
-    manifest.tier1_hooks = { "CommandScript", "PlayerScript.OnChat", "PlayerScript.OnBotTrade", "PlayerScript.OnLootItem" };
+    manifest.tier1_hooks = { "CommandScript", "PlayerScript.OnChat", "PlayerScript.OnBotTrade", "PlayerScript.OnLootItem",
+                             "LfgScript.OnQueueUpdate", "GuildScript.OnMemberLevel" };   // protocol 21 events; the handlers do nothing while their feature is off (the settings arrive after the manifest)
 
     forever_module::ModuleClient client(std::move(manifest));
     if (!client.Connect(argv[1]) || !client.Handshake())

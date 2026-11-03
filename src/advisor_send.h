@@ -1,0 +1,35 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// The one place that names the protocol 21 SDK calls (BotEmote, BotLfgJoin, BotSpeak kParty / kGuild) and decodes the two protocol 21 events, so an SDK
+// rename is a one-file change.
+#pragma once
+
+#include "advisor_orders.h"
+
+#include "lfg_queue_fill.h"
+
+#include <cstdint>
+
+namespace forever_module {
+class ModuleClient;
+class EventNotify;
+}
+
+namespace advisor {
+
+// Sends the order. False when it could not be sent (an order with no bot, or an empty line).
+bool Send(forever_module::ModuleClient& client, Order const& order);
+
+struct GuildLevel
+{
+    std::uint64_t Guild = 0;
+    std::uint64_t Member = 0;
+    std::uint32_t Level = 0;
+};
+
+// The payload of EventNotify::guild_member_level() (hook GuildScript.OnMemberLevel).
+bool Decode(forever_module::EventNotify const& notify, GuildLevel& out);
+
+// The payload of EventNotify::lfg_queue() (hook LfgScript.OnQueueUpdate); false when the notify carries none.
+bool Decode(forever_module::EventNotify const& notify, lfg_queue_fill::Queue& out);
+
+}  // namespace advisor

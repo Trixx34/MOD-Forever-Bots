@@ -1,0 +1,28 @@
+# Whisper replies by keyword and state (src/whisper_matrix.h). Format: keyword|state|text
+# keyword: where, inv, group, lfg, level, help. state: grinding, questing, traveling, dungeon, fullgroup, or any. {level} is the bot's level.
+# A state line is used when one fits and was not sent to this player in the last 10 minutes; else an "any" line; else the bot stays silent.
+where|grinding|Out hunting around here, nothing special.
+where|grinding|Just grinding nearby, killing whatever walks past.
+where|questing|Working on some quests at the moment.
+where|traveling|On the road to somewhere else right now.
+where|dungeon|I am inside a dungeon with my group.
+where|fullgroup|Out with my group, we are on a run.
+where|any|Around, just busy at the moment.
+inv|grinding|Sorry, I am in the middle of a grind. Maybe later.
+inv|questing|I am busy with a quest right now, try me again in a bit.
+inv|traveling|I am on my way somewhere, ask again when I arrive.
+inv|dungeon|Sorry, I am in a dungeon, cannot take an invite now.
+inv|fullgroup|My group is full, sorry.
+inv|any|Not right now, sorry.
+group|grinding|Maybe later, I am grinding at the moment.
+group|questing|I am on a quest, but ask again later.
+group|dungeon|In a dungeon already, sorry.
+group|fullgroup|Our group is full, sorry.
+group|any|Not at the moment, sorry.
+lfg|dungeon|Already in a dungeon with a group.
+lfg|fullgroup|Already grouped and full, thanks.
+lfg|any|Maybe, but I am busy now. Try again later.
+level|any|I am level {level}.
+level|grinding|Level {level} and grinding.
+help|any|I cannot do much, but ask in the open chat, someone may help.
+help|dungeon|Busy in a dungeon right now, sorry.

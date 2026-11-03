@@ -942,6 +942,25 @@ void BotPolicy::TurnSendMove(DecideTick& tick, BotTurn& turn)
     auto& aoeWarder = turn.aoeWarder;
     auto& kiteEntry = turn.kiteEntry;
 
+    // PathJitter: a plain walk (not a kite, a flee or a dungeon route) ends a little to one side of the target. Out of combat only.
+    if (_options.PathJitter.Enabled && wanted.Type == ActionType::kMoveTo && bot.in_combat == 0 && !turn.hasTarget && !turn.enemyNear && partyLeader == 0 &&
+        scenario.RouteMap == 0 && !turn.routeBusy && !turn.dungeonHold && !state.TankLead && _options.DungeonsByMap.count(bot.map_id) == 0 &&
+        !kiteEntry && kiteRetry < 0 && !turn.healLosPoint && DistanceTo(bot, wanted.Dest) > 4.0f)
+    {
+        std::vector<path_jitter::Pt> unwalkable;
+        if (_options.Grind)
+            for (std::size_t const spot : _grindBlocks.Blocked(nowMs))
+                if (spot < _options.Grind->Spots.size() && _options.Grind->Spots[spot].Map == bot.map_id)
+                    unwalkable.push_back({ _options.Grind->Spots[spot].X, _options.Grind->Spots[spot].Y });
+        path_jitter::Facts facts;
+        facts.Walking = true;
+        facts.Unwalkable = &unwalkable;
+        facts.From = { bot.pos_x, bot.pos_y };
+        path_jitter::Pt const moved = path_jitter::Apply(_options.PathJitter, facts, { wanted.Dest.X, wanted.Dest.Y }, _options.RandomSeed, bot.guid);
+        wanted.Dest.X = moved.X;
+        wanted.Dest.Y = moved.Y;
+    }
+
     if (_options.OnEvent && scenario.RouteMap != 0 && partyLeader != 0 && (wanted.Type == ActionType::kMoveTo || (wanted.Type == ActionType::kFollow && partyLeaderBot)) &&
         nowMs - state.MoveWhyLoggedMs >= 5000 && (wanted.Type == ActionType::kFollow || std::hypot(wanted.Dest.X - state.MoveWhyDest.X, wanted.Dest.Y - state.MoveWhyDest.Y) > 8.0f))
     {

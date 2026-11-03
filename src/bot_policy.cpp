@@ -43,7 +43,13 @@ BotActivity BotPolicy::ActivityOf(BotSnapshot const& bot) const
 std::vector<BotPolicy::WhisperReply> BotPolicy::ApplyWhisper(WorldTickSnapshotView const& view, std::uint64_t player, std::uint64_t bot,
                                                              std::string const& text, std::uint64_t nowMs)
 {
-    if (!_options.WhisperReplies || _bots.count(player) != 0) // our own bots never get an answer (nor is a bot's whisper to a bot answered)
+    if (_options.WhisperMatrix.Enabled && _options.Pools && !_whisperTemplatesLoaded)
+    {
+        _whisperTemplates = whisper_matrix::Parse(_options.Pools->WhisperReplies);
+        _whisperTemplatesLoaded = true;
+    }
+    bool const matrix = _options.WhisperMatrix.Enabled && !_whisperTemplates.empty();
+    if ((!_options.WhisperReplies && !matrix) || _bots.count(player) != 0) // our own bots never get an answer (nor is a bot's whisper to a bot answered)
         return {};
     BotSnapshot const* snapshot = nullptr;
     for (BotSnapshot const& b : view.bots)
@@ -54,8 +60,32 @@ std::vector<BotPolicy::WhisperReply> BotPolicy::ApplyWhisper(WorldTickSnapshotVi
         }
     if (snapshot == nullptr)
         return {};
+    bool allowed = false;
+    if (matrix && whisper_matrix::Match(text) != whisper_matrix::Keyword::None)
+    {
+        // WhisperMatrix: the keyword lists and the state pools; the same limiter as the other replies.
+        if (!_whispers.Allow(player, bot, nowMs))
+            return {};
+        allowed = true;
+        whisper_matrix::State state = whisper_matrix::State::Grinding;
+        auto const found = _bots.find(bot);
+        BusyKind const where = BusyOf(*snapshot);
+        if (_options.DungeonsByMap.count(snapshot->map_id) != 0)
+            state = whisper_matrix::State::Dungeon;
+        else if (snapshot->group_size >= 5)
+            state = whisper_matrix::State::FullGroup;
+        else if (where == BusyKind::Travelling || (found != _bots.end() && (found->second.Traveling || found->second.SupplyTrip)))
+            state = whisper_matrix::State::Traveling;
+        else if (snapshot->quest_count > 0)
+            state = whisper_matrix::State::Questing;
+        std::string reply = _whisperMatrix.Reply(_options.WhisperMatrix, _whisperTemplates, text, state, snapshot->level, player, _options.RandomSeed, bot, nowMs);
+        if (!reply.empty())
+            return { WhisperReply{ bot, player, ClampReply(std::move(reply)) } };
+        if (!_options.WhisperReplies)
+            return {};
+    }
     WhisperIntent const intent = ClassifyWhisper(text);
-    if (intent == WhisperIntent::Other || !_whispers.Allow(player, bot, nowMs))
+    if (!_options.WhisperReplies || intent == WhisperIntent::Other || (!allowed && !_whispers.Allow(player, bot, nowMs)))
         return {};
     BusyKind const busy = BusyOf(*snapshot);
     std::string line = intent == WhisperIntent::NeedGroup && busy != BusyKind::None ? BusyLine(bot, busy) : ReplyLine(intent, bot, ActivityOf(*snapshot));
@@ -438,6 +468,7 @@ void BotPolicy::DecideBot(DecideTick& tick, std::size_t i)
     TurnRestAndConsume(tick, turn);
     TurnTrainAndParty(tick, turn);
     TurnSocial(tick, turn);
+    TurnAdvisor(tick, turn);
     TurnLootTaxiMount(tick, turn);
     TurnSendMove(tick, turn);
     if (TurnForcedHeal(tick, turn) == TurnFlow::kSkip)

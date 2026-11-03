@@ -308,6 +308,24 @@ void SetUpTrade(forever_module::ModuleClient& client, std::shared_ptr<trade::Tra
             }
         }
     };
+    client.OnNotify("GuildScript.OnMemberLevel", [commands](forever_module::EventNotify const& notify)
+    {
+        advisor::GuildLevel level;
+        if (!advisor::Decode(notify, level))
+            return;
+        std::lock_guard<std::mutex> lock(commands->Lock);
+        if (commands->GuildLevels.size() < 64)
+            commands->GuildLevels.push_back(level);
+    });
+    client.OnNotify("LfgScript.OnQueueUpdate", [commands](forever_module::EventNotify const& notify)
+    {
+        lfg_queue_fill::Queue queue;
+        if (!advisor::Decode(notify, queue))
+            return;
+        std::lock_guard<std::mutex> lock(commands->Lock);
+        if (commands->LfgQueues.size() < 32)
+            commands->LfgQueues.push_back(std::move(queue));
+    });
     client.OnNotify("PlayerScript.OnBotTrade", [trades, runTrade, commands](forever_module::EventNotify const& notify)
     {
         if (notify.event_payload_case() != forever_module::EventNotify::kBotTrade)
@@ -395,6 +413,7 @@ void SetUpChat(forever_module::ModuleClient& client, std::shared_ptr<CommandQueu
         std::vector<CommandQueue::AmbientLine> ambientLines;
         std::vector<BotPolicy::WhisperReply> whispers;
         std::vector<social::Order> socialOrders;
+        std::vector<advisor::Order> advisorOrders;
         {
             std::lock_guard<std::mutex> lock(commands->Lock);
             replies.swap(commands->Replies);
@@ -403,6 +422,7 @@ void SetUpChat(forever_module::ModuleClient& client, std::shared_ptr<CommandQueu
             whispers.swap(commands->WhisperReplies);
             ambientLines.swap(commands->Ambient);
             socialOrders.swap(commands->Social);
+            advisorOrders.swap(commands->Advisor);
         }
         for (social::Order const& order : socialOrders)
         {
@@ -424,6 +444,8 @@ void SetUpChat(forever_module::ModuleClient& client, std::shared_ptr<CommandQueu
                 commands->SocialOutcomes.push_back(std::move(failed));
             }
         }
+        for (advisor::Order const& order : advisorOrders)
+            advisor::Send(client, order);
         for (BotPolicy::WhisperReply const& whisper : whispers)
             client.BotSpeak(whisper.Bot, forever_module::ModuleClient::SpeakKind::kWhisper, whisper.Player, whisper.Text);
         for (BotPolicy::TalentOrder const& order : talents)

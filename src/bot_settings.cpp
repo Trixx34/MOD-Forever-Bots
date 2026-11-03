@@ -4,6 +4,7 @@
 #include "bot_pick.h"
 #include "text_number.h"
 
+#include <cstdlib>
 #include <algorithm>
 #include <charconv>
 #include <limits>
@@ -667,6 +668,45 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadKey(config, "TownAfkZoneMax", 0, 100, settings.TownAfk.ZoneMax, warnings);
     if (settings.TownAfk.MaxMin < settings.TownAfk.MinMin)
         settings.TownAfk.MaxMin = settings.TownAfk.MinMin;
+    ReadBool(config, "LfgQueueFill", settings.LfgQueueFill.Enabled, warnings);
+    ReadKey(config, "LfgQueueFillWaitSec", 0, 3600, settings.LfgQueueFill.WaitSec, warnings);
+    ReadKey(config, "LfgQueueFillCooldownSec", 0, 86400, settings.LfgQueueFill.CooldownSec, warnings);
+    ReadBool(config, "DeathPause", settings.DeathPause.Enabled, warnings);
+    ReadKey(config, "DeathPauseMinSec", 0, 600, settings.DeathPause.MinSec, warnings);
+    ReadKey(config, "DeathPauseMaxSec", 0, 600, settings.DeathPause.MaxSec, warnings);
+    if (settings.DeathPause.MaxSec < settings.DeathPause.MinSec)
+        settings.DeathPause.MaxSec = settings.DeathPause.MinSec;
+    ReadBool(config, "TradeAds", settings.TradeAds.Enabled, warnings);
+    ReadKey(config, "TradeAdsIntervalMin", 1, 1440, settings.TradeAds.IntervalMin, warnings);
+    ReadKey(config, "TradeAdsMinSkill", 1, 450, settings.TradeAds.MinSkill, warnings);
+    if (auto const it = config.find("TradeAdsFile"); it != config.end())
+        settings.TradeAdsFile = it->second;
+    ReadBool(config, "PartyMana", settings.PartyMana.Enabled, warnings);
+    ReadKey(config, "PartyManaHoldSec", 1, 600, settings.PartyMana.HoldSec, warnings);
+    if (auto const it = config.find("PartyManaFile"); it != config.end())
+        settings.PartyManaFile = it->second;
+    ReadBool(config, "WhisperMatrix", settings.WhisperMatrix.Enabled, warnings);
+    if (auto const it = config.find("WhisperMatrixFile"); it != config.end())
+        settings.WhisperMatrixFile = it->second;
+    ReadBool(config, "PathJitter", settings.PathJitter.Enabled, warnings);
+    if (auto const it = config.find("PathJitterYards"); it != config.end())
+    {
+        char* end = nullptr;
+        float const yards = std::strtof(it->second.c_str(), &end);
+        if (end != it->second.c_str() && *end == '\0' && yards >= 0.0f && yards <= 5.0f)
+            settings.PathJitter.Yards = yards;
+        else
+            warnings.push_back("Module.forever-bots.PathJitterYards: '" + it->second + "' is not a number from 0 to 5; using the default.");
+    }
+    ReadBool(config, "GuildMilestone", settings.GuildMilestone.Enabled, warnings);
+    ReadKey(config, "GuildMilestoneChancePct", 0, 100, settings.GuildMilestone.ChancePct, warnings);
+    if (auto const it = config.find("GuildMilestoneFile"); it != config.end())
+        settings.GuildMilestoneFile = it->second;
+    ReadBool(config, "CityInspect", settings.CityInspect.Enabled, warnings);
+    ReadKey(config, "CityInspectChancePct", 0, 100, settings.CityInspect.ChancePct, warnings);
+    ReadKey(config, "CityInspectZoneMax", 0, 100, settings.CityInspect.ZoneMax, warnings);
+    ReadBool(config, "QuestInvite", settings.QuestInvite.Enabled, warnings);
+    // ADVISOR-KEYS
     ReadBool(config, "InnDowntime", settings.InnDowntime.Enabled, warnings);
     ReadBool(config, "ScenarioConfigGuard", settings.ScenarioConfigGuard, warnings);
     if (auto const it = config.find("DungeonSummons"); it != config.end())
@@ -841,6 +881,7 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
         ReadKey(config, "AuctionEverySec", 60, 86400, everySec, warnings);
         settings.Auction.EveryMs = std::uint64_t(everySec) * 1000;
     }
+    ReadKey(config, "AhBatchIntervalHours", 0, 168, settings.Auction.BatchIntervalHours, warnings);
     ReadKey(config, "AuctionBuyMaxPct", 1, 100, settings.Auction.BuyMaxPct, warnings);
     ReadKey(config, "AuctionBrowsePerVisit", 1, 20, settings.Auction.BrowsePerVisit, warnings);
     ReadKey(config, "AuctionCallsPerTick", 1, 50, settings.Auction.MaxCallsPerTick, warnings);

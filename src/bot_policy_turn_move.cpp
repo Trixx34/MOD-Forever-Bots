@@ -438,6 +438,10 @@ void BotPolicy::RouteReadiness(DecideTick& tick, BotTurn& turn, RouteLeg& route)
             state.RouteManaSinceMs = nowMs;
     }
     route.manaReady = !manaLowInParty || nowMs - state.RouteManaSinceMs >= kRouteManaMaxMs;
+    // PartyMana: a member that said it is low on mana holds the walk too (never in combat, and never longer than PartyManaHoldSec).
+    if (_options.PartyMana.Enabled && route.manaReady)
+        if (auto const mana = _partyMana.find(bot.guid); mana != _partyMana.end() && mana->second.Holding(_options.PartyMana, bot.in_combat != 0, nowMs))
+            route.manaReady = false;
     bool const& manaReady = route.manaReady;
     // A waypoint the core finds no route to (a spawn on a ledge or off the navmesh, a generated point inside a wall) would hold the whole run for
     // good: after kRouteNoRouteSkip refusals in a row the leader gives that point up and goes on to the next one.

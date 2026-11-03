@@ -154,6 +154,42 @@ Module.forever-bots.TelemetrySummarySec = 60
 # TownAfkMinMin = 5
 # TownAfkMaxMin = 20
 # TownAfkZoneMax = 5     (bots staying at once per map)
+#
+# Advisor features (ten, all off by default; each acts only for a bot that is out of combat, has no target and sees no hostile; none touches a fight).
+# LfgQueueFill = 0       (protocol 21: when a dungeon finder queue has waited LfgQueueFillWaitSec and still misses a role, one idle bot with no group joins it
+#                         in that role; not the same as LfgFill above, which sends free bots to a human's party)
+# LfgQueueFillWaitSec = 60
+# LfgQueueFillCooldownSec = 120   (at most one bot per queue in this time)
+# DeathPause = 0         (a dead bot waits a random time after the death before it sends release spirit; nothing else of the corpse run changes)
+# DeathPauseMinSec = 10
+# DeathPauseMaxSec = 30
+# TradeAds = 0           (a bot whose skill in a crafting profession is at TradeAdsMinSkill or more posts one templated line on the Trade channel every
+#                         TradeAdsIntervalMin minutes, from TradeAdsFile; it starts no trade; out of combat only)
+# TradeAdsIntervalMin = 45
+# TradeAdsMinSkill = 150
+# TradeAdsFile = data/trade_ads.txt
+# PartyMana = 0          (a healer or caster of a dungeon party below 20 percent mana, out of combat, says one line in party chat from PartyManaFile, and
+#                         the party's non-combat movement holds until that bot is at 80 percent; never in combat)
+# PartyManaHoldSec = 60  (hard cap of one hold)
+# PartyManaFile = data/party_mana.txt
+# WhisperMatrix = 0      (a whisper with "where are you", "inv", "group", "lfg", "what level" or "help" is answered from WhisperMatrixFile by the bot's state:
+#                         grinding, questing, travelling, dungeon, full group; the whisper limit of ChatWhisperReplies applies, and no template goes to the
+#                         same player twice in 10 minutes; works without ChatWhisperReplies, which keeps its own replies)
+# WhisperMatrixFile = data/whisper_replies.txt
+# PathJitter = 0         (an out-of-combat walking move target is offset by up to PathJitterYards in a random direction; never within 2 yards of a point
+#                         the route data marks as not walkable (blocked grind spots), never across a required route waypoint, never in a dungeon or party route)
+# PathJitterYards = 1.0  (0..5)
+# GuildMilestone = 0     (protocol 21: when a player member of a guild that has a bot member gains a level, one random bot of the guild says a line from
+#                         GuildMilestoneFile in guild chat, with the chance below; a second bot never answers the same event)
+# GuildMilestoneChancePct = 30
+# GuildMilestoneFile = data/guild_milestones.txt
+# CityInspect = 0        (an idle bot in a capital that sees a player within 20 yards wearing a higher-level item than its own salutes, applauds or cheers at
+#                         the player; needs the host to supply item levels and the capital test, see PolicyOptions::ItemLevelOf and InCapital: inert without them)
+# CityInspectChancePct = 5
+# CityInspectZoneMax = 2 (emotes a minute over all bots of one map; and no more than one bot per player per 5 minutes)
+# QuestInvite = 0        (an idle bot and a human on the same quest objective, the human within 30 yards: the bot invites the human to its group, once per
+#                         human per 30 minutes, never within 2 hours of a decline; needs the host to say who shares an objective, PolicyOptions::SharedQuestObjective)
+# ADVISOR-DOCS-ANCHOR
 # AuctionRoundStep = 0   (copper; 10000 rounds a goods unit price to a gold, half a gold or just under; 0 = off)
 # AuctionRoundMaxPct = 5 (how far the rounded price may lie from the computed one, and never below the vendor price)
 #
@@ -198,6 +234,8 @@ Module.forever-bots.TelemetrySummarySec = 60
 # AuctionGoodsPerEntryMax = 1
 # AuctionGoodsMinQuality = 1
 # AuctionEverySec = 1800        (at most one visit per bot this often, 60..86400)
+# AhBatchIntervalHours = 0      (0 = off, 0..168. Above 0: a bot visits the auction house to list, relist or cancel only once per this many hours, and lists
+#                                goods in stacks of 1, 5 or 20 chosen per item; with 0 the rules above stay as they are)
 # AuctionBuy = 0                (off by default; needs Auction = 1 and a core with protocol 19. A bot also looks for upgrades: every AuctionEverySec it
 #                                browses one equipment slot of the house in turn, the core says which listings beat what the bot wears (its AutoGear score),
 #                                and the bot buys out the best upgrade per copper it can afford. Never in a scenario run. The item arrives by mail, which the

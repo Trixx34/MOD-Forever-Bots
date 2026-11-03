@@ -50,6 +50,17 @@
 #include "dungeon_events.h"
 #include "errand_trainers.h"
 #include "supply_policy.h"
+#include "advisor_orders.h"
+#include "advisor_text.h"
+#include "lfg_queue_fill.h"
+#include "death_pause.h"
+#include "trade_ads.h"
+#include "party_mana.h"
+#include "whisper_matrix.h"
+#include "path_jitter.h"
+#include "guild_milestone.h"
+#include "city_inspect.h"
+#include "quest_invite.h"
 #include "realism.h"
 #include "taxi_policy.h"
 
@@ -288,6 +299,22 @@ struct PolicyOptions
     realism::ReadSettings ReadDelay;
     realism::BuffSettings PassingBuff;
     realism::AfkSettings TownAfk;
+    lfg_queue_fill::Settings LfgQueueFill;
+    death_pause::Settings DeathPause;
+    trade_ads::Settings TradeAds;
+    party_mana::Settings PartyMana;
+    whisper_matrix::Settings WhisperMatrix;
+    path_jitter::Settings PathJitter;
+    guild_milestone::Settings GuildMilestone;
+    city_inspect::Settings CityInspect;
+    quest_invite::Settings QuestInvite;
+    // Facts the core's snapshot does not carry, supplied by the host for CityInspect and QuestInvite. Unset: those two features do nothing.
+    std::function<std::uint32_t(std::uint64_t unitRef)> ItemLevelOf;                          // the best item level worn by a bot (its guid) or a player (unit reference); 0 unknown
+    std::function<bool(std::uint32_t map, float x, float y)> InCapital;                       // whether a place is inside a capital city
+    std::function<bool(std::uint64_t botGuid, std::uint64_t playerRef)> SharedQuestObjective;  // the bot and the player are on the same objective of the same quest
+    // ADVISOR-OPTIONS
+    // Advisor features (docs: config/modules.d/forever-bots.conf.example, "Advisor features"; each off by default). The line pools are read once at start.
+    std::shared_ptr<advisor::Pools const> Pools;
     std::shared_ptr<std::vector<taxi::Place>> TaxiPlaces;   // where flights go, to name the city in the taxi journal lines (unset: "unknown")
 };
 
@@ -395,6 +422,16 @@ public:
     // flight; NoteSocialOutcome (pump thread) reports what the core answered, which updates the feature's state and logs a *_gap event when the core
     // does not know the action.
     std::vector<social::Order> TakeSocialOrders();
+    // Advisor orders (emote, dungeon finder join, party / guild / Trade line) queued by Decide and by the event handlers; taken once by the pump thread.
+    std::vector<advisor::Order> TakeAdvisorOrders();
+    // A dungeon finder queue changed (LfgQueueFill): when it has waited long enough and misses a role, one idle bot with no group joins in that role. Pump thread.
+    // A guild member gained a level (GuildMilestone): when the member is a player and a bot of that guild is known, one of them says a line in guild chat. The
+    // module learns which guild a bot is in only through NoteBotGuild (the core's snapshot does not carry it). Pump thread.
+    void OnGuildMemberLevel(forever_module::WorldTickSnapshotView const& view, std::uint64_t guild, std::uint64_t member, std::uint32_t level, std::uint64_t nowMs);
+    void NoteBotGuild(std::uint64_t bot, std::uint64_t guild) { _botGuild[bot] = guild; }
+    // A player declined (or left) the group a bot invited it to for a shared quest objective (QuestInvite): no new invite for 2 hours. `playerRef` is a unit reference.
+    void NoteQuestInviteDeclined(std::uint64_t playerRef, std::uint64_t nowMs) { _questInvite.NoteDeclined(playerRef, nowMs); }
+    void OnLfgQueue(forever_module::WorldTickSnapshotView const& view, lfg_queue_fill::Queue const& queue, std::uint64_t nowMs);
     void NoteSocialOutcome(social::Outcome const& outcome, std::uint64_t nowMs);
     // Facts the core's snapshot does not carry: a player challenged the bot to a duel (Duels accepts it), a player is to be thanked with a gift
     // (MailGifts: a trade with the bot finished), a player asked the bot to leave its guild (GuildJoin). `player` is a character guid counter.
@@ -585,6 +622,7 @@ private:
         std::uint64_t RouteHoldLoggedMs = 0;             // when the leader last logged why it does not walk on (route_hold)
         std::uint64_t TaxiBlockedUntilMs = 0;            // the core refused a flight: walk until this
         std::uint64_t TaxiWaitUntilMs = 0;               // a flight was ordered: give it time to show
+        trade_ads::State TradeAds;                       // the next Trade-channel ad (trade_ads.h)
         realism::FidgetState FidgetState;                // idle fidgeting while a flight is awaited (realism.h)
         realism::ReadGate QuestRead;                     // reading delay before a quest accept
         realism::ReadGate TrainRead;                     // reading delay before a trainer visit
@@ -757,6 +795,7 @@ private:
     void TurnRestAndConsume(DecideTick& tick, BotTurn& turn);
     void TurnTrainAndParty(DecideTick& tick, BotTurn& turn);
     void TurnSocial(DecideTick& tick, BotTurn& turn);
+    void TurnAdvisor(DecideTick& tick, BotTurn& turn);   // the advisor features (bot_policy_advisor.cpp); out of combat only
     void TurnLootTaxiMount(DecideTick& tick, BotTurn& turn);
     void TurnSendMove(DecideTick& tick, BotTurn& turn);
     TurnFlow TurnForcedHeal(DecideTick& tick, BotTurn& turn);
@@ -791,6 +830,16 @@ private:
     std::unordered_map<std::uint64_t, BotState> _bots; // bot guid -> state
     std::vector<TalentOrder> _talentOrders;            // queued by Decide, taken by TakeTalentOrders
     std::vector<TalentOrder> _respecOrders;            // queued by Decide (TalentRespec), taken by TakeRespecOrders
+    std::map<std::uint64_t, party_mana::Tracker> _partyMana;   // party leader (a bot) -> who waits for mana (party_mana.h)
+    whisper_matrix::Matrix _whisperMatrix;                      // repeat avoidance of the matrix replies
+    std::vector<whisper_matrix::Template> _whisperTemplates;    // parsed from Pools->WhisperReplies on first use
+    bool _whisperTemplatesLoaded = false;
+    city_inspect::Inspector _cityInspect;                       // limits of the capital emotes
+    quest_invite::Memory _questInvite;                          // who was invited and who declined
+    guild_milestone::Speaker _guildSpeaker;                     // one bot answers one level event
+    std::map<std::uint64_t, std::uint64_t> _botGuild;           // bot -> guild guid, from NoteBotGuild
+    lfg_queue_fill::Limiter _lfgQueueLimiter;           // one bot per queue per cooldown
+    std::vector<advisor::Order> _advisorOrders;        // queued by the advisor features (bot_policy_advisor.cpp), taken by TakeAdvisorOrders
     std::vector<social::Order> _socialOrders;          // queued by Decide (TurnSocial), taken by TakeSocialOrders
     std::vector<WhisperReply> _whisperReplies;         // queued by Decide (busy refusals), taken by TakeWhisperReplies
     WhisperLimiter _whispers;                          // replies to players (ApplyWhisper and the refusals)

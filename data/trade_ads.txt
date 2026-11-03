@@ -1,0 +1,12 @@
+# Trade chat ads of crafting bots (src/trade_ads.h). One line each; {profession} and {item} are filled in from the bot's profession. At most 255 bytes.
+# A bot posts one of these every TradeAdsIntervalMin minutes once its skill reaches TradeAdsMinSkill. It starts no trade.
+LF customers! {profession} here, can make {item}. Whisper me.
+{profession} crafter available, {item} for the cost of mats plus a tip.
+Anyone need {item}? I do {profession}, just whisper.
+Skilled in {profession}: {item}, send me a whisper if you are interested.
+Selling my {profession} services, {item} on request. Bring the mats, tip appreciated.
+{profession} on duty. Need {item}? Whisper me, I will see what I can do.
+Looking for work: {profession}. Whisper for {item}.
+Free slots for {profession} orders today, {item} and more. Whisper me!
+Need {item}? Ask me, I am a {profession} crafter and glad to help.
+Made by hand: {item}. {profession} orders open, whisper me.

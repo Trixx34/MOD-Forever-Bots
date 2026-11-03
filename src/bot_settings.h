@@ -15,6 +15,15 @@
 #include "bot_ramp.h"
 #include "sell_policy.h"
 #include "supply_policy.h"
+#include "lfg_queue_fill.h"
+#include "death_pause.h"
+#include "trade_ads.h"
+#include "party_mana.h"
+#include "whisper_matrix.h"
+#include "path_jitter.h"
+#include "guild_milestone.h"
+#include "city_inspect.h"
+#include "quest_invite.h"
 #include "realism.h"
 #include "taxi_policy.h"
 
@@ -206,6 +215,21 @@ struct BotSettings
     realism::ReadSettings ReadDelay;
     realism::BuffSettings PassingBuff;
     realism::AfkSettings TownAfk;
+    // Advisor features (all off by default; keys in config/modules.d/forever-bots.conf.example, "Advisor features"):
+    lfg_queue_fill::Settings LfgQueueFill;
+    death_pause::Settings DeathPause;
+    trade_ads::Settings TradeAds;
+    std::string TradeAdsFile = "data/trade_ads.txt";
+    party_mana::Settings PartyMana;
+    std::string PartyManaFile = "data/party_mana.txt";
+    whisper_matrix::Settings WhisperMatrix;
+    std::string WhisperMatrixFile = "data/whisper_replies.txt";
+    path_jitter::Settings PathJitter;
+    guild_milestone::Settings GuildMilestone;
+    std::string GuildMilestoneFile = "data/guild_milestones.txt";
+    city_inspect::Settings CityInspect;
+    quest_invite::Settings QuestInvite;
+    // ADVISOR-MEMBERS
     // Supplies (layout 15, config keys Supplies, SupplyAmmoLow, SupplyAmmoTarget, SupplyFoodLow, SupplyFoodTarget, SupplyDrinkLow, SupplyDrinkTarget,
     // SupplyTripSec; off by default): bots buy ammunition, food and drink at vendors that sell what they can use, and eat and drink while resting.
     // Layout 16, each off by default: SupplyPotions (health and mana potions, drunk in a fight below UseHealthPotionBelowPct and

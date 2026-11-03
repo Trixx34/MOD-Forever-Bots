@@ -130,6 +130,31 @@ void LoadPolicyTables(PolicyOptions& policyOptions, BotSettings& settings)
     policyOptions.ReadDelay = settings.ReadDelay;
     policyOptions.PassingBuff = settings.PassingBuff;
     policyOptions.TownAfk = settings.TownAfk;
+    // The line pools of the advisor features (each feature adds its own below; a pool is read only when its feature is on).
+    auto pools = std::make_shared<advisor::Pools>();
+    policyOptions.LfgQueueFill = settings.LfgQueueFill;
+    policyOptions.DeathPause = settings.DeathPause;
+    policyOptions.TradeAds = settings.TradeAds;
+    policyOptions.PartyMana = settings.PartyMana;
+    policyOptions.WhisperMatrix = settings.WhisperMatrix;
+    policyOptions.PathJitter = settings.PathJitter;
+    policyOptions.GuildMilestone = settings.GuildMilestone;
+    policyOptions.CityInspect = settings.CityInspect;
+    policyOptions.QuestInvite = settings.QuestInvite;
+    // ADVISOR-COPY
+    // ADVISOR-POOLS
+    if (settings.GuildMilestone.Enabled)
+        pools->GuildMilestones = advisor::LoadLines(BesideTheModule(settings.GuildMilestoneFile));
+    if (settings.WhisperMatrix.Enabled)
+        pools->WhisperReplies = advisor::LoadLines(BesideTheModule(settings.WhisperMatrixFile));
+    if (settings.PartyMana.Enabled)
+        pools->PartyMana = advisor::LoadLines(BesideTheModule(settings.PartyManaFile));
+    if (settings.TradeAds.Enabled)
+    {
+        pools->TradeAds = advisor::LoadLines(BesideTheModule(settings.TradeAdsFile));
+        std::cerr << "forever-bots: trade ads: " << pools->TradeAds.size() << " template(s) from " << settings.TradeAdsFile << "\n";
+    }
+    policyOptions.Pools = pools;
     if (settings.Taxi.Enabled)
     {
         // The city named in the taxi journal lines comes from the capitals' trainer table (ErrandTrainerFile); without it every city is "unknown".

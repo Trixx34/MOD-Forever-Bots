@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "auction_policy.h"
+#include "ah_batch.h"
 
 #include <algorithm>
 #include <string>
@@ -61,7 +62,7 @@ bool VisitDue(Settings const& settings, Bags const& bags, Standing const& standi
 {
     if (!settings.Enabled || bags.TotalSlots == 0)
         return false;
-    if (standing.LastVisitMs != 0 && nowMs - standing.LastVisitMs < settings.EveryMs)
+    if (standing.LastVisitMs != 0 && nowMs - standing.LastVisitMs < ah_batch::VisitEveryMs(settings.BatchIntervalHours, settings.EveryMs))
         return false;
     if (standing.ListedNow >= settings.ListedMax && !relistingDue)
         return false;
@@ -181,7 +182,7 @@ std::vector<GoodsListing> PlanGoods(Settings const& settings, Standing const& st
         if (unitPrice == 0)
             unitPrice = 1;
         unitPrice = RoundUnitPrice(settings, unitPrice, vendorUnit, item.ItemGuid);
-        std::uint32_t const count = std::min<std::uint32_t>(item.Count, settings.GoodsStackMax);
+        std::uint32_t const count = ah_batch::StackSize(settings.BatchIntervalHours, item.Entry, item.Count, settings.GoodsStackMax);
         if (count == 0 || unitPrice > 0xFFFFFFFFu)
             continue;
         ranked.push_back({ { item.ItemGuid, item.Entry, count, std::uint32_t(unitPrice) }, unitPrice * count });

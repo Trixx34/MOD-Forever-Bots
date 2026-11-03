@@ -1,0 +1,9 @@
+# Guild chat lines when a player member of the guild gains a level (src/guild_milestone.h). {level} is the new level. One line each, at most 255 bytes.
+Grats on level {level}!
+Nice, level {level}! Well done.
+Level {level}, congratulations!
+Congrats on {level}, keep it going.
+Ding {level}! Grats!
+Well played, level {level} already.
+Gz on {level}!
+Another level, {level} now. Nice work.
