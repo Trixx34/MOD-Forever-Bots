@@ -130,6 +130,10 @@ void LoadPolicyTables(PolicyOptions& policyOptions, BotSettings& settings)
     policyOptions.ReadDelay = settings.ReadDelay;
     policyOptions.PassingBuff = settings.PassingBuff;
     policyOptions.TownAfk = settings.TownAfk;
+    // The line pools of the advisor features (each feature adds its own below; a pool is read only when its feature is on).
+    auto pools = std::make_shared<advisor::Pools>();
+    // ADVISOR-POOLS
+    policyOptions.Pools = pools;
     if (settings.Taxi.Enabled)
     {
         // The city named in the taxi journal lines comes from the capitals' trainer table (ErrandTrainerFile); without it every city is "unknown".

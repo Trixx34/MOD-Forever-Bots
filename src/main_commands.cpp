@@ -395,6 +395,7 @@ void SetUpChat(forever_module::ModuleClient& client, std::shared_ptr<CommandQueu
         std::vector<CommandQueue::AmbientLine> ambientLines;
         std::vector<BotPolicy::WhisperReply> whispers;
         std::vector<social::Order> socialOrders;
+        std::vector<advisor::Order> advisorOrders;
         {
             std::lock_guard<std::mutex> lock(commands->Lock);
             replies.swap(commands->Replies);
@@ -403,6 +404,7 @@ void SetUpChat(forever_module::ModuleClient& client, std::shared_ptr<CommandQueu
             whispers.swap(commands->WhisperReplies);
             ambientLines.swap(commands->Ambient);
             socialOrders.swap(commands->Social);
+            advisorOrders.swap(commands->Advisor);
         }
         for (social::Order const& order : socialOrders)
         {
@@ -424,6 +426,8 @@ void SetUpChat(forever_module::ModuleClient& client, std::shared_ptr<CommandQueu
                 commands->SocialOutcomes.push_back(std::move(failed));
             }
         }
+        for (advisor::Order const& order : advisorOrders)
+            advisor::Send(client, order);
         for (BotPolicy::WhisperReply const& whisper : whispers)
             client.BotSpeak(whisper.Bot, forever_module::ModuleClient::SpeakKind::kWhisper, whisper.Player, whisper.Text);
         for (BotPolicy::TalentOrder const& order : talents)

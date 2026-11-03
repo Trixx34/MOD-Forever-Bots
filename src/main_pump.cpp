@@ -418,6 +418,9 @@ void main_detail::PumpTier2(forever_module::Tier2Session& session, std::atomic<b
                 for (auto const& [bot, player] : extras.Commands->GiftThanks)
                     policy.NoteGiftRecipient(bot, player);
                 extras.Commands->GiftThanks.clear();
+                for (advisor::Order& order : policy.TakeAdvisorOrders())
+                    if (extras.Commands->Advisor.size() < 64)
+                        extras.Commands->Advisor.push_back(std::move(order));
                 for (social::Order const& order : policy.TakeSocialOrders())
                     if (extras.Commands->Social.size() < 64)
                         extras.Commands->Social.push_back(order);
