@@ -438,6 +438,7 @@ void BotPolicy::DecideBot(DecideTick& tick, std::size_t i)
     TurnRestAndConsume(tick, turn);
     TurnTrainAndParty(tick, turn);
     TurnSocial(tick, turn);
+    TurnAdvisor(tick, turn);
     TurnLootTaxiMount(tick, turn);
     TurnSendMove(tick, turn);
     if (TurnForcedHeal(tick, turn) == TurnFlow::kSkip)

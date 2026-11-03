@@ -134,8 +134,14 @@ void LoadPolicyTables(PolicyOptions& policyOptions, BotSettings& settings)
     auto pools = std::make_shared<advisor::Pools>();
     policyOptions.LfgQueueFill = settings.LfgQueueFill;
     policyOptions.DeathPause = settings.DeathPause;
+    policyOptions.TradeAds = settings.TradeAds;
     // ADVISOR-COPY
     // ADVISOR-POOLS
+    if (settings.TradeAds.Enabled)
+    {
+        pools->TradeAds = advisor::LoadLines(BesideTheModule(settings.TradeAdsFile));
+        std::cerr << "forever-bots: trade ads: " << pools->TradeAds.size() << " template(s) from " << settings.TradeAdsFile << "\n";
+    }
     policyOptions.Pools = pools;
     if (settings.Taxi.Enabled)
     {

@@ -64,3 +64,31 @@ void BotPolicy::OnLfgQueue(forever_module::WorldTickSnapshotView const& view, lf
         return;
     }
 }
+
+void BotPolicy::TurnAdvisor(DecideTick& tick, BotTurn& turn)
+{
+    BotSnapshot const& bot = turn.bot;
+    BotState& state = turn.state;
+    std::uint64_t const nowMs = tick.nowMs;
+    // Out of combat, no target, nothing hostile in view, alive and on the ground: the only bots the advisor features speak or emote for.
+    bool const quiet = bot.in_combat == 0 && bot.life_state == 0 && bot.in_flight == 0 && !turn.hasTarget && !turn.enemyNear && bot.threat_target_guid == 0;
+    if (!quiet)
+        return;
+    std::uint64_t const seed = _options.RandomSeed;
+
+    // Trade-chat crafting ad (TradeAds): a bot with a crafting skill posts a templated line now and then. Not in a party (the Trade channel is the zone's).
+    if (_options.TradeAds.Enabled && _options.Pools && bot.group_role == 0 && !_options.Pools->TradeAds.empty())
+    {
+        std::uint32_t const lines[2] = { bot.profession_skill[0], bot.profession_skill[1] };
+        std::uint32_t const values[2] = { bot.profession_value[0], bot.profession_value[1] };
+        std::string line = trade_ads::Next(_options.TradeAds, state.TradeAds, _options.Pools->TradeAds, lines, values, seed, bot.guid, nowMs);
+        if (!line.empty())
+        {
+            advisor::Order order;
+            order.What = advisor::Kind::TradeSay;
+            order.Bot = bot.guid;
+            order.Text = std::move(line);
+            _advisorOrders.push_back(std::move(order));
+        }
+    }
+}

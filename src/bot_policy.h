@@ -54,6 +54,7 @@
 #include "advisor_text.h"
 #include "lfg_queue_fill.h"
 #include "death_pause.h"
+#include "trade_ads.h"
 #include "realism.h"
 #include "taxi_policy.h"
 
@@ -294,6 +295,7 @@ struct PolicyOptions
     realism::AfkSettings TownAfk;
     lfg_queue_fill::Settings LfgQueueFill;
     death_pause::Settings DeathPause;
+    trade_ads::Settings TradeAds;
     // ADVISOR-OPTIONS
     // Advisor features (docs: config/modules.d/forever-bots.conf.example, "Advisor features"; each off by default). The line pools are read once at start.
     std::shared_ptr<advisor::Pools const> Pools;
@@ -598,6 +600,7 @@ private:
         std::uint64_t RouteHoldLoggedMs = 0;             // when the leader last logged why it does not walk on (route_hold)
         std::uint64_t TaxiBlockedUntilMs = 0;            // the core refused a flight: walk until this
         std::uint64_t TaxiWaitUntilMs = 0;               // a flight was ordered: give it time to show
+        trade_ads::State TradeAds;                       // the next Trade-channel ad (trade_ads.h)
         realism::FidgetState FidgetState;                // idle fidgeting while a flight is awaited (realism.h)
         realism::ReadGate QuestRead;                     // reading delay before a quest accept
         realism::ReadGate TrainRead;                     // reading delay before a trainer visit
@@ -770,6 +773,7 @@ private:
     void TurnRestAndConsume(DecideTick& tick, BotTurn& turn);
     void TurnTrainAndParty(DecideTick& tick, BotTurn& turn);
     void TurnSocial(DecideTick& tick, BotTurn& turn);
+    void TurnAdvisor(DecideTick& tick, BotTurn& turn);   // the advisor features (bot_policy_advisor.cpp); out of combat only
     void TurnLootTaxiMount(DecideTick& tick, BotTurn& turn);
     void TurnSendMove(DecideTick& tick, BotTurn& turn);
     TurnFlow TurnForcedHeal(DecideTick& tick, BotTurn& turn);

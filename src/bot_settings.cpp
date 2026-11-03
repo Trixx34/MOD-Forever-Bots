@@ -675,6 +675,11 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadKey(config, "DeathPauseMaxSec", 0, 600, settings.DeathPause.MaxSec, warnings);
     if (settings.DeathPause.MaxSec < settings.DeathPause.MinSec)
         settings.DeathPause.MaxSec = settings.DeathPause.MinSec;
+    ReadBool(config, "TradeAds", settings.TradeAds.Enabled, warnings);
+    ReadKey(config, "TradeAdsIntervalMin", 1, 1440, settings.TradeAds.IntervalMin, warnings);
+    ReadKey(config, "TradeAdsMinSkill", 1, 450, settings.TradeAds.MinSkill, warnings);
+    if (auto const it = config.find("TradeAdsFile"); it != config.end())
+        settings.TradeAdsFile = it->second;
     // ADVISOR-KEYS
     ReadBool(config, "InnDowntime", settings.InnDowntime.Enabled, warnings);
     ReadBool(config, "ScenarioConfigGuard", settings.ScenarioConfigGuard, warnings);
