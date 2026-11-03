@@ -177,6 +177,13 @@ void BotPolicy::TurnWander(DecideTick& tick, BotTurn& turn)
     auto& moveWhy = turn.moveWhy;
     auto& idle = turn.idle;
 
+    // Town AFK (TownAfk, off by default) ends when the stay is over or the bot is no longer idle (a fight, an order): it frees its place on the map.
+    if (state.AfkUntilMs != 0 && (!idle || nowMs >= state.AfkUntilMs || bot.in_combat != 0))
+    {
+        state.AfkUntilMs = 0;
+        _afkZones.End(bot.guid);
+    }
+
     // Hubs (M7): a bot that has been idle for kWanderIdleMs walks to the next hub of its map, and waits there until the
     // next walk. A hurt bot rests instead, and a party member follows its leader. Anything that comes near stops the walk.
     // Mana (the soak's hunter spent most of its time at a third of its mana, because only health made a bot sit): an idle mana user
@@ -332,6 +339,20 @@ void BotPolicy::TurnWander(DecideTick& tick, BotTurn& turn)
                 state.HubFailures = arrived ? 0 : state.HubFailures + 1;
                 state.NextHub = (state.NextHub + 1) % list.size();
                 state.IdleSinceMs = arrived ? nowMs : nowMs - (kWanderIdleMs - kHubRetryIdleMs);
+                // Town AFK: now and then a bot that reached a hub stays for 5 to 20 minutes (it stands; no new order is sent), unless the map already has its quota of
+                // staying bots. The stay only holds back the next walk; any fight or order ends it.
+                if (arrived && _options.TownAfk.Enabled && bot.in_combat == 0 && !turn.enemyNear &&
+                    realism::AfkRoll(_options.TownAfk, _options.RandomSeed, bot.guid, state.AfkCounter))
+                {
+                    std::uint64_t const stay = realism::AfkDurationMs(_options.TownAfk, _options.RandomSeed, bot.guid, state.AfkCounter);
+                    if (_afkZones.TryStart(bot.map_id, bot.guid, nowMs, nowMs + stay, _options.TownAfk.ZoneMax))
+                    {
+                        state.AfkUntilMs = nowMs + stay;
+                        if (_options.OnEvent)
+                            _options.OnEvent("town_afk: bot=" + std::to_string(bot.guid) + " map=" + std::to_string(bot.map_id) + " minutes=" + std::to_string(stay / 60000));
+                    }
+                }
+                ++state.AfkCounter;
             }
             else
             {
@@ -340,7 +361,7 @@ void BotPolicy::TurnWander(DecideTick& tick, BotTurn& turn)
                 idle = false;
             }
         }
-        else if (nowMs - state.IdleSinceMs >= WanderIdleFor(turn))
+        else if (nowMs - state.IdleSinceMs >= WanderIdleFor(turn) && nowMs >= state.AfkUntilMs)
         {
             ++state.WanderCycles;
             state.WanderIdleMs = 0; // the next walk draws its own idle time
@@ -548,8 +569,10 @@ void BotPolicy::TurnTrainAndParty(DecideTick& tick, BotTurn& turn)
 
     bool const levelUp = bot.level != 0 && bot.level != state.LastTrainLevel;
     // A sitting bot (resting, or drinking) is not available for a trainer check, exactly as a walking bot is not: it stands first.
-    if (idle && !state.Sitting && _options.TrainEveryMs != 0 && (levelUp || nowMs >= state.NextTrainMs))
+    if (idle && !state.Sitting && _options.TrainEveryMs != 0 && (levelUp || nowMs >= state.NextTrainMs) &&
+        realism::ReadReady(_options.ReadDelay, state.TrainRead, kTrainReadKey, _options.RandomSeed, bot.guid, nowMs))
     {
+        realism::Close(state.TrainRead);
         BotAction train;
         train.bot_guid = bot.guid;
         train.type = ActionType::kTrain;
@@ -766,6 +789,7 @@ void BotPolicy::TurnLootTaxiMount(DecideTick& tick, BotTurn& turn)
 
     // Flight points (layout 17): a bot on a flight takes no walking orders; a long walk of a bot that is on its own is replaced by a walk to the nearest
     // flight master and a flight from it (taxi_policy.h). The core refuses a flight that would not bring the bot closer, and the bot then walks.
+    bool fidgetWait = false;
     if (_options.Taxi.Enabled && wanted.Type == ActionType::kMoveTo && !partyMember && !partyLeaderBot)
     {
         taxi::Facts facts;
@@ -796,6 +820,7 @@ void BotPolicy::TurnLootTaxiMount(DecideTick& tick, BotTurn& turn)
                 fly.dest_z = wanted.Dest.Z;
                 actions.push_back(fly);
                 state.TaxiWaitUntilMs = nowMs + _options.Taxi.WaitMs;
+                state.FidgetState = realism::FidgetState{};
                 state.TaxiFlight = taxi::Flight{ nowMs, 0, wanted.Dest.X, wanted.Dest.Y, bot.taxi_master_guid };
                 if (_options.TaxiPlaces)
                     state.TaxiFlight.Place = taxi::PlaceName(*_options.TaxiPlaces, bot.map_id, wanted.Dest.X, wanted.Dest.Y);
@@ -805,6 +830,10 @@ void BotPolicy::TurnLootTaxiMount(DecideTick& tick, BotTurn& turn)
                 [[fallthrough]];
             }
             case taxi::Move::Wait:
+                // Idle fidgeting (IdleFidget, off by default): decided at the end of this step, once the mount step has had its say.
+                if (_options.Fidget.Enabled && state.TaxiFlight.OrderedMs != 0 && nowMs >= state.TaxiFlight.OrderedMs + _options.Fidget.AfterOrderMs &&
+                    bot.in_flight == 0)
+                    fidgetWait = true;
                 if (state.Last)
                     wanted = *state.Last; // nothing new is sent while the flight starts or runs
                 else
@@ -861,6 +890,39 @@ void BotPolicy::TurnLootTaxiMount(DecideTick& tick, BotTurn& turn)
             state.Mounted = false;
             state.MountSentUp = false;
             state.MountRetryMs = nowMs + 5000;
+        }
+    }
+
+    // Idle fidgeting while a flight is awaited: the bot stands or takes a short step now and then. Only out of combat, with no target, no hostile in view, no fight
+    // under way or pending, and only when this turn sent the bot nothing else (the action budget of a bot is two).
+    if (fidgetWait && actions.size() == turn.actionsAtStart && bot.in_combat == 0 && bot.life_state == 0 && bot.casting_spell == 0 && bot.moving == 0 &&
+        !turn.hasTarget && !turn.enemyNear && !state.InFight && !lowHealth && !state.Mounted)
+    {
+        bool hostileNear = false;
+        for (NearbyUnit const& unit : nearby)
+            hostileNear = hostileNear || (unit.is_hostile && unit.health != 0);
+        if (!hostileNear)
+        {
+            realism::Fidget const fidget = realism::NextFidget(_options.Fidget, state.FidgetState, _options.RandomSeed, bot.guid, nowMs);
+            if (fidget == realism::Fidget::Stand)
+            {
+                BotAction stand;
+                stand.bot_guid = bot.guid;
+                stand.type = ActionType::kStop;
+                actions.push_back(stand);
+            }
+            else if (fidget != realism::Fidget::None)
+            {
+                // A step of 1.5 yards; the turn goes the other way round, so the bot faces the other side.
+                float const angle = float((bot.guid * 2654435761ull + state.FidgetState.Counter * 40503ull) % 628) * 0.01f + (fidget == realism::Fidget::Turn ? 3.14159f : 0.0f);
+                BotAction step;
+                step.bot_guid = bot.guid;
+                step.type = ActionType::kMoveTo;
+                step.dest_x = bot.pos_x + std::cos(angle) * 1.5f;
+                step.dest_y = bot.pos_y + std::sin(angle) * 1.5f;
+                step.dest_z = bot.pos_z;
+                actions.push_back(step);
+            }
         }
     }
 }

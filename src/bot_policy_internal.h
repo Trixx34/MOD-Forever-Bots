@@ -159,6 +159,7 @@ constexpr std::uint32_t kPetAttack = 1;               // attack target_guid
 constexpr std::uint32_t kPetFollow = 2;
 constexpr std::uint32_t kPetStay = 3;                 // hold position
 constexpr std::uint32_t kPetStance = 4;               // passive, defensive or aggressive, in dest_x
+constexpr std::uint64_t kTrainReadKey = 0x7261696E00000000ull;   // the reading-delay gate key of a trainer visit (realism.h)
 constexpr std::uint32_t kMaxComboPoints = 5;
 // Saber Slash (Forever): like Sinister Strike it gives one combo point (SpellEffect 30 energize, power type 4, 1 point, in the client data).
 constexpr std::uint32_t kSaberSlash = 424785;
@@ -609,6 +610,7 @@ struct BotPolicy::BotTurn
     std::optional<Point> healLosPoint{};
     std::optional<Point> kiteEntry{};
     bool enemyNear = false;                               // TurnIdle
+    std::size_t actionsAtStart = 0;                       // the tick's action count when this bot's turn began (DecideBot)
     bool idle = false;
     supply::Facts supplyFacts{};                          // TurnShopping
     bool manaUser = false;                                // TurnWander

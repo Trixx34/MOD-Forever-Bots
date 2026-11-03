@@ -5950,6 +5950,229 @@ void FlightsAreOffByDefaultAndNotForPartyMembers()
 }
  
 
+// ---- Realism without combat (docs/bot-realism-backlog.md items 2, 4 and 5) ----
+
+// Item 2: a bot that waits for its flight to start fidgets, only while it is idle.
+std::size_t FidgetsInWait(BotPolicy& policy, WorldTickSnapshotView const& view, std::uint64_t from, std::uint64_t to)
+{
+    std::size_t n = 0;
+    for (std::uint64_t t = from; t <= to; t += 500)
+        for (BotAction const& action : policy.Decide(view, t))
+            if (action.bot_guid == 10 && (action.type == ActionType::kStop || action.type == ActionType::kMoveTo))
+                ++n;
+    return n;
+}
+
+BotPolicy FidgetPolicy(bool enabled)
+{
+    PolicyOptions options = AggressiveOptions();
+    options.HubsByMap[1] = { Point{ 3000.0f, 0.0f, 0.0f } };
+    options.Taxi.Enabled = true;
+    options.Fidget.Enabled = enabled;
+    options.Fidget.ChancePct = 100;
+    options.Fidget.MinGapSec = 1;
+    options.Fidget.MaxGapSec = 1;
+    options.Fidget.StandWeight = 1;
+    options.Fidget.StepWeight = 1;
+    options.Fidget.TurnWeight = 1;
+    return BotPolicy(options);
+}
+
+void ABotWaitingForAFlightFidgetsWhenIdle()
+{
+    BotPolicy policy = FidgetPolicy(true);
+    WorldTickSnapshotView there = TaxiView(98.0f);
+    policy.Decide(there, 0);
+    CHECK(FirstOf(policy.Decide(there, 30000), ActionType::kTaxi).has_value());
+    CHECK(FidgetsInWait(policy, there, 30500, 33900) == 0);      // not before the take-off had its time
+    std::size_t const n = FidgetsInWait(policy, there, 34000, 37500);
+    CHECK(n >= 1);
+    // The steps stay within two yards of where the bot stands.
+    BotPolicy again = FidgetPolicy(true);
+    again.Decide(there, 0);
+    again.Decide(there, 30000);
+    for (std::uint64_t t = 34000; t <= 37500; t += 500)
+        for (BotAction const& action : again.Decide(there, t))
+            if (action.bot_guid == 10 && action.type == ActionType::kMoveTo)
+                CHECK(std::hypot(action.dest_x - 98.0f, action.dest_y) <= 2.0f);
+}
+
+void NoFidgetByDefaultInCombatOrWithAnEnemyNear()
+{
+    {
+        BotPolicy policy = FidgetPolicy(false);
+        WorldTickSnapshotView there = TaxiView(98.0f);
+        policy.Decide(there, 0);
+        policy.Decide(there, 30000);
+        CHECK(FidgetsInWait(policy, there, 34000, 37500) == 0);
+    }
+    {
+        BotPolicy policy = FidgetPolicy(true);
+        WorldTickSnapshotView there = TaxiView(98.0f);
+        policy.Decide(there, 0);
+        policy.Decide(there, 30000);
+        WorldTickSnapshotView fight = there;
+        fight.bots[0].in_combat = 1;
+        CHECK(FidgetsInWait(policy, fight, 34000, 37500) == 0);
+    }
+    {
+        BotPolicy policy = FidgetPolicy(true);
+        WorldTickSnapshotView there = TaxiView(98.0f);
+        policy.Decide(there, 0);
+        policy.Decide(there, 30000);
+        WorldTickSnapshotView near = there;
+        near.bots[0].nearby_count = 1;
+        near.nearby[0] = Unit(8, 77, 20.0f, true);               // a hostile creature in view
+        near.nearby[0].level = 1;
+        CHECK(FidgetsInWait(policy, near, 34000, 37500) == 0);
+    }
+}
+
+// Item 4: the passing-player buff.
+PolicyOptions BuffOptions()
+{
+    std::istringstream file("class 11\nrow 5176 always target range 0 30\nbuff 1126 duration 1800 party\n");
+    std::vector<std::string> drop;
+    PolicyOptions options = AggressiveOptions();
+    options.Rotations = std::make_shared<rotation::RotationData>(rotation::ParseRotationData(file, drop));
+    std::istringstream costs("1126\t1\t0\t200\t0\t0\t0\tMark\n5176\t1\t0\t2000\t0\t0\t0\tWrath\n");
+    std::vector<std::string> warnings;
+    options.SpellCosts = std::make_shared<spell_cost::SpellCostData>(spell_cost::ParseSpellCosts(costs, warnings));
+    options.ClassOf = [](std::uint64_t) { return 11; };
+    options.PassingBuff.Enabled = true;
+    options.PassingBuff.ChancePct = 100;
+    options.PassingBuff.CooldownSec = 600;
+    options.PassingBuff.ZonePerMin = 10;
+    return options;
+}
+
+WorldTickSnapshotView PasserView(std::uint32_t power)
+{
+    WorldTickSnapshotView view = PartyView({ 10 }, [](std::uint64_t) { return 11u; });
+    view.bots[0].level = 10;
+    view.bots[0].power = power;
+    view.bots[0].max_power = 5000;
+    view.bots[0].nearby_count = 1;
+    view.nearby[0] = Unit(2, 900, 8.0f, false);                  // a player 8 yards away, not one of ours
+    return view;
+}
+
+// The buff casts that go to the player (not the bot's own upkeep).
+std::size_t BuffsOnThePlayer(std::vector<BotAction> const& actions)
+{
+    std::size_t n = 0;
+    for (BotAction const& action : actions)
+        if (action.type == ActionType::kCastSpell && action.spell_id == 1126 && action.target_guid == MakeUnitRef(2, 1, 900))
+            ++n;
+    return n;
+}
+
+std::size_t PasserBuffsOver(BotPolicy& policy, WorldTickSnapshotView const& view, std::uint64_t from, std::uint64_t to)
+{
+    std::size_t n = 0;
+    for (std::uint64_t t = from; t <= to; t += 3000)
+        n += BuffsOnThePlayer(policy.Decide(view, t));
+    return n;
+}
+
+void ABotBuffsAPassingPlayerOutOfCombat()
+{
+    BotPolicy policy(BuffOptions());
+    CHECK(PasserBuffsOver(policy, PasserView(5000), 0, 30000) == 1);   // once: the cooldown holds the next one
+}
+
+void NoPassingBuffByDefaultInCombatBelowTheManaThresholdOrOnCooldown()
+{
+    PolicyOptions off = BuffOptions();
+    off.PassingBuff.Enabled = false;
+    BotPolicy offPolicy(off);
+    CHECK(PasserBuffsOver(offPolicy, PasserView(5000), 0, 30000) == 0);
+
+    BotPolicy fighting(BuffOptions());
+    WorldTickSnapshotView combat = PasserView(5000);
+    combat.bots[0].in_combat = 1;
+    CHECK(PasserBuffsOver(fighting, combat, 0, 30000) == 0);
+
+    BotPolicy low(BuffOptions());
+    CHECK(PasserBuffsOver(low, PasserView(3500), 0, 30000) == 0);       // 70 percent, under 80
+
+    // Enough percent, but the rotation's reserve (Wrath 2000 x 1 cast) plus the buff (200) does not fit.
+    PolicyOptions tight = BuffOptions();
+    tight.PassingBuff.ManaAbovePct = 0;
+    BotPolicy reserve(tight);
+    CHECK(PasserBuffsOver(reserve, PasserView(2100), 0, 30000) == 0);
+    BotPolicy enough(tight);
+    CHECK(PasserBuffsOver(enough, PasserView(2300), 0, 3000) == 1);
+
+    // The cooldown: after the first buff no second until it ends.
+    BotPolicy policy(BuffOptions());
+    CHECK(PasserBuffsOver(policy, PasserView(5000), 0, 9000) == 1);
+    CHECK(PasserBuffsOver(policy, PasserView(5000), 12000, 300000) == 0);
+    CHECK(PasserBuffsOver(policy, PasserView(5000), 603000, 615000) == 1);
+
+    // A hostile creature in view: no buff.
+    BotPolicy hostile(BuffOptions());
+    WorldTickSnapshotView threat = PasserView(5000);
+    threat.bots[0].nearby_count = 2;
+    threat.nearby[1] = Unit(8, 5, 25.0f, true);
+    CHECK(PasserBuffsOver(hostile, threat, 0, 30000) == 0);
+}
+
+// Item 5: town AFK.
+PolicyOptions AfkOptions(std::uint32_t zoneMax)
+{
+    PolicyOptions options = AggressiveOptions();
+    options.HubsByMap[1] = { Point{ 500.0f, 0.0f, 0.0f }, Point{ 900.0f, 0.0f, 0.0f } };
+    options.TownAfk.Enabled = true;
+    options.TownAfk.ChancePct = 100;
+    options.TownAfk.MinMin = 5;
+    options.TownAfk.MaxMin = 5;
+    options.TownAfk.ZoneMax = zoneMax;
+    return options;
+}
+
+void ABotAtAHubStaysForTheDowntimeThenLeaves()
+{
+    BotPolicy policy(AfkOptions(5));
+    WorldTickSnapshotView view = OnMap(1);
+    policy.Decide(view, 0);
+    CHECK(WalkTo(AfterMount(policy, view, 30000), 10) == 500.0f);    // walking to hub 1
+    view.bots[0].pos_x = 495.0f;                                     // arrived
+    CHECK(WalkTo(policy.Decide(view, 31000), 10) < 0.0f);
+    CHECK(WalkTo(policy.Decide(view, 61000), 10) < 0.0f);            // the usual interval has passed ...
+    CHECK(WalkTo(policy.Decide(view, 31000 + 299000), 10) < 0.0f);   // ... but the downtime (5 min) has not
+    CHECK(WalkTo(AfterMount(policy, view, 31000 + 301000), 10) == 900.0f); // then it mounts and walks on to the next hub
+}
+
+void TheNumberOfIdleBotsPerZoneIsCapped()
+{
+    BotPolicy policy(AfkOptions(1));
+    WorldTickSnapshotView view = PartyView({ 10, 11 });
+    for (BotSnapshot& bot : view.bots)
+        bot.map_id = 1;
+    policy.Decide(view, 0);
+    policy.Decide(view, 30000);
+    policy.Decide(view, 30001);
+    for (BotSnapshot& bot : view.bots)
+        bot.pos_x = 495.0f;
+    policy.Decide(view, 31000);
+    auto const later = policy.Decide(view, 62000);
+    CHECK((WalkTo(later, 10) == 900.0f) != (WalkTo(later, 11) == 900.0f));   // one walks on, the other stays: one idle bot per map
+}
+
+void NoTownAfkByDefault()
+{
+    PolicyOptions options = AfkOptions(5);
+    options.TownAfk.Enabled = false;
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = OnMap(1);
+    policy.Decide(view, 0);
+    CHECK(WalkTo(AfterMount(policy, view, 30000), 10) == 500.0f);
+    view.bots[0].pos_x = 495.0f;
+    policy.Decide(view, 31000);
+    CHECK(WalkTo(policy.Decide(view, 61000), 10) == 900.0f);
+}
+
 // --- The Holy priest of the level 30 guide: Renew on the tank, Binding Heal, Prayer of Healing, no shield on a rage user; a roster spec sets the role ---
 
 WorldTickSnapshotView LeveledDungeonView(std::uint32_t level, std::function<std::uint32_t(std::uint64_t)> classOf = nullptr)
@@ -6113,6 +6336,13 @@ int main()
     EachPartyWalksItsOwnDungeonsRoute();
     ALongWalkGoesToTheFlightMasterThenFlies();
     ARefusedFlightMakesTheBotWalk();
+    ABotWaitingForAFlightFidgetsWhenIdle();
+    NoFidgetByDefaultInCombatOrWithAnEnemyNear();
+    ABotBuffsAPassingPlayerOutOfCombat();
+    NoPassingBuffByDefaultInCombatBelowTheManaThresholdOrOnCooldown();
+    ABotAtAHubStaysForTheDowntimeThenLeaves();
+    TheNumberOfIdleBotsPerZoneIsCapped();
+    NoTownAfkByDefault();
     FlightsAreOffByDefaultAndNotForPartyMembers();
     ABotIsSafeToLogOutOnlyWhenNothingIsGoingOn();
     AWarriorWithoutPotionsOrBandagesBuysThemAtTheGoodsVendor();

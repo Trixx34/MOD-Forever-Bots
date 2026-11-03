@@ -44,6 +44,8 @@ void main_detail::PumpTier2(forever_module::Tier2Session& session, std::atomic<b
     std::optional<ambient::Speaker> ambientSpeaker;
     std::unordered_map<std::uint64_t, std::uint32_t> ambientLevel; // bot guid -> the level last seen, for the level-up line
     std::uint64_t ambientMs = 0;                                    // when the last ambient line was scheduled
+    ambient::DeathWatch ambientDeaths;                              // a bot that saw another bot die says its local_death line
+    ambient::BossWatch ambientBosses;                               // a dungeon party that killed a boss says its boss_kill line
     std::size_t ambientCursor = 0;                                  // the bot the next ambient line is tried for
     std::uint32_t ambientTurn = 0;                                  // alternates General and Trade when both are on
     if (settings.AmbientChat)
@@ -273,6 +275,40 @@ void main_detail::PumpTier2(forever_module::Tier2Session& session, std::atomic<b
                     ambient::Channel const chan = channelFor(ambientTurn++);
                     if (auto line = ambientSpeaker->Pick(bot.guid, chan, contextOf(bot, "level"), at))
                         picks.push_back({ bot.guid, chan == ambient::Channel::Trade, std::move(*line) });
+                }
+                {
+                    // World events: a death seen by a nearby bot, and a boss killed by a dungeon party. One line at most per event; the Speaker keeps its rate limits.
+                    std::vector<ambient::LifeSample> samples;
+                    samples.reserve(view.bots.size());
+                    std::unordered_map<std::uint64_t, forever_module::BotSnapshot const*> byGuid;
+                    for (forever_module::BotSnapshot const& bot : view.bots)
+                    {
+                        samples.push_back({ bot.guid, bot.map_id, bot.life_state, bot.in_combat != 0 });
+                        byGuid[bot.guid] = &bot;
+                    }
+                    for (std::uint64_t guid : ambientDeaths.Observe(samples))
+                    {
+                        ambient::Channel const chan = channelFor(ambientTurn++);
+                        if (auto line = ambientSpeaker->Pick(guid, chan, contextOf(*byGuid[guid], ambient::kEventLocalDeath), at))
+                            picks.push_back({ guid, chan == ambient::Channel::Trade, std::move(*line) });
+                    }
+                    for (std::size_t party = 0; party < directors.size(); ++party)
+                    {
+                        if (!ambientBosses.Grew(party, directors[party].KilledBossEntries().size()))
+                            continue;
+                        for (forever_module::BotSnapshot const& bot : view.bots)
+                        {
+                            auto const member = partyOf.find(bot.guid);
+                            if (member == partyOf.end() || member->second != party || bot.life_state != 0)
+                                continue;
+                            ambient::Channel const chan = channelFor(ambientTurn++);
+                            if (auto line = ambientSpeaker->Pick(bot.guid, chan, contextOf(bot, ambient::kEventBossKill), at))
+                            {
+                                picks.push_back({ bot.guid, chan == ambient::Channel::Trade, std::move(*line) });
+                                break; // one bot of the party speaks
+                            }
+                        }
+                    }
                 }
                 if (!view.bots.empty() && at - ambientMs >= 1000)
                 {

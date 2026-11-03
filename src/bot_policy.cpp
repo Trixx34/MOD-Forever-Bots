@@ -413,6 +413,7 @@ void BotPolicy::DecideBot(DecideTick& tick, std::size_t i)
     BotSnapshot const& bot = tick.view.bots[i];
     tick.present.insert(bot.guid);
     BotTurn turn{ i, bot, StateOf(bot.guid), tick.nowMs };
+    turn.actionsAtStart = tick.actions.size();
     if (TurnBegin(tick, turn) == TurnFlow::kSkip)
         return;
     if (TurnGroundEffects(tick, turn) == TurnFlow::kSkip)

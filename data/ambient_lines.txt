@@ -179,3 +179,15 @@ t|0|0|-|Trading a few bolts of cloth for a decent bow string.
 t|0|0|-|Free: a bundle of bandages, come grab them before they go.
 t|0|0|-|Buying old armor pieces, any condition, whisper me.
 t|0|0|-|Selling a few mining nodes' worth of ore, bulk price is fine.
+
+# --- Events from the world (src/ambient_chat.h): boss_kill is said by a bot whose dungeon party just killed a boss, local_death by a bot that saw another bot die nearby ---
+g|0|0|boss_kill|That boss is down. Everyone still standing?
+g|0|0|boss_kill|One boss fewer. On to the next.
+g|0|0|boss_kill|Boss down, and I am still on my feet. Good fight.
+g|0|0|boss_kill|That took a while, but it is dead. Loot time.
+g|0|0|boss_kill|Nice work, party. That was a tough one.
+g|0|0|local_death|Ouch. Somebody just went down over here.
+g|0|0|local_death|Looks like someone did not make it. Be careful out here.
+g|0|0|local_death|Another one on the ground. Watch your pulls, people.
+g|0|0|local_death|Did you see that? Poor soul. I will keep my distance.
+g|0|0|local_death|Rough luck for whoever that was. {zone} is not forgiving.

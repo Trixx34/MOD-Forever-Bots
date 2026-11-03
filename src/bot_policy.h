@@ -50,6 +50,7 @@
 #include "dungeon_events.h"
 #include "errand_trainers.h"
 #include "supply_policy.h"
+#include "realism.h"
 #include "taxi_policy.h"
 
 #include <cstdint>
@@ -282,6 +283,11 @@ struct PolicyOptions
     supply::Settings Supplies;
     // Flight points (layout 17, taxi_policy.h): a long walk becomes a flight from the nearest flight master. Off by default.
     taxi::Settings Taxi;
+    // Realism features without combat (realism.h; off by default).
+    realism::FidgetSettings Fidget;
+    realism::ReadSettings ReadDelay;
+    realism::BuffSettings PassingBuff;
+    realism::AfkSettings TownAfk;
     std::shared_ptr<std::vector<taxi::Place>> TaxiPlaces;   // where flights go, to name the city in the taxi journal lines (unset: "unknown")
 };
 
@@ -579,6 +585,13 @@ private:
         std::uint64_t RouteHoldLoggedMs = 0;             // when the leader last logged why it does not walk on (route_hold)
         std::uint64_t TaxiBlockedUntilMs = 0;            // the core refused a flight: walk until this
         std::uint64_t TaxiWaitUntilMs = 0;               // a flight was ordered: give it time to show
+        realism::FidgetState FidgetState;                // idle fidgeting while a flight is awaited (realism.h)
+        realism::ReadGate QuestRead;                     // reading delay before a quest accept
+        realism::ReadGate TrainRead;                     // reading delay before a trainer visit
+        std::uint64_t PassingBuffNextMs = 0;             // the per-bot cooldown of the passing-player buff
+        std::uint32_t PassingBuffCounter = 0;
+        std::uint64_t AfkUntilMs = 0;                    // town AFK: stays at the hub until this time
+        std::uint32_t AfkCounter = 0;
         taxi::Flight TaxiFlight;                         // the flight ordered and not ended yet (for the landing and timeout log lines)
         std::uint64_t NextPotionMs = 0;                  // no potion before this (the game shares one cooldown between potions)
         std::uint64_t TravelStartMs = 0;                 // when this walk began; it is dropped after kTravelTimeoutMs
@@ -800,6 +813,8 @@ private:
         std::uint64_t UntilMs = 0;
     };
     std::map<std::pair<std::uint32_t, std::uint64_t>, BuffClaim> _buffClaims;
+    realism::ZoneRate _passingBuffRate;   // passing-player buffs a minute per map
+    realism::AfkZones _afkZones;          // bots staying at a hub, per map
     std::map<std::uint64_t, std::pair<std::uint64_t, std::uint64_t>> _tameClaims;   // beast reference -> (hunter, when its hold ends): one hunter per beast
     // Who is healing which member and until when: two healers of a party must not cast on the same member.
     struct HealClaim

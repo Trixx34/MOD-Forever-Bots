@@ -215,4 +215,37 @@ std::optional<std::string> Speaker::Pick(std::uint64_t bot, Channel chan, Contex
     return std::nullopt;
 }
 
+std::vector<std::uint64_t> DeathWatch::Observe(std::vector<LifeSample> const& bots)
+{
+    std::vector<std::uint64_t> observers;
+    for (LifeSample const& bot : bots)
+    {
+        auto const last = _lastLife.find(bot.Guid);
+        bool const died = last != _lastLife.end() && last->second == 0 && bot.LifeState != 0;
+        _lastLife[bot.Guid] = bot.LifeState;
+        if (!died)
+            continue;
+        std::vector<std::uint64_t> candidates;
+        for (LifeSample const& other : bots)
+            if (other.Guid != bot.Guid && other.Map == bot.Map && other.LifeState == 0 && !other.InCombat)
+                candidates.push_back(other.Guid);
+        if (!candidates.empty())
+            observers.push_back(candidates[static_cast<std::size_t>(Mix(bot.Guid, candidates.size()) % candidates.size())]);
+    }
+    return observers;
+}
+
+bool BossWatch::Grew(std::uint64_t key, std::size_t killed)
+{
+    auto const at = _last.find(key);
+    if (at == _last.end())
+    {
+        _last[key] = killed;
+        return false;
+    }
+    bool const grew = killed > at->second;
+    at->second = killed;
+    return grew;
+}
+
 } // namespace ambient

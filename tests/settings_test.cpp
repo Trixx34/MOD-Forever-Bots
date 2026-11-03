@@ -481,8 +481,23 @@ void CorpseRunTeleportSettings()
     CHECK(warnings.size() == 1);
 }
 
+void RealismSettings()
+{
+    std::vector<std::string> warnings;
+    BotSettings const off = ParseBotSettings({}, warnings);
+    CHECK(!off.Fidget.Enabled && !off.ReadDelay.Enabled && !off.PassingBuff.Enabled && !off.TownAfk.Enabled && off.Auction.RoundStepCopper == 0); // all off by default
+    CHECK(off.ReadDelay.MinSec == 3 && off.ReadDelay.MaxSec == 12 && off.TownAfk.MinMin == 5 && off.TownAfk.MaxMin == 20);
+    BotSettings const on = ParseBotSettings({ { "IdleFidget", "1" }, { "ReadDelay", "1" }, { "PassingBuff", "1" }, { "TownAfk", "1" }, { "AuctionRoundStep", "10000" },
+                                              { "TownAfkZoneMax", "3" }, { "PassingBuffCooldownSec", "900" }, { "ReadDelayMinSec", "5" }, { "ReadDelayMaxSec", "2" } }, warnings);
+    CHECK(on.Fidget.Enabled && on.ReadDelay.Enabled && on.PassingBuff.Enabled && on.TownAfk.Enabled && on.Auction.RoundStepCopper == 10000);
+    CHECK(on.TownAfk.ZoneMax == 3 && on.PassingBuff.CooldownSec == 900);
+    CHECK(on.ReadDelay.MaxSec >= on.ReadDelay.MinSec);   // an upside-down range is fixed
+    CHECK(warnings.empty());
+}
+
 int main()
 {
+    RealismSettings();
     CorpseRunTeleportSettings();
     ErrandSettings();
     ChatSettings();

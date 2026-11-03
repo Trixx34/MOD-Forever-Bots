@@ -49,6 +49,11 @@ struct Settings
     std::uint32_t GoodsStackMax = 20;           // a listing sells at most this many units
     std::uint32_t GoodsPerEntryMax = 1;         // listings of one item kind on the house at once
     std::uint8_t GoodsMinQuality = kCommon;     // white or better
+    // Round-number prices (config keys AuctionRoundStep, AuctionRoundMaxPct; off by default, backlog item 1): a goods unit price is moved to a human number,
+    // a whole step (a gold), half a step, or a hundredth of a step under a whole step, when one lies within RoundMaxPct percent of the computed price. Never
+    // below the vendor's unit price, never above the computed price plus RoundMaxPct, so a listing's total stays under the cap it had.
+    std::uint32_t RoundStepCopper = 0;          // 0: off; 10000 is a gold
+    std::uint32_t RoundMaxPct = 5;
 };
 
 // One item in a bot's bags as the core describes it for selling.
@@ -122,6 +127,9 @@ struct GoodsListing
 // The commodity listings to make this visit: goods stacks of at least GoodsMinQuality that the bot does not need, each at GoodsPct of the vendor's unit
 // price (at least 1 copper), at most GoodsStackMax units, and at most GoodsPerEntryMax listings per item kind. The same PerVisit and ListedMax limits as
 // PlanListings apply. A stack whose vendor value is under MinVendorCopper is left for a vendor. Empty when GoodsSell is off.
+// The unit price moved to a round number as Settings::RoundStepCopper says (or `unit` unchanged): the same `salt` (the item's guid) gives the same price.
+std::uint64_t RoundUnitPrice(Settings const& settings, std::uint64_t unit, std::uint64_t vendorUnit, std::uint64_t salt);
+
 std::vector<GoodsListing> PlanGoods(Settings const& settings, Standing const& standing, std::vector<Candidate> const& items);
 
 // Items that ran their course on the house and go to a vendor now: listed `attempts` times already (the second listing is the last).

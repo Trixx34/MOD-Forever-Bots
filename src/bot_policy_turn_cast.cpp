@@ -616,6 +616,79 @@ void BotPolicy::TurnUpkeepBuffs(DecideTick& tick, BotTurn& turn)
             if (cast)
                 break;
         }
+
+        // Passing-player buff (PassingBuff, off by default): out of combat, a low chance to buff a friendly player within 15 yards. Only when the bot has the mana
+        // (a share of its pool, and always the mana of its own next casts of the fight rotation on top of the buff), after its per-bot cooldown, and within the
+        // map's rate. It sends one cast and touches nothing of the fight.
+        if (!cast && _options.PassingBuff.Enabled && !state.InFight && !turn.enemyNear && bot.life_state == 0 && bot.power_type == 0 && bot.max_power > 0 &&
+            nowMs >= state.PassingBuffNextMs &&
+            bot_random::Below(bot_random::Draw(_options.RandomSeed, bot.guid, bot_random::kSaltIdle, 0x600000000ull + nowMs / 5000), 100) < _options.PassingBuff.ChancePct)
+        {
+            NearbyUnit const* passer = nullptr;
+            float passerDistance = 1e9f;
+            bool hostileNear = false;
+            for (NearbyUnit const& unit : nearby)
+            {
+                if (unit.is_hostile && unit.health != 0)
+                    hostileNear = true;
+                else if (!unit.is_hostile && forever_module::UnitRefType(unit.guid) == kPlayerType && !tick.IsOurBot(unit.guid) && unit.health != 0)
+                {
+                    float const distance = std::hypot(unit.pos_x - bot.pos_x, unit.pos_y - bot.pos_y);
+                    if (distance < passerDistance)
+                    {
+                        passer = &unit;
+                        passerDistance = distance;
+                    }
+                }
+            }
+            if (passer && !hostileNear && _options.SpellCosts)
+            {
+                std::vector<std::uint32_t> fightCosts;
+                for (rotation::Row const& row : RowsFor(classId, spec))
+                    if (!row.Buff && (bot.level == 0 || row.MinLevel <= bot.level))
+                        if (auto const payment = _options.SpellCosts->CostAtLevel(row.Spell, bot.level); payment && payment->PowerType == 0)
+                            fightCosts.push_back(payment->Cost);
+                for (rotation::Row const& row : RowsFor(classId, spec))
+                {
+                    if (!row.Buff || !row.Party || (bot.level != 0 && (row.MinLevel > bot.level || (row.MaxLevel != 0 && bot.level > row.MaxLevel))))
+                        continue;
+                    if (row.When.Condition != rotation::Cond::Always)
+                        continue;
+                    auto const retry = state.RetryAtMs.find(row.Spell);
+                    if (retry != state.RetryAtMs.end() && nowMs < retry->second)
+                        continue;
+                    auto const payment = _options.SpellCosts->CostAtLevel(row.Spell, bot.level);
+                    if (!payment || payment->PowerType != 0)
+                        continue;
+                    realism::BuffFacts facts;
+                    facts.InCombat = bot.in_combat != 0;
+                    facts.HasTarget = hasTarget;
+                    facts.Alive = bot.life_state == 0;
+                    facts.Moving = bot.moving != 0;
+                    facts.Casting = IsCasting(bot);
+                    facts.ManaUser = true;
+                    facts.Power = bot.power;
+                    facts.MaxPower = bot.max_power;
+                    facts.BuffCost = payment->Cost;
+                    facts.RotationReserve = realism::ReserveMana(fightCosts, _options.PassingBuff.ReserveCasts);
+                    facts.TargetDistance = passerDistance;
+                    if (!realism::BuffAllowed(_options.PassingBuff, facts, nowMs, state.PassingBuffNextMs))
+                        continue;
+                    if (!_passingBuffRate.TryGrant(bot.map_id, nowMs, _options.PassingBuff.ZonePerMin))
+                        break;
+                    BotAction buff;
+                    buff.bot_guid = bot.guid;
+                    buff.type = ActionType::kCastSpell;
+                    buff.spell_id = row.Spell;
+                    buff.target_guid = passer->guid;
+                    actions.push_back(buff);
+                    state.CastTarget[row.Spell] = passer->guid;
+                    state.NextCastMs = nowMs + kGlobalCooldownMs;
+                    state.PassingBuffNextMs = nowMs + std::uint64_t(_options.PassingBuff.CooldownSec) * 1000;
+                    break;
+                }
+            }
+        }
     }
 }
 

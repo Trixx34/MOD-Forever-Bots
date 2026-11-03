@@ -376,8 +376,64 @@ void GoodsRespectTheEntryCapAndTheVisitLimit()
     CHECK(auction::PlanGoods(settings, standing, { other }).empty());
 }
 
+// Backlog item 1: round-number prices.
+void RoundPricesAreRoundAndWithinTheCap()
+{
+    auction::Settings settings;
+    settings.Enabled = true;
+    settings.GoodsSell = true;
+    settings.RoundStepCopper = 10000;   // a gold
+    settings.RoundMaxPct = 5;
+    int roundOnes = 0;
+    for (std::uint64_t guid = 1; guid <= 60; ++guid)
+    {
+        std::uint64_t const vendorUnit = 66000;                       // 6g 60s
+        std::uint64_t const unit = vendorUnit * settings.GoodsPct / 100;   // 9g 90s
+        std::uint64_t const price = auction::RoundUnitPrice(settings, unit, vendorUnit, guid);
+        CHECK(price >= vendorUnit);                                   // never under the vendor
+        CHECK(price <= unit + unit * settings.RoundMaxPct / 100);     // at or under the cap
+        CHECK(price + unit * settings.RoundMaxPct / 100 >= unit);     // and not far under it
+        bool const whole = price % 10000 == 0, half = price % 5000 == 0, justUnder = (price + 100) % 10000 == 0;
+        CHECK(whole || half || justUnder);                            // one of the round values
+        roundOnes += price != unit;
+    }
+    CHECK(roundOnes > 0);
+    // A price that has no round number within the window stays as it is.
+    CHECK(auction::RoundUnitPrice(settings, 137, 10, 3) == 137);      // a few copper: no round number near
+}
+
+void RoundPricesAreOffByDefaultAndKeepThePlan()
+{
+    auction::Settings settings;
+    settings.Enabled = true;
+    settings.GoodsSell = true;
+    CHECK(settings.RoundStepCopper == 0);
+    CHECK(auction::RoundUnitPrice(settings, 99000, 1000, 5) == 99000);
+    auction::Standing standing;
+    auction::Candidate herb;
+    herb.ItemGuid = 7;
+    herb.Entry = 2453;
+    herb.Count = 20;
+    herb.Quality = auction::kCommon;
+    herb.VendorSellCopper = 66000 * 20;
+    herb.Stackable = true;
+    herb.Goods = true;
+    auto const plain = auction::PlanGoods(settings, standing, { herb });
+    CHECK(plain.size() == 1 && plain[0].UnitPrice == 99000);          // the old price with the feature off
+    settings.RoundStepCopper = 10000;
+    auto const rounded = auction::PlanGoods(settings, standing, { herb });
+    CHECK(rounded.size() == 1);
+    if (rounded.size() == 1)
+    {
+        CHECK(rounded[0].UnitPrice >= 66000 && rounded[0].UnitPrice <= 99000 + 99000 * 5 / 100);
+        CHECK(std::uint64_t(rounded[0].UnitPrice) * rounded[0].Count <= (99000ull + 99000 * 5 / 100) * 20);
+    }
+}
+
 int main()
 {
+    RoundPricesAreRoundAndWithinTheCap();
+    RoundPricesAreOffByDefaultAndKeepThePlan();
     TheListingsThatRanOutAreDropped();
     ARefusalForThePlaceOrTheMoneyIsTriedAgain();
     PricesAreMultiplesOfTheVendorPrice();

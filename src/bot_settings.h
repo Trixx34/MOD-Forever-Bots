@@ -15,6 +15,7 @@
 #include "bot_ramp.h"
 #include "sell_policy.h"
 #include "supply_policy.h"
+#include "realism.h"
 #include "taxi_policy.h"
 
 #include <array>
@@ -199,6 +200,12 @@ struct BotSettings
     inn::Settings InnDowntime;
     guild::Settings GuildJoin;
     gifts::Settings MailGifts;
+    // Realism features without combat (docs/bot-realism-backlog.md items 2 to 5; all off by default): IdleFidget*, ReadDelay*, PassingBuff*, TownAfk*; the
+    // round-number auction price is in Auction (AuctionRoundStep, AuctionRoundMaxPct).
+    realism::FidgetSettings Fidget;
+    realism::ReadSettings ReadDelay;
+    realism::BuffSettings PassingBuff;
+    realism::AfkSettings TownAfk;
     // Supplies (layout 15, config keys Supplies, SupplyAmmoLow, SupplyAmmoTarget, SupplyFoodLow, SupplyFoodTarget, SupplyDrinkLow, SupplyDrinkTarget,
     // SupplyTripSec; off by default): bots buy ammunition, food and drink at vendors that sell what they can use, and eat and drink while resting.
     // Layout 16, each off by default: SupplyPotions (health and mana potions, drunk in a fight below UseHealthPotionBelowPct and

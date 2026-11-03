@@ -94,4 +94,38 @@ private:
     std::set<std::pair<std::uint64_t, std::string>> _eventDone; // (bot, event) already answered
 };
 
+// ---- Events from the world (backlog item 7): "boss_kill" (a boss of a bot's dungeon party died) and "local_death" (a bot died where another bot is) ----
+// An event line is picked only with a context that carries its event (Speaker::Pick), so these lines are never said as ambient chat.
+constexpr char const* kEventBossKill = "boss_kill";
+constexpr char const* kEventLocalDeath = "local_death";
+
+struct LifeSample
+{
+    std::uint64_t Guid = 0;
+    std::uint32_t Map = 0;
+    std::uint8_t LifeState = 0;     // 0 alive
+    bool InCombat = false;
+};
+
+// Sees the bots' life states tick by tick. For each bot that has just died it names one other bot on the same map that is alive and out of combat, the one who
+// "saw" it (at most one per death, and none when nobody is near), so one death gives one line at most.
+class DeathWatch
+{
+public:
+    std::vector<std::uint64_t> Observe(std::vector<LifeSample> const& bots);
+
+private:
+    std::map<std::uint64_t, std::uint8_t> _lastLife;
+};
+
+// Counts boss kills per key (a dungeon party): Grew() is true once when the count rose above what was last seen. The first sight only records the count.
+class BossWatch
+{
+public:
+    bool Grew(std::uint64_t key, std::size_t killed);
+
+private:
+    std::map<std::uint64_t, std::size_t> _last;
+};
+
 } // namespace ambient

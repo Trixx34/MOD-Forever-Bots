@@ -717,8 +717,83 @@ void AStuckWalkToAnEnderBlocksThatQuestForAWhile()
     CHECK(memory.BlockedUntilMs.count(0) == 0);
 }
 
+// Backlog item 3: the reading delay before a quest accept.
+void ReadDelayHoldsTheAcceptForThreeToTwelveSeconds()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.Quests = Data();
+    options.ReadDelay.Enabled = true;
+    BotPolicy policy(options);
+    auto const accepts = [](std::vector<BotAction> const& actions)
+    {
+        for (BotAction const& action : actions)
+            if (action.type == ActionType::kQuest && action.spell_id == QuestCode(kQuestAccept, 783))
+                return true;
+        return false;
+    };
+    WorldTickSnapshotView const view = OneBotView(Bot(-8933.0f, -136.0f), {});
+    CHECK(!accepts(policy.Decide(view, 100000)));            // the quest is just opened
+    CHECK(!accepts(policy.Decide(view, 102900)));            // under the shortest delay (3 s)
+    std::uint64_t acceptedAt = 0;
+    for (std::uint64_t t = 103000; t <= 113000 && acceptedAt == 0; t += 500)
+        if (accepts(policy.Decide(view, t)))
+            acceptedAt = t;
+    CHECK(acceptedAt != 0);                                  // and the accept comes, within 12 s of opening
+    CHECK(acceptedAt - 100000 >= 3000 && acceptedAt - 100000 <= 12500);
+}
+
+void NoReadDelayByDefault()
+{
+    BotPolicy policy = QuestPolicy();
+    bool sent = false;
+    for (BotAction const& action : policy.Decide(OneBotView(Bot(-8933.0f, -136.0f), {}), 2000))
+        sent = sent || action.type == ActionType::kQuest;
+    CHECK(sent);                                             // the accept goes out at once, as before
+}
+
+// Item 3, trainer: a trainer visit waits for the reading delay too.
+void TrainerVisitWaitsForTheReadingDelay()
+{
+    auto const trains = [](std::vector<BotAction> const& actions)
+    {
+        for (BotAction const& action : actions)
+            if (action.type == ActionType::kTrain)
+                return true;
+        return false;
+    };
+    PolicyOptions base = AggressiveOptions();
+    base.TrainEveryMs = 600000;
+    BotSnapshot bot = Bot(0.0f, 0.0f);
+    bot.level = 5;
+    WorldTickSnapshotView const view = OneBotView(bot, {});
+    {
+        BotPolicy policy(base);
+        bool any = false;
+        for (std::uint64_t t = 1000; t <= 3000; t += 500)
+            any = any || trains(policy.Decide(view, t));
+        CHECK(any);                                          // off: it trains at once
+    }
+    PolicyOptions delayed = base;
+    delayed.ReadDelay.Enabled = true;
+    BotPolicy policy(delayed);
+    CHECK(!trains(policy.Decide(view, 1000)));
+    CHECK(!trains(policy.Decide(view, 3900)));
+    bool later = false;
+    std::uint64_t at = 0;
+    for (std::uint64_t t = 4000; t <= 14000 && !later; t += 500)
+        if (trains(policy.Decide(view, t)))
+        {
+            later = true;
+            at = t;
+        }
+    CHECK(later && at - 1000 >= 3000 && at - 1000 <= 12500);
+}
+
 int main()
 {
+    ReadDelayHoldsTheAcceptForThreeToTwelveSeconds();
+    NoReadDelayByDefault();
+    TrainerVisitWaitsForTheReadingDelay();
     AStuckWalkToAnEnderBlocksThatQuestForAWhile();
     StuckQuestWalkIsDroppedWhenTeleportIsOff();
     StuckQuestWalkTeleportsOnceThenDropsTheStart();

@@ -3,6 +3,7 @@
 #include "ambient_chat.h"
 
 #include <cstdio>
+#include <fstream>
 #include <sstream>
 
 namespace {
@@ -107,8 +108,90 @@ void SpeakerRespectsCooldownRateAndEvents()
 
 } // namespace
 
+// Backlog item 7: the boss kill and local death events.
+void WorldEventLinesAreSaidOnlyForTheirEvent()
+{
+    std::size_t errors = 0;
+    auto const lines = Parse("g|0|0|-|An ambient line\n"
+                             "g|0|0|boss_kill|The boss is down\n"
+                             "g|0|0|local_death|Somebody fell\n",
+                             errors);
+    CHECK(errors == 0 && lines.size() == 3);
+    ambient::Limits limits;
+    limits.BotCooldownMs = 0;
+    limits.PerMinute = 100;
+    ambient::Context plain;
+    plain.Level = 10;
+    ambient::Speaker speaker(lines, limits);
+    // An ambient context never says an event line.
+    auto const line = speaker.Pick(100, ambient::Channel::General, plain, 0);
+    CHECK(line.has_value() && *line == "An ambient line");
+    ambient::Context boss = plain;
+    boss.Event = ambient::kEventBossKill;
+    auto const said = speaker.Pick(1, ambient::Channel::General, boss, 100000);
+    CHECK(said.has_value() && *said == "The boss is down");
+    ambient::Context death = plain;
+    death.Event = ambient::kEventLocalDeath;
+    auto const fell = speaker.Pick(2, ambient::Channel::General, death, 101000);
+    CHECK(fell.has_value() && *fell == "Somebody fell");
+    // The event line is said once per bot and event.
+    CHECK(!speaker.Pick(1, ambient::Channel::General, boss, 200000).has_value());
+    // With no line for the event, nothing is said.
+    ambient::Context other = plain;
+    other.Event = "server_notice";
+    CHECK(!speaker.Pick(3, ambient::Channel::General, other, 300000).has_value());
+}
+
+void ShippedDataHasBossAndDeathLines()
+{
+    std::ifstream file(std::string(FOREVER_BOTS_DATA_DIR) + "/ambient_lines.txt");
+    std::size_t errors = 0;
+    auto const lines = ambient::ParseLines(file, errors);
+    CHECK(errors == 0);
+    int boss = 0, death = 0;
+    for (auto const& line : lines)
+    {
+        boss += line.Event == ambient::kEventBossKill;
+        death += line.Event == ambient::kEventLocalDeath;
+    }
+    CHECK(boss >= 3 && death >= 3);
+}
+
+void ADeathIsSeenByOneNearbyBotAtMost()
+{
+    ambient::DeathWatch watch;
+    using S = ambient::LifeSample;
+    CHECK(watch.Observe({ S{ 1, 0, 0, false }, S{ 2, 0, 0, false }, S{ 3, 1, 0, false } }).empty());   // first sight: nothing
+    // Bot 1 dies: bot 2 (same map, alive, calm) can see it; bot 3 is on another map.
+    auto const seen = watch.Observe({ S{ 1, 0, 1, false }, S{ 2, 0, 0, false }, S{ 3, 1, 0, false } });
+    CHECK(seen.size() == 1 && seen[0] == 2);
+    CHECK(watch.Observe({ S{ 1, 0, 1, false }, S{ 2, 0, 0, false }, S{ 3, 1, 0, false } }).empty());   // still dead: no second line
+    // A bot in combat does not comment, and a lone bot has nobody to see it.
+    ambient::DeathWatch busy;
+    busy.Observe({ S{ 1, 0, 0, false }, S{ 2, 0, 0, true } });
+    CHECK(busy.Observe({ S{ 1, 0, 1, false }, S{ 2, 0, 0, true } }).empty());
+    ambient::DeathWatch alone;
+    alone.Observe({ S{ 1, 0, 0, false } });
+    CHECK(alone.Observe({ S{ 1, 0, 1, false } }).empty());
+}
+
+void ABossKillIsCountedOnce()
+{
+    ambient::BossWatch watch;
+    CHECK(!watch.Grew(0, 0));      // first sight
+    CHECK(!watch.Grew(0, 0));
+    CHECK(watch.Grew(0, 1));
+    CHECK(!watch.Grew(0, 1));
+    CHECK(watch.Grew(0, 2));
+    CHECK(!watch.Grew(1, 3));      // another party, first sight
+}
+
 int main()
 {
+    WorldEventLinesAreSaidOnlyForTheirEvent();
+    ShippedDataHasBossAndDeathLines();
+    ADeathIsSeenByOneNearbyBotAtMost();
+    ABossKillIsCountedOnce();
     ParsesFieldsAndSkipsCommentsAndBadLines();
     FillsTokensAndRefusesMissingOnes();
     ZoneAndClassNames();

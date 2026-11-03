@@ -134,6 +134,29 @@ Module.forever-bots.TelemetrySummarySec = 60
 # MailGiftDailyCap = 1
 # AutoGearEveryLevels = 5
 #
+# Realism without combat (docs/bot-realism-backlog.md items 1 to 5 and 7), all off by default. None of them touches a fight: each acts only out of combat,
+# with no target and nothing hostile in view.
+# IdleFidget = 0         (a bot waiting for its flight to start stands or takes a short step now and then; only 4 s after the order, while idle)
+# IdleFidgetChancePct = 30
+# IdleFidgetMinSec = 3   / IdleFidgetMaxSec = 10   (the gap between two checks of one bot)
+# IdleFidgetStandWeight = 2 / IdleFidgetStepWeight = 2 / IdleFidgetTurnWeight = 1
+# ReadDelay = 0          (a bot waits 3 to 12 s after opening a quest or a trainer before it accepts or trains)
+# ReadDelayMinSec = 3
+# ReadDelayMaxSec = 12
+# PassingBuff = 0        (a low-chance upkeep buff on a friendly player within 15 yards, out of combat, from the buff rows of the rotation)
+# PassingBuffChancePct = 10
+# PassingBuffManaAbovePct = 80   (and the mana of PassingBuffReserveCasts of the bot's own fight casts is always kept back)
+# PassingBuffReserveCasts = 4
+# PassingBuffCooldownSec = 600   (per bot)
+# PassingBuffZonePerMin = 2      (over all bots of one map)
+# TownAfk = 0            (a bot that reaches a hub sometimes stays 5 to 20 minutes before it walks on)
+# TownAfkChancePct = 10
+# TownAfkMinMin = 5
+# TownAfkMaxMin = 20
+# TownAfkZoneMax = 5     (bots staying at once per map)
+# AuctionRoundStep = 0   (copper; 10000 rounds a goods unit price to a gold, half a gold or just under; 0 = off)
+# AuctionRoundMaxPct = 5 (how far the rounded price may lie from the computed one, and never below the vendor price)
+#
 # Supplies (layout 15, off by default): a bot short of ammunition, food or drink walks to the nearest vendor that sells what it can use and buys,
 # and a resting bot eats or drinks what it carries. Needs Bot.Actions.Supplies in the core (on by default there). A hunter with no ammunition
 # fights in melee until it has bought some. A trip that bought nothing (no money, the vendor out of stock) is tried again later, after a longer wait each time.

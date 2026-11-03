@@ -126,6 +126,10 @@ std::vector<dungeon_events::Event> LoadDungeons(PolicyOptions& policyOptions, Bo
 void LoadPolicyTables(PolicyOptions& policyOptions, BotSettings& settings)
 {
     policyOptions.Taxi = settings.Taxi;
+    policyOptions.Fidget = settings.Fidget;
+    policyOptions.ReadDelay = settings.ReadDelay;
+    policyOptions.PassingBuff = settings.PassingBuff;
+    policyOptions.TownAfk = settings.TownAfk;
     if (settings.Taxi.Enabled)
     {
         // The city named in the taxi journal lines comes from the capitals' trainer table (ErrandTrainerFile); without it every city is "unknown".

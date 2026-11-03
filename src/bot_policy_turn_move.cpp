@@ -895,6 +895,11 @@ void BotPolicy::MoveForQuestOrGoto(DecideTick& tick, BotTurn& turn)
         case QuestStepKind::Abandon:
         case QuestStepKind::Reward:
         {
+            // Reading delay (ReadDelay, off by default): the bot reads the quest for a few seconds before it accepts. It stands meanwhile.
+            if (questStep.Kind == QuestStepKind::Accept && bot.in_combat == 0 &&
+                !realism::ReadReady(_options.ReadDelay, state.QuestRead, questStep.Quest, _options.RandomSeed, bot.guid, nowMs))
+                break;
+            realism::Close(state.QuestRead);
             BotAction quest;
             quest.bot_guid = bot.guid;
             quest.type = ActionType::kQuest;
@@ -1000,8 +1005,10 @@ void BotPolicy::TurnIdle(DecideTick& tick, BotTurn& turn)
         }
         else if (dist <= kTrainReachYards)
         {
-            if (bot.in_combat == 0 && bot.life_state == 0 && nowMs >= state.ErrandTrainSentMs)
+            if (bot.in_combat == 0 && bot.life_state == 0 && nowMs >= state.ErrandTrainSentMs &&
+                realism::ReadReady(_options.ReadDelay, state.TrainRead, kTrainReadKey, _options.RandomSeed, bot.guid, nowMs))
             {
+                realism::Close(state.TrainRead);
                 BotAction train;
                 train.bot_guid = bot.guid;
                 train.type = ActionType::kTrain;

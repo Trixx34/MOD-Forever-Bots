@@ -640,6 +640,33 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadBool(config, "Battlegrounds", settings.Battlegrounds.Enabled, warnings);
     ReadKey(config, "BattlegroundMinLevel", 1, 80, settings.Battlegrounds.MinLevel, warnings);
     ReadKey(config, "BattlegroundMaxWaitMin", 1, 60, settings.Battlegrounds.MaxWaitMin, warnings);
+    ReadBool(config, "IdleFidget", settings.Fidget.Enabled, warnings);
+    ReadKey(config, "IdleFidgetChancePct", 0, 100, settings.Fidget.ChancePct, warnings);
+    ReadKey(config, "IdleFidgetMinSec", 1, 600, settings.Fidget.MinGapSec, warnings);
+    ReadKey(config, "IdleFidgetMaxSec", 1, 600, settings.Fidget.MaxGapSec, warnings);
+    ReadKey(config, "IdleFidgetStandWeight", 0, 100, settings.Fidget.StandWeight, warnings);
+    ReadKey(config, "IdleFidgetStepWeight", 0, 100, settings.Fidget.StepWeight, warnings);
+    ReadKey(config, "IdleFidgetTurnWeight", 0, 100, settings.Fidget.TurnWeight, warnings);
+    if (settings.Fidget.MaxGapSec < settings.Fidget.MinGapSec)
+        settings.Fidget.MaxGapSec = settings.Fidget.MinGapSec;
+    ReadBool(config, "ReadDelay", settings.ReadDelay.Enabled, warnings);
+    ReadKey(config, "ReadDelayMinSec", 0, 60, settings.ReadDelay.MinSec, warnings);
+    ReadKey(config, "ReadDelayMaxSec", 0, 60, settings.ReadDelay.MaxSec, warnings);
+    if (settings.ReadDelay.MaxSec < settings.ReadDelay.MinSec)
+        settings.ReadDelay.MaxSec = settings.ReadDelay.MinSec;
+    ReadBool(config, "PassingBuff", settings.PassingBuff.Enabled, warnings);
+    ReadKey(config, "PassingBuffChancePct", 0, 100, settings.PassingBuff.ChancePct, warnings);
+    ReadKey(config, "PassingBuffManaAbovePct", 0, 100, settings.PassingBuff.ManaAbovePct, warnings);
+    ReadKey(config, "PassingBuffCooldownSec", 0, 86400, settings.PassingBuff.CooldownSec, warnings);
+    ReadKey(config, "PassingBuffZonePerMin", 0, 60, settings.PassingBuff.ZonePerMin, warnings);
+    ReadKey(config, "PassingBuffReserveCasts", 0, 20, settings.PassingBuff.ReserveCasts, warnings);
+    ReadBool(config, "TownAfk", settings.TownAfk.Enabled, warnings);
+    ReadKey(config, "TownAfkChancePct", 0, 100, settings.TownAfk.ChancePct, warnings);
+    ReadKey(config, "TownAfkMinMin", 1, 240, settings.TownAfk.MinMin, warnings);
+    ReadKey(config, "TownAfkMaxMin", 1, 240, settings.TownAfk.MaxMin, warnings);
+    ReadKey(config, "TownAfkZoneMax", 0, 100, settings.TownAfk.ZoneMax, warnings);
+    if (settings.TownAfk.MaxMin < settings.TownAfk.MinMin)
+        settings.TownAfk.MaxMin = settings.TownAfk.MinMin;
     ReadBool(config, "InnDowntime", settings.InnDowntime.Enabled, warnings);
     ReadBool(config, "ScenarioConfigGuard", settings.ScenarioConfigGuard, warnings);
     if (auto const it = config.find("DungeonSummons"); it != config.end())
@@ -826,6 +853,8 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
         ReadKey(config, "AuctionGoodsMinQuality", 1, 4, minQuality, warnings);
         settings.Auction.GoodsMinQuality = static_cast<std::uint8_t>(minQuality);
     }
+    ReadKey(config, "AuctionRoundStep", 0, 1000000, settings.Auction.RoundStepCopper, warnings);
+    ReadKey(config, "AuctionRoundMaxPct", 0, 10, settings.Auction.RoundMaxPct, warnings);
     ReadBool(config, "SellVendor", settings.Sell.Enabled, warnings);
     {
         std::uint32_t everySec = static_cast<std::uint32_t>(settings.Sell.EveryMs / 1000);

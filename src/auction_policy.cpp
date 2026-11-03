@@ -111,6 +111,48 @@ std::vector<Listing> PlanListings(Settings const& settings, Bags const&, Standin
     return plan;
 }
 
+std::uint64_t RoundUnitPrice(Settings const& settings, std::uint64_t unit, std::uint64_t vendorUnit, std::uint64_t salt)
+{
+    std::uint64_t const step = settings.RoundStepCopper;
+    if (step == 0 || unit == 0)
+        return unit;
+    std::uint64_t const pct = std::min<std::uint32_t>(settings.RoundMaxPct, 50);
+    std::uint64_t const cap = unit + unit * pct / 100;
+    std::uint64_t lowest = unit - unit * pct / 100;
+    lowest = std::max<std::uint64_t>({ lowest, vendorUnit, 1 });
+    if (lowest > cap)
+        return unit;
+    // Three kinds of round number, chosen by the salt: a whole step, half a step, a hundredth of a step under a whole step.
+    std::uint64_t mix = salt * 0x9E3779B97F4A7C15ull;
+    mix ^= mix >> 29;
+    std::uint64_t const first = mix % 3;
+    for (std::uint64_t k = 0; k < 3; ++k)
+    {
+        std::uint64_t const kind = (first + k) % 3;
+        std::uint64_t grid = kind == 1 ? step / 2 : step;
+        std::uint64_t const under = kind == 2 ? std::max<std::uint64_t>(1, step / 100) : 0;
+        if (grid == 0)
+            continue;
+        // The candidates around the price on the grid; the one closest to the price that lies in the window wins.
+        std::uint64_t const base = (unit + under) / grid;
+        std::uint64_t best = 0;
+        for (std::uint64_t m = base > 0 ? base - 1 : 0; m <= base + 1; ++m)
+        {
+            if (m * grid <= under)
+                continue;
+            std::uint64_t const value = m * grid - under;
+            if (value < lowest || value > cap)
+                continue;
+            auto const gap = [unit](std::uint64_t v) { return v > unit ? v - unit : unit - v; };
+            if (best == 0 || gap(value) < gap(best))
+                best = value;
+        }
+        if (best != 0)
+            return best;
+    }
+    return unit;
+}
+
 std::vector<GoodsListing> PlanGoods(Settings const& settings, Standing const& standing, std::vector<Candidate> const& items)
 {
     std::vector<GoodsListing> plan;
@@ -138,6 +180,7 @@ std::vector<GoodsListing> PlanGoods(Settings const& settings, Standing const& st
         std::uint64_t unitPrice = vendorUnit * settings.GoodsPct / 100;
         if (unitPrice == 0)
             unitPrice = 1;
+        unitPrice = RoundUnitPrice(settings, unitPrice, vendorUnit, item.ItemGuid);
         std::uint32_t const count = std::min<std::uint32_t>(item.Count, settings.GoodsStackMax);
         if (count == 0 || unitPrice > 0xFFFFFFFFu)
             continue;
