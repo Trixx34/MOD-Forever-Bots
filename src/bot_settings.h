@@ -15,6 +15,7 @@
 #include "bot_ramp.h"
 #include "sell_policy.h"
 #include "supply_policy.h"
+#include "lfg_queue_fill.h"
 #include "realism.h"
 #include "taxi_policy.h"
 
@@ -206,6 +207,9 @@ struct BotSettings
     realism::ReadSettings ReadDelay;
     realism::BuffSettings PassingBuff;
     realism::AfkSettings TownAfk;
+    // Advisor features (all off by default; keys in config/modules.d/forever-bots.conf.example, "Advisor features"):
+    lfg_queue_fill::Settings LfgQueueFill;
+    // ADVISOR-MEMBERS
     // Supplies (layout 15, config keys Supplies, SupplyAmmoLow, SupplyAmmoTarget, SupplyFoodLow, SupplyFoodTarget, SupplyDrinkLow, SupplyDrinkTarget,
     // SupplyTripSec; off by default): bots buy ammunition, food and drink at vendors that sell what they can use, and eat and drink while resting.
     // Layout 16, each off by default: SupplyPotions (health and mana potions, drunk in a fight below UseHealthPotionBelowPct and

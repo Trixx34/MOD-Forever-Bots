@@ -173,6 +173,7 @@ struct CommandQueue
     std::vector<std::uint64_t> TalentRefused;                   // bots the core refused a talent order, for the pump thread to retry
     // Duel, battleground, guild and gift orders (social_actions.h): the pump thread queues them, the Run() thread sends them, and the core's answers come back.
     std::vector<social::Order> Social;
+    std::vector<lfg_queue_fill::Queue> LfgQueues;                // dungeon finder queue events (LfgScript.OnQueueUpdate), for the pump thread
     std::vector<advisor::Order> Advisor;                        // advisor orders (advisor_send.h) for the Run() thread to send
     std::vector<social::Outcome> SocialOutcomes;
     std::vector<std::pair<std::uint64_t, std::uint64_t>> GiftThanks;   // (bot, player counter): a trade between them finished, so the bot may thank the player

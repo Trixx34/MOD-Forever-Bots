@@ -52,6 +52,7 @@
 #include "supply_policy.h"
 #include "advisor_orders.h"
 #include "advisor_text.h"
+#include "lfg_queue_fill.h"
 #include "realism.h"
 #include "taxi_policy.h"
 
@@ -290,6 +291,8 @@ struct PolicyOptions
     realism::ReadSettings ReadDelay;
     realism::BuffSettings PassingBuff;
     realism::AfkSettings TownAfk;
+    lfg_queue_fill::Settings LfgQueueFill;
+    // ADVISOR-OPTIONS
     // Advisor features (docs: config/modules.d/forever-bots.conf.example, "Advisor features"; each off by default). The line pools are read once at start.
     std::shared_ptr<advisor::Pools const> Pools;
     std::shared_ptr<std::vector<taxi::Place>> TaxiPlaces;   // where flights go, to name the city in the taxi journal lines (unset: "unknown")
@@ -401,6 +404,8 @@ public:
     std::vector<social::Order> TakeSocialOrders();
     // Advisor orders (emote, dungeon finder join, party / guild / Trade line) queued by Decide and by the event handlers; taken once by the pump thread.
     std::vector<advisor::Order> TakeAdvisorOrders();
+    // A dungeon finder queue changed (LfgQueueFill): when it has waited long enough and misses a role, one idle bot with no group joins in that role. Pump thread.
+    void OnLfgQueue(forever_module::WorldTickSnapshotView const& view, lfg_queue_fill::Queue const& queue, std::uint64_t nowMs);
     void NoteSocialOutcome(social::Outcome const& outcome, std::uint64_t nowMs);
     // Facts the core's snapshot does not carry: a player challenged the bot to a duel (Duels accepts it), a player is to be thanked with a gift
     // (MailGifts: a trade with the bot finished), a player asked the bot to leave its guild (GuildJoin). `player` is a character guid counter.
@@ -797,6 +802,7 @@ private:
     std::unordered_map<std::uint64_t, BotState> _bots; // bot guid -> state
     std::vector<TalentOrder> _talentOrders;            // queued by Decide, taken by TakeTalentOrders
     std::vector<TalentOrder> _respecOrders;            // queued by Decide (TalentRespec), taken by TakeRespecOrders
+    lfg_queue_fill::Limiter _lfgQueueLimiter;           // one bot per queue per cooldown
     std::vector<advisor::Order> _advisorOrders;        // queued by the advisor features (bot_policy_advisor.cpp), taken by TakeAdvisorOrders
     std::vector<social::Order> _socialOrders;          // queued by Decide (TurnSocial), taken by TakeSocialOrders
     std::vector<WhisperReply> _whisperReplies;         // queued by Decide (busy refusals), taken by TakeWhisperReplies

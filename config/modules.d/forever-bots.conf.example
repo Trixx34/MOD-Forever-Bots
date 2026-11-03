@@ -154,6 +154,13 @@ Module.forever-bots.TelemetrySummarySec = 60
 # TownAfkMinMin = 5
 # TownAfkMaxMin = 20
 # TownAfkZoneMax = 5     (bots staying at once per map)
+#
+# Advisor features (ten, all off by default; each acts only for a bot that is out of combat, has no target and sees no hostile; none touches a fight).
+# LfgQueueFill = 0       (protocol 21: when a dungeon finder queue has waited LfgQueueFillWaitSec and still misses a role, one idle bot with no group joins it
+#                         in that role; not the same as LfgFill above, which sends free bots to a human's party)
+# LfgQueueFillWaitSec = 60
+# LfgQueueFillCooldownSec = 120   (at most one bot per queue in this time)
+# ADVISOR-DOCS-ANCHOR
 # AuctionRoundStep = 0   (copper; 10000 rounds a goods unit price to a gold, half a gold or just under; 0 = off)
 # AuctionRoundMaxPct = 5 (how far the rounded price may lie from the computed one, and never below the vendor price)
 #

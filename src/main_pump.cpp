@@ -389,6 +389,14 @@ void main_detail::PumpTier2(forever_module::Tier2Session& session, std::atomic<b
                     std::lock_guard<std::mutex> lock(extras.Commands->Lock);
                     whispers.swap(extras.Commands->Whispers);
                 }
+                // Dungeon finder queue events (LfgQueueFill): the policy picks an idle bot for a missing role.
+                std::vector<lfg_queue_fill::Queue> lfgQueues;
+                {
+                    std::lock_guard<std::mutex> lock(extras.Commands->Lock);
+                    lfgQueues.swap(extras.Commands->LfgQueues);
+                }
+                for (lfg_queue_fill::Queue const& queue : lfgQueues)
+                    policy.OnLfgQueue(view, queue, nowMs());
                 std::vector<BotPolicy::WhisperReply> answers;
                 for (CommandQueue::WhisperItem const& item : whispers)
                 {

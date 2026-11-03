@@ -667,6 +667,10 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadKey(config, "TownAfkZoneMax", 0, 100, settings.TownAfk.ZoneMax, warnings);
     if (settings.TownAfk.MaxMin < settings.TownAfk.MinMin)
         settings.TownAfk.MaxMin = settings.TownAfk.MinMin;
+    ReadBool(config, "LfgQueueFill", settings.LfgQueueFill.Enabled, warnings);
+    ReadKey(config, "LfgQueueFillWaitSec", 0, 3600, settings.LfgQueueFill.WaitSec, warnings);
+    ReadKey(config, "LfgQueueFillCooldownSec", 0, 86400, settings.LfgQueueFill.CooldownSec, warnings);
+    // ADVISOR-KEYS
     ReadBool(config, "InnDowntime", settings.InnDowntime.Enabled, warnings);
     ReadBool(config, "ScenarioConfigGuard", settings.ScenarioConfigGuard, warnings);
     if (auto const it = config.find("DungeonSummons"); it != config.end())

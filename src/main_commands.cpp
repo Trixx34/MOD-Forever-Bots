@@ -308,6 +308,15 @@ void SetUpTrade(forever_module::ModuleClient& client, std::shared_ptr<trade::Tra
             }
         }
     };
+    client.OnNotify("LfgScript.OnQueueUpdate", [commands, &settings](forever_module::EventNotify const& notify)
+    {
+        lfg_queue_fill::Queue queue;
+        if (!settings.LfgQueueFill.Enabled || !advisor::Decode(notify, queue))
+            return;
+        std::lock_guard<std::mutex> lock(commands->Lock);
+        if (commands->LfgQueues.size() < 32)
+            commands->LfgQueues.push_back(std::move(queue));
+    });
     client.OnNotify("PlayerScript.OnBotTrade", [trades, runTrade, commands](forever_module::EventNotify const& notify)
     {
         if (notify.event_payload_case() != forever_module::EventNotify::kBotTrade)

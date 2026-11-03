@@ -39,4 +39,15 @@ bool Send(forever_module::ModuleClient& client, Order const& order)
     return false;
 }
 
+bool Decode(forever_module::EventNotify const& notify, lfg_queue_fill::Queue& out)
+{
+    if (!notify.has_lfg_queue())
+        return false;
+    forever_module::LfgQueueEvent const& event = notify.lfg_queue();
+    out.MapId = event.map_id();
+    out.QueuedSec = event.queued_seconds();
+    out.OpenRoles.assign(event.open_roles().begin(), event.open_roles().end());
+    return true;
+}
+
 }  // namespace advisor
