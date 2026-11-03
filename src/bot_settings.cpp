@@ -684,6 +684,9 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadKey(config, "PartyManaHoldSec", 1, 600, settings.PartyMana.HoldSec, warnings);
     if (auto const it = config.find("PartyManaFile"); it != config.end())
         settings.PartyManaFile = it->second;
+    ReadBool(config, "WhisperMatrix", settings.WhisperMatrix.Enabled, warnings);
+    if (auto const it = config.find("WhisperMatrixFile"); it != config.end())
+        settings.WhisperMatrixFile = it->second;
     // ADVISOR-KEYS
     ReadBool(config, "InnDowntime", settings.InnDowntime.Enabled, warnings);
     ReadBool(config, "ScenarioConfigGuard", settings.ScenarioConfigGuard, warnings);

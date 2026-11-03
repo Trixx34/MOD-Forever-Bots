@@ -172,6 +172,10 @@ Module.forever-bots.TelemetrySummarySec = 60
 #                         the party's non-combat movement holds until that bot is at 80 percent; never in combat)
 # PartyManaHoldSec = 60  (hard cap of one hold)
 # PartyManaFile = data/party_mana.txt
+# WhisperMatrix = 0      (a whisper with "where are you", "inv", "group", "lfg", "what level" or "help" is answered from WhisperMatrixFile by the bot's state:
+#                         grinding, questing, travelling, dungeon, full group; the whisper limit of ChatWhisperReplies applies, and no template goes to the
+#                         same player twice in 10 minutes; works without ChatWhisperReplies, which keeps its own replies)
+# WhisperMatrixFile = data/whisper_replies.txt
 # ADVISOR-DOCS-ANCHOR
 # AuctionRoundStep = 0   (copper; 10000 rounds a goods unit price to a gold, half a gold or just under; 0 = off)
 # AuctionRoundMaxPct = 5 (how far the rounded price may lie from the computed one, and never below the vendor price)

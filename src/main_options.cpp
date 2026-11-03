@@ -136,8 +136,11 @@ void LoadPolicyTables(PolicyOptions& policyOptions, BotSettings& settings)
     policyOptions.DeathPause = settings.DeathPause;
     policyOptions.TradeAds = settings.TradeAds;
     policyOptions.PartyMana = settings.PartyMana;
+    policyOptions.WhisperMatrix = settings.WhisperMatrix;
     // ADVISOR-COPY
     // ADVISOR-POOLS
+    if (settings.WhisperMatrix.Enabled)
+        pools->WhisperReplies = advisor::LoadLines(BesideTheModule(settings.WhisperMatrixFile));
     if (settings.PartyMana.Enabled)
         pools->PartyMana = advisor::LoadLines(BesideTheModule(settings.PartyManaFile));
     if (settings.TradeAds.Enabled)

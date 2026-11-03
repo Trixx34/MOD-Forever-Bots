@@ -19,6 +19,7 @@
 #include "death_pause.h"
 #include "trade_ads.h"
 #include "party_mana.h"
+#include "whisper_matrix.h"
 #include "realism.h"
 #include "taxi_policy.h"
 
@@ -217,6 +218,8 @@ struct BotSettings
     std::string TradeAdsFile = "data/trade_ads.txt";
     party_mana::Settings PartyMana;
     std::string PartyManaFile = "data/party_mana.txt";
+    whisper_matrix::Settings WhisperMatrix;
+    std::string WhisperMatrixFile = "data/whisper_replies.txt";
     // ADVISOR-MEMBERS
     // Supplies (layout 15, config keys Supplies, SupplyAmmoLow, SupplyAmmoTarget, SupplyFoodLow, SupplyFoodTarget, SupplyDrinkLow, SupplyDrinkTarget,
     // SupplyTripSec; off by default): bots buy ammunition, food and drink at vendors that sell what they can use, and eat and drink while resting.
