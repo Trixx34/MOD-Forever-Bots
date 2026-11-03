@@ -190,7 +190,8 @@ struct BotSettings
     bool ChatWhisperReplies = false;
     std::uint32_t WhisperCooldownMs = 60000;
     std::uint32_t WhisperMaxPerMin = 6;
-    // Second-list features (off by default; the decisions are pure logic, the SDK has no action for them yet, so the policy logs them as *_gap):
+    // Second-list features (off by default; the policy sends duel, battleground, guild and gift orders through the SDK's BotDuel, BotBattleground, BotGuild and
+    // BotGiftMail, which need a core that knows them; an older core refuses them and the policy logs *_gap; InnDowntime is still logic only):
     // Duels, DuelMinLevel, DuelCooldownMin; Battlegrounds, BattlegroundMinLevel, BattlegroundMaxWaitMin; InnDowntime, InnHealthBelowPct,
     // InnPowerBelowPct, InnMaxRestMin; GuildJoin; MailGifts, MailGiftDailyCap.
     duels::Settings Duels;

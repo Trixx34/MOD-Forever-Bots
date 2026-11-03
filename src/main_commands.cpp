@@ -323,6 +323,13 @@ void SetUpTrade(forever_module::ModuleClient& client, std::shared_ptr<trade::Tra
             if (commands->BusyBots.count(event.bot_guid()))
                 busyLine = BusyLine(event.bot_guid(), BusyKind::None);
         }
+        // A finished trade: the bot may thank the partner with a gift (MailGifts; the policy ignores it when the setting is off).
+        if (event.status() == static_cast<std::uint32_t>(trade::Status::Completed))
+        {
+            std::lock_guard<std::mutex> lock(commands->Lock);
+            if (commands->GiftThanks.size() < 64)
+                commands->GiftThanks.emplace_back(event.bot_guid(), event.partner_guid());
+        }
         (*runTrade)(trades->OnEvent(event.bot_guid(), event.partner_guid(), static_cast<trade::Status>(event.status()), nowMs(), busyLine));
     });
     // A trade nobody is working on is cancelled.
@@ -387,6 +394,7 @@ void SetUpChat(forever_module::ModuleClient& client, std::shared_ptr<CommandQueu
         std::vector<BotPolicy::TalentOrder> talents;
         std::vector<CommandQueue::AmbientLine> ambientLines;
         std::vector<BotPolicy::WhisperReply> whispers;
+        std::vector<social::Order> socialOrders;
         {
             std::lock_guard<std::mutex> lock(commands->Lock);
             replies.swap(commands->Replies);
@@ -394,6 +402,27 @@ void SetUpChat(forever_module::ModuleClient& client, std::shared_ptr<CommandQueu
             talents.swap(commands->Talents);
             whispers.swap(commands->WhisperReplies);
             ambientLines.swap(commands->Ambient);
+            socialOrders.swap(commands->Social);
+        }
+        for (social::Order const& order : socialOrders)
+        {
+            // The core's answer goes back to the pump thread (the policy updates the feature's state from it).
+            bool const sent = social::Send(client, order, [commands](social::Outcome const& outcome)
+            {
+                std::lock_guard<std::mutex> lock(commands->Lock);
+                if (commands->SocialOutcomes.size() < 256)
+                    commands->SocialOutcomes.push_back(outcome);
+            });
+            if (!sent)
+            {
+                social::Outcome failed;
+                failed.What = order.What;
+                failed.Bot = order.Bot;
+                failed.Op = order.Op;
+                failed.Reason = "the order could not be sent: unknown action";
+                std::lock_guard<std::mutex> lock(commands->Lock);
+                commands->SocialOutcomes.push_back(std::move(failed));
+            }
         }
         for (BotPolicy::WhisperReply const& whisper : whispers)
             client.BotSpeak(whisper.Bot, forever_module::ModuleClient::SpeakKind::kWhisper, whisper.Player, whisper.Text);

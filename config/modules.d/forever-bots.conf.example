@@ -116,7 +116,9 @@ Module.forever-bots.TelemetrySummarySec = 60
 # WhisperMaxPerMin = 6       (per player, over all bots; 1 to 60)
 # LfgFill = 0        (a human's party short of a tank or a healer is offered free bots: they teleport over and whisper their role to the leader, who invites them;
 #                     offers go to a party at most every 5 minutes and to a bot at most every 10 minutes; bots within 5 levels of the party's highest level only)
-# Second-list features, all off by default. The decisions are logged as *_gap events until the SDK has the actions.
+# Second-list features, all off by default. Duels, Battlegrounds, GuildJoin and MailGifts send the SDK actions BotDuel, BotBattleground, BotGuild and BotGiftMail;
+# they need a core with those actions (the core's Bot.Social.Enabled = 1). A core without them refuses the request and the module logs a *_gap event.
+# MailGifts also lists the bot's bags, which needs the core's Bot.Trade.Enabled = 1. InnDowntime is still logic only.
 # Duels = 0
 # DuelMinLevel = 10
 # DuelCooldownMin = 30

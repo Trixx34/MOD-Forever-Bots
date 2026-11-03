@@ -175,6 +175,31 @@ std::vector<BotPolicy::TalentOrder> BotPolicy::TakeRespecOrders()
     return orders;
 }
 
+std::vector<social::Order> BotPolicy::TakeSocialOrders()
+{
+    std::vector<social::Order> orders;
+    orders.swap(_socialOrders);
+    return orders;
+}
+
+void BotPolicy::NoteDuelChallenge(std::uint64_t bot, std::uint64_t player)
+{
+    if (_options.Duels.Enabled)
+        StateOf(bot).DuelChallenger = player;
+}
+
+void BotPolicy::NoteGiftRecipient(std::uint64_t bot, std::uint64_t player)
+{
+    if (_options.MailGifts.Enabled)
+        StateOf(bot).GiftRecipient = player;
+}
+
+void BotPolicy::NoteGuildLeaveRequest(std::uint64_t bot)
+{
+    if (_options.GuildJoin.Enabled)
+        StateOf(bot).GuildLeaveRequested = true;
+}
+
 // The core refused the order (the bot was in combat): forget that it was sent and look again in a few seconds.
 void BotPolicy::TalentOrderFailed(std::uint64_t bot, std::uint64_t nowMs)
 {
@@ -411,6 +436,7 @@ void BotPolicy::DecideBot(DecideTick& tick, std::size_t i)
     TurnWander(tick, turn);
     TurnRestAndConsume(tick, turn);
     TurnTrainAndParty(tick, turn);
+    TurnSocial(tick, turn);
     TurnLootTaxiMount(tick, turn);
     TurnSendMove(tick, turn);
     if (TurnForcedHeal(tick, turn) == TurnFlow::kSkip)

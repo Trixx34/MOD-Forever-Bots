@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Guilds (config key GuildJoin, off by default): an idle bot accepts a guild invite, and leaves when told to. Pure logic. The SDK has no guild
-// accept or leave action, so the policy logs the decision (event guild_gap) until one is added to the core and SDK.
+// Guilds (config key GuildJoin, off by default): an idle bot accepts a guild invite, and leaves when told to. Pure logic. The policy (TurnSocial) turns a decision
+// into social::Order, which main_commands.cpp sends with ModuleClient::BotGuild. A core without the guild action refuses it and the policy logs the
+// event guild_gap.
 #pragma once
 
 #include <cstdint>

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Duels (config key Duels, off by default): a bot that is idle, healthy and at least DuelMinLevel challenges a rival that stands near it, or accepts a
-// challenge sent to it. Pure logic: the caller passes the bot's state and the clock. No duel action exists in the SDK yet (doc/second-list-gaps.md),
-// so the policy only logs the decision (event duel_gap) until one is added.
+// challenge sent to it. Pure logic: the caller passes the bot's state and the clock. The policy (TurnSocial in bot_policy_turn_town.cpp)
+// turns a decision into social::Order, which main_commands.cpp sends with ModuleClient::BotDuel. A core without the duel action refuses it and the
+// policy logs the event duel_gap (doc/second-list-gaps.md).
 #pragma once
 
 #include <cstdint>

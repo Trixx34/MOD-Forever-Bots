@@ -16,6 +16,10 @@ void PolicyFromSettings(PolicyOptions& policyOptions, BotSettings& settings)
     policyOptions.LevelDungeons = settings.LevelDungeons && settings.Scenarios.empty();   // a scenario run drives its own parties
     policyOptions.LevelDungeonRuns = settings.LevelDungeonRuns;
     policyOptions.LfgFill = settings.LfgFill;
+    policyOptions.Duels = settings.Duels;
+    policyOptions.Battlegrounds = settings.Battlegrounds;
+    policyOptions.GuildJoin = settings.GuildJoin;
+    policyOptions.MailGifts = settings.MailGifts;
     policyOptions.DungeonReviveOutOfCombat = settings.DungeonReviveOutOfCombat;
     policyOptions.CorpseRunTeleportMs = std::uint64_t(settings.CorpseRunTeleportSec) * 1000;
     policyOptions.AggressiveStart = settings.AggressiveStart;

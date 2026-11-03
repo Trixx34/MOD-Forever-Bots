@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Battlegrounds (config key Battlegrounds, off by default): an idle bot at least BattlegroundMinLevel queues for a battleground. A queue that has not
-// popped within BattlegroundMaxWaitMin is left. Pure logic. No battleground queue action exists in the SDK yet, so the policy only logs the decision
-// (event battleground_gap) until one is added.
+// popped within BattlegroundMaxWaitMin is left. Pure logic. The policy (TurnSocial) turns a decision into social::Order, which main_commands.cpp sends with
+// ModuleClient::BotBattleground. A core without the battleground action refuses it and the policy logs the event battleground_gap.
 #pragma once
 
 #include <cstdint>

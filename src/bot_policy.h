@@ -42,6 +42,11 @@
 #include "gather_nodes.h"
 #include "bot_random.h"
 #include "chat_say.h"
+#include "battlegrounds.h"
+#include "duels.h"
+#include "guild_join.h"
+#include "mail_gifts.h"
+#include "social_actions.h"
 #include "dungeon_events.h"
 #include "errand_trainers.h"
 #include "supply_policy.h"
@@ -179,6 +184,12 @@ struct PolicyOptions
     // LFG fill (config LfgFill, lfg_fill.h): a human's party short of a tank or a healer gets a free bot sent next to it, which whispers its offer to the leader.
     // Off by default. Needs PartySize and a level for the party.
     bool LfgFill = false;
+    // Duels, battlegrounds, guild join and mail gifts (config Duels, Battlegrounds, GuildJoin, MailGifts; all off by default). TurnSocial turns their decisions
+    // into social::Order values (TakeSocialOrders), which the Run() thread sends with ModuleClient::BotDuel, BotBattleground, BotGuild and BotGiftMail.
+    duels::Settings Duels;
+    battlegrounds::Settings Battlegrounds;
+    guild::Settings GuildJoin;
+    gifts::Settings MailGifts;
     // Creature entry -> rank (0 first): the dungeon's kill priority. The damage dealers of a dungeon party fight the best-ranked live hostile next to the tank's target.
     std::map<std::uint32_t, std::uint32_t> KillPriority;
     // The dungeon's summons (ScenarioSummons, on where DungeonSummons lists the dungeon): creature entries a summoner makes, which the party fights first, as an
@@ -373,6 +384,17 @@ public:
     // The bots that are busy now: a trade request to one of them is refused (main.cpp). Empty unless WhisperReplies.
     std::vector<std::uint64_t> BusyBots(forever_module::WorldTickSnapshotView const& view) const;
     void TalentOrderFailed(std::uint64_t bot, std::uint64_t nowMs);
+
+    // Social orders (Duels, Battlegrounds, GuildJoin, MailGifts): queued by Decide, taken once by the pump thread. Each bot has at most one order in
+    // flight; NoteSocialOutcome (pump thread) reports what the core answered, which updates the feature's state and logs a *_gap event when the core
+    // does not know the action.
+    std::vector<social::Order> TakeSocialOrders();
+    void NoteSocialOutcome(social::Outcome const& outcome, std::uint64_t nowMs);
+    // Facts the core's snapshot does not carry: a player challenged the bot to a duel (Duels accepts it), a player is to be thanked with a gift
+    // (MailGifts: a trade with the bot finished), a player asked the bot to leave its guild (GuildJoin). `player` is a character guid counter.
+    void NoteDuelChallenge(std::uint64_t bot, std::uint64_t player);
+    void NoteGiftRecipient(std::uint64_t bot, std::uint64_t player);
+    void NoteGuildLeaveRequest(std::uint64_t bot);
 
 private:
     struct Decision
@@ -603,6 +625,18 @@ private:
         std::uint32_t TalentSpec = 0;     // the spec the last talent order carried (a changed spec orders again)
         std::uint64_t RespecNotBeforeMs = 0; // no respec for this bot before this time (TalentRespec: one an hour)
         std::uint64_t TalentRetryMs = 0;                 // no talent order before this time (after a refusal)
+        // TurnSocial: one order at a time (SocialBusyUntilMs), and the state of each feature.
+        std::uint64_t SocialBusyUntilMs = 0;             // an order is in flight until this time or until its outcome arrives
+        duels::State DuelState;
+        std::uint64_t DuelChallenger = 0;                // character guid counter of the player whose challenge waits (0 = none)
+        battlegrounds::State BgState;
+        std::uint32_t BgId = 0;                          // the battleground the bot is queued for
+        bool BgWasInside = false;
+        bool GuildHas = false;                           // the core accepted the bot into a guild
+        bool GuildLeaveRequested = false;
+        std::uint64_t GuildPollAtMs = 0;                 // the next try at a pending guild invitation (the snapshot does not show one)
+        gifts::State GiftState;
+        std::uint64_t GiftRecipient = 0;                 // character guid counter of the player to thank (0 = none)
         std::uint32_t GearedAtLevel = 0;                 // the level at the last auto gear (0 = not yet)
         bool GearRequested = false;                      // the .autogear command asked for it
         bool BagGearRequested = false;                   // a bag-only pass is wanted now (a trade finished)
@@ -709,6 +743,7 @@ private:
     void TurnWander(DecideTick& tick, BotTurn& turn);
     void TurnRestAndConsume(DecideTick& tick, BotTurn& turn);
     void TurnTrainAndParty(DecideTick& tick, BotTurn& turn);
+    void TurnSocial(DecideTick& tick, BotTurn& turn);
     void TurnLootTaxiMount(DecideTick& tick, BotTurn& turn);
     void TurnSendMove(DecideTick& tick, BotTurn& turn);
     TurnFlow TurnForcedHeal(DecideTick& tick, BotTurn& turn);
@@ -743,6 +778,7 @@ private:
     std::unordered_map<std::uint64_t, BotState> _bots; // bot guid -> state
     std::vector<TalentOrder> _talentOrders;            // queued by Decide, taken by TakeTalentOrders
     std::vector<TalentOrder> _respecOrders;            // queued by Decide (TalentRespec), taken by TakeRespecOrders
+    std::vector<social::Order> _socialOrders;          // queued by Decide (TurnSocial), taken by TakeSocialOrders
     std::vector<WhisperReply> _whisperReplies;         // queued by Decide (busy refusals), taken by TakeWhisperReplies
     WhisperLimiter _whispers;                          // replies to players (ApplyWhisper and the refusals)
     // Why the bot cannot take an invite or a trade now (chat_reply.h); None when it is free. Uses the snapshot and the module state for the bot.

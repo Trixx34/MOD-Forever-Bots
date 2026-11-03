@@ -170,6 +170,10 @@ struct CommandQueue
     std::vector<AmbientLine> Ambient;
     std::vector<BotPolicy::TalentOrder> Talents;                // talent orders for the Run() thread to send (SpendBotTalents)
     std::vector<std::uint64_t> TalentRefused;                   // bots the core refused a talent order, for the pump thread to retry
+    // Duel, battleground, guild and gift orders (social_actions.h): the pump thread queues them, the Run() thread sends them, and the core's answers come back.
+    std::vector<social::Order> Social;
+    std::vector<social::Outcome> SocialOutcomes;
+    std::vector<std::pair<std::uint64_t, std::uint64_t>> GiftThanks;   // (bot, player counter): a trade between them finished, so the bot may thank the player
     // Whispers that are not orders (WhisperReplies): read on the Run() thread, answered on the pump thread, sent from the timer.
     struct WhisperItem
     {

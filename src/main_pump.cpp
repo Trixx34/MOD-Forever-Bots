@@ -375,6 +375,16 @@ void main_detail::PumpTier2(forever_module::Tier2Session& session, std::atomic<b
                 for (std::uint64_t const bot : extras.Commands->TalentRefused)
                     policy.TalentOrderFailed(bot, nowMs());
                 extras.Commands->TalentRefused.clear();
+                // Duels, battlegrounds, guild and gifts: what the core answered goes to the policy; the new orders go to the Run() thread to send.
+                for (social::Outcome const& outcome : extras.Commands->SocialOutcomes)
+                    policy.NoteSocialOutcome(outcome, nowMs());
+                extras.Commands->SocialOutcomes.clear();
+                for (auto const& [bot, player] : extras.Commands->GiftThanks)
+                    policy.NoteGiftRecipient(bot, player);
+                extras.Commands->GiftThanks.clear();
+                for (social::Order const& order : policy.TakeSocialOrders())
+                    if (extras.Commands->Social.size() < 64)
+                        extras.Commands->Social.push_back(order);
                 for (BotPolicy::TalentOrder const& order : talentOrders)
                     if (extras.Commands->Talents.size() < 256)
                         extras.Commands->Talents.push_back(order);
