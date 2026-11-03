@@ -249,6 +249,8 @@ BotPolicy::TurnFlow BotPolicy::DeadCorpse(DecideTick& tick, BotTurn& turn)
             }
             return TurnFlow::kSkip;
         }
+        if (!death_pause::ReleaseAllowed(_options.DeathPause, _options.RandomSeed, bot.guid, state.DeathMs, nowMs))
+            return TurnFlow::kSkip; // DeathPause: a player takes a moment before pressing release
         BotAction release;
         release.bot_guid = bot.guid;
         release.type = ActionType::kReleaseSpirit;

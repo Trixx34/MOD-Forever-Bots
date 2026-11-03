@@ -53,6 +53,7 @@
 #include "advisor_orders.h"
 #include "advisor_text.h"
 #include "lfg_queue_fill.h"
+#include "death_pause.h"
 #include "realism.h"
 #include "taxi_policy.h"
 
@@ -292,6 +293,7 @@ struct PolicyOptions
     realism::BuffSettings PassingBuff;
     realism::AfkSettings TownAfk;
     lfg_queue_fill::Settings LfgQueueFill;
+    death_pause::Settings DeathPause;
     // ADVISOR-OPTIONS
     // Advisor features (docs: config/modules.d/forever-bots.conf.example, "Advisor features"; each off by default). The line pools are read once at start.
     std::shared_ptr<advisor::Pools const> Pools;

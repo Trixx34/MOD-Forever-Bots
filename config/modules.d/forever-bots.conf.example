@@ -160,6 +160,9 @@ Module.forever-bots.TelemetrySummarySec = 60
 #                         in that role; not the same as LfgFill above, which sends free bots to a human's party)
 # LfgQueueFillWaitSec = 60
 # LfgQueueFillCooldownSec = 120   (at most one bot per queue in this time)
+# DeathPause = 0         (a dead bot waits a random time after the death before it sends release spirit; nothing else of the corpse run changes)
+# DeathPauseMinSec = 10
+# DeathPauseMaxSec = 30
 # ADVISOR-DOCS-ANCHOR
 # AuctionRoundStep = 0   (copper; 10000 rounds a goods unit price to a gold, half a gold or just under; 0 = off)
 # AuctionRoundMaxPct = 5 (how far the rounded price may lie from the computed one, and never below the vendor price)

@@ -133,6 +133,7 @@ void LoadPolicyTables(PolicyOptions& policyOptions, BotSettings& settings)
     // The line pools of the advisor features (each feature adds its own below; a pool is read only when its feature is on).
     auto pools = std::make_shared<advisor::Pools>();
     policyOptions.LfgQueueFill = settings.LfgQueueFill;
+    policyOptions.DeathPause = settings.DeathPause;
     // ADVISOR-COPY
     // ADVISOR-POOLS
     policyOptions.Pools = pools;

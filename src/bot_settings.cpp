@@ -670,6 +670,11 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadBool(config, "LfgQueueFill", settings.LfgQueueFill.Enabled, warnings);
     ReadKey(config, "LfgQueueFillWaitSec", 0, 3600, settings.LfgQueueFill.WaitSec, warnings);
     ReadKey(config, "LfgQueueFillCooldownSec", 0, 86400, settings.LfgQueueFill.CooldownSec, warnings);
+    ReadBool(config, "DeathPause", settings.DeathPause.Enabled, warnings);
+    ReadKey(config, "DeathPauseMinSec", 0, 600, settings.DeathPause.MinSec, warnings);
+    ReadKey(config, "DeathPauseMaxSec", 0, 600, settings.DeathPause.MaxSec, warnings);
+    if (settings.DeathPause.MaxSec < settings.DeathPause.MinSec)
+        settings.DeathPause.MaxSec = settings.DeathPause.MinSec;
     // ADVISOR-KEYS
     ReadBool(config, "InnDowntime", settings.InnDowntime.Enabled, warnings);
     ReadBool(config, "ScenarioConfigGuard", settings.ScenarioConfigGuard, warnings);
