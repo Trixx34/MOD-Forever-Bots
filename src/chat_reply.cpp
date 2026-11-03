@@ -212,7 +212,7 @@ void WhisperLimiter::Prune(std::uint64_t nowMs)
             it->second.pop_front();
         it = it->second.empty() ? _replies.erase(it) : std::next(it);
     }
-    // Still past the bound (every entry is inside its cooldown): the oldest pair goes.
-    while (_lastPair.size() > kMaxTracked)
+    // Still past the bound (every entry is inside its cooldown): the oldest pair goes. The bound counts both maps, as Allow checks it.
+    while (Tracked() > kMaxTracked && !_lastPair.empty())
         _lastPair.erase(std::min_element(_lastPair.begin(), _lastPair.end(), [](auto const& a, auto const& b) { return a.second < b.second; }));
 }

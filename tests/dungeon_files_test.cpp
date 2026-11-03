@@ -427,6 +427,7 @@ void ShippedFilesEqualTheOldTextFiles()
         auto fromJson = MergeDungeonSet(config, json, mergeWarnings);
         CHECK(mergeWarnings.empty());
         fromJson.erase("ScenarioKillPriority"); // new in the JSON file (kill_priority): the old text file has no such line
+        fromJson.erase("ScenarioSummons");      // new in the JSON file (summons): the old text file has no such line too
         CHECK(fromText == fromJson);
         CHECK(fromJson.size() > 10);
     }

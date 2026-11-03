@@ -355,9 +355,9 @@ void NoRouteAndMapColumns()
     Recorder rec(options);
     BotSnapshot bot = Bot(1000);
     bot.map_id = 389;
+    rec.telemetry.Observe(View(bot), 0);   // first sight seeds the record: a result already there is not counted
     bot.last_action_sequence = 1;
     bot.last_action_status = BotActionStatus::kNoRoute;
-    rec.telemetry.Observe(View(bot), 0);
     rec.telemetry.Observe(View(bot), 500);
     bot.last_action_sequence = 2;
     rec.telemetry.Observe(View(bot), 1000);

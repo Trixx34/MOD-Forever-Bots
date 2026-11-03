@@ -878,7 +878,8 @@ void CountsBossesSeenDead()
     auto const result = director.TakeResult();
     CHECK(result && result->BossesTotal == 2 && result->BossesKilled.size() == 1);
     CHECK(FormatScenarioResult(*result).find("bosses=1/2 killed=Rhahk'Zor") != std::string::npos);
-    CHECK(FormatScenarioResult(*result).find("killed=Rhahk'Zor | roster=2:1,5:5,5:5 classes=1,5,5 combo=1-5-5") != std::string::npos);
+    // boss_ms= (the kill time) sits between the boss list and the roster
+    CHECK(FormatScenarioResult(*result).find(" | roster=2:1,5:5,5:5 classes=1,5,5 combo=1-5-5") != std::string::npos);
 }
 
 void Down(BotSnapshot& bot, std::uint8_t life = 1)

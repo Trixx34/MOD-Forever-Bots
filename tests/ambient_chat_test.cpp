@@ -67,8 +67,10 @@ void ZoneAndClassNames()
 void SpeakerRespectsCooldownRateAndEvents()
 {
     std::size_t errors = 0;
+    // three general lines: once two are in the dedupe ring, the third is the only one the minute can use
     auto const lines = Parse("g|0|0|-|Ambient one\n"
                              "g|0|0|-|Ambient two\n"
+                             "g|0|0|-|Ambient three\n"
                              "g|0|0|level|Level {level}\n",
                              errors);
     ambient::Limits limits;

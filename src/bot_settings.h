@@ -185,6 +185,11 @@ struct BotSettings
     std::uint32_t AmbientBotCooldownSec = 300;
     std::uint32_t AmbientChannels = 1;
     std::string AmbientFile = "data/ambient_lines.txt";
+    // Whisper replies (config keys ChatWhisperReplies 0 or 1, off by default; WhisperCooldownMs 0..600000, default 60000; WhisperMaxPerMin 1..60,
+    // default 6): a bot whispers a short reply to a player who whispers it, and to a player whose invite it cannot take while busy.
+    bool ChatWhisperReplies = false;
+    std::uint32_t WhisperCooldownMs = 60000;
+    std::uint32_t WhisperMaxPerMin = 6;
     // Second-list features (off by default; the decisions are pure logic, the SDK has no action for them yet, so the policy logs them as *_gap):
     // Duels, DuelMinLevel, DuelCooldownMin; Battlegrounds, BattlegroundMinLevel, BattlegroundMaxWaitMin; InnDowntime, InnHealthBelowPct,
     // InnPowerBelowPct, InnMaxRestMin; GuildJoin; MailGifts, MailGiftDailyCap.

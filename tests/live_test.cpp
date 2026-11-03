@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <sstream>
 #include <string>
 
@@ -93,7 +94,7 @@ void TestEmptyAndOddFloats()
     CHECK(Has(json, "\"bots\":[],\"units\":[]"));
     WorldTickSnapshotView odd = TwoBots();
     odd.bots[0].pos_x = 1e30f;                             // not a plausible position: written as 0, never as "inf" or "nan"
-    odd.bots[0].pos_y = 0.0f / 0.0f;
+    odd.bots[0].pos_y = std::numeric_limits<float>::quiet_NaN();
     std::string const text = BotLive::Build(odd, 1, 10);
     CHECK(!Has(text, "inf") && !Has(text, "nan"));
 }
