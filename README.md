@@ -166,7 +166,7 @@ Two tools read a telemetry file (both are Python 3, run with `-I`, and both read
     cmake --build build
     ctest --test-dir build
 
-Without `FOREVER_MODULE_SDK_SOURCE`, CMake fetches `Trixx34/forever-module-sdk` (`main`), which does not yet have layout 7.
+Without `FOREVER_MODULE_SDK_SOURCE`, CMake fetches `Trixx34/forever-module-sdk` (`main`). Use a checkout of the SDK branch that matches `module.json` (protocol 22, layout 23) until that branch is on `main`.
 
 ## Layout
 
