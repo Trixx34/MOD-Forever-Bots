@@ -176,6 +176,9 @@ Module.forever-bots.TelemetrySummarySec = 60
 #                         grinding, questing, travelling, dungeon, full group; the whisper limit of ChatWhisperReplies applies, and no template goes to the
 #                         same player twice in 10 minutes; works without ChatWhisperReplies, which keeps its own replies)
 # WhisperMatrixFile = data/whisper_replies.txt
+# PathJitter = 0         (an out-of-combat walking move target is offset by up to PathJitterYards in a random direction; never within 2 yards of a point
+#                         the route data marks as not walkable (blocked grind spots), never across a required route waypoint, never in a dungeon or party route)
+# PathJitterYards = 1.0  (0..5)
 # ADVISOR-DOCS-ANCHOR
 # AuctionRoundStep = 0   (copper; 10000 rounds a goods unit price to a gold, half a gold or just under; 0 = off)
 # AuctionRoundMaxPct = 5 (how far the rounded price may lie from the computed one, and never below the vendor price)

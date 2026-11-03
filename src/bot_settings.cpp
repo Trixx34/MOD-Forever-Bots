@@ -4,6 +4,7 @@
 #include "bot_pick.h"
 #include "text_number.h"
 
+#include <cstdlib>
 #include <algorithm>
 #include <charconv>
 #include <limits>
@@ -687,6 +688,16 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadBool(config, "WhisperMatrix", settings.WhisperMatrix.Enabled, warnings);
     if (auto const it = config.find("WhisperMatrixFile"); it != config.end())
         settings.WhisperMatrixFile = it->second;
+    ReadBool(config, "PathJitter", settings.PathJitter.Enabled, warnings);
+    if (auto const it = config.find("PathJitterYards"); it != config.end())
+    {
+        char* end = nullptr;
+        float const yards = std::strtof(it->second.c_str(), &end);
+        if (end != it->second.c_str() && *end == '\0' && yards >= 0.0f && yards <= 5.0f)
+            settings.PathJitter.Yards = yards;
+        else
+            warnings.push_back("Module.forever-bots.PathJitterYards: '" + it->second + "' is not a number from 0 to 5; using the default.");
+    }
     // ADVISOR-KEYS
     ReadBool(config, "InnDowntime", settings.InnDowntime.Enabled, warnings);
     ReadBool(config, "ScenarioConfigGuard", settings.ScenarioConfigGuard, warnings);

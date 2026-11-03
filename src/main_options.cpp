@@ -137,6 +137,7 @@ void LoadPolicyTables(PolicyOptions& policyOptions, BotSettings& settings)
     policyOptions.TradeAds = settings.TradeAds;
     policyOptions.PartyMana = settings.PartyMana;
     policyOptions.WhisperMatrix = settings.WhisperMatrix;
+    policyOptions.PathJitter = settings.PathJitter;
     // ADVISOR-COPY
     // ADVISOR-POOLS
     if (settings.WhisperMatrix.Enabled)

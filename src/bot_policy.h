@@ -57,6 +57,7 @@
 #include "trade_ads.h"
 #include "party_mana.h"
 #include "whisper_matrix.h"
+#include "path_jitter.h"
 #include "realism.h"
 #include "taxi_policy.h"
 
@@ -300,6 +301,7 @@ struct PolicyOptions
     trade_ads::Settings TradeAds;
     party_mana::Settings PartyMana;
     whisper_matrix::Settings WhisperMatrix;
+    path_jitter::Settings PathJitter;
     // ADVISOR-OPTIONS
     // Advisor features (docs: config/modules.d/forever-bots.conf.example, "Advisor features"; each off by default). The line pools are read once at start.
     std::shared_ptr<advisor::Pools const> Pools;
