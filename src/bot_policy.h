@@ -55,6 +55,7 @@
 #include "lfg_queue_fill.h"
 #include "death_pause.h"
 #include "trade_ads.h"
+#include "party_mana.h"
 #include "realism.h"
 #include "taxi_policy.h"
 
@@ -296,6 +297,7 @@ struct PolicyOptions
     lfg_queue_fill::Settings LfgQueueFill;
     death_pause::Settings DeathPause;
     trade_ads::Settings TradeAds;
+    party_mana::Settings PartyMana;
     // ADVISOR-OPTIONS
     // Advisor features (docs: config/modules.d/forever-bots.conf.example, "Advisor features"; each off by default). The line pools are read once at start.
     std::shared_ptr<advisor::Pools const> Pools;
@@ -808,6 +810,7 @@ private:
     std::unordered_map<std::uint64_t, BotState> _bots; // bot guid -> state
     std::vector<TalentOrder> _talentOrders;            // queued by Decide, taken by TakeTalentOrders
     std::vector<TalentOrder> _respecOrders;            // queued by Decide (TalentRespec), taken by TakeRespecOrders
+    std::map<std::uint64_t, party_mana::Tracker> _partyMana;   // party leader (a bot) -> who waits for mana (party_mana.h)
     lfg_queue_fill::Limiter _lfgQueueLimiter;           // one bot per queue per cooldown
     std::vector<advisor::Order> _advisorOrders;        // queued by the advisor features (bot_policy_advisor.cpp), taken by TakeAdvisorOrders
     std::vector<social::Order> _socialOrders;          // queued by Decide (TurnSocial), taken by TakeSocialOrders

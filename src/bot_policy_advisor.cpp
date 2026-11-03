@@ -76,6 +76,29 @@ void BotPolicy::TurnAdvisor(DecideTick& tick, BotTurn& turn)
         return;
     std::uint64_t const seed = _options.RandomSeed;
 
+    // Party mana sync (PartyMana): a low healer or caster of a dungeon party says so once; the party's walk holds for it (RouteReadiness asks the tracker).
+    if (_options.PartyMana.Enabled && bot.group_role != 0 && _options.DungeonsByMap.count(bot.map_id) != 0)
+    {
+        std::uint32_t const classId = ClassFor(_options, bot.guid);
+        bool const caster = classId == 5 || classId == 7 || classId == 8 || classId == 9 || classId == 11 || HealSpellFor(classId, 99) != 0;
+        party_mana::Facts facts;
+        facts.InDungeonParty = true;
+        facts.ManaUser = caster && bot.power_type == 0;
+        facts.InCombat = bot.in_combat != 0;
+        facts.Power = bot.power;
+        facts.MaxPower = bot.max_power;
+        std::uint64_t const leader = bot.group_role == 2 ? bot.guid : (bot.group_leader_guid & forever_module::kUnitRefCounterMask);
+        if (_partyMana[leader].Note(_options.PartyMana, facts, bot.guid, nowMs) && _options.Pools && !_options.Pools->PartyMana.empty())
+        {
+            advisor::Order order;
+            order.What = advisor::Kind::PartySay;
+            order.Bot = bot.guid;
+            std::vector<std::string> const& lines = _options.Pools->PartyMana;
+            order.Text = lines[bot_random::Below(bot_random::Draw(seed, bot.guid, 0xF1, nowMs / 1000), std::uint32_t(lines.size()))];
+            _advisorOrders.push_back(std::move(order));
+        }
+    }
+
     // Trade-chat crafting ad (TradeAds): a bot with a crafting skill posts a templated line now and then. Not in a party (the Trade channel is the zone's).
     if (_options.TradeAds.Enabled && _options.Pools && bot.group_role == 0 && !_options.Pools->TradeAds.empty())
     {

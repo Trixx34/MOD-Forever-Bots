@@ -168,6 +168,10 @@ Module.forever-bots.TelemetrySummarySec = 60
 # TradeAdsIntervalMin = 45
 # TradeAdsMinSkill = 150
 # TradeAdsFile = data/trade_ads.txt
+# PartyMana = 0          (a healer or caster of a dungeon party below 20 percent mana, out of combat, says one line in party chat from PartyManaFile, and
+#                         the party's non-combat movement holds until that bot is at 80 percent; never in combat)
+# PartyManaHoldSec = 60  (hard cap of one hold)
+# PartyManaFile = data/party_mana.txt
 # ADVISOR-DOCS-ANCHOR
 # AuctionRoundStep = 0   (copper; 10000 rounds a goods unit price to a gold, half a gold or just under; 0 = off)
 # AuctionRoundMaxPct = 5 (how far the rounded price may lie from the computed one, and never below the vendor price)

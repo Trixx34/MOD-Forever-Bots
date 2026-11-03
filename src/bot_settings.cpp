@@ -680,6 +680,10 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadKey(config, "TradeAdsMinSkill", 1, 450, settings.TradeAds.MinSkill, warnings);
     if (auto const it = config.find("TradeAdsFile"); it != config.end())
         settings.TradeAdsFile = it->second;
+    ReadBool(config, "PartyMana", settings.PartyMana.Enabled, warnings);
+    ReadKey(config, "PartyManaHoldSec", 1, 600, settings.PartyMana.HoldSec, warnings);
+    if (auto const it = config.find("PartyManaFile"); it != config.end())
+        settings.PartyManaFile = it->second;
     // ADVISOR-KEYS
     ReadBool(config, "InnDowntime", settings.InnDowntime.Enabled, warnings);
     ReadBool(config, "ScenarioConfigGuard", settings.ScenarioConfigGuard, warnings);

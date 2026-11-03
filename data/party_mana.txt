@@ -1,0 +1,9 @@
+# Party chat lines of a healer or caster that is low on mana before a pull (src/party_mana.h). One line each, at most 255 bytes.
+Low on mana, give me a moment to drink.
+Need a sec to drink, almost out of mana.
+Mana is low, let me recover before the next pack.
+Hold up a moment, I am nearly oom.
+One moment please, drinking for mana.
+Running dry on mana, can we pause a bit?
+Let me sit and recover mana before we go on.
+Oom, give me a few seconds to drink.

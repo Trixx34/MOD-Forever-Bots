@@ -18,6 +18,7 @@
 #include "lfg_queue_fill.h"
 #include "death_pause.h"
 #include "trade_ads.h"
+#include "party_mana.h"
 #include "realism.h"
 #include "taxi_policy.h"
 
@@ -214,6 +215,8 @@ struct BotSettings
     death_pause::Settings DeathPause;
     trade_ads::Settings TradeAds;
     std::string TradeAdsFile = "data/trade_ads.txt";
+    party_mana::Settings PartyMana;
+    std::string PartyManaFile = "data/party_mana.txt";
     // ADVISOR-MEMBERS
     // Supplies (layout 15, config keys Supplies, SupplyAmmoLow, SupplyAmmoTarget, SupplyFoodLow, SupplyFoodTarget, SupplyDrinkLow, SupplyDrinkTarget,
     // SupplyTripSec; off by default): bots buy ammunition, food and drink at vendors that sell what they can use, and eat and drink while resting.

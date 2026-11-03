@@ -135,8 +135,11 @@ void LoadPolicyTables(PolicyOptions& policyOptions, BotSettings& settings)
     policyOptions.LfgQueueFill = settings.LfgQueueFill;
     policyOptions.DeathPause = settings.DeathPause;
     policyOptions.TradeAds = settings.TradeAds;
+    policyOptions.PartyMana = settings.PartyMana;
     // ADVISOR-COPY
     // ADVISOR-POOLS
+    if (settings.PartyMana.Enabled)
+        pools->PartyMana = advisor::LoadLines(BesideTheModule(settings.PartyManaFile));
     if (settings.TradeAds.Enabled)
     {
         pools->TradeAds = advisor::LoadLines(BesideTheModule(settings.TradeAdsFile));
