@@ -5,7 +5,7 @@ route, and can be overridden from your own folder (`DungeonDir`). The text forma
 file. The behaviour (triggers, steps, timeouts, the runner) is the same.
 
 Status: built and unit-tested (`src/dungeon_events.*`, `tests/dungeon_events_test.cpp`, the policy tests for tank lead). The core side is `ActionType::kUseObject`
-(layout 19 / protocol 14, `Bot.Actions.UseObject`). **Not run on a sim yet.**
+(layout 19 / protocol 14, `Bot.Actions.UseObject`). **Run on the sim** (Deadmines, 2026-10-25/26, `UseObject` on): the Factory Door, Heavy Door (north and south), Mast Room Door and Iron Clad Door events logged `event_done` in several parties; the Iron Clad cannon step is confirmed only by the event's completion.
 
 ## One table for every dungeon
 
