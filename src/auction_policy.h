@@ -54,6 +54,9 @@ struct Settings
     // below the vendor's unit price, never above the computed price plus RoundMaxPct, so a listing's total stays under the cap it had.
     std::uint32_t RoundStepCopper = 0;          // 0: off; 10000 is a gold
     std::uint32_t RoundMaxPct = 5;
+    // Batched listing (config AhBatchIntervalHours, 0 = off, ah_batch.h): a bot visits the house at most once per this many hours (relisting and cancelling included),
+    // and lists goods in stacks of 1, 5 or 20 chosen per item. With 0 the rules above are unchanged.
+    std::uint32_t BatchIntervalHours = 0;
 };
 
 // One item in a bot's bags as the core describes it for selling.

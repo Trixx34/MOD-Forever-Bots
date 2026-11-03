@@ -873,6 +873,7 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
         ReadKey(config, "AuctionEverySec", 60, 86400, everySec, warnings);
         settings.Auction.EveryMs = std::uint64_t(everySec) * 1000;
     }
+    ReadKey(config, "AhBatchIntervalHours", 0, 168, settings.Auction.BatchIntervalHours, warnings);
     ReadKey(config, "AuctionBuyMaxPct", 1, 100, settings.Auction.BuyMaxPct, warnings);
     ReadKey(config, "AuctionBrowsePerVisit", 1, 20, settings.Auction.BrowsePerVisit, warnings);
     ReadKey(config, "AuctionCallsPerTick", 1, 50, settings.Auction.MaxCallsPerTick, warnings);

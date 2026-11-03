@@ -224,6 +224,8 @@ Module.forever-bots.TelemetrySummarySec = 60
 # AuctionGoodsPerEntryMax = 1
 # AuctionGoodsMinQuality = 1
 # AuctionEverySec = 1800        (at most one visit per bot this often, 60..86400)
+# AhBatchIntervalHours = 0      (0 = off, 0..168. Above 0: a bot visits the auction house to list, relist or cancel only once per this many hours, and lists
+#                                goods in stacks of 1, 5 or 20 chosen per item; with 0 the rules above stay as they are)
 # AuctionBuy = 0                (off by default; needs Auction = 1 and a core with protocol 19. A bot also looks for upgrades: every AuctionEverySec it
 #                                browses one equipment slot of the house in turn, the core says which listings beat what the bot wears (its AutoGear score),
 #                                and the bot buys out the best upgrade per copper it can afford. Never in a scenario run. The item arrives by mail, which the
