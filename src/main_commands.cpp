@@ -317,6 +317,15 @@ void SetUpTrade(forever_module::ModuleClient& client, std::shared_ptr<trade::Tra
         if (commands->GuildLevels.size() < 64)
             commands->GuildLevels.push_back(level);
     });
+    client.OnNotify("GroupScript.OnInviteDeclined", [commands](forever_module::EventNotify const& notify)
+    {
+        std::uint64_t decliner = 0;
+        if (!advisor::DecodeDecline(notify, decliner))
+            return;
+        std::lock_guard<std::mutex> lock(commands->Lock);
+        if (commands->QuestDeclines.size() < 64)
+            commands->QuestDeclines.push_back(decliner);
+    });
     client.OnNotify("LfgScript.OnQueueUpdate", [commands](forever_module::EventNotify const& notify)
     {
         lfg_queue_fill::Queue queue;

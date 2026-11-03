@@ -91,12 +91,14 @@ void PolicySendsOneGuildLineFromAGuildBot()
     pools->GuildMilestones = { "Grats on {level}!" };
     options.Pools = pools;
     BotPolicy policy(options);
-    policy.NoteBotGuild(5, 900);
-    policy.NoteBotGuild(6, 900);
-    policy.NoteBotGuild(7, 901);   // another guild
+    // the guild each bot is in comes from its snapshot (BotSnapshot::guild_guid, layout 23)
+    BotSnapshot a = Bot(5), b = Bot(6), c = Bot(7);
+    a.guild_guid = 900;
+    b.guild_guid = 900;
+    c.guild_guid = 901;   // another guild
     WorldTickSnapshotView view;
     view.max_nearby_units = 4;
-    view.bots = { Bot(5), Bot(6), Bot(7) };
+    view.bots = { a, b, c };
     view.nearby.resize(12);
     policy.OnGuildMemberLevel(view, 900, 1234, 25, 1000);
     auto orders = policy.TakeAdvisorOrders();
@@ -116,10 +118,11 @@ void PolicySendsOneGuildLineFromAGuildBot()
 void PolicyIsSilentWhenOff()
 {
     BotPolicy off{ PolicyOptions{} };
-    off.NoteBotGuild(5, 900);
+    BotSnapshot a = Bot(5);
+    a.guild_guid = 900;
     WorldTickSnapshotView view;
     view.max_nearby_units = 4;
-    view.bots = { Bot(5) };
+    view.bots = { a };
     view.nearby.resize(4);
     off.OnGuildMemberLevel(view, 900, 1234, 25, 1000);
     CHECK(off.TakeAdvisorOrders().empty());

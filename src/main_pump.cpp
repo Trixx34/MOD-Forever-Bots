@@ -400,6 +400,14 @@ void main_detail::PumpTier2(forever_module::Tier2Session& session, std::atomic<b
                     std::lock_guard<std::mutex> lock(extras.Commands->Lock);
                     guildLevels.swap(extras.Commands->GuildLevels);
                 }
+                std::vector<std::uint64_t> declines;
+                {
+                    std::lock_guard<std::mutex> lock(extras.Commands->Lock);
+                    declines.swap(extras.Commands->QuestDeclines);
+                }
+                // A declined invite: the player's unit reference (type 2, a player) keeps QuestInvite from inviting it again for two hours.
+                for (std::uint64_t const decliner : declines)
+                    policy.NoteQuestInviteDeclined(forever_module::MakeUnitRef(2, 0, decliner), nowMs());
                 for (advisor::GuildLevel const& level : guildLevels)
                     policy.OnGuildMemberLevel(view, level.Guild, level.Member, level.Level, nowMs());
                 for (lfg_queue_fill::Queue const& queue : lfgQueues)

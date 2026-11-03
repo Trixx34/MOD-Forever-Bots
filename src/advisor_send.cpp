@@ -50,6 +50,14 @@ bool Decode(forever_module::EventNotify const& notify, lfg_queue_fill::Queue& ou
     return true;
 }
 
+bool DecodeDecline(forever_module::EventNotify const& notify, std::uint64_t& decliner)
+{
+    if (!notify.has_group_invite_declined())
+        return false;
+    decliner = notify.group_invite_declined().decliner_guid();
+    return true;
+}
+
 bool Decode(forever_module::EventNotify const& notify, GuildLevel& out)
 {
     if (!notify.has_guild_member_level())

@@ -101,10 +101,11 @@ void BotPolicy::TurnAdvisor(DecideTick& tick, BotTurn& turn)
 
     // Capital inspection (CityInspect) and quest group invites (QuestInvite): both look at the players near an idle bot.
     bool const calm = turn.idle && bot.group_role != 1;
-    if (calm && ((_options.CityInspect.Enabled && _options.ItemLevelOf && _options.InCapital) || (_options.QuestInvite.Enabled && _options.SharedQuestObjective)))
+    // The facts come from the snapshot (layout 23): BotSnapshot::in_capital and item_level, NearbyUnit::item_level and shared_objective.
+    if (calm && ((_options.CityInspect.Enabled && bot.in_capital) || _options.QuestInvite.Enabled))
     {
-        bool const inCapital = _options.CityInspect.Enabled && _options.InCapital && _options.InCapital(bot.map_id, bot.pos_x, bot.pos_y);
-        std::uint32_t const botLevel = inCapital ? _options.ItemLevelOf(bot.guid) : 0;
+        bool const inCapital = _options.CityInspect.Enabled && bot.in_capital != 0;
+        std::uint32_t const botLevel = inCapital ? bot.item_level : 0;
         for (forever_module::NearbyUnit const& unit : turn.nearby)
         {
             if (forever_module::UnitRefType(unit.guid) != 2 || unit.is_hostile)
@@ -118,7 +119,7 @@ void BotPolicy::TurnAdvisor(DecideTick& tick, BotTurn& turn)
                 facts.Idle = true;
                 facts.InCapital = true;
                 facts.BotItemLevel = botLevel;
-                facts.PlayerItemLevel = _options.ItemLevelOf(unit.guid);
+                facts.PlayerItemLevel = unit.item_level;
                 facts.Distance = distance;
                 if (_cityInspect.Try(_options.CityInspect, facts, seed, bot.guid, player, bot.map_id, nowMs, emote))
                 {
@@ -131,13 +132,13 @@ void BotPolicy::TurnAdvisor(DecideTick& tick, BotTurn& turn)
                     break;
                 }
             }
-            if (_options.QuestInvite.Enabled && _options.SharedQuestObjective && bot.group_size < 5)
+            if (_options.QuestInvite.Enabled && bot.group_size < 5)
             {
                 quest_invite::Facts facts;
                 facts.Idle = true;
                 facts.GroupFull = bot.group_size >= 5;
                 facts.Distance = distance;
-                facts.SameObjective = _options.SharedQuestObjective(bot.guid, unit.guid);
+                facts.SameObjective = unit.shared_objective != 0;
                 if (_questInvite.ShouldInvite(_options.QuestInvite, facts, unit.guid, nowMs))
                 {
                     BotAction invite;
@@ -180,8 +181,7 @@ void BotPolicy::OnGuildMemberLevel(forever_module::WorldTickSnapshotView const& 
     std::vector<std::uint64_t> members;
     for (forever_module::BotSnapshot const& bot : view.bots)
     {
-        auto const known = _botGuild.find(bot.guid);
-        if (known != _botGuild.end() && known->second == guild && bot.life_state == 0 && bot.in_combat == 0)
+        if (bot.guild_guid == guild && bot.life_state == 0 && bot.in_combat == 0)
             members.push_back(bot.guid);
     }
     std::uint64_t const speaker = _guildSpeaker.Pick(_options.GuildMilestone, guild, member, level, members, _options.RandomSeed);

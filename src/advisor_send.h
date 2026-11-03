@@ -29,6 +29,9 @@ struct GuildLevel
 // The payload of EventNotify::guild_member_level() (hook GuildScript.OnMemberLevel).
 bool Decode(forever_module::EventNotify const& notify, GuildLevel& out);
 
+// The payload of EventNotify::group_invite_declined() (hook GroupScript.OnInviteDeclined): the player that declined; false when the notify carries none.
+bool DecodeDecline(forever_module::EventNotify const& notify, std::uint64_t& decliner);
+
 // The payload of EventNotify::lfg_queue() (hook LfgScript.OnQueueUpdate); false when the notify carries none.
 bool Decode(forever_module::EventNotify const& notify, lfg_queue_fill::Queue& out);
 
