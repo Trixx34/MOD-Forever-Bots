@@ -22,6 +22,8 @@
 #include "whisper_matrix.h"
 #include "path_jitter.h"
 #include "guild_milestone.h"
+#include "city_inspect.h"
+#include "quest_invite.h"
 #include "realism.h"
 #include "taxi_policy.h"
 
@@ -225,6 +227,8 @@ struct BotSettings
     path_jitter::Settings PathJitter;
     guild_milestone::Settings GuildMilestone;
     std::string GuildMilestoneFile = "data/guild_milestones.txt";
+    city_inspect::Settings CityInspect;
+    quest_invite::Settings QuestInvite;
     // ADVISOR-MEMBERS
     // Supplies (layout 15, config keys Supplies, SupplyAmmoLow, SupplyAmmoTarget, SupplyFoodLow, SupplyFoodTarget, SupplyDrinkLow, SupplyDrinkTarget,
     // SupplyTripSec; off by default): bots buy ammunition, food and drink at vendors that sell what they can use, and eat and drink while resting.

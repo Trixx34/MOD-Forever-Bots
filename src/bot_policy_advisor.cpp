@@ -99,6 +99,62 @@ void BotPolicy::TurnAdvisor(DecideTick& tick, BotTurn& turn)
         }
     }
 
+    // Capital inspection (CityInspect) and quest group invites (QuestInvite): both look at the players near an idle bot.
+    bool const calm = turn.idle && bot.group_role != 1;
+    if (calm && ((_options.CityInspect.Enabled && _options.ItemLevelOf && _options.InCapital) || (_options.QuestInvite.Enabled && _options.SharedQuestObjective)))
+    {
+        bool const inCapital = _options.CityInspect.Enabled && _options.InCapital && _options.InCapital(bot.map_id, bot.pos_x, bot.pos_y);
+        std::uint32_t const botLevel = inCapital ? _options.ItemLevelOf(bot.guid) : 0;
+        for (forever_module::NearbyUnit const& unit : turn.nearby)
+        {
+            if (forever_module::UnitRefType(unit.guid) != 2 || unit.is_hostile)
+                continue;   // players only
+            float const distance = rotation::DistanceYards(bot, unit);
+            std::uint64_t const player = unit.guid & forever_module::kUnitRefCounterMask;
+            city_inspect::Emote emote{};
+            if (inCapital)
+            {
+                city_inspect::Facts facts;
+                facts.Idle = true;
+                facts.InCapital = true;
+                facts.BotItemLevel = botLevel;
+                facts.PlayerItemLevel = _options.ItemLevelOf(unit.guid);
+                facts.Distance = distance;
+                if (_cityInspect.Try(_options.CityInspect, facts, seed, bot.guid, player, bot.map_id, nowMs, emote))
+                {
+                    advisor::Order order;
+                    order.What = advisor::Kind::Emote;
+                    order.Bot = bot.guid;
+                    order.Target = player;
+                    order.Arg = static_cast<std::uint32_t>(emote);
+                    _advisorOrders.push_back(order);
+                    break;
+                }
+            }
+            if (_options.QuestInvite.Enabled && _options.SharedQuestObjective && bot.group_size < 5)
+            {
+                quest_invite::Facts facts;
+                facts.Idle = true;
+                facts.GroupFull = bot.group_size >= 5;
+                facts.Distance = distance;
+                facts.SameObjective = _options.SharedQuestObjective(bot.guid, unit.guid);
+                if (_questInvite.ShouldInvite(_options.QuestInvite, facts, unit.guid, nowMs))
+                {
+                    BotAction invite;
+                    invite.bot_guid = bot.guid;
+                    invite.type = ActionType::kGroup;
+                    invite.spell_id = kGroupInvite;   // the existing group action
+                    invite.target_guid = unit.guid;
+                    tick.actions.push_back(invite);
+                    _questInvite.NoteInvited(unit.guid, nowMs);
+                    if (_options.OnEvent)
+                        _options.OnEvent("quest_invite: bot=" + std::to_string(bot.guid) + " player=" + std::to_string(player));
+                    break;
+                }
+            }
+        }
+    }
+
     // Trade-chat crafting ad (TradeAds): a bot with a crafting skill posts a templated line now and then. Not in a party (the Trade channel is the zone's).
     if (_options.TradeAds.Enabled && _options.Pools && bot.group_role == 0 && !_options.Pools->TradeAds.empty())
     {

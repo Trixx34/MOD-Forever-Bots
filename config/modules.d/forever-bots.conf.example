@@ -183,6 +183,12 @@ Module.forever-bots.TelemetrySummarySec = 60
 #                         GuildMilestoneFile in guild chat, with the chance below; a second bot never answers the same event)
 # GuildMilestoneChancePct = 30
 # GuildMilestoneFile = data/guild_milestones.txt
+# CityInspect = 0        (an idle bot in a capital that sees a player within 20 yards wearing a higher-level item than its own salutes, applauds or cheers at
+#                         the player; needs the host to supply item levels and the capital test, see PolicyOptions::ItemLevelOf and InCapital: inert without them)
+# CityInspectChancePct = 5
+# CityInspectZoneMax = 2 (emotes a minute over all bots of one map; and no more than one bot per player per 5 minutes)
+# QuestInvite = 0        (an idle bot and a human on the same quest objective, the human within 30 yards: the bot invites the human to its group, once per
+#                         human per 30 minutes, never within 2 hours of a decline; needs the host to say who shares an objective, PolicyOptions::SharedQuestObjective)
 # ADVISOR-DOCS-ANCHOR
 # AuctionRoundStep = 0   (copper; 10000 rounds a goods unit price to a gold, half a gold or just under; 0 = off)
 # AuctionRoundMaxPct = 5 (how far the rounded price may lie from the computed one, and never below the vendor price)

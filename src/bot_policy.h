@@ -59,6 +59,8 @@
 #include "whisper_matrix.h"
 #include "path_jitter.h"
 #include "guild_milestone.h"
+#include "city_inspect.h"
+#include "quest_invite.h"
 #include "realism.h"
 #include "taxi_policy.h"
 
@@ -304,6 +306,12 @@ struct PolicyOptions
     whisper_matrix::Settings WhisperMatrix;
     path_jitter::Settings PathJitter;
     guild_milestone::Settings GuildMilestone;
+    city_inspect::Settings CityInspect;
+    quest_invite::Settings QuestInvite;
+    // Facts the core's snapshot does not carry, supplied by the host for CityInspect and QuestInvite. Unset: those two features do nothing.
+    std::function<std::uint32_t(std::uint64_t unitRef)> ItemLevelOf;                          // the best item level worn by a bot (its guid) or a player (unit reference); 0 unknown
+    std::function<bool(std::uint32_t map, float x, float y)> InCapital;                       // whether a place is inside a capital city
+    std::function<bool(std::uint64_t botGuid, std::uint64_t playerRef)> SharedQuestObjective;  // the bot and the player are on the same objective of the same quest
     // ADVISOR-OPTIONS
     // Advisor features (docs: config/modules.d/forever-bots.conf.example, "Advisor features"; each off by default). The line pools are read once at start.
     std::shared_ptr<advisor::Pools const> Pools;
@@ -421,6 +429,8 @@ public:
     // module learns which guild a bot is in only through NoteBotGuild (the core's snapshot does not carry it). Pump thread.
     void OnGuildMemberLevel(forever_module::WorldTickSnapshotView const& view, std::uint64_t guild, std::uint64_t member, std::uint32_t level, std::uint64_t nowMs);
     void NoteBotGuild(std::uint64_t bot, std::uint64_t guild) { _botGuild[bot] = guild; }
+    // A player declined (or left) the group a bot invited it to for a shared quest objective (QuestInvite): no new invite for 2 hours. `playerRef` is a unit reference.
+    void NoteQuestInviteDeclined(std::uint64_t playerRef, std::uint64_t nowMs) { _questInvite.NoteDeclined(playerRef, nowMs); }
     void OnLfgQueue(forever_module::WorldTickSnapshotView const& view, lfg_queue_fill::Queue const& queue, std::uint64_t nowMs);
     void NoteSocialOutcome(social::Outcome const& outcome, std::uint64_t nowMs);
     // Facts the core's snapshot does not carry: a player challenged the bot to a duel (Duels accepts it), a player is to be thanked with a gift
@@ -824,6 +834,8 @@ private:
     whisper_matrix::Matrix _whisperMatrix;                      // repeat avoidance of the matrix replies
     std::vector<whisper_matrix::Template> _whisperTemplates;    // parsed from Pools->WhisperReplies on first use
     bool _whisperTemplatesLoaded = false;
+    city_inspect::Inspector _cityInspect;                       // limits of the capital emotes
+    quest_invite::Memory _questInvite;                          // who was invited and who declined
     guild_milestone::Speaker _guildSpeaker;                     // one bot answers one level event
     std::map<std::uint64_t, std::uint64_t> _botGuild;           // bot -> guild guid, from NoteBotGuild
     lfg_queue_fill::Limiter _lfgQueueLimiter;           // one bot per queue per cooldown

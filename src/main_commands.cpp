@@ -308,19 +308,19 @@ void SetUpTrade(forever_module::ModuleClient& client, std::shared_ptr<trade::Tra
             }
         }
     };
-    client.OnNotify("GuildScript.OnMemberLevel", [commands, &settings](forever_module::EventNotify const& notify)
+    client.OnNotify("GuildScript.OnMemberLevel", [commands](forever_module::EventNotify const& notify)
     {
         advisor::GuildLevel level;
-        if (!settings.GuildMilestone.Enabled || !advisor::Decode(notify, level))
+        if (!advisor::Decode(notify, level))
             return;
         std::lock_guard<std::mutex> lock(commands->Lock);
         if (commands->GuildLevels.size() < 64)
             commands->GuildLevels.push_back(level);
     });
-    client.OnNotify("LfgScript.OnQueueUpdate", [commands, &settings](forever_module::EventNotify const& notify)
+    client.OnNotify("LfgScript.OnQueueUpdate", [commands](forever_module::EventNotify const& notify)
     {
         lfg_queue_fill::Queue queue;
-        if (!settings.LfgQueueFill.Enabled || !advisor::Decode(notify, queue))
+        if (!advisor::Decode(notify, queue))
             return;
         std::lock_guard<std::mutex> lock(commands->Lock);
         if (commands->LfgQueues.size() < 32)

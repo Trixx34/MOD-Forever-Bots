@@ -139,6 +139,8 @@ void LoadPolicyTables(PolicyOptions& policyOptions, BotSettings& settings)
     policyOptions.WhisperMatrix = settings.WhisperMatrix;
     policyOptions.PathJitter = settings.PathJitter;
     policyOptions.GuildMilestone = settings.GuildMilestone;
+    policyOptions.CityInspect = settings.CityInspect;
+    policyOptions.QuestInvite = settings.QuestInvite;
     // ADVISOR-COPY
     // ADVISOR-POOLS
     if (settings.GuildMilestone.Enabled)

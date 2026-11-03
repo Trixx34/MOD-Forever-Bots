@@ -34,7 +34,7 @@ target_link_libraries(forever_bots_settings PUBLIC forever_bots_policy)
 add_library(forever_bots_store STATIC src/bot_store.cpp)
 target_include_directories(forever_bots_store PUBLIC src)
 
-add_library(forever_bots_policy STATIC src/bot_policy.cpp src/bot_policy_result.cpp src/bot_policy_chat.cpp src/bot_policy_spells.cpp src/bot_policy_units.cpp src/bot_policy_turn_life.cpp src/bot_policy_turn_dead.cpp src/bot_policy_turn_target.cpp src/bot_policy_turn_move.cpp src/bot_policy_turn_town.cpp src/bot_policy_turn_cast.cpp src/chat_commands.cpp src/combat_rotation.cpp src/quest_data.cpp src/quest_planner.cpp src/scenario.cpp src/grind_data.cpp src/supply_policy.cpp src/auction_policy.cpp src/taxi_policy.cpp src/dungeon_events.cpp src/chat_say.cpp src/errand_policy.cpp src/sell_policy.cpp src/errand_trainers.cpp src/spell_costs.cpp src/crafting_foci.cpp src/ground_avoid.cpp src/tame_beasts.cpp src/level_dungeon.cpp src/duels.cpp src/battlegrounds.cpp src/inn_downtime.cpp src/guild_join.cpp src/mail_gifts.cpp src/riding_training.cpp src/weapon_training.cpp src/fishing.cpp src/rare_hunts.cpp src/ambient_chat.cpp src/chat_reply.cpp src/lfg_fill.cpp src/bot_brackets.cpp src/gather_nodes.cpp src/bot_policy_features.cpp src/bot_policy_social.cpp src/social_actions.cpp src/realism.cpp src/advisor_text.cpp src/advisor_send.cpp src/lfg_queue_fill.cpp src/death_pause.cpp src/trade_ads.cpp src/party_mana.cpp src/whisper_matrix.cpp src/path_jitter.cpp src/ah_batch.cpp src/guild_milestone.cpp src/bot_policy_advisor.cpp)
+add_library(forever_bots_policy STATIC src/bot_policy.cpp src/bot_policy_result.cpp src/bot_policy_chat.cpp src/bot_policy_spells.cpp src/bot_policy_units.cpp src/bot_policy_turn_life.cpp src/bot_policy_turn_dead.cpp src/bot_policy_turn_target.cpp src/bot_policy_turn_move.cpp src/bot_policy_turn_town.cpp src/bot_policy_turn_cast.cpp src/chat_commands.cpp src/combat_rotation.cpp src/quest_data.cpp src/quest_planner.cpp src/scenario.cpp src/grind_data.cpp src/supply_policy.cpp src/auction_policy.cpp src/taxi_policy.cpp src/dungeon_events.cpp src/chat_say.cpp src/errand_policy.cpp src/sell_policy.cpp src/errand_trainers.cpp src/spell_costs.cpp src/crafting_foci.cpp src/ground_avoid.cpp src/tame_beasts.cpp src/level_dungeon.cpp src/duels.cpp src/battlegrounds.cpp src/inn_downtime.cpp src/guild_join.cpp src/mail_gifts.cpp src/riding_training.cpp src/weapon_training.cpp src/fishing.cpp src/rare_hunts.cpp src/ambient_chat.cpp src/chat_reply.cpp src/lfg_fill.cpp src/bot_brackets.cpp src/gather_nodes.cpp src/bot_policy_features.cpp src/bot_policy_social.cpp src/social_actions.cpp src/realism.cpp src/advisor_text.cpp src/advisor_send.cpp src/lfg_queue_fill.cpp src/death_pause.cpp src/trade_ads.cpp src/party_mana.cpp src/whisper_matrix.cpp src/path_jitter.cpp src/ah_batch.cpp src/guild_milestone.cpp src/city_inspect.cpp src/quest_invite.cpp src/bot_policy_advisor.cpp)
 target_include_directories(forever_bots_policy PUBLIC src)
 target_link_libraries(forever_bots_policy PUBLIC forever_module_sdk)
 
@@ -331,3 +331,11 @@ add_test(NAME ah_batch COMMAND ah_batch_test)
 add_executable(guild_milestone_test tests/guild_milestone_test.cpp)
 target_link_libraries(guild_milestone_test PRIVATE forever_bots_policy)
 add_test(NAME guild_milestone COMMAND guild_milestone_test)
+
+add_executable(city_inspect_test tests/city_inspect_test.cpp)
+target_link_libraries(city_inspect_test PRIVATE forever_bots_policy)
+add_test(NAME city_inspect COMMAND city_inspect_test)
+
+add_executable(quest_invite_test tests/quest_invite_test.cpp)
+target_link_libraries(quest_invite_test PRIVATE forever_bots_policy)
+add_test(NAME quest_invite COMMAND quest_invite_test)
