@@ -112,9 +112,13 @@ void TestWriteAndRate()
     CHECK(live.Maybe(view, 5000, 1));                      // first call writes
     CHECK(!live.Maybe(view, 5500, 2));                     // too soon
     CHECK(live.Maybe(view, 6000, 3));                      // a second later
-    std::ifstream in(path);
     std::stringstream text;
-    text << in.rdbuf();
+    {
+        // closed before the folder is removed below: Windows cannot delete an open file, and the throwing remove_all ended the
+        // test with a fail-fast (0xc0000409) in forever-windows-package #34
+        std::ifstream in(path);
+        text << in.rdbuf();
+    }
     CHECK(Has(text.str(), "\"time_ms\":3"));
     CHECK(!fs::exists(path + ".tmp"));                     // the temporary file is gone
 
@@ -124,7 +128,8 @@ void TestWriteAndRate()
 
     BotLive bad(BotLive::Options{ (dir / "no-such-folder" / "x.json").string(), 1000, 400 });
     CHECK(!bad.Maybe(view, 1, 1));                         // an unwritable path fails quietly
-    fs::remove_all(dir);
+    std::error_code cleanup;
+    fs::remove_all(dir, cleanup);                          // a leftover temp folder must not fail the test
 }
 
 } // namespace
