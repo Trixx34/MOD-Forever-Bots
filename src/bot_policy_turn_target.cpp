@@ -138,12 +138,38 @@ void BotPolicy::TurnQuestsAndHold(DecideTick& tick, BotTurn& turn)
                     _options.OnEvent("regroup_start: leader=" + std::to_string(bot.guid) + " reason=" + (deadWaitKind != 0 ? "dead_member" : "member_far") +
                                      " far=" + std::to_string(farMembers));
             }
+            // 0.44.5: while a regroup lasts, one line per kRegroupLogMs with every member's place, so the log shows why followers trail the leader
+            // (where they stand, whether they move, fight or are stuck), not just that they do. Read-only: it changes nothing the policy does.
+            if (state.RegroupSinceMs != 0 && _options.OnEvent && (state.RegroupLastLogMs == 0 || nowMs - state.RegroupLastLogMs >= kRegroupLogMs))
+            {
+                state.RegroupLastLogMs = nowMs;
+                std::string line = "regroup_members: leader=" + std::to_string(bot.guid) + " why=" + (ready ? "far_or_dead" : not_ready_reason) + " t_ms=" +
+                                   std::to_string(nowMs - state.RegroupSinceMs) + " map=" + std::to_string(bot.map_id) + " at=" + std::to_string(int(bot.pos_x)) + "," +
+                                   std::to_string(int(bot.pos_y)) + "," + std::to_string(int(bot.pos_z)) + " moving=" + std::to_string(bot.moving) + " fight=" + std::to_string(bot.in_combat);
+                for (std::uint64_t member : membersOf[bot.guid])
+                {
+                    auto const at = indexOf.find(member);
+                    if (at == indexOf.end())
+                    {
+                        line += " | " + std::to_string(member) + " not_in_view";
+                        continue;
+                    }
+                    BotSnapshot const& m = view.bots[at->second];
+                    line += " | " + std::to_string(member) + " yd=" + std::to_string(int(Distance2d(bot, m))) + " at=" + std::to_string(int(m.pos_x)) + "," +
+                            std::to_string(int(m.pos_y)) + "," + std::to_string(int(m.pos_z)) + " life=" + std::to_string(m.life_state) + " hp=" +
+                            std::to_string(m.max_health > 0 ? std::uint64_t(m.health) * 100 / m.max_health : 0) + " pw=" +
+                            std::to_string(m.max_power > 0 ? std::uint64_t(m.power) * 100 / m.max_power : 0) + " mv=" + std::to_string(m.moving) + " fight=" +
+                            std::to_string(m.in_combat) + " stuck=" + std::to_string(state.RegroupStuck.count(member) != 0);
+                }
+                _options.OnEvent(line);
+            }
             if (ready && state.RegroupSinceMs != 0 && state.HoldSinceMs == 0 && farMembers == 0 && deadWaitKind == 0)
             {
                 if (_options.OnEvent)
                     _options.OnEvent("regroup_done: leader=" + std::to_string(bot.guid) + " waited_ms=" + std::to_string(nowMs - state.RegroupSinceMs) +
                                      " stuck=" + std::to_string(state.RegroupStuckCount));
                 state.RegroupSinceMs = 0;
+                state.RegroupLastLogMs = 0;
                 state.RegroupStuck.clear();
             }
             if (!ready)

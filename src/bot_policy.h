@@ -665,6 +665,7 @@ private:
         std::uint64_t RegroupSinceMs = 0;                // the party leader's regroup started at this time (a member dead or out of range; 0 = none)
         std::map<std::uint64_t, std::uint64_t> RegroupFarSinceMs; // member guid -> the time it was first out of range (cleared once it is back or dead)
         std::set<std::uint64_t> RegroupStuck;            // members out of range for kRegroupStuckMs in this regroup: the party does not wait for them
+        std::uint64_t RegroupLastLogMs = 0;              // the last regroup_members line (a snapshot of every member, every kRegroupLogMs while the regroup lasts)
         std::uint32_t RegroupStuckCount = 0;             // how many members were stuck in this regroup (for the regroup_done line)
         std::uint32_t TalentLevel = 0;                   // the level and role (1 to 3) of the last talent order sent for this bot (0 = none yet)
         std::uint32_t TalentRole = 0;

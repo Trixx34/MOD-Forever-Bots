@@ -921,19 +921,19 @@ void CountsWhereTheTimeGoes()
     step(5000);                                  // rest 5 s
     bots[1].health = 1000;
     bots[1].pos_x = bots[0].pos_x + 100.0f;
-    step(6000);                                  // far 6 s
+    step(4000);                                  // far 4 s
     bots[1].pos_x = bots[0].pos_x;
-    step(7000);                                  // idle 7 s
+    step(5000);                                  // idle 5 s (a step over kTimeStateMaxGapMs, 5 s, is not counted)
     step(60000);                                 // a gap over kTimeStateMaxGapMs is not counted
     bots[0].health = bots[1].health = bots[2].health = 0;
     bots[0].life_state = bots[1].life_state = bots[2].life_state = 1;
-    step(1000);                                  // a wipe ends the run
+    step(1000);                                  // a wipe ends the run; this last second counts as dead
     auto const result = director.TakeResult();
     CHECK(result.has_value());
     if (result)
     {
         std::printf("%s\n", FormatScenarioResult(*result).c_str());
-        CHECK(FormatScenarioResult(*result).find(" time_s=fight:2,walk:3,dead:5,rest:5,far:6,idle:7") != std::string::npos);
+        CHECK(FormatScenarioResult(*result).find(" time_s=fight:2,walk:3,dead:5,rest:5,far:4,idle:5") != std::string::npos);
     }
 }
 
