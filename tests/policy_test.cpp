@@ -2993,7 +2993,7 @@ void AMemberThatLostItsLeaderIsPutNextToIt()
     view.bots[0].pos_x = -200.0f;                                     // bot 10 is far away
     CHECK(!TeleportOf(policy.Decide(view, 1000), 10).has_value());    // not at once
     CHECK(!TeleportOf(policy.Decide(view, 10000), 10).has_value());
-    std::optional<BotAction> back = TeleportOf(policy.Decide(view, 32000), 10);      // after kLostLeaderMs (30 s)
+    std::optional<BotAction> back = TeleportOf(policy.Decide(view, 32000), 10);      // after kLostLeaderMs (15 s)
     CHECK(back.has_value() && back->dest_x == -3.0f);                 // next to the leader (3 yards behind it)
     CHECK(!TeleportOf(policy.Decide(view, 33000), 10).has_value());   // and not again at once
     // A member stuck past the distance the leader waits at (30 yards), but not far, is put back too: the leader would wait for it for good.
@@ -3163,8 +3163,8 @@ void ARegroupStopsWaitingForAStuckMember()
     };
     CHECK(LeaderWalk(policy.Decide(view, 1000)) == -1.0f);            // the party is not together: no walk
     CHECK(has("regroup_start: leader=12 reason=member_far far=1"));
-    CHECK(LeaderWalk(policy.Decide(view, 10000)) == -1.0f);           // not stuck yet (9 s out of range)
-    CHECK(LeaderWalk(policy.Decide(view, 22000)) == 100.0f);          // stuck (21 s): the leader walks on without it
+    CHECK(LeaderWalk(policy.Decide(view, 10000)) == -1.0f);           // not stuck yet (9 s out of range, kRegroupStuckMs is 10 s)
+    CHECK(LeaderWalk(policy.Decide(view, 22000)) == 100.0f);          // stuck (21 s, past kRegroupStuckMs): the leader walks on without it
     CHECK(has("regroup_stuck: leader=12 bot=10 "));
     policy.Decide(view, 23000);
     CHECK(!has("regroup_done:"));                                     // the regroup stays on while a member is out of range
@@ -3279,7 +3279,7 @@ void AFlippingPartyDoesNotHoldTheLeaderForever()
         pulled = HasAction(policy.Decide(view, now), 12, ActionType::kFollow, MakeUnitRef(8, 1, 7)) ||
                  HasAction(policy.Decide(view, now), 12, ActionType::kAttackTarget);
     }
-    CHECK(pulled);                                                    // the wait ends after kPullHoldMaxMs (120 s) of flipping
+    CHECK(pulled);                                                    // the wait ends after kPullHoldMaxMs (45 s) of flipping
 }
 
 void HealerHealsTheHurtMember()
@@ -5227,8 +5227,8 @@ void TheRouteWaitsForTheHealersMana()
         return false;
     };
     CHECK(!walks(policy.Decide(view, 1000), 12));
-    CHECK(!walks(policy.Decide(view, 61000), 12));
-    CHECK(walks(policy.Decide(view, 160000), 12)); // given up after 150 s
+    CHECK(!walks(policy.Decide(view, 41000), 12));
+    CHECK(walks(policy.Decide(view, 100000), 12)); // given up after 60 s
     // Mana full: the leader walks at once.
     BotPolicy full(options);
     full.SetRouteActive(true);

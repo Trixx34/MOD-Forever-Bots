@@ -212,7 +212,7 @@ constexpr std::uint64_t kBossHoldMs = 180000;     // how long the leader waits a
 // farther (stuck below a ramp the leader climbed) held the party for good when this was 60 (Ragefire Chasm and the Deadmines, 2026-10-26).
 constexpr float kLostLeaderYards = 30.0f;
 constexpr float kLostLeaderHeight = 25.0f;        // ... or this far above or below it (another level of the dungeon)
-constexpr std::uint64_t kLostLeaderMs = 30000;    // for this long, then it is put next to the leader (DungeonTeleport). Longer than kRegroupStuckMs: the leader has
+constexpr std::uint64_t kLostLeaderMs = 15000;    // for this long, then it is put next to the leader (DungeonTeleport). Longer than kRegroupStuckMs: the leader has
                                                   // flagged the member and walked on by then, so the teleport is not in the same second as the regroup_stuck line (0.36.2)
 constexpr float kRouteFarYards = 150.0f;           // a leader this far from a waypoint it gets no route to is not at the point: it is put back on the route instead of skipping
 constexpr std::uint32_t kRouteNoRouteSkip = 3;     // refusals in a row (no route) after which a dungeon waypoint is skipped
@@ -248,7 +248,7 @@ constexpr std::uint64_t kCcRefreshBeforeMs = 3000;
 constexpr float kRouteWaitYards = 30.0f;         // the leader waits for a member farther behind than this
 constexpr std::uint32_t kRouteMinHealthPct = 80; // and for its own health to be at least this
 constexpr std::uint32_t kRouteMinManaPct = 80;   // the leader walks on only when every mana user of the party has at least this much mana (the healer walked into fights at 3%)
-constexpr std::uint64_t kRouteManaMaxMs = 150000; // and never waits longer than this for mana (no drink left, or a member that cannot sit)
+constexpr std::uint64_t kRouteManaMaxMs = 60000;  // and never waits longer than this for mana (no drink left, or a member that cannot sit)
 constexpr std::uint32_t kRouteTopUpPct = 90;     // out of a fight, the party's healer heals the route leader up to this (above kRouteMinHealthPct, so it walks on)
 // A leader walking the route that has not moved this far in this long, out of combat, has a move that went nowhere (sent once, no answer; dm#6 of 2026-10-26 stood
 // 53 minutes so): the move is sent again and counted as a refusal (kRouteNoRouteSkip), so the point is recovered or skipped as for a "no route".
@@ -261,9 +261,9 @@ constexpr std::uint32_t kPartyReadyHealthPct = 90;  // every living member has a
 constexpr std::uint32_t kPartyReadyPowerPct = 95;   // and every mana user at least this much mana (matches drink cap)
 constexpr std::uint32_t kPartyReadySitHealthPct = 95; // a sitting member rests up to this much
 constexpr std::uint64_t kPullHoldClearMs = 10000;  // the party must be ready this long in a row before a pull hold ends
-constexpr std::uint64_t kPullHoldMaxMs = 120000;    // the party never waits longer than this for itself
+constexpr std::uint64_t kPullHoldMaxMs = 45000;     // the party never waits longer than this for itself
 constexpr float kRegroupClearYards = 20.0f;               // a stuck member counts as back only inside this (hysteresis: it trails the leader at about kRouteWaitYards)
-constexpr std::uint64_t kRegroupStuckMs = 20000;    // a member out of range this long is stuck: the party stops waiting for it (regroup, 0.35.0)
+constexpr std::uint64_t kRegroupStuckMs = 10000;    // a member out of range this long is stuck: the party stops waiting for it (regroup, 0.35.0)
 constexpr std::uint64_t kRegroupLogMs = 15000;      // a regroup logs where every member stands this often (regroup_members, 0.44.5)
 constexpr std::uint64_t kTankHeadStartMs = 2500;    // the others join a fight this long after the tank started it, so the tank has the threat
 // Healing: a healer class heals the party member with the lowest health below this share, within this range.
