@@ -140,9 +140,13 @@ add_executable(mail_gifts_test tests/mail_gifts_test.cpp)
 target_link_libraries(mail_gifts_test PRIVATE forever_bots_policy)
 add_test(NAME mail_gifts COMMAND mail_gifts_test)
 
-add_executable(social_test tests/social_test.cpp)
-target_link_libraries(social_test PRIVATE forever_bots_policy)
-add_test(NAME social COMMAND social_test)
+# social_test plays a fake core on a Unix socket (poll, read, sockaddr_un), which the Windows build has no header for; the Windows ModuleClient
+# transport is covered by the SDK's own tests. Left out on Windows so the module and its other tests build there (Windows package #33, 2026-11-04).
+if(NOT WIN32)
+    add_executable(social_test tests/social_test.cpp)
+    target_link_libraries(social_test PRIVATE forever_bots_policy)
+    add_test(NAME social COMMAND social_test)
+endif()
 
 add_executable(errand_test tests/errand_test.cpp)
 target_link_libraries(errand_test PRIVATE forever_bots_policy)
