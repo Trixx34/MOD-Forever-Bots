@@ -15,6 +15,7 @@
 
 #include "forever_module/tier2_session.h"
 
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <map>
@@ -122,8 +123,26 @@ struct ScenarioResult
     std::vector<std::string> BossesKilled; // names of the ones seen dead, in the order they were seen
     // The same bosses with the time into the run they were seen dead (ms), in that order: boss_ms=Name:ms in the result line, so a clear's pace is in the log.
     std::vector<std::pair<std::string, std::uint64_t>> BossKillMs;
+    // Where the run's time went (ms per state, in kTimeStateNames order): time_s= in the result line. See TimeState.
+    std::array<std::uint64_t, 6> StateMs = {};
     std::vector<std::pair<std::uint32_t, std::uint32_t>> Party; // race and class id of each member, in the order first seen
 };
+
+// Where a dungeon run's time goes, from the snapshots alone (one state per tick, first match wins; the time between two ticks goes to the state
+// of the later one, a gap over kTimeStateMaxGapMs is not counted):
+//   fight  a living member is in combat
+//   walk   the leader is moving
+//   dead   a member is down (corpse or ghost): the party waits for the release, the rez or the corpse run
+//   rest   a living member is under kTimeRestHealthPct health or (a mana user) kTimeRestPowerPct mana: the party waits for it to regenerate
+//   far    a living member is more than kTimeFarYards from the leader: the party waits for it to catch up
+//   idle   none of those: an event (lever, door), a boss hold, a path being found, casting
+// The thresholds are the policy's (kPartyReadyHealthPct, kPartyReadyPowerPct, kRouteWaitYards) so "rest" and "far" are the holds the leader logs as route_hold.
+enum class TimeState : std::size_t { Fight, Walk, Dead, Rest, Far, Idle, Count };
+constexpr char const* kTimeStateNames[] = { "fight", "walk", "dead", "rest", "far", "idle" };
+constexpr std::uint32_t kTimeRestHealthPct = 90;
+constexpr std::uint32_t kTimeRestPowerPct = 95;
+constexpr float kTimeFarYards = 30.0f;
+constexpr std::uint64_t kTimeStateMaxGapMs = 5000;
 
 constexpr std::uint64_t kDressPauseMs = 1500;
 constexpr std::uint64_t kEquipPauseMs = 3000;
@@ -222,6 +241,8 @@ private:
     std::map<std::uint64_t, std::uint32_t> _grantSeqSeen; // bot -> last_action_sequence of the last grant result looked at
     std::set<std::uint64_t> _grantRefusedBy;               // bots whose dressing grant the core refused
     std::vector<std::pair<std::string, std::uint64_t>> _bossKillMs; // boss name and ms into the run, in the order seen dead
+    std::array<std::uint64_t, 6> _stateMs = {};                     // ms per TimeState while Running
+    std::uint64_t _stateLastMs = 0;                                 // the last tick that was counted
     ScenarioPhase _phase = ScenarioPhase::Waiting;
     std::uint64_t _phaseSinceMs = 0;
     bool _phaseStarted = false;
@@ -282,6 +303,6 @@ private:
 };
 
 // One line of text for the log: "scenario <name>: outcome=... furthest=3/7 deaths=2 alive=3/5 events=3 revived=1 wipes=0 ghosts=0 run=412s",
-// then " raid=1 groups=8" for a raid scenario (doc 108; nothing for a dungeon one), then ' | roster=<race>:<class>,... classes=<sorted ids>
+// then " time_s=fight:40,walk:900,..." (seconds per TimeState, only for a run that reached Running), then " raid=1 groups=8" for a raid scenario (doc 108; nothing for a dungeon one), then ' | roster=<race>:<class>,... classes=<sorted ids>
 // combo=<sorted ids joined by -> ' when the party is known.
 std::string FormatScenarioResult(ScenarioResult const& result);

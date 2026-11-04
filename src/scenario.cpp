@@ -54,6 +54,7 @@ void ScenarioDirector::Finish(std::string outcome, std::uint64_t nowMs)
     result.BossesTotal = std::uint32_t(_plan.Bosses.size());
     result.BossesKilled = _bossKills;
     result.BossKillMs = _bossKillMs;
+    result.StateMs = _stateMs;
     for (auto const& [guid, dead] : _everDead)
         if (dead)
             ++result.Deaths;
@@ -637,6 +638,43 @@ void ScenarioDirector::Decide(forever_module::WorldTickSnapshotView const& view,
                     if (Reached(bot, _plan.Route[i]))
                         _furthest = std::max<std::uint32_t>(_furthest, std::uint32_t(i + 1));
             }
+            // Where the time goes: one state for this tick (see TimeState).
+            if (leader)
+            {
+                if (_stateLastMs != 0 && nowMs > _stateLastMs && nowMs - _stateLastMs <= kTimeStateMaxGapMs)
+                {
+                    TimeState state = TimeState::Idle;
+                    bool fight = false, down = false, rest = false, far = false;
+                    for (BotSnapshot const& bot : bots)
+                    {
+                        if (bot.life_state != 0)
+                        {
+                            down = true;
+                            continue;
+                        }
+                        fight = fight || bot.in_combat != 0;
+                        rest = rest || (bot.max_health > 0 && std::uint64_t(bot.health) * 100 < std::uint64_t(bot.max_health) * kTimeRestHealthPct) ||
+                               (bot.power_type == 0 && bot.max_power > 0 && std::uint64_t(bot.power) * 100 < std::uint64_t(bot.max_power) * kTimeRestPowerPct);
+                        if (&bot != leader && leader->life_state == 0)
+                        {
+                            float const dx = bot.pos_x - leader->pos_x, dy = bot.pos_y - leader->pos_y;
+                            far = far || dx * dx + dy * dy > kTimeFarYards * kTimeFarYards;
+                        }
+                    }
+                    if (fight)
+                        state = TimeState::Fight;
+                    else if (leader->life_state == 0 && leader->moving != 0)
+                        state = TimeState::Walk;
+                    else if (down)
+                        state = TimeState::Dead;
+                    else if (rest)
+                        state = TimeState::Rest;
+                    else if (far)
+                        state = TimeState::Far;
+                    _stateMs[std::size_t(state)] += nowMs - _stateLastMs;
+                }
+                _stateLastMs = nowMs;
+            }
             // A boss counts as killed once any bot sees its corpse (a creature of that entry with no health).
             if (!_plan.Bosses.empty())
             {
@@ -750,6 +788,17 @@ std::string FormatScenarioResult(ScenarioResult const& result)
         << " deaths=" << result.Deaths << " alive=" << result.Alive << "/" << result.RosterSize << " events=" << result.DeathEvents
         << " revived=" << result.Revived << " wipes=" << result.Wipes << " ghosts=" << result.Ghosts << " run=" << result.RunMs / 1000 << "s"
         << " party=" << (result.PartyFormed ? "yes" : "no");
+    {
+        std::uint64_t total = 0;
+        for (std::uint64_t const ms : result.StateMs)
+            total += ms;
+        if (total != 0)
+        {
+            out << " time_s=";
+            for (std::size_t i = 0; i < result.StateMs.size(); ++i)
+                out << (i ? "," : "") << kTimeStateNames[i] << ":" << result.StateMs[i] / 1000;
+        }
+    }
     // 40-man raid support (doc 108): raid=1 groups=<n> for a raid scenario, nothing extra for a dungeon one (acceptance criteria).
     if (result.Raid)
         out << " raid=1 groups=" << result.Groups;

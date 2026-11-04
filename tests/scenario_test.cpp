@@ -882,6 +882,60 @@ void CountsBossesSeenDead()
     CHECK(FormatScenarioResult(*result).find(" | roster=2:1,5:5,5:5 classes=1,5,5 combo=1-5-5") != std::string::npos);
 }
 
+// time_s=: each tick of the Running phase goes to one state, fight first, then walk, dead, rest, far, idle.
+void CountsWhereTheTimeGoes()
+{
+    ScenarioDirector director(Plan());
+    std::vector<BotAction> actions;
+    std::vector<BotSnapshot> bots = { Bot(1, 36, 0, 0, 2, 3), Bot(2, 36, 0, 0, 1, 3), Bot(3, 36, 0, 0, 1, 3) };
+    std::uint64_t t = 1000, tick = 1;
+    for (int i = 0; i < 12 && director.Phase() != ScenarioPhase::Running; ++i)
+        director.Decide(View(++tick, bots), t += 3000, actions);
+    CHECK(director.Phase() == ScenarioPhase::Running);
+    for (BotSnapshot& bot : bots)
+    {
+        bot.max_health = 1000;
+        bot.health = 1000;
+        bot.max_power = 0;
+        bot.in_combat = 0;
+        bot.moving = 0;
+    }
+    auto step = [&](std::uint64_t advance)
+    {
+        actions.clear();
+        director.Decide(View(++tick, bots), t += advance, actions);
+    };
+    step(1000);                                  // the first tick only starts the clock
+    bots[1].in_combat = 1;
+    step(2000);                                  // fight 2 s
+    bots[1].in_combat = 0;
+    bots[0].moving = 1;
+    step(3000);                                  // walk 3 s
+    bots[0].moving = 0;
+    bots[2].life_state = 1;
+    bots[2].health = 0;
+    step(4000);                                  // dead 4 s
+    bots[2].life_state = 0;
+    bots[2].health = 1000;
+    bots[1].health = 500;
+    step(5000);                                  // rest 5 s
+    bots[1].health = 1000;
+    bots[1].pos_x = bots[0].pos_x + 100.0f;
+    step(6000);                                  // far 6 s
+    bots[1].pos_x = bots[0].pos_x;
+    step(7000);                                  // idle 7 s
+    step(60000);                                 // a gap over kTimeStateMaxGapMs is not counted
+    bots[0].health = bots[1].health = bots[2].health = 0;
+    bots[0].life_state = bots[1].life_state = bots[2].life_state = 1;
+    step(1000);                                  // a wipe ends the run
+    auto const result = director.TakeResult();
+    CHECK(result.has_value());
+    if (result)
+    {
+        CHECK(FormatScenarioResult(*result).find(" time_s=fight:2,walk:3,dead:5,rest:5,far:6,idle:7") != std::string::npos);
+    }
+}
+
 void Down(BotSnapshot& bot, std::uint8_t life = 1)
 {
     bot.life_state = life;
@@ -1562,6 +1616,7 @@ int main()
     BagGearIsNotAskedForAltsTheDeadOrBotsInACombat();
     ARequestAsksAtOnceAndOnlyOnce();
     AFullGearPassAndABagPassNeverShareATick();
+    CountsWhereTheTimeGoes();
     NoCastWhileAnotherCastRuns();
     StopsBeforeASpellWithACastTimeWhileMoving();
     RefusedAsMovingIsLearnedAndRetriedSoon();
