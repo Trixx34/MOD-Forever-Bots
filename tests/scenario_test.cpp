@@ -932,6 +932,7 @@ void CountsWhereTheTimeGoes()
     CHECK(result.has_value());
     if (result)
     {
+        std::printf("%s\n", FormatScenarioResult(*result).c_str());
         CHECK(FormatScenarioResult(*result).find(" time_s=fight:2,walk:3,dead:5,rest:5,far:6,idle:7") != std::string::npos);
     }
 }
