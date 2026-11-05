@@ -532,6 +532,13 @@ void BotPolicy::RouteLeaderRecover(DecideTick& tick, BotTurn& turn, RouteLeg& ro
             atEntry = true;
     if (!atEntry)
         state.LeaderRecoverWaitSinceMs = 0;
+    // 0.44.8: the Deadmines run of 2026-11-05 (06:53-07:55) had 103 stretches of a leader at the entrance (median 60 s, 120 min over 18 parties), and in 28 % of the lines
+    // every member further in was in a fight, which kept the leader out (a member in a fight was never a target). After kLeaderRecoverCombatMs at the entrance a member in a fight is a target too.
+    if (!atEntry)
+        state.AtEntrySinceMs = 0;
+    else if (state.AtEntrySinceMs == 0)
+        state.AtEntrySinceMs = nowMs;
+    bool const fightingMemberOk = atEntry && state.AtEntrySinceMs != 0 && nowMs - state.AtEntrySinceMs >= kLeaderRecoverCombatMs;
     if (!recovering && atEntry && nowMs >= state.NextRecoverMs)
         if (auto const dungeon = _options.DungeonsByMap.find(bot.map_id); dungeon != _options.DungeonsByMap.end())
             for (std::uint64_t member : membersOf[bot.guid])
@@ -540,7 +547,7 @@ void BotPolicy::RouteLeaderRecover(DecideTick& tick, BotTurn& turn, RouteLeg& ro
                 if (at == indexOf.end())
                     continue;
                 BotSnapshot const& other = view.bots[at->second];
-                if (other.life_state != 0 || other.in_combat != 0 || other.map_id != bot.map_id || DistanceTo(other, dungeon->second.Entry) <= kLostLeaderYards)
+                if (other.life_state != 0 || (other.in_combat != 0 && !fightingMemberOk) || other.map_id != bot.map_id || DistanceTo(other, dungeon->second.Entry) <= kLostLeaderYards)
                     continue;
                 if (!strong)
                 {

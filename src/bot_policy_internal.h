@@ -376,6 +376,7 @@ constexpr std::uint32_t kOutOfCombatReviveTries = 3;       // and after this man
 constexpr std::uint64_t kDungeonEntryWaitMs = 90000;       // a ghost of a dungeon party waits this long at the instance entrance for its revive, then walks to its corpse as before
 constexpr std::uint64_t kEntryTeleportRetryMs = 5000;      // the next try of the teleport to the entrance, while it is refused or the ghost is not there yet
 constexpr float kEntryYards = 15.0f;                        // a ghost this close to the entrance is at it
+constexpr std::uint64_t kLeaderRecoverCombatMs = 15000;   // a leader at the entrance this long goes to a member who is in a fight too (0.44.8)
 constexpr std::uint64_t kLeaderRecoverMaxWaitMs = 120000;  // a revived leader rests at the entrance this long at most before it goes to its party (kRouteMinHealthPct first)
 // A ghost cannot be attacked; the body it reclaims can: it comes back alive at about half health, on the spot where it died, next to whatever killed it (on the sim a tank was
 // killed seven times in a row by the same scout, each time minutes after its reclaim). A ghost therefore waits, up to this long, while a live hostile stands this close to it.

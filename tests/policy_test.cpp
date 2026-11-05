@@ -3048,6 +3048,35 @@ void ALeaderRevivedAtTheEntranceGoesToItsParty()
     CHECK(!member.has_value());                                       // the members are not sent to the entrance
 }
 
+// 0.44.8: a leader at the entrance goes to a party that is in a fight, but only after 15 s at the entrance.
+void ALeaderAtTheEntranceGoesToAFightingPartyAfterAWhile()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.ClassOf = WarriorLeads;
+    options.DungeonTeleport = true;
+    options.Route = { Point{ 220.0f, 0.0f, 0.0f }, Point{ 260.0f, 0.0f, 0.0f } };
+    PolicyOptions::DungeonRoute dungeon;
+    dungeon.HasEntry = true;
+    dungeon.Entry = Point{ 0.0f, 0.0f, 0.0f };
+    options.DungeonsByMap[36] = dungeon;
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    for (BotSnapshot& bot : view.bots)
+    {
+        bot.map_id = 36;
+        bot.pos_x = 200.0f;
+        bot.in_combat = 1;                                            // the whole party fights
+    }
+    view.bots[2].pos_x = 2.0f;                                        // the leader (12) at the entrance
+    view.bots[2].in_combat = 0;
+    CHECK(!TeleportOf(policy.Decide(view, 1000), 12).has_value());    // just arrived: not yet
+    CHECK(!TeleportOf(policy.Decide(view, 9000), 12).has_value());
+    std::optional<BotAction> leader = TeleportOf(policy.Decide(view, 17000), 12);
+    CHECK(leader.has_value() && leader->dest_x == 197.0f);           // 16 s on: next to a member
+}
+
 // The Stockade's revived tank (2026-10-28 sim: 31 of 96 tank deaths came within 120 s of the same tank's last one, 24 of 60 leader_recover teleports ended in its death):
 // a leader revived at the entrance at half health rests there until it is fit to walk (80 %), at most two minutes, and the members deep in the dungeon do not walk back to it.
 void ARevivedLeaderRestsAtTheEntranceBeforeItGoesToItsParty()
@@ -6320,6 +6349,7 @@ int main()
     ALeaderWithNoRouteIsPutBackOnTheRouteOnce();
     AMemberThatLostItsLeaderIsPutNextToIt();
     ALeaderRevivedAtTheEntranceGoesToItsParty();
+    ALeaderAtTheEntranceGoesToAFightingPartyAfterAWhile();
     ARevivedLeaderRestsAtTheEntranceBeforeItGoesToItsParty();
     ALeaderThatDoesNotMoveIsNoticed();
     TankLeadParsesAsAnOrderOfTheTank();
