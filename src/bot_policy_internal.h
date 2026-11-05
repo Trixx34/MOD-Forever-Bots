@@ -264,6 +264,7 @@ constexpr std::uint64_t kPullHoldClearMs = 10000;  // the party must be ready th
 constexpr std::uint64_t kPullHoldMaxMs = 45000;     // the party never waits longer than this for itself
 constexpr float kRegroupClearYards = 20.0f;               // a stuck member counts as back only inside this (hysteresis: it trails the leader at about kRouteWaitYards)
 constexpr std::uint64_t kRegroupStuckMs = 10000;    // a member out of range this long is stuck: the party stops waiting for it (regroup, 0.35.0)
+constexpr std::uint64_t kConsumeLogMs = 30000;     // consume_check: one line per held bot per 30 s
 constexpr std::uint64_t kRegroupLogMs = 15000;      // a regroup logs where every member stands this often (regroup_members, 0.44.5)
 constexpr std::uint64_t kTankHeadStartMs = 2500;    // the others join a fight this long after the tank started it, so the tank has the threat
 // Healing: a healer class heals the party member with the lowest health below this share, within this range.

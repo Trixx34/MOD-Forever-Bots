@@ -531,6 +531,13 @@ void BotPolicy::TurnRestAndConsume(DecideTick& tick, BotTurn& turn)
         std::uint32_t what = supply::ConsumeNow(consumeSettings, supplyFacts, healthPct, manaPct);
         if (what == 0)
             what = supply::BandageNow(_options.Supplies, supplyFacts, healthPct); // layout 16: no food to eat, so a bandage
+        if (holdIdle && _options.OnEvent && nowMs - state.ConsumeLoggedMs >= kConsumeLogMs)
+        {
+            state.ConsumeLoggedMs = nowMs; // 0.44.8: what a held, sitting bot has and does (the 0.44.7 runs gave no sign that the food and drink were used)
+            _options.OnEvent("consume_check: bot=" + std::to_string(bot.guid) + " hp=" + std::to_string(healthPct) + " pw=" + std::to_string(manaPct) +
+                             " mana_user=" + std::to_string(manaUser ? 1 : 0) + " food=" + std::to_string(supplyFacts.FoodCount) + " drink=" + std::to_string(supplyFacts.DrinkCount) +
+                             " what=" + std::to_string(what));
+        }
         if (what != 0)
         {
             BotAction eat;
