@@ -28,6 +28,7 @@
 // when it has none of its own. Party actions are sent only out of combat.
 #pragma once
 
+#include "role_profile.h"
 #include "forever_module/tier2_session.h"
 #include "chat_commands.h"
 #include "chat_reply.h"
@@ -435,6 +436,9 @@ public:
     void NoteGuildLeaveRequest(std::uint64_t bot);
 
 private:
+    // The rest, drink and ready marks of this bot: its play style (class and set role) picks the row of role_profile.h.
+    role_profile::Profile ProfileOfBot(std::uint64_t guid) const;
+
     struct Decision
     {
         forever_module::ActionType Type = forever_module::ActionType::kStop;

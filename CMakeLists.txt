@@ -315,6 +315,10 @@ target_link_libraries(trade_ads_test PRIVATE forever_bots_policy)
 target_compile_definitions(trade_ads_test PRIVATE FOREVER_BOTS_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
 add_test(NAME trade_ads COMMAND trade_ads_test)
 
+add_executable(role_profile_test tests/role_profile_test.cpp)
+target_link_libraries(role_profile_test PRIVATE forever_bots_policy)
+add_test(NAME role_profile COMMAND role_profile_test)
+
 add_executable(party_mana_test tests/party_mana_test.cpp)
 target_link_libraries(party_mana_test PRIVATE forever_bots_policy)
 add_test(NAME party_mana COMMAND party_mana_test)

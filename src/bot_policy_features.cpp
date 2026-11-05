@@ -532,3 +532,19 @@ std::vector<std::string> BotPolicy::ApplyLfg(WorldTickSnapshotView const& view, 
         line += ". Invite the bots next to you.";
     return { line };
 }
+
+role_profile::Profile BotPolicy::ProfileOfBot(std::uint64_t guid) const
+{
+    role_profile::PlayedRole role = role_profile::PlayedRole::Auto;
+    if (auto const state = _bots.find(guid); state != _bots.end())
+    {
+        switch (state->second.Role_)
+        {
+            case BotState::Role::Tank: role = role_profile::PlayedRole::Tank; break;
+            case BotState::Role::Healer: role = role_profile::PlayedRole::Healer; break;
+            case BotState::Role::Dps: role = role_profile::PlayedRole::Dps; break;
+            default: break;
+        }
+    }
+    return role_profile::ProfileFor(ClassFor(_options, guid), role);
+}
