@@ -3,6 +3,7 @@
 #include "role_profile.h"
 
 #include <cstdio>
+#include <initializer_list>
 
 using namespace role_profile;
 
