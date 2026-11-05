@@ -395,7 +395,14 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
     {
         auto const cast = state.CastTarget.find(spell);
         std::uint64_t const target = cast == state.CastTarget.end() ? 0 : cast->second;
+        // The level and what the highest rank of this spell at that level costs (the file's flat cost, -1 when unpriced): a cast whose real power drop
+        // is the rank 1 cost at level 23 shows the bot never learned the higher ranks.
+        std::int64_t wantCost = -1;
+        if (_options.SpellCosts)
+            if (auto const pay = _options.SpellCosts->CostAtLevel(spell, bot.level))
+                wantCost = pay->Cost;
         _options.OnEvent("cast_result: time_ms=" + std::to_string(nowMs) + " bot=" + std::to_string(bot.guid) + " spell=" + std::to_string(spell) +
+                         " level=" + std::to_string(bot.level) + " want_cost=" + std::to_string(wantCost) +
                          " target=" + std::to_string(target) + " status=" + ActionStatusName(bot.last_action_status) +
                          " hp=" + std::to_string(bot.health) + "/" + std::to_string(bot.max_health) +
                          " power=" + std::to_string(bot.power) + "/" + std::to_string(bot.max_power));
