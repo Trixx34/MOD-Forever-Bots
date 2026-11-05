@@ -520,7 +520,15 @@ void BotPolicy::TurnRestAndConsume(DecideTick& tick, BotTurn& turn)
     {
         std::uint32_t const healthPct = bot.max_health > 0 ? std::uint32_t(std::uint64_t(bot.health) * 100 / bot.max_health) : 100;
         std::uint32_t const manaPct = manaUser && bot.max_power > 0 ? std::uint32_t(std::uint64_t(bot.power) * 100 / bot.max_power) : 100;
-        std::uint32_t what = supply::ConsumeNow(_options.Supplies, supplyFacts, healthPct, manaPct);
+        // A party held for itself (a dungeon pull hold or regroup) eats and drinks up to the marks the hold waits for (kPartyReadyHealthPct, kPartyReadyPowerPct), not
+        // only below the normal 70 % / 40 %: the Deadmines runs sat between the two for minutes on sitting regeneration alone (health stuck at 74 %, mana 0 to 40 % in 20 min).
+        supply::Settings consumeSettings = _options.Supplies;
+        if (holdIdle)
+        {
+            consumeSettings.EatBelowHealthPct = std::max<std::uint32_t>(consumeSettings.EatBelowHealthPct, kPartyReadyHealthPct - 1);
+            consumeSettings.DrinkBelowManaPct = std::max<std::uint32_t>(consumeSettings.DrinkBelowManaPct, kPartyReadyPowerPct - 1);
+        }
+        std::uint32_t what = supply::ConsumeNow(consumeSettings, supplyFacts, healthPct, manaPct);
         if (what == 0)
             what = supply::BandageNow(_options.Supplies, supplyFacts, healthPct); // layout 16: no food to eat, so a bandage
         if (what != 0)
