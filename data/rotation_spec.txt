@@ -282,7 +282,7 @@ row "Earth Shock" target_casting target range 0 20
 row "Healing Wave" self_hp_below 40 self
 row "Searing Totem" duration 55 always self
 row "Flame Shock" duration 12 always target range 0 20
-row "Lava Burst" always target range 0 30          # Forever: 10 s cooldown
+# Lava Burst: removed from the client in 1.60.1.70790 (no spell of that name for shamans any more)
 row "Lightning Bolt" always target range 0 30
 buff "Lightning Shield" duration 600 self
 buff "Water Shield" duration 600 self               # Forever
