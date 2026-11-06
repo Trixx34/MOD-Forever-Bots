@@ -2513,6 +2513,47 @@ void EachPartyWalksItsOwnDungeonsRoute()
     CHECK(walkOf(one, 12) == 500.0f && walkOf(one, 22) == 500.0f);
 }
 
+// 0.44.10: in a Deadmines run a cast result is logged with the bot's level and what the highest rank of the spell costs at that level (-1 when unpriced).
+void ACastResultInTheDeadminesLogsTheWantedCost()
+{
+    PolicyOptions options = AggressiveOptions();
+    std::istringstream costs("1126\t1\t0\t200\t0\t0\t0\tMark\n");
+    std::vector<std::string> warnings;
+    options.SpellCosts = std::make_shared<spell_cost::SpellCostData>(spell_cost::ParseSpellCosts(costs, warnings));
+    std::vector<std::string> events;
+    options.OnEvent = [&events](std::string const& line) { events.push_back(line); };
+    PolicyOptions::ScenarioRoute deadmines;
+    deadmines.Route = { Point{ 100.0f, 0.0f, 0.0f } };
+    deadmines.RouteMap = 36;
+    BotPolicy policy(options);
+    policy.SetRouteActiveFor([](std::uint64_t) { return true; });
+    policy.SetScenarioRouteFor([&](std::uint64_t) -> PolicyOptions::ScenarioRoute const* { return &deadmines; });
+    auto const resultFor = [&](std::uint32_t spell, std::uint32_t sequence, std::uint64_t at)
+    {
+        WorldTickSnapshotView view = PartyView({ 10 });
+        view.bots[0].level = 23;
+        view.bots[0].last_action_sequence = sequence;
+        view.bots[0].last_action_type = uint8_t(ActionType::kCastSpell);
+        view.bots[0].last_action_spell = spell;
+        view.bots[0].last_action_status = BotActionStatus::kApplied;
+        policy.Decide(view, at);
+    };
+    resultFor(1126, 1, 1000);
+    resultFor(99999, 2, 2000);
+    bool priced = false, unpriced = false;
+    for (std::string const& line : events)
+    {
+        if (line.find("cast_result:") == std::string::npos)
+            continue;
+        if (line.find(" spell=1126 level=23 want_cost=200 ") != std::string::npos)
+            priced = true;
+        if (line.find(" spell=99999 level=23 want_cost=-1 ") != std::string::npos)
+            unpriced = true;
+    }
+    CHECK(priced);
+    CHECK(unpriced);
+}
+
 // A dungeon waypoint the core finds no route to is given up after three refusals in a row; the leader goes on to the next point.
 void ALeaderSkipsAWaypointWithNoRoute()
 {
@@ -6725,6 +6766,7 @@ int main()
     TheRouteWaitsForTheHealersMana();
     TheRouteKeepsWaitingWhileTheHealerDrinks();
     AHeldHealerLogsConsumeCheckAndDrinks();
+    ACastResultInTheDeadminesLogsTheWantedCost();
     TwoDruidsDoNotBothCastThePartyBuff();
     AFailingBuffBacksOffLongerEachTime();
     HubTimeoutTriesTheNextHubSoonerThanAnArrival();
