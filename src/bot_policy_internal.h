@@ -578,6 +578,18 @@ struct BotPolicy::DecideTick
     // A leader or inviter reference that is one of this module's bots, as against a human player (both are players to the core).
     bool IsOurBot(std::uint64_t ref) const;
 
+    // The members of a leader's party that are online (not the leader).
+    template <typename Fn>
+    void ForMembers(std::uint64_t leaderGuid, Fn&& fn) const
+    {
+        auto const members = membersOf.find(leaderGuid);
+        if (members == membersOf.end())
+            return;
+        for (std::uint64_t member : members->second)
+            if (auto const at = indexOf.find(member); at != indexOf.end())
+                fn(view.bots[at->second]);
+    }
+
     // The party of a leader: the leader and its members that are online.
     template <typename Fn>
     void ForParty(std::uint64_t leaderGuid, Fn&& fn) const
