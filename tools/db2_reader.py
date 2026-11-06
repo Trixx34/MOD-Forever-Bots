@@ -6,7 +6,7 @@ A copy of the forever-dashboard reader (same author) with three additions for to
 SpellID of SpellEffect and SpellMisc rows).
 
 It follows the core's own loader (src/common/DataStores/DB2FileLoader.cpp). Not supported, and refused with a Db2Error: sparse
-tables (variable-length records), array columns of anything but 32-bit values (returned as a list), encrypted sections. Used by the offline tools only.
+tables through read_table (use read_sparse_strings for the text-only Spell.db2), array columns of anything but 32-bit values (returned as a list), encrypted sections. Used by the offline tools only.
 """
 from __future__ import annotations
 
@@ -162,3 +162,35 @@ def read_table(path: str, strings: tuple[int, ...] = (), skip_encrypted: bool = 
 
 def signed(value: int, bits: int = 32) -> int:
     return value - (1 << bits) if value >= 1 << (bits - 1) else value
+
+
+def read_sparse_strings(path: str) -> dict[int, list[str]]:
+    """A sparse WDC5 table whose records are only null-terminated strings (Spell.db2: NameSubtext, Description, AuraDescription).
+    Returns {record id: [strings]}. Records are found through the offset map; copy-table rows are added with their source's text."""
+    with open(path, "rb") as f:
+        data = f.read()
+    h = HEADER.unpack_from(data, 0)
+    if h[0] != 0x35434457 or h[1] != 5 or not h[12] & 1:
+        raise Db2Error(f"{path}: not a sparse WDC5 file")
+    pos = HEADER.size
+    rows: dict[int, list[str]] = {}
+    copies: list[tuple[int, int]] = []
+    for _ in range(h[20]):
+        tact, _fo, _n, _ss, rec_end, id_size, rel_size, map_count, copy_count = SECTION.unpack_from(data, pos)
+        pos += SECTION.size
+        sections_start = pos
+        if tact:
+            continue
+        ids = struct.unpack_from(f"<{id_size // 4}I", data, rec_end)
+        copy_at = rec_end + id_size
+        map_at = copy_at + 8 * copy_count
+        for i in range(map_count):
+            off, size = struct.unpack_from("<IH", data, map_at + 6 * i)
+            parts = data[off:off + size].split(b"\0")
+            rows[ids[i]] = [x.decode("utf-8", "replace") for x in parts[:-1]] if size > 4 else []
+        for j in range(copy_count):
+            copies.append(struct.unpack_from("<II", data, copy_at + 8 * j))
+    for new_id, src in copies:
+        if src in rows:
+            rows[new_id] = list(rows[src])
+    return rows

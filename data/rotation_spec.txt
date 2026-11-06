@@ -9,6 +9,7 @@
 # Wowhead Forever level 30 spec guides (docs/102-wowhead-class-rotations.md in forever-ops) and the rotations the owner pasted; each block says what it could not do.
 # Left out on purpose: crowd control, totems that need placing (Searing Totem is cast at the fight's start), a position behind a target (Backstab, Shred from behind), and anything
 # that needs a target's target (the snapshot has none: Taunt is cast against two or more enemies). See doc/rotations.md for what was not added and why.
+# Left out of the 70790 additions: Shank (rogue, level 24: an off-hand strike with no known combo point effect), Command and Poised (passives), Lacerate for hunters.
 # Rows marked "Forever" are abilities of this fork's client data. A name that the ability dump does not show for the class is dropped with a warning, so a bot never gets a guessed id.
 
 class 1
@@ -16,6 +17,7 @@ class 1
 row "Execute" self_aura_below 71 1 target range 0 5    # not while in Defensive Stance: the core refuses it there
 row "Taunt" enemies 2 target range 0 5
 row "Bloodrage" self_power_below 20 self
+row "Reckless Swings" self_power_below 30 self   # Forever: the next melee attacks generate extra rage
 row "Charge" opener 8 target range 8 25
 row "Shield Block" duration 5 always self
 row "Revenge" always target range 0 5
@@ -35,6 +37,7 @@ class 1 spec prot
 row "Execute" self_aura_below 71 1 target range 0 5
 row "Taunt" enemies 2 target range 0 5
 row "Bloodrage" self_power_below 20 self
+row "Reckless Swings" self_power_below 30 self   # Forever: the next melee attacks generate extra rage
 row "Charge" opener 8 target range 8 25
 row "Shield Block" duration 5 always self
 row "Revenge" always target range 0 5
@@ -55,6 +58,7 @@ class 1 spec arms
 # Berserker Stance comes from the level 30 class quest and is not cast; the warrior stays in Battle Stance.
 row "Execute" target_hp_below 20 target range 0 5
 row "Bloodrage" self_power_below 20 self
+row "Reckless Swings" self_power_below 30 self   # Forever: the next melee attacks generate extra rage
 row "Charge" opener 8 target range 8 25
 row 12292 level 30 enemies 2 duration 10 self      # Sweeping Strikes (the talent spell; 12723 is its effect)
 row "Mortal Strike" always target range 0 5
@@ -72,6 +76,7 @@ class 1 spec fury
 # lots of rage (the guide calls them rage-inefficient). Whirlwind and Berserker Rage need Berserker Stance and are not cast.
 row "Execute" target_hp_below 20 target range 0 5
 row "Bloodrage" self_power_below 20 self
+row "Reckless Swings" self_power_below 30 self   # Forever: the next melee attacks generate extra rage
 row "Charge" opener 8 target range 8 25
 row "Death Wish" target_strong 1 self
 row "Bloodthirst" always target range 0 5
@@ -102,6 +107,7 @@ row "Rebuke" target_casting target range 0 5
 row "Hammer of Justice" target_casting target range 0 10
 row "Holy Light" self_hp_below 50 self
 row "Consecration" enemies 3 self
+row "Holy Shield" duration 10 always self   # level 50 in this client
 row "Seal of Fury" duration 30 always self            # Forever
 row "Holy Strike" always target range 0 5
 row "Hammer of the Righteous" always target range 0 5   # Forever: 6 s cooldown melee
@@ -120,6 +126,7 @@ row "Judgement" always target range 0 10
 buff "Devotion Aura" duration 3600 self
 buff "Retribution Aura" duration 3600 self
 buff "Blessing of Wisdom" duration 300 party
+buff "Oath of Light" duration 300 self   # Forever: more healing from Holy Light, Flash of Light, Holy Shock on the target (self here)
 supersede "Devotion Aura" by "Retribution Aura"
 
 class 2 spec ret
@@ -194,6 +201,7 @@ class 4
 row "Kick" target_casting target range 0 5
 row "Evasion" self_hp_below 40 self
 row "Slice and Dice" combo 2 duration 20 self
+row "Death Mark" combo 5 target_strong 1 target range 0 5   # Forever: level 40 finisher, kept for strong targets
 row "Eviscerate" combo 5 target range 0 5
 row "Saber Slash" duration 12 always target range 0 5   # Forever: 12 s bleed and one combo point (the policy counts it like Sinister Strike)
 row "Sinister Strike" always target range 0 5
@@ -205,6 +213,7 @@ row "Evasion" self_hp_below 40 self
 row "Blade Flurry" enemies 2 duration 15 self
 row "Expose Armor" target_strong 1 duration 30 target range 0 5
 row "Slice and Dice" combo 2 duration 20 self
+row "Death Mark" combo 5 target_strong 1 target range 0 5   # Forever: level 40 finisher, kept for strong targets
 row "Eviscerate" combo 5 target range 0 5
 row "Saber Slash" duration 12 always target range 0 5   # Forever
 row "Sinister Strike" always target range 0 5
@@ -214,6 +223,7 @@ class 4 spec assassination
 row "Kick" target_casting target range 0 5
 row "Evasion" self_hp_below 40 self
 row "Slice and Dice" combo 2 duration 20 self
+row "Death Mark" combo 5 target_strong 1 target range 0 5   # Forever: level 40 finisher, kept for strong targets
 row "Eviscerate" combo 5 target range 0 5
 row "Mutilate" always target range 0 5
 row "Sinister Strike" always target range 0 5
@@ -223,6 +233,7 @@ class 4 spec subtlety
 row "Kick" target_casting target range 0 5
 row "Evasion" self_hp_below 40 self
 row "Slice and Dice" combo 2 duration 20 self
+row "Death Mark" combo 5 target_strong 1 target range 0 5   # Forever: level 40 finisher, kept for strong targets
 row "Eviscerate" combo 5 target range 0 5
 row "Hemorrhage" duration 15 always target range 0 5
 row "Sinister Strike" always target range 0 5
@@ -280,6 +291,7 @@ class 7
 # The default shaman: Enhancement.
 row "Earth Shock" target_casting target range 0 20
 row "Healing Wave" self_hp_below 40 self
+row "Mana Tide Totem" self_power_below 25 duration 12 self   # level 38, restores mana to the party
 row "Searing Totem" duration 55 always self
 row "Flame Shock" duration 12 always target range 0 20
 # Lava Burst: removed from the client in 1.60.1.70790 (no spell of that name for shamans any more)
@@ -322,6 +334,7 @@ class 7 spec resto
 # Restoration (healer): the heal block casts Healing Wave on the tank; Searing Totem and Flame Shock when damage is low, Lightning Bolt to pool mana by fighting. Water Shield first.
 row "Earth Shock" target_casting target range 0 20
 row "Healing Wave" self_hp_below 40 self
+row "Mana Tide Totem" self_power_below 25 duration 12 self   # level 38, restores mana to the party
 row "Searing Totem" duration 55 always self
 row "Flame Shock" duration 12 always target range 0 20
 row "Lightning Bolt" always target range 0 30
@@ -360,6 +373,7 @@ row "Evocation" self_power_below 15 self
 row "Fire Blast" target_hp_below 25 target range 0 20
 row "Flamestrike" enemies 3 duration 8 target range 0 30
 row "Arcane Explosion" enemies 3 self
+row "Arcane Wrath" always target range 0 30   # Forever: level 36 nuke, extra damage from maximum mana
 row "Arcane Missiles" self_aura_at_least 400588 1 target range 0 30
 row "Fire Blast" self_aura_at_least 400573 2 target range 0 20
 row 400574 level 20 maxlevel 29 self_aura_below 400573 2 target range 0 30   # Arcane Blast as the guide has it at level 20: no trainer teaches this id, so the core refuses it and Fireball carries levels 20 to 29
@@ -506,6 +520,7 @@ row "Enrage" self_power_below 20 self
 row "Faerie Fire" duration 40 opener 3 target range 0 30
 row "Demoralizing Roar" enemies 3 self duration 30
 row "Swipe" enemies 2 self
+row "Lacerate" duration 15 always target range 0 5   # Forever: bleed, level 42 in this client
 row "Maul" self_power_above 30 target range 0 5
 buff "Bear Form" duration 600 self self_aura_below 5487 1
 buff "Thorns" duration 600 party
@@ -516,6 +531,7 @@ class 11 spec feral_cat
 # druid (Rip and Ferocious Bite are left out). The form is an upkeep buff cast only when the aura list does not show it (see feral_tank).
 row "Tiger's Fury" target_strong 1 self
 row "Faerie Fire" duration 40 opener 3 target range 0 30
+row "Ferocious Bite" combo 5 target range 0 5   # finisher, level 32
 row "Rake" duration 9 always target range 0 5
 row "Shred" always target range 0 5
 row "Claw" always target range 0 5
