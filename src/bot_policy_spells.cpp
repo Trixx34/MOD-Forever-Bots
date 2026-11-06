@@ -144,6 +144,16 @@ bool AuraRunning(BotSnapshot const& bot, std::uint32_t spell)
     return false;
 }
 
+bool AuraRunning(BotSnapshot const& bot, std::uint32_t spell, std::vector<std::uint32_t> const& ranks)
+{
+    if (AuraRunning(bot, spell))
+        return true;
+    for (std::uint32_t rank : ranks)
+        if (AuraRunning(bot, rank))
+            return true;
+    return false;
+}
+
 PetKnown PetOf(BotSnapshot const& bot)
 {
     switch (bot.pet_state)

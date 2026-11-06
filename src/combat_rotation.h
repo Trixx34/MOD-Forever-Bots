@@ -82,12 +82,14 @@ struct Row
     std::uint32_t DurationSec = 0;  // how long the effect lasts: a damage-over-time effect or a buff is not recast while it runs
     bool Buff = false;              // an upkeep spell cast out of combat, not part of the fight rotation
     bool Party = false;             // a buff: cast on every member of the bot's group (itself included), not only on the bot
+    std::vector<std::uint32_t> Ranks; // a buff: every rank's spell id. The core casts the highest rank known, so the aura on the bot carries that id, not Spell's
 };
 
 // Rotations read from a file (data/rotations.txt, made by tools/make_rotations.py), per class id. A class missing from the file keeps the built-in rows.
 //   class <id> [spec <key>]            the rows below belong to the class, or to one spec of it (a spec with no block uses the class's)
 //   row <spell> [level <n>] [maxlevel <n>] [duration <sec>] <condition> self|target [range <min> <max>]       a fight spell, in priority order
-//   buff <spell> [level <n>] [maxlevel <n>] duration <sec> self|party                                        an upkeep spell, cast out of combat when it has run out
+//   buff <spell> [level <n>] [maxlevel <n>] duration <sec> self|party [ranks <id,id,...>]                    an upkeep spell, cast out of combat when it has run out;
+//                                                                                                           ranks: the spell ids of every rank (the aura shows the rank cast)
 // Conditions: always | target_hp_above N | target_hp_below N | self_hp_below N | self_power_below N | self_power_above N | enemies N |
 // target_casting | opener N | target_strong N | combo N | enemies_below N | in_party | no_pet | self_aura_below <spell> <stacks> | self_aura_at_least <spell> <stacks>.
 struct RotationData

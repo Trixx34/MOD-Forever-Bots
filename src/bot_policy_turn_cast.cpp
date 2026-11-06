@@ -582,7 +582,7 @@ void BotPolicy::TurnUpkeepBuffs(DecideTick& tick, BotTurn& turn)
                 // snapshot, so its timer and the party claim carry it.
                 if (recipient == 0)
                 {
-                    if (AuraRunning(bot, row.Spell))
+                    if (AuraRunning(bot, row.Spell, row.Ranks))
                         continue;
                 }
                 else

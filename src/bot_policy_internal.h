@@ -460,6 +460,8 @@ bool CcAffects(std::uint32_t spell, CreatureType type);
 // another player cast over the bot, or one it lost to a death, is the fact it is. An aura with no duration reports a large
 // remaining_ms and runs for ever; a reported aura with 0 left is one that just expired.
 bool AuraRunning(BotSnapshot const& bot, std::uint32_t spell);
+// True when the bot carries the aura of the spell or of any rank in `ranks` (a buff row's Ranks). The core casts the highest rank known, so the aura id is that rank's.
+bool AuraRunning(BotSnapshot const& bot, std::uint32_t spell, std::vector<std::uint32_t> const& ranks);
 
 // Layout 13: the bot's pet, from the snapshot, instead of what refused casts imply. pet_state is 0 none, 1 alive, 2 dead.
 // A core that does not report pets leaves it 0, and the inference from refused casts below is the fallback.

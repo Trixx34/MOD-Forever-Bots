@@ -92,6 +92,8 @@ def main():
                 continue
             levels[name_token] = level
             extra = tokens
+            if kind == "buff" and ranks and len(ranks) > 1:
+                extra += " ranks " + ",".join(str(r) for r in ranks)   # the aura shows the rank cast, not rank 1
             comment = f"   # {name_token}: ranks {ranks}" if ranks else ""
             out.append(f"{kind} {sid}{extra}{comment}")
         # The supersede pairs: the old spell stops at the level before the new one is learned.
