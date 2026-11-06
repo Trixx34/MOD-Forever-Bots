@@ -5282,6 +5282,8 @@ void TheRouteKeepsWaitingWhileTheHealerDrinks()
     {
         bot.group_role = bot.guid == 12 ? 2 : 1;
         bot.group_leader_guid = (std::uint64_t(2) << 56) | 12;
+        if (bot.guid != 10)
+            bot.max_power = 0; // only the healer counts toward the party's mana total (8 % of the other casters' 5000 would hide the rises below)
     }
     auto const setHealerMana = [&view](std::uint32_t power, std::uint32_t maxPower = 1000)
     {
