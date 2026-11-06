@@ -5268,6 +5268,48 @@ void TheRouteWaitsForTheHealersMana()
 }
 
 // 0.44.14: the wait for mana counts from the last time the party's mana rose, so a healer that is drinking is waited for, up to kRouteManaAbsMaxMs.
+// 0.44.8: a held, sitting mana user logs consume_check (hp, pw, food, drink, what) and drinks. Same party as the healer-drinks test, with supplies on.
+void AHeldHealerLogsConsumeCheckAndDrinks()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.PartyCount = 1;
+    options.ClassOf = WarriorLeads;
+    options.Route = { Point{ 100.0f, 0.0f, 0.0f } };
+    options.Supplies.Enabled = true;
+    std::vector<std::string> events;
+    options.OnEvent = [&events](std::string const& line) { events.push_back(line); };
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 }, WarriorLeads);
+    for (BotSnapshot& bot : view.bots)
+    {
+        bot.group_role = bot.guid == 12 ? 2 : 1;
+        bot.group_leader_guid = (std::uint64_t(2) << 56) | 12;
+        if (bot.guid != 10)
+            bot.max_power = 0;
+        else
+        {
+            bot.power_type = 0;
+            bot.max_power = 1000;
+            bot.power = 50;
+            bot.drink_count = 5;
+            bot.food_count = 3;
+        }
+    }
+    std::vector<BotAction> const actions = policy.Decide(view, 1000);
+    bool drank = false;
+    for (BotAction const& action : actions)
+        if (action.bot_guid == 10 && action.type == ActionType::kConsume)
+            drank = action.spell_id == 2;
+    CHECK(drank);
+    bool logged = false;
+    for (std::string const& line : events)
+        if (line.find("consume_check: bot=10 ") != std::string::npos && line.find(" drink=5 ") != std::string::npos && line.find(" what=2") != std::string::npos)
+            logged = true;
+    CHECK(logged);
+}
+
 void TheRouteKeepsWaitingWhileTheHealerDrinks()
 {
     PolicyOptions options = AggressiveOptions();
@@ -6682,6 +6724,7 @@ int main()
     TheRouteLeaderIsHealedUpOutOfAFight();
     TheRouteWaitsForTheHealersMana();
     TheRouteKeepsWaitingWhileTheHealerDrinks();
+    AHeldHealerLogsConsumeCheckAndDrinks();
     TwoDruidsDoNotBothCastThePartyBuff();
     AFailingBuffBacksOffLongerEachTime();
     HubTimeoutTriesTheNextHubSoonerThanAnArrival();
