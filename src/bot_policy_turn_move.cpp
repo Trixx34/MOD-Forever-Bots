@@ -423,10 +423,10 @@ void BotPolicy::RouteReadiness(DecideTick& tick, BotTurn& turn, RouteLeg& route)
     // Mana: a party whose healer (or any caster) is dry walks into the next pack and loses it. The members sit and drink while the leader waits, at most kRouteManaMaxMs.
     bool manaLowInParty = false;
     {
-        auto const dry = [](BotSnapshot const& member)
+        auto const dry = [this](BotSnapshot const& member)
         {
             return member.life_state == 0 && member.power_type == 0 && member.max_power > 0 &&
-                   std::uint64_t(member.power) * 100 < std::uint64_t(member.max_power) * kRouteMinManaPct;
+                   std::uint64_t(member.power) * 100 < std::uint64_t(member.max_power) * ProfileOfBot(member.guid).RouteMinManaPct;
         };
         std::uint64_t manaSum = 0, manaMax = 0;
         std::uint32_t manaAlive = 0;

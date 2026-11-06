@@ -67,13 +67,13 @@ void BotPolicy::TurnQuestsAndHold(DecideTick& tick, BotTurn& turn)
             {
                 if (member.life_state != 0)
                     return;
-                if (member.max_health > 0 && std::uint64_t(member.health) * 100 < std::uint64_t(member.max_health) * (_options.TacticRest ? kPartyReadyHealthPct : kPartyReadyHealthOldPct))
+                if (member.max_health > 0 && std::uint64_t(member.health) * 100 < std::uint64_t(member.max_health) * (_options.TacticRest ? ProfileOfBot(member.guid).ReadyHealthPct : kPartyReadyHealthOldPct))
                 {
                     ready = false;
                     not_ready_reason = "health bot=" + std::to_string(member.guid) + " pct=" + std::to_string(std::uint64_t(member.health) * 100 / member.max_health);
                 }
                 else if (member.power_type == 0 && member.max_power > 0 &&
-                         std::uint64_t(member.power) * 100 < std::uint64_t(member.max_power) * (_options.TacticRest ? kPartyReadyPowerPct : kPartyReadyPowerOldPct))
+                         std::uint64_t(member.power) * 100 < std::uint64_t(member.max_power) * (_options.TacticRest ? ProfileOfBot(member.guid).ReadyPowerPct : kPartyReadyPowerOldPct))
                 {
                     ready = false;
                     not_ready_reason = "mana bot=" + std::to_string(member.guid) + " pct=" + std::to_string(std::uint64_t(member.power) * 100 / member.max_power);

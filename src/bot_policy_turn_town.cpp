@@ -491,15 +491,16 @@ void BotPolicy::TurnRestAndConsume(DecideTick& tick, BotTurn& turn)
     // Dungeon drink: any mana user in a dungeon party drinks at kDungeonDrinkBelowPct and drinks up to kDungeonDrinkUpToPct.
     // This overrides the normal rest share so the pull does not go out with anyone OOM. The owner's rule of 2026-10-23:
     // a pull should not start with the healer (or any mana user) OOM.
+    role_profile::Profile const profile = ProfileOfBot(bot.guid);
     bool const dungeonDrink = holdIdle && manaUser && IsRouteActive(bot.guid) &&
-                              std::uint64_t(bot.power) * 100 < std::uint64_t(bot.max_power) * kDungeonDrinkBelowPct;
+                              std::uint64_t(bot.power) * 100 < std::uint64_t(bot.max_power) * profile.DrinkBelowPct;
     bool const manaLow = holdIdle && manaUser &&
-                         std::uint64_t(bot.power) * 100 < std::uint64_t(bot.max_power) * (state.Sitting ? kPartyReadySitHealthPct : (_options.TacticRest ? kPartyReadyPowerPct : kPartyReadyPowerOldPct));
+                         std::uint64_t(bot.power) * 100 < std::uint64_t(bot.max_power) * (state.Sitting ? kPartyReadySitHealthPct : (_options.TacticRest ? profile.ReadyPowerPct : kPartyReadyPowerOldPct));
     // The Rest tactic: the party waits for every member to reach the pull share (90 %), so a member below it sits to get there (it only sat below its own rest share).
     bool const healthLow = holdIdle && _options.TacticRest && bot.max_health > 0 &&
-                           std::uint64_t(bot.health) * 100 < std::uint64_t(bot.max_health) * kPartyReadyHealthPct;
+                           std::uint64_t(bot.health) * 100 < std::uint64_t(bot.max_health) * profile.ReadyHealthPct;
     // A dungeon mana user drinks up to the dungeon drink cap; others use the normal manaLow threshold.
-    bool const drinkCap = dungeonDrink ? kDungeonDrinkUpToPct : (state.Sitting ? kPartyReadySitHealthPct : (_options.TacticRest ? kPartyReadyPowerPct : kPartyReadyPowerOldPct));
+    bool const drinkCap = dungeonDrink ? profile.DrinkUpToPct : (state.Sitting ? kPartyReadySitHealthPct : (_options.TacticRest ? profile.ReadyPowerPct : kPartyReadyPowerOldPct));
     bool const manaStillLow = state.Sitting && dungeonDrink &&
                               std::uint64_t(bot.power) * 100 < std::uint64_t(bot.max_power) * drinkCap;
     bool const sitWanted = (idle || holdIdle) && (state.Sitting ? (stillHurt || manaLow || manaStillLow || manaResting) : (hurtEnough || healthLow || manaLow || manaResting)) &&
@@ -525,9 +526,9 @@ void BotPolicy::TurnRestAndConsume(DecideTick& tick, BotTurn& turn)
         supply::Settings consumeSettings = _options.Supplies;
         if (holdIdle)
         {
-            // the marks the hold waits for: the Rest tactic off uses the older, lower ones (TurnQuestsAndHold)
-            consumeSettings.EatBelowHealthPct = std::max<std::uint32_t>(consumeSettings.EatBelowHealthPct, (_options.TacticRest ? kPartyReadyHealthPct : kPartyReadyHealthOldPct) - 1);
-            consumeSettings.DrinkBelowManaPct = std::max<std::uint32_t>(consumeSettings.DrinkBelowManaPct, (_options.TacticRest ? kPartyReadyPowerPct : kPartyReadyPowerOldPct) - 1);
+            // the marks the hold waits for: the profile's, or the older, lower ones with the Rest tactic off (TurnQuestsAndHold)
+            consumeSettings.EatBelowHealthPct = std::max<std::uint32_t>(consumeSettings.EatBelowHealthPct, (_options.TacticRest ? profile.ReadyHealthPct : kPartyReadyHealthOldPct) - 1);
+            consumeSettings.DrinkBelowManaPct = std::max<std::uint32_t>(consumeSettings.DrinkBelowManaPct, (_options.TacticRest ? profile.ReadyPowerPct : kPartyReadyPowerOldPct) - 1);
         }
         std::uint32_t what = supply::ConsumeNow(consumeSettings, supplyFacts, healthPct, manaPct);
         if (what == 0)
