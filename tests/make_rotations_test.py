@@ -21,7 +21,7 @@ FOREVER = {
     2: {"Rebuke": 425609, "Holy Strike": 678, "Hammer of the Righteous": 407632},
     4: {"Saber Slash": 424785},
     5: {"Void Plague": 425204, "Vampiric Touch": 402668},
-    7: {"Lava Burst": 408490, "Water Shield": 408510},
+    7: {"Water Shield": 408510},   # Lava Burst is gone from the 70790 client
     8: {"Icy Veins": 425121, "Ice Lance": 400640},
     9: {},  # no Forever row: Fel Armor is left out (no trainer teaches it)
     11: {"Starsurge": 417157, "Sunfire": 414684},
