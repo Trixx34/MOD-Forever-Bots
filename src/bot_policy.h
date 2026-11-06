@@ -615,6 +615,8 @@ private:
         std::uint32_t RouteNoRoute = 0;                  // moves in a row to the current dungeon waypoint that the core found no route for
         Point RouteStallAt{};                            // where the leader stood when its walk along the route was last seen to move
         std::uint64_t RouteStallSinceMs = 0;             // since when it has stood there while walking (0 = not walking)
+        std::uint64_t RouteManaProgressMs = 0;           // 0.44.14: the last tick the party's summed mana rose while the leader waited (kRouteManaMaxMs counts from here)
+        std::uint64_t RouteManaLastSum = 0;              // the party's summed mana at the last tick of the wait
         std::uint64_t RouteManaSinceMs = 0;              // since when a mana user of the party has been below kRouteMinManaPct (0 = none)
         std::uint64_t RouteHoldLoggedMs = 0;             // when the leader last logged why it does not walk on (route_hold)
         std::uint64_t TaxiBlockedUntilMs = 0;            // the core refused a flight: walk until this
@@ -663,6 +665,8 @@ private:
         std::uint64_t HealLosUntilMs = 0;
         std::uint64_t LosRepositionTarget = 0;            // target of a healer DPS cast refused for LoS; move to clear it before retrying
         std::uint64_t HoldLastNotReadyMs = 0;            // the last tick the party was not ready (the pull hold ends after kPullHoldClearMs of readiness)
+        std::uint64_t HoldProgressMs = 0;                // 0.44.14: the last tick the party's health plus mana rose during the hold (the kPullHoldMaxMs cap counts from here)
+        std::uint64_t HoldRestSum = 0;                   // the party's summed health and mana at the last tick of the hold
         std::uint64_t HoldSinceMs = 0;                   // the party leader waits for the party to be ready since this time (0 = not waiting)
         std::uint64_t RegroupSinceMs = 0;                // the party leader's regroup started at this time (a member dead or out of range; 0 = none)
         std::map<std::uint64_t, std::uint64_t> RegroupFarSinceMs; // member guid -> the time it was first out of range (cleared once it is back or dead)

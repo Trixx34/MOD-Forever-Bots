@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // BotPolicy::Decide, a bot's turn: quests, the pull hold, targets, crowd control, taming, the fight watchdog and the movement set-up (the steps DecideBot runs in order; bot_policy.cpp).
+#include <algorithm>
 #include "bot_policy_internal.h"
 
 void BotPolicy::TurnQuestsAndHold(DecideTick& tick, BotTurn& turn)
@@ -115,6 +116,20 @@ void BotPolicy::TurnQuestsAndHold(DecideTick& tick, BotTurn& turn)
             for (std::uint64_t member : membersOf[bot.guid])
                 if (auto const at = indexOf.find(member); at != indexOf.end())
                     checkReady(view.bots[at->second]);
+            // 0.44.14: the hold's 45 s cap counts from the last tick the party's health plus mana rose (they are resting), up to kPullHoldAbsMaxMs.
+            std::uint64_t restSum = 0;
+            auto const addRest = [&restSum](BotSnapshot const& member)
+            {
+                if (member.life_state == 0)
+                    restSum += std::uint64_t(member.health) + (member.power_type == 0 ? member.power : 0);
+            };
+            addRest(bot);
+            for (std::uint64_t member : membersOf[bot.guid])
+                if (auto const at = indexOf.find(member); at != indexOf.end())
+                    addRest(view.bots[at->second]);
+            if (restSum > state.HoldRestSum)
+                state.HoldProgressMs = nowMs;
+            state.HoldRestSum = restSum;
             if (ready && deadWaitKind != 0)
             {
                 ready = false;
@@ -177,12 +192,13 @@ void BotPolicy::TurnQuestsAndHold(DecideTick& tick, BotTurn& turn)
                 if (state.HoldSinceMs == 0)
                 {
                     state.HoldSinceMs = nowMs;
+                    state.HoldProgressMs = nowMs;
                     if (_options.OnEvent)
                         _options.OnEvent("pull hold started: leader=" + std::to_string(bot.guid) + " reason=" + not_ready_reason);
                 }
                 state.HoldLastNotReadyMs = nowMs;
             }
-            dungeonHold = !ready ? nowMs - state.HoldSinceMs < kPullHoldMaxMs : false;
+            dungeonHold = !ready ? (nowMs - std::max(state.HoldSinceMs, state.HoldProgressMs) < kPullHoldMaxMs && nowMs - state.HoldSinceMs < kPullHoldAbsMaxMs) : false;
         }
         else
         {

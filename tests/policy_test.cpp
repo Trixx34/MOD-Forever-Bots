@@ -5267,6 +5267,71 @@ void TheRouteWaitsForTheHealersMana()
     CHECK(walks(full.Decide(view, 0), 12));
 }
 
+// 0.44.14: the wait for mana counts from the last time the party's mana rose, so a healer that is drinking is waited for, up to kRouteManaAbsMaxMs.
+void TheRouteKeepsWaitingWhileTheHealerDrinks()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.PartyCount = 1;
+    options.ClassOf = WarriorLeads;
+    options.Route = { Point{ 100.0f, 0.0f, 0.0f } };
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 }, WarriorLeads);
+    for (BotSnapshot& bot : view.bots)
+    {
+        bot.group_role = bot.guid == 12 ? 2 : 1;
+        bot.group_leader_guid = (std::uint64_t(2) << 56) | 12;
+    }
+    auto const setHealerMana = [&view](std::uint32_t power)
+    {
+        for (BotSnapshot& bot : view.bots)
+            if (bot.guid == 10)
+            {
+                bot.power_type = 0;
+                bot.max_power = 1000;
+                bot.power = power;
+            }
+    };
+    auto const walks = [](std::vector<BotAction> const& actions, std::uint64_t guid)
+    {
+        for (BotAction const& action : actions)
+            if (action.bot_guid == guid && action.type == ActionType::kMoveTo && action.dest_x == 100.0f)
+                return true;
+        return false;
+    };
+    setHealerMana(50);
+    CHECK(!walks(policy.Decide(view, 1000), 12));
+    setHealerMana(200);
+    CHECK(!walks(policy.Decide(view, 50000), 12));
+    CHECK(!walks(policy.Decide(view, 100000), 12));   // 50 s after the last rise: still waiting (the plain 60 s cap would have ended at 61 s)
+    setHealerMana(400);
+    CHECK(!walks(policy.Decide(view, 140000), 12));
+    // No rise for 60 s: goes on.
+    BotPolicy stuck(options);
+    stuck.SetRouteActive(true);
+    setHealerMana(50);
+    CHECK(!walks(stuck.Decide(view, 1000), 12));
+    setHealerMana(300);
+    CHECK(!walks(stuck.Decide(view, 30000), 12));
+    CHECK(!walks(stuck.Decide(view, 80000), 12));
+    CHECK(walks(stuck.Decide(view, 95000), 12));      // 65 s without a rise
+    // Rising forever: cut off at kRouteManaAbsMaxMs (180 s).
+    BotPolicy rising(options);
+    rising.SetRouteActive(true);
+    std::uint32_t power = 50;
+    bool walked = false;
+    std::uint64_t at = 1000;
+    for (; at <= 200000 && !walked; at += 20000)
+    {
+        setHealerMana(power);
+        power += 10;
+        walked = walks(rising.Decide(view, at), 12);
+    }
+    CHECK(walked);
+    CHECK(at > 170000);
+}
+
 // Two druids of one party with one party buff: each member gets it once, however many druids know it.
 void TwoDruidsDoNotBothCastThePartyBuff()
 {
@@ -6601,6 +6666,7 @@ int main()
     TankIsHealedBeforeTheLowestMember();
     TheRouteLeaderIsHealedUpOutOfAFight();
     TheRouteWaitsForTheHealersMana();
+    TheRouteKeepsWaitingWhileTheHealerDrinks();
     TwoDruidsDoNotBothCastThePartyBuff();
     AFailingBuffBacksOffLongerEachTime();
     HubTimeoutTriesTheNextHubSoonerThanAnArrival();

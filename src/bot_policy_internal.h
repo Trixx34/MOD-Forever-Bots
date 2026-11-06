@@ -248,6 +248,7 @@ constexpr std::uint64_t kCcRefreshBeforeMs = 3000;
 constexpr float kRouteWaitYards = 30.0f;         // the leader waits for a member farther behind than this
 constexpr std::uint32_t kRouteMinHealthPct = 80; // and for its own health to be at least this
 constexpr std::uint32_t kRouteMinManaPct = 80;   // the leader walks on only when every mana user of the party has at least this much mana (the healer walked into fights at 3%)
+constexpr std::uint64_t kRouteManaAbsMaxMs = 180000; // 0.44.14: the wait is cut off here even while mana still rises (a full priest needs about 90 s of drinking from 3%)
 constexpr std::uint64_t kRouteManaMaxMs = 60000;  // and never waits longer than this for mana (no drink left, or a member that cannot sit)
 constexpr std::uint32_t kRouteTopUpPct = 90;     // out of a fight, the party's healer heals the route leader up to this (above kRouteMinHealthPct, so it walks on)
 // A leader walking the route that has not moved this far in this long, out of combat, has a move that went nowhere (sent once, no answer; dm#6 of 2026-10-26 stood
@@ -261,6 +262,7 @@ constexpr std::uint32_t kPartyReadyHealthPct = 90;  // every living member has a
 constexpr std::uint32_t kPartyReadyPowerPct = 95;   // and every mana user at least this much mana (matches drink cap)
 constexpr std::uint32_t kPartyReadySitHealthPct = 95; // a sitting member rests up to this much
 constexpr std::uint64_t kPullHoldClearMs = 10000;  // the party must be ready this long in a row before a pull hold ends
+constexpr std::uint64_t kPullHoldAbsMaxMs = 180000;  // 0.44.14: the hold is cut off here even while the party still recovers (the 45 s cap below counts from the last rise)
 constexpr std::uint64_t kPullHoldMaxMs = 45000;     // the party never waits longer than this for itself
 constexpr float kRegroupClearYards = 20.0f;               // a stuck member counts as back only inside this (hysteresis: it trails the leader at about kRouteWaitYards)
 constexpr std::uint64_t kRegroupStuckMs = 10000;    // a member out of range this long is stuck: the party stops waiting for it (regroup, 0.35.0)
