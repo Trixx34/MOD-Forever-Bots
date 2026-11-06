@@ -525,8 +525,9 @@ void BotPolicy::TurnRestAndConsume(DecideTick& tick, BotTurn& turn)
         supply::Settings consumeSettings = _options.Supplies;
         if (holdIdle)
         {
-            consumeSettings.EatBelowHealthPct = std::max<std::uint32_t>(consumeSettings.EatBelowHealthPct, kPartyReadyHealthPct - 1);
-            consumeSettings.DrinkBelowManaPct = std::max<std::uint32_t>(consumeSettings.DrinkBelowManaPct, kPartyReadyPowerPct - 1);
+            // the marks the hold waits for: the Rest tactic off uses the older, lower ones (TurnQuestsAndHold)
+            consumeSettings.EatBelowHealthPct = std::max<std::uint32_t>(consumeSettings.EatBelowHealthPct, (_options.TacticRest ? kPartyReadyHealthPct : kPartyReadyHealthOldPct) - 1);
+            consumeSettings.DrinkBelowManaPct = std::max<std::uint32_t>(consumeSettings.DrinkBelowManaPct, (_options.TacticRest ? kPartyReadyPowerPct : kPartyReadyPowerOldPct) - 1);
         }
         std::uint32_t what = supply::ConsumeNow(consumeSettings, supplyFacts, healthPct, manaPct);
         if (what == 0)

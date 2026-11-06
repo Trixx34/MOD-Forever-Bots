@@ -5283,13 +5283,13 @@ void TheRouteKeepsWaitingWhileTheHealerDrinks()
         bot.group_role = bot.guid == 12 ? 2 : 1;
         bot.group_leader_guid = (std::uint64_t(2) << 56) | 12;
     }
-    auto const setHealerMana = [&view](std::uint32_t power)
+    auto const setHealerMana = [&view](std::uint32_t power, std::uint32_t maxPower = 1000)
     {
         for (BotSnapshot& bot : view.bots)
             if (bot.guid == 10)
             {
                 bot.power_type = 0;
-                bot.max_power = 1000;
+                bot.max_power = maxPower;
                 bot.power = power;
             }
     };
@@ -5324,12 +5324,25 @@ void TheRouteKeepsWaitingWhileTheHealerDrinks()
     std::uint64_t at = 1000;
     for (; at <= 200000 && !walked; at += 20000)
     {
-        setHealerMana(power);
-        power += 10;
+        setHealerMana(power, 10000);
+        power += 800; // 8 % of the maximum per step: real recovery
         walked = walks(rising.Decide(view, at), 12);
     }
     CHECK(walked);
     CHECK(at > 170000);
+    // Plain regeneration (+1 per tick) is not recovery: the 60 s cap holds.
+    BotPolicy regen(options);
+    regen.SetRouteActive(true);
+    bool regenWalked = false;
+    std::uint64_t regenAt = 1000;
+    std::uint32_t regenPower = 50;
+    for (; regenAt <= 100000 && !regenWalked; regenAt += 5000)
+    {
+        setHealerMana(regenPower++, 1000);
+        regenWalked = walks(regen.Decide(view, regenAt), 12);
+    }
+    CHECK(regenWalked);
+    CHECK(regenAt <= 70000); // gave up at about 61 s, not 180 s
 }
 
 // Two druids of one party with one party buff: each member gets it once, however many druids know it.

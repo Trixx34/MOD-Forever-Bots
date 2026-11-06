@@ -262,9 +262,32 @@ constexpr std::uint32_t kPartyReadyHealthPct = 90;  // every living member has a
 constexpr std::uint32_t kPartyReadyPowerPct = 95;   // and every mana user at least this much mana (matches drink cap)
 constexpr std::uint32_t kPartyReadySitHealthPct = 95; // a sitting member rests up to this much
 constexpr std::uint64_t kPullHoldClearMs = 10000;  // the party must be ready this long in a row before a pull hold ends
+constexpr std::uint32_t kRecoveryRisePct = 8;        // a rise counts as recovery when it is this much of the summed maximum within kRecoveryWindowMs (drinking gives about 14 % in 10 s, plain regeneration about 3 %)
+constexpr std::uint64_t kRecoveryWindowMs = 10000;
 constexpr std::uint64_t kPullHoldAbsMaxMs = 180000;  // 0.44.14: the hold is cut off here even while the party still recovers (the 45 s cap below counts from the last rise)
 constexpr std::uint64_t kPullHoldMaxMs = 45000;     // the party never waits longer than this for itself
-constexpr float kRegroupClearYards = 20.0f;               // a stuck member counts as back only inside this (hysteresis: it trails the leader at about kRouteWaitYards)
+
+
+// Recovery tracking for the mana and pull waits: true when the summed resource `sum` (of `alive` living members, `maxSum` at most) has risen by
+// kRecoveryRisePct of maxSum since the baseline, which is re-taken every kRecoveryWindowMs, whenever it falls, and whenever the number of living
+// members changes (a death lowers the sum and a revive raises it, neither is recovery). Zero `baseMs` means no baseline yet.
+inline bool RecoveryProgress(std::uint64_t sum, std::uint64_t maxSum, std::uint32_t alive, std::uint64_t nowMs, std::uint64_t& baseSum,
+                             std::uint64_t& baseMs, std::uint32_t& baseAlive)
+{
+    if (baseMs == 0 || alive != baseAlive || sum < baseSum)
+    {
+        baseSum = sum, baseMs = nowMs, baseAlive = alive;
+        return false;
+    }
+    if (sum >= baseSum + maxSum * kRecoveryRisePct / 100)
+    {
+        baseSum = sum, baseMs = nowMs;
+        return true;
+    }
+    if (nowMs - baseMs >= kRecoveryWindowMs)
+        baseSum = sum, baseMs = nowMs;
+    return false;
+}constexpr float kRegroupClearYards = 20.0f;               // a stuck member counts as back only inside this (hysteresis: it trails the leader at about kRouteWaitYards)
 constexpr std::uint64_t kRegroupStuckMs = 10000;    // a member out of range this long is stuck: the party stops waiting for it (regroup, 0.35.0)
 constexpr std::uint64_t kConsumeLogMs = 30000;     // consume_check: one line per held bot per 30 s
 constexpr std::uint64_t kRegroupLogMs = 15000;      // a regroup logs where every member stands this often (regroup_members, 0.44.5)

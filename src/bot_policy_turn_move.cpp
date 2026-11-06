@@ -428,11 +428,16 @@ void BotPolicy::RouteReadiness(DecideTick& tick, BotTurn& turn, RouteLeg& route)
             return member.life_state == 0 && member.power_type == 0 && member.max_power > 0 &&
                    std::uint64_t(member.power) * 100 < std::uint64_t(member.max_power) * kRouteMinManaPct;
         };
-        std::uint64_t manaSum = 0;
-        auto const add = [&manaSum](BotSnapshot const& member)
+        std::uint64_t manaSum = 0, manaMax = 0;
+        std::uint32_t manaAlive = 0;
+        auto const add = [&](BotSnapshot const& member)
         {
             if (member.life_state == 0 && member.power_type == 0 && member.max_power > 0)
+            {
                 manaSum += member.power;
+                manaMax += member.max_power;
+                ++manaAlive;
+            }
         };
         manaLowInParty = dry(bot);
         add(bot);
@@ -446,21 +451,16 @@ void BotPolicy::RouteReadiness(DecideTick& tick, BotTurn& turn, RouteLeg& route)
         {
             state.RouteManaSinceMs = 0;
             state.RouteManaProgressMs = 0;
+            state.RouteManaBaseMs = 0;
         }
         else if (state.RouteManaSinceMs == 0)
         {
             state.RouteManaSinceMs = nowMs;
             state.RouteManaProgressMs = nowMs;
-            state.RouteManaLastSum = manaSum;
+            state.RouteManaBaseSum = manaSum, state.RouteManaBaseMs = nowMs, state.RouteManaBaseAlive = manaAlive;
         }
-        else
-        {
-            // 0.44.14: the 60 s cap counts from the last tick the party's mana rose (the members are drinking), so a priest drinking from 3% is not
-            // dragged into the next pack after 60 s at 40%; a party where nobody gains mana (no drink, cannot sit) still goes on after 60 s.
-            if (manaSum > state.RouteManaLastSum)
-                state.RouteManaProgressMs = nowMs;
-            state.RouteManaLastSum = manaSum;
-        }
+        else if (RecoveryProgress(manaSum, manaMax, manaAlive, nowMs, state.RouteManaBaseSum, state.RouteManaBaseMs, state.RouteManaBaseAlive))
+            state.RouteManaProgressMs = nowMs; // the 60 s cap counts from the last real recovery (drinking), not from regeneration or a revive
     }
     route.manaReady = !manaLowInParty || nowMs - state.RouteManaProgressMs >= kRouteManaMaxMs || nowMs - state.RouteManaSinceMs >= kRouteManaAbsMaxMs;
     // PartyMana: a member that said it is low on mana holds the walk too (never in combat, and never longer than PartyManaHoldSec).

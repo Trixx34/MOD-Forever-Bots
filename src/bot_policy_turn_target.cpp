@@ -117,19 +117,24 @@ void BotPolicy::TurnQuestsAndHold(DecideTick& tick, BotTurn& turn)
                 if (auto const at = indexOf.find(member); at != indexOf.end())
                     checkReady(view.bots[at->second]);
             // 0.44.14: the hold's 45 s cap counts from the last tick the party's health plus mana rose (they are resting), up to kPullHoldAbsMaxMs.
-            std::uint64_t restSum = 0;
-            auto const addRest = [&restSum](BotSnapshot const& member)
+            std::uint64_t restSum = 0, restMax = 0;
+            std::uint32_t restAlive = 0;
+            auto const addRest = [&](BotSnapshot const& member)
             {
-                if (member.life_state == 0)
-                    restSum += std::uint64_t(member.health) + (member.power_type == 0 ? member.power : 0);
+                if (member.life_state != 0)
+                    return;
+                ++restAlive;
+                restSum += std::uint64_t(member.health) + (member.power_type == 0 ? member.power : 0);
+                restMax += std::uint64_t(member.max_health) + (member.power_type == 0 ? member.max_power : 0);
             };
             addRest(bot);
             for (std::uint64_t member : membersOf[bot.guid])
                 if (auto const at = indexOf.find(member); at != indexOf.end())
                     addRest(view.bots[at->second]);
-            if (restSum > state.HoldRestSum)
+            if (ready)
+                state.HoldBaseMs = 0;
+            else if (RecoveryProgress(restSum, restMax, restAlive, nowMs, state.HoldBaseSum, state.HoldBaseMs, state.HoldBaseAlive))
                 state.HoldProgressMs = nowMs;
-            state.HoldRestSum = restSum;
             if (ready && deadWaitKind != 0)
             {
                 ready = false;
