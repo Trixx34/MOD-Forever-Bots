@@ -10,6 +10,7 @@
 #include <memory>
 #include <optional>
 #include <set>
+#include <functional>
 #include <sstream>
 #include <string>
 
@@ -2511,6 +2512,50 @@ void EachPartyWalksItsOwnDungeonsRoute()
     single.SetRouteActive(true);
     auto const one = AfterMount(single, PartyView({ 10, 11, 12, 13, 14, 20, 21, 22, 23, 24 }, options.ClassOf), 0);
     CHECK(walkOf(one, 12) == 500.0f && walkOf(one, 22) == 500.0f);
+}
+
+// 0.44.14: the waits give up 45 s (pull hold) / 60 s (route) after the party's health plus mana last rose, and at 180 s at the latest while it keeps rising.
+void ThePullHoldEndsAfterNoRiseAndAtTheAbsoluteCap()
+{
+    PolicyOptions base = AggressiveOptions();
+    base.PartySize = 5;
+    base.PartyCount = 1;
+    base.ClassOf = WarriorLeads;
+    base.Route = { Point{ 100.0f, 0.0f, 0.0f } };
+    // Runs the hold with a mana user (bot 10) whose mana is `power(step)` at each step; returns the time the leader first walks on, 0 if it never does.
+    auto const heldFor = [&](std::function<std::uint32_t(std::uint64_t)> const& power, std::uint64_t stepMs, std::uint64_t untilMs)
+    {
+        PolicyOptions options = base;
+        BotPolicy policy(options);
+        policy.SetRouteActive(true);
+        WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 }, WarriorLeads);
+        for (BotSnapshot& bot : view.bots)
+        {
+            bot.group_role = bot.guid == 12 ? 2 : 1;
+            bot.group_leader_guid = (std::uint64_t(2) << 56) | 12;
+            bot.max_power = 0;
+        }
+        for (std::uint64_t at = 1000; at <= untilMs; at += stepMs)
+        {
+            for (BotSnapshot& bot : view.bots)
+                if (bot.guid == 10)
+                {
+                    bot.power_type = 0;
+                    bot.max_power = 100000;
+                    bot.power = power(at);
+                }
+            for (BotAction const& action : policy.Decide(view, at))
+                if (action.bot_guid == 12 && action.type == ActionType::kMoveTo && action.dest_x == 100.0f)
+                    return at;
+        }
+        return std::uint64_t(0);
+    };
+    // Flat mana: the leader walks on after about a minute.
+    std::uint64_t const flat = heldFor([](std::uint64_t) { return 5000u; }, 5000, 120000);
+    CHECK(flat >= 45000 && flat <= 70000);   // the 45 s pull hold and the 60 s route wait both lapse by 61 s
+    // Mana rising 8.5 % of the maximum every 5 s and falling back every fourth step: the hold goes on past 45 s and is cut off at 180 s.
+    std::uint64_t const rising = heldFor([](std::uint64_t at) { return std::uint32_t(5000 + ((at / 5000) % 4) * 8500); }, 5000, 300000);
+    CHECK(rising >= 180000 && rising <= 200000);
 }
 
 // 0.44.10: in a Deadmines run a cast result is logged with the bot's level and what the highest rank of the spell costs at that level (-1 when unpriced).
@@ -6767,6 +6812,7 @@ int main()
     TheRouteKeepsWaitingWhileTheHealerDrinks();
     AHeldHealerLogsConsumeCheckAndDrinks();
     ACastResultInTheDeadminesLogsTheWantedCost();
+    ThePullHoldEndsAfterNoRiseAndAtTheAbsoluteCap();
     TwoDruidsDoNotBothCastThePartyBuff();
     AFailingBuffBacksOffLongerEachTime();
     HubTimeoutTriesTheNextHubSoonerThanAnArrival();
