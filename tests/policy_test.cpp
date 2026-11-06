@@ -5286,7 +5286,7 @@ void AHeldHealerLogsConsumeCheckAndDrinks()
     {
         bot.group_role = bot.guid == 12 ? 2 : 1;
         bot.group_leader_guid = (std::uint64_t(2) << 56) | 12;
-        if (bot.guid != 10)
+        if (bot.guid != 12)
             bot.max_power = 0;
         else
         {
@@ -5297,15 +5297,15 @@ void AHeldHealerLogsConsumeCheckAndDrinks()
             bot.food_count = 3;
         }
     }
-    std::vector<BotAction> const actions = policy.Decide(view, 1000);
+    std::vector<BotAction> const actions = policy.Decide(view, 40000);
     bool drank = false;
     for (BotAction const& action : actions)
-        if (action.bot_guid == 10 && action.type == ActionType::kConsume)
+        if (action.bot_guid == 12 && action.type == ActionType::kConsume)
             drank = action.spell_id == 2;
     CHECK(drank);
     bool logged = false;
     for (std::string const& line : events)
-        if (line.find("consume_check: bot=10 ") != std::string::npos && line.find(" drink=5 ") != std::string::npos && line.find(" what=2") != std::string::npos)
+        if (line.find("consume_check: bot=12 ") != std::string::npos && line.find(" drink=5 ") != std::string::npos && line.find(" what=2") != std::string::npos)
             logged = true;
     CHECK(logged);
 }
