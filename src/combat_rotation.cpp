@@ -393,6 +393,24 @@ RotationData ParseRotationData(std::istream& in, std::vector<std::string>& warni
             else if (key == "self") { row.OnTarget = false; targetGiven = true; }
             else if (key == "target") { row.OnTarget = true; targetGiven = true; }
             else if (key == "party") { row.Party = true; row.OnTarget = false; targetGiven = true; }
+            else if (key == "ranks")
+            {
+                // "ranks 1243,1244,1245": the ids of every rank of a buff, so the aura of any rank counts as the buff being up
+                ok = i < t.size();
+                std::string const& list = ok ? t[i++] : std::string();
+                std::size_t from = 0;
+                while (ok && from <= list.size())
+                {
+                    std::size_t const comma = list.find(',', from);
+                    std::uint32_t id = 0;
+                    ok = Whole(list.substr(from, comma == std::string::npos ? std::string::npos : comma - from), id) && id != 0;
+                    if (ok)
+                        row.Ranks.push_back(id);
+                    if (comma == std::string::npos)
+                        break;
+                    from = comma + 1;
+                }
+            }
             else if (key == "range") ok = i + 1 < t.size() && Decimal(t[i++], row.MinRange) && Decimal(t[i++], row.MaxRange);
             else if (key == "always") row.When = Rule{ Cond::Always, 0 };
             else if (key == "target_casting") row.When = Rule{ Cond::TargetCasting, 0 };

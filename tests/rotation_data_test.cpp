@@ -151,6 +151,30 @@ void ABuffTheBotCannotPayForIsNotCast()
     CHECK(Casts(later.Decide(high, 1100), 10, 168, 0));
 }
 
+void ABuffRunningAtAnyRankCountsAsUp()
+{
+    // The core casts the highest rank known, so the aura on the bot carries that rank's id (Frost Armor rank 3 is 7301), not the rank 1 id of the row.
+    auto const hasAura = [](std::uint32_t spell) {
+        WorldTickSnapshotView view = Group(10);
+        view.bots[0].aura_count = 0;
+        view.bots[0].auras[view.bots[0].aura_count++] = forever_module::AuraEntry{ spell, 900000, 1 };
+        return view;
+    };
+    BotPolicy withRanks = MagePolicy("class 8\nbuff 168 duration 1800 self ranks 168,7300,7301\n");
+    CHECK(!Casts(withRanks.Decide(hasAura(7301), 1000), 10, 168, 0));   // the rank 3 aura is the buff being up
+    BotPolicy withRanks2 = MagePolicy("class 8\nbuff 168 duration 1800 self ranks 168,7300,7301\n");
+    CHECK(!Casts(withRanks2.Decide(hasAura(168), 1000), 10, 168, 0));   // and the rank 1 aura too
+    BotPolicy other = MagePolicy("class 8\nbuff 168 duration 1800 self ranks 168,7300,7301\n");
+    CHECK(Casts(other.Decide(hasAura(9999), 1000), 10, 168, 0));        // an unrelated aura is not it
+    BotPolicy plain = MagePolicy("class 8\nbuff 168 duration 1800 self\n");
+    CHECK(Casts(plain.Decide(hasAura(7301), 1000), 10, 168, 0));        // a row without ranks still reads the one id (old files)
+
+    // The parser: a list of ids, and a bad list drops the row.
+    std::vector<std::string> warnings;
+    auto const data = Parse("class 8\nbuff 168 duration 1800 self ranks 168,7300\nbuff 169 duration 60 self ranks 168,,7\nbuff 170 duration 60 self ranks x\n", warnings);
+    CHECK(data && data->ByClass.at(8).size() == 1 && data->ByClass.at(8)[0].Ranks.size() == 2 && data->ByClass.at(8)[0].Ranks[1] == 7300);
+}
+
 void MaxLevelRetiresASupersededBuff()
 {
     BotPolicy policy = MagePolicy("class 8\nbuff 168 level 1 duration 1800 self maxlevel 10   # Frost Armor\nbuff 7302 level 11 duration 1800 self   # Ice Armor\n");
@@ -566,6 +590,7 @@ int main()
 {
     ParsesRowsAndBuffs();
     ABuffTheBotCannotPayForIsNotCast();
+    ABuffRunningAtAnyRankCountsAsUp();
     MaxLevelRetiresASupersededBuff();
     SelfBuffIsCastOutOfCombatThenHeldForItsDuration();
     ABuffRefusedForPowerWaitsLongBeforeItIsTriedAgain();
