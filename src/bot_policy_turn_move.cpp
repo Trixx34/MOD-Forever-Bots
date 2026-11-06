@@ -139,7 +139,7 @@ void BotPolicy::MoveToTarget(DecideTick& tick, BotTurn& turn)
     bool const healerSupport = partyLeader != 0 && state.Role_ != BotState::Role::Dps &&
                                HealSpellFor(classId, bot.level) != 0;
     // A ranged bot that has run out of power closes to melee range: its spells are spent.
-    bool const outOfPower = bot.max_power > 0 && std::uint64_t(bot.power) * 100 < std::uint64_t(bot.max_power) * kOutOfPowerPct;
+    bool const outOfPower = bot.max_power > 0 && BelowPct(bot.power, bot.max_power, kOutOfPowerPct);
     // A hunter with no ammunition cannot shoot (the core refuses every ranged attack): it closes to melee range as well.
     float approach = (outOfPower || NoAmmo(bot, classId)) && !healerSupport ? kMeleeApproachYards : rotation::ApproachYards(classId);
     if (nowMs < state.CloserUntilMs)
@@ -426,7 +426,7 @@ void BotPolicy::RouteReadiness(DecideTick& tick, BotTurn& turn, RouteLeg& route)
         auto const dry = [this](BotSnapshot const& member)
         {
             return member.life_state == 0 && member.power_type == 0 && member.max_power > 0 &&
-                   std::uint64_t(member.power) * 100 < std::uint64_t(member.max_power) * ProfileOfBot(member.guid).RouteMinManaPct;
+                   BelowPct(member.power, member.max_power, ProfileOfBot(member.guid).RouteMinManaPct);
         };
         std::uint64_t manaSum = 0, manaMax = 0;
         std::uint32_t manaAlive = 0;

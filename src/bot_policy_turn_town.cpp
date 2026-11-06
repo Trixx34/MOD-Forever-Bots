@@ -196,7 +196,7 @@ void BotPolicy::TurnWander(DecideTick& tick, BotTurn& turn)
     if (idle && manaUser)
     {
         if (state.ManaRestSinceMs == 0 && nowMs >= state.ManaRestBlockedUntilMs &&
-            std::uint64_t(bot.power) * 100 < std::uint64_t(bot.max_power) * kRestManaBelowPct)
+            BelowPct(bot.power, bot.max_power, kRestManaBelowPct))
             state.ManaRestSinceMs = nowMs;
         if (state.ManaRestSinceMs != 0)
         {
@@ -484,7 +484,7 @@ void BotPolicy::TurnRestAndConsume(DecideTick& tick, BotTurn& turn)
     // Idle means no fight and no player to follow, with no live hostile anywhere near: a sitting bot is easy prey.
     // Creatures only: a hostile player that is not attacking the bot does not stop it from resting (its threat target
     // already does, through hasTarget).
-    bool const hurtEnough = bot.max_health > 0 && std::uint64_t(bot.health) * 100 < std::uint64_t(bot.max_health) * state.RestPct;
+    bool const hurtEnough = bot.max_health > 0 && BelowPct(bot.health, bot.max_health, state.RestPct);
     bool const stillHurt = bot.max_health > 0 && bot.health < bot.max_health;
     // Waiting for the party (dungeon): sits to recover health, and mana for a mana user, even with creatures in view.
     bool const holdIdle = dungeonHold && !hasTarget && wanted.Type == ActionType::kStop && !routeBusy;
@@ -493,16 +493,16 @@ void BotPolicy::TurnRestAndConsume(DecideTick& tick, BotTurn& turn)
     // a pull should not start with the healer (or any mana user) OOM.
     role_profile::Profile const profile = ProfileOfBot(bot.guid);
     bool const dungeonDrink = holdIdle && manaUser && IsRouteActive(bot.guid) &&
-                              std::uint64_t(bot.power) * 100 < std::uint64_t(bot.max_power) * profile.DrinkBelowPct;
+                              BelowPct(bot.power, bot.max_power, profile.DrinkBelowPct);
     bool const manaLow = holdIdle && manaUser &&
-                         std::uint64_t(bot.power) * 100 < std::uint64_t(bot.max_power) * (state.Sitting ? kPartyReadySitHealthPct : (_options.TacticRest ? profile.ReadyPowerPct : kPartyReadyPowerOldPct));
+                         BelowPct(bot.power, bot.max_power, (state.Sitting ? kPartyReadySitHealthPct : (_options.TacticRest ? profile.ReadyPowerPct : kPartyReadyPowerOldPct)));
     // The Rest tactic: the party waits for every member to reach the pull share (90 %), so a member below it sits to get there (it only sat below its own rest share).
     bool const healthLow = holdIdle && _options.TacticRest && bot.max_health > 0 &&
-                           std::uint64_t(bot.health) * 100 < std::uint64_t(bot.max_health) * profile.ReadyHealthPct;
+                           BelowPct(bot.health, bot.max_health, profile.ReadyHealthPct);
     // A dungeon mana user drinks up to the dungeon drink cap; others use the normal manaLow threshold.
     bool const drinkCap = dungeonDrink ? profile.DrinkUpToPct : (state.Sitting ? kPartyReadySitHealthPct : (_options.TacticRest ? profile.ReadyPowerPct : kPartyReadyPowerOldPct));
     bool const manaStillLow = state.Sitting && dungeonDrink &&
-                              std::uint64_t(bot.power) * 100 < std::uint64_t(bot.max_power) * drinkCap;
+                              BelowPct(bot.power, bot.max_power, drinkCap);
     bool const sitWanted = (idle || holdIdle) && (state.Sitting ? (stillHurt || manaLow || manaStillLow || manaResting) : (hurtEnough || healthLow || manaLow || manaResting)) &&
                            nowMs >= state.RestRetryAtMs;
     if (sitWanted != state.Sitting)

@@ -558,6 +558,12 @@ bool CanPay(spell_cost::SpellCostData const* costs, std::uint32_t spell, BotSnap
 // The snapshot facts the supply logic reads (supply_policy.h).
 supply::Facts FactsOf(BotSnapshot const& bot);
 
+// Whether `value` is below `pct` percent of `max` (the comparison is done in 64 bits, no division).
+inline bool BelowPct(std::uint32_t value, std::uint32_t max, std::uint32_t pct)
+{
+    return std::uint64_t(value) * 100 < std::uint64_t(max) * pct;
+}
+
 } // namespace bot_policy_detail
 
 using namespace bot_policy_detail;

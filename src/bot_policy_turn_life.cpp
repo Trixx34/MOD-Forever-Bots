@@ -295,7 +295,7 @@ void BotPolicy::TurnRevivedAndRoles(DecideTick& tick, BotTurn& turn)
         }
     }
 
-    turn.lowHealth = bot.max_health > 0 && std::uint64_t(bot.health) * 100 < std::uint64_t(bot.max_health) * kDisengagePct;
+    turn.lowHealth = bot.max_health > 0 && BelowPct(bot.health, bot.max_health, kDisengagePct);
     auto const& lowHealth = turn.lowHealth;
 
     // ==== Party role, dungeon routing and follow logic (alive bots) ====
