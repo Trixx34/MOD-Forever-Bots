@@ -387,6 +387,13 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
         return;
     }
 
+    ReadCastResult(state, bot, nowMs);
+}
+
+// The answer to a cast (ActionType::kCastSpell): the Deadmines cost log, the resurrect and pet spells, the refusals by status, and the upkeep buffs' back-off.
+// Split from ReadResult (which has already taken the sequence): a spell with no id, or any other action type, is not read here.
+void BotPolicy::ReadCastResult(BotState& state, BotSnapshot const& bot, std::uint64_t nowMs)
+{
     if (bot.last_action_type != uint8_t(ActionType::kCastSpell) || bot.last_action_spell == 0)
         return;
 

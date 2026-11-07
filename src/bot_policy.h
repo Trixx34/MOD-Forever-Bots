@@ -750,6 +750,7 @@ private:
     std::uint64_t DurationMsOf(std::uint32_t classId, std::uint32_t spell, std::string const& spec = {}) const;
 
     void ReadResult(BotState& state, forever_module::BotSnapshot const& bot, std::uint64_t nowMs);
+    void ReadCastResult(BotState& state, forever_module::BotSnapshot const& bot, std::uint64_t nowMs); // the cast half of ReadResult
 
     // Parties (M8): cuts the bots of `view` into parties of _options.PartySize (one faction each, the lowest-guid
     // bots first), picks each party's leader (a set tank role, else a warrior with no role set), and fills
