@@ -2691,6 +2691,61 @@ void TheLeaderWaitsAtABossPointUntilTheBossIsDead()
     CHECK(missed);
 }
 
+// 0.44.17: past the last route point with a boss of the route not dead (Stockade: bosses_missing at 23/23), the leader walks back to that boss point, waits there, and
+// after the sweep (kBossSweepMaxMs) or the kill it stands at the end.
+void TheLeaderSweepsBackToAMissingBoss()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.ClassOf = WarriorLeads;
+    options.Route = { Point{ 100.0f, 0.0f, 0.0f }, Point{ 140.0f, 0.0f, 0.0f }, Point{ 180.0f, 0.0f, 0.0f } };
+    options.RouteBossAt[1] = 644;
+    std::vector<std::string> events;
+    options.OnEvent = [&events](std::string const& line) { events.push_back(line); };
+    auto const at = [](float x)
+    {
+        WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+        for (BotSnapshot& bot : view.bots)
+            bot.pos_x = x;
+        return view;
+    };
+    auto const walkTo = [&](BotPolicy& policy, float x, std::uint64_t now) { return LeaderWalk(policy.Decide(at(x), now)); };
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    walkTo(policy, 0.0f, 0);
+    walkTo(policy, 95.0f, 1000);
+    CHECK(walkTo(policy, 138.0f, 2000) < 0.0f);                    // at the boss point, the boss alive
+    CHECK(walkTo(policy, 138.0f, 190000) == 180.0f);               // boss_missed after kBossHoldMs: on to the last point
+    CHECK(walkTo(policy, 178.0f, 200000) < 0.0f);                  // the end: arrived (the next tick sweeps)
+    walkTo(policy, 178.0f, 201000);                                // the sweep picks the boss point
+    CHECK(walkTo(policy, 178.0f, 202000) == 140.0f);               // back to the boss point
+    CHECK(walkTo(policy, 138.0f, 230000) < 0.0f);                  // and waits there
+    bool swept = false;
+    for (std::string const& line : events)
+        swept = swept || line.rfind("boss_sweep: bot=12 point=1/3 boss=644", 0) == 0;
+    CHECK(swept);
+    policy.SetKilledBosses({ 644 });                               // killed during the wait: back to the end, then it stands
+    walkTo(policy, 138.0f, 240000);
+    walkTo(policy, 178.0f, 250000);
+    CHECK(walkTo(policy, 178.0f, 252000) < 0.0f);
+
+    // A boss that never comes: the sweep gives up after kBossSweepMaxMs and the leader stays at the end.
+    BotPolicy patient(options);
+    patient.SetRouteActive(true);
+    walkTo(patient, 0.0f, 0);
+    walkTo(patient, 95.0f, 1000);
+    walkTo(patient, 138.0f, 2000);
+    walkTo(patient, 138.0f, 190000);
+    walkTo(patient, 178.0f, 200000);
+    walkTo(patient, 178.0f, 201000);                               // the sweep starts at 201 s
+    CHECK(walkTo(patient, 178.0f, 202000) == 140.0f);
+    CHECK(walkTo(patient, 138.0f, 203000) < 0.0f);
+    CHECK(walkTo(patient, 138.0f, 400000) < 0.0f);                 // still waiting (199 s into the sweep)
+    walkTo(patient, 138.0f, 502000);                               // 301 s: the hold ends, the leader goes to the end
+    walkTo(patient, 178.0f, 503000);
+    CHECK(walkTo(patient, 178.0f, 504000) < 0.0f);                 // and does not go back again
+}
+
 void ABossPointIsNeverSkippedForNoRoute()
 {
     PolicyOptions options = AggressiveOptions();
@@ -6582,6 +6637,7 @@ int main()
     TheTankHoldsAtABossUntilItIsSeenDead();
     ALeverIsPulledWhenTheTankComesNear();
     TheLeaderWaitsAtABossPointUntilTheBossIsDead();
+    TheLeaderSweepsBackToAMissingBoss();
     ABossPointIsNeverSkippedForNoRoute();
     ALeaderSkipsAWaypointWithNoRoute();
     EachPartyWalksItsOwnDungeonsRoute();

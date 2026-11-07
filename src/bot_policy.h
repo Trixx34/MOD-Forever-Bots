@@ -612,6 +612,9 @@ private:
         std::uint64_t AtEntrySinceMs = 0;                // a leader has stood at the instance entrance since this time (0 = not there)
         std::uint64_t ConsumeLoggedMs = 0;               // when consume_check was last logged for this bot (held party)
         std::uint64_t LeaderRecoverWaitSinceMs = 0;      // a revived leader at the entrance, resting before it goes to its party: since when (0 = not waiting)
+        std::uint64_t RouteSweepSinceMs = 0;             // 0.44.17: since when the leader goes back to the boss points whose boss is not dead (0 = not sweeping)
+        std::size_t RouteSweepLast = 0;                  // the boss point of the sweep that was walked to last (+1; 0 = none yet)
+        bool RouteSweeping = false;                      // the leader stands at or walks to such a boss point (the route is not walked on from there)
         std::uint64_t RouteBossSinceMs = 0;              // when the leader began to wait at a boss point (0 = not waiting)
         std::uint64_t MoveWhyLoggedMs = 0;               // when the policy last logged why a party bot moves (move_why)
         Point MoveWhyDest{};
@@ -796,6 +799,7 @@ private:
     void RouteLeaderRecover(DecideTick& tick, BotTurn& turn, RouteLeg& route);
     void RouteEvents(DecideTick& tick, BotTurn& turn, RouteLeg& route);
     void RouteWalkOn(DecideTick& tick, BotTurn& turn, RouteLeg& route);
+    void RouteSweepBosses(DecideTick& tick, BotTurn& turn, RouteLeg& route);
     void MoveForQuestOrGoto(DecideTick& tick, BotTurn& turn);
     void TurnIdle(DecideTick& tick, BotTurn& turn);
     void TurnShopping(DecideTick& tick, BotTurn& turn);

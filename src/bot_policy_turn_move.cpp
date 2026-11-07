@@ -377,6 +377,11 @@ void BotPolicy::MoveWithoutTarget(DecideTick& tick, BotTurn& turn)
         RouteEvents(tick, turn, route);
         RouteWalkOn(tick, turn, route);
     }
+    else if (routePoints && !routePoints->empty() && routeBoss && !routeBoss->empty() && IsRouteActive(bot.guid) && partyLeaderBot)
+    {
+        RouteLeg route{ routePoints, routeBoss, routeEvents, &killedNow };
+        RouteSweepBosses(tick, turn, route);
+    }
     MoveForQuestOrGoto(tick, turn);
 }
 
@@ -766,7 +771,7 @@ void BotPolicy::RouteWalkOn(DecideTick& tick, BotTurn& turn, RouteLeg& route)
             {
                 if (state.RouteBossSinceMs == 0)
                     state.RouteBossSinceMs = nowMs;
-                if (nowMs - state.RouteBossSinceMs >= kBossHoldMs)
+                if (nowMs - state.RouteBossSinceMs >= kBossHoldMs || (state.RouteSweeping && nowMs - state.RouteSweepSinceMs >= kBossSweepMaxMs))
                 {
                     if (_options.OnEvent)
                         _options.OnEvent("boss_missed: bot=" + std::to_string(bot.guid) + " point=" + std::to_string(state.RouteIndex) + " boss=" + std::to_string(boss->second));
@@ -775,7 +780,10 @@ void BotPolicy::RouteWalkOn(DecideTick& tick, BotTurn& turn, RouteLeg& route)
             }
             if (!hold)
             {
-                ++state.RouteIndex; // arrived: on to the next point in the same tick
+                if (state.RouteSweeping)
+                    state.RouteIndex = routePoints->size(); // a sweep back to a boss point: from here to the end of the route again (RouteSweepBosses picks the next one)
+                else
+                    ++state.RouteIndex; // arrived: on to the next point in the same tick
                 state.RouteNoRoute = 0;
                 state.RouteBossSinceMs = 0;
                 waypoint = state.RouteIndex < routePoints->size() ? &(*routePoints)[state.RouteIndex] : nullptr;
@@ -851,6 +859,39 @@ void BotPolicy::RouteWalkOn(DecideTick& tick, BotTurn& turn, RouteLeg& route)
                              "," + std::to_string(int(bot.pos_z)));
         }
     }
+}
+
+// 0.44.17: the leader is past the last route point and a boss of the route is not dead (the Stockade ends "bosses_missing" at 23/23 with Dextren, Kam or Bazil standing):
+// it walks back to the first such boss point it has not been sent to yet and waits there as at any boss point (kBossHoldMs), then to the next. The sweep as a whole
+// takes kBossSweepMaxMs; after it, or with nothing missing, the leader stands at the end as before (the scenario then ends the run).
+void BotPolicy::RouteSweepBosses(DecideTick& tick, BotTurn& turn, RouteLeg& route)
+{
+    std::uint64_t nowMs = tick.nowMs;
+    BotSnapshot const& bot = turn.bot;
+    BotState& state = turn.state;
+    if (bot.life_state != 0)
+        return;
+    std::size_t const end = route.routePoints->size();
+    if (state.RouteSweepSinceMs != 0 && nowMs - state.RouteSweepSinceMs >= kBossSweepMaxMs)
+        return; // the sweep is over: the leader stands at the end
+    for (auto const& [point, entry] : *route.routeBoss)
+    {
+        if (point >= end || point + 1 <= state.RouteSweepLast || route.killedNow->count(entry))
+            continue;
+        if (state.RouteSweepSinceMs == 0)
+            state.RouteSweepSinceMs = nowMs;
+        if (_options.OnEvent)
+            _options.OnEvent("boss_sweep: bot=" + std::to_string(bot.guid) + " point=" + std::to_string(point) + "/" + std::to_string(end) + " boss=" + std::to_string(entry) +
+                             " since_ms=" + std::to_string(nowMs - state.RouteSweepSinceMs));
+        state.RouteIndex = point;
+        state.RouteSweepLast = point + 1;
+        state.RouteSweeping = true;
+        state.RouteBossSinceMs = 0;
+        state.RouteNoRoute = 0;
+        state.Last.reset();
+        return;
+    }
+    state.RouteSweeping = false;
 }
 
 // The bot's quest step (walk, accept, hand in, hunt, ...) and a goto order.

@@ -40,6 +40,9 @@ std::size_t BotPolicy::BeginTankLead(BotState& state, BotSnapshot const& bot, Po
     state.RouteIndex = nearest;
     state.RouteNoRoute = 0;
     state.RouteBossSinceMs = 0;
+    state.RouteSweepSinceMs = 0;
+    state.RouteSweepLast = 0;
+    state.RouteSweeping = false;
     state.Last.reset();
     return nearest;
 }

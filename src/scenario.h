@@ -188,7 +188,7 @@ constexpr std::uint64_t kRecoverMaxMs = 240000;
 // through the portal does the same on foot), and again every kEnterRetryMs while some are still outside.
 constexpr std::uint64_t kReenterDelayMs = 20000;
 constexpr std::uint64_t kUnderstrengthGraceMs = 180000; // fewer than MinAlive alive this long: the run is given up
-constexpr std::uint64_t kBossGraceMs = 120000;          // RequireBosses: time allowed after the last waypoint for the remaining bosses to die
+constexpr std::uint64_t kBossGraceMs = 360000;          // RequireBosses: time allowed after the last waypoint for the remaining bosses to die
 constexpr float kRoutePointReachYards = 15.0f; // the leader counts as having reached a waypoint this close to it
 // ...and only this far above or below it (a different storey of the same tower is not "reached"). Shadowfang Keep's own route (2026-10-27) puts its
 // courtyard-floor waypoints (points 4, 9, 10: around the Rethilgore gate) within kRoutePointReachYards in X/Y of its topmost waypoints (points 35, 36:
