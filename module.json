@@ -3,7 +3,7 @@
   "version": "0.45.0",
   "protocol_version": "22",
   "tier1": {
-    "hooks": ["CommandScript", "PlayerScript.OnChat"]
+    "hooks": ["CommandScript", "PlayerScript.OnChat", "PlayerScript.OnBotTrade", "PlayerScript.OnLootItem", "LfgScript.OnQueueUpdate", "GuildScript.OnMemberLevel", "GroupScript.OnInviteDeclined"]
   },
   "tier2": {
     "participates": true,
