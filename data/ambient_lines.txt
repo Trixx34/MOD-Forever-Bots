@@ -191,3 +191,413 @@ g|0|0|local_death|Looks like someone did not make it. Be careful out here.
 g|0|0|local_death|Another one on the ground. Watch your pulls, people.
 g|0|0|local_death|Did you see that? Poor soul. I will keep my distance.
 g|0|0|local_death|Rough luck for whoever that was. {zone} is not forgiving.
+
+# --- General, any level (third batch) ---
+g|0|0|-|Is the road to the next town safe after dark, or should I camp?
+g|0|0|-|Somebody left a campfire burning by the signpost. Thanks, stranger.
+g|0|0|-|I swear that crow has been following me since the gate.
+g|0|0|-|Anyone know how long until the next boat?
+g|0|0|-|Spent twenty minutes looking for a quest giver who was standing right behind me.
+g|0|0|-|The innkeeper here makes the best stew. Not that I'd know, I just stand near it.
+g|0|0|-|It is raining in {zone} again. My boots are not enjoying it.
+g|0|0|-|Does anyone else talk to their mount while riding? Just me?
+g|0|0|-|Found a nice quiet spot to rest. If you need it, it's yours.
+g|0|0|-|Which way is the closest bank from here?
+g|0|0|-|I should write down where I buried that chest. Again.
+g|0|0|-|The sunset over {zone} is something else tonight.
+g|0|0|-|Just ran past a whole camp without waking anything. Proud moment.
+g|0|0|-|Do the guards ever get tired of answering directions?
+g|0|0|-|Who keeps stacking crates in the middle of the road?
+g|0|0|-|My hearthstone is on cooldown and my patience is not far behind.
+g|0|0|-|If anyone sees a brown dog with a red collar, it's friendly, I promise.
+g|0|0|-|That bridge creaks like it is about to give up.
+g|0|0|-|Cold morning, hot tea. I wish.
+g|0|0|-|Anyone else enjoy the music in the inn more than the actual questing?
+g|0|0|-|I picked flowers for twenty minutes and now I'm late for everything.
+g|0|0|-|The trainer told me to practice. So here I am, practicing on a boar.
+g|0|0|-|Left my map at the inn. Navigating by vibes now.
+g|0|0|-|Big respect to anyone who actually reads all the quest text.
+g|0|0|-|There was a rainbow over the lake a minute ago. Missed it? Too bad.
+g|0|0|-|Does the fog ever lift around here, or is that just the look?
+g|0|0|-|My cloak got caught on a thorn bush. The bush won.
+g|0|0|-|Honestly I just like running around and seeing what is over the next hill.
+g|0|0|-|Anyone need directions? I only half know them, but I'll try.
+g|0|0|-|I have never seen so many rabbits in one place.
+g|0|0|-|Someone should put a bench on this hill. Just saying.
+g|0|0|-|Three deaths in a row on the same pull. I respect the boar.
+g|0|0|-|The moon is bright tonight, you can almost read by it.
+g|0|0|-|Grabbed a snack from the cookpot, tastes like victory.
+g|0|0|-|Gotta love an empty road and a long to-do list.
+g|0|0|-|The wind picked up out here. Hold on to your hats, everyone.
+g|0|0|-|Always the last quest item, never the first drop.
+g|0|0|-|Walking beats riding when you want to notice things. Not that I'd admit it in a hurry.
+g|0|0|-|Some days the best plan is just to follow the road.
+g|0|0|-|How many bags does a person really need? Asking for a friend. Mine is full.
+g|0|0|-|Someone's whistling in the trees. If it's you, nice tune.
+g|0|0|-|Heard there's a good fishing spot past the farm. Anyone been?
+g|0|0|-|Just dodged a patrol by the skin of my teeth.
+g|0|0|-|The tavern was loud tonight, so I took my supper outside.
+g|0|0|-|I get lost in every new area, it's practically a hobby.
+g|0|0|-|Smells like smoke over the ridge. Hope nothing's on fire.
+g|0|0|-|Anyone else recognise the faces they keep running into out here?
+g|0|0|-|Those tracks in the mud are bigger than my head.
+g|0|0|-|Resting by the water for a bit. Good company, quiet spot.
+g|0|0|-|I could really go for a roast chicken right about now.
+g|0|0|-|Sorry if I walked through your pull earlier, I was reading the quest log.
+g|0|0|-|Thanks to whoever dropped a heal on me back there. You're a legend.
+g|0|0|-|Standing at the crossroads, wondering which way I meant to go.
+g|0|0|-|It's strange how quickly a quiet road can turn busy in {zone}.
+g|0|0|-|Wolves, boars, spiders. I think the whole world wants a piece of me today.
+g|0|0|-|I owe the stable master an apology for last night.
+g|0|0|-|Anyone want to guess how many steps from here to the capital?
+g|0|0|-|Needed a break, so I counted the stars. Lost count at nineteen.
+g|0|0|-|Keep your head down near the ruins, there's something moving in there.
+g|0|0|-|Every time I clear a camp, it fills right back up. Feels personal.
+g|0|0|-|Could use a walking buddy for the long stretch ahead. Anyone heading that way?
+g|0|0|-|This must be what a vacation feels like. A dangerous one, but still.
+g|0|0|-|I don't mind the grind when the scenery is this nice.
+g|0|0|-|Hey, {zone}! You look good today.
+g|0|0|-|That boar looked at me wrong, so naturally we fought.
+g|0|0|-|The flight path map is a lie, it is always farther than it looks.
+g|0|0|-|My supplies are running low. Might head back before nightfall.
+g|0|0|-|If a stranger offers you a free mount, politely decline. Trust me.
+g|0|0|-|Never trust a quest that starts with "just a quick errand".
+g|0|0|-|Some days I'm a hero, and some days I'm lost in a field.
+g|0|0|-|The old well has the best echo. Try it, it answers back.
+g|0|0|-|Good luck to everyone on a long hunt tonight, may your drops be kind.
+g|0|0|-|I've been standing here so long the birds think I'm a statue.
+g|0|0|-|One more pull, then I'm done for the night. Famous last words.
+g|0|0|-|Look at the size of that moon over {zone}. Unreal.
+g|0|0|-|It's a slow day, but I'm not complaining.
+g|0|0|-|Those berries looked delicious until I saw who was eating them.
+g|0|0|-|Counting my coins at the roadside again. Still fewer than I thought.
+g|0|0|-|Always a good day for a trip somewhere new.
+g|0|0|-|Who builds a tower on a swamp and expects it to stay up?
+g|0|0|-|Gathering herbs and minding my own business. Carry on.
+
+# --- General, low levels 1-20 (third batch) ---
+g|1|20|-|Wait, you can jump onto the roof from here? I did not know that.
+g|1|20|-|Died to a squirrel once. Let's not talk about it.
+g|1|20|-|I just got my first bag upgrade and I feel unstoppable.
+g|1|20|-|Do spiders always hit this hard at my level?
+g|1|20|-|The training dummy and I have become close friends.
+g|1|20|-|Anyone know where the herbalist hides in {zone}?
+g|1|20|-|Just sold my first piece of grey gear. So much money! Almost two coppers.
+g|1|20|-|Somebody tell me how the quest log works, I have nineteen quests and no plan.
+g|1|20|-|These kobolds keep stealing my candle. Not the first time either.
+g|1|20|-|I'm so lost. Which way is the starter village again?
+g|1|20|-|Level {level} and still finding new ways to fall off ledges.
+g|1|20|-|Think I'm ready for the next zone. Maybe. Possibly. Probably not.
+g|1|20|-|Would a kind soul share a few bandages with a newcomer?
+g|1|20|-|Two boars at once, and I'm still here. Growth.
+g|1|20|-|Found a rare spawn but I'm far too low to touch it.
+g|1|20|-|Is it normal to lose track of which quest goes where?
+g|1|20|-|Just picked up my first weapon skill. Feels good.
+g|1|20|-|Took a quest to deliver a letter and walked the long way round. Twice.
+g|1|20|-|Can anyone point me toward the nearest inn, please?
+g|1|20|-|My first mount is a long way off, but I can wait.
+g|1|20|-|So many things to loot. I can barely carry any more.
+g|1|20|-|Spent an hour looking for mushrooms and found a single one.
+g|1|20|-|I've learned that mobs with names tend to hit harder.
+g|1|20|-|Thanks to the stranger who showed me where the trainer was. Very kind.
+g|1|20|-|Starting to like this place more every level.
+g|1|20|-|The first cave is scary, but the loot is good.
+g|1|20|-|Didn't know potions had a cooldown. Learned that the hard way.
+g|1|20|-|The rats around here are the size of cats. I miss home.
+g|1|20|-|I think I'll skip the dark forest until I'm a bit stronger.
+g|1|20|-|Almost ready to buy my first real armor piece. Soon.
+g|1|20|-|It's my first time here. Be gentle, please.
+g|1|20|-|Practice makes passable, they say. I am passable.
+g|1|20|-|Anyone else treat the first few levels like a nature walk?
+g|1|20|-|Hoping for a warm sword drop before the next quest.
+g|1|20|-|Where do I turn in this quest? The text did not help at all.
+g|1|20|-|New {class} here. Any tips for the early levels?
+g|1|20|-|Dad always said to wear a hat. I never got one, and I regret it.
+g|1|20|-|Fell asleep while waiting for a spawn. Woke up to three of them.
+g|1|20|-|Just got a lucky drop from a gnoll. Hoping it's worth something.
+g|1|20|-|Should I be saving silver or spending it? Too many choices.
+g|1|20|-|The first dungeon looks scary from the outside.
+
+# --- General, mid levels 20-40 (third batch) ---
+g|20|40|-|The long road between zones always makes me hungry.
+g|20|40|-|Anyone else tired of running back from the graveyard? Just me?
+g|20|40|-|I finally saved enough for my riding skill. Almost there.
+g|20|40|-|Good place to farm herbs around here, if you can handle the wolves.
+g|20|40|-|Level {level} feels like the halfway point of everything.
+g|20|40|-|Elites patrol this path now. Stay sharp near the bend.
+g|20|40|-|The new armor smell is almost worth the price.
+g|20|40|-|Spent an hour on a single quest chain and loved every second.
+g|20|40|-|Wondering if I should pick up a second profession or stay focused.
+g|20|40|-|Heard the dungeon nearby has a decent set drop. Worth a try?
+g|20|40|-|Slow night in {zone}, but I made some progress.
+g|20|40|-|The ghosts in this swamp give me the chills.
+g|20|40|-|Wish the next quest hub was closer than a twenty minute ride.
+g|20|40|-|Nothing like a long camp session with good company.
+g|20|40|-|Finally picked up the better shield. Smooth sailing from here.
+g|20|40|-|A patient pull beats a lucky pull every time.
+g|20|40|-|You get used to the big mobs after a while. Mostly.
+g|20|40|-|Who keeps tagging my quest mobs? Come on, share the field.
+g|20|40|-|At this level the fights start to feel like real fights.
+g|20|40|-|Tomorrow I'll get serious. Tonight I explore.
+g|20|40|-|Gold is slow but steady. Next stop, the trainer.
+g|20|40|-|Stuck between two quest areas and can't decide which to do first.
+g|20|40|-|The ruins out east are full of surprises, and not the nice kind.
+g|20|40|-|I count three camps within one hill. Nice and efficient.
+g|20|40|-|Just survived a pack of wolves with one health bar. Never again.
+g|20|40|-|Found a secret path behind the waterfall. Not sharing where.
+g|20|40|-|Do I fight the ogres or sneak around them? Decisions.
+g|20|40|-|This stretch of {zone} is prettier than I remember.
+g|20|40|-|Sometimes you just need a long ride and a good view.
+g|20|40|-|The capital feels very far away right now.
+g|20|40|-|Picked a fight with a large crocodile. Regret is a strong word.
+g|20|40|-|I'm going to take one more quest before calling it a night.
+g|20|40|-|Hearing murmurs about a rare spawn in the hills. Anyone seen it?
+g|20|40|-|Mana is low and my patience is lower.
+g|20|40|-|Only a few more levels before the next big goal. Let's go.
+g|20|40|-|The deeper I go into {zone}, the stranger it gets.
+g|20|40|-|The ferry captain looked at me funny. Guilty conscience, I guess.
+g|20|40|-|At this level repair bills start to hurt. Be kind to your gear.
+g|20|40|-|I need a second pair of boots after that last swamp.
+g|20|40|-|Skipping the optional quests this time. We'll see if that was wise.
+g|20|40|-|Traded stories with a traveler tonight. He made up half of them, I think.
+g|20|40|-|Making camp early tonight. Too many things that go bump.
+
+# --- General, high levels 40-60 (third batch) ---
+g|40|60|-|The long grind from here to the top is all about patience.
+g|40|60|-|Anyone been to the burning plains lately? Heard it's rough.
+g|40|60|-|Still saving for my epic mount. Almost there, no really.
+g|40|60|-|Packs are bigger and meaner at this level. Take it slow.
+g|40|60|-|Wish we had a few more healers on the road these days.
+g|40|60|-|A good group makes all the difference up here.
+g|40|60|-|My repair bill this week would make a dwarf cry.
+g|40|60|-|Level {level} and I still get a thrill from a clean pull.
+g|40|60|-|Don't let the pretty scenery fool you, that cave is full of surprises.
+g|40|60|-|Farming for the last few reputation points. So close.
+g|40|60|-|Getting ready for the big dungeon. Bags packed, potions stocked.
+g|40|60|-|Rare mobs here drop good stuff, if you can kill them.
+g|40|60|-|Never stop learning. Even at the top, there's more to know.
+g|40|60|-|Too many elites for one person. Looking for someone to team up.
+g|40|60|-|It's a long way to the top, but the view is worth it.
+g|40|60|-|My cooldowns and I have a lot of understanding now.
+g|40|60|-|Always bring more food than you think you need.
+g|40|60|-|The dungeon was worth every minute. Loot or no loot.
+g|40|60|-|Spent the whole evening hunting a single drop. Not even a little sorry.
+g|40|60|-|The road north has gotten far more dangerous this week.
+g|40|60|-|Still impressed by how the world looks from a high ridge.
+g|40|60|-|Anyone else have a favorite spot to rest in {zone}?
+g|40|60|-|Gear check before we move out. Everyone good?
+g|40|60|-|I remember when this zone felt huge. Now it is just home.
+g|40|60|-|Elite quests are more fun with friends.
+g|40|60|-|It takes grit to make it past fifty. We're almost there.
+g|40|60|-|Need one more piece for the set. The drop rate is a joke.
+g|40|60|-|Respect for the healers who keep us alive. Truly.
+g|40|60|-|The mounted patrols out here do not mess around.
+g|40|60|-|Seeing a high level pass by always makes me smile.
+g|40|60|-|The ruins are crawling with undead tonight. Pass.
+g|40|60|-|My weapon is chipped, my pack is heavy, and I'm very happy.
+g|40|60|-|Anyone spotted a rare around here? Asking for a good reason.
+g|40|60|-|The last bit of {zone} is the toughest. You earn every step.
+g|40|60|-|Gathering mats for the next big craft. Slow work.
+g|40|60|-|Saw a big dragon shadow fly overhead earlier. Not telling anyone.
+g|40|60|-|Always check your bags before the big fight. Learned that one twice.
+g|40|60|-|Whoever invented flight paths deserves a medal.
+g|40|60|-|Veteran tip: always drink before pulling. Always.
+g|40|60|-|Tough night, but I made it out with some good loot.
+g|40|60|-|If you are low on health, don't try to be a hero. I mean it.
+
+# --- General, zone-aware chatter ---
+g|0|0|-|I could spend all day just wandering around {zone}.
+g|0|0|-|There is something about {zone} that makes everything feel bigger.
+g|0|0|-|Guess I'll never get tired of the view in {zone}.
+g|0|0|-|If you're new to {zone}, welcome. Watch the roads at night.
+g|0|0|-|Heard a rumour that something big is stirring in {zone}.
+g|0|0|-|{zone} has the best sunrises. Fight me.
+g|0|0|-|Spent the evening exploring all corners of {zone}. Tired but happy.
+g|0|0|-|Anyone want to trade travel stories about {zone}?
+g|0|0|-|The people in {zone} are friendlier than I expected.
+g|0|0|-|I was told {zone} would be easy. I was told wrong.
+g|0|0|-|After all these years, {zone} still has places I've never been.
+g|0|0|-|The wildlife in {zone} seems to be getting bolder.
+g|0|0|-|Heading across {zone} on foot tonight. Wish me luck.
+g|0|0|-|The innkeepers in {zone} always know the best gossip.
+g|0|0|-|There are worse places than {zone} to spend a quiet evening.
+
+# --- Class flavour (third batch) ---
+g|0|0|-|There is no feeling quite like a clean pull as a {class}.
+g|0|0|-|Any other {class} around? We should swap tips sometime.
+g|0|0|-|Being a {class} is a bit of a lonely road, but I like it.
+g|0|0|-|My trainer said a good {class} knows when to retreat. I am working on that.
+g|0|0|-|The {class} life: lots of walking, plenty of cooldowns.
+g|0|0|-|Once a {class}, always a {class}. Even in {zone}.
+g|0|0|-|Spent the whole afternoon practicing my {class} rotation. Slowly improving.
+g|0|0|-|If you see a {class} looking lost around {zone}, say hello. It's probably me.
+g|0|0|-|There are good days and bad days as a {class}. Today is a good one.
+g|0|0|-|Do other {class} players have this much trouble with bags? Asking for me.
+
+# --- Level-up, more variants (third batch) ---
+g|0|0|level|Ding! Level {level}.
+g|0|0|level|Level {level}! Time for a short break and some food.
+g|0|0|level|Finally, level {level}. That last bit took forever.
+g|0|0|level|Level {level} unlocked a few new tricks. Let's see what they do.
+g|0|0|level|That's level {level} for this {class}. Onwards.
+g|0|0|level|Level {level} and I am feeling pretty good about it.
+g|0|0|level|A new level, {level}, and my feet are still on the ground.
+g|0|0|level|Reached level {level} just now. Anyone nearby, you heard it first.
+g|0|0|level|Level {level}! The trainer will be happy to see me.
+g|0|0|level|Wow, level {level} already? Time flies in {zone}.
+t|0|0|level|Level {level} today. Selling my old gear to fund the next set.
+t|0|0|level|Ding, level {level}. Anyone got a good weapon to sell?
+t|0|0|level|Level {level} reached. Looking for bags and herbs, whisper me.
+t|0|0|level|Level {level}, and my coin purse is still light. Time to sell.
+
+# --- Boss kills, more variants (third batch) ---
+g|0|0|boss_kill|Got him! Check the corpse for loot, everyone.
+g|0|0|boss_kill|That was a good fight. Anyone need a break before the next room?
+g|0|0|boss_kill|Down he goes. That took some teamwork.
+g|0|0|boss_kill|Well played, everyone. Nobody wiped, nobody quit.
+g|0|0|boss_kill|Boss is dead. I think my hands are still shaking.
+g|0|0|boss_kill|Finally! That boss gave us a real run for the money.
+g|0|0|boss_kill|One more down. Now where is the exit?
+g|0|0|boss_kill|He's down, he's down! Great work, team.
+g|0|0|boss_kill|That fight took everything I had. Worth it, though.
+
+# --- Local deaths, more variants (third batch) ---
+g|0|0|local_death|Oof. Someone just went down hard near {zone}.
+g|0|0|local_death|Poor fellow. That one came out of nowhere.
+g|0|0|local_death|I saw that. May the next run go better.
+g|0|0|local_death|Another casualty. Keep an eye on your health, folks.
+g|0|0|local_death|Somebody needs a rez. I'd help, but I'm too far.
+g|0|0|local_death|That did not end well for them. Careful, friends.
+g|0|0|local_death|Looks like someone pulled more than they could handle.
+g|0|0|local_death|Tough break for that one. I'll steer clear of that spot.
+g|0|0|local_death|Down they go. Hope the walk back is short.
+
+# --- Trade, any level (third batch) ---
+t|0|0|-|WTS stack of linen cloth, 20 pieces, whisper offers.
+t|0|0|-|WTB copper bars, as many as you have. Paying fair.
+t|0|0|-|WTS a stack of light leather, prime condition.
+t|0|0|-|WTB wool cloth, whisper me your price.
+t|0|0|-|Selling a few stacks of peacebloom, cheaper than the auction house.
+t|0|0|-|WTS tin ore, ten pieces, bulk deals available.
+t|0|0|-|Looking for a six-slot bag, paying silver. Whisper.
+t|0|0|-|The auction house cut is brutal. Selling here instead, whisper me.
+t|0|0|-|WTB silverleaf, I need a few for a potion batch.
+t|0|0|-|WTS spare runed copper rods, whisper if interested.
+t|0|0|-|Anyone selling an eight-slot bag? Name your price.
+t|0|0|-|WTB rough stones, any amount. Need them for a recipe.
+t|0|0|-|WTS wool bolts, fair price, never used.
+t|0|0|-|Cheap vendor trash for sale, whisper for the list.
+t|0|0|-|WTB heavy leather, stack of ten if you have it.
+t|0|0|-|Selling healing potions at less than vendor price. Just ask.
+t|0|0|-|LF a blacksmith to craft me a mace. I'll bring the bars.
+t|0|0|-|WTS bolts of linen cloth. Perfect for first aid.
+t|0|0|-|Buying tin bars and bronze bars, offers welcome.
+t|0|0|-|WTS stacks of copper ore. Whisper for a quick deal.
+t|0|0|-|Who has a spare bag? I'm out of room and drowning in loot.
+t|0|0|-|Selling junk from the dungeon run. Whisper to browse.
+t|0|0|-|WTB mining pick, anything works. Paying cash.
+t|0|0|-|Anyone buying cheap potions? Bulk discount.
+t|0|0|-|WTS stack of ruined leather scraps for crafters.
+t|0|0|-|WTB mageweave, ten bolts or more. Whisper me.
+t|0|0|-|Auction house price is too high for me. Anyone selling cheaper?
+t|0|0|-|WTS fine green gear, mostly unused, pick your piece.
+t|0|0|-|WTB healing herbs for alchemy. Name your price.
+t|0|0|-|Selling two stacks of rough arrows, whisper me.
+t|0|0|-|LF someone selling water or bread, I'll buy a stack.
+t|0|0|-|Buying Elixir of Defense, whisper your price.
+t|0|0|-|WTS stack of spider silk, hand-gathered.
+t|0|0|-|WTB a stack of firebloom if anyone has them.
+t|0|0|-|Anyone selling a decent quiver? Mine has a hole.
+t|0|0|-|Leatherworker for hire. Bring your own hides.
+t|0|0|-|Going cheap: wool boots, never worn.
+t|0|0|-|WTS copper ore, tin ore, a bit of everything.
+t|0|0|-|WTB bronze bars. Quick deal, whisper me.
+t|0|0|-|Buying wool bandages, need at least twenty.
+t|0|0|-|Looking for an enchanter to put a little bonus on my boots.
+t|0|0|-|WTB goldthorn, a few stacks. Will pay above market.
+t|0|0|-|The vendors are paying so little today. Anyone want my spare gear?
+t|0|0|-|WTS thick leather, three stacks, cheaper in bulk.
+t|0|0|-|LF someone to sell me fresh bread, my pack is empty.
+t|0|0|-|WTB silk cloth, plenty of it, whisper a price.
+t|0|0|-|Selling a bundle of arrows, plenty for a long hunt.
+t|0|0|-|Spare ore for sale, no reasonable offer refused.
+t|0|0|-|WTS gently used cloth armor, mostly unworn.
+t|0|0|-|WTB runecloth in stacks, will pay above auction price.
+t|0|0|-|Who sells reagents cheap? I will buy a lot.
+t|0|0|-|Anyone selling a pair of sturdy gloves? Buying.
+t|0|0|-|Spare bags for sale, don't ask where I got them.
+t|0|0|-|WTS Ruined Leather Scraps, 40 or so, whisper.
+t|0|0|-|WTB a quiver and some arrows, whisper me.
+t|0|0|-|Cheap meat for sale. Cooks, come and get it.
+t|0|0|-|Anyone buying cheap stuff from the dungeon? I have a pile.
+t|0|0|-|WTS ten bolts of mageweave, good price, whisper.
+t|0|0|-|Trading a few herbs for any decent offhand.
+t|0|0|-|WTB a few bronze bars and some coarse stone. Whisper offers.
+t|0|0|-|Gold is tight this week. Selling my spare linen cloth.
+t|0|0|-|WTS enough leather for a whole set. Take it or leave it.
+t|0|0|-|The auction house is flooded with copper bars today. Prices are low.
+t|0|0|-|WTB a stack of Silk Cloth. Offers in gold.
+t|0|0|-|Selling a bag of mixed herbs, five silver each.
+t|0|0|-|WTS Weak Troll's Blood Potion, six of them.
+t|0|0|-|Heavy hides for sale, bulk or single.
+t|0|0|-|Buying simple bows, any level, paying cash.
+t|0|0|-|Selling a few vials of antidote, cheap.
+t|0|0|-|WTB soft bread and water, a few stacks of each.
+t|0|0|-|WTS stack of silver bars, lightly used.
+t|0|0|-|The vendor won't pay fair for these boots. Anyone interested?
+t|0|0|-|Looking for a friendly crafter, I have the ore, you have the time.
+t|0|0|-|WTS leftover cloth from a long night of questing.
+t|0|0|-|Buying low-level armor for a friend, whisper offers.
+t|0|0|-|WTS Linen Bandages, 30 of them.
+t|0|0|-|Selling extra torches, 5 copper each.
+t|0|0|-|WTB a decent staff, anything plain will do.
+t|0|0|-|Anyone selling a shortsword? Not picky.
+t|0|0|-|WTS three stacks of spider eyes, whisper me.
+t|0|0|-|Sell high, buy low. That's all I know about the auction house.
+
+# --- Trade, low levels 1-20 ---
+t|1|20|-|WTS spare wolf meat, leftover from my quest.
+t|1|20|-|WTB a 6-slot bag, any kind, please whisper.
+t|1|20|-|Selling some linen cloth I picked up, cheap.
+t|1|20|-|WTS Light Leather from the boars. Fair price.
+t|1|20|-|Looking to buy a cheap starter weapon, low level is fine.
+t|1|20|-|WTB some copper ore for my first profession.
+t|1|20|-|Selling three bits of grey gear for vendor price.
+t|1|20|-|WTB any cloth shoes, I'm cold. Whisper.
+t|1|20|-|WTS spare herbs, first batch, bargain bin.
+t|1|20|-|Anyone selling a cheap small bag? I only have room for five things.
+t|1|20|-|WTS a stack of rough stone, anyone starting out in mining?
+t|1|20|-|WTB leather scraps, newbie crafter here.
+t|1|20|-|Anyone want my spare bandages? Newbie prices.
+t|1|20|-|Selling spare mushrooms, never ate one.
+
+# --- Trade, mid levels 20-40 ---
+t|20|40|-|WTB mithril ore, a few stacks. Paying in silver.
+t|20|40|-|WTS stack of medium leather, whisper me.
+t|20|40|-|WTS Greater Healing Potions, small batch.
+t|20|40|-|WTB mageweave bolts for a tailoring project.
+t|20|40|-|Looking to buy a ten-slot bag, name your price.
+t|20|40|-|Selling a few spare green items from the dungeon.
+t|20|40|-|WTB spare armor kits for my boots, whisper offers.
+t|20|40|-|WTS spare truesilver ore, fair offers welcome.
+t|20|40|-|WTB heavy leather and a few scraps, crafting day.
+t|20|40|-|Selling extra elixirs, good for a long run.
+t|20|40|-|WTS a stack of mageweave for a nice price.
+t|20|40|-|WTB dungeon food, a few stacks please.
+t|20|40|-|WTS mining supplies, pick one up cheap.
+
+# --- Trade, high levels 40-60 ---
+t|40|60|-|WTB runecloth in bulk, whisper me.
+t|40|60|-|WTS Major Healing Potions, small batch, cheaper than the auction house.
+t|40|60|-|Looking for a bag with 14 slots, will pay well.
+t|40|60|-|WTS thorium ore, three stacks, whisper offers.
+t|40|60|-|WTB heavy leather and rugged leather, any amount.
+t|40|60|-|WTS spare epic-quality materials, serious offers only.
+t|40|60|-|WTB flasks for the next dungeon run, whisper.
+t|40|60|-|Selling a few spare green weapons, level 45 and up.
+t|40|60|-|WTB dark iron ore, I'll pay above market.
+t|40|60|-|Anyone selling bolts of runecloth? Buying a stack.
+t|40|60|-|WTS spare bag, 16 slots. Hard to find, fair price.
+t|40|60|-|Buying herbs for a big batch of elixirs, whisper.
+t|40|60|-|WTS a few rare cloth drops, no lowballing please.
+t|40|60|-|Gold is slow this week, selling my spare reagents.
