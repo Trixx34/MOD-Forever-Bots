@@ -22,8 +22,8 @@ struct Profile
 {
     std::uint32_t DrinkBelowPct = 50;    // a held mana user starts to drink below this mana
     std::uint32_t DrinkUpToPct = 95;     // ... and drinks up to this
-    std::uint32_t RouteMinManaPct = 80;  // the leader walks on only when every mana user of the party has at least this much
-    std::uint32_t ReadyPowerPct = 95;    // the pull hold waits until every mana user has this much (Rest tactic)
+    std::uint32_t RouteMinManaPct = 70;  // the leader walks on only when every mana user of the party has at least this much
+    std::uint32_t ReadyPowerPct = 85;    // the pull hold waits until every mana user has this much (Rest tactic)
     std::uint32_t ReadyHealthPct = 90;   // ... and every member this much health
 };
 

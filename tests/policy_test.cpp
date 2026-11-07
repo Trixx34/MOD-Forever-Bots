@@ -2550,9 +2550,9 @@ void ThePullHoldEndsAfterNoRiseAndAtTheAbsoluteCap()
         }
         return std::uint64_t(0);
     };
-    // Flat mana: the leader walks on after about a minute.
+    // Flat mana: the leader walks on after about 40 s.
     std::uint64_t const flat = heldFor([](std::uint64_t) { return 5000u; }, 5000, 120000);
-    CHECK(flat >= 45000 && flat <= 70000);   // the 45 s pull hold and the 60 s route wait both lapse by 61 s
+    CHECK(flat >= 30000 && flat <= 50000);   // the 35 s route wait lapses by 36 s, the 45 s pull hold by 46 s
     // Mana rising 8.5 % of the maximum every 5 s and falling back every fourth step: the hold goes on past 45 s and is cut off at 180 s.
     std::uint64_t const rising = heldFor([](std::uint64_t at) { return std::uint32_t(5000 + ((at / 5000) % 4) * 8500); }, 5000, 300000);
     CHECK(rising >= 180000 && rising <= 200000);
@@ -5342,8 +5342,8 @@ void TheRouteWaitsForTheHealersMana()
         return false;
     };
     CHECK(!walks(policy.Decide(view, 1000), 12));
-    CHECK(!walks(policy.Decide(view, 41000), 12));
-    CHECK(walks(policy.Decide(view, 100000), 12)); // given up after 60 s
+    CHECK(!walks(policy.Decide(view, 30000), 12));
+    CHECK(walks(policy.Decide(view, 100000), 12)); // given up after 35 s
     // Mana full: the leader walks at once.
     BotPolicy full(options);
     full.SetRouteActive(true);
@@ -5434,18 +5434,18 @@ void TheRouteKeepsWaitingWhileTheHealerDrinks()
     CHECK(!walks(policy.Decide(view, 1000), 12));
     setHealerMana(200);
     CHECK(!walks(policy.Decide(view, 50000), 12));
-    CHECK(!walks(policy.Decide(view, 100000), 12));   // 50 s after the last rise: still waiting (the plain 60 s cap would have ended at 61 s)
+    CHECK(!walks(policy.Decide(view, 80000), 12));   // 30 s after the last rise: still waiting (the plain 35 s cap would have ended at 36 s)
     setHealerMana(400);
-    CHECK(!walks(policy.Decide(view, 140000), 12));
-    // No rise for 60 s: goes on.
+    CHECK(!walks(policy.Decide(view, 110000), 12));
+    // No rise for 35 s: goes on.
     BotPolicy stuck(options);
     stuck.SetRouteActive(true);
     setHealerMana(50);
     CHECK(!walks(stuck.Decide(view, 1000), 12));
     setHealerMana(300);
     CHECK(!walks(stuck.Decide(view, 30000), 12));
-    CHECK(!walks(stuck.Decide(view, 80000), 12));
-    CHECK(walks(stuck.Decide(view, 95000), 12));      // 65 s without a rise
+    CHECK(!walks(stuck.Decide(view, 60000), 12));
+    CHECK(walks(stuck.Decide(view, 95000), 12));      // 65 s without a rise (the cap is 35 s)
     // Rising forever: cut off at kRouteManaAbsMaxMs (180 s).
     BotPolicy rising(options);
     rising.SetRouteActive(true);

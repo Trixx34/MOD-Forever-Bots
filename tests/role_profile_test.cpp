@@ -36,11 +36,11 @@ int main()
     CHECK(StyleOf(2, PlayedRole::Tank) == Style::Tank);       // protection paladin
     CHECK(StyleOf(11, PlayedRole::Tank) == Style::Tank);      // bear druid
     CHECK(StyleOf(8, PlayedRole::Healer) == Style::Healer);
-    // Every profile equals the old constants (kDungeonDrinkBelowPct 50, kDungeonDrinkUpToPct 95, kRouteMinManaPct 80, kPartyReadyPowerPct 95, kPartyReadyHealthPct 90)
+    // Every profile equals the old constants (kDungeonDrinkBelowPct 50, kDungeonDrinkUpToPct 95, kRouteMinManaPct 70, kPartyReadyPowerPct 85, kPartyReadyHealthPct 90)
     for (Style s : { Style::Tank, Style::Healer, Style::MeleeDps, Style::RangedDps, Style::CasterDps })
     {
         Profile const p = ProfileOf(s);
-        CHECK(p.DrinkBelowPct == 50 && p.DrinkUpToPct == 95 && p.RouteMinManaPct == 80 && p.ReadyPowerPct == 95 && p.ReadyHealthPct == 90);
+        CHECK(p.DrinkBelowPct == 50 && p.DrinkUpToPct == 95 && p.RouteMinManaPct == 70 && p.ReadyPowerPct == 85 && p.ReadyHealthPct == 90);
     }
     if (failures == 0)
         std::puts("role_profile_test: all passed");

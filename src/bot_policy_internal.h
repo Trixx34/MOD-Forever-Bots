@@ -247,9 +247,9 @@ constexpr std::uint32_t kBanishSpell = 710;
 constexpr std::uint64_t kCcRefreshBeforeMs = 3000;
 constexpr float kRouteWaitYards = 30.0f;         // the leader waits for a member farther behind than this
 constexpr std::uint32_t kRouteMinHealthPct = 80; // and for its own health to be at least this
-constexpr std::uint32_t kRouteMinManaPct = 80;   // the leader walks on only when every mana user of the party has at least this much mana (the healer walked into fights at 3%)
+constexpr std::uint32_t kRouteMinManaPct = 70;   // the leader walks on only when every mana user of the party has at least this much mana (the healer walked into fights at 3%)
 constexpr std::uint64_t kRouteManaAbsMaxMs = 180000; // 0.44.14: the wait is cut off here even while mana still rises (a full priest needs about 90 s of drinking from 3%)
-constexpr std::uint64_t kRouteManaMaxMs = 60000;  // and never waits longer than this for mana (no drink left, or a member that cannot sit)
+constexpr std::uint64_t kRouteManaMaxMs = 35000;  // and never waits longer than this for mana (no drink left, or a member that cannot sit)
 constexpr std::uint32_t kRouteTopUpPct = 90;     // out of a fight, the party's healer heals the route leader up to this (above kRouteMinHealthPct, so it walks on)
 // A leader walking the route that has not moved this far in this long, out of combat, has a move that went nowhere (sent once, no answer; dm#6 of 2026-10-26 stood
 // 53 minutes so): the move is sent again and counted as a refusal (kRouteNoRouteSkip), so the point is recovered or skipped as for a "no route".
@@ -259,7 +259,7 @@ constexpr std::uint64_t kRouteHoldLogMs = 30000; // a leader that does not walk 
 // Dungeon pull control: the tank (the party leader) pulls only when the party is ready, and the others wait for the tank to hold the target.
 constexpr std::uint32_t kPartyReadyHealthOldPct = 80, kPartyReadyPowerOldPct = 60; // with the Rest tactic off
 constexpr std::uint32_t kPartyReadyHealthPct = 90;  // every living member has at least this much health
-constexpr std::uint32_t kPartyReadyPowerPct = 95;   // and every mana user at least this much mana (matches drink cap)
+constexpr std::uint32_t kPartyReadyPowerPct = 85;   // and every mana user at least this much mana (matches drink cap)
 constexpr std::uint32_t kPartyReadySitHealthPct = 95; // a sitting member rests up to this much
 constexpr std::uint64_t kPullHoldClearMs = 10000;  // the party must be ready this long in a row before a pull hold ends
 constexpr std::uint32_t kRecoveryRisePct = 8;        // a rise counts as recovery when it is this much of the summed maximum within kRecoveryWindowMs (drinking gives about 14 % in 10 s, plain regeneration about 3 %)
