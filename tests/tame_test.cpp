@@ -216,6 +216,34 @@ void ARefusedTameCallsOrRevivesTheStoredPetFirst()
     CHECK(!Has(policy.Decide(View(bot, { beast }, 6), 12000), ActionType::kCastSpell, 1515));
 }
 
+// The sim's hunters had not learned Tame Beast: the core answers "spell not known". That is not the stored-pet refusal: no Call Pet / Revive Pet, no cast again for ten minutes.
+void ANotLearnedTameBeastIsNotAStoredPetRefusal()
+{
+    std::vector<std::string> events;
+    PolicyOptions options;
+    options.ClassId = 3;
+    options.TameBeasts = Beasts();
+    options.OnEvent = [&events](std::string const& line) { events.push_back(line); };
+    BotPolicy policy(options);
+    NearbyUnit const beast = Beast(157, 5, 10.0f, 15);
+    BotSnapshot bot = Hunter(20);
+    CHECK(Has(policy.Decide(View(bot, { beast }, 1), 1000), ActionType::kCastSpell, 1515));
+    bot.last_action_type = std::uint8_t(ActionType::kCastSpell);
+    bot.last_action_spell = 1515;
+    bot.last_action_status = forever_module::BotActionStatus::kNotKnown;
+    bot.last_action_sequence = 1;
+    policy.Decide(View(bot, { beast }, 2), 4500);
+    for (std::uint64_t now = 6000; now < 500000; now += 5000)
+        CHECK(!Has(policy.Decide(View(bot, { beast }, now), now), ActionType::kCastSpell, 1515));
+    bool notKnown = false, refused = false;
+    for (std::string const& line : events)
+    {
+        notKnown = notKnown || line.find("tame_failed") != std::string::npos && line.find("why=not_known") != std::string::npos;
+        refused = refused || line.find("why=refused") != std::string::npos;
+    }
+    CHECK(notKnown && !refused);
+}
+
 void BothPetCastsRefusedMeansNoStoredPetAndTamingGoesOn()
 {
     BotPolicy policy = HunterPolicy();
@@ -410,6 +438,7 @@ int main()
     ANoPetAfterTheChannelIsAFailureWithARetryPause();
     ARefusedCastEndsTheHoldAtOnce();
     ARefusedTameCallsOrRevivesTheStoredPetFirst();
+    ANotLearnedTameBeastIsNotAStoredPetRefusal();
     BothPetCastsRefusedMeansNoStoredPetAndTamingGoesOn();
     TwoHuntersDoNotTameTheSameBeast();
     AGroupedHunterTamesOnlyInTheTamingPhaseAndStaysPut();

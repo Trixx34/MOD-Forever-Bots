@@ -558,7 +558,17 @@ BotPolicy::TurnFlow BotPolicy::TurnTaming(DecideTick& tick, BotTurn& turn)
             {
                 state.TameUntilMs = 0;
                 _tameClaims.erase(state.TameTarget);
-                if (refusedNow)
+                bool const notKnown = state.TameNotKnown && !hurtInCombat;
+                state.TameNotKnown = false;
+                if (notKnown)
+                {
+                    // Not learned (the sim's hunters never had Tame Beast: 8 casts, 8 "spell not known"): not the stored-pet refusal, so no Call Pet / Revive Pet round; wait long.
+                    state.TameFailures = 0;
+                    state.TameRetryAtMs = nowMs + kTameNotKnownMs;
+                    if (_options.OnEvent)
+                        _options.OnEvent("tame_failed: bot=" + std::to_string(bot.guid) + " target=" + std::to_string(state.TameTarget) + " why=not_known");
+                }
+                else if (refusedNow)
                 {
                     // The core refuses Tame Beast (result 32, "too many pets") while a stored pet fills the first slot and Call Pet 2 is not known: that pet is dead, or was
                     // dismissed with its dead owner. Call Pet (Revive Pet when that is refused) comes before another try.
@@ -570,13 +580,16 @@ BotPolicy::TurnFlow BotPolicy::TurnTaming(DecideTick& tick, BotTurn& turn)
                     state.RetryAtMs.erase(kCallPet);
                     state.RetryAtMs.erase(kRevivePet);
                 }
-                ++state.TameFailures;
-                state.TameRetryAtMs = nowMs + (state.TameFailures >= kTameMaxFailures ? kTameGiveUpMs : kTameRetryMs);
-                if (state.TameFailures >= kTameMaxFailures)
-                    state.TameFailures = 0;
-                if (_options.OnEvent)
-                    _options.OnEvent("tame_failed: bot=" + std::to_string(bot.guid) + " target=" + std::to_string(state.TameTarget) +
-                                     (hurtInCombat ? " why=combat" : refusedNow ? " why=refused" : " why=no_pet"));
+                if (!notKnown)
+                {
+                    ++state.TameFailures;
+                    state.TameRetryAtMs = nowMs + (state.TameFailures >= kTameMaxFailures ? kTameGiveUpMs : kTameRetryMs);
+                    if (state.TameFailures >= kTameMaxFailures)
+                        state.TameFailures = 0;
+                    if (_options.OnEvent)
+                        _options.OnEvent("tame_failed: bot=" + std::to_string(bot.guid) + " target=" + std::to_string(state.TameTarget) +
+                                         (hurtInCombat ? " why=combat" : refusedNow ? " why=refused" : " why=no_pet"));
+                }
             }
             else
                 return TurnFlow::kSkip; // still channelling: stand still, send nothing

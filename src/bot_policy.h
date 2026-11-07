@@ -488,6 +488,7 @@ private:
         // Tame Beast was refused (core CheckCast, spell_hun_tame_beast: result 32, "too many pets") for a hunter that holds a stored pet (dead, or dismissed with its dead owner), which
         // fills the first pet slot: Call Pet (or Revive Pet) comes first, until one is accepted, both are refused (no stored pet), or TamePetUntilMs passes.
         bool TamePetFirst = false;
+        bool TameNotKnown = false;                       // Tame Beast came back "not known": the hunter has not learned it, so it is no stored-pet refusal and casting again is pointless for a while
         std::uint64_t TamePetUntilMs = 0;
         bool PetCommanded = false;                       // the pet has been sent at this fight's target (layout 13)
         bool Sitting = false;                            // sat down to rest; stands before it moves or fights

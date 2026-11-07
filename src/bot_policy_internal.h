@@ -161,6 +161,7 @@ constexpr std::uint64_t kTameHoldMs = 22000;         // the channel (20 s) and a
 constexpr std::uint64_t kTameRetryMs = 20000;        // after a cast that gave no pet, or a search that found nothing
 constexpr std::uint32_t kTameMaxFailures = 4;        // casts with no pet before the hunter stops for kTameGiveUpMs
 constexpr std::uint64_t kTameGiveUpMs = 600000;
+constexpr std::uint64_t kTameNotKnownMs = 600000;    // Tame Beast is not learned: no search or cast for this long (a trainer visit or the core may teach it meanwhile)
 constexpr std::uint64_t kTamePetFirstMs = 90000;      // Call Pet / Revive Pet get this long to deal with a stored pet before taming is tried again
 constexpr std::uint64_t kPetBackoffMs = 30000;       // first wait after a refused revive; doubles per failure
 constexpr std::uint64_t kPetBackoffMaxMs = 300000;

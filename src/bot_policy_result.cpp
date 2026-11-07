@@ -594,6 +594,8 @@ void BotPolicy::ReadCastResult(BotState& state, BotSnapshot const& bot, std::uin
         case BotActionStatus::kNotKnown:
         case BotActionStatus::kUnknownSpell:
             state.RetryAtMs[spell] = nowMs + failWait(kNotKnownRetryMs);
+            if (spell == kTameBeast)
+                state.TameNotKnown = true;
             break;
         case BotActionStatus::kOnCooldown:
             state.RetryAtMs[spell] = nowMs + (buff ? failWait(kBuffFailBaseMs) : kCooldownRetryMs);
