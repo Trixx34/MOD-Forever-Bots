@@ -113,18 +113,6 @@ wait 6
 timeout 240
 end
 
-# Gnomeregan (map 90). The Explosive Charges (goobers 144065) beside the Cave In doors 146085 and 146086; the event runs after the last boss (Dark Iron Ambassador) and walks there.
-event 90 cave-ins Cave Ins (Explosive Charges)
-after_boss 6228
-use 144065 -503.9 -97.2 -151.0
-wait 5
-use 144065 -506.6 -88.8 -151.1
-wait 5
-use 144065 -535.2 -105.6 -156.0
-wait 5
-timeout 300
-end
-
 # Razorfen Kraul (map 47). The ward (door 21099), opened by a click on the door itself.
 event 47 ward Ward (door)
 near 2060.4 2015.7 62.4 30
@@ -148,15 +136,16 @@ wait 120
 timeout 1200
 end
 
-# Gnomeregan: Electrocutioner 6000 stands on a navmesh island no path reaches (island 3 of map 90, 1.4 yards from the main mesh). After Viscous Fallout the leader is put on the island side of the gap, and back at Fallout's route point once he is dead.
+# Gnomeregan: Electrocutioner 6000 stands on a navmesh island no path reaches (island 3 of map 90, 1.4 yards from the main mesh). After Viscous Fallout the leader is put on the island side of the gap, and on the main-mesh side of the gap (-538.1, 530.6, -216.3, a route point of its own) once he is dead;
+# the route walks on to Crowd Pummeler from there (no walk back past Fallout). The cave-ins event is gone: it walked ~1000 yards back to the entrance after the last boss.
 event 90 electrocutioner-bridge Bridge to Electrocutioner 6000 (his island has no navmesh link)
 after_boss 7079
 teleport -537.9 528.3 -216.1
 wait 5
 end
 
-event 90 electrocutioner-back Back from Electrocutioner 6000 (to Viscous Fallout)
+event 90 electrocutioner-back Back from Electrocutioner 6000 (the main-mesh side of the gap)
 after_boss 6235
-teleport -430.2 42.5 -208.7
+teleport -538.1 530.6 -216.3
 wait 5
 end

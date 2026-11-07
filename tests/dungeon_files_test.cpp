@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Unit tests for the per-dungeon JSON files (dungeon_files.h, mini_json.h): the reader, the checks, the override folder, and that the shipped files say what
 // the old text files said. No core needed.
+#include "bot_pick.h"
+#include "bot_settings.h"
 #include "dungeon_data.h"
 #include "dungeon_events.h"
 #include "dungeon_files.h"
@@ -447,7 +449,7 @@ void ShippedFilesEqualTheOldTextFiles()
 
 // Lady Sarevess and Old Serra'kis (Blackfathom Deeps, islands 5 and 2 of the map-48 mesh) and Electrocutioner 6000 (Gnomeregan, island 3 of map 90). The place on the
 // island is a walkable point of the island next to the gap to the main mesh (read from the navmesh when the events were written); the way back is the route point of the
-// boss before them. The checks here are about the data and the runner; whether the points are on the mesh was checked with the navmesh tools.
+// boss before them (Blackfathom Deeps) or, with BackToBoss false, the main-mesh side of the gap (Gnomeregan since 2026-11-07: the route walks on from there). The checks here are about the data and the runner; whether the points are on the mesh was checked with the navmesh tools.
 struct CutOff
 {
     std::uint32_t Map;
@@ -456,6 +458,7 @@ struct CutOff
     float BX, BY, BZ;        // where the leader is put
     char const* BackId;
     std::uint32_t Boss;      // the cut-off boss
+    bool BackToBoss = true;  // the back event lands on the route point of the boss before (else on a point of its own after the cut-off boss)
 };
 
 void CheckOneCutOffBoss(std::vector<Dungeon> const& json, CutOff const& c)
@@ -499,7 +502,7 @@ void CheckOneCutOffBoss(std::vector<Dungeon> const& json, CutOff const& c)
     CHECK(bridge->Steps[0].X == c.BX && bridge->Steps[0].Y == c.BY && bridge->Steps[0].Z == c.BZ);
     CHECK(back->When == Event::Trigger::AfterBoss && back->Boss == c.Boss);
     CHECK(back->Steps.size() == 2 && back->Steps[0].What == Step::Kind::Teleport && back->Steps[1].What == Step::Kind::Wait);
-    if (at + 1 < d->Route.size())
+    if (c.BackToBoss && at + 1 < d->Route.size())
         CHECK(back->Steps[0].X == d->Route[at].X && back->Steps[0].Y == d->Route[at].Y && back->Steps[0].Z == d->Route[at].Z);
 
     // the runner: nothing before the boss is dead, then one teleport to the island, then the event is over
@@ -534,7 +537,100 @@ void CutOffBossesAreBridgedByTeleportEvents()
     CHECK(warnings.empty());
     CheckOneCutOffBoss(json, { 48, "sarevess-bridge", 4887, -355.5f, 295.5f, -55.8f, "sarevess-back", 4831 });
     CheckOneCutOffBoss(json, { 48, "serrakis-bridge", 4832, -831.7f, -109.6f, -35.2f, "serrakis-back", 4830 });
-    CheckOneCutOffBoss(json, { 90, "electrocutioner-bridge", 7079, -537.9f, 528.3f, -216.1f, "electrocutioner-back", 6235 });
+    CheckOneCutOffBoss(json, { 90, "electrocutioner-bridge", 7079, -537.9f, 528.3f, -216.1f, "electrocutioner-back", 6235, false });
+}
+
+// ---- Gnomeregan (2026-11-07): the route of forever-ops docs/gnomer-route-20261107.md, an Alliance party, 3600 s ------------------------------------------
+
+void GnomereganRouteRosterAndDuration()
+{
+    std::string const root = FOREVER_BOTS_SOURCE_DIR;
+    std::vector<std::string> warnings;
+    std::vector<Dungeon> const json = LoadDungeonDir(root + "/data/dungeons", true, warnings);
+    CHECK(warnings.empty());
+    Dungeon const* g = nullptr;
+    for (Dungeon const& d : json)
+        if (d.MapId() == 90)
+            g = &d;
+    CHECK(g != nullptr && g->Id == "gnomer");
+    if (!g)
+        return;
+
+    // 82 points; the bosses at 23 (Viscous Fallout), 25 (Electrocutioner 6000, on the island), 48 (Crowd Pummeler), 72 (Thermaplugg), 81 (the Ambassador, last)
+    CHECK(g->Route.size() == 82);
+    std::vector<std::pair<std::size_t, std::uint32_t>> bosses;
+    for (std::size_t i = 0; i < g->Route.size(); ++i)
+        if (g->Route[i].BossEntry != 0)
+            bosses.emplace_back(i, g->Route[i].BossEntry);
+    CHECK((bosses == std::vector<std::pair<std::size_t, std::uint32_t>>{ { 23, 7079 }, { 25, 6235 }, { 48, 6229 }, { 72, 7800 }, { 81, 6228 } }));
+    // the way round the Clean Zone: no point on its floor (z -193.6) between the entrance and Viscous Fallout, the outer ramp at (-563.7, 225.3, -159.3)
+    for (std::size_t i = 0; i < 23 && i < g->Route.size(); ++i)
+        CHECK(!(g->Route[i].X < -500.0f && g->Route[i].X > -580.0f && g->Route[i].Y > 140.0f && g->Route[i].Y < 230.0f && g->Route[i].Z < -185.0f));
+    CHECK(g->Route.size() > 13 && g->Route[13].X == -563.7f && g->Route[13].Y == 225.3f && g->Route[13].Z == -159.3f);
+
+    // two events, the bridge and the way back to the main-mesh side of the gap (route point 26); the cave-ins event is gone
+    CHECK(g->Events.size() == 2);
+    for (dungeon_events::Event const& e : g->Events)
+        CHECK(e.Id == "electrocutioner-bridge" || e.Id == "electrocutioner-back");
+    if (g->Events.size() == 2 && g->Route.size() > 26)
+    {
+        CHECK(g->Events[1].Id == "electrocutioner-back" && g->Events[1].Steps[0].X == -538.1f && g->Events[1].Steps[0].Y == 530.6f && g->Events[1].Steps[0].Z == -216.3f);
+        CHECK(g->Route[26].X == g->Events[1].Steps[0].X && g->Route[26].Y == g->Events[1].Steps[0].Y && g->Route[26].Z == g->Events[1].Steps[0].Z);
+        CHECK(g->Route[24].X == g->Events[0].Steps[0].X && g->Route[24].Y == g->Events[0].Steps[0].Y && g->Route[24].Z == g->Events[0].Steps[0].Z);
+    }
+
+    // an Alliance party (dwarf, gnome and human only), staged in Ironforge; 3600 s
+    CHECK(g->Roster == "3:1,1:5,7:8,7:9,1:4");
+    CHECK(g->Staging.has_value() && (*g->Staging)[0] == 0.0f && (*g->Staging)[1] == -4918.9f && (*g->Staging)[2] == -940.4f && (*g->Staging)[3] == 501.6f);
+    CHECK(g->Portal.has_value() && (*g->Portal)[0] == 0.0f);
+    CHECK(g->DurationSec == 3600);
+
+    // the whole set as the sim loads it (the old files named too): the same gnomer with its 2 events
+    DungeonSources sources;
+    sources.File = root + "/data/dungeons.txt";
+    sources.EventsFile = root + "/data/dungeon_events.txt";
+    warnings.clear();
+    DungeonSet const set = LoadDungeonSet(sources, warnings);
+    CHECK(warnings.empty());
+    CHECK(dungeon_events::ForMap(set.Events, 90).size() == 2);
+
+    // the settings of a list run as the sim's loop writes it: a shared ScenarioDurationSec, a Horde roster for the others, ScenarioDurationSec.gnomer for gnomer
+    auto settingsOf = [&](std::unordered_map<std::string, std::string> config)
+    {
+        config["DungeonFile"] = sources.File;
+        config["DungeonEventsFile"] = sources.EventsFile;
+        std::vector<std::string> w;
+        BotSettings const s = ParseBotSettings(MergeDungeonFile(config, w), w);
+        for (std::string const& line : w)
+            CHECK(line.find("gnomer") == std::string::npos && line.find("roster") == std::string::npos);
+        return s;
+    };
+    BotSettings const loop = settingsOf({ { "Scenario", "rfc:3,gnomer:3" }, { "ScenarioDurationSec", "1800" }, { "ScenarioDurationSec.gnomer", "3600" },
+                                          { "ScenarioRoster.rfc", "2:1,5:5,8:8,2:9,8:3" } });
+    CHECK(loop.Scenarios.size() == 2);
+    if (loop.Scenarios.size() == 2)
+    {
+        ScenarioSettings const& rfc = loop.Scenarios[0];
+        ScenarioSettings const& gn = loop.Scenarios[1];
+        CHECK(rfc.Name == "rfc" && rfc.DurationSec == 1800 && rfc.HasStaging && rfc.Staging[0] == 1.0f);
+        for (auto const& rc : rfc.Roster)
+            CHECK(pick::IsHordeRace(rc[0]));
+        CHECK(gn.Name == "gnomer" && gn.DurationSec == 3600 && gn.Route.size() == 82 && gn.Roster.size() == 5 && gn.Parties == 3);
+        CHECK(gn.HasStaging && gn.Staging[0] == 0.0f && gn.Staging[1] == -4918.9f && gn.HasPortal && gn.Portal[0] == 0.0f && gn.HasEntry && gn.Entry[0] == 90.0f);
+        for (auto const& rc : gn.Roster)
+            CHECK(rc[0] == 1 || rc[0] == 3 || rc[0] == 7);
+        // the slots: rfc's 15 bots first (Horde), then gnomer's (Alliance)
+        CHECK(pick::IsHordeRace(ScenarioSlotOf(loop.Scenarios, 14).Race) && ScenarioSlotOf(loop.Scenarios, 15).Race == 3 && ScenarioSlotOf(loop.Scenarios, 15).Dungeon == 1);
+    }
+    // a shared ScenarioDurationSec alone wins over the file: gnomer then runs 1800 s (why the loop writes ScenarioDurationSec.gnomer)
+    BotSettings const shared = settingsOf({ { "Scenario", "rfc:1,gnomer:1" }, { "ScenarioDurationSec", "1800" } });
+    CHECK(shared.Scenarios.size() == 2 && shared.Scenarios[1].DurationSec == 1800);
+    // no ScenarioDurationSec in the config: each dungeon its file's duration
+    BotSettings const files = settingsOf({ { "Scenario", "rfc:1,gnomer:1" } });
+    CHECK(files.Scenarios.size() == 2 && files.Scenarios[0].DurationSec == 1800 && files.Scenarios[1].DurationSec == 3600);
+    // a Horde roster set for gnomer in the config still wins (and keeps its own faction): the loop must not write one for gnomer
+    BotSettings const horde = settingsOf({ { "Scenario", "gnomer:1" }, { "ScenarioRoster.gnomer", "2:1,5:5,8:8,2:9,5:4" } });
+    CHECK(horde.Scenarios.size() == 1 && horde.Scenarios[0].Roster.size() == 5 && horde.Scenarios[0].Roster[0][0] == 2);
 }
 
 void ConfigKeysNameTheFolders()
@@ -571,6 +667,7 @@ int main()
     OldTextFilesStayAFallback();
     ShippedFilesEqualTheOldTextFiles();
     CutOffBossesAreBridgedByTeleportEvents();
+    GnomereganRouteRosterAndDuration();
     ConfigKeysNameTheFolders();
     if (failures != 0)
     {

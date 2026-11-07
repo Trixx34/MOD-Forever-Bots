@@ -103,7 +103,7 @@ and the exit (where a ghost walks to, `portal`) are the teleport targets of the 
 and the bosses (found by name; a boss with no spawn on the map is left out and the tool says so: Mutanus, Baron Aquanis, Grubbis and Tuten'kash are summoned
 or event spawns, so those dungeons are cleared without them). What is a guess: **the order of every route** (the pack or boss nearest to where the party
 stands next, starting at the entrance, with a penalty for another floor), so a route may walk past a door into a dead end and back, and the levels (the usual
-vanilla ranges) and the roster (an orc warrior, undead priest, troll mage, orc warlock and undead rogue from Orgrimmar for all of them). Zul'Farrak is left out
+vanilla ranges) and the roster (an orc warrior, undead priest, troll mage, orc warlock and undead rogue from Orgrimmar for all of them; since bots 0.44.18 Gnomeregan has an Alliance party instead, a dwarf warrior, human priest, gnome mage, gnome warlock and human rogue from Ironforge, because the Clean Zone Holdouts are hostile to the Horde). Zul'Farrak is left out
 (most of its bosses are event spawns) and the Temple of Atal'Hakkar has no "Classic:" door in this database. None of it has run on the sim: start with `rfc`,
 whose route has 42 waypoints, and edit the `go` lines that lead the party wrong.
 
