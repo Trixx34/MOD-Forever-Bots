@@ -574,7 +574,14 @@ void BotPolicy::RouteLeaderRecover(DecideTick& tick, BotTurn& turn, RouteLeg& ro
                 BotSnapshot const& other = view.bots[at->second];
                 if (other.life_state != 0 || (other.in_combat != 0 && !fightingMemberOk) || other.map_id != bot.map_id || DistanceTo(other, dungeon->second.Entry) <= kLostLeaderYards)
                     continue;
-                if (!strong)
+                // 0.44.17: the wait for kRouteMinHealthPct took about 37 s per death in the Deadmines. At kLeaderRecoverMinHealthPct or more the leader goes at once
+                // while the whole party is out of a fight (the party is not about to need it, and it arrives next to a quiet group).
+                bool partyQuiet = bot.max_health != 0 && !BelowPct(bot.health, bot.max_health, kLeaderRecoverMinHealthPct);
+                for (std::uint64_t mate : membersOf[bot.guid])
+                    if (partyQuiet)
+                        if (auto const mateAt = indexOf.find(mate); mateAt != indexOf.end() && view.bots[mateAt->second].life_state == 0 && view.bots[mateAt->second].in_combat != 0)
+                            partyQuiet = false;
+                if (!strong && !partyQuiet)
                 {
                     if (state.LeaderRecoverWaitSinceMs == 0)
                     {

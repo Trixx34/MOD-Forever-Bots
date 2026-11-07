@@ -3208,6 +3208,19 @@ void ARevivedLeaderRestsAtTheEntranceBeforeItGoesToItsParty()
     CHECK(waited);
     std::optional<BotAction> gaveUp = TeleportOf(policy.Decide(hurt, 122000), 12);   // it cannot recover: after kLeaderRecoverMaxWaitMs it goes in all the same
     CHECK(gaveUp.has_value() && gaveUp->dest_x == 197.0f);
+    // 0.44.17: 60 % or more and nobody of the party in a fight: at once. Below 60 % it still rests; with a member in a fight it still rests.
+    BotPolicy sixty(options);
+    sixty.SetRouteActive(true);
+    std::optional<BotAction> atSixty = TeleportOf(sixty.Decide(hurtLeaderView(600), 1000), 12);
+    CHECK(atSixty.has_value() && atSixty->dest_x == 197.0f);
+    BotPolicy fiftyNine(options);
+    fiftyNine.SetRouteActive(true);
+    CHECK(!TeleportOf(fiftyNine.Decide(hurtLeaderView(599), 1000), 12).has_value());
+    BotPolicy fighting(options);
+    fighting.SetRouteActive(true);
+    WorldTickSnapshotView busyParty = hurtLeaderView(700);
+    busyParty.bots[3].in_combat = 1;                                  // a member deep in the dungeon fights
+    CHECK(!TeleportOf(fighting.Decide(busyParty, 1000), 12).has_value());
     // Fit (80 % or more): at once, as before.
     BotPolicy fit(options);
     fit.SetRouteActive(true);
