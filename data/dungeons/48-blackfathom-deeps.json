@@ -42,7 +42,9 @@
     { "x": -426.7, "y": 192.0, "z": -52.6 },
     { "x": -442.4, "y": 211.8, "z": -52.6, "boss": 4887 },  // boss: Ghamoo-ra
     // Lady Sarevess stands on a navmesh island no path reaches (island 5): the event "sarevess-bridge" puts the party on it when Ghamoo-ra is dead, "sarevess-back" brings it back.
+    { "x": -355.5, "y": 295.5, "z": -55.8 },  // landing on the island (where the bridge event puts the party)
     { "x": -305.6, "y": 409.5, "z": -57.1, "boss": 4831 },  // boss: Lady Sarevess
+    { "x": -442.4, "y": 211.8, "z": -52.6 },  // back on the main mesh (where the back event puts the party)
     { "x": -542.7, "y": 210.9, "z": -56.0 },
     { "x": -577.3, "y": 217.3, "z": -51.7 },
     { "x": -613.1, "y": 216.3, "z": -50.1 },
@@ -77,7 +79,9 @@
     { "x": -810.7, "y": -128.0, "z": -25.6 },
     { "x": -818.8, "y": -155.6, "z": -25.8, "boss": 4832 },  // boss: Twilight Lord Kelris
     // Old Serra'kis stands on a navmesh island no path reaches (island 2): the event "serrakis-bridge" puts the party on it when Kelris is dead, "serrakis-back" brings it back.
+    { "x": -831.7, "y": -109.6, "z": -35.2 },  // landing on the island (where the bridge event puts the party)
     { "x": -746.7, "y": -169.4, "z": -50.6, "boss": 4830 },  // boss: Old Serra'kis
+    { "x": -818.8, "y": -155.6, "z": -25.8 },  // back on the main mesh (where the back event puts the party)
     { "x": -821.9, "y": -202.1, "z": -25.6 },
     { "x": -832.0, "y": -256.0, "z": -26.1 },
     { "x": -845.9, "y": -421.1, "z": -33.0 },

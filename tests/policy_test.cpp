@@ -2986,6 +2986,48 @@ void TheTankHoldsAtABossUntilItIsSeenDead()
     CHECK(WalkTo(policy.Decide(view, 4000), 12) == 180.0f);
 }
 
+// A teleport event moves the route index: the bridge to a boss on a cut-off island lands on the point before the boss, so the walk goes on to the boss, not back to the
+// point the leader was teleported away from (Blackfathom Deeps, Lady Sarevess).
+void ATeleportEventSnapsTheRouteIndexToThePointItLandsOn()
+{
+    PolicyOptions options = LeadOptions();
+    options.DungeonTeleport = true;
+    PolicyOptions::DungeonRoute route;
+    route.Route = { Point{ 100.0f, 0.0f, 0.0f }, Point{ 300.0f, 0.0f, 0.0f }, Point{ 340.0f, 0.0f, 0.0f }, Point{ 100.0f, 0.0f, 0.0f } };
+    route.BossAt[0] = 644;
+    route.BossAt[2] = 645;
+    std::vector<std::string> warnings;
+    route.Events = dungeon_events::Parse("event 36 bridge Bridge\nafter_boss 644\nteleport 300 0 0\nwait 5\nend\n", warnings);
+    CHECK(warnings.empty());
+    options.DungeonsByMap[36] = route;
+    std::vector<std::string> events;
+    options.OnEvent = [&events](std::string const& line) { events.push_back(line); };
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = PlayerGroupView(98.0f);
+    policy.Decide(view, 0);
+    policy.ApplyChat(view, FromPlayer(), TankLead(), 1000);
+    NearbyUnit corpse;
+    corpse.guid = MakeUnitRef(8, 644, 55);
+    corpse.health = 0;
+    AddNearby(view, 3, corpse);                                        // the first boss is dead
+    std::optional<BotAction> jump = OfTank(policy.Decide(view, 2000), ActionType::kTeleport);
+    CHECK(jump.has_value() && jump->dest_x == 300.0f);
+    for (BotSnapshot& bot : view.bots)
+        bot.pos_x = 300.0f;                                            // the party is on the island
+    view.bots[2].nearby_count = 0;
+    NearbyUnit player;
+    player.guid = PlayerOf(900);
+    player.pos_x = 300.0f;
+    AddNearby(view, 2, player);
+    AddNearby(view, 3, corpse);
+    policy.Decide(view, 3000);
+    CHECK(WalkTo(policy.Decide(view, 12000), 12) == 340.0f);           // on to the boss on the island, not back to the first point
+    bool snapped = false;
+    for (std::string const& line : events)
+        snapped = snapped || line.find("route_teleport_snap") != std::string::npos;
+    CHECK(snapped);
+}
+
 void ALeverIsPulledWhenTheTankComesNear()
 {
     PolicyOptions options = LeadOptions();
@@ -6636,6 +6678,7 @@ int main()
     TheTankWaitsForThePlayerToCatchUp();
     TheTankHoldsAtABossUntilItIsSeenDead();
     ALeverIsPulledWhenTheTankComesNear();
+    ATeleportEventSnapsTheRouteIndexToThePointItLandsOn();
     TheLeaderWaitsAtABossPointUntilTheBossIsDead();
     TheLeaderSweepsBackToAMissingBoss();
     ABossPointIsNeverSkippedForNoRoute();

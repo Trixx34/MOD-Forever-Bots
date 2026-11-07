@@ -486,7 +486,13 @@ void CheckOneCutOffBoss(std::vector<Dungeon> const& json, CutOff const& c)
     for (std::size_t i = 0; i < d->Route.size(); ++i)
         if (d->Route[i].BossEntry == c.After)
             at = i;
-    CHECK(at + 1 < d->Route.size() && d->Route[at + 1].BossEntry == c.Boss);
+    // the leader lands on a route point of its own before the cut-off boss and comes back to one after it (the teleport snaps the route index to them)
+    CHECK(at + 3 < d->Route.size() && d->Route[at + 2].BossEntry == c.Boss && d->Route[at + 1].BossEntry == 0 && d->Route[at + 3].BossEntry == 0);
+    if (at + 3 < d->Route.size())
+    {
+        CHECK(d->Route[at + 1].X == c.BX && d->Route[at + 1].Y == c.BY && d->Route[at + 1].Z == c.BZ);
+        CHECK(back->Steps.size() == 2 && d->Route[at + 3].X == back->Steps[0].X && d->Route[at + 3].Y == back->Steps[0].Y && d->Route[at + 3].Z == back->Steps[0].Z);
+    }
 
     CHECK(bridge->When == Event::Trigger::AfterBoss && bridge->Boss == c.After);
     CHECK(bridge->Steps.size() == 2 && bridge->Steps[0].What == Step::Kind::Teleport && bridge->Steps[1].What == Step::Kind::Wait);
