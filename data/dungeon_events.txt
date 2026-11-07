@@ -52,6 +52,7 @@ end
 
 event 33 courtyard-door Courtyard Door (used directly: the escape script that should open it is unwired in this fork's world database)
 near -242.6 2159.0 90.6 30
+teleport -250.9 2162.1 95.6
 use 18895 -242.6 2159.0 90.6
 end
 

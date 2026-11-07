@@ -190,7 +190,7 @@
     },
     {
       // The Naralex awakening: with the four Lords of the Fang dead (Anacondra, Cobrahn, Pythas, Serpentis), the Disciple of Naralex (creature 3678, at the start of the
-      // instance) offers a gossip option (menu 202, option 0) that starts his escort to Naralex (creature 3679 at (115.4, 240.0, -94.0)). The leader goes back to him, talks, follows him
+      // instance) offers a gossip option (menu 201, option 0) that starts his escort to Naralex (creature 3679 at (115.4, 240.0, -94.0)). The leader goes back to him, talks, follows him
       // while the party fights what comes, and waits through the waves; Mutanus the Devourer comes after the second wave. The escort and the waves are the core's script.
       "id": "naralex-escort",
       "name": "Naralex awakening (talk to the Disciple, escort him)",

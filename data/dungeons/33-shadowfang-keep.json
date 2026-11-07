@@ -113,6 +113,7 @@
       "name": "Courtyard Door (used directly: the escape script that should open it is unwired in this fork's world database)",
       "trigger": { "type": "near", "x": -242.6, "y": 2159.0, "z": 90.6, "radius": 30 },
       "steps": [
+        { "type": "teleport", "x": -250.9, "y": 2162.1, "z": 95.6 },
         { "type": "use", "object": 18895, "x": -242.6, "y": 2159.0, "z": 90.6 }
       ]
     }
