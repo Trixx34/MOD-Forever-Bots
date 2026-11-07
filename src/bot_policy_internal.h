@@ -35,6 +35,11 @@ inline std::uint32_t HealthPct(BotSnapshot const& unit, std::uint32_t whenNoMax)
 {
     return unit.max_health > 0 ? std::uint32_t(std::uint64_t(unit.health) * 100 / unit.max_health) : whenNoMax;
 }
+// A rotation row is usable at this level: at or above its MinLevel and not past its MaxLevel (0 = no upper bound). A level of 0 (unknown) takes every row.
+inline bool RowInLevelRange(rotation::Row const& row, std::uint32_t level)
+{
+    return level == 0 || (row.MinLevel <= level && (row.MaxLevel == 0 || level <= row.MaxLevel));
+}
 inline std::uint32_t PowerPct(BotSnapshot const& unit, std::uint32_t whenNoMax)
 {
     return unit.max_power > 0 ? std::uint32_t(std::uint64_t(unit.power) * 100 / unit.max_power) : whenNoMax;
