@@ -19,16 +19,19 @@ end
 event 36 heavy-door-1 Heavy Door (north)
 near -262.7 -482.4 49.4 30
 use 17153 -262.7 -482.4 49.4
+timeout 45
 end
 
 event 36 heavy-door-2 Heavy Door (south)
 near -243.0 -578.6 51.1 30
 use 17154 -243.0 -578.6 51.1
+timeout 45
 end
 
 event 36 mast-lever Mast Room Door (lever)
 near -287.3 -539.9 49.4 30
 use 101832 -287.3 -539.9 49.4
+timeout 45
 end
 
 event 36 iron-clad Iron Clad Door (Defias Gunpowder, then Defias Cannon)

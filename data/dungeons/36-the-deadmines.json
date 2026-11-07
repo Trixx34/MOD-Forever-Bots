@@ -166,7 +166,8 @@
       "trigger": { "type": "near", "x": -262.7, "y": -482.4, "z": 49.4, "radius": 30 },
       "steps": [
         { "type": "use", "object": 17153, "x": -262.7, "y": -482.4, "z": 49.4 }
-      ]
+      ],
+      "timeout_sec": 45
     },
     {
       // Heavy Door 17154 (south): opened by a click on the door itself.
@@ -175,7 +176,8 @@
       "trigger": { "type": "near", "x": -243.0, "y": -578.6, "z": 51.1, "radius": 30 },
       "steps": [
         { "type": "use", "object": 17154, "x": -243.0, "y": -578.6, "z": 51.1 }
-      ]
+      ],
+      "timeout_sec": 45
     },
     {
       // Mast Room Door 16400 at (-290.3, -537.0, 49.4): opened by this lever (object 101832).
@@ -184,7 +186,8 @@
       "trigger": { "type": "near", "x": -287.3, "y": -539.9, "z": 49.4, "radius": 30 },
       "steps": [
         { "type": "use", "object": 101832, "x": -287.3, "y": -539.9, "z": 49.4 }
-      ]
+      ],
+      "timeout_sec": 45
     },
     {
       // Iron Clad Door 16397 at (-100.5, -668.8, 7.4): opened by firing the Defias Cannon (object 16398) with Defias Gunpowder (item 5397).
