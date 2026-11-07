@@ -173,8 +173,8 @@ void BotPolicy::TurnQuestsAndHold(DecideTick& tick, BotTurn& turn)
                     BotSnapshot const& m = view.bots[at->second];
                     line += " | " + std::to_string(member) + " yd=" + std::to_string(int(Distance2d(bot, m))) + " at=" + std::to_string(int(m.pos_x)) + "," +
                             std::to_string(int(m.pos_y)) + "," + std::to_string(int(m.pos_z)) + " life=" + std::to_string(m.life_state) + " hp=" +
-                            std::to_string(m.max_health > 0 ? std::uint64_t(m.health) * 100 / m.max_health : 0) + " pw=" +
-                            std::to_string(m.max_power > 0 ? std::uint64_t(m.power) * 100 / m.max_power : 0) + " mv=" + std::to_string(m.moving) + " fight=" +
+                            std::to_string(HealthPct(m, 0)) + " pw=" +
+                            std::to_string(PowerPct(m, 0)) + " mv=" + std::to_string(m.moving) + " fight=" +
                             std::to_string(m.in_combat) + " stuck=" + std::to_string(state.RegroupStuck.count(member) != 0);
                 }
                 _options.OnEvent(line);

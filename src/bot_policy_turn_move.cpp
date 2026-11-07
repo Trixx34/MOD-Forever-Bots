@@ -593,7 +593,7 @@ void BotPolicy::RouteLeaderRecover(DecideTick& tick, BotTurn& turn, RouteLeg& ro
                         state.LeaderRecoverWaitSinceMs = nowMs;
                         if (_options.OnEvent)
                             _options.OnEvent("leader_recover_wait: bot=" + std::to_string(bot.guid) + " member=" + std::to_string(other.guid) + " hp_pct=" +
-                                             std::to_string(bot.max_health ? std::uint64_t(bot.health) * 100 / bot.max_health : 100));
+                                             std::to_string(HealthPct(bot, 100)));
                     }
                     if (nowMs - state.LeaderRecoverWaitSinceMs < kLeaderRecoverMaxWaitMs)
                         break; // rests at the entrance first
@@ -854,7 +854,7 @@ void BotPolicy::RouteWalkOn(DecideTick& tick, BotTurn& turn, RouteLeg& route)
             char const* why = !strong ? "health" : !manaReady ? "mana" : deadWaitKind != 0 ? "dead_member" : farthestYards > kRouteWaitYards ? "member_far" : "player_far";
             _options.OnEvent(std::string("route_hold: bot=") + std::to_string(bot.guid) + " point=" + std::to_string(state.RouteIndex) + "/" +
                              std::to_string(routePoints->size()) + " why=" + why + " hp_pct=" +
-                             std::to_string(bot.max_health ? std::uint64_t(bot.health) * 100 / bot.max_health : 100) + " farthest=" + std::to_string(farthest) +
+                             std::to_string(HealthPct(bot, 100)) + " farthest=" + std::to_string(farthest) +
                              " farthest_yards=" + std::to_string(int(farthestYards)) + " pos=" + std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) +
                              "," + std::to_string(int(bot.pos_z)));
         }

@@ -30,6 +30,16 @@ using forever_module::WorldTickSnapshotView;
 
 namespace bot_policy_detail {
 
+// A unit's health and power as whole percent of the maximum; `whenNoMax` for a unit that reports no maximum (a bot not yet in view, a class without that power).
+inline std::uint32_t HealthPct(BotSnapshot const& unit, std::uint32_t whenNoMax)
+{
+    return unit.max_health > 0 ? std::uint32_t(std::uint64_t(unit.health) * 100 / unit.max_health) : whenNoMax;
+}
+inline std::uint32_t PowerPct(BotSnapshot const& unit, std::uint32_t whenNoMax)
+{
+    return unit.max_power > 0 ? std::uint32_t(std::uint64_t(unit.power) * 100 / unit.max_power) : whenNoMax;
+}
+
 constexpr float kDisengagePct = 30.0f;       // below this health the bot stops fighting
 constexpr float kRangedKiteYards = 12.0f;    // a ranged bot keeps a melee target this far away
 // Fire Nova (spell 20203) reaches 20 yards from the Warder plus the target's combat reach (1.5), and 2 more while the Warder is moving (23.5 in all); the bot stands
