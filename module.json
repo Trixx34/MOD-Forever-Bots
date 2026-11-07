@@ -1,9 +1,9 @@
 {
   "name": "forever-bots",
-  "version": "0.44.17",
+  "version": "0.44.18",
   "protocol_version": "22",
   "tier1": {
-    "hooks": ["CommandScript", "PlayerScript.OnChat"]
+    "hooks": ["CommandScript", "PlayerScript.OnChat", "PlayerScript.OnBotTrade", "PlayerScript.OnLootItem", "LfgScript.OnQueueUpdate", "GuildScript.OnMemberLevel", "GroupScript.OnInviteDeclined"]
   },
   "tier2": {
     "participates": true,
