@@ -31,6 +31,8 @@ SLUGS = {
     129: "razorfen-downs",
     389: "ragefire-chasm",
     249: "onyxias-lair",
+    2999: "ruins-of-lordaeron",
+    3065: "hall-of-thanes",
 }
 
 
