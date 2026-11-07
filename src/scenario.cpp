@@ -753,6 +753,38 @@ void ScenarioDirector::Decide(forever_module::WorldTickSnapshotView const& view,
             }
             else
                 _outsideSinceMs = 0;
+            // A living member outside while the leader is inside (2026-11-07 16:29, gnomer#1, furthest=3/82): four members died at the Ironforge staging place, so the
+            // leader went in alone (a dead bot does not hold the gate) and the run started without them (a corpse does not hold it either). They were revived where they
+            // fell, on map 0, and walked to the portal; a bot is not taken in by walking onto it, so they stood there for the rest of the run while the leader died 19 times
+            // alone at the Irradiated Pillagers. The entering teleport puts living stragglers in; once the run has started nothing did, short of a wipe. Now the living
+            // ones out of combat are put at the entry the same way as after a wipe: kReenterDelayMs after one is first seen outside, again every kEnterRetryMs.
+            bool memberOutside = false;
+            if (leader && leader->life_state == 0 && leader->map_id == _plan.EntryMap)
+                for (BotSnapshot const& bot : bots)
+                    memberOutside = memberOutside || (&bot != leader && bot.life_state == 0 && bot.map_id != _plan.EntryMap);
+            if (!memberOutside)
+                _memberOutsideSinceMs = 0;
+            else
+            {
+                if (_memberOutsideSinceMs == 0)
+                    _memberOutsideSinceMs = nowMs;
+                if (nowMs - _memberOutsideSinceMs >= kReenterDelayMs && (_lastMemberReenterMs == 0 || nowMs - _lastMemberReenterMs >= kEnterRetryMs))
+                {
+                    for (BotSnapshot const& bot : bots)
+                        if (&bot != leader && bot.life_state == 0 && bot.map_id != _plan.EntryMap && !bot.in_combat)
+                        {
+                            BotAction action;
+                            action.bot_guid = bot.guid;
+                            action.type = ActionType::kTeleport;
+                            action.spell_id = _plan.EntryMap;
+                            action.dest_x = _plan.Entry.X;
+                            action.dest_y = _plan.Entry.Y;
+                            action.dest_z = _plan.Entry.Z;
+                            actions.push_back(action);
+                        }
+                    _lastMemberReenterMs = nowMs;
+                }
+            }
             std::uint32_t const alive = aliveCount();
             if (alive == 0)
             {

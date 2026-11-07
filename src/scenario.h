@@ -259,6 +259,8 @@ private:
     bool _equipSent = false;
     std::uint64_t _outsideSinceMs = 0;     // since when the living leader has been outside the dungeon map in the Running phase (0 = not outside)
     std::uint64_t _lastReenterMs = 0;
+    std::uint64_t _memberOutsideSinceMs = 0; // since when a living member has been outside while the living leader is inside (Running; 0 = none is)
+    std::uint64_t _lastMemberReenterMs = 0;
     bool _recovered = false;               // the party has rested up at its staging place (Entering waits for it once)
     std::uint64_t _lastEnterMs = 0;
     std::uint64_t _leaderArrivedMs = 0;

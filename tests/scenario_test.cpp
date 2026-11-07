@@ -1039,6 +1039,43 @@ void RevivedPartyOutsideIsPutBackAtTheEntry()
     CHECK(Count(actions, ActionType::kTeleport) == 0);                 // they are back inside
 }
 
+// 0.45.3 (gnomer#1, 2026-11-07 16:29): members killed at staging were revived outside after the leader had gone in alone; nothing put them in, so they stood at the
+// portal for the rest of the run. With the leader inside, a living member outside is put at the entry (not one in combat, and not a ghost).
+void LivingMembersOutsideAreSentInWhileTheLeaderIsInside()
+{
+    std::uint64_t t, tick;
+    std::vector<BotSnapshot> bots;
+    ScenarioDirector director = RunningDirector(t, tick, bots);
+    CHECK(director.Phase() == ScenarioPhase::Running);
+    std::vector<BotAction> actions;
+    bots[1].map_id = 0;                  // revived where it fell, outside
+    bots[2].map_id = 0;
+    Down(bots[2], 2);                    // still a ghost outside
+    director.Decide(View(++tick, bots), t += 1000, actions);
+    CHECK(Count(actions, ActionType::kTeleport) == 0);                 // not at once
+    actions.clear();
+    director.Decide(View(++tick, bots), t += kReenterDelayMs, actions);
+    CHECK(Count(actions, ActionType::kTeleport, 2) == 1);
+    CHECK(Count(actions, ActionType::kTeleport, 1) == 0 && Count(actions, ActionType::kTeleport, 3) == 0); // not the leader inside, not the ghost
+    for (BotAction const& action : actions)
+        CHECK(action.spell_id == 36 && action.dest_x == -14.0f);
+    actions.clear();
+    director.Decide(View(++tick, bots), t += 1000, actions);
+    CHECK(Count(actions, ActionType::kTeleport) == 0);                 // not again before the retry time
+    bots[1].in_combat = 1;                                             // a member in a fight is left to it
+    actions.clear();
+    director.Decide(View(++tick, bots), t += kEnterRetryMs, actions);
+    CHECK(Count(actions, ActionType::kTeleport) == 0);
+    bots[1].in_combat = 0;
+    actions.clear();
+    director.Decide(View(++tick, bots), t += kEnterRetryMs, actions);
+    CHECK(Count(actions, ActionType::kTeleport, 2) == 1);              // retried
+    bots[1].map_id = 36;
+    actions.clear();
+    director.Decide(View(++tick, bots), t += kEnterRetryMs, actions);
+    CHECK(Count(actions, ActionType::kTeleport) == 0);                 // inside: done
+}
+
 void GhostCountsAsNotAlive()
 {
     std::uint64_t t, tick;
@@ -1669,6 +1706,7 @@ int main()
     LeaderDoesNotWalkTheDungeonRouteOutsideTheDungeon();
     LeaderDropsARoutePointItHasAlreadyPassed();
     RevivedPartyOutsideIsPutBackAtTheEntry();
+    LivingMembersOutsideAreSentInWhileTheLeaderIsInside();
     PartyEntersAfterTheRestCapEvenWhenHurt();
     LeaderWalksTheRouteWhileTheRouteIsActive();
     LeaderWaitsForAMemberWhoFellBehind();

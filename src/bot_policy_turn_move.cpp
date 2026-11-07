@@ -328,7 +328,10 @@ void BotPolicy::MoveWithoutTarget(DecideTick& tick, BotTurn& turn)
     if (leaderSnap)
         if (auto const dungeon = _options.DungeonsByMap.find(bot.map_id); dungeon != _options.DungeonsByMap.end() && dungeon->second.HasEntry)
             leaderAtEntry = DistanceTo(*leaderSnap, dungeon->second.Entry) <= kEntryYards && DistanceTo(bot, dungeon->second.Entry) > kLostLeaderYards;
-    if (_options.DungeonTeleport && routeOn && partyMember && leaderSnap && bot.life_state == 0 && bot.in_combat == 0 && leaderSnap->life_state == 0 && !leaderAtEntry)
+    // Only on the leader's map: the teleport keeps the bot's map, so a member outside (gnomer#1 2026-11-07 16:29, at the portal on map 0) was sent to the leader's
+    // instance coordinates on the outside map. A member outside is put at the entry by the scenario (member re-enter, scenario.cpp).
+    if (_options.DungeonTeleport && routeOn && partyMember && leaderSnap && bot.life_state == 0 && bot.in_combat == 0 && leaderSnap->life_state == 0 && !leaderAtEntry &&
+        leaderSnap->map_id == bot.map_id)
     {
         bool const lost = Distance2d(bot, *leaderSnap) > kLostLeaderYards || std::fabs(bot.pos_z - leaderSnap->pos_z) > kLostLeaderHeight;
         if (!lost)
@@ -802,7 +805,14 @@ void BotPolicy::RouteWalkOn(DecideTick& tick, BotTurn& turn, RouteLeg& route)
     bool const& manaReady = route.manaReady;
     bool& recovering = route.recovering;
     bool& eventBusy = route.eventBusy;
-    while (!eventBusy && !recovering && state.RouteIndex + 1 < routePoints->size() && (*routeBoss).count(state.RouteIndex) == 0 &&
+    // A boss point is passed the same way once its boss is dead: the party pulled it and killed it away from its point (Targorr the Dread, the Stockade's point 0,
+    // is often pulled down the corridor), so the leader does not walk back to the spot only to turn round.
+    auto const bossPointOpen = [&](std::size_t index)
+    {
+        auto const boss = routeBoss->find(index);
+        return boss == routeBoss->end() || killedNow.count(boss->second) != 0;
+    };
+    while (!eventBusy && !recovering && state.RouteIndex + 1 < routePoints->size() && bossPointOpen(state.RouteIndex) &&
            DistanceTo(bot, (*routePoints)[state.RouteIndex]) > kRoutePointReachYards &&
            DistanceTo(bot, (*routePoints)[state.RouteIndex + 1]) <= kRouteSkipAheadYards)
     {
