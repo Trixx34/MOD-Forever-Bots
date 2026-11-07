@@ -6653,7 +6653,8 @@ void ARosterSpecSetsTheRoleOfAPriest()
 // --- 0.44.18 tests: the hold and regroup logs, the cost log, the pull-hold cap, and a module with no scenario ---
 
 // A held party of five with a hurt mana user (bot 10) that has food and drink; returns the lines logged over `untilMs` of 1 s ticks.
-std::vector<std::string> HeldPartyLog(bool held, std::uint64_t untilMs)
+// With recovering, bot 12's mana climbs 60 points a tick and starts over every 10 ticks (a rise of 8 % of the party's summed maximum within 10 s counts as progress), so the hold keeps seeing progress and does not give up at its 45 s cap.
+std::vector<std::string> HeldPartyLog(bool held, std::uint64_t untilMs, bool recovering = false)
 {
     PolicyOptions options = AggressiveOptions();
     options.PartySize = 5;
@@ -6681,7 +6682,13 @@ std::vector<std::string> HeldPartyLog(bool held, std::uint64_t untilMs)
         }
     }
     for (std::uint64_t at = 40000; at <= untilMs; at += 1000)
+    {
+        if (recovering)
+            for (BotSnapshot& bot : view.bots)
+                if (bot.guid == 12)
+                    bot.power = 50 + std::uint32_t(((at - 40000) / 1000) % 10) * 60;
         policy.Decide(view, at);
+    }
     return events;
 }
 
@@ -6701,6 +6708,16 @@ void ConsumeCheckIsThrottledAndOnlyForAHeldParty()
     CHECK(lines == 1);                                                // five ticks inside the hold, one line (the 30 s throttle)
     CHECK(CountLines(held, "consume_check: bot=10 ") == 0);           // a bot with no mana is not a drinker
     CHECK(CountLines(HeldPartyLog(false, 44000), "consume_check:") == 0);
+}
+
+// consume_check repeats once kConsumeLogMs (30 s) have passed, on the fake clock (ticks from 40000 ms). The line is written inside the consume step, which
+// runs every ConsumeEveryMs (24 s), so the repeat comes on the first consume tick at least 30 s after the first line: the consumes are at 40, 64 and 88 s,
+// the lines at 40 s and 88 s (not at 64 s, only 24 s after the first).
+void ConsumeCheckRepeatsAfterThirtySeconds()
+{
+    CHECK(CountLines(HeldPartyLog(true, 64000, true), "consume_check: bot=12 ") == 1);   // the consume at 64 s is 24 s after the first line: throttled
+    CHECK(CountLines(HeldPartyLog(true, 87000, true), "consume_check: bot=12 ") == 1);   // 47 s after the first: no consume tick yet
+    CHECK(CountLines(HeldPartyLog(true, 88000, true), "consume_check: bot=12 ") == 2);   // the first consume tick past 30 s: the line repeats
 }
 
 // regroup_members names every member of the party, and comes once per kRegroupLogMs (15 s) while the regroup lasts.
@@ -7099,6 +7116,7 @@ int main()
     HubTimeoutTriesTheNextHubSoonerThanAnArrival();
     DefaultBotsDoNotPullWhatIsInRange();
     ConsumeCheckIsThrottledAndOnlyForAHeldParty();
+    ConsumeCheckRepeatsAfterThirtySeconds();
     RegroupMembersLogsEveryMemberAndIsThrottled();
     WantCostIsAbsentOffTheDeadminesAndMinusOneWithNoCostFile();
     ThePullHoldCapIsReachedAndNotExceededWithFlatMana();
