@@ -138,7 +138,7 @@ is ignored). One key for one dungeon of the list is set with the dungeon's id af
     Module.forever-bots.Scenario = dm:10,rfc:10
     Module.forever-bots.ScenarioRoster.dm = 1:1,1:5,1:8,3:3,7:9      # an Alliance roster for the Deadmines
     Module.forever-bots.ScenarioLevel.dm = 18
-    Module.forever-bots.ScenarioStaging.dm = 0 -8913 554 94          # Stormwind: the shipped files stage in Orgrimmar
+    Module.forever-bots.ScenarioStaging.dm = 0 -8913 554 94          # Stormwind: the shipped files stage in Orgrimmar (gnomer: Ironforge)
     Module.forever-bots.ScenarioLevel.rfc = 17
     Module.forever-bots.ScenarioDurationSec = 3600                   # a plain shared key: every dungeon of the list
 

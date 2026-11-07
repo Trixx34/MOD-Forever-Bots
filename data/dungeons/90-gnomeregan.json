@@ -11,16 +11,16 @@
   "map": 90,
   "name": "Gnomeregan",
   "levels": [29, 38],
-  "roster": "2:1,5:5,8:8,2:9,5:4",
+  "roster": "3:1,1:5,7:8,7:9,1:4",  // ALLIANCE: dwarf warrior, human priest, gnome mage, gnome warlock, human rogue (the Clean Zone Holdouts are hostile to the Horde)
   // Where the party gathers and how it gets in. "staging" = the place outside where the party rests until it is ready (health and mana up) before it goes in;
   // "portal" = the instance entrance on the outside map; "entry" = where the party stands inside right after it enters (a revived party is put back here).
   "entrance": {
-    "staging": { "map": 1, "x": 1629, "y": -4373, "z": 31 },
+    "staging": { "map": 0, "x": -4918.9, "y": -940.4, "z": 501.6 },  // Ironforge (game_tele "Ironforge"): an Alliance party
     "portal": { "map": 0, "x": -5162.6, "y": 927.8, "z": 257.2 },
     "entry": { "map": 90, "x": -329.1, "y": -3.21, "z": -152.85 }
   },
   // Limits of one run: "duration_sec" = the run is over after this long, "wipe_recovery_sec" = how long the party gets to recover after a wipe.
-  "run": { "duration_sec": 1800, "wipe_recovery_sec": 300 },
+  "run": { "duration_sec": 3600, "wipe_recovery_sec": 300 },  // about 200 hostiles on the route: 1800 s was not enough (docs/gnomer-route-20261107.md)
   // The path the leader walks, point after point (in order). A point with "boss": <entry> is where that boss is expected; the route waits there until that boss is
   // seen dead, then goes on. Add, remove or move points to change the way; keep the first point near "entry" and every point reachable on foot.
   "route": [
@@ -32,34 +32,38 @@
     { "x": -489.1, "y": 66.7, "z": -155.0 },
     { "x": -502.1, "y": 81.9, "z": -154.7 },
     { "x": -502.1, "y": 136.0, "z": -154.7 },
-    { "x": -490.7, "y": 149.3, "z": -154.5 },
-    { "x": -490.7, "y": 170.7, "z": -154.5 },
-    { "x": -498.4, "y": 178.9, "z": -154.5 },
-    { "x": -492.0, "y": 205.6, "z": -161.4 },
-    { "x": -498.7, "y": 222.1, "z": -172.6 },
-    { "x": -521.1, "y": 201.1, "z": -191.8 },
-    { "x": -543.2, "y": 161.3, "z": -193.7 },
-    { "x": -548.3, "y": 149.3, "z": -201.9 },
-    { "x": -530.1, "y": 115.5, "z": -204.3 },
+    { "x": -495.7, "y": 155.7, "z": -154.5 },
+    { "x": -508.3, "y": 169.3, "z": -154.5 },
+    { "x": -533.3, "y": 169.1, "z": -153.7 },
+    { "x": -545.9, "y": 174.1, "z": -153.7 },
+    { "x": -536.0, "y": 201.6, "z": -155.0 },
+    // Points 13 to 19 round the Clean Zone on the outer ramp (z -159 to -184) instead of crossing its floor (z -193.6): an Alliance party is friendly with the Holdouts, the way is kept for a Horde roster set in the config.
+    { "x": -563.7, "y": 225.3, "z": -159.3 },
+    { "x": -582.7, "y": 212.0, "z": -165.4 },
+    { "x": -620.0, "y": 174.7, "z": -177.9 },
+    { "x": -634.1, "y": 160.3, "z": -184.3 },
+    { "x": -629.9, "y": 142.4, "z": -183.8 },
+    { "x": -618.7, "y": 128.5, "z": -183.8 },
+    { "x": -554.7, "y": 106.7, "z": -201.7 },
+    { "x": -548.5, "y": 88.3, "z": -201.9 },
+    { "x": -530.1, "y": 101.3, "z": -204.3 },
+    { "x": -512.0, "y": 101.3, "z": -207.8 },
     { "x": -430.2, "y": 42.5, "z": -208.7, "boss": 7079 },  // boss: Viscous Fallout
-    // Electrocutioner 6000 stands on a navmesh island no path reaches (island 3): the event "electrocutioner-bridge" puts the party on it when Viscous Fallout is dead, "electrocutioner-back" brings it back.
+    // Electrocutioner 6000 stands on a navmesh island no path reaches (island 3): the event "electrocutioner-bridge" puts the party on it when Viscous Fallout is dead, "electrocutioner-back" puts it on the main-mesh side of the 1.4-yard gap.
     { "x": -537.9, "y": 528.3, "z": -216.1 },  // landing on the island (where the bridge event puts the party)
     { "x": -552.0, "y": 502.9, "z": -216.7, "boss": 6235 },  // boss: Electrocutioner 6000
-    { "x": -430.2, "y": 42.5, "z": -208.7 },  // back on the main mesh (where the back event puts the party)
-    { "x": -455.7, "y": 62.4, "z": -210.7 },
-    { "x": -448.3, "y": 193.9, "z": -207.8 },
-    { "x": -448.3, "y": 239.5, "z": -207.8 },
-    { "x": -454.4, "y": 254.1, "z": -207.8 },
-    { "x": -496.0, "y": 272.3, "z": -210.5 },
-    { "x": -512.0, "y": 277.3, "z": -211.5 },
-    { "x": -533.3, "y": 298.7, "z": -212.1 },
-    { "x": -538.7, "y": 312.0, "z": -216.9 },
-    { "x": -551.5, "y": 360.0, "z": -231.5 },
-    { "x": -568.0, "y": 408.0, "z": -230.5 },
-    { "x": -597.3, "y": 426.7, "z": -230.5 },
-    { "x": -611.7, "y": 429.1, "z": -230.5 },
-    { "x": -628.5, "y": 431.2, "z": -230.5 },
-    { "x": -640.0, "y": 426.7, "z": -230.5 },
+    { "x": -538.1, "y": 530.6, "z": -216.3 },  // the main-mesh side of the gap (where the back event puts the party); the route walks on from here
+    { "x": -539.7, "y": 584.8, "z": -229.6 },
+    { "x": -563.2, "y": 590.9, "z": -230.4 },
+    { "x": -575.2, "y": 588.0, "z": -230.4 },
+    { "x": -600.3, "y": 566.7, "z": -230.4 },
+    { "x": -625.6, "y": 549.6, "z": -230.4 },
+    { "x": -640.0, "y": 533.3, "z": -230.4 },
+    { "x": -640.5, "y": 496.5, "z": -230.5 },
+    { "x": -640.0, "y": 469.3, "z": -230.5 },
+    { "x": -637.3, "y": 457.1, "z": -230.5 },
+    { "x": -636.8, "y": 442.4, "z": -230.5 },
+    { "x": -643.2, "y": 420.0, "z": -230.5 },
     { "x": -640.0, "y": 405.3, "z": -231.3 },
     { "x": -627.2, "y": 373.9, "z": -247.0 },
     { "x": -637.6, "y": 363.7, "z": -255.0 },
@@ -141,24 +145,6 @@
   ],
   "events": [
     {
-      // Cave In doors 146085 (-505.1, -94.0, -147.8) and 146086 (-541.6, -105.4, -151.8) are blown open by the Explosive Charges (goobers 144065) beside them: three
-      // charges at (-503.9, -97.2, -151.0), (-506.6, -88.8, -151.1) and (-535.2, -105.6, -156.0). They are 140 to 170 yards from the first route point and the route does not
-      // pass them: run at the start (2026-10-31 sim, 29 starts in 16 runs) the lone leader walked through the Caverndeep and died, 19 timeouts, 6 bosses of 32. It now runs
-      // after the last boss (Dark Iron Ambassador). The Workshop Door (90858 at (-758.5, 260.4, -273.0)) has no switch in the world database and is left out. Not run on the sim yet.
-      "id": "cave-ins",
-      "name": "Cave Ins (Explosive Charges)",
-      "trigger": { "type": "after_boss", "boss": 6228 },
-      "steps": [
-        { "type": "use", "object": 144065, "x": -503.9, "y": -97.2, "z": -151.0 },
-        { "type": "wait", "seconds": 5 },
-        { "type": "use", "object": 144065, "x": -506.6, "y": -88.8, "z": -151.1 },
-        { "type": "wait", "seconds": 5 },
-        { "type": "use", "object": 144065, "x": -535.2, "y": -105.6, "z": -156.0 },
-        { "type": "wait", "seconds": 5 }
-      ],
-      "timeout_sec": 300
-    },
-    {
       // Electrocutioner 6000 is on island 3 of the map-90 mesh, 1.4 yards from the main mesh: the leader is put on the island side of the gap.
       "id": "electrocutioner-bridge",
       "name": "Bridge to Electrocutioner 6000 (his island has no navmesh link)",
@@ -169,12 +155,13 @@
       ]
     },
     {
-      // Back to the route point of Viscous Fallout.
+      // To the main-mesh side of the gap, a route point of its own (the teleport snaps the route index to it); the route walks on to Crowd Pummeler from there.
+      // The old "cave-ins" event (after the last boss) is gone: it walked the leader ~1000 yards back to the entrance, and Grubbis is an escort event, not the charges.
       "id": "electrocutioner-back",
-      "name": "Back from Electrocutioner 6000 (to Viscous Fallout)",
+      "name": "Back from Electrocutioner 6000 (the main-mesh side of the gap)",
       "trigger": { "type": "after_boss", "boss": 6235 },
       "steps": [
-        { "type": "teleport", "x": -430.2, "y": 42.5, "z": -208.7 },
+        { "type": "teleport", "x": -538.1, "y": 530.6, "z": -216.3 },
         { "type": "wait", "seconds": 5 }
       ]
     }
