@@ -6608,6 +6608,175 @@ void ARosterSpecSetsTheRoleOfAPriest()
     CHECK(CastsSpell(holy.Decide(view, 0), 10, 2050, PlayerOf(13)));           // a holy priest does
 }
 
+// --- 0.44.18 tests: the hold and regroup logs, the cost log, the pull-hold cap, and a module with no scenario ---
+
+// A held party of five with a hurt mana user (bot 10) that has food and drink; returns the lines logged over `untilMs` of 1 s ticks.
+std::vector<std::string> HeldPartyLog(bool held, std::uint64_t untilMs)
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.PartyCount = 1;
+    options.ClassOf = WarriorLeads;
+    options.Route = { Point{ 100.0f, 0.0f, 0.0f } };
+    options.Supplies.Enabled = true;
+    std::vector<std::string> events;
+    options.OnEvent = [&events](std::string const& line) { events.push_back(line); };
+    BotPolicy policy(options);
+    policy.SetRouteActive(held);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 }, WarriorLeads);
+    for (BotSnapshot& bot : view.bots)
+    {
+        bot.group_role = bot.guid == 12 ? 2 : 1;
+        bot.group_leader_guid = (std::uint64_t(2) << 56) | 12;
+        bot.max_power = 0;
+        if (bot.guid == 12)
+        {
+            bot.power_type = 0;
+            bot.max_power = 1000;
+            bot.power = 50;
+            bot.drink_count = 5;
+            bot.food_count = 3;
+        }
+    }
+    for (std::uint64_t at = 40000; at <= untilMs; at += 1000)
+        policy.Decide(view, at);
+    return events;
+}
+
+std::size_t CountLines(std::vector<std::string> const& events, std::string const& prefix)
+{
+    std::size_t n = 0;
+    for (std::string const& line : events)
+        n += line.rfind(prefix, 0) == 0;
+    return n;
+}
+
+// consume_check is one line per held bot per kConsumeLogMs (30 s), and none for a party that is not held.
+void ConsumeCheckIsThrottledAndOnlyForAHeldParty()
+{
+    auto const held = HeldPartyLog(true, 44000);
+    std::size_t const lines = CountLines(held, "consume_check: bot=12 ");
+    CHECK(lines == 1);                                                // five ticks inside the hold, one line (the 30 s throttle)
+    CHECK(CountLines(held, "consume_check: bot=10 ") == 0);           // a bot with no mana is not a drinker
+    CHECK(CountLines(HeldPartyLog(false, 44000), "consume_check:") == 0);
+}
+
+// regroup_members names every member of the party, and comes once per kRegroupLogMs (15 s) while the regroup lasts.
+void RegroupMembersLogsEveryMemberAndIsThrottled()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.ClassOf = WarriorLeads;
+    options.Route = { Point{ 100.0f, 0.0f, 0.0f }, Point{ 140.0f, 0.0f, 0.0f } };
+    std::vector<std::string> events;
+    options.OnEvent = [&events](std::string const& line) { events.push_back(line); };
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    for (BotSnapshot& bot : view.bots)
+        bot.pos_x = 50.0f;
+    view.bots[0].pos_x = 0.0f;                                        // bot 10 stays 50 yards behind
+    for (std::uint64_t now = 1000; now <= 9000; now += 1000)
+        policy.Decide(view, now);
+    CHECK(CountLines(events, "regroup_members: leader=12 ") == 1);    // 8 s of regroup: the first line only
+    std::string line;
+    for (std::string const& e : events)
+        if (e.rfind("regroup_members: leader=12 ", 0) == 0)
+            line = e;
+    for (char const* member : { " | 10 yd=50 ", " | 11 yd=0 ", " | 13 yd=0 ", " | 14 yd=0 " })
+        CHECK(line.find(member) != std::string::npos);
+    for (std::uint64_t now = 10000; now <= 20000; now += 1000)
+        policy.Decide(view, now);
+    CHECK(CountLines(events, "regroup_members: leader=12 ") == 2);    // the second line after 15 s, not before
+}
+
+// want_cost is only logged for a Deadmines cast result, and is -1 with no cost file at all.
+void WantCostIsAbsentOffTheDeadminesAndMinusOneWithNoCostFile()
+{
+    for (int variant = 0; variant < 2; ++variant)
+    {
+        PolicyOptions options = AggressiveOptions();
+        std::vector<std::string> events;
+        options.OnEvent = [&events](std::string const& line) { events.push_back(line); };
+        PolicyOptions::ScenarioRoute route;
+        route.Route = { Point{ 100.0f, 0.0f, 0.0f } };
+        route.RouteMap = variant == 0 ? 36 : 1;
+        BotPolicy policy(options);                                    // no SpellCosts
+        policy.SetRouteActiveFor([](std::uint64_t) { return true; });
+        policy.SetScenarioRouteFor([&](std::uint64_t) -> PolicyOptions::ScenarioRoute const* { return &route; });
+        WorldTickSnapshotView view = PartyView({ 10 });
+        view.bots[0].level = 23;
+        view.bots[0].last_action_sequence = 1;
+        view.bots[0].last_action_type = uint8_t(ActionType::kCastSpell);
+        view.bots[0].last_action_spell = 1126;
+        view.bots[0].last_action_status = BotActionStatus::kApplied;
+        policy.Decide(view, 1000);
+        bool minusOne = false, any = false;
+        for (std::string const& e : events)
+            if (e.rfind("cast_result:", 0) == 0)
+            {
+                any = true;
+                minusOne = minusOne || e.find(" want_cost=-1 ") != std::string::npos;
+            }
+        if (variant == 0)
+            CHECK(any && minusOne);
+        else
+            CHECK(!any);
+    }
+}
+
+// The pull hold gives up kPullHoldMaxMs (45 s) after the party last rose, not earlier, and never later than a tick after.
+void ThePullHoldCapIsReachedAndNotExceededWithFlatMana()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.PartyCount = 1;
+    options.ClassOf = WarriorLeads;
+    options.Route = { Point{ 100.0f, 0.0f, 0.0f } };
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 }, WarriorLeads);
+    for (BotSnapshot& bot : view.bots)
+    {
+        bot.group_role = bot.guid == 12 ? 2 : 1;
+        bot.group_leader_guid = (std::uint64_t(2) << 56) | 12;
+        bot.max_power = 0;
+        if (bot.guid == 10)
+        {
+            bot.power_type = 0;
+            bot.max_power = 100000;
+            bot.power = 5000;
+        }
+    }
+    std::uint64_t walkedAt = 0;
+    for (std::uint64_t at = 1000; at <= 120000 && walkedAt == 0; at += 1000)
+        for (BotAction const& action : policy.Decide(view, at))
+            if (action.bot_guid == 12 && action.type == ActionType::kMoveTo && action.dest_x == 100.0f)
+                walkedAt = at;
+    CHECK(walkedAt != 0);
+    CHECK(walkedAt >= 30000);                                         // it waited for the mana first
+    CHECK(walkedAt <= 47000);                                         // and not past the 45 s cap
+}
+
+// No scenario, no director: the policy with none of the per-party hooks set must decide for a party, a lone bot and an empty view without crashing.
+void NoScenarioNoDirectorDoesNotCrash()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.PartyCount = 1;
+    options.ClassOf = WarriorLeads;
+    BotPolicy policy(options);                                        // no SetRouteActiveFor, SetTamingFor, SetStagingHoldFor, SetKilledBossesFor
+    WorldTickSnapshotView const party = PartyView({ 10, 11, 12, 13, 14 }, WarriorLeads);
+    WorldTickSnapshotView const lone = PartyView({ 10 });
+    WorldTickSnapshotView empty;
+    for (std::uint64_t at = 0; at < 20000; at += 1000)
+    {
+        policy.Decide(party, at);
+        policy.Decide(lone, at);
+        policy.Decide(empty, at);
+    }
+}
+
 int main()
 {
     RenewKeepsUpOnTheFightingTankEveryFifteenSeconds();
@@ -6886,6 +7055,11 @@ int main()
     AFailingBuffBacksOffLongerEachTime();
     HubTimeoutTriesTheNextHubSoonerThanAnArrival();
     DefaultBotsDoNotPullWhatIsInRange();
+    ConsumeCheckIsThrottledAndOnlyForAHeldParty();
+    RegroupMembersLogsEveryMemberAndIsThrottled();
+    WantCostIsAbsentOffTheDeadminesAndMinusOneWithNoCostFile();
+    ThePullHoldCapIsReachedAndNotExceededWithFlatMana();
+    NoScenarioNoDirectorDoesNotCrash();
 
     if (failures == 0)
         std::printf("policy_test: all checks passed\n");
