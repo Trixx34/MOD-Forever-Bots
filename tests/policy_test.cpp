@@ -1401,6 +1401,23 @@ void MemberFollowsItsLeaderUntilClose()
     CHECK(!HasAction(PartyPolicy(5).Decide(view, 0), 11, ActionType::kFollow));
 }
 
+// 0.45.3: a leader on another map (the Stockade leader's ghost released to Stormwind, 2026-11-07 22:20) is not followed: the core's follow walked the members
+// towards the leader's coordinates on the other map, out of the prison and off the route.
+void MemberDoesNotFollowALeaderOnAnotherMap()
+{
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    for (BotSnapshot& bot : view.bots)
+        bot.map_id = 34;
+    view.bots[1].pos_x = 30.0f;                // bot 11, far from the leader
+    view.bots[2].map_id = 0;                   // the leader, bot 12, on map 0
+    view.bots[2].pos_x = -8700.0f;
+    auto const actions = PartyPolicy(5).Decide(view, 0);
+    CHECK(!HasAction(actions, 11, ActionType::kFollow));
+    view.bots[2].map_id = 34;                  // back on the same map: followed again
+    view.bots[2].pos_x = 0.0f;
+    CHECK(HasAction(PartyPolicy(5).Decide(view, 0), 11, ActionType::kFollow, PlayerOf(12)));
+}
+
 void MemberFightsItsLeadersTarget()
 {
     WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
@@ -2736,6 +2753,39 @@ void TheLeaderWaitsAtABossPointUntilTheBossIsDead()
     for (std::string const& line : events)
         missed = missed || line.rfind("boss_missed: bot=12 point=1 boss=644", 0) == 0;
     CHECK(missed);
+}
+
+// 0.45.3: a boss killed away from its point (Targorr the Dread, the Stockade's point 0, pulled down the corridor): a leader already by the next point drops the boss
+// point as it drops any point it has passed. While the boss lives the boss point is never dropped.
+void ABossPointWhoseBossDiedElsewhereIsPassed()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.ClassOf = WarriorLeads;
+    options.Route = { Point{ 160.0f, 0.0f, 0.0f }, Point{ 146.0f, 0.0f, 0.0f }, Point{ 100.0f, 0.0f, 0.0f } };   // a dead end at 160, then back west
+    options.RouteBossAt[0] = 644;
+    std::vector<std::string> events;
+    options.OnEvent = [&events](std::string const& line) { events.push_back(line); };
+    auto const at = [](float x)
+    {
+        WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+        for (BotSnapshot& bot : view.bots)
+            bot.pos_x = x;
+        return view;
+    };
+    // The boss alive: the leader 22 yards short of the boss point (and 8 from the next one) still goes to the boss point.
+    BotPolicy alive(options);
+    alive.SetRouteActive(true);
+    CHECK(LeaderWalk(alive.Decide(at(138.0f), 0)) == 160.0f);
+    // The boss dead (killed at x = 138): the boss point is passed, on to the next one.
+    BotPolicy dead(options);
+    dead.SetRouteActive(true);
+    dead.SetKilledBosses({ 644 });
+    CHECK(LeaderWalk(dead.Decide(at(138.0f), 0)) == 146.0f);
+    bool passed = false;
+    for (std::string const& line : events)
+        passed = passed || line.rfind("route_passed: bot=12 point=0/3", 0) == 0;
+    CHECK(passed);
 }
 
 // 0.44.17: past the last route point with a boss of the route not dead (Stockade: bosses_missing at 23/23), the leader walks back to that boss point, waits there, and
@@ -7193,6 +7243,7 @@ int main()
     ATeleportEventSnapsTheRouteIndexToThePointItLandsOn();
     ATeleportEventDoesNotSnapPastALivingBoss();
     TheLeaderWaitsAtABossPointUntilTheBossIsDead();
+    ABossPointWhoseBossDiedElsewhereIsPassed();
     TheLeaderSweepsBackToAMissingBoss();
     ABossPointIsNeverSkippedForNoRoute();
     ALeaderSkipsAWaypointWithNoRoute();
@@ -7298,6 +7349,7 @@ int main()
     MemberAcceptsItsLeadersInvite();
     MemberLeavesAForeignParty();
     MemberFollowsItsLeaderUntilClose();
+    MemberDoesNotFollowALeaderOnAnotherMap();
     MemberFightsItsLeadersTarget();
     ADamageDealerFightsThePriorityCasterOfThePack();
     ADamageDealerFocusesTheEngineerWhenAGolemIsUp();

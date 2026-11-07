@@ -349,7 +349,10 @@ void BotPolicy::TurnRevivedAndRoles(DecideTick& tick, BotTurn& turn)
     // onto whichever real player walked past it); it only follows when told to (ChatFollow, below) or led.
     turn.followRef = 0;
     auto& followRef = turn.followRef;
-    if (partyMember && leaderSnap)
+    // Only a leader on the bot's own map: the core's follow walks towards the leader's coordinates whatever map they are on. In the Stockade (2026-11-07 22:20 and
+    // 22:26, stockade#3) the leader's ghost was released to Stormwind (map 0, x about -8700), and its four members walked west out of the prison at 7 yards a second,
+    // 100 and 400 yards off the mesh; the leader then rejoined next to one of them at -9,-16, where the route had no path (route_blocked at Targorr's point 0).
+    if (partyMember && leaderSnap && leaderSnap->map_id == bot.map_id)
         followRef = atLeader ? 0 : leaderRef;
     // A leader revived at the instance entrance rests there before it goes back to its party (leader_recover_wait, below): the members deep in the dungeon stay where they are,
     // they do not walk back through the packs to it.
