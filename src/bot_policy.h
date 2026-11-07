@@ -737,6 +737,9 @@ private:
         std::uint64_t ReviveHeldLoggedMs = 0;            // the last time this ghost logged that it is held back from its revive by a live Onyxian Warder
         std::uint64_t ReviveRetryMs = 0;                 // the next out-of-combat revive order of this ghost by its leader
         std::uint32_t ReviveAttempts = 0;                // revive orders sent in this death
+        std::uint64_t ReviveWindowStartMs = 0;           // revive-loop guard: start of the window the corpse revives below are counted in (kept across deaths)
+        std::uint32_t ReviveWindowCount = 0;             // corpse revives ordered in that window
+        std::uint64_t ReviveHostileLoggedMs = 0;         // the last revive_hostile_hold line
         std::uint64_t EntrySinceMs = 0;                  // when this ghost of a dungeon party began its way back to the entrance (0 = not yet)
         bool Reclaimed = false;                          // a reclaim was sent in this death
         std::optional<ErrandOrder> Errand;               // the town errand this bot is on (none = not on one)
@@ -791,6 +794,7 @@ private:
     TurnFlow DeadAnswerResurrect(DecideTick& tick, BotTurn& turn);
     TurnFlow DeadCorpse(DecideTick& tick, BotTurn& turn);
     TurnFlow DeadHeldByWarder(DecideTick& tick, BotTurn& turn);
+    bool ReviveGuardHolds(DecideTick& tick, BotTurn& turn, forever_module::BotSnapshot const& member);
     TurnFlow DeadReviveByLeader(DecideTick& tick, BotTurn& turn);
     void DeadGhostRun(DecideTick& tick, BotTurn& turn);
     void DeadEmit(DecideTick& tick, BotTurn& turn, Decision const& wantedDead);

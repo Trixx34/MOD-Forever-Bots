@@ -169,6 +169,34 @@ BotPolicy::TurnFlow BotPolicy::DeadAnswerResurrect(DecideTick& tick, BotTurn& tu
     return TurnFlow::kNext;
 }
 
+// Revive-loop guard: a dead bot is not stood up beside a live hostile (within kReviveHostileYards of the member it comes back next to), and at most kReviveWindowMax times
+// in kReviveWindowMs (the 2026-11-07 stockade, rfd and gnomer runs revived a bot every 8 s next to its killer: 106-127 deaths). True: hold back.
+bool BotPolicy::ReviveGuardHolds(DecideTick& tick, BotTurn& turn, BotSnapshot const& member)
+{
+    std::uint64_t const nowMs = tick.nowMs;
+    BotState& state = turn.state;
+    if (nowMs >= state.ReviveWindowStartMs + kReviveWindowMs)
+    {
+        state.ReviveWindowStartMs = nowMs;
+        state.ReviveWindowCount = 0;
+    }
+    bool held = state.ReviveWindowCount >= kReviveWindowMax;
+    if (auto const at = tick.indexOf.find(member.guid); !held && at != tick.indexOf.end())
+        for (NearbyUnit const& unit : tick.view.NearbyOf(at->second))
+            if (IsLiveMob(unit) && std::hypot(unit.pos_x - member.pos_x, unit.pos_y - member.pos_y) <= kReviveHostileYards)
+            {
+                held = true;
+                break;
+            }
+    if (held && _options.OnEvent && (state.ReviveHostileLoggedMs == 0 || nowMs - state.ReviveHostileLoggedMs >= kReviveWarderLogMs))
+    {
+        state.ReviveHostileLoggedMs = nowMs;
+        _options.OnEvent("revive_hostile_hold: bot=" + std::to_string(turn.bot.guid) + " member=" + std::to_string(member.guid) + " window_count=" +
+                         std::to_string(state.ReviveWindowCount) + " waited_ms=" + std::to_string(nowMs - state.DeathMs));
+    }
+    return held;
+}
+
 // A corpse: the leader's revive (Recover tactic), or the release once no resurrect is coming.
 BotPolicy::TurnFlow BotPolicy::DeadCorpse(DecideTick& tick, BotTurn& turn)
 {
@@ -217,7 +245,9 @@ BotPolicy::TurnFlow BotPolicy::DeadCorpse(DecideTick& tick, BotTurn& turn)
                 leader = LeaderRejoinMember(tick, bot.guid, bot.map_id, bot.pos_x, bot.pos_y);
             else if (auto const leaderAt = indexOf.find(deadParty); leaderAt != indexOf.end())
                 leader = &view.bots[leaderAt->second];
-            if (leader && leader->life_state == 0 && leader->in_combat == 0)
+            // Revive-loop guard (see ReviveGuardHolds): held back, the corpse takes the release path below as before.
+            bool const reviveHeld = leader && leader->life_state == 0 && leader->in_combat == 0 && ReviveGuardHolds(tick, turn, *leader);
+            if (leader && leader->life_state == 0 && leader->in_combat == 0 && !reviveHeld)
             {
                 if (nowMs >= state.ReviveRetryMs)
                 {
@@ -228,6 +258,7 @@ BotPolicy::TurnFlow BotPolicy::DeadCorpse(DecideTick& tick, BotTurn& turn)
                     revive.dest_x = 0.0f;
                     actions.push_back(revive);
                     state.ReviveAttempts += 1;
+                    state.ReviveWindowCount += 1;
                     state.ReviveRetryMs = nowMs + kOutOfCombatReviveRetryMs;
                     LogEvent("revive_corpse: bot=" + std::to_string(bot.guid) + " leader=" + std::to_string(leader->guid) + " attempt=" + std::to_string(state.ReviveAttempts) +
                           " waited_ms=" + std::to_string(waited) + (leaderCorpse ? " rejoin=1" : ""));
@@ -367,7 +398,7 @@ BotPolicy::TurnFlow BotPolicy::DeadReviveByLeader(DecideTick& tick, BotTurn& tur
     {
         auto const leaderAt = indexOf.find(deadParty);
         BotSnapshot const* const leader = leaderAt == indexOf.end() ? nullptr : &view.bots[leaderAt->second];
-        if (leader && leader->life_state == 0 && leader->in_combat == 0)
+        if (leader && leader->life_state == 0 && leader->in_combat == 0 && !ReviveGuardHolds(tick, turn, *leader))
         {
             if (nowMs >= state.ReviveRetryMs)
             {
@@ -378,6 +409,7 @@ BotPolicy::TurnFlow BotPolicy::DeadReviveByLeader(DecideTick& tick, BotTurn& tur
                 revive.dest_x = 0.0f;
                 actions.push_back(revive);
                 state.ReviveAttempts += 1;
+                state.ReviveWindowCount += 1;
                 state.ReviveRetryMs = nowMs + kOutOfCombatReviveRetryMs;
                 LogEvent("revive_out_of_combat: bot=" + std::to_string(bot.guid) + " leader=" + std::to_string(leader->guid) +
                       " attempt=" + std::to_string(state.ReviveAttempts) + " map=" + std::to_string(bot.map_id));

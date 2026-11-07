@@ -3836,6 +3836,23 @@ void ACorpseIsRevivedByTheQuietLeaderAfterAFewSeconds()
     CHECK(!HasAction(fighting.Decide(busy(), 9500), 13, ActionType::kRevive));
 }
 
+// Revive-loop guard: no corpse revive while a live hostile stands next to the reviving member, and no more than three in a window (the 2026-11-07 stockade/rfd/gnomer revive loops).
+void ACorpseIsNotRevivedBesideAHostileAndRevivesAreCapped()
+{
+    std::vector<std::string> events;
+    PolicyOptions options = DeadOptions(&events);
+    options.DungeonReviveOutOfCombat = true;
+    options.Route = { Point{ 100.0f, 0.0f, 0.0f } };
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    auto const near = [] { WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 }); Corpse(v.bots[3], 10.0f); v.bots[2].nearby_count = 1; v.nearby[2 * v.max_nearby_units] = Hostile(5, 6.0f, 100); return v; };
+    auto const quiet = [] { WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 }); Corpse(v.bots[3], 10.0f); return v; };
+    policy.Decide(near(), 1000);
+    CHECK(!HasAction(policy.Decide(near(), 9500), 13, ActionType::kRevive));
+    CHECK(LoggedWith(events, "revive_hostile_hold"));
+    CHECK(HasAction(policy.Decide(quiet(), 20000), 13, ActionType::kRevive));
+}
+
 // A dungeon party's dead wait for a rezzer no longer than a leveling party's: 20 s (0.36.2; the 60 s of 0.34 left ghosts for whole fights, 44-87 s in the sim's Ragefire Chasm).
 void ADungeonCorpseWaitsTwentySecondsForARezzer()
 {
@@ -7305,6 +7322,7 @@ int main()
     AFightInThePartyDoesNotHoldADungeonRelease();
     AReleasedDungeonGhostIsTeleportedToTheLeader();
     ACorpseIsRevivedByTheQuietLeaderAfterAFewSeconds();
+    ACorpseIsNotRevivedBesideAHostileAndRevivesAreCapped();
     CorpseReleasesAtOnceWithoutARezzer();
     CorpseReleasesWhenTheWholePartyIsDown();
     ReleaseIsHeldInCombatUpToTheCap();
