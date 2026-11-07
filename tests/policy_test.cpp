@@ -1694,6 +1694,53 @@ void ADamageDealerTakesTheWarlockWhoseVoidwalkerIsUp()
     CHECK(onEnforcer > 0);
 }
 
+// Razorfen Downs, the second hall (2026-11-07 sim journal, bots 0.45.2): the tank fights a non-elite Splinterbone Centurion (7346) while a Boneflayer
+// Ghoul (7347) and a Freezing Spirit (7353, damage x2.8, Frost Nova) are already in the fight. With 129-razorfen-downs.json's kill_priority the damage
+// dealers turn on the Spirit, and on the Skeletal Summoner (7342) before it when one is there; with no list they stay on the tank's target, as before.
+void RazorfenDownsDamageDealersTakeTheFreezingSpiritFirst()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.PartyCount = 1;
+    options.ClassOf = [](std::uint64_t guid) { return guid == 12 ? 1u : guid == 11 ? 8u : 5u; }; // bot 11 is the mage, 12 the warrior, the rest priests
+    options.TacticInterrupt = false;
+    std::map<std::uint32_t, std::uint32_t> const shipped = { { 7342, 0 }, { 7340, 1 }, { 7353, 2 }, { 7345, 3 }, { 7341, 4 }, { 7335, 5 }, { 7337, 6 } }; // the file's order
+    NearbyUnit centurion = Hostile(7, 2.0f, 30);
+    centurion.guid = MakeUnitRef(8, 7346, 7);   // the tank's target, the weakest
+    NearbyUnit ghoul = Hostile(8, 5.0f, 60);
+    ghoul.guid = MakeUnitRef(8, 7347, 8);
+    NearbyUnit spirit = Hostile(9, 8.0f, 100);
+    spirit.guid = MakeUnitRef(8, 7353, 9);
+    NearbyUnit summoner = Hostile(10, 9.0f, 100);
+    summoner.guid = MakeUnitRef(8, 7342, 10);
+    auto const firstTarget = [&](std::map<std::uint32_t, std::uint32_t> const& priority, bool withSummoner)
+    {
+        options.KillPriority = priority;
+        BotPolicy policy(options);
+        policy.SetRouteActive(true);
+        WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+        view.bots[2].in_combat = 1;
+        view.bots[2].threat_target_guid = centurion.guid;
+        view.bots[3].in_combat = 1;
+        view.bots[3].threat_target_guid = ghoul.guid;
+        view.bots[4].in_combat = 1;
+        view.bots[4].threat_target_guid = spirit.guid;
+        AddNearby(view, 1, centurion);
+        AddNearby(view, 1, ghoul);
+        AddNearby(view, 1, spirit);
+        if (withSummoner)
+            AddNearby(view, 1, summoner);
+        for (std::uint64_t at = 0; at < 6000; at += 500)
+            for (BotAction const& action : policy.Decide(view, at))
+                if (action.bot_guid == 11 && action.target_guid != 0)
+                    return action.target_guid;
+        return std::uint64_t(0);
+    };
+    CHECK(firstTarget(shipped, false) == spirit.guid);     // the Spirit before the weaker Centurion and the Ghoul
+    CHECK(firstTarget(shipped, true) == summoner.guid);    // the Summoner before the Spirit
+    CHECK(firstTarget({}, false) == centurion.guid);       // no list: the tank's target, as before 0.45.2
+}
+
 // Cc: a mage (Polymorph, spell 118) holds one extra, unengaged Humanoid member of the tank's pack -- not the tank's own target,
 // which is already engaged.
 void CcHoldsAnUnengagedHumanoidPackMember()
@@ -7258,6 +7305,7 @@ int main()
     ADamageDealerDoesNotWidenPastTwoAlreadyEngagedHostiles();
     TheVoidwalkerCompanionStaysReachablePastTheEngagementCapToo();
     ADamageDealerTakesTheWarlockWhoseVoidwalkerIsUp();
+    RazorfenDownsDamageDealersTakeTheFreezingSpiritFirst();
     CcHoldsAnUnengagedHumanoidPackMember();
     CcDoesNotHoldACreatureTypeItHasNoSpellFor();
     CcNeverHoldsTheKillPriorityTarget();

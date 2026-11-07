@@ -633,6 +633,44 @@ void GnomereganRouteRosterAndDuration()
     CHECK(horde.Scenarios.size() == 1 && horde.Scenarios[0].Roster.size() == 5 && horde.Scenarios[0].Roster[0][0] == 2);
 }
 
+// Razorfen Downs (bots 0.45.2): a kill_priority with the Skeletal Summoner and its Shadowcaster first, then the Freezing Spirit, the Captain and the
+// casters (2026-11-07 sim journal: the Spirit was the top killer of the first two halls). The route is unchanged. The sim's list run hands it to rfd only.
+void RazorfenDownsKillPriority()
+{
+    std::string const root = FOREVER_BOTS_SOURCE_DIR;
+    std::vector<std::string> warnings;
+    std::vector<Dungeon> const json = LoadDungeonDir(root + "/data/dungeons", true, warnings);
+    CHECK(warnings.empty());
+    Dungeon const* r = nullptr;
+    for (Dungeon const& d : json)
+        if (d.MapId() == 129)
+            r = &d;
+    CHECK(r != nullptr && r->Id == "rfd");
+    if (!r)
+        return;
+    std::vector<std::uint32_t> const order{ 7342, 7340, 7353, 7345, 7341, 7335, 7337 };
+    CHECK(r->KillPriority == order);
+    CHECK(r->Summons == std::vector<std::uint32_t>{ 7340 });
+    CHECK(r->Route.size() == 93);
+    std::vector<std::pair<std::size_t, std::uint32_t>> bosses;
+    for (std::size_t i = 0; i < r->Route.size(); ++i)
+        if (r->Route[i].BossEntry != 0)
+            bosses.emplace_back(i, r->Route[i].BossEntry);
+    CHECK((bosses == std::vector<std::pair<std::size_t, std::uint32_t>>{ { 15, 8567 }, { 29, 7354 }, { 45, 7358 }, { 92, 7357 } }));
+
+    // the sim's list run: rfd takes its file's kill order, another dungeon of the list keeps its own
+    std::unordered_map<std::string, std::string> config{ { "Scenario", "rfc:3,rfd:3" }, { "DungeonFile", root + "/data/dungeons.txt" },
+                                                         { "DungeonEventsFile", root + "/data/dungeon_events.txt" } };
+    std::vector<std::string> w;
+    BotSettings const s = ParseBotSettings(MergeDungeonFile(config, w), w);
+    CHECK(s.Scenarios.size() == 2);
+    if (s.Scenarios.size() == 2)
+    {
+        CHECK(s.Scenarios[0].Name == "rfc" && s.Scenarios[0].KillPriority == (std::vector<std::uint32_t>{ 11324, 8996, 11322, 11323 }));
+        CHECK(s.Scenarios[1].Name == "rfd" && s.Scenarios[1].KillPriority == order && s.Scenarios[1].Summons == std::vector<std::uint32_t>{ 7340 });
+    }
+}
+
 void ConfigKeysNameTheFolders()
 {
     DungeonSources const s = SourcesFromConfig({ { "DungeonFile", "data/dungeons.txt" }, { "DungeonDir", "/my/dungeons" }, { "DungeonDataDir", "/ship" }, { "DungeonEventsFile", "e.txt" } });
@@ -668,6 +706,7 @@ int main()
     ShippedFilesEqualTheOldTextFiles();
     CutOffBossesAreBridgedByTeleportEvents();
     GnomereganRouteRosterAndDuration();
+    RazorfenDownsKillPriority();
     ConfigKeysNameTheFolders();
     if (failures != 0)
     {
