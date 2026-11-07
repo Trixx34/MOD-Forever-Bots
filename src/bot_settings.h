@@ -55,7 +55,7 @@
 //   ScenarioRequireBosses = 0         1: the run is complete when every boss of ScenarioBosses has been seen dead (not when the last waypoint is reached)
 // A dungeon file (doc/dungeons.md) fills most of these keys: DungeonFile = "data/dungeons.txt" and Dungeon = "rfc" (see dungeon_data.h).
 // Several dungeons in one run (bots 0.29.0): Scenario = "dm:10,rfc:10" lists dungeon ids of the dungeon files, each with its number of parties, in order (the
-// first one's parties are spawned first); at most 20 parties in all. Each listed dungeon takes all its scenario keys from its dungeon file entry; a key with
+// first one's parties are spawned first); at most 40 parties in all. Each listed dungeon takes all its scenario keys from its dungeon file entry; a key with
 // ".<id>" after it changes one key for that dungeon only: ScenarioRoster.dm = "1:1,1:5,1:8,3:3,7:9", ScenarioLevel.dm = 18, ScenarioStaging.dm = "0 -8913 554 94".
 // In the list form the plain dungeon keys (ScenarioRoster, ScenarioLevel, ScenarioStaging, ScenarioEntry, ScenarioPortal, ScenarioRoute<n>, ScenarioBosses,
 // ScenarioBossAt, ScenarioKillPriority, ScenarioParties and Dungeon) are ignored, with a warning: they belong to one dungeon. The other keys (ScenarioDurationSec,
@@ -95,7 +95,7 @@ struct ScenarioSettings
     std::uint32_t MinAlive = 0;                          // 0 = the understrength stop is off
     std::uint32_t LeaderDeadAbandonSec = 0;              // 0 = off
     bool RequireBosses = false;
-    // ScenarioParties (1 to 20, default 1): this many parties of the roster run at the same time, each with its own director and its own dungeon instance (the core makes an
+    // ScenarioParties (1 to 40, default 1): this many parties of the roster run at the same time, each with its own director and its own dungeon instance (the core makes an
     // instance per group). Bot guids in order are cut into parties of the roster's size, as the policy's party logic does. MaxBots must cover Parties x roster.
     std::uint32_t Parties = 1;
     // ScenarioKillPriority = "entry,entry,..": creature entries in the order the party kills them (the dungeon file's kill_priority).
@@ -339,7 +339,7 @@ struct BotSettings
 };
 
 // The most parties a scenario runs at once, over all its dungeons.
-constexpr std::uint32_t kMaxScenarioParties = 20;
+constexpr std::uint32_t kMaxScenarioParties = 40;
 
 // One entry of a Scenario list ("dm:10").
 struct ScenarioListItem

@@ -316,7 +316,7 @@ bool HasWarning(std::vector<std::string> const& warnings, std::string const& par
     return false;
 }
 
-// Scenario = "dm:10,rfc:10": the list, in order, with at most 20 parties in all.
+// Scenario = "dm:10,rfc:10": the list, in order, with at most 40 parties in all.
 void ScenarioListParsing()
 {
     CHECK(!IsScenarioList("rfc") && IsScenarioList("rfc:3") && IsScenarioList("dm,rfc"));
@@ -326,12 +326,12 @@ void ScenarioListParsing()
     auto const plain = ParseScenarioList("dm,rfc:2", warnings);
     CHECK(plain.size() == 2 && plain[0].Parties == 1 && plain[1].Parties == 2);
 
-    auto const over = ParseScenarioList("dm:15,rfc:10,wc:2", warnings);    // 20 in all: rfc is cut to 5, wc dropped
-    CHECK(over.size() == 2 && over[0].Parties == 15 && over[1].Parties == 5 && HasWarning(warnings, "more than 20 parties"));
+    auto const over = ParseScenarioList("dm:30,rfc:20,wc:2", warnings);    // 40 in all: rfc is cut to 10, wc dropped
+    CHECK(over.size() == 2 && over[0].Parties == 30 && over[1].Parties == 10 && HasWarning(warnings, "more than 40 parties"));
     warnings.clear();
-    auto const bad = ParseScenarioList("dm:0,rfc:x,:3,wc:21,sfk:2,sfk:3", warnings);
+    auto const bad = ParseScenarioList("dm:0,rfc:x,:3,wc:41,sfk:2,sfk:3", warnings);
     CHECK(bad.size() == 1 && bad[0].Name == "sfk" && bad[0].Parties == 2);
-    CHECK(HasWarning(warnings, "'dm:0' is not dungeon:parties") && HasWarning(warnings, "'wc:21'") && HasWarning(warnings, "'sfk' is listed twice"));
+    CHECK(HasWarning(warnings, "'dm:0' is not dungeon:parties") && HasWarning(warnings, "'wc:41'") && HasWarning(warnings, "'sfk' is listed twice"));
 }
 
 // Each listed dungeon reads its own keys ("<key>.<id>") over the shared ones; the plain dungeon keys are for the single form and are ignored here.
@@ -408,7 +408,7 @@ void SingleDungeonScenarioIsUnchanged()
     CHECK(ScenarioBotCount(s.Scenarios) == 100 && ScenarioPartyCount(s.Scenarios) == 20);
     ScenarioSlot const slot = ScenarioSlotOf(s.Scenarios, 57);           // the same roster cycle as before: slot % 5
     CHECK(slot.Valid && slot.Dungeon == 0 && slot.Party == 11 && slot.Race == 8 && slot.Class == 8);
-    CHECK(ParseBotSettings({ { "Scenario", "rfc" }, { "ScenarioParties", "21" }, { "ScenarioRoster", "2:1" } }, warnings).Scenario.Parties == 1);
+    CHECK(ParseBotSettings({ { "Scenario", "rfc" }, { "ScenarioParties", "41" }, { "ScenarioRoster", "2:1" } }, warnings).Scenario.Parties == 1);
 }
 
 // 40-man raid support (doc 108): ScenarioRaid is a distinct opt-in mode. Without it (the default) a roster longer than 5 is still
