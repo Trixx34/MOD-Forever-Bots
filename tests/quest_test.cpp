@@ -595,6 +595,29 @@ void ARunOfRefusedQuestActionsPausesTheQuestEngine()
     CHECK(!sent);
 }
 
+// A class quest sent with its reward leaves a journal line (quest_reward), once per send; an ordinary hand-in does not.
+void ClassQuestRewardIsLogged()
+{
+    std::istringstream in("start A\nanchor 0 0 0 0\nquest 500 giver 0 0 0 ender 0 0 0\nreq 500 classes 8\nreward 500\n");
+    std::vector<std::string> warnings;
+    PolicyOptions options = AggressiveOptions();
+    options.Quests = std::make_shared<QuestData>(ParseQuestData(in, warnings));
+    std::vector<std::string> events;
+    options.OnEvent = [&](std::string const& text) { events.push_back(text); };
+    BotPolicy policy(options);
+    BotSnapshot bot = Bot(-9000.0f, -100.0f);
+    LogQuest(bot, 500, 1);
+    bool sent = false;
+    for (BotAction const& action : policy.Decide(OneBotView(bot, {}), 1000))
+        sent = sent || (action.type == ActionType::kQuest && action.spell_id == QuestCode(kQuestReward, 500));
+    CHECK(sent);
+    int lines = 0;
+    for (std::string const& event : events)
+        if (event.rfind("quest_reward: bot=", 0) == 0 && event.find("quest=500 kind=class_quest") != std::string::npos)
+            ++lines;
+    CHECK(lines == 1);
+}
+
 void HandInRefusalsBlockLessThanOtherRefusals()
 {
     QuestPlanner planner(Data());
@@ -814,6 +837,7 @@ int main()
     NoStartOnAnotherMapMeansNoQuests();
     ReqRecordsAreParsed();
     ClassQuestInLogIsRewardedFromAnywhere();
+    ClassQuestRewardIsLogged();
     LevelLimitsDecideWhichQuestsAreTaken();
     ClassAndRaceLimitsApply();
     PrerequisiteQuestsComeAfterTheirPredecessors();
