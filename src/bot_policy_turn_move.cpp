@@ -450,20 +450,20 @@ void BotPolicy::RouteReadiness(DecideTick& tick, BotTurn& turn, RouteLeg& route)
         });
         if (!manaLowInParty || bot.in_combat != 0)
         {
-            state.RouteManaSinceMs = 0;
+            state.RouteManaStartMs = 0;
             state.RouteManaProgressMs = 0;
             state.RouteManaBaseMs = 0;
         }
-        else if (state.RouteManaSinceMs == 0)
+        else if (state.RouteManaStartMs == 0)
         {
-            state.RouteManaSinceMs = nowMs;
+            state.RouteManaStartMs = nowMs;
             state.RouteManaProgressMs = nowMs;
             state.RouteManaBaseSum = manaSum, state.RouteManaBaseMs = nowMs, state.RouteManaBaseAlive = manaAlive;
         }
         else if (RecoveryProgress(manaSum, manaMax, manaAlive, nowMs, state.RouteManaBaseSum, state.RouteManaBaseMs, state.RouteManaBaseAlive))
             state.RouteManaProgressMs = nowMs; // the 60 s cap counts from the last real recovery (drinking), not from regeneration or a revive
     }
-    route.manaReady = !manaLowInParty || nowMs - state.RouteManaProgressMs >= kRouteManaMaxMs || nowMs - state.RouteManaSinceMs >= kRouteManaAbsMaxMs;
+    route.manaReady = !manaLowInParty || nowMs - state.RouteManaProgressMs >= kRouteManaMaxMs || nowMs - state.RouteManaStartMs >= kRouteManaAbsMaxMs;
     // PartyMana: a member that said it is low on mana holds the walk too (never in combat, and never longer than PartyManaHoldSec).
     if (_options.PartyMana.Enabled && route.manaReady)
         if (auto const mana = _partyMana.find(bot.guid); mana != _partyMana.end() && mana->second.Holding(_options.PartyMana, bot.in_combat != 0, nowMs))

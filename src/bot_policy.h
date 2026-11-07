@@ -625,7 +625,7 @@ private:
         std::uint64_t RouteManaProgressMs = 0;           // 0.44.14: the last tick the party's summed mana rose while the leader waited (kRouteManaMaxMs counts from here)
         std::uint64_t RouteManaBaseSum = 0, RouteManaBaseMs = 0; // RecoveryProgress baseline of the wait (cleared when the wait ends)
         std::uint32_t RouteManaBaseAlive = 0;
-        std::uint64_t RouteManaSinceMs = 0;              // since when a mana user of the party has been below kRouteMinManaPct (0 = none)
+        std::uint64_t RouteManaStartMs = 0;              // since when a mana user of the party has been below kRouteMinManaPct (0 = none)
         std::uint64_t RouteHoldLoggedMs = 0;             // when the leader last logged why it does not walk on (route_hold)
         std::uint64_t TaxiBlockedUntilMs = 0;            // the core refused a flight: walk until this
         std::uint64_t TaxiWaitUntilMs = 0;               // a flight was ordered: give it time to show
