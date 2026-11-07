@@ -113,7 +113,7 @@ void BotPolicy::TurnQuestsAndHold(DecideTick& tick, BotTurn& turn)
                 }
             }
             checkReady(bot);
-            tick.ForMembers(bot.guid, checkReady);
+            tick.ForEachPartyMember(bot.guid, checkReady);
             // 0.44.14: the hold's 45 s cap counts from the last tick the party's health plus mana rose (they are resting), up to kPullHoldAbsMaxMs.
             std::uint64_t restSum = 0, restMax = 0;
             std::uint32_t restAlive = 0;
@@ -126,7 +126,7 @@ void BotPolicy::TurnQuestsAndHold(DecideTick& tick, BotTurn& turn)
                 restMax += std::uint64_t(member.max_health) + (member.power_type == 0 ? member.max_power : 0);
             };
             addRest(bot);
-            tick.ForMembers(bot.guid, addRest);
+            tick.ForEachPartyMember(bot.guid, addRest);
             if (ready)
                 state.HoldBaseMs = 0;
             else if (RecoveryProgress(restSum, restMax, restAlive, nowMs, state.HoldBaseSum, state.HoldBaseMs, state.HoldBaseAlive))

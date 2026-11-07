@@ -598,7 +598,7 @@ struct BotPolicy::DecideTick
 
     // The members of a leader's party that are online (not the leader).
     template <typename Fn>
-    void ForMembers(std::uint64_t leaderGuid, Fn&& fn) const
+    void ForEachPartyMember(std::uint64_t leaderGuid, Fn&& fn) const
     {
         auto const members = membersOf.find(leaderGuid);
         if (members == membersOf.end())
