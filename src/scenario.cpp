@@ -12,6 +12,25 @@ using forever_module::BotSnapshot;
 namespace
 {
 
+// Tuning values only this file uses (moved from scenario.h; the ones the tests also name stay in the header).
+constexpr char const* kTimeStateNames[] = { "fight", "walk", "dead", "rest", "far", "idle" };
+constexpr std::uint32_t kTimeRestHealthPct = 90;
+constexpr std::uint32_t kTimeRestPowerPct = 95;
+constexpr float kTimeFarYards = 30.0f;
+constexpr float kTameArrivedYards = 150.0f;         // a hunter this close to the spot has arrived
+constexpr float kTameHomeYards = 40.0f;             // and one this close to where it stood is back
+constexpr std::uint32_t kAmmoLow = 100;             // below this many pieces of its ammunition a hunter is given more
+constexpr std::uint32_t kAmmoGrantsMax = 40;        // per bot and run
+constexpr std::uint32_t kAmmoStackMax = 200;        // a grant is at most one stack (the core refuses a count above the item's stack size: 200 for arrows and shot)
+constexpr std::uint32_t kAmmoUselessMax = 3;        // grants in a row after which the count did not grow: the bot is left alone (the core refuses for another reason)
+constexpr std::uint32_t kSupplyGrantsMax = 40;       // per bot and item, per run (on top of the dressing's first grant)
+constexpr std::uint64_t kConfigProbeRetryMs = 6000;   // a config probe the core has not answered (or answered without applying) is sent again after this
+constexpr std::uint32_t kConfigProbeRefusalsMax = 3;   // refusals in a row (a teleport refused in combat is not the config) that end the run as config_refused
+constexpr std::uint64_t kGroupingTimeoutMs = 120000;
+// The party waits at its staging place while any living member is in combat, and the whole party is sent in together once none is. This is the longest that
+// wait may last; a fight that outlasts it ends the run as before.
+constexpr std::uint64_t kEnterCombatMaxMs = 600000;
+
 constexpr std::uint32_t kServiceEquip = 4; // kVendor's equip bit
 constexpr std::uint32_t kWarriorClass = 1;
 constexpr std::uint32_t kHunterClass = 3;
