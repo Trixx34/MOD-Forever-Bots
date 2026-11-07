@@ -714,7 +714,35 @@ void BotPolicy::RouteEvents(DecideTick& tick, BotTurn& turn, RouteLeg& route)
             }
             case dungeon_events::Command::What::Teleport:
                 if (_options.DungeonTeleport)
+                {
                     wanted = Decision{ ActionType::kTeleport, 0, Point{ command.X, command.Y, command.Z }, bot.map_id };
+                    // The route goes on from where the teleport puts the leader: the route point nearest to the destination, from the current one on (a bridge to a boss
+                    // on a cut-off island lands on a point before the boss, the way back on the point after it). Without this the index stays at the point left behind.
+                    if (route.routePoints && state.RouteIndex < route.routePoints->size())
+                    {
+                        std::size_t snap = state.RouteIndex;
+                        float snapDistance = std::numeric_limits<float>::max();
+                        for (std::size_t i = state.RouteIndex; i < route.routePoints->size(); ++i)
+                        {
+                            Point const& p = (*route.routePoints)[i];
+                            float const dx = p.X - command.X, dy = p.Y - command.Y, dz = p.Z - command.Z;
+                            float const d = std::sqrt(dx * dx + dy * dy + dz * dz);
+                            if (d < snapDistance)
+                            {
+                                snapDistance = d;
+                                snap = i;
+                            }
+                        }
+                        if (snapDistance <= kRoutePointReachYards && snap != state.RouteIndex)
+                        {
+                            if (_options.OnEvent)
+                                _options.OnEvent("route_teleport_snap: bot=" + std::to_string(bot.guid) + " from=" + std::to_string(state.RouteIndex) + " to=" + std::to_string(snap));
+                            state.RouteIndex = snap;
+                            state.RouteNoRoute = 0;
+                            state.RouteBossSinceMs = 0;
+                        }
+                    }
+                }
                 else
                     wanted = Decision{ ActionType::kStop, 0 };
                 eventBusy = true;

@@ -43,7 +43,9 @@
     { "x": -530.1, "y": 115.5, "z": -204.3 },
     { "x": -430.2, "y": 42.5, "z": -208.7, "boss": 7079 },  // boss: Viscous Fallout
     // Electrocutioner 6000 stands on a navmesh island no path reaches (island 3): the event "electrocutioner-bridge" puts the party on it when Viscous Fallout is dead, "electrocutioner-back" brings it back.
+    { "x": -537.9, "y": 528.3, "z": -216.1 },  // landing on the island (where the bridge event puts the party)
     { "x": -552.0, "y": 502.9, "z": -216.7, "boss": 6235 },  // boss: Electrocutioner 6000
+    { "x": -430.2, "y": 42.5, "z": -208.7 },  // back on the main mesh (where the back event puts the party)
     { "x": -455.7, "y": 62.4, "z": -210.7 },
     { "x": -448.3, "y": 193.9, "z": -207.8 },
     { "x": -448.3, "y": 239.5, "z": -207.8 },
