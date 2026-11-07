@@ -225,6 +225,33 @@ void TheLeaderFightsFirst()
     CHECK(runner.Next(f, 300).Do == Command::What::Hold);
 }
 
+// A fight does not use up an event's timeout (heavy-door-1 timed out while the party fought Sneed beside it), within a cap.
+void TheTimeoutDoesNotRunDuringAFight()
+{
+    std::vector<std::string> warnings;
+    Runner runner(ForMap(Parse(kFile, warnings), 36));
+    std::set<std::uint32_t> killed{ 644 };
+    Facts f;
+    f.X = -50;
+    f.Y = -600;
+    f.KilledBosses = &killed;
+    CHECK(runner.Next(f, 0).Do == Command::What::MoveTo);                                // timeout 90 s
+    f.InCombat = true;
+    CHECK(runner.Next(f, 10000).Do == Command::What::Hold);
+    CHECK(runner.Next(f, 70000).Do == Command::What::Hold);
+    f.InCombat = false;
+    CHECK(runner.Next(f, 100000).Do == Command::What::MoveTo && runner.Active());        // 100 s since the start, 60 s of it a fight: 40 s counted
+    CHECK(runner.Next(f, 149000).Do == Command::What::MoveTo && runner.Active());
+    CHECK(runner.Next(f, 150000).Do == Command::What::Nothing && !runner.Active());      // 90 s counted: timed out
+    // A fight that never ends is cut off by the cap.
+    Runner endless(ForMap(Parse(kFile, warnings), 36));
+    CHECK(endless.Next(f, 0).Do == Command::What::MoveTo);
+    f.InCombat = true;
+    for (std::uint64_t at = 10000; at <= 400000; at += 10000)
+        endless.Next(f, at);
+    CHECK(!endless.Active());                                                            // 90 s + the 180 s cap
+}
+
 // The Wailing Caverns escort: after the four Lords of the Fang are dead, talk to the Disciple of Naralex at the start, follow him, then stand through the waves.
 void TheNaralexEscortRuns()
 {
@@ -343,6 +370,7 @@ int main()
     AFailedEventRetriesWithBackoffThenGivesUpForGood();
     ATimedOutEventRetriesThenCanSucceed();
     TheLeaderFightsFirst();
+    TheTimeoutDoesNotRunDuringAFight();
     TheNaralexEscortRuns();
     ARefusedNaralexTalkMovesOnToTheFollow();
     if (failures == 0)

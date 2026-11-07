@@ -127,6 +127,9 @@ private:
     std::size_t _step = 0;
     std::uint64_t _startedMs = 0;
     std::uint64_t _stepSinceMs = 0;
+    std::uint64_t _lastNextMs = 0;     // the previous call of Next() while this event ran, and whether the leader was in a fight or dead then
+    bool _lastPaused = false;
+    std::uint64_t _pausedMs = 0;       // fight time of this cycle that the timeout does not count (at most kEventCombatPauseMaxMs)
     bool _sent = false;                // the Use of this step was sent and its answer is awaited
     std::uint64_t _sentMs = 0;
     std::uint32_t _failures = 0;
@@ -137,6 +140,7 @@ private:
 constexpr float kApproachYards = 4.0f;
 constexpr float kCloseYards = 1.5f;
 constexpr std::uint64_t kAnswerWaitMs = 3000;
+constexpr std::uint64_t kEventCombatPauseMaxMs = 180000; // time spent in a fight (or dead) does not count toward an event's timeout, up to this much per cycle
 constexpr std::uint32_t kMaxFailures = 3;
 constexpr std::uint32_t kMaxEventAttemptCycles = 5;   // full restarts of one event before it is given up for good (event_blocked)
 constexpr std::uint64_t kEventRetryBackoffMs = 20000; // wait this long before an event that failed or timed out may start again

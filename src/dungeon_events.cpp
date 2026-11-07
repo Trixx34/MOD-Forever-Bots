@@ -3,6 +3,7 @@
 
 #include "text_number.h"
 
+#include <algorithm>
 #include <cmath>
 #include <sstream>
 
@@ -352,6 +353,9 @@ Command Runner::Next(Facts const& facts, std::uint64_t nowMs)
             _step = 0;
             _startedMs = nowMs;
             _stepSinceMs = nowMs;
+            _lastNextMs = nowMs;
+            _lastPaused = false;
+            _pausedMs = 0;
             _sent = false;
             _failures = 0;
             _close = false;
@@ -363,6 +367,17 @@ Command Runner::Next(Facts const& facts, std::uint64_t nowMs)
     }
 
     Event const& event = _events[_active];
+    // The party's fight holds the event (the Deadmines doors lie where the pack and Sneed fight), so the time of that fight is not the event's: the timeout
+    // runs on the time the leader was free to click, with a cap (an escort that fights for good still ends).
+    bool const paused = facts.InCombat || !facts.Alive;
+    if (_lastPaused && paused && nowMs > _lastNextMs && _pausedMs < kEventCombatPauseMaxMs)
+    {
+        std::uint64_t const add = std::min<std::uint64_t>(nowMs - _lastNextMs, kEventCombatPauseMaxMs - _pausedMs);
+        _startedMs += add;
+        _pausedMs += add;
+    }
+    _lastNextMs = nowMs;
+    _lastPaused = paused;
     if (nowMs - _startedMs >= std::uint64_t(event.TimeoutSec) * 1000)
     {
         Finish("event_timeout", nowMs, /*success=*/false);
