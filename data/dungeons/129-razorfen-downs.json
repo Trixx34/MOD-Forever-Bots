@@ -118,6 +118,16 @@
     { "x": 2502.4, "y": 697.1, "z": 52.0 },
     { "x": 2466.6, "y": 671.4, "z": 63.5, "boss": 7357 }  // boss: Mordresh Fire Eye
   ],
+  // Kill order when the party fights a pack (focus tactic, Module.forever-bots.DungeonTactics; the sim runs focus,interrupt,rest,recover,cc). Bots 0.45.2,
+  // from the 2026-11-07 sim journal (12 rfd parties, 16:22 to 22:30, no party past route point 15): the first two halls are packs of 8 (Boneflayer Ghoul,
+  // Freezing Spirit, Splinterbone Centurion, one Skeletal Summoner) that the leader cannot pull apart, and the Freezing Spirit was the top killer (136 of
+  // 440 deaths: elite, damage x2.8 in creature_classic_stats, Frost Nova 15532 every 10-12 s that roots the party in the Ghouls' melee). Without a
+  // list the damage dealers only assisted the tank's target (no focus event in the journal), so the Spirits were left free.
+  // Order: the Skeletal Summoner (Lightning Bolt every 2 s, Summon Shadowcaster 12258 every 15-20 s), then its Skeletal Shadowcaster (7340, no spawn of
+  // its own), then the Freezing Spirit, the Splinterbone Captain (damage x2.8), then the casters met later (Skeletal Frostweaver, Death's Head
+  // Geomancer, Death's Head Necromancer). The melee (Boneflayer Ghoul, Centurion, Thorn Eater Ghoul) stay unlisted: the tank holds them.
+  "kill_priority": [7342, 7340, 7353, 7345, 7341, 7335, 7337],
+  "summons": [7340],
   // The bosses, in the order the route meets them. "strategy" holds the tactics for each boss: pull, tank_position, interrupt, dispel, avoid, avoid_spells, kill_order,
   // notes. Fields the bots act on today are listed in doc/dungeon-strategy.md ("what bots do today"); the others are kept but not used yet.
   "bosses": [
