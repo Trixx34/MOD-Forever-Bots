@@ -87,6 +87,7 @@ void BotPolicy::DeadRecord(DecideTick& tick, BotTurn& turn)
         state.ReleaseNow = false;
         state.ReleaseSent = false;
         state.ReleaseHeldLogged = false;
+        state.LeaderGhostWaitLogged = false;
         state.AcceptRetryMs = 0;
         state.AcceptedFrom = 0;
         state.ReclaimRetryMs = 0;
@@ -205,11 +206,17 @@ BotPolicy::TurnFlow BotPolicy::DeadCorpse(DecideTick& tick, BotTurn& turn)
         std::uint64_t const releaseCombatHoldMs = _options.ReleaseCombatHoldMs;
         // The Recover tactic (the core's revive order, as for a ghost): the leader is up and nothing is fighting, so the dead member is stood up at the leader's side after a few
         // seconds instead of waiting for the healer's 10 s cast, a release and a corpse run (the members that released were killed again outside by the wolves of Westfall).
-        if (_options.TacticRecover && _options.DungeonReviveOutOfCombat && dungeonParty && deadParty != 0 && deadParty != bot.guid && !partyFights &&
+        // DungeonLeaderRejoin: the dead leader's own corpse is stood up the same way, next to the living, quiet member nearest to it (the core's revive order takes any
+        // member of the group), not released to come back at the entrance alone (the 2026-11-07 sim: 224 of 231 leader deaths ended in a release with a rezzer up).
+        bool const leaderCorpse = _options.DungeonLeaderRejoin && deadParty != 0 && deadParty == bot.guid;
+        if (_options.TacticRecover && _options.DungeonReviveOutOfCombat && dungeonParty && deadParty != 0 && (deadParty != bot.guid || leaderCorpse) && !partyFights &&
             state.ReviveAttempts < kOutOfCombatReviveTries && waited >= kCorpseReviveDelayMs && bot.resurrect_from == 0)
         {
-            auto const leaderAt = indexOf.find(deadParty);
-            BotSnapshot const* const leader = leaderAt == indexOf.end() ? nullptr : &view.bots[leaderAt->second];
+            BotSnapshot const* leader = nullptr;
+            if (leaderCorpse)
+                leader = LeaderRejoinMember(tick, bot.guid, bot.map_id, bot.pos_x, bot.pos_y);
+            else if (auto const leaderAt = indexOf.find(deadParty); leaderAt != indexOf.end())
+                leader = &view.bots[leaderAt->second];
             if (leader && leader->life_state == 0 && leader->in_combat == 0)
             {
                 if (nowMs >= state.ReviveRetryMs)
@@ -217,13 +224,13 @@ BotPolicy::TurnFlow BotPolicy::DeadCorpse(DecideTick& tick, BotTurn& turn)
                     BotAction revive;
                     revive.bot_guid = bot.guid;
                     revive.type = ActionType::kRevive;
-                    revive.target_guid = PlayerRef(deadParty);
+                    revive.target_guid = PlayerRef(leader->guid);
                     revive.dest_x = 0.0f;
                     actions.push_back(revive);
                     state.ReviveAttempts += 1;
                     state.ReviveRetryMs = nowMs + kOutOfCombatReviveRetryMs;
                     LogEvent("revive_corpse: bot=" + std::to_string(bot.guid) + " leader=" + std::to_string(leader->guid) + " attempt=" + std::to_string(state.ReviveAttempts) +
-                          " waited_ms=" + std::to_string(waited));
+                          " waited_ms=" + std::to_string(waited) + (leaderCorpse ? " rejoin=1" : ""));
                 }
                 return TurnFlow::kSkip;
             }
@@ -239,6 +246,32 @@ BotPolicy::TurnFlow BotPolicy::DeadCorpse(DecideTick& tick, BotTurn& turn)
             reason = "release_ordered";
         if (!reason)
             return TurnFlow::kSkip; // waiting for a resurrect
+        // A party rezzer is casting its resurrect on this corpse right now (the cast is 10 s): the release waits for it, at most kRezCastMs past the release delay. The
+        // 2026-11-07 sim released 14 corpses 0-10 s into the cast on them (dm 14:32:09 rez_cast on 1863, 14:32:10 release_timeout).
+        if (std::string(reason) == "release_timeout" && waited < releaseDelayMs + kRezCastMs && deadParty != 0)
+        {
+            bool rezIncoming = false;
+            tick.ForParty(deadParty, [&](BotSnapshot const& member)
+            {
+                if (rezIncoming || member.guid == bot.guid || member.life_state != 0 || member.casting_spell == 0)
+                    return;
+                std::uint32_t const rezSpell = ResurrectSpellFor(ClassFor(_options, member.guid), member.level);
+                auto const known = _bots.find(member.guid);
+                if (rezSpell == 0 || member.casting_spell != rezSpell || known == _bots.end())
+                    return;
+                auto const target = known->second.CastTarget.find(rezSpell);
+                rezIncoming = target != known->second.CastTarget.end() && target->second == PlayerRef(bot.guid);
+            });
+            if (rezIncoming)
+            {
+                if (!state.ReleaseHeldLogged)
+                {
+                    state.ReleaseHeldLogged = true;
+                    LogEvent("release_held: bot=" + std::to_string(bot.guid) + " reason=rez_casting would_release=" + reason);
+                }
+                return TurnFlow::kSkip;
+            }
+        }
         if (fighting && waited < releaseCombatHoldMs)
         {
             // The core refuses a release in combat, and this corpse is still in combat: held back, capped.
@@ -405,6 +438,45 @@ void BotPolicy::DeadGhostRun(DecideTick& tick, BotTurn& turn)
                   " leader_map=" + std::to_string(leader.map_id) + " waited_ms=" + std::to_string(nowMs - state.DeathMs));
         }
         return;
+    }
+    // DungeonLeaderRejoin: the leader's own ghost (it has no leader to be teleported to) comes back next to a living member of its party once the party is quiet; the
+    // core revives it on entering. While the party still fights it waits where it is, kLeaderGhostWaitMs at most, and only then goes to the entrance as before. At the
+    // entrance it came back alone at half health, rested 30-60 s and was put back into the fight it had died in: 55 of 170 leader_recover teleports of the 2026-11-07
+    // sim ended in that leader's death within 120 s.
+    if (_options.DungeonLeaderRejoin && instanceParty && deadParty != 0 && deadParty == bot.guid)
+    {
+        std::uint64_t const ghostSinceMs = state.EntrySinceMs != 0 ? state.EntrySinceMs : state.DeathMs;
+        BotSnapshot const* const member = LeaderRejoinMember(tick, bot.guid, bot.corpse_map, bot.corpse_x, bot.corpse_y);
+        bool const fighting = PartyFighting(tick, bot.guid);
+        if (!fighting && member)
+        {
+            bool const withMember = bot.map_id == member->map_id && DistanceTo(bot, Point{ member->pos_x, member->pos_y, member->pos_z }) <= kEntryYards;
+            if (!withMember && nowMs >= state.CorpseTeleportRetryMs)
+            {
+                state.CorpseTeleportRetryMs = nowMs + kEntryTeleportRetryMs;
+                BotAction toMember;
+                toMember.bot_guid = bot.guid;
+                toMember.type = ActionType::kTeleport;
+                toMember.spell_id = member->map_id;
+                toMember.dest_x = member->pos_x;
+                toMember.dest_y = member->pos_y;
+                toMember.dest_z = member->pos_z;
+                actions.push_back(toMember);
+                LogEvent("leader_rejoin: bot=" + std::to_string(bot.guid) + " member=" + std::to_string(member->guid) + " map=" + std::to_string(bot.map_id) +
+                      " member_map=" + std::to_string(member->map_id) + " waited_ms=" + std::to_string(nowMs - state.DeathMs));
+            }
+            return;
+        }
+        if (fighting && nowMs - ghostSinceMs < kLeaderGhostWaitMs)
+        {
+            DeadEmit(tick, turn, Decision{ ActionType::kStop, 0 });
+            if (!state.LeaderGhostWaitLogged)
+            {
+                state.LeaderGhostWaitLogged = true;
+                LogEvent("leader_ghost_wait: bot=" + std::to_string(bot.guid) + " reason=party_fighting waited_ms=" + std::to_string(nowMs - state.DeathMs));
+            }
+            return;
+        }
     }
     if (instanceParty && entryOf != _options.DungeonsByMap.end() && entryOf->second.HasEntry && nowMs - state.EntrySinceMs < kDungeonEntryWaitMs)
     {

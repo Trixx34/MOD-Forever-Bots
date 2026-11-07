@@ -311,6 +311,12 @@ struct BotSettings
     std::string AvoidSpellsFile;
     // CorpseRunTeleportSec (0 = off, else 10..3600): a ghost whose corpse run takes longer is put at its corpse (needs Bot.Actions.Teleport).
     std::uint32_t CorpseRunTeleportSec = 60;
+    // Combat drift of dungeon parties (0.45.0; PolicyOptions has the details). DungeonPullLeashYards (0 = off, else 10..80): the route leader pulls only hostiles this
+    // close to the leg of the route it walks. DungeonChaseLeashYards (0 = off, else 10..80): a party bot does not chase or pick a hostile farther than this from both
+    // that leg and its leader. DungeonLeaderRejoin = 1: a dead leader comes back next to its quiet party, not alone at the entrance.
+    std::uint32_t DungeonPullLeashYards = 30;
+    std::uint32_t DungeonChaseLeashYards = 40;
+    bool DungeonLeaderRejoin = true;
     bool DungeonReviveOutOfCombat = false;  // DungeonReviveOutOfCombat = 1: a dead member of a dungeon party is revived by its leader out of combat (needs Bot.Chat.Orders.Enabled in the core)
     std::string DungeonFile;
     // DungeonDataDir (default: the folder "dungeons" beside DungeonFile) holds the shipped per-dungeon JSON files; DungeonDir is your own folder of them, whose file for a map

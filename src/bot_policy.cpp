@@ -553,6 +553,69 @@ bool BotPolicy::InterruptTaken(DecideTick const& tick, BotSnapshot const& bot, s
     return taken;
 }
 
+float BotPolicy::PartyRouteLegDistance(std::uint64_t leaderGuid, std::uint32_t mapId, float x, float y) const
+{
+    auto const known = _bots.find(leaderGuid);
+    if (known == _bots.end())
+        return std::numeric_limits<float>::infinity();
+    BotState const& leader = known->second;
+    auto const dungeon = _options.DungeonsByMap.find(mapId);
+    std::optional<Point> const start = dungeon != _options.DungeonsByMap.end() && dungeon->second.HasEntry ? std::optional<Point>(dungeon->second.Entry) : std::nullopt;
+    // The same route the leader walks (MoveWithoutTarget): the scenario's on its map, else the "tank lead" dungeon's.
+    if (IsRouteActive(leaderGuid))
+    {
+        PolicyOptions::ScenarioRoute const& scenario = ScenarioOf(leaderGuid);
+        if (scenario.RouteMap == 0 || scenario.RouteMap == mapId)
+            return RouteLegDistance(scenario.Route, leader.RouteIndex, start, x, y);
+    }
+    else if (leader.TankLead && dungeon != _options.DungeonsByMap.end())
+        return RouteLegDistance(dungeon->second.Route, leader.RouteIndex, start, x, y);
+    return std::numeric_limits<float>::infinity();
+}
+
+bool BotPolicy::OffPartyLeash(DecideTick const& tick, std::uint64_t leaderGuid, std::uint32_t mapId, float x, float y, std::uint32_t yards, bool orLeader) const
+{
+    if (yards == 0 || leaderGuid == 0)
+        return false;
+    float const leg = PartyRouteLegDistance(leaderGuid, mapId, x, y);
+    if (std::isinf(leg) || leg <= float(yards))
+        return false;
+    if (orLeader)
+        if (auto const at = tick.indexOf.find(leaderGuid); at != tick.indexOf.end())
+        {
+            BotSnapshot const& leader = tick.view.bots[at->second];
+            if (leader.life_state == 0 && leader.map_id == mapId && std::hypot(leader.pos_x - x, leader.pos_y - y) <= float(yards))
+                return false;
+        }
+    return true;
+}
+
+std::string BotPolicy::RouteYardsField(BotTurn const& turn) const
+{
+    if (!turn.routeOn || turn.partyLeader == 0 || !turn.targetUnit)
+        return {};
+    float const leg = PartyRouteLegDistance(turn.partyLeader, turn.bot.map_id, turn.targetUnit->pos_x, turn.targetUnit->pos_y);
+    return std::isinf(leg) ? std::string() : " route_yards=" + std::to_string(int(leg));
+}
+
+BotSnapshot const* BotPolicy::LeaderRejoinMember(DecideTick const& tick, std::uint64_t leaderGuid, std::uint32_t mapId, float x, float y) const
+{
+    BotSnapshot const* best = nullptr;
+    float bestDistance = std::numeric_limits<float>::max();
+    tick.ForEachPartyMember(leaderGuid, [&](BotSnapshot const& member)
+    {
+        if (member.guid == leaderGuid || member.life_state != 0 || member.in_combat != 0 || member.map_id != mapId)
+            return;
+        float const distance = std::hypot(member.pos_x - x, member.pos_y - y);
+        if (distance < bestDistance)
+        {
+            bestDistance = distance;
+            best = &member;
+        }
+    });
+    return best;
+}
+
 // Whether the party waits for a dead member: 0 no, 1 for a resurrect, 2 for a ghost on its way back. Never in a fight, never
 // for a ghost whose run failed, and every wait is capped.
 std::uint8_t BotPolicy::DeadWait(DecideTick const& tick, std::uint64_t leaderGuid) const

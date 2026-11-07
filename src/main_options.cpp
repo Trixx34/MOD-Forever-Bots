@@ -21,6 +21,9 @@ void PolicyFromSettings(PolicyOptions& policyOptions, BotSettings& settings)
     policyOptions.GuildJoin = settings.GuildJoin;
     policyOptions.MailGifts = settings.MailGifts;
     policyOptions.DungeonReviveOutOfCombat = settings.DungeonReviveOutOfCombat;
+    policyOptions.DungeonPullLeashYards = settings.DungeonPullLeashYards;
+    policyOptions.DungeonChaseLeashYards = settings.DungeonChaseLeashYards;
+    policyOptions.DungeonLeaderRejoin = settings.DungeonLeaderRejoin;
     policyOptions.CorpseRunTeleportMs = std::uint64_t(settings.CorpseRunTeleportSec) * 1000;
     policyOptions.AggressiveStart = settings.AggressiveStart;
     policyOptions.Crafting = settings.Crafting;

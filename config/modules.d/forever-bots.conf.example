@@ -293,6 +293,13 @@ Module.forever-bots.TelemetrySummarySec = 60
 #                            (out of a fight the route leader is also healed up to 90%, whatever these say: it walks on only at 80%; since 0.30.0)
 # HealerDpsManaPct = 40
 # HealerLosMoveYards = 6
+# Combat drift of dungeon parties (0.45.0; a scenario or "tank lead" party with a route; the 2026-11-07 sim's fights pulled leaders 60-250 yards off the route):
+# DungeonPullLeashYards = 30   (the route leader, out of a fight, pulls only a hostile within this many yards of the leg of the route it walks; 0 = off, else 10..80)
+# DungeonChaseLeashYards = 40  (a party bot does not walk after, or pick in a fight, a hostile farther than this from both that leg and its leader: a member goes
+#                               back to its leader, the leader stands, and they fight it when it comes back; 0 = off, else 10..80)
+# DungeonLeaderRejoin = 1      (a dead leader comes back with its party: its corpse is stood up next to a quiet member, with the recover tactic and
+#                               DungeonReviveOutOfCombat, and its ghost waits up to 60 s for the party's fight to end and is then teleported next to a living
+#                               member, instead of resting alone at the entrance and walking back into the fight; 0 = the entrance, as before 0.45.0)
 
 # Live picture for the dashboard's map: the bots' positions and the units near them, as one JSON file rewritten in place every
 # LiveEveryMs (250..10000). Use an absolute path the dashboard may read (for example in the server's log folder). Empty = off.

@@ -3941,6 +3941,235 @@ void GhostThatCannotReachItsCorpseIsPutThereOnce()
     CHECK(Logged(events, "corpse_run_failed:"));
 }
 
+// ---- combat drift (0.45.0): the pull and chase leash, the leader's rejoin, a release that would cut a resurrect ----
+
+// A route-active party of five on map 36, everyone at the origin; the route runs from (0, 0) east to (100, 0). Bot 12 (a warrior) leads; 10 is a rogue (melee).
+PolicyOptions DriftOptions(std::uint32_t pullLeash, std::uint32_t chaseLeash, std::vector<std::string>* events = nullptr)
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.PartyCount = 1;
+    options.WanderWhenIdle = false;
+    options.ClassOf = [](std::uint64_t guid) { return guid == 12 ? 1u : guid == 10 ? 4u : 5u; };
+    options.Route = { Point{ 0.0f, 0.0f, 0.0f }, Point{ 100.0f, 0.0f, 0.0f } };
+    options.DungeonPullLeashYards = pullLeash;
+    options.DungeonChaseLeashYards = chaseLeash;
+    if (events)
+        options.OnEvent = [events](std::string const& text) { events->push_back(text); };
+    return options;
+}
+
+WorldTickSnapshotView DriftView()
+{
+    WorldTickSnapshotView view = DungeonView({ 10, 11, 12, 13, 14 }, [](std::uint64_t guid) { return guid == 12 ? 1u : guid == 10 ? 4u : 5u; });
+    view.max_nearby_units = 8;
+    view.nearby.assign(view.bots.size() * view.max_nearby_units, NearbyUnit{});
+    for (BotSnapshot& bot : view.bots)
+        bot.map_id = 36;
+    return view;
+}
+
+NearbyUnit HostileAt(std::uint64_t counter, float x, float y)
+{
+    NearbyUnit unit = Hostile(counter, x, 100);
+    unit.pos_y = y;
+    return unit;
+}
+
+// DungeonPullLeashYards: the leader pulls a hostile beside the leg of the route it walks (point 0 to point 1), not one 45 yards off it; with the leash off it pulls
+// the one off the route as before (the weaker one is the first pick, so it would be chosen).
+void TheLeaderPullsOnlyAlongItsRouteLeg()
+{
+    auto const pulls = [](std::uint32_t leash, std::uint64_t counter)
+    {
+        BotPolicy policy(DriftOptions(leash, 0));
+        policy.SetRouteActive(true);
+        policy.Decide(DriftView(), 1000);                                   // the leader passes point 0 and walks the leg to point 1
+        WorldTickSnapshotView view = DriftView();
+        NearbyUnit off = HostileAt(7, 50.0f, 45.0f);                       // 45 yards off the middle of the leg, and hurt: the first pick without a leash
+        off.health = 40;
+        AddNearby(view, 2, off);
+        AddNearby(view, 2, HostileAt(8, 30.0f, 5.0f));                     // 5 yards off the leg
+        return HasAction(policy.Decide(view, 1500), 12, ActionType::kFollow, MakeUnitRef(8, 1, counter));
+    };
+    CHECK(pulls(30, 8));
+    CHECK(!pulls(30, 7));
+    CHECK(pulls(0, 7));
+}
+
+// DungeonChaseLeashYards: a member does not walk after its threat target once that is farther than the leash from both the route leg and the leader (it fled, or it
+// is the next pack); inside the leash, and with the leash off, it does (kPartyChaseYards, 45, is the old limit).
+void AMemberDoesNotChaseOffThePartysLeash()
+{
+    auto const chases = [](std::uint32_t leash, float y, std::vector<std::string>* events)
+    {
+        BotPolicy policy(DriftOptions(0, leash, events));
+        policy.SetRouteActive(true);
+        policy.Decide(DriftView(), 1000);
+        WorldTickSnapshotView view = DriftView();
+        NearbyUnit const mob = HostileAt(7, 0.0f, y);
+        view.bots[0].in_combat = 1;
+        view.bots[0].threat_target_guid = mob.guid;
+        AddNearby(view, 0, mob);
+        return HasAction(policy.Decide(view, 1500), 10, ActionType::kFollow, mob.guid);
+    };
+    std::vector<std::string> events;
+    CHECK(!chases(30, 42.0f, &events));                                    // 42 yards from the leg and from the leader
+    CHECK(Logged(events, "chase_leash: bot=10"));
+    CHECK(chases(30, 25.0f, nullptr));                                     // inside the leash
+    CHECK(chases(0, 42.0f, nullptr));                                      // off: chased, as before 0.45.0
+    // with another hostile by the party in view, the bot turns to that one: the fled target is left alone for a while
+    BotPolicy policy(DriftOptions(0, 30));
+    policy.SetRouteActive(true);
+    policy.Decide(DriftView(), 1000);
+    WorldTickSnapshotView view = DriftView();
+    NearbyUnit const fled = HostileAt(7, 0.0f, 42.0f);
+    view.bots[0].in_combat = 1;
+    view.bots[0].threat_target_guid = fled.guid;
+    AddNearby(view, 0, fled);
+    AddNearby(view, 0, HostileAt(8, 2.0f, 0.0f));
+    CHECK(!HasAction(policy.Decide(view, 1500), 10, ActionType::kFollow, fled.guid));
+    CHECK(HasAction(policy.Decide(view, 1600), 10, ActionType::kAttackTarget, MakeUnitRef(8, 1, 8)));
+}
+
+// DungeonChaseLeashYards also bounds what a bot in a fight picks for itself (PullTarget, defending): a hurt hostile far off the leash is not the pick, the one by
+// the party is.
+void AFightingMemberPicksNothingOffTheLeash()
+{
+    auto const picks = [](std::uint32_t leash, std::uint64_t counter)
+    {
+        BotPolicy policy(DriftOptions(0, leash));
+        policy.SetRouteActive(true);
+        policy.Decide(DriftView(), 1000);
+        WorldTickSnapshotView view = DriftView();
+        view.bots[0].in_combat = 1;                                        // in a fight, with no threat target of its own (it just died)
+        view.bots[2].in_combat = 1;
+        NearbyUnit far = HostileAt(7, 0.0f, 38.0f);                        // fled: hurt, 38 yards off
+        far.health = 15;
+        AddNearby(view, 0, far);
+        AddNearby(view, 0, HostileAt(8, 3.0f, 0.0f));
+        std::vector<BotAction> const actions = policy.Decide(view, 1500);
+        return HasAction(actions, 10, ActionType::kFollow, MakeUnitRef(8, 1, counter)) || HasAction(actions, 10, ActionType::kAttackTarget, MakeUnitRef(8, 1, counter));
+    };
+    CHECK(picks(20, 8));
+    CHECK(!picks(20, 7));
+    CHECK(picks(0, 7));                                                    // off: the weakest, wherever it is
+}
+
+// DungeonLeaderRejoin: the dead leader's corpse is stood up next to a quiet member a few seconds after the fight (the members' recover), not released at 20 s.
+void ADeadLeadersCorpseIsRevivedNextToAQuietMember()
+{
+    auto const run = [](bool rejoin, bool fight, std::vector<std::string>* events)
+    {
+        PolicyOptions options = DeadOptions(events);
+        options.DungeonReviveOutOfCombat = true;
+        options.DungeonLeaderRejoin = rejoin;
+        options.Route = { Point{ 100.0f, 0.0f, 0.0f } };
+        BotPolicy policy(options);
+        policy.SetRouteActive(true);
+        auto const build = [fight]
+        {
+            WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 });
+            Corpse(v.bots[2], 10.0f);                                      // the leader (12)
+            v.bots[0].pos_x = 40.0f;                                       // 30 yards from the corpse
+            v.bots[1].in_combat = fight ? 1 : 0;
+            return v;
+        };
+        policy.Decide(build(), 1000);
+        std::optional<BotAction> revive;
+        for (BotAction const& action : policy.Decide(build(), 9500))
+            if (action.bot_guid == 12 && action.type == ActionType::kRevive)
+                revive = action;
+        return revive;
+    };
+    std::vector<std::string> events;
+    std::optional<BotAction> const revive = run(true, false, &events);
+    CHECK(revive.has_value() && revive->target_guid != PlayerOf(12) && revive->target_guid != PlayerOf(10));   // next to a member by the corpse, not the far one
+    CHECK(LoggedWith(events, "rejoin=1"));
+    CHECK(!run(false, false, nullptr).has_value());                        // off: the leader's corpse is left to the rezzer and the release
+    CHECK(!run(true, true, nullptr).has_value());                          // a fight in the party: nobody is stood up
+}
+
+// DungeonLeaderRejoin: the dead leader's ghost waits outside while its party fights, and is then teleported next to a living member; not put at the entrance at once.
+// A fight that goes on past kLeaderGhostWaitMs (60 s) sends it to the entrance as before.
+void ADeadLeadersGhostRejoinsItsPartyWhenTheFightEnds()
+{
+    std::vector<std::string> events;
+    PolicyOptions options = DeadOptions(&events);
+    options.DungeonLeaderRejoin = true;
+    options.Route = { Point{ 220.0f, 0.0f, 0.0f } };
+    PolicyOptions::DungeonRoute dungeon;
+    dungeon.HasEntry = true;
+    dungeon.Entry = Point{ 0.0f, 0.0f, 0.0f };
+    options.DungeonsByMap[36] = dungeon;
+    auto const build = [](bool fight)
+    {
+        WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 });
+        for (BotSnapshot& bot : v.bots)
+        {
+            bot.map_id = 36;
+            bot.pos_x = 200.0f;
+            bot.in_combat = fight ? 1 : 0;
+        }
+        Ghost(v.bots[2], 0.0f, 36, 190.0f);                                // the leader's ghost, outside at the graveyard
+        v.bots[2].map_id = 0;
+        v.bots[2].in_combat = 0;
+        return v;
+    };
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    CHECK(!TeleportOf(policy.Decide(build(true), 1000), 12).has_value());  // the party fights: it waits
+    CHECK(!TeleportOf(policy.Decide(build(true), 30000), 12).has_value());
+    CHECK(Logged(events, "leader_ghost_wait: bot=12"));
+    std::optional<BotAction> const back = TeleportOf(policy.Decide(build(false), 31000), 12);
+    CHECK(back.has_value() && back->spell_id == 36 && back->dest_x == 200.0f);   // next to a member, not the entrance at 0
+    CHECK(Logged(events, "leader_rejoin: bot=12"));
+    // a fight that does not end: after 60 s, the entrance
+    BotPolicy long_fight(options);
+    long_fight.SetRouteActive(true);
+    long_fight.Decide(build(true), 1000);
+    std::optional<BotAction> const entry = TeleportOf(long_fight.Decide(build(true), 62000), 12);
+    CHECK(entry.has_value() && entry->dest_x == 0.0f);
+    // off: the entrance at once, fight or not
+    options.DungeonLeaderRejoin = false;
+    BotPolicy off(options);
+    off.SetRouteActive(true);
+    std::optional<BotAction> const atOnce = TeleportOf(off.Decide(build(true), 1000), 12);
+    CHECK(atOnce.has_value() && atOnce->dest_x == 0.0f);
+}
+
+// A corpse does not release while a party rezzer is casting its resurrect on it (the 2026-11-07 sim cut 14 casts so), and releases once the cast is over or
+// kRezCastMs past the release delay.
+void ACorpseDoesNotReleaseUnderARunningResurrect()
+{
+    std::vector<std::string> events;
+    BotPolicy policy(DeadOptions(&events));
+    auto const build = [](std::uint32_t casting)
+    {
+        WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 });
+        Corpse(v.bots[3], 10.0f);
+        v.bots[1].in_combat = 1;                                           // a fight holds every rez cast until the cast below
+        v.bots[0].casting_spell = casting;
+        return v;
+    };
+    policy.Decide(build(0), 1000);
+    WorldTickSnapshotView quiet = build(0);
+    quiet.bots[1].in_combat = 0;
+    std::uint32_t rezSpell = 0;
+    for (BotAction const& action : policy.Decide(quiet, 19000))            // the fight ends: the nearest priest (10) starts its resurrect on 13
+        if (action.bot_guid == 10 && action.type == ActionType::kCastSpell && action.target_guid == PlayerOf(13))
+            rezSpell = action.spell_id;
+    CHECK(rezSpell != 0);
+    WorldTickSnapshotView casting = build(rezSpell);
+    casting.bots[1].in_combat = 0;
+    CHECK(!HasAction(policy.Decide(casting, 21500), 13, ActionType::kReleaseSpirit));
+    CHECK(LoggedWith(events, "reason=rez_casting"));
+    CHECK(HasAction(policy.Decide(casting, 32500), 13, ActionType::kReleaseSpirit));   // capped
+    BotPolicy other(DeadOptions(nullptr));
+    other.Decide(build(0), 1000);
+    CHECK(HasAction(other.Decide(build(0), 21500), 13, ActionType::kReleaseSpirit));    // nobody casting: the 20 s rule
+}
+
 // A corpse run that takes longer than CorpseRunTeleportMs (60 s, the owner's rule of 2026-10-25) ends in a teleport to the corpse; no party revive is asked
 // for. The ghost walks first, and the teleport comes once.
 void ALongCorpseRunEndsInATeleportToTheCorpse()
@@ -7155,6 +7384,12 @@ int main()
     WantCostIsAbsentOffTheDeadminesAndMinusOneWithNoCostFile();
     ThePullHoldCapIsReachedAndNotExceededWithFlatMana();
     NoScenarioNoDirectorDoesNotCrash();
+    TheLeaderPullsOnlyAlongItsRouteLeg();
+    AMemberDoesNotChaseOffThePartysLeash();
+    AFightingMemberPicksNothingOffTheLeash();
+    ADeadLeadersCorpseIsRevivedNextToAQuietMember();
+    ADeadLeadersGhostRejoinsItsPartyWhenTheFightEnds();
+    ACorpseDoesNotReleaseUnderARunningResurrect();
 
     if (failures == 0)
         std::printf("policy_test: all checks passed\n");

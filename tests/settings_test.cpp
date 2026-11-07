@@ -308,6 +308,20 @@ void DungeonLearningKnobsAreBounded()
     CHECK(refused.HealerDpsManaPct == 40 && refused.HealerLosMoveYards == 6 && warnings.size() == 4);
 }
 
+// 0.45.0: the combat-drift settings. On by default (30 and 40 yards, the leader's rejoin); 0 turns a leash off, and a value outside 10..80 keeps the default with a warning.
+void CombatDriftSettings()
+{
+    std::vector<std::string> warnings;
+    BotSettings const defaults = ParseBotSettings({}, warnings);
+    CHECK(defaults.DungeonPullLeashYards == 30 && defaults.DungeonChaseLeashYards == 40 && defaults.DungeonLeaderRejoin && warnings.empty());
+    BotSettings const off = ParseBotSettings({ { "DungeonPullLeashYards", "0" }, { "DungeonChaseLeashYards", "0" }, { "DungeonLeaderRejoin", "0" } }, warnings);
+    CHECK(off.DungeonPullLeashYards == 0 && off.DungeonChaseLeashYards == 0 && !off.DungeonLeaderRejoin && warnings.empty());
+    BotSettings const set = ParseBotSettings({ { "DungeonPullLeashYards", "25" }, { "DungeonChaseLeashYards", "60" } }, warnings);
+    CHECK(set.DungeonPullLeashYards == 25 && set.DungeonChaseLeashYards == 60 && warnings.empty());
+    BotSettings const refused = ParseBotSettings({ { "DungeonPullLeashYards", "5" }, { "DungeonChaseLeashYards", "200" } }, warnings);
+    CHECK(refused.DungeonPullLeashYards == 30 && refused.DungeonChaseLeashYards == 40 && warnings.size() == 2);
+}
+
 bool HasWarning(std::vector<std::string> const& warnings, std::string const& part)
 {
     for (std::string const& w : warnings)
@@ -499,6 +513,7 @@ int main()
 {
     RealismSettings();
     CorpseRunTeleportSettings();
+    CombatDriftSettings();
     ErrandSettings();
     ChatSettings();
     LevelDungeonSettings();

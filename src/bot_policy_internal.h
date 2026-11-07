@@ -415,6 +415,7 @@ constexpr std::uint64_t kCorpseTeleportRetryMs = 15000; // a ghost off its corps
 constexpr std::uint64_t kOutOfCombatReviveRetryMs = 10000; // a ghost of a dungeon party is revived by its leader out of combat, not again before this
 constexpr std::uint64_t kCorpseReviveDelayMs = 8000;       // the Recover tactic: a dead member of a dungeon party whose leader is up and quiet is revived by the leader this long after the fight ended
 constexpr std::uint32_t kOutOfCombatReviveTries = 3;       // and after this many tries the ghost walks back to its corpse as before
+constexpr std::uint64_t kLeaderGhostWaitMs = 60000;        // DungeonLeaderRejoin: a dead leader's ghost waits this long (from its release) for its party's fight to end, then goes to the entrance as before
 constexpr std::uint64_t kDungeonEntryWaitMs = 90000;       // a ghost of a dungeon party waits this long at the instance entrance for its revive, then walks to its corpse as before
 constexpr std::uint64_t kEntryTeleportRetryMs = 5000;      // the next try of the teleport to the entrance, while it is refused or the ghost is not there yet
 constexpr float kEntryYards = 15.0f;                        // a ghost this close to the entrance is at it
@@ -514,9 +515,15 @@ float HealthShare(NearbyUnit const& unit);
 // route's first point is right under them, and 34 stuck episodes (about 77 bot-minutes, fights of up to 12 minutes) all came from pulling them.
 bool OnOtherLevel(BotSnapshot const& bot, NearbyUnit const& unit);
 
+// `leashed` (a dungeon party's leash, DungeonPullLeashYards / DungeonChaseLeashYards; empty = none): a candidate it says is outside is not chosen, defending or not.
 NearbyUnit const* PullTarget(BotSnapshot const& bot, std::span<NearbyUnit const> units,
                             std::function<bool(std::uint64_t)> const& avoided, bool defending,
-                            std::vector<std::uint32_t> const& onlyEntries = {}, bool dungeon = false);
+                            std::vector<std::uint32_t> const& onlyEntries = {}, bool dungeon = false,
+                            std::function<bool(NearbyUnit const&)> const& leashed = {});
+
+// The flat distance from (x, y) to the leg of a dungeon route its leader is walking: the segment from point index - 1 to point index (at index 0, from `start`, the
+// instance entry, when known, else point 0 alone). Infinity for an empty route or an index past its end (the boss sweep after the route goes anywhere).
+float RouteLegDistance(std::vector<Point> const& route, std::size_t index, std::optional<Point> const& start, float x, float y);
 
 // The closest unit in `units` that satisfies `wanted`, or nullptr.
 NearbyUnit const* Closest(BotSnapshot const& bot, std::span<NearbyUnit const> units, bool (*wanted)(NearbyUnit const&));

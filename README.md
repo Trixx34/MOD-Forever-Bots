@@ -53,6 +53,9 @@ line to the module's stderr. A config reload updates the ramp, the random picks 
 | `SupplyFoodLow`, `SupplyFoodTarget`, `SupplyDrinkLow`, `SupplyDrinkTarget` | 3, 10, 3, 10 | The same for food, and for drink (bots with mana) |
 | `SupplyTripSec` | 120 | A bot that needs supplies makes a trip at most this often (30 to 3600); a trip that bought nothing waits 10 minutes, doubling each time (an hour at most) |
 | `CorpseRunTeleportSec` | 60 | A ghost whose corpse run takes longer is put at its corpse (the teleport needs `Bot.Actions.Teleport`); the four-minute teleport is brought forward to this. 0 is off (10 to 3600); a ghost already at its corpse is left alone |
+| `DungeonPullLeashYards` | 30 | A dungeon party's route leader, out of a fight, pulls only a hostile within this many yards of the leg of the route it walks (0 is off, 10 to 80) |
+| `DungeonChaseLeashYards` | 40 | A dungeon party's bot does not walk after, or pick in a fight, a hostile farther than this from both that leg and its leader (a fled creature, the next pack); a member goes back to its leader instead (0 is off, 10 to 80) |
+| `DungeonLeaderRejoin` | 1 | A dead route leader comes back next to its quiet party (its corpse is stood up beside a member with the recover tactic and `DungeonReviveOutOfCombat`; its ghost waits up to 60 s for the party's fight, then is teleported next to a living member), not alone at the entrance; 0 is the entrance as before |
 | `QuestTeleport` | 0 | A quest walk stuck for two minutes teleports to its giver (needs `Bot.Actions.Teleport = 1`); 0 drops the start and grinds instead |
 | `TrainEverySec` | 0 (off) | Seconds between trainer checks, also after a level-up (0, or 60 to 86400) |
 | `PartySize`, `PartyCount` | 0 (off), 1 | Bots per party (at most 5) and number of parties |

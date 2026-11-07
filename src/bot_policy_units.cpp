@@ -56,7 +56,8 @@ bool OnOtherLevel(BotSnapshot const& bot, NearbyUnit const& unit)
 
 NearbyUnit const* PullTarget(BotSnapshot const& bot, std::span<NearbyUnit const> units,
                             std::function<bool(std::uint64_t)> const& avoided, bool defending,
-                            std::vector<std::uint32_t> const& onlyEntries, bool dungeon)
+                            std::vector<std::uint32_t> const& onlyEntries, bool dungeon,
+                            std::function<bool(NearbyUnit const&)> const& leashed)
 {
     NearbyUnit const* best = nullptr;
     float bestHealth = 0.0f;
@@ -65,6 +66,8 @@ NearbyUnit const* PullTarget(BotSnapshot const& bot, std::span<NearbyUnit const>
     {
         if (!IsLiveMob(candidate) || avoided(candidate.guid))
             continue;
+        if (leashed && leashed(candidate))
+            continue; // off the party's route (a pack beside it, a creature that fled): left alone, the party does not drift after it
         // A creature on another level is not pulled (one that attacks the bot is: `defending`, and the stall watchdog deals with it if it cannot be reached).
         if (!defending && OnOtherLevel(bot, candidate))
             continue;
@@ -100,6 +103,20 @@ NearbyUnit const* PullTarget(BotSnapshot const& bot, std::span<NearbyUnit const>
         bestDist = dist;
     }
     return best;
+}
+
+float RouteLegDistance(std::vector<Point> const& route, std::size_t index, std::optional<Point> const& start, float x, float y)
+{
+    if (route.empty() || index >= route.size())
+        return std::numeric_limits<float>::infinity();
+    Point const& to = route[index];
+    Point const from = index > 0 ? route[index - 1] : start.value_or(to);
+    float const dx = to.X - from.X;
+    float const dy = to.Y - from.Y;
+    float const length2 = dx * dx + dy * dy;
+    float t = length2 > 0.0f ? ((x - from.X) * dx + (y - from.Y) * dy) / length2 : 0.0f;
+    t = std::clamp(t, 0.0f, 1.0f);
+    return std::hypot(x - (from.X + t * dx), y - (from.Y + t * dy));
 }
 
 NearbyUnit const* Closest(BotSnapshot const& bot, std::span<NearbyUnit const> units, bool (*wanted)(NearbyUnit const&))

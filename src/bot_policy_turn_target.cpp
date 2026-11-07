@@ -517,6 +517,16 @@ BotPolicy::TurnFlow BotPolicy::TurnTaming(DecideTick& tick, BotTurn& turn)
     bool const tameNow = classId == kHunterClass && _options.TameBeasts && !_options.TameBeasts->ByEntry.empty() && bot.life_state == 0 && (bot.group_role == 0 || tamingPhase) &&
                          (bot.level == 0 || bot.level >= kTameMinLevel) && bot.in_combat == 0 && PetOf(bot) == PetKnown::kNone &&
                          (state.TameUntilMs != 0 || (nowMs >= state.TameRetryAtMs && tame::PickTameTarget(bot, nearby, *_options.TameBeasts, kTameSearchYards, tameTaken) != nullptr));
+    // The combat-drift leash of a dungeon party (DungeonPullLeashYards, DungeonChaseLeashYards; PullTarget's `leashed`): the leader out of a fight pulls only along the
+    // leg of the route it walks; a bot in a fight picks nothing that is off both that leg and its leader. The 2026-11-07 sim: the leaders' pulls were a median 66-72
+    // yards off the route in Shadowfang Keep, the Stockade and Razorfen Kraul (10-20 in the Deadmines, Wailing Caverns, Ragefire Chasm), the route index frozen.
+    std::function<bool(NearbyUnit const&)> leashed;
+    std::uint64_t const leashParty = turn.partyLeader;
+    bool const leaderPull = turn.partyLeaderBot && bot.in_combat == 0;
+    std::uint32_t const leashYards = !routeOn || leashParty == 0 ? 0u : leaderPull ? _options.DungeonPullLeashYards : _options.DungeonChaseLeashYards;
+    if (leashYards != 0)
+        leashed = [this, &tick, leashParty, leashYards, leaderPull, mapId = bot.map_id](NearbyUnit const& unit)
+        { return OffPartyLeash(tick, leashParty, mapId, unit.pos_x, unit.pos_y, leashYards, !leaderPull); };
     if (targetRef != 0)
     {
         for (NearbyUnit const& unit : nearby)
@@ -524,7 +534,7 @@ BotPolicy::TurnFlow BotPolicy::TurnTaming(DecideTick& tick, BotTurn& turn)
                 targetUnit = &unit;
     }
     else if (NearbyUnit const* hostile = (dungeonHold || noSelfPull || tameNow || (stagingHold && bot.in_combat == 0)) ? nullptr
-                 : PullTarget(bot, nearby, turn.AvoidedFn(), bot.in_combat != 0, huntEntries, routeOn))
+                 : PullTarget(bot, nearby, turn.AvoidedFn(), bot.in_combat != 0, huntEntries, routeOn, leashed))
     {
         targetUnit = hostile;
         targetRef = hostile->guid;

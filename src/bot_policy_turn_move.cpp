@@ -119,7 +119,7 @@ void BotPolicy::MoveToTarget(DecideTick& tick, BotTurn& turn)
                   " pos=" + std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) +
                   " hp=" + std::to_string(bot.health) + "/" + std::to_string(bot.max_health) +
                   " power=" + std::to_string(bot.power) + "/" + std::to_string(bot.max_power) +
-                  " target=" + std::to_string(forever_module::UnitRefEntry(targetRef)));
+                  " target=" + std::to_string(forever_module::UnitRefEntry(targetRef)) + RouteYardsField(turn));
         // Layout 13: the pet is in the snapshot, so it can be sent at this fight's target. Once per fight, so a
         // long one does not repeat the order. A core that reports no pet never gets this action.
         if (PetOf(bot) == PetKnown::kOut)
@@ -236,7 +236,29 @@ void BotPolicy::MoveToTarget(DecideTick& tick, BotTurn& turn)
     {
         // Walking to a target that never gets in range (behind a wall, or unreachable) is given up after a while:
         // the target is avoided, and the bot picks another one next tick.
-        if (partyLeader != 0 && bot.in_combat != 0 && distance > kPartyChaseYards)
+        if (targetUnit && turn.routeOn && OffPartyLeash(tick, partyLeader, bot.map_id, targetUnit->pos_x, targetUnit->pos_y, _options.DungeonChaseLeashYards, true))
+        {
+            // DungeonChaseLeashYards: the target is off the party's leash (far from the leg of the route and from the leader: it fled, or it is the next pack). The bot
+            // does not walk after it: a member goes back to its leader, the leader stands, and either fights it when it comes back. It is avoided (the bot turns to another
+            // target next tick) only when another live hostile inside the leash is in view: alone, it may be the one hitting us, and the fight watchdog ends a stand-off.
+            state.Approaching = false;
+            bool otherInLeash = false;
+            for (NearbyUnit const& unit : turn.nearby)
+                otherInLeash = otherInLeash || (unit.guid != targetRef && IsLiveMob(unit) && !turn.Avoided(unit.guid) &&
+                                                !OffPartyLeash(tick, partyLeader, bot.map_id, unit.pos_x, unit.pos_y, _options.DungeonChaseLeashYards, true));
+            if (otherInLeash)
+                AvoidUnit(state.AvoidUntilMs, state.AvoidCount, targetRef, nowMs);
+            wanted = partyMember && turn.leaderSnap && turn.leaderSnap->life_state == 0 && Distance2d(bot, *turn.leaderSnap) > kFollowLeaderYards
+                         ? Decision{ ActionType::kFollow, turn.leaderRef }
+                         : Decision{ ActionType::kStop, 0 };
+            if (_options.OnEvent && (state.ChaseLeashLoggedMs == 0 || nowMs - state.ChaseLeashLoggedMs >= 5000))
+            {
+                state.ChaseLeashLoggedMs = nowMs;
+                _options.OnEvent("chase_leash: bot=" + std::to_string(bot.guid) + " target_entry=" + std::to_string(forever_module::UnitRefEntry(targetRef)) +
+                                 " distance=" + std::to_string(int(distance)) + RouteYardsField(turn));
+            }
+        }
+        else if (partyLeader != 0 && bot.in_combat != 0 && distance > kPartyChaseYards)
         {
             state.Approaching = false;
             AvoidUnit(state.AvoidUntilMs, state.AvoidCount, targetRef, nowMs);

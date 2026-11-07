@@ -227,6 +227,16 @@ struct PolicyOptions
     std::uint32_t DungeonTankHealBelowPct = 75;
     std::uint32_t HealerDpsManaPct = 40;
     std::uint32_t HealerLosMoveYards = 6;
+    // Combat drift (0.45.0; the 2026-11-07 sim: fights took 1000-1600 s of each 1800 s run and pulled the leaders 60-250 yards off their route). 0 = off here (the
+    // tests); the module's settings turn them on by default. DungeonPullLeashYards: the route leader, out of a fight, pulls only a hostile within this many yards of
+    // the leg of the route it walks (RouteLegDistance). DungeonChaseLeashYards: a bot of a dungeon party neither walks after nor picks a hostile farther than this from
+    // both that leg and its leader (a creature that fled, the next pack beside the way); it stands, or goes back to its leader, and fights what comes to it.
+    std::uint32_t DungeonPullLeashYards = 0;
+    std::uint32_t DungeonChaseLeashYards = 0;
+    // DungeonLeaderRejoin (0.45.0): a dead route leader comes back with its party, not alone at the entrance. Its corpse is stood up next to a living, quiet member
+    // (with TacticRecover and DungeonReviveOutOfCombat, like a member's), and its ghost waits outside while the party still fights (kLeaderGhostWaitMs at most) and is
+    // then teleported next to a living member (the core revives it on entering), instead of being put at the entrance to rest and come back alone (leader_recover).
+    bool DungeonLeaderRejoin = false;
     // Auto gear (AutoGearing setting): every bot is dressed for its level when it first appears, and again after AutoGearEveryLevels levels.
     bool AutoGearing = false;
     // Talent respec (TalentRespec setting, see talent_respec.h): a role or spec change after points were spent takes them back (kRespecTalents).
@@ -718,6 +728,8 @@ private:
         std::uint8_t DeadWaitKind = 0;                   // the leader waits for a dead member: 0 no, 1 for a rez, 2 for a ghost
         std::uint64_t DeadWaitSinceMs = 0;
         bool ReleaseHeldLogged = false;
+        std::uint64_t ChaseLeashLoggedMs = 0;            // the last chase_leash line (one per 5 s at most)
+        bool LeaderGhostWaitLogged = false;              // DungeonLeaderRejoin: the leader's ghost waiting out its party's fight was logged (once per death)
         std::uint64_t AcceptRetryMs = 0;
         std::uint64_t AcceptedFrom = 0;                  // the resurrecter of the last accept sent (0 = none)
         std::uint64_t ReclaimRetryMs = 0;
@@ -830,6 +842,14 @@ private:
     std::set<std::uint64_t> PartyEngagedTargets(DecideTick const& tick, std::uint64_t leaderGuid) const;
     bool InterruptTaken(DecideTick const& tick, forever_module::BotSnapshot const& bot, std::uint64_t leaderGuid) const;
     std::uint8_t DeadWait(DecideTick const& tick, std::uint64_t leaderGuid) const;
+    // The combat-drift leash (DungeonPullLeashYards, DungeonChaseLeashYards): how far (x, y) is from the leg of the route this party's leader walks (infinity: no
+    // route known, or past its end), and whether a hostile there is off the leash (farther than `yards` from that leg and, with `orLeader`, from the living leader).
+    float PartyRouteLegDistance(std::uint64_t leaderGuid, std::uint32_t mapId, float x, float y) const;
+    bool OffPartyLeash(DecideTick const& tick, std::uint64_t leaderGuid, std::uint32_t mapId, float x, float y, std::uint32_t yards, bool orLeader) const;
+    // " route_yards=N" for a log line: how far the turn's target is from its party's route leg (empty off a route, or with no target or route).
+    std::string RouteYardsField(BotTurn const& turn) const;
+    // DungeonLeaderRejoin: the living, quiet member of a dead leader's party on the given map that it comes back next to (nearest to (x, y)), or nullptr.
+    forever_module::BotSnapshot const* LeaderRejoinMember(DecideTick const& tick, std::uint64_t leaderGuid, std::uint32_t mapId, float x, float y) const;
     std::uint64_t WanderIdleFor(BotTurn& turn) const;
 
     // The state of a bot, created on first use with the starting stance (PolicyOptions::AggressiveStart).

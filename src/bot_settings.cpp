@@ -751,6 +751,15 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadBool(config, "LfgCommand", settings.LfgCommand, warnings);
     ReadBool(config, "LfgFill", settings.LfgFill, warnings);
     ReadBool(config, "DungeonReviveOutOfCombat", settings.DungeonReviveOutOfCombat, warnings);
+    for (auto const& [key, value] : { std::pair<char const*, std::uint32_t*>{ "DungeonPullLeashYards", &settings.DungeonPullLeashYards },
+                                      std::pair<char const*, std::uint32_t*>{ "DungeonChaseLeashYards", &settings.DungeonChaseLeashYards } })
+    {
+        if (auto const leash = config.find(key); leash != config.end() && leash->second == "0")
+            *value = 0; // explicitly off
+        else
+            ReadKey(config, key, 10, 80, *value, warnings);
+    }
+    ReadBool(config, "DungeonLeaderRejoin", settings.DungeonLeaderRejoin, warnings);
     if (auto const teleport = config.find("CorpseRunTeleportSec"); teleport != config.end() && teleport->second == "0")
         settings.CorpseRunTeleportSec = 0; // explicitly off: the ghost walks on, and is put at its corpse after CorpseRunTimeoutMs
     else
