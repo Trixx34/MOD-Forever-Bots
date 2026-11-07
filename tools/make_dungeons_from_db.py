@@ -41,6 +41,11 @@ DUNGEONS = {
     # `convert_dungeons.py`. The --roster default (ROSTER, a five-bot tank/healer/dps string) is almost certainly wrong for a 40-bot raid: Onyxia's
     # file, once generated, needs its "roster"/roster-size handling redone to fit whatever raid-roster schema the parallel raid-support effort lands
     # (see docs/108-onyxia-raid-job.md) -- this dungeon-data entry describes the encounter only; it does not implement raid grouping.
+    # Custom dungeons of the forever core (2026-11-07): no "Classic:" door; the door comes from world_safe_locs "<name> (dungeon) - entrance inside" / "exit outside".
+    # Boss entries are the instance scripts' ClassicDungeonBossEntry lists (src/server/scripts/Custom/Classic/instances). Spawns exist on the sim DB for these two
+    # only. The Abandoned (250631, Ruins of Lordaeron) comes out of a statue and has no spawn, so it is not required (reported on stderr as missing).
+    "rol": (2999, "Ruins of Lordaeron", 15, 20, ["Witherfang", "Rath'mael", "The Baron", "The Abandoned", "Bjork"]),
+    "hot": (3065, "Hall of Thanes", 13, 18, ["Faldrim Anvilmar", "Magmatus", "Plunder", "Durgen Dirgehammer"]),
     "onyxia": (249, "Onyxia's Lair", 60, 60, ["Onyxia"]),
 }
 ROSTER = "2:1,5:5,8:8,2:9,5:4"              # tank first, healer second: orc warrior, undead priest, troll mage, orc warlock, undead rogue
@@ -53,6 +58,9 @@ def door(db, name):
     for kind in ("Entrance", "Exit"):
         row = db.execute("""SELECT s.MapID, s.LocX, s.LocY, s.LocZ FROM areatrigger_teleport a JOIN world_safe_locs s ON s.ID = a.PortLocID
                             WHERE s.Comment LIKE ? ORDER BY s.ID DESC LIMIT 1""", (f"Classic: {name} - {kind}",)).fetchone()
+        if not row:   # custom dungeons: world_safe_locs comments "<name> (dungeon) - entrance inside" / "exit outside..."
+            like = "entrance inside%" if kind == "Entrance" else "exit outside%"
+            row = db.execute("SELECT MapID, LocX, LocY, LocZ FROM world_safe_locs WHERE Comment LIKE ? ORDER BY ID DESC LIMIT 1", (f"{name} (dungeon) - {like}",)).fetchone()
         found[kind] = row
     return found["Entrance"], found["Exit"]
 
