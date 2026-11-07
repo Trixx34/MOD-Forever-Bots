@@ -335,12 +335,8 @@ void main_detail::PumpTier2(forever_module::Tier2Session& session, std::atomic<b
                 for (forever_module::BotSnapshot const& bot : view.bots)
                     guids.push_back(bot.guid);
                 std::sort(guids.begin(), guids.end());
-                partyOf.clear();
-                // No scenario configured means no director: leave partyOf empty so the lambdas below answer "no party" (directors[0] of an empty vector is a null
-                // dereference; the module crashed in a loop on it, 2026-11-04, once the dungeon loop was stopped and Staging() was asked).
-                if (!directors.empty())
-                    for (std::size_t i = 0; i < guids.size(); ++i)
-                        partyOf[guids[i]] = std::min(i / partySize, directors.size() - 1);
+                // No scenario configured means no director: partyOf stays empty so the lambdas below answer "no party" (see party_cut.h).
+                partyOf = party_cut::PartyOf(guids, partySize, directors.size());
                 policy.SetRouteActiveFor([&directors, &partyOf](std::uint64_t guid)
                 {
                     auto const at = partyOf.find(guid);

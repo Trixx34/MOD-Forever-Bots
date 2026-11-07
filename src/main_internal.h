@@ -30,6 +30,7 @@
 #include "ambient_chat.h"
 #include "advisor_send.h"
 #include "text_case.h"
+#include "party_cut.h"
 
 #include "forever_module/module_client.h"
 #include "forever_module/tier2_session.h"

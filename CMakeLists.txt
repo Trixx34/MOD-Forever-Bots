@@ -254,6 +254,10 @@ add_executable(route_triage_test tests/route_triage_test.cpp)
 target_include_directories(route_triage_test PRIVATE src)
 add_test(NAME route_triage COMMAND route_triage_test)
 
+add_executable(party_cut_test tests/party_cut_test.cpp)
+target_include_directories(party_cut_test PRIVATE src)
+add_test(NAME party_cut COMMAND party_cut_test)
+
 add_executable(pick_test tests/pick_test.cpp)
 target_link_libraries(pick_test PRIVATE forever_bots_settings)
 add_test(NAME pick COMMAND pick_test)
