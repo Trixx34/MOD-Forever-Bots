@@ -361,6 +361,32 @@ end
 
 } // namespace
 
+// A bridge teleport held in its trailing wait by a fight (the leader died on the island) times out with nothing left to do but wait: it is done, not retried.
+// The retry teleported the leader back to the island after the boss there was dead (Blackfathom Deeps, sim 2026-11-07 15:27:50).
+void ATimeoutWithOnlyAWaitLeftIsDone()
+{
+    std::vector<std::string> warnings;
+    Runner runner(ForMap(Parse("event 48 bridge Bridge\nafter_boss 4887\nteleport -355.5 295.5 -55.8\nwait 5\nend\n", warnings), 48));
+    CHECK(warnings.empty());
+    std::set<std::uint32_t> killed{ 4887 };
+    Facts f;
+    f.KilledBosses = &killed;
+    CHECK(runner.Next(f, 0).Do == Command::What::Teleport);
+    f.InCombat = true;                                                                   // a fight on the island, then the leader dies
+    for (std::uint64_t at = 10000; at <= 400000; at += 10000)
+        runner.Next(f, at);
+    CHECK(!runner.Active());                                                             // 120 s + the 180 s cap
+    f.InCombat = false;
+    CHECK(runner.Next(f, 400000 + kEventRetryBackoffMs).Do == Command::What::Nothing && !runner.Active()); // not fired again
+    bool done = false, retried = false;
+    for (std::string const& line : runner.TakeLog())
+    {
+        done = done || line.rfind("event_done: event=bridge", 0) == 0;
+        retried = retried || line.find("_retry") != std::string::npos;
+    }
+    CHECK(done && !retried);
+}
+
 int main()
 {
     TheFileIsParsedAndBadBlocksAreDropped();
@@ -373,6 +399,7 @@ int main()
     TheTimeoutDoesNotRunDuringAFight();
     TheNaralexEscortRuns();
     ARefusedNaralexTalkMovesOnToTheFollow();
+    ATimeoutWithOnlyAWaitLeftIsDone();
     if (failures == 0)
         std::printf("dungeon_events_test: all passed\n");
     return failures == 0 ? 0 : 1;

@@ -649,13 +649,28 @@ void ScenarioDirector::Decide(forever_module::WorldTickSnapshotView const& view,
                 leader = &bots.front();
             // Route progress: the leader's while it is up; with the leader down, the furthest point any living member reaches, so the
             // progress neither freezes nor is lost when the leader comes back. It never decreases.
-            for (BotSnapshot const& bot : bots)
+            // In route order (2026-11-07): only the next kRouteProgressWindow points count, so a point is reached on the way, not by standing near a later
+            // point that the route passes again (Wailing Caverns' point 70 lies by its point 22 on the way back, the Stockade's point 17 is its point 5,
+            // Shadowfang Keep's last point is over its courtyard gate): the sim's cycle of 2026-11-07 14:20 reported furthest=70/96 for every wc party whose
+            // leader was at point 33, and ended sfk#3 as bosses_missing at 818 s with the leader at point 2 (furthest=37/37). And the leader only while it is
+            // up: the old test let every living member count while the leader was up (and nobody while it was down), the reverse of the rule above, so a
+            // member chasing a pack across the dungeon moved the progress.
+            bool const leaderUp = leader && leader->life_state == 0;
+            for (bool advanced = true; advanced;)
             {
-                if (bot.life_state != 0 || (leader && leader->life_state == 0 && &bot != leader))
-                    continue;
-                for (std::size_t i = 0; i < _plan.Route.size(); ++i)
-                    if (Reached(bot, _plan.Route[i]))
-                        _furthest = std::max<std::uint32_t>(_furthest, std::uint32_t(i + 1));
+                advanced = false;
+                std::size_t const end = std::min<std::size_t>(_plan.Route.size(), std::size_t(_furthest) + kRouteProgressWindow);
+                for (BotSnapshot const& bot : bots)
+                {
+                    if (bot.life_state != 0 || (leaderUp && &bot != leader))
+                        continue;
+                    for (std::size_t i = _furthest; i < end; ++i)
+                        if (Reached(bot, _plan.Route[i]) && std::uint32_t(i + 1) > _furthest)
+                        {
+                            _furthest = std::uint32_t(i + 1);
+                            advanced = true;
+                        }
+                }
             }
             // Where the time goes: one state for this tick (see TimeState).
             if (leader)

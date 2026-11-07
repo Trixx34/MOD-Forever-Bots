@@ -111,7 +111,9 @@
     {
       "id": "courtyard-door",
       "name": "Courtyard Door (used directly: the escape script that should open it is unwired in this fork's world database)",
-      "trigger": { "type": "near", "x": -242.6, "y": 2159.0, "z": 90.6, "radius": 30 },
+      // After Rethilgore, not "near the door" (2026-11-07): the route passes within 30 yards of the door at points 3-4 on its way TO Rethilgore (point 7),
+      // so the event fired there, the teleport put the leader past the door before Rethilgore was fought, and the route index jumped to point 31.
+      "trigger": { "type": "after_boss", "boss": 3914 },
       "steps": [
         { "type": "teleport", "x": -250.9, "y": 2162.1, "z": 95.6 },
         { "type": "use", "object": 18895, "x": -242.6, "y": 2159.0, "z": 90.6 }

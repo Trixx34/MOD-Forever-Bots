@@ -718,6 +718,10 @@ void BotPolicy::RouteEvents(DecideTick& tick, BotTurn& turn, RouteLeg& route)
                     {
                         std::size_t snap = state.RouteIndex;
                         float snapDistance = std::numeric_limits<float>::max();
+                        // Never past a boss that is still alive (2026-11-07): the search stops at the first boss point whose boss is not dead. Shadowfang Keep's
+                        // courtyard-door teleport lands exactly on route point 31 (the way down from Springvale to Odo), so a leader at point 1-3 was snapped to 31
+                        // and the route skipped Rethilgore, Razorclaw, Silverlaine and Springvale. The bridges of Blackfathom Deeps and Gnomeregan land 1 to 5
+                        // points on, past bosses already dead, and are unchanged.
                         for (std::size_t i = state.RouteIndex; i < route.routePoints->size(); ++i)
                         {
                             Point const& p = (*route.routePoints)[i];
@@ -727,6 +731,12 @@ void BotPolicy::RouteEvents(DecideTick& tick, BotTurn& turn, RouteLeg& route)
                             {
                                 snapDistance = d;
                                 snap = i;
+                            }
+                            if (route.routeBoss)
+                            {
+                                auto const boss = route.routeBoss->find(i);
+                                if (boss != route.routeBoss->end() && killedNow.count(boss->second) == 0)
+                                    break;
                             }
                         }
                         if (snapDistance <= kRoutePointReachYards && snap != state.RouteIndex)

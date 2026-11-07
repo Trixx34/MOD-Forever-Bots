@@ -179,6 +179,9 @@ constexpr float kRoutePointReachYards = 15.0f; // the leader counts as having re
 // was credited with "reached" the dungeon's last point this way (bots 0.36.2 and earlier: furthest=37/37, bosses=0/5). 8 yards keeps that pair apart
 // while staying well above the under-one-yard Z gaps between a waypoint and the very next one that are meant to count as the same spot.
 constexpr float kRouteReachMaxZYards = 8.0f;
+// Route progress counts the points in order: from the furthest one reached, only the next this many can be reached (a leader that skips a few points
+// on the way, or a bridge teleport that lands it 1 to 5 points on, still counts; a later point that lies by an earlier one does not).
+constexpr std::size_t kRouteProgressWindow = 8;
 
 // The part of a snapshot that holds the bots in `keep` (guids), with their nearby slots: the director of one party of several sees only its own bots. The nearby units are
 // stored per bot position (max_nearby_units slots each), so they are copied along with the bots, else a director would read another party's creatures.

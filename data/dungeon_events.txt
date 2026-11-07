@@ -50,8 +50,9 @@ end
 # (gameobject_template type 0, like the Deadmines' Heavy Doors above, which open the same way with no lever at all), with no item or quest lock recorded
 # against it, so it is opened directly here, the way a player would click it open by hand if the lever did not work.
 
+# Triggered after Rethilgore (3914), not "near the door": the route passes within 30 yards of the door on its way to Rethilgore (2026-11-07).
 event 33 courtyard-door Courtyard Door (used directly: the escape script that should open it is unwired in this fork's world database)
-near -242.6 2159.0 90.6 30
+after_boss 3914
 teleport -250.9 2162.1 95.6
 use 18895 -242.6 2159.0 90.6
 end

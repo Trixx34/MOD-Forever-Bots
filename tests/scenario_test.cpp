@@ -363,6 +363,68 @@ void AWaypointAStoreyUpByTheRealShadowfangKeepGapIsNotReached()
     CHECK(!result);
 }
 
+// A route that comes back the way it went (2026-11-07 sim: wc parties at point 33 reported furthest=70/96, the Stockade's point 17 is its point 5): a
+// point far down the route that lies by an early one is not reached by standing at the early one. Only the next kRouteProgressWindow points count.
+ScenarioPlan ThereAndBackPlan()
+{
+    ScenarioPlan plan = Plan();
+    plan.Route.clear();
+    for (int i = 0; i < 10; ++i)
+        plan.Route.push_back({ 0.0f, 100.0f + 100.0f * float(i), 0.0f }); // out: y 100 .. 1000
+    for (int i = 0; i < 10; ++i)
+        plan.Route.push_back({ 50.0f, 1000.0f - 100.0f * float(i), 0.0f }); // back, 50 yards to the side: y 1000 .. 100 (the last one by the first)
+    plan.Route.back().X = 5.0f;
+    return plan;
+}
+
+void AnEarlyPointDoesNotReachALaterPointBesideIt()
+{
+    std::uint64_t t, tick;
+    std::vector<BotSnapshot> bots;
+    ScenarioDirector director = RunningDirector(t, tick, bots, ThereAndBackPlan());
+    std::vector<BotAction> actions;
+    bots[0].pos_x = 0.0f;
+    bots[0].pos_y = 100.0f; // the leader at the first point, 5 yards from the last one
+    director.Decide(View(++tick, bots), t += 1000, actions);
+    director.Decide(View(++tick, bots), t += 1000, actions);
+    CHECK(director.Phase() == ScenarioPhase::Running); // not "complete" (nor, with bosses, the grace that ends as bosses_missing)
+    CHECK(!director.TakeResult());
+    for (int i = 1; i < 10; ++i) // out ...
+    {
+        bots[0].pos_y = 100.0f + 100.0f * float(i);
+        director.Decide(View(++tick, bots), t += 1000, actions);
+    }
+    for (int i = 0; i < 10; ++i) // ... and back
+    {
+        bots[0].pos_x = i == 9 ? 5.0f : 50.0f;
+        bots[0].pos_y = 1000.0f - 100.0f * float(i);
+        director.Decide(View(++tick, bots), t += 1000, actions);
+    }
+    auto const result = director.TakeResult();
+    CHECK(result && result->Outcome == "complete" && result->Furthest == 20);
+}
+
+// While the leader is up only the leader counts: a member that chases a pack onto a later point does not move the progress.
+void AMemberAheadOfALiveLeaderDoesNotMoveTheProgress()
+{
+    std::uint64_t t, tick;
+    std::vector<BotSnapshot> bots;
+    ScenarioDirector director = RunningDirector(t, tick, bots);
+    std::vector<BotAction> actions;
+    bots[1].pos_y = 100.0f;
+    director.Decide(View(++tick, bots), t += 1000, actions);
+    bots[1].pos_y = 200.0f; // the member reaches the last point; the leader still stands at the entry
+    director.Decide(View(++tick, bots), t += 1000, actions);
+    CHECK(director.Phase() == ScenarioPhase::Running);
+    CHECK(!director.TakeResult());
+    bots[0].pos_y = 100.0f;
+    director.Decide(View(++tick, bots), t += 1000, actions);
+    bots[0].pos_y = 200.0f;
+    director.Decide(View(++tick, bots), t += 1000, actions);
+    auto const result = director.TakeResult();
+    CHECK(result && result->Outcome == "complete" && result->Furthest == 2);
+}
+
 void WipeEndsTheRunAndCountsDeaths()
 {
     std::uint64_t t, tick;
@@ -1579,6 +1641,8 @@ int main()
     CompletesWhenTheLeaderReachesTheLastPoint();
     AWaypointAboveIsNotReachedByStandingBelowIt();
     AWaypointAStoreyUpByTheRealShadowfangKeepGapIsNotReached();
+    AnEarlyPointDoesNotReachALaterPointBesideIt();
+    AMemberAheadOfALiveLeaderDoesNotMoveTheProgress();
     WipeEndsTheRunAndCountsDeaths();
     GhostCountsAsNotAlive();
     SingleDeathKeepsTheRunGoing();

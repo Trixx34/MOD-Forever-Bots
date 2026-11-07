@@ -3028,6 +3028,39 @@ void ATeleportEventSnapsTheRouteIndexToThePointItLandsOn()
     CHECK(snapped);
 }
 
+// The snap stops at a boss still alive (Shadowfang Keep, 2026-11-07: the courtyard-door teleport lands on route point 31, and a leader at point 1-3 was
+// snapped there past four living bosses). A teleport that lands past a living boss leaves the route index where it was.
+void ATeleportEventDoesNotSnapPastALivingBoss()
+{
+    PolicyOptions options = LeadOptions();
+    options.DungeonTeleport = true;
+    PolicyOptions::DungeonRoute route;
+    route.Route = { Point{ 100.0f, 0.0f, 0.0f }, Point{ 200.0f, 0.0f, 0.0f }, Point{ 300.0f, 0.0f, 0.0f }, Point{ 340.0f, 0.0f, 0.0f } };
+    route.BossAt[0] = 644;
+    route.BossAt[1] = 646; // alive, between the leader and the point the teleport lands on
+    route.BossAt[3] = 645;
+    std::vector<std::string> warnings;
+    route.Events = dungeon_events::Parse("event 36 door Door\nafter_boss 644\nteleport 300 0 0\nwait 5\nend\n", warnings);
+    CHECK(warnings.empty());
+    options.DungeonsByMap[36] = route;
+    std::vector<std::string> events;
+    options.OnEvent = [&events](std::string const& line) { events.push_back(line); };
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = PlayerGroupView(98.0f);
+    policy.Decide(view, 0);
+    policy.ApplyChat(view, FromPlayer(), TankLead(), 1000);
+    NearbyUnit corpse;
+    corpse.guid = MakeUnitRef(8, 644, 55);
+    corpse.health = 0;
+    AddNearby(view, 3, corpse);
+    std::optional<BotAction> jump = OfTank(policy.Decide(view, 2000), ActionType::kTeleport);
+    CHECK(jump.has_value() && jump->dest_x == 300.0f);
+    bool snapped = false;
+    for (std::string const& line : events)
+        snapped = snapped || line.find("route_teleport_snap") != std::string::npos;
+    CHECK(!snapped);
+}
+
 void ALeverIsPulledWhenTheTankComesNear()
 {
     PolicyOptions options = LeadOptions();
@@ -6865,6 +6898,7 @@ int main()
     TheTankHoldsAtABossUntilItIsSeenDead();
     ALeverIsPulledWhenTheTankComesNear();
     ATeleportEventSnapsTheRouteIndexToThePointItLandsOn();
+    ATeleportEventDoesNotSnapPastALivingBoss();
     TheLeaderWaitsAtABossPointUntilTheBossIsDead();
     TheLeaderSweepsBackToAMissingBoss();
     ABossPointIsNeverSkippedForNoRoute();

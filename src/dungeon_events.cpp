@@ -380,7 +380,14 @@ Command Runner::Next(Facts const& facts, std::uint64_t nowMs)
     _lastPaused = paused;
     if (nowMs - _startedMs >= std::uint64_t(event.TimeoutSec) * 1000)
     {
-        Finish("event_timeout", nowMs, /*success=*/false);
+        // Every step that does something was sent and only waits are left (a bridge teleport and its "wait 5"): the event did its work, so it is done,
+        // not retried. A retry teleported the leader again: Blackfathom Deeps' sarevess-bridge, held in its wait by a fight on the island until the leader
+        // died, fired once more after Lady Sarevess was dead and sarevess-back had brought the party back (sim 2026-11-07 15:27:50), and the party
+        // went back and forth between the island and Ghamoo-ra.
+        bool onlyWaitsLeft = true;
+        for (std::size_t s = _step; s < event.Steps.size(); ++s)
+            onlyWaitsLeft = onlyWaitsLeft && event.Steps[s].What == Step::Kind::Wait;
+        Finish(onlyWaitsLeft ? "event_done" : "event_timeout", nowMs, /*success=*/onlyWaitsLeft);
         return {};
     }
     if (_step >= event.Steps.size())
