@@ -1030,6 +1030,10 @@ void BotPolicy::MoveForQuestOrGoto(DecideTick& tick, BotTurn& turn)
                 state.Last = Decision{ ActionType::kStop, 0 };
             }
             actions.push_back(quest);
+            // A class quest's reward (the GM command .quest reward) has no other trace: neither the quest planner nor the core logs it as taken.
+            if (operation == kQuestReward && _options.OnEvent)
+                _options.OnEvent("quest_reward: bot=" + std::to_string(bot.guid) + " quest=" + std::to_string(questStep.Quest) + " kind=class_quest level=" +
+                                 std::to_string(bot.level) + " map=" + std::to_string(bot.map_id));
             _quests.NoteSent(state.Quest, operation, questStep.Quest, nowMs);
             wanted = Decision{ ActionType::kStop, 0 };
             break;
