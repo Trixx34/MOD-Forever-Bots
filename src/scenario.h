@@ -138,10 +138,6 @@ struct ScenarioResult
 //   idle   none of those: an event (lever, door), a boss hold, a path being found, casting
 // The thresholds are the policy's (kPartyReadyHealthPct, kPartyReadyPowerPct, kRouteWaitYards) so "rest" and "far" are the holds the leader logs as route_hold.
 enum class TimeState : std::size_t { Fight, Walk, Dead, Rest, Far, Idle, Count };
-constexpr char const* kTimeStateNames[] = { "fight", "walk", "dead", "rest", "far", "idle" };
-constexpr std::uint32_t kTimeRestHealthPct = 90;
-constexpr std::uint32_t kTimeRestPowerPct = 95;
-constexpr float kTimeFarYards = 30.0f;
 constexpr std::uint64_t kTimeStateMaxGapMs = 5000;
 
 constexpr std::uint64_t kDressPauseMs = 1500;
@@ -149,30 +145,17 @@ constexpr std::uint64_t kEquipPauseMs = 3000;
 constexpr std::uint64_t kTameTimeoutMs = 300000;    // the Taming phase gives the hunters this long to get a pet
 constexpr std::uint64_t kTameRetryMs = 6000;        // a teleport that was refused (in combat) is sent again after this
 constexpr std::uint64_t kTameBackMs = 20000;        // the hunters are given this long to be back before the grouping starts anyway
-constexpr float kTameArrivedYards = 150.0f;         // a hunter this close to the spot has arrived
-constexpr float kTameHomeYards = 40.0f;             // and one this close to where it stood is back
 constexpr std::uint32_t kTameMinLevel = 10;         // the hunter pet quest is given at level 10
-constexpr std::uint32_t kAmmoLow = 100;             // below this many pieces of its ammunition a hunter is given more
 constexpr std::uint64_t kAmmoRetryMs = 5000;        // a bot is given ammunition at most this often (the snapshot needs a moment to show it)
-constexpr std::uint32_t kAmmoGrantsMax = 40;        // per bot and run
-constexpr std::uint32_t kAmmoStackMax = 200;        // a grant is at most one stack (the core refuses a count above the item's stack size: 200 for arrows and shot)
-constexpr std::uint32_t kAmmoUselessMax = 3;        // grants in a row after which the count did not grow: the bot is left alone (the core refuses for another reason)
 constexpr std::uint64_t kSupplyRetryMs = 5000;      // a bot is given more of a supply item at most this often (the snapshot needs a moment to show it)
-constexpr std::uint32_t kSupplyGrantsMax = 40;       // per bot and item, per run (on top of the dressing's first grant)
 constexpr std::uint32_t kSupplyUselessMax = 3;       // grants in a row after which neither total grew: the bot is left alone for that item
 // The roster is complete (every bot in view) but one of them is already dead: the run starts anyway this long after the last one came into view. A bot that
 // died before the 40th was spawned (2026-10-29 22:31: the first tank, killed by Emberstrife while the roster was still spawning) held Waiting for good.
 constexpr std::uint64_t kRosterDeadGraceMs = 30000;
-constexpr std::uint64_t kConfigProbeRetryMs = 6000;   // a config probe the core has not answered (or answered without applying) is sent again after this
 constexpr std::uint64_t kConfigProbeTimeoutMs = 60000; // no applied probe in this long: the run ends as config_unknown
-constexpr std::uint32_t kConfigProbeRefusalsMax = 3;   // refusals in a row (a teleport refused in combat is not the config) that end the run as config_refused
-constexpr std::uint64_t kGroupingTimeoutMs = 120000;
 constexpr std::uint64_t kMembersDelayMs = 3000;
 constexpr std::uint64_t kEnterRetryMs = 10000;
 constexpr std::uint64_t kEnterTimeoutMs = 90000;
-// The party waits at its staging place while any living member is in combat, and the whole party is sent in together once none is. This is the longest that
-// wait may last; a fight that outlasts it ends the run as before.
-constexpr std::uint64_t kEnterCombatMaxMs = 600000;
 // A fight at the staging place holds the whole party only this long: then the members out of combat are sent in (the leader too, when it is one of them), and the
 // ones still fighting every kEnterRetryMs after. The 2026-10-29 21:42 run waited the full kEnterCombatMaxMs with 1-13 bots always in some fight and ended enter_failed.
 constexpr std::uint64_t kEnterCombatGraceMs = 45000;

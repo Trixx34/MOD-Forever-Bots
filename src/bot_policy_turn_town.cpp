@@ -519,8 +519,8 @@ void BotPolicy::TurnRestAndConsume(DecideTick& tick, BotTurn& turn)
     // far faster than sitting alone. Not while moving or fighting, and not again until the last piece has done its work.
     if (_options.Supplies.Enabled && state.Sitting && sitWanted && bot.moving == 0 && bot.in_combat == 0 && nowMs >= state.NextConsumeMs)
     {
-        std::uint32_t const healthPct = bot.max_health > 0 ? std::uint32_t(std::uint64_t(bot.health) * 100 / bot.max_health) : 100;
-        std::uint32_t const manaPct = manaUser && bot.max_power > 0 ? std::uint32_t(std::uint64_t(bot.power) * 100 / bot.max_power) : 100;
+        std::uint32_t const healthPct = HealthPct(bot, 100);
+        std::uint32_t const manaPct = manaUser ? PowerPct(bot, 100) : 100;
         // A party held for itself (a dungeon pull hold or regroup) eats and drinks up to the marks the hold waits for (kPartyReadyHealthPct, kPartyReadyPowerPct), not
         // only below the normal 70 % / 40 %: the Deadmines runs sat between the two for minutes on sitting regeneration alone (health stuck at 74 %, mana 0 to 40 % in 20 min).
         supply::Settings consumeSettings = _options.Supplies;
@@ -555,8 +555,8 @@ void BotPolicy::TurnRestAndConsume(DecideTick& tick, BotTurn& turn)
     // no standing still, so it goes alongside whatever the bot does; the game's shared potion cooldown is why it is not asked for sooner.
     if (_options.Supplies.Enabled && _options.Supplies.Potions && bot.in_combat != 0 && nowMs >= state.NextPotionMs)
     {
-        std::uint32_t const healthPct = bot.max_health > 0 ? std::uint32_t(std::uint64_t(bot.health) * 100 / bot.max_health) : 100;
-        std::uint32_t const manaPct = manaUser && bot.max_power > 0 ? std::uint32_t(std::uint64_t(bot.power) * 100 / bot.max_power) : 100;
+        std::uint32_t const healthPct = HealthPct(bot, 100);
+        std::uint32_t const manaPct = manaUser ? PowerPct(bot, 100) : 100;
         if (std::uint32_t const which = supply::PotionNow(_options.Supplies, supplyFacts, healthPct, manaPct))
         {
             BotAction potion;

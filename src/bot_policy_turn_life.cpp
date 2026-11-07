@@ -137,8 +137,8 @@ BotPolicy::TurnFlow BotPolicy::TurnBegin(DecideTick& tick, BotTurn& turn)
         actions.push_back(*state.OrderAction);
         state.OrderAction.reset();
     }
-    state.SeenHealthPct = bot.max_health ? std::uint32_t(std::uint64_t(bot.health) * 100 / bot.max_health) : 100;
-    state.SeenPowerPct = bot.max_power ? std::uint32_t(std::uint64_t(bot.power) * 100 / bot.max_power) : 100;
+    state.SeenHealthPct = HealthPct(bot, 100);
+    state.SeenPowerPct = PowerPct(bot, 100);
     state.SeenLife = bot.life_state;
     state.SeenInCombat = bot.in_combat != 0;
     return TurnFlow::kNext;
@@ -255,7 +255,7 @@ void BotPolicy::TurnRevivedAndRoles(DecideTick& tick, BotTurn& turn)
         if (_options.OnEvent)
             _options.OnEvent("revived: bot=" + std::to_string(bot.guid) + " how=" + (state.AcceptedFrom != 0 ? "resurrect" : state.Reclaimed ? "reclaim" : "unknown") +
                              " down_ms=" + std::to_string(nowMs - state.DeathMs) + " health_pct=" +
-                             std::to_string(bot.max_health ? std::uint64_t(bot.health) * 100 / bot.max_health : 0));
+                             std::to_string(HealthPct(bot, 0)));
         state.Life = 0;
         state.ReleaseNow = false;
         state.Last.reset();

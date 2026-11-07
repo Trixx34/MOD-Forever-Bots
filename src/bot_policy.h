@@ -625,7 +625,7 @@ private:
         std::uint64_t RouteManaProgressMs = 0;           // 0.44.14: the last tick the party's summed mana rose while the leader waited (kRouteManaMaxMs counts from here)
         std::uint64_t RouteManaBaseSum = 0, RouteManaBaseMs = 0; // RecoveryProgress baseline of the wait (cleared when the wait ends)
         std::uint32_t RouteManaBaseAlive = 0;
-        std::uint64_t RouteManaSinceMs = 0;              // since when a mana user of the party has been below kRouteMinManaPct (0 = none)
+        std::uint64_t RouteManaStartMs = 0;              // since when a mana user of the party has been below kRouteMinManaPct (0 = none)
         std::uint64_t RouteHoldLoggedMs = 0;             // when the leader last logged why it does not walk on (route_hold)
         std::uint64_t TaxiBlockedUntilMs = 0;            // the core refused a flight: walk until this
         std::uint64_t TaxiWaitUntilMs = 0;               // a flight was ordered: give it time to show
@@ -750,6 +750,7 @@ private:
     std::uint64_t DurationMsOf(std::uint32_t classId, std::uint32_t spell, std::string const& spec = {}) const;
 
     void ReadResult(BotState& state, forever_module::BotSnapshot const& bot, std::uint64_t nowMs);
+    void ReadCastResult(BotState& state, forever_module::BotSnapshot const& bot, std::uint64_t nowMs); // the cast half of ReadResult
 
     // Parties (M8): cuts the bots of `view` into parties of _options.PartySize (one faction each, the lowest-guid
     // bots first), picks each party's leader (a set tank role, else a warrior with no role set), and fills

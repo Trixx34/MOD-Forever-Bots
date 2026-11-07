@@ -113,7 +113,7 @@ void BotPolicy::TurnQuestsAndHold(DecideTick& tick, BotTurn& turn)
                 }
             }
             checkReady(bot);
-            tick.ForMembers(bot.guid, checkReady);
+            tick.ForEachPartyMember(bot.guid, checkReady);
             // 0.44.14: the hold's 45 s cap counts from the last tick the party's health plus mana rose (they are resting), up to kPullHoldAbsMaxMs.
             std::uint64_t restSum = 0, restMax = 0;
             std::uint32_t restAlive = 0;
@@ -126,7 +126,7 @@ void BotPolicy::TurnQuestsAndHold(DecideTick& tick, BotTurn& turn)
                 restMax += std::uint64_t(member.max_health) + (member.power_type == 0 ? member.max_power : 0);
             };
             addRest(bot);
-            tick.ForMembers(bot.guid, addRest);
+            tick.ForEachPartyMember(bot.guid, addRest);
             if (ready)
                 state.HoldBaseMs = 0;
             else if (RecoveryProgress(restSum, restMax, restAlive, nowMs, state.HoldBaseSum, state.HoldBaseMs, state.HoldBaseAlive))
@@ -173,8 +173,8 @@ void BotPolicy::TurnQuestsAndHold(DecideTick& tick, BotTurn& turn)
                     BotSnapshot const& m = view.bots[at->second];
                     line += " | " + std::to_string(member) + " yd=" + std::to_string(int(Distance2d(bot, m))) + " at=" + std::to_string(int(m.pos_x)) + "," +
                             std::to_string(int(m.pos_y)) + "," + std::to_string(int(m.pos_z)) + " life=" + std::to_string(m.life_state) + " hp=" +
-                            std::to_string(m.max_health > 0 ? std::uint64_t(m.health) * 100 / m.max_health : 0) + " pw=" +
-                            std::to_string(m.max_power > 0 ? std::uint64_t(m.power) * 100 / m.max_power : 0) + " mv=" + std::to_string(m.moving) + " fight=" +
+                            std::to_string(HealthPct(m, 0)) + " pw=" +
+                            std::to_string(PowerPct(m, 0)) + " mv=" + std::to_string(m.moving) + " fight=" +
                             std::to_string(m.in_combat) + " stuck=" + std::to_string(state.RegroupStuck.count(member) != 0);
                 }
                 _options.OnEvent(line);

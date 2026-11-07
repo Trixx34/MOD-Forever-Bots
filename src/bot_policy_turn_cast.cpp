@@ -543,7 +543,7 @@ void BotPolicy::TurnUpkeepBuffs(DecideTick& tick, BotTurn& turn)
         rotation::Facts const buffFacts = rotation::FactsFor(bot, nearby, nullptr, 0);
         for (rotation::Row const& row : RowsFor(classId, spec))
         {
-            if (!row.Buff || (bot.level != 0 && (row.MinLevel > bot.level || (row.MaxLevel != 0 && bot.level > row.MaxLevel))))
+            if (!row.Buff || !RowInLevelRange(row, bot.level))
                 continue;
             // A buff row may carry a condition: a stance only in a party (in_party), a pet summon only with no pet (no_pet).
             if (row.When.Condition != rotation::Cond::Always && !rotation::Allowed(row.When, buffFacts))
@@ -650,7 +650,7 @@ void BotPolicy::TurnUpkeepBuffs(DecideTick& tick, BotTurn& turn)
                             fightCosts.push_back(payment->Cost);
                 for (rotation::Row const& row : RowsFor(classId, spec))
                 {
-                    if (!row.Buff || !row.Party || (bot.level != 0 && (row.MinLevel > bot.level || (row.MaxLevel != 0 && bot.level > row.MaxLevel))))
+                    if (!row.Buff || !row.Party || !RowInLevelRange(row, bot.level))
                         continue;
                     if (row.When.Condition != rotation::Cond::Always)
                         continue;

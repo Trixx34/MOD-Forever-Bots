@@ -366,8 +366,7 @@ void BotPolicy::MoveWithoutTarget(DecideTick& tick, BotTurn& turn)
                             killedHere.insert(entry);
         };
         scan(bot.guid);
-        for (std::uint64_t member : membersOf[bot.guid])
-            scan(member);
+        tick.ForEachPartyMember(bot.guid, [&](BotSnapshot const& member) { scan(member.guid); });
     }
     if (routePoints && !routePoints->empty() && state.RouteIndex < routePoints->size())
     {
@@ -405,13 +404,11 @@ void BotPolicy::RouteReadiness(DecideTick& tick, BotTurn& turn, RouteLeg& route)
     std::set<std::uint32_t> const& killedNow = *route.killedNow;
     bool& together = route.together;
     together = true;
-    for (std::uint64_t member : membersOf[bot.guid])
+    tick.ForEachPartyMember(bot.guid, [&](BotSnapshot const& member)
     {
-        auto const at = indexOf.find(member);
-        if (at == indexOf.end() || view.bots[at->second].life_state != 0)
-            continue;
-        together = together && (state.RegroupStuck.count(member) != 0 || Distance2d(bot, view.bots[at->second]) <= kRouteWaitYards);
-    }
+        if (member.life_state == 0)
+            together = together && (state.RegroupStuck.count(member.guid) != 0 || Distance2d(bot, member) <= kRouteWaitYards);
+    });
     if (state.TankLead && !IsRouteActive(bot.guid))
     {
         // The group's player: the tank does not run off without them. A player out of its view counts as far.
@@ -446,28 +443,27 @@ void BotPolicy::RouteReadiness(DecideTick& tick, BotTurn& turn, RouteLeg& route)
         };
         manaLowInParty = dry(bot);
         add(bot);
-        for (std::uint64_t member : membersOf[bot.guid])
-            if (auto const at = indexOf.find(member); at != indexOf.end())
-            {
-                manaLowInParty = manaLowInParty || dry(view.bots[at->second]);
-                add(view.bots[at->second]);
-            }
+        tick.ForEachPartyMember(bot.guid, [&](BotSnapshot const& member)
+        {
+            manaLowInParty = manaLowInParty || dry(member);
+            add(member);
+        });
         if (!manaLowInParty || bot.in_combat != 0)
         {
-            state.RouteManaSinceMs = 0;
+            state.RouteManaStartMs = 0;
             state.RouteManaProgressMs = 0;
             state.RouteManaBaseMs = 0;
         }
-        else if (state.RouteManaSinceMs == 0)
+        else if (state.RouteManaStartMs == 0)
         {
-            state.RouteManaSinceMs = nowMs;
+            state.RouteManaStartMs = nowMs;
             state.RouteManaProgressMs = nowMs;
             state.RouteManaBaseSum = manaSum, state.RouteManaBaseMs = nowMs, state.RouteManaBaseAlive = manaAlive;
         }
         else if (RecoveryProgress(manaSum, manaMax, manaAlive, nowMs, state.RouteManaBaseSum, state.RouteManaBaseMs, state.RouteManaBaseAlive))
             state.RouteManaProgressMs = nowMs; // the 60 s cap counts from the last real recovery (drinking), not from regeneration or a revive
     }
-    route.manaReady = !manaLowInParty || nowMs - state.RouteManaProgressMs >= kRouteManaMaxMs || nowMs - state.RouteManaSinceMs >= kRouteManaAbsMaxMs;
+    route.manaReady = !manaLowInParty || nowMs - state.RouteManaProgressMs >= kRouteManaMaxMs || nowMs - state.RouteManaStartMs >= kRouteManaAbsMaxMs;
     // PartyMana: a member that said it is low on mana holds the walk too (never in combat, and never longer than PartyManaHoldSec).
     if (_options.PartyMana.Enabled && route.manaReady)
         if (auto const mana = _partyMana.find(bot.guid); mana != _partyMana.end() && mana->second.Holding(_options.PartyMana, bot.in_combat != 0, nowMs))
@@ -593,7 +589,7 @@ void BotPolicy::RouteLeaderRecover(DecideTick& tick, BotTurn& turn, RouteLeg& ro
                         state.LeaderRecoverWaitSinceMs = nowMs;
                         if (_options.OnEvent)
                             _options.OnEvent("leader_recover_wait: bot=" + std::to_string(bot.guid) + " member=" + std::to_string(other.guid) + " hp_pct=" +
-                                             std::to_string(bot.max_health ? std::uint64_t(bot.health) * 100 / bot.max_health : 100));
+                                             std::to_string(HealthPct(bot, 100)));
                     }
                     if (nowMs - state.LeaderRecoverWaitSinceMs < kLeaderRecoverMaxWaitMs)
                         break; // rests at the entrance first
@@ -851,12 +847,14 @@ void BotPolicy::RouteWalkOn(DecideTick& tick, BotTurn& turn, RouteLeg& route)
         {
             state.RouteWalkLoggedMs = nowMs;
             std::uint32_t near = 0, all = 0;
-            for (std::uint64_t member : membersOf[bot.guid])
-                if (auto const at = indexOf.find(member); at != indexOf.end() && view.bots[at->second].life_state == 0)
+            tick.ForEachPartyMember(bot.guid, [&](BotSnapshot const& member)
+            {
+                if (member.life_state == 0)
                 {
                     ++all;
-                    near += Distance2d(bot, view.bots[at->second]) <= kRouteWaitYards;
+                    near += Distance2d(bot, member) <= kRouteWaitYards;
                 }
+            });
             _options.OnEvent("route_walk: bot=" + std::to_string(bot.guid) + " point=" + std::to_string(state.RouteIndex) + "/" + std::to_string(routePoints->size()) +
                              " to=" + std::to_string(int(waypoint->X)) + "," + std::to_string(int(waypoint->Y)) + "," + std::to_string(int(waypoint->Z)) + " from=" +
                              std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) + "," + std::to_string(int(bot.pos_z)) + " members_near=" +
@@ -872,17 +870,19 @@ void BotPolicy::RouteWalkOn(DecideTick& tick, BotTurn& turn, RouteLeg& route)
             state.RouteHoldLoggedMs = nowMs;
             std::uint64_t farthest = 0;
             float farthestYards = 0.0f;
-            for (std::uint64_t member : membersOf[bot.guid])
-                if (auto const at = indexOf.find(member); at != indexOf.end() && view.bots[at->second].life_state == 0)
-                    if (float const yards = Distance2d(bot, view.bots[at->second]); yards > farthestYards)
+            tick.ForEachPartyMember(bot.guid, [&](BotSnapshot const& member)
+            {
+                if (member.life_state == 0)
+                    if (float const yards = Distance2d(bot, member); yards > farthestYards)
                     {
                         farthestYards = yards;
-                        farthest = member;
+                        farthest = member.guid;
                     }
+            });
             char const* why = !strong ? "health" : !manaReady ? "mana" : deadWaitKind != 0 ? "dead_member" : farthestYards > kRouteWaitYards ? "member_far" : "player_far";
             _options.OnEvent(std::string("route_hold: bot=") + std::to_string(bot.guid) + " point=" + std::to_string(state.RouteIndex) + "/" +
                              std::to_string(routePoints->size()) + " why=" + why + " hp_pct=" +
-                             std::to_string(bot.max_health ? std::uint64_t(bot.health) * 100 / bot.max_health : 100) + " farthest=" + std::to_string(farthest) +
+                             std::to_string(HealthPct(bot, 100)) + " farthest=" + std::to_string(farthest) +
                              " farthest_yards=" + std::to_string(int(farthestYards)) + " pos=" + std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) +
                              "," + std::to_string(int(bot.pos_z)));
         }
