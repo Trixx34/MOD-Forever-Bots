@@ -424,7 +424,7 @@ constexpr std::uint64_t kEntryTeleportRetryMs = 5000;      // the next try of th
 constexpr float kEntryYards = 15.0f;                        // a ghost this close to the entrance is at it
 constexpr std::uint64_t kLeaderRecoverCombatMs = 15000;   // a leader at the entrance this long goes to a member who is in a fight too (0.44.8)
 constexpr std::uint32_t kLeaderRecoverMinHealthPct = 60;    // 0.44.17: a revived leader at the entrance goes to its party at this health (never below: tanks that came in at 30 % died again) when nobody of the party is in a fight
-constexpr std::uint64_t kLeaderRecoverMaxWaitMs = 120000;  // a revived leader rests at the entrance this long at most before it goes to its party (kRouteMinHealthPct first)
+constexpr std::uint64_t kLeaderRecoverMaxWaitMs = 600000;  // a revived leader rests at the entrance this long at most before it goes to its party (kRouteMinHealthPct first; 120 s sent a tank in at 49 %: 275 of 568 deaths in the 2026-11-08 sim followed a pull at 40-59 %)
 // A ghost cannot be attacked; the body it reclaims can: it comes back alive at about half health, on the spot where it died, next to whatever killed it (on the sim a tank was
 // killed seven times in a row by the same scout, each time minutes after its reclaim). A ghost therefore waits, up to this long, while a live hostile stands this close to it.
 constexpr float kReclaimDangerYards = 30.0f;

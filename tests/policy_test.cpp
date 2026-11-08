@@ -3433,7 +3433,9 @@ void ARevivedLeaderRestsAtTheEntranceBeforeItGoesToItsParty()
     for (std::string const& line : events)
         waited = waited || line.rfind("leader_recover_wait: bot=12", 0) == 0;
     CHECK(waited);
-    std::optional<BotAction> gaveUp = TeleportOf(policy.Decide(hurt, 122000), 12);   // it cannot recover: after kLeaderRecoverMaxWaitMs it goes in all the same
+    // 0.45.4: two minutes at the entrance were not enough for a tank at half health (the sim's deaths): it still rests at two minutes, and only after kLeaderRecoverMaxWaitMs goes in.
+    CHECK(!TeleportOf(policy.Decide(hurt, 122000), 12).has_value());
+    std::optional<BotAction> gaveUp = TeleportOf(policy.Decide(hurt, 601000), 12);   // it cannot recover: after kLeaderRecoverMaxWaitMs it goes in all the same
     CHECK(gaveUp.has_value() && gaveUp->dest_x == 197.0f);
     // 0.44.17: 60 % or more and nobody of the party in a fight: at once. Below 60 % it still rests; with a member in a fight it still rests.
     BotPolicy sixty(options);

@@ -574,8 +574,9 @@ void BotPolicy::RouteLeaderRecover(DecideTick& tick, BotTurn& turn, RouteLeg& ro
     // Stockade, 2026-10-28 (0.39.0 sim, 220 deaths in 6 h): the leader comes back at about half health (a release brings it back at 49 %, and it then arrives next to the party
     // with 30 %): 31 of the 96 tank deaths came less than 120 s after the same tank's previous death, 24 of 60 leader_recover teleports were followed by that tank's death
     // within 120 s, and 38 of 72 tank pull lines of a 50-minute journal window began below 50 % health (5 to 13 % in the other dungeons). The tank stays at the entrance, which is quiet, and sits
-    // there until it is fit to walk on (kRouteMinHealthPct, the same as for a walk along the route), at most kLeaderRecoverMaxWaitMs: a tank that cannot get there (no food,
-    // a slow regeneration) goes in all the same.
+    // there until it is fit to walk on (kRouteMinHealthPct, the same as for a walk along the route), at most kLeaderRecoverMaxWaitMs (10 min since 0.45.4; 2 min sent a tank in at
+    // 49 % health: 275 of the 568 deaths in the 2026-11-08 sim that had a pull by the same bot in the 90 s before began with a pull at 40-59 %): a tank that cannot get there (no food,
+    // a slow regeneration) goes in all the same after that.
     bool atEntry = false;
     if (!recovering && _options.DungeonTeleport && bot.life_state == 0 && bot.in_combat == 0)
         if (auto const dungeon = _options.DungeonsByMap.find(bot.map_id);
