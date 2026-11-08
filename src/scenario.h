@@ -123,6 +123,9 @@ struct ScenarioResult
     std::vector<std::string> BossesKilled; // names of the ones seen dead, in the order they were seen
     // The same bosses with the time into the run they were seen dead (ms), in that order: boss_ms=Name:ms in the result line, so a clear's pace is in the log.
     std::vector<std::pair<std::string, std::uint64_t>> BossKillMs;
+    // Onyxia's health in percent at the end of the run (onyxia_hp=): the last sighting by any bot, 0 for her corpse. Set only in the Onyxia raid
+    // (her entry among the plan's bosses), and only when some bot saw her; empty otherwise, and the result line then leaves it out.
+    std::optional<std::uint32_t> OnyxiaHealthPct;
     // Where the run's time went (ms per state, in kTimeStateNames order): time_s= in the result line. See TimeState.
     std::array<std::uint64_t, 6> StateMs = {};
     std::vector<std::pair<std::uint32_t, std::uint32_t>> Party; // race and class id of each member, in the order first seen
@@ -283,6 +286,7 @@ private:
     bool _leaderDown = false;
     std::uint32_t _furthest = 0;
     std::vector<std::string> _bossKills;    // names, in the order seen dead
+    std::optional<std::uint32_t> _onyxiaHealthPct; // Onyxia's health in percent, the last time a bot saw her (ScenarioResult::OnyxiaHealthPct)
     std::size_t _bossKillsReported = 0;
     bool _partyFormed = true;
     std::optional<ScenarioResult> _result;

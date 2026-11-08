@@ -944,6 +944,48 @@ void CountsBossesSeenDead()
     CHECK(FormatScenarioResult(*result).find(" | roster=2:1,5:5,5:5 classes=1,5,5 combo=1-5-5") != std::string::npos);
 }
 
+// onyxia_hp=: Onyxia's health at the end, the last time a bot saw her, in the Onyxia raid only (her entry among the bosses); no bot seeing her leaves it out.
+void ReportsOnyxiaHealthInTheOnyxiaRaidOnly()
+{
+    for (bool const onyxiaRaid : { true, false })
+    {
+        std::uint64_t t, tick;
+        std::vector<BotSnapshot> bots;
+        ScenarioPlan plan = Plan();
+        plan.Bosses = { { onyxiaRaid ? 10184u : 644u, "Onyxia" } };
+        ScenarioDirector director(plan);
+        std::vector<BotAction> actions;
+        bots = { Bot(1, 36, 0, 0, 2, 3), Bot(2, 36, 0, 0, 1, 3), Bot(3, 36, 0, 0, 1, 3) };
+        t = 1000;
+        tick = 1;
+        for (int i = 0; i < 12 && director.Phase() != ScenarioPhase::Running; ++i)
+            director.Decide(View(++tick, bots), t += 3000, actions);
+        CHECK(director.Phase() == ScenarioPhase::Running);
+
+        // Onyxia at a quarter health in bot 2's view, then at half: the later sighting is the one reported.
+        WorldTickSnapshotView view = View(++tick, bots);
+        view.bots[1].nearby_count = 1;
+        view.nearby[1].guid = forever_module::MakeUnitRef(8, 10184, 5);
+        view.nearby[1].health = 250;
+        view.nearby[1].max_health = 1000;
+        director.Decide(view, t += 1000, actions);
+        view.tick_number = ++tick;
+        view.nearby[1].health = 500;
+        director.Decide(view, t += 1000, actions);
+
+        bots[0].health = bots[1].health = bots[2].health = 0;
+        bots[0].life_state = bots[1].life_state = bots[2].life_state = 1; // a wipe ends it
+        director.Decide(View(++tick, bots), t += 1000, actions);
+        auto const result = director.TakeResult();
+        CHECK(result);
+        std::string const line = FormatScenarioResult(*result);
+        if (onyxiaRaid)
+            CHECK(result->OnyxiaHealthPct == 50u && line.find(" onyxia_hp=50") != std::string::npos);
+        else
+            CHECK(!result->OnyxiaHealthPct && line.find("onyxia_hp") == std::string::npos);
+    }
+}
+
 // time_s=: each tick of the Running phase goes to one state, fight first, then walk, dead, rest, far, idle.
 void CountsWhereTheTimeGoes()
 {
@@ -1672,6 +1714,7 @@ int main()
     NoTamingWithoutAHunterThatNeedsAPetOrWithoutASpot();
     SettingsReadRosterSpecsClassSuppliesAndTheTameSpot();
     CountsBossesSeenDead();
+    ReportsOnyxiaHealthInTheOnyxiaRaidOnly();
     WaitsForTheWholeRoster();
     ADeadBotDoesNotHoldTheRosterForGood();
     DressesThenGroupsThenEnters();

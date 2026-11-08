@@ -457,6 +457,8 @@ void BotPolicy::DecideBot(DecideTick& tick, std::size_t i)
     TurnTargeting(tick, turn);
     if (TurnCrowdControl(tick, turn) == TurnFlow::kSkip)
         return;
+    if (TurnOnyxiaCasts(tick, turn) == TurnFlow::kSkip)
+        return;
     if (TurnTaming(tick, turn) == TurnFlow::kSkip)
         return;
     TurnFightWatch(tick, turn);

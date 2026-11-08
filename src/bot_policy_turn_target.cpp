@@ -232,6 +232,15 @@ void BotPolicy::TurnTargeting(DecideTick& tick, BotTurn& turn)
     auto& targetUnit = turn.targetUnit;
     turn.targetRef = bot.threat_target_guid;
     auto& targetRef = turn.targetRef;
+    // Onyxia (study item 2): the raid tank's first pull of her starts the damage dealers' hold (TurnTaming). Set once per fight, cleared when the tank is out of
+    // combat. Here, not in a later step: a step like TurnOnyxiaCasts can end the turn before TurnTaming runs.
+    if (turn.partyLeaderBot)
+    {
+        if (bot.in_combat == 0)
+            state.OnyxiaPullMs = 0;
+        else if (state.OnyxiaPullMs == 0 && IsOnyxiaRef(bot.threat_target_guid))
+            state.OnyxiaPullMs = nowMs;
+    }
     if (targetRef != 0 && turn.Avoided(targetRef))
         targetRef = 0; // it refused us: the bot does not fight it for now
     if (returningToDungeon)
@@ -479,6 +488,71 @@ BotPolicy::TurnFlow BotPolicy::TurnCrowdControl(DecideTick& tick, BotTurn& turn)
     return TurnFlow::kNext;
 }
 
+// Onyxia, the warrior tank (study items 2 and 6): Berserker Rage on its own 30 s timer while she is up (the fear break), and Taunt when the raid is on her
+// and the tank is not. Onyxia's threat list is not in the snapshot, so "the tank is not her threat target" is read as the tank's own target not being her
+// while another party member is fighting her. Neither spell is cast in the middle of another cast, or inside the global cooldown.
+BotPolicy::TurnFlow BotPolicy::TurnOnyxiaCasts(DecideTick& tick, BotTurn& turn)
+{
+    std::uint64_t nowMs = tick.nowMs;
+    std::vector<BotAction>& actions = tick.actions;
+    BotSnapshot const& bot = turn.bot;
+    BotState& state = turn.state;
+    auto& nearby = turn.nearby;
+    auto const& classId = turn.classId;
+    auto const& partyLeader = turn.partyLeader;
+
+    if (!turn.partyLeaderBot || classId != kWarriorClass || bot.in_combat == 0 || nowMs < state.NextCastMs || IsCasting(bot))
+        return TurnFlow::kNext;
+    NearbyUnit const* boss = nullptr;
+    for (NearbyUnit const& unit : nearby)
+        if (unit.is_hostile && unit.health != 0 && IsOnyxiaRef(unit.guid))
+            boss = &unit;
+    if (boss == nullptr)
+        return TurnFlow::kNext;
+
+    if (nowMs >= state.OnyxiaBerserkerAtMs)
+    {
+        BotAction rage;
+        rage.bot_guid = bot.guid;
+        rage.type = ActionType::kCastSpell;
+        rage.spell_id = kBerserkerRageSpell;
+        rage.target_guid = 0; // self
+        actions.push_back(rage);
+        state.OnyxiaBerserkerAtMs = nowMs + kOnyxiaBerserkerCdMs;
+        state.NextCastMs = nowMs + kGlobalCooldownMs;
+        if (_options.OnEvent)
+            _options.OnEvent("onyxia_rage: bot=" + std::to_string(bot.guid));
+        return TurnFlow::kSkip;
+    }
+
+    if (!IsOnyxiaRef(bot.threat_target_guid) && nowMs >= state.OnyxiaTauntAtMs &&
+        std::hypot(boss->pos_x - bot.pos_x, boss->pos_y - bot.pos_y) <= kOnyxiaTauntYards)
+    {
+        bool raidOnHer = false;
+        tick.ForParty(partyLeader, [&](BotSnapshot const& member)
+        {
+            if (member.guid != bot.guid && member.life_state == 0 && member.in_combat != 0 && IsOnyxiaRef(member.threat_target_guid))
+                raidOnHer = true;
+        });
+        if (raidOnHer)
+        {
+            BotAction taunt;
+            taunt.bot_guid = bot.guid;
+            taunt.type = ActionType::kCastSpell;
+            taunt.spell_id = kTauntSpell;
+            taunt.target_guid = boss->guid;
+            actions.push_back(taunt);
+            state.CastTarget[kTauntSpell] = boss->guid;
+            state.OnyxiaTauntAtMs = nowMs + kOnyxiaTauntCdMs;
+            state.NextCastMs = nowMs + kGlobalCooldownMs;
+            if (_options.OnEvent)
+                _options.OnEvent("onyxia_taunt: bot=" + std::to_string(bot.guid));
+            return TurnFlow::kSkip;
+        }
+    }
+    return TurnFlow::kNext;
+}
+
 BotPolicy::TurnFlow BotPolicy::TurnTaming(DecideTick& tick, BotTurn& turn)
 {
     std::uint64_t nowMs = tick.nowMs;
@@ -490,6 +564,8 @@ BotPolicy::TurnFlow BotPolicy::TurnTaming(DecideTick& tick, BotTurn& turn)
     auto const& lowHealth = turn.lowHealth;
     auto const& classId = turn.classId;
     auto const& routeOn = turn.routeOn;
+    auto const& partyLeader = turn.partyLeader;
+    auto const& partyMember = turn.partyMember;
     std::vector<std::uint32_t> const& huntEntries = *turn.huntEntries;
     auto& dungeonHold = turn.dungeonHold;
     auto& targetUnit = turn.targetUnit;
@@ -538,6 +614,17 @@ BotPolicy::TurnFlow BotPolicy::TurnTaming(DecideTick& tick, BotTurn& turn)
     {
         targetUnit = hostile;
         targetRef = hostile->guid;
+    }
+    // Onyxia threat discipline (study item 2): the damage dealers hold for a short time after the tank's first pull of her (the stamp is set in
+    // TurnTargeting). A healer does not attack anyway.
+    if (!turn.partyLeaderBot && partyMember && IsOnyxiaRef(targetRef) && HealSpellFor(classId, bot.level) == 0 && state.Role_ != BotState::Role::Tank)
+    {
+        auto const tank = _bots.find(partyLeader);
+        if (tank != _bots.end() && tank->second.OnyxiaPullMs != 0 && nowMs < tank->second.OnyxiaPullMs + kOnyxiaPullHoldMs)
+        {
+            targetRef = 0;
+            targetUnit = nullptr;
+        }
     }
     turn.hasTarget = targetRef != 0 && !lowHealth;
     auto& hasTarget = turn.hasTarget;

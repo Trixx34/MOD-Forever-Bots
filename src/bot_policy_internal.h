@@ -59,6 +59,16 @@ constexpr float kAoeKiteRetryDegrees = 30.0f;  // and a kite point the core foun
 constexpr std::uint64_t kHealLosMoveMs = 4000; // after a heal refused for line of sight a healer may leave its stand-off to find the target, for this long
 constexpr std::uint32_t kOnyxianWarderEntry = 12129;
 constexpr std::uint32_t kOnyxiaBossEntry = 10184;   // Onyxia herself, the lair's last boss (data/dungeons/249-onyxias-lair.json)
+constexpr std::uint32_t kBerserkerRageSpell = 18499; // warrior tank: the fear break in Onyxia's phase 3 (study item 6); 30 s cooldown
+constexpr std::uint32_t kTauntSpell = 355;           // warrior tank: re-taunts Onyxia when the raid is on her and the tank is not
+constexpr std::uint64_t kOnyxiaBerserkerCdMs = 30000;
+constexpr std::uint64_t kOnyxiaTauntCdMs = 10000;
+constexpr float kOnyxiaTauntYards = 30.0f;           // Taunt's reach: the tank does not cast it at a farther Onyxia
+constexpr std::uint64_t kOnyxiaPullHoldMs = 3000;    // the raid's damage dealers hold their attacks this long after the tank first gets Onyxia
+inline bool IsOnyxiaRef(std::uint64_t unitRef)
+{
+    return unitRef != 0 && forever_module::UnitRefType(unitRef) == 8 && forever_module::UnitRefEntry(unitRef) == kOnyxiaBossEntry;
+}
 // Explicit stand-off bands from Onyxia (the boss, not the Warder), in yards from her: a bot walks in to Max and kites back out when it is closer than Min. Healers
 // 21-25, ranged 23-29, melee 2-9 (the Karrz repo's RaidEncounterData_ONY). The Warder's Fire Nova (kAoeStandYards) is not in these bands: they are for the boss only.
 struct StandBand

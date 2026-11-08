@@ -14,6 +14,7 @@ namespace
 
 // Tuning values only this file uses (moved from scenario.h; the ones the tests also name stay in the header).
 constexpr char const* kTimeStateNames[] = { "fight", "walk", "dead", "rest", "far", "idle" };
+constexpr std::uint32_t kOnyxiaBossEntry = 10184; // Onyxia, the Onyxia raid's last boss (bot_policy_internal.h): her health is the result's onyxia_hp=
 constexpr std::uint32_t kTimeRestHealthPct = 90;
 constexpr std::uint32_t kTimeRestPowerPct = 95;
 constexpr float kTimeFarYards = 30.0f;
@@ -73,6 +74,7 @@ void ScenarioDirector::Finish(std::string outcome, std::uint64_t nowMs)
     result.BossesTotal = std::uint32_t(_plan.Bosses.size());
     result.BossesKilled = _bossKills;
     result.BossKillMs = _bossKillMs;
+    result.OnyxiaHealthPct = _onyxiaHealthPct;
     result.StateMs = _stateMs;
     for (auto const& [guid, dead] : _everDead)
         if (dead)
@@ -729,6 +731,19 @@ void ScenarioDirector::Decide(forever_module::WorldTickSnapshotView const& view,
                             }
                     }
             }
+            // Onyxia's health (onyxia_hp=): the last sighting by any bot, and 0 for her corpse. Only in the Onyxia raid (her entry is one of the bosses).
+            if (std::any_of(_plan.Bosses.begin(), _plan.Bosses.end(), [](auto const& boss) { return boss.first == kOnyxiaBossEntry; }))
+            {
+                for (std::size_t b = 0; b < bots.size(); ++b)
+                    for (forever_module::NearbyUnit const& unit : view.NearbyOf(b))
+                    {
+                        if (forever_module::UnitRefType(unit.guid) != 8 || forever_module::UnitRefEntry(unit.guid) != kOnyxiaBossEntry)
+                            continue;
+                        if (unit.max_health == 0 && unit.health != 0)
+                            continue;
+                        _onyxiaHealthPct = unit.max_health != 0 ? std::uint32_t(std::uint64_t(unit.health) * 100 / unit.max_health) : 0u;
+                    }
+            }
             // A wipe: the party was revived at the graveyard outside the dungeon. The leader is up and the route is not walkable from here: put the living back at the entry.
             if (leader && leader->life_state == 0 && leader->map_id != _plan.EntryMap)
             {
@@ -868,6 +883,9 @@ std::string FormatScenarioResult(ScenarioResult const& result)
     // 40-man raid support (doc 108): raid=1 groups=<n> for a raid scenario, nothing extra for a dungeon one (acceptance criteria).
     if (result.Raid)
         out << " raid=1 groups=" << result.Groups;
+    // Onyxia's health at the end, in the Onyxia raid only (study item 10); omitted when no bot saw her.
+    if (result.OnyxiaHealthPct)
+        out << " onyxia_hp=" << *result.OnyxiaHealthPct;
     if (result.BossesTotal != 0)
     {
         out << " bosses=" << result.BossesKilled.size() << "/" << result.BossesTotal << " killed=";

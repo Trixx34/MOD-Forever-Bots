@@ -5188,7 +5188,8 @@ void RangedBandHoldsInsideOnyxiaBand()
             AddNearby(view, i, boss);
         }
         float mageAt = -1.0f;
-        for (std::uint64_t at = 1000; at < 3000; at += 100)
+        // Run past the 3 s hold the raid's damage dealers keep after the tank's first pull of Onyxia (OnyxiaPullHoldsTheDamageDealers): the mage kites after it.
+        for (std::uint64_t at = 1000; at < 5000; at += 100)
         {
             view.tick_number = at / 100;
             for (BotAction const& action : policy.Decide(view, at))
@@ -5270,6 +5271,113 @@ void HealerBandStandSkipsAHazard()
         CHECK(std::sqrt(bx * bx + by * by) >= 21.0f && std::sqrt(bx * bx + by * by) <= 25.0f);
     }
     CHECK(found);
+}
+
+// The warrior tank casts Berserker Rage on its own 30 s timer while Onyxia is up: over 40 s of a fight, two casts (at once, and 30 s on).
+void OnyxiaTankBerserkerRageOnATimer()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 3;
+    options.PartyCount = 1;
+    options.WanderWhenIdle = false;
+    options.ClassOf = [](std::uint64_t guid) { return guid == 10 ? 1u : guid == 11 ? 4u : 5u; };   // 10 the warrior tank, 11 a rogue, 12 a priest
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12 }, options.ClassOf);
+    NearbyUnit boss = Hostile(2, 5.0f, 100);
+    boss.guid = MakeUnitRef(8, 10184, 2);
+    for (std::size_t i = 0; i < 3; ++i)
+    {
+        view.bots[i].threat_target_guid = boss.guid;
+        view.bots[i].in_combat = 1;
+        AddNearby(view, i, boss);
+    }
+    int rages = 0;
+    for (std::uint64_t at = 1000; at < 41000; at += 100)
+    {
+        view.tick_number = at / 100;
+        for (BotAction const& action : policy.Decide(view, at))
+            if (action.bot_guid == 10 && action.type == ActionType::kCastSpell && action.spell_id == 18499)
+            {
+                CHECK(action.target_guid == 0);   // on the tank itself
+                ++rages;
+            }
+    }
+    CHECK(rages == 2);
+}
+
+// Taunt (355) on Onyxia: the tank re-taunts when another party member is fighting her and the tank is not, once per 10 s. Not while the tank is on her.
+void OnyxiaTankTauntsWhenTheRaidIsOnHer()
+{
+    for (bool tankOnHer : { false, true })
+    {
+        PolicyOptions options = AggressiveOptions();
+        options.PartySize = 3;
+        options.PartyCount = 1;
+        options.WanderWhenIdle = false;
+        options.ClassOf = [](std::uint64_t guid) { return guid == 10 ? 1u : guid == 11 ? 4u : 5u; };   // 10 the warrior tank, 11 a rogue, 12 a priest
+        BotPolicy policy(options);
+        WorldTickSnapshotView view = PartyView({ 10, 11, 12 }, options.ClassOf);
+        NearbyUnit boss = Hostile(2, 20.0f, 100);
+        boss.guid = MakeUnitRef(8, 10184, 2);
+        NearbyUnit other = Hostile(3, 5.0f, 100);
+        other.guid = MakeUnitRef(8, 12129, 3);
+        view.bots[0].threat_target_guid = tankOnHer ? boss.guid : other.guid;
+        view.bots[1].threat_target_guid = boss.guid;
+        view.bots[2].threat_target_guid = other.guid;
+        for (std::size_t i = 0; i < 3; ++i)
+        {
+            view.bots[i].in_combat = 1;
+            AddNearby(view, i, boss);
+            AddNearby(view, i, other);
+        }
+        int taunts = 0;
+        for (std::uint64_t at = 1000; at < 14000; at += 100)
+        {
+            view.tick_number = at / 100;
+            for (BotAction const& action : policy.Decide(view, at))
+                if (action.bot_guid == 10 && action.type == ActionType::kCastSpell && action.spell_id == 355)
+                {
+                    CHECK(action.target_guid == boss.guid);
+                    ++taunts;
+                }
+        }
+        // The rage at 1 s holds the global cooldown, so the first taunt comes at 2.5 s, the next at 12.5 s (10 s on); none while the tank is on Onyxia.
+        CHECK(taunts == (tankOnHer ? 0 : 2));
+    }
+}
+
+// Threat discipline: the tank's first pull of Onyxia holds the raid's damage dealers for 3 s. Before that the rogue (11) does not attack her; after, it does.
+void OnyxiaPullHoldsTheDamageDealers()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 3;
+    options.PartyCount = 1;
+    options.WanderWhenIdle = false;
+    options.ClassOf = [](std::uint64_t guid) { return guid == 10 ? 1u : guid == 11 ? 4u : 5u; };   // 10 the warrior tank, 11 a rogue, 12 a priest
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12 }, options.ClassOf);
+    NearbyUnit boss = Hostile(2, 5.0f, 100);
+    boss.guid = MakeUnitRef(8, 10184, 2);
+    for (std::size_t i = 0; i < 3; ++i)
+    {
+        view.bots[i].threat_target_guid = boss.guid;
+        view.bots[i].in_combat = 1;
+        AddNearby(view, i, boss);
+    }
+    int rogueEarly = 0, rogueLate = 0, tankAttacks = 0;
+    for (std::uint64_t at = 1000; at < 6000; at += 100)
+    {
+        view.tick_number = at / 100;
+        for (BotAction const& action : policy.Decide(view, at))
+        {
+            if (action.bot_guid == 10 && action.type == ActionType::kAttackTarget)
+                ++tankAttacks;
+            if (action.bot_guid == 11 && action.target_guid == boss.guid)
+                (at < 4000 ? rogueEarly : rogueLate) += 1;        }
+    }
+    CHECK(tankAttacks > 0);
+    CHECK(rogueEarly == 0);
+    CHECK(rogueLate > 0);
 }
 
 // Onyxian Warder (12129): its Fire Nova hits everything within 20 yards, so a ranged raid member backs off to 21+ yards and only the tank melees it, every other member backs off, melee classes too.
@@ -7459,6 +7567,9 @@ int main()
     HealerKitesToOnyxiaBand();
     RangedBandHoldsInsideOnyxiaBand();
     MeleeDoesNotKiteFromOnyxia();
+    OnyxiaTankBerserkerRageOnATimer();
+    OnyxiaTankTauntsWhenTheRaidIsOnHer();
+    OnyxiaPullHoldsTheDamageDealers();
     HealerBandStandSkipsAHazard();
     RaidCasterKitesOutOfWarderNova();
     RaidMemberOnAnotherTargetKitesOutOfWarderNova();
