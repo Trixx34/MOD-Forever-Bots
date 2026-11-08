@@ -328,6 +328,16 @@ BotPolicy::TurnFlow BotPolicy::DeadCorpse(DecideTick& tick, BotTurn& turn)
     return TurnFlow::kNext;
 }
 
+// A live Onyxian Warder within the given reach of a point (its Fire Nova reaches a bot standing there).
+static bool WarderWithin(std::span<NearbyUnit const> units, float x, float y, float yards)
+{
+    for (NearbyUnit const& unit : units)
+        if (IsLiveMob(unit) && forever_module::UnitRefEntry(unit.guid) == kOnyxianWarderEntry &&
+            std::hypot(unit.pos_x - x, unit.pos_y - y) <= yards)
+            return true;
+    return false;
+}
+
 BotPolicy::TurnFlow BotPolicy::DeadHeldByWarder(DecideTick& tick, BotTurn& turn)
 {
     WorldTickSnapshotView const& view = tick.view;
@@ -366,6 +376,15 @@ BotPolicy::TurnFlow BotPolicy::DeadHeldByWarder(DecideTick& tick, BotTurn& turn)
         });
         if (held)
         {
+            // The leader revives a held ghost (the core puts it at the leader's side) when the leader stands outside every live Warder's Fire Nova.
+            // The ghost itself does not walk to its corpse while it is held.
+            auto const leaderAt = indexOf.find(deadParty);
+            if (deadParty != 0 && deadParty != bot.guid && leaderAt != indexOf.end())
+            {
+                BotSnapshot const& leader = view.bots[leaderAt->second];
+                if (!WarderWithin(view.NearbyOf(leaderAt->second), leader.pos_x, leader.pos_y, kFireNovaYards))
+                    DeadReviveByLeader(tick, turn);
+            }
             if (_options.OnEvent && nowMs - state.ReviveHeldLoggedMs >= kReviveWarderLogMs)
             {
                 state.ReviveHeldLoggedMs = nowMs;
