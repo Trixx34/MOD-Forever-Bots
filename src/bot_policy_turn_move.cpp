@@ -23,6 +23,18 @@ void BotPolicy::TurnMoveChoice(DecideTick& tick, BotTurn& turn)
     auto& healLosPoint = turn.healLosPoint;
     auto& kiteEntry = turn.kiteEntry;
 
+    // Diagnostics, one line per bot per 5 s while an Onyxian Warder is near: which branch below the bot takes (flee, kite, heal_los, or the rest).
+    bool const warderLog = static_cast<bool>(_options.OnEvent) && partyMember && aoeWarder != nullptr && nowMs >= state.WarderLogMs + 5000 &&
+                           std::hypot(bot.pos_x - aoeWarder->pos_x, bot.pos_y - aoeWarder->pos_y) < kAoeStandYards + 6.0f;
+    if (warderLog)
+    {
+        state.WarderLogMs = nowMs;
+        _options.OnEvent("warder_near: bot=" + std::to_string(bot.guid) + " dist=" +
+                         std::to_string(int(std::hypot(bot.pos_x - aoeWarder->pos_x, bot.pos_y - aoeWarder->pos_y))) +
+                         " low_health=" + std::to_string(lowHealth ? 1 : 0) + " route_on=" + std::to_string(routeOn ? 1 : 0) +
+                         " party_leader=" + std::to_string(partyLeader) + " in_combat=" + std::to_string(bot.in_combat));
+    }
+
     // A member of a party does not run from the fight on low health: its healer can only heal a tank that holds still, and the pack follows a fleeing bot onto the party.
     // Nor does a bot on a dungeon run (routeOn), grouped or not: the run's pack follows a fleeing bot too.
     if (lowHealth && partyLeader == 0 && !routeOn)
@@ -65,6 +77,7 @@ void BotPolicy::TurnMoveChoice(DecideTick& tick, BotTurn& turn)
         // A kite point that a hazard covers (a ground effect the bot would walk into) is given up for the next one too.
         wanted = Decision{ ActionType::kStop, 0 };
         std::vector<ground_avoid::Circle> const hazards = HazardCircles(_options, bot);
+        bool kiteFound = false;
         for (int retry = 0; retry < 6; ++retry)
         {
             Point const kite = AoeKitePoint(bot, *aoeWarder, retry, kiteEntry);
@@ -77,9 +90,15 @@ void BotPolicy::TurnMoveChoice(DecideTick& tick, BotTurn& turn)
                 wanted = Decision{ ActionType::kMoveTo, 0, kite };
                 moveWhy = "kite";
                 kiteRetry = retry;
+                kiteFound = true;
+                if (warderLog)
+                    _options.OnEvent("kite: bot=" + std::to_string(bot.guid) + " retry=" + std::to_string(retry) + " to=" +
+                                     std::to_string(int(kite.X)) + "," + std::to_string(int(kite.Y)));
                 break;
             }
         }
+        if (!kiteFound && warderLog)
+            _options.OnEvent("kite_none: bot=" + std::to_string(bot.guid) + " all 6 points blocked (no route, refused or hazard)");
     }
     else if (partyMember && bot.in_combat != 0 && nowMs < state.HealLosUntilMs && state.HealLosTarget != 0 && aoeWarder != nullptr && healLosPoint)
     {
