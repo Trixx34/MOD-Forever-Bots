@@ -236,6 +236,12 @@ void BotPolicy::TurnTargeting(DecideTick& tick, BotTurn& turn)
     // combat. Here, not in a later step: a step like TurnOnyxiaCasts can end the turn before TurnTaming runs.
     if (turn.partyLeaderBot)
     {
+        // A dead Onyxian Warder in the leader's view (the core keeps creature corpses in the nearby list): logged once per Warder, the kill measure of the raid runs.
+        for (NearbyUnit const& unit : turn.nearby)
+            if (unit.health == 0 && unit.max_health != 0 && forever_module::UnitRefType(unit.guid) == 8 &&
+                forever_module::UnitRefEntry(unit.guid) == kOnyxianWarderEntry && state.WardersSeenDead.insert(unit.guid).second && _options.OnEvent)
+                _options.OnEvent("warder_dead: leader=" + std::to_string(bot.guid) + " warder=" + std::to_string(unit.guid) + " at=" +
+                                 std::to_string(int(unit.pos_x)) + "," + std::to_string(int(unit.pos_y)) + " leader_in_combat=" + std::to_string(bot.in_combat));
         if (bot.in_combat == 0)
         {
             state.OnyxiaPullMs = 0;

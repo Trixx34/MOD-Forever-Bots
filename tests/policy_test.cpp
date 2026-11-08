@@ -5662,6 +5662,29 @@ void RaidMemberSeesTheWarderInItsLeadersView()
     }
 }
 
+// A dead Warder in the leader's view is logged once (warder_dead), the kill measure of the Onyxia runs.
+void TheLeaderLogsADeadWarderOnce()
+{
+    std::vector<std::string> events;
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 3;
+    options.PartyCount = 1;
+    options.WanderWhenIdle = false;
+    options.ClassOf = [](std::uint64_t guid) { return guid == 10 ? 1u : 8u; };
+    options.OnEvent = [&events](std::string const& text) { events.push_back(text); };
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12 }, options.ClassOf);
+    NearbyUnit warder = Hostile(2, 5.0f, 0);   // a corpse: health 0
+    warder.guid = MakeUnitRef(8, 12129, 2);
+    AddNearby(view, 0, warder);
+    for (std::uint64_t at = 1000; at < 3000; at += 100)
+        policy.Decide(view, at);
+    int lines = 0;
+    for (std::string const& event : events)
+        lines += event.rfind("warder_dead: leader=10", 0) == 0;
+    CHECK(lines == 1);
+}
+
 // The kite point must be somewhere the core can path to. The module has no path query, so the first point is the retreat along the entry route (the line from the Warder
 // toward the dungeon entry, 26 yards out); when the core refuses it, the next point is the circle round the Warder, a different place and not the refused one again.
 void KiteRetreatsAlongTheEntryRouteAndFallsBackToTheCircle()
@@ -7735,6 +7758,7 @@ int main()
     NonTankOutOfCombatKitesWhenWarderIsWithinMargin();
     RaidCasterAtTheWarderStandCastsOnIt();
     RaidMemberSeesTheWarderInItsLeadersView();
+    TheLeaderLogsADeadWarderOnce();
     KiteRetreatsAlongTheEntryRouteAndFallsBackToTheCircle();
     PartyMemberDoesNotFleeOnLowHealth();
     PartyMemberDoesNotChaseAFleeingTarget();
