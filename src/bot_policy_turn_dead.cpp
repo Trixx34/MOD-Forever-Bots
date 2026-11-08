@@ -363,6 +363,10 @@ BotPolicy::TurnFlow BotPolicy::DeadHeldByWarder(DecideTick& tick, BotTurn& turn)
                     return true;
             return false;
         };
+        // The leader's own ghost (the tank) is held only by a Warder at its corpse, not by one near a living member: the members cannot fight a Warder without the
+        // tank, so holding it for them kept the raid tankless for 3-4 min after each of its deaths (2026-11-08 16:41-17:08: bot 1 held 12 of the run's 27 minutes, while
+        // the members stood near Warders they could not kill without it).
+        bool const leaderGhost = deadParty == bot.guid;
         bool held = false;
         tick.ForParty(deadParty, [&](BotSnapshot const& member)
         {
@@ -372,7 +376,7 @@ BotPolicy::TurnFlow BotPolicy::DeadHeldByWarder(DecideTick& tick, BotTurn& turn)
             if (at == indexOf.end())
                 return;
             std::span<NearbyUnit const> const units = view.NearbyOf(at->second);
-            held = warderNear(member, units, bot.corpse_x, bot.corpse_y) || warderNear(member, units, member.pos_x, member.pos_y);
+            held = warderNear(member, units, bot.corpse_x, bot.corpse_y) || (!leaderGhost && warderNear(member, units, member.pos_x, member.pos_y));
         });
         if (held)
         {

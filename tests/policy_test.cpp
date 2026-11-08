@@ -4254,6 +4254,47 @@ void ADeadLeadersGhostRejoinsItsPartyWhenTheFightEnds()
     CHECK(atOnce.has_value() && atOnce->dest_x == 0.0f);
 }
 
+// The leader's own ghost (the tank) is held only by a Warder at its corpse. A Warder near a living member does not hold it: without the tank nobody can fight that Warder
+// (2026-11-08: bot 1 held 3-4 min after each death). A member's ghost is still held by it.
+void ADeadLeadersGhostIsNotHeldByAWarderNearAMember()
+{
+    auto const run = [](float warderX, std::vector<std::string>& events)
+    {
+        PolicyOptions options = DeadOptions(&events);
+        options.DungeonLeaderRejoin = true;
+        options.Route = { Point{ 220.0f, 0.0f, 0.0f } };
+        PolicyOptions::DungeonRoute dungeon;
+        dungeon.HasEntry = true;
+        dungeon.Entry = Point{ 0.0f, 0.0f, 0.0f };
+        options.DungeonsByMap[36] = dungeon;
+        WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 });
+        for (BotSnapshot& bot : v.bots)
+        {
+            bot.map_id = 36;
+            bot.pos_x = 200.0f;
+        }
+        Ghost(v.bots[2], 0.0f, 36, 190.0f);                                // the leader's ghost, outside; its corpse at 190
+        v.bots[2].map_id = 0;
+        Ghost(v.bots[4], 0.0f, 36, 195.0f);                                // a member's ghost (14), its corpse at 195
+        v.bots[4].map_id = 0;
+        NearbyUnit warder = Hostile(2, warderX, 100);
+        warder.guid = MakeUnitRef(8, 12129, 2);
+        for (std::size_t i : { 0, 1, 3 })
+            AddNearby(v, i, warder);
+        BotPolicy policy(options);
+        policy.SetRouteActive(true);
+        return TeleportOf(policy.Decide(v, 40000), 12);   // past the first 30 s, so the hold is logged
+    };
+    std::vector<std::string> events;
+    std::optional<BotAction> const back = run(220.0f, events);             // 20 yards from the members, 30 from the leader's corpse
+    CHECK(back.has_value() && back->spell_id == 36);
+    CHECK(!Logged(events, "revive_held: bot=12"));
+    CHECK(Logged(events, "revive_held: bot=14"));                          // 25 yards from 14's corpse, but 20 from the members: still held
+    std::vector<std::string> atCorpse;
+    CHECK(!run(200.0f, atCorpse).has_value());                             // 10 yards from the leader's corpse: held
+    CHECK(Logged(atCorpse, "revive_held: bot=12"));
+}
+
 // A corpse does not release while a party rezzer is casting its resurrect on it (the 2026-11-07 sim cut 14 casts so), and releases once the cast is over or
 // kRezCastMs past the release delay.
 void ACorpseDoesNotReleaseUnderARunningResurrect()
@@ -5511,7 +5552,7 @@ void NonTankOutOfCombatKitesWhenWarderIsWithinMargin()
     options.ClassOf = [](std::uint64_t guid) { return guid == 10 ? 1u : 8u; };   // 10 the warrior tank, 11 and 12 mages
     BotPolicy policy(options);
     WorldTickSnapshotView view = PartyView({ 10, 11, 12 });
-    NearbyUnit warder = Hostile(2, 28.0f, 100);   // inside the 30 yard margin, outside the 24.5 yard nova
+    NearbyUnit warder = Hostile(2, 25.0f, 100);   // inside the 26 yard margin, outside the 24.5 yard nova
     warder.guid = MakeUnitRef(8, 12129, 2);
     for (std::size_t i = 0; i < 3; ++i)
     {
@@ -5530,7 +5571,7 @@ void NonTankOutOfCombatKitesWhenWarderIsWithinMargin()
             if (action.bot_guid == 11 && move)
             {
                 ++mageKites;
-                CHECK(std::hypot(action.dest_x - warder.pos_x, action.dest_y - warder.pos_y) >= 29.0f);
+                CHECK(std::hypot(action.dest_x - warder.pos_x, action.dest_y - warder.pos_y) >= 25.5f);
             }
         }
     }
@@ -5538,8 +5579,44 @@ void NonTankOutOfCombatKitesWhenWarderIsWithinMargin()
     CHECK(tankKites == 0);
 }
 
+// The tank holds the Warder; a mage standing where the kite puts it (kAoeStandYards, 26) is inside its Fireball's usable reach (30 less the 2-yard slack) and casts it,
+// without kiting further out. At the old 30-yard stand no 30-yard spell was ever cast on a Warder (2026-11-08, 126 fight_stalled at 28-31 yards, Warder at full health).
+void RaidCasterAtTheWarderStandCastsOnIt()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 3;
+    options.PartyCount = 1;
+    options.WanderWhenIdle = false;
+    options.ClassOf = [](std::uint64_t guid) { return guid == 10 ? 1u : 8u; };   // 10 the warrior tank, 11 and 12 mages
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12 }, options.ClassOf);
+    NearbyUnit warder = Hostile(2, 26.0f, 100);
+    warder.guid = MakeUnitRef(8, 12129, 2);
+    for (std::size_t i = 0; i < 3; ++i)
+    {
+        view.bots[i].threat_target_guid = warder.guid;
+        view.bots[i].in_combat = 1;
+        AddNearby(view, i, warder);
+    }
+    view.bots[0].pos_x = 25.0f;   // the tank in melee
+    int fireballs = 0, mageMoves = 0;
+    for (std::uint64_t at = 1000; at < 6000; at += 100)
+    {
+        view.tick_number = at / 100;
+        for (BotAction const& action : policy.Decide(view, at))
+        {
+            if (action.bot_guid == 11 && action.type == ActionType::kCastSpell && action.spell_id == 133 && action.target_guid == warder.guid)
+                ++fireballs;
+            if (action.bot_guid == 11 && action.type == ActionType::kMoveTo)
+                ++mageMoves;
+        }
+    }
+    CHECK(fireballs > 0);
+    CHECK(mageMoves == 0);
+}
+
 // The kite point must be somewhere the core can path to. The module has no path query, so the first point is the retreat along the entry route (the line from the Warder
-// toward the dungeon entry, 30 yards out); when the core refuses it, the next point is the circle round the Warder, a different place and not the refused one again.
+// toward the dungeon entry, 26 yards out); when the core refuses it, the next point is the circle round the Warder, a different place and not the refused one again.
 void KiteRetreatsAlongTheEntryRouteAndFallsBackToTheCircle()
 {
     PolicyOptions options = AggressiveOptions();
@@ -5576,7 +5653,7 @@ void KiteRetreatsAlongTheEntryRouteAndFallsBackToTheCircle()
     Point const retreat = kiteOf(1000, found);
     CHECK(found);
     float const length = std::hypot(retreat.X - warder.pos_x, retreat.Y - warder.pos_y);
-    CHECK(length >= 29.0f && length <= 31.0f);
+    CHECK(length >= 25.0f && length <= 27.0f);
     CHECK((retreat.Y - warder.pos_y) / length < -0.9f);   // toward the entry, within a spread of 25 degrees
 
     view.bots[1].last_action_sequence = 1;
@@ -5585,7 +5662,7 @@ void KiteRetreatsAlongTheEntryRouteAndFallsBackToTheCircle()
     Point const fallback = kiteOf(2000, found);
     CHECK(found);
     CHECK(std::hypot(fallback.X - retreat.X, fallback.Y - retreat.Y) >= 12.0f);   // not the refused place
-    CHECK(std::hypot(fallback.X - warder.pos_x, fallback.Y - warder.pos_y) >= 29.0f);
+    CHECK(std::hypot(fallback.X - warder.pos_x, fallback.Y - warder.pos_y) >= 25.5f);
 
     // A second refusal: the third point is neither of the two refused ones (it used to go back to the first, 91,000 refusals in 15 minutes on 2026-10-30).
     view.bots[1].last_action_sequence = 2;
@@ -7609,6 +7686,7 @@ int main()
     RaidCasterKitesOutOfWarderNova();
     RaidMemberOnAnotherTargetKitesOutOfWarderNova();
     NonTankOutOfCombatKitesWhenWarderIsWithinMargin();
+    RaidCasterAtTheWarderStandCastsOnIt();
     KiteRetreatsAlongTheEntryRouteAndFallsBackToTheCircle();
     PartyMemberDoesNotFleeOnLowHealth();
     PartyMemberDoesNotChaseAFleeingTarget();
@@ -7655,6 +7733,7 @@ int main()
     AFightingMemberPicksNothingOffTheLeash();
     ADeadLeadersCorpseIsRevivedNextToAQuietMember();
     ADeadLeadersGhostRejoinsItsPartyWhenTheFightEnds();
+    ADeadLeadersGhostIsNotHeldByAWarderNearAMember();
     ACorpseDoesNotReleaseUnderARunningResurrect();
 
     if (failures == 0)

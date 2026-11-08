@@ -50,8 +50,10 @@ constexpr float kRangedKiteYards = 12.0f;    // a ranged bot keeps a melee targe
 // Fire Nova (spell 20203) reaches 20 yards from the Warder plus the target's combat reach (1.5), and 2 more while the Warder is moving (23.5 in all); the bot stands
 // there at the centre-to-centre distance below. 21 yards (the first value) left every kiting bot inside the nova. A tuning value: 24-25 is the range to try.
 constexpr float kAoeKiteYards = 24.5f;       // every party member other than the tank keeps an Onyxian Warder this far away
-constexpr float kAoeKiteMarginYards = 5.5f;      // a party member also holds this much beyond kAoeKiteYards, and starts to kite before it is inside the radius, in combat or not
-constexpr float kAoeStandYards = kAoeKiteYards + kAoeKiteMarginYards;   // 30: where a kited bot stands, so a step of the Warder or the bot does not put it back in the nova
+// The stand distance must also be inside the casters' reach: a 30-yard row (Frostbolt, Shadow Bolt, Smite, Lightning Bolt, Wrath) is used to 28 yards (kRangeSlackYards).
+// At 5.5 (a stand of 30) no caster ever cast on a Warder: 2026-11-08 16:40-19:35, 126 fight_stalled at distance 28-31 with the Warder at full health, 0 Warders killed.
+constexpr float kAoeKiteMarginYards = 1.5f;      // a party member also holds this much beyond kAoeKiteYards, and starts to kite before it is inside the radius, in combat or not
+constexpr float kAoeStandYards = kAoeKiteYards + kAoeKiteMarginYards;   // 26: where a kited bot stands, 2.5 outside the nova and 2 inside a 30-yard spell's usable range
 constexpr std::uint32_t kOnyxiaMap = 249;              // Onyxia's Lair
 constexpr float kOnyxiaEntryX = 30.89f, kOnyxiaEntryY = -54.08f, kOnyxiaEntryZ = -5.03f;   // the lair's entry, the way the party came in (known walkable)
 constexpr float kAoeKiteSpreadDegrees = 4.0f;  // each bot takes its own bearing off the Warder, up to 5 steps of this either side of the straight line away
