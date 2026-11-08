@@ -92,7 +92,10 @@ constexpr StandBand kHealerBand{ 21.0f, 25.0f };
 constexpr StandBand kRangedBand{ 23.0f, 29.0f };
 constexpr StandBand kMeleeBand{ 2.0f, 9.0f };
 constexpr float kBandStepDegrees = 15.0f;     // a stand point that a hazard covers is tried this far round the bot's bearing, up to 4 steps either side
-constexpr float kReviveWarderYards = 25.0f;  // a ghost of a dungeon party is not brought back (entrance teleport, leader's revive, corpse reclaim) while a live Warder is this close to its corpse or to a living party member
+// Fire Nova reach from the Warder's centre (see kAoeKiteYards above): a ghost is held only while a live Warder is inside it. The 25-yard hold of 2026-11-08 kept 28 dead bots
+// on the floor 25 yards from a Warder that could not reach them (sim, 14:30-14:52).
+constexpr float kFireNovaYards = 23.5f;
+constexpr float kReviveWarderYards = kFireNovaYards;  // a ghost of a dungeon party is not brought back (entrance teleport, leader's revive, corpse reclaim) while a live Warder is inside the Fire Nova of its corpse or of a living party member
 constexpr std::uint64_t kReviveWarderLogMs = 30000;
 constexpr float kFleeYards = 15.0f;          // below 30% health: flees while a threat is this close
 constexpr std::uint64_t kGlobalCooldownMs = 1500;
