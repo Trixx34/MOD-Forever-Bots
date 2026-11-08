@@ -11,6 +11,7 @@ void BotPolicy::TurnMoveChoice(DecideTick& tick, BotTurn& turn)
     auto const& lowHealth = turn.lowHealth;
     auto const& partyLeader = turn.partyLeader;
     auto const& partyMember = turn.partyMember;
+    auto const& routeOn = turn.routeOn;
     auto& followRef = turn.followRef;
     auto& targetUnit = turn.targetUnit;
     auto& targetRef = turn.targetRef;
@@ -23,7 +24,8 @@ void BotPolicy::TurnMoveChoice(DecideTick& tick, BotTurn& turn)
     auto& kiteEntry = turn.kiteEntry;
 
     // A member of a party does not run from the fight on low health: its healer can only heal a tank that holds still, and the pack follows a fleeing bot onto the party.
-    if (lowHealth && partyLeader == 0)
+    // Nor does a bot on a dungeon run (routeOn), grouped or not: the run's pack follows a fleeing bot too.
+    if (lowHealth && partyLeader == 0 && !routeOn)
     {
         // Below kDisengagePct health: get clear of whatever is close enough to still kill it. In combat that is the threat
         // target; out of combat the closest live hostile is the one to run from, since nothing says yet that it is the target.
