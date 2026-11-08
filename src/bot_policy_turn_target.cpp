@@ -311,6 +311,8 @@ void BotPolicy::TurnTargeting(DecideTick& tick, BotTurn& turn)
         // A leader that has not engaged the target (not in combat: it is still walking to it) and that stands on another level from the bot is not assisted: the
         // bot would stand under it for as long as the leader tried (see OnOtherLevel).
         NearbyUnit const* assist = FindLiveMob(nearby, leaderSnap->threat_target_guid);
+        if (!assist && leaderSnap->in_combat != 0)
+            assist = FindLiveMob(tick.LeaderNearby(partyLeader, bot.map_id), leaderSnap->threat_target_guid);   // in the leader's view only (LeaderNearby)
         if (assist && leaderSnap->in_combat == 0 && bot.in_combat == 0 && OnOtherLevel(bot, *assist))
             assist = nullptr;
         if (assist)
@@ -634,6 +636,11 @@ BotPolicy::TurnFlow BotPolicy::TurnTaming(DecideTick& tick, BotTurn& turn)
         for (NearbyUnit const& unit : nearby)
             if (unit.guid == targetRef)
                 targetUnit = &unit;
+        // The leader's target, seen only in the leader's view (TurnTargeting's assist): the same unit, so the bot's range and kite work from its position.
+        if (!targetUnit && partyMember)
+            for (NearbyUnit const& unit : tick.LeaderNearby(partyLeader, bot.map_id))
+                if (unit.guid == targetRef)
+                    targetUnit = &unit;
     }
     else if (NearbyUnit const* hostile = (dungeonHold || noSelfPull || tameNow || (stagingHold && bot.in_combat == 0)) ? nullptr
                  : PullTarget(bot, nearby, turn.AvoidedFn(), bot.in_combat != 0, huntEntries, routeOn, leashed))
@@ -917,6 +924,32 @@ void BotPolicy::TurnMoveSetup(DecideTick& tick, BotTurn& turn)
                     aoeWarder = &unit;
                 }
             }
+        // None in the bot's own view: a Warder in its leader's (LeaderNearby), which the tank is likely fighting a few yards from the raid.
+        if (!aoeWarder)
+        {
+            for (NearbyUnit const& unit : tick.LeaderNearby(turn.partyLeader, bot.map_id))
+                if (IsLiveMob(unit) && forever_module::UnitRefEntry(unit.guid) == kOnyxianWarderEntry)
+                {
+                    float const away = std::hypot(bot.pos_x - unit.pos_x, bot.pos_y - unit.pos_y);
+                    if (away < nearestWarder)
+                    {
+                        nearestWarder = away;
+                        aoeWarder = &unit;
+                    }
+                }
+            if (aoeWarder && _options.OnEvent && nearestWarder < kAoeStandYards + 6.0f &&
+                (state.WarderUnseenLogMs == 0 || nowMs >= state.WarderUnseenLogMs + 30000))
+            {
+                // What fills the bot's own list instead (the diagnostic for LeaderNearby): players, hostile creatures, other creatures (pets, totems).
+                state.WarderUnseenLogMs = nowMs;
+                int players = 0, hostile = 0, others = 0;
+                for (NearbyUnit const& unit : nearby)
+                    (forever_module::UnitRefType(unit.guid) == 2 ? players : unit.is_hostile ? hostile : others) += 1;
+                _options.OnEvent("warder_unseen: bot=" + std::to_string(bot.guid) + " dist=" + std::to_string(int(nearestWarder)) + " own_nearby=" +
+                                 std::to_string(nearby.size()) + " players=" + std::to_string(players) + " hostile=" + std::to_string(hostile) +
+                                 " other_creatures=" + std::to_string(others));
+            }
+        }
         if (bot.in_combat != 0 && nowMs < state.HealLosUntilMs && state.HealLosTarget != 0 && aoeWarder)
             for (BotSnapshot const& other : view.bots)
                 if (PlayerRef(other.guid) == state.HealLosTarget && other.map_id == bot.map_id)

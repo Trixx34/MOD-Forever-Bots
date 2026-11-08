@@ -635,6 +635,19 @@ struct BotPolicy::DecideTick
     std::unordered_map<std::uint64_t, std::vector<std::uint64_t>>& membersOf;  // leader guid -> the other members
     std::unordered_set<std::uint64_t> const& tankLed;                         // the tanks leading their group ("tank lead")
 
+    // The nearby list of a party's leader when it is online and on the given map, else empty. A member's own list (16 slots: 4 players, then the closest creatures)
+    // can be full of the raid's pets and totems, so a Warder the tank is fighting a few yards away is not in it (2026-11-08 20:03-20:05: 39 members logged no
+    // warder_near while the tank fought one, and none assisted it).
+    std::span<NearbyUnit const> LeaderNearby(std::uint64_t leaderGuid, std::uint32_t mapId) const
+    {
+        if (leaderGuid == 0)
+            return {};
+        auto const at = indexOf.find(leaderGuid);
+        if (at == indexOf.end() || view.bots[at->second].map_id != mapId)
+            return {};
+        return view.NearbyOf(at->second);
+    }
+
     // A leader or inviter reference that is one of this module's bots, as against a human player (both are players to the core).
     bool IsOurBot(std::uint64_t ref) const;
 

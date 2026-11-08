@@ -689,6 +689,7 @@ private:
         std::uint64_t HealLosTarget = 0;                 // party member a heal was refused for line of sight on (unit reference); the healer may move to find it until HealLosUntilMs
         std::uint64_t HealLosUntilMs = 0;
         std::uint64_t WarderLogMs = 0;                   // last time the warder_near / kite diagnostic line was written for this bot (one per 5 s)
+        std::uint64_t WarderUnseenLogMs = 0;             // last time the warder_unseen diagnostic line was written for this bot (one per 30 s)
         std::uint64_t LosRepositionTarget = 0;            // target of a healer DPS cast refused for LoS; move to clear it before retrying
         std::uint64_t HoldLastNotReadyMs = 0;            // the last tick the party was not ready (the pull hold ends after kPullHoldClearMs of readiness)
         std::uint64_t HoldProgressMs = 0;                // 0.44.14: the last tick the party's health plus mana rose during the hold (the kPullHoldMaxMs cap counts from here)

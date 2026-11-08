@@ -5615,6 +5615,53 @@ void RaidCasterAtTheWarderStandCastsOnIt()
     CHECK(mageMoves == 0);
 }
 
+// A member whose own nearby list does not hold the Warder (in the sim it was full of the raid's pets and totems) still sees the one its tank fights, in the
+// tank's list: it assists it from the stand, and it kites when the Warder is inside the nova, the same as with the Warder in its own list.
+void RaidMemberSeesTheWarderInItsLeadersView()
+{
+    for (float warderX : { 26.0f, 10.0f })
+    {
+        std::vector<std::string> events;
+        PolicyOptions options = AggressiveOptions();
+        options.PartySize = 3;
+        options.PartyCount = 1;
+        options.WanderWhenIdle = false;
+        options.ClassOf = [](std::uint64_t guid) { return guid == 10 ? 1u : 8u; };   // 10 the warrior tank, 11 and 12 mages
+        options.OnEvent = [&events](std::string const& text) { events.push_back(text); };
+        BotPolicy policy(options);
+        WorldTickSnapshotView view = PartyView({ 10, 11, 12 }, options.ClassOf);
+        NearbyUnit warder = Hostile(2, warderX, 100);
+        warder.guid = MakeUnitRef(8, 12129, 2);
+        view.bots[0].pos_x = warderX - 1.0f;   // the tank in melee
+        view.bots[0].threat_target_guid = warder.guid;
+        view.bots[0].in_combat = 1;
+        AddNearby(view, 0, warder);           // only the tank's list holds it
+        int fireballs = 0, kites = 0;
+        for (std::uint64_t at = 1000; at < 6000; at += 100)
+        {
+            view.tick_number = at / 100;
+            for (BotAction const& action : policy.Decide(view, at))
+            {
+                if (action.bot_guid == 11 && action.type == ActionType::kCastSpell && action.spell_id == 133 && action.target_guid == warder.guid)
+                    ++fireballs;
+                if (action.bot_guid == 11 && action.type == ActionType::kMoveTo && action.target_guid == 0)
+                {
+                    ++kites;
+                    CHECK(std::hypot(action.dest_x - warder.pos_x, action.dest_y - warder.pos_y) >= 25.5f);
+                }
+            }
+        }
+        if (warderX == 26.0f)
+        {
+            CHECK(fireballs > 0);
+            CHECK(kites == 0);
+        }
+        else
+            CHECK(kites > 0);
+        CHECK(Logged(events, "warder_unseen: bot=11"));
+    }
+}
+
 // The kite point must be somewhere the core can path to. The module has no path query, so the first point is the retreat along the entry route (the line from the Warder
 // toward the dungeon entry, 26 yards out); when the core refuses it, the next point is the circle round the Warder, a different place and not the refused one again.
 void KiteRetreatsAlongTheEntryRouteAndFallsBackToTheCircle()
@@ -7687,6 +7734,7 @@ int main()
     RaidMemberOnAnotherTargetKitesOutOfWarderNova();
     NonTankOutOfCombatKitesWhenWarderIsWithinMargin();
     RaidCasterAtTheWarderStandCastsOnIt();
+    RaidMemberSeesTheWarderInItsLeadersView();
     KiteRetreatsAlongTheEntryRouteAndFallsBackToTheCircle();
     PartyMemberDoesNotFleeOnLowHealth();
     PartyMemberDoesNotChaseAFleeingTarget();
