@@ -4254,11 +4254,12 @@ void ADeadLeadersGhostRejoinsItsPartyWhenTheFightEnds()
     CHECK(atOnce.has_value() && atOnce->dest_x == 0.0f);
 }
 
-// The leader's own ghost (the tank) is held only by a Warder at its corpse. A Warder near a living member does not hold it: without the tank nobody can fight that Warder
-// (2026-11-08: bot 1 held 3-4 min after each death). A member's ghost is still held by it.
+// The leader's own ghost (the tank) is never held by a Warder, near a living member or near its corpse: without the tank nobody can fight that Warder (2026-11-08: bot 1
+// held 3-4 min after each death; bot 121 held 46 min by a Warder at its corpse). A member's ghost is still held. The leader comes back next to a member with no Warder
+// inside its Fire Nova reach, even one farther from the corpse.
 void ADeadLeadersGhostIsNotHeldByAWarderNearAMember()
 {
-    auto const run = [](float warderX, std::vector<std::string>& events)
+    auto const run = [](float warderX, std::vector<std::string>& events, bool clearMember = false)
     {
         PolicyOptions options = DeadOptions(&events);
         options.DungeonLeaderRejoin = true;
@@ -4280,7 +4281,10 @@ void ADeadLeadersGhostIsNotHeldByAWarderNearAMember()
         NearbyUnit warder = Hostile(2, warderX, 100);
         warder.guid = MakeUnitRef(8, 12129, 2);
         for (std::size_t i : { 0, 1, 3 })
-            AddNearby(v, i, warder);
+            if (!(clearMember && i == 3))
+                AddNearby(v, i, warder);
+        if (clearMember)
+            v.bots[3].pos_x = 300.0f;                                      // 13: 100 yards off, no Warder in its view
         BotPolicy policy(options);
         policy.SetRouteActive(true);
         return TeleportOf(policy.Decide(v, 40000), 12);   // past the first 30 s, so the hold is logged
@@ -4291,8 +4295,12 @@ void ADeadLeadersGhostIsNotHeldByAWarderNearAMember()
     CHECK(!Logged(events, "revive_held: bot=12"));
     CHECK(Logged(events, "revive_held: bot=14"));                          // 25 yards from 14's corpse, but 20 from the members: still held
     std::vector<std::string> atCorpse;
-    CHECK(!run(200.0f, atCorpse).has_value());                             // 10 yards from the leader's corpse: held
-    CHECK(Logged(atCorpse, "revive_held: bot=12"));
+    std::optional<BotAction> const fromCorpse = run(200.0f, atCorpse);     // 10 yards from the leader's corpse: not held either
+    CHECK(fromCorpse.has_value() && fromCorpse->spell_id == 36);
+    CHECK(!Logged(atCorpse, "revive_held: bot=12"));
+    std::vector<std::string> clear;
+    std::optional<BotAction> const toClear = run(200.0f, clear, true);     // the members by the corpse stand in the Warder: the clear one, farther off
+    CHECK(toClear.has_value() && toClear->dest_x == 300.0f);
 }
 
 // A corpse does not release while a party rezzer is casting its resurrect on it (the 2026-11-07 sim cut 14 casts so), and releases once the cast is over or

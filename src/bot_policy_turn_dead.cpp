@@ -363,20 +363,21 @@ BotPolicy::TurnFlow BotPolicy::DeadHeldByWarder(DecideTick& tick, BotTurn& turn)
                     return true;
             return false;
         };
-        // The leader's own ghost (the tank) is held only by a Warder at its corpse, not by one near a living member: the members cannot fight a Warder without the
-        // tank, so holding it for them kept the raid tankless for 3-4 min after each of its deaths (2026-11-08 16:41-17:08: bot 1 held 12 of the run's 27 minutes, while
-        // the members stood near Warders they could not kill without it).
+        // The leader's own ghost (the tank) is never held. It does not come back at its corpse: DungeonLeaderRejoin puts it next to a living member away from the
+        // Warders (LeaderRejoinMember), or the entry teleport at the entrance. The members cannot fight a Warder without the tank, so holding it kept the raid
+        // tankless: by a Warder near a member, 3-4 min after each death (2026-11-08 16:41-17:08, 12 of the run's 27 minutes); by a Warder near its corpse, from
+        // 21:22 to the end of the run (bot 121, 46 min, route stopped at 22/24 with 37 of 40 members alive and idle at the entry).
         bool const leaderGhost = deadParty == bot.guid;
         bool held = false;
         tick.ForParty(deadParty, [&](BotSnapshot const& member)
         {
-            if (held || member.life_state != 0)
+            if (held || leaderGhost || member.life_state != 0)
                 return;
             auto const at = indexOf.find(member.guid);
             if (at == indexOf.end())
                 return;
             std::span<NearbyUnit const> const units = view.NearbyOf(at->second);
-            held = warderNear(member, units, bot.corpse_x, bot.corpse_y) || (!leaderGhost && warderNear(member, units, member.pos_x, member.pos_y));
+            held = warderNear(member, units, bot.corpse_x, bot.corpse_y) || warderNear(member, units, member.pos_x, member.pos_y);
         });
         if (held)
         {

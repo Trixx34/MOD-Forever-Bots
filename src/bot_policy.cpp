@@ -630,15 +630,25 @@ std::string BotPolicy::RouteYardsField(BotTurn const& turn) const
 
 BotSnapshot const* BotPolicy::LeaderRejoinMember(DecideTick const& tick, std::uint64_t leaderGuid, std::uint32_t mapId, float x, float y) const
 {
+    // A member with a live Onyxian Warder inside its Fire Nova reach is passed over while another one is clear: the leader came back at half health next to
+    // the member nearest its corpse, in the Warder that had killed it, and died 10 s later (2026-11-08 21:22:05, bot 121 next to 150).
     BotSnapshot const* best = nullptr;
+    bool bestClear = false;
     float bestDistance = std::numeric_limits<float>::max();
     tick.ForEachPartyMember(leaderGuid, [&](BotSnapshot const& member)
     {
         if (member.guid == leaderGuid || member.life_state != 0 || member.in_combat != 0 || member.map_id != mapId)
             return;
+        bool clear = true;
+        if (auto const at = tick.indexOf.find(member.guid); at != tick.indexOf.end())
+            for (NearbyUnit const& unit : tick.view.NearbyOf(at->second))
+                if (IsLiveMob(unit) && forever_module::UnitRefEntry(unit.guid) == kOnyxianWarderEntry &&
+                    std::hypot(unit.pos_x - member.pos_x, unit.pos_y - member.pos_y) <= kFireNovaYards)
+                    clear = false;
         float const distance = std::hypot(member.pos_x - x, member.pos_y - y);
-        if (distance < bestDistance)
+        if ((clear && !bestClear) || (clear == bestClear && distance < bestDistance))
         {
+            bestClear = clear;
             bestDistance = distance;
             best = &member;
         }
