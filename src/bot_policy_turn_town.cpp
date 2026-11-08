@@ -959,6 +959,31 @@ void BotPolicy::TurnSendMove(DecideTick& tick, BotTurn& turn)
     auto& aoeWarder = turn.aoeWarder;
     auto& kiteEntry = turn.kiteEntry;
 
+    // Stacking: a follower that stands on a lower-guid bot of its map (both out of combat) steps about 2.5 yards off, so bots do not stand
+    // inside each other. Only the higher guid steps, so one of the two stays put; a party leader (partyLeader 0) never steps, it holds its
+    // point. Idle bots only: a walk to a point is the policy's own choice.
+    if (wanted.Type == ActionType::kStop && turn.partyLeader != 0 && bot.in_combat == 0 && !turn.hasTarget &&
+        !turn.enemyNear && scenario.RouteMap == 0 && !turn.routeOn && !turn.routeBusy && !turn.dungeonHold && bot.life_state == 0)
+    {
+        constexpr float kStackYards = 1.5f;
+        constexpr float kStepYards = 2.5f;
+        for (BotSnapshot const& other : tick.view.bots)
+        {
+            if (other.guid >= bot.guid || other.life_state != 0 || other.map_id != bot.map_id)
+                continue;
+            float const dx = bot.pos_x - other.pos_x;
+            float const dy = bot.pos_y - other.pos_y;
+            float const dist = std::sqrt(dx * dx + dy * dy);
+            if (dist >= kStackYards)
+                continue;
+            float ux = dist > 0.0f ? dx / dist : std::cos(float(bot.guid % 360) * 0.0174533f);
+            float uy = dist > 0.0f ? dy / dist : std::sin(float(bot.guid % 360) * 0.0174533f);
+            Point const step{ bot.pos_x + ux * kStepYards, bot.pos_y + uy * kStepYards, bot.pos_z };
+            wanted = Decision{ ActionType::kMoveTo, 0, step };
+            break;
+        }
+    }
+
     // PathJitter: a plain walk (not a kite, a flee or a dungeon route) ends a little to one side of the target. Out of combat only.
     if (_options.PathJitter.Enabled && wanted.Type == ActionType::kMoveTo && bot.in_combat == 0 && !turn.hasTarget && !turn.enemyNear && partyLeader == 0 &&
         scenario.RouteMap == 0 && !turn.routeBusy && !turn.dungeonHold && !state.TankLead && _options.DungeonsByMap.count(bot.map_id) == 0 &&
