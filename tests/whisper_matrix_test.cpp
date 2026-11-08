@@ -152,6 +152,24 @@ void PolicyIsSilentWhenOffAndKeepsTheOldRepliesOtherwise()
 
 }  // namespace
 
+void PolicyTalkSpecsByWhisper()
+{
+    // A mage (class 8): "talents spec list" names its specs, "talents spec <key>" plays one, anything else is refused. One player per
+    // command: the shared limiter allows a player one answer per bot every ten minutes.
+    PolicyOptions options = Options(false, true);
+    options.ClassOf = [](std::uint64_t) { return 8u; };
+    BotPolicy policy(options);
+    auto const view = View(Bot());
+    auto replies = policy.ApplyWhisper(view, 91, 7, "talents spec list", 1000);
+    CHECK(replies.size() == 1 && replies[0].Text.find("arcane") != std::string::npos && replies[0].Text.find("frost") != std::string::npos);
+    replies = policy.ApplyWhisper(view, 92, 7, "Talents Spec Fire", 1000);
+    CHECK(replies.size() == 1 && replies[0].Text.rfind("Playing fire", 0) == 0);
+    replies = policy.ApplyWhisper(view, 93, 7, "talents spec list", 1000);
+    CHECK(replies.size() == 1 && replies[0].Text.find("fire (current)") != std::string::npos);
+    replies = policy.ApplyWhisper(view, 94, 7, "talents spec bogus", 1000);
+    CHECK(replies.size() == 1 && replies[0].Text.rfind("No spec bogus", 0) == 0);
+}
+
 int main()
 {
     KeywordsMatchWholeWords();
@@ -162,6 +180,7 @@ int main()
     TheShippedFileParsesAndCoversEveryKeyword();
     PolicyAnswersFromTheMatrix();
     PolicyIsSilentWhenOffAndKeepsTheOldRepliesOtherwise();
+    PolicyTalkSpecsByWhisper();
     if (failures == 0)
         std::printf("whisper_matrix_test: all passed\n");
     return failures == 0 ? 0 : 1;

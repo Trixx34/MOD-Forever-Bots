@@ -108,6 +108,8 @@ std::vector<Row> const* RowsFor(RotationData const& data, std::uint32_t classId,
 //   tank: warrior prot, paladin prot, druid feral_tank; healer: priest holy, paladin holy, shaman resto, druid resto;
 //   dps: warrior arms, paladin ret, hunter bm, rogue combat, priest shadow, shaman enh, mage arcane, warlock demonology, druid feral_cat. Empty for a class with no such role.
 std::uint32_t SpecRole(std::uint32_t classId, std::string const& spec);
+// Every spec key the class has, in table order (empty for an unknown class).
+std::vector<std::string> SpecKeysFor(std::uint32_t classId);
 std::string DefaultSpec(std::uint32_t classId, std::uint32_t role);
 
 // What a spec wants from its gear, as a small id the core's autogear scoring turns into a stat list (ModuleBotActions.cpp's

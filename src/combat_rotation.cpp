@@ -170,6 +170,15 @@ std::uint32_t SpecRole(std::uint32_t classId, std::string const& spec)
     return 0;
 }
 
+std::vector<std::string> SpecKeysFor(std::uint32_t classId)
+{
+    std::vector<std::string> keys;
+    for (SpecInfo const& info : kSpecs)
+        if (info.ClassId == classId)
+            keys.push_back(info.Key);
+    return keys;
+}
+
 std::string DefaultSpec(std::uint32_t classId, std::uint32_t role)
 {
     for (SpecInfo const& info : kSpecs)

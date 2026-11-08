@@ -700,6 +700,7 @@ private:
         std::uint32_t TalentRole = 0;
         std::uint32_t TalentSpec = 0;     // the spec the last talent order carried (a changed spec orders again)
         std::uint64_t RespecNotBeforeMs = 0; // no respec for this bot before this time (TalentRespec: one an hour)
+        std::string SpecOverride;         // a whisper "talents spec <key>": the spec this bot plays, instead of the roster's
         std::uint64_t TalentRetryMs = 0;                 // no talent order before this time (after a refusal)
         // TurnSocial: one order at a time (SocialBusyUntilMs), and the state of each feature.
         std::uint64_t SocialBusyUntilMs = 0;             // an order is in flight until this time or until its outcome arrives

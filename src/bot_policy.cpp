@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "bot_policy_internal.h"
+#include "text_case.h"
 
 
 bool BotPolicy::SafeToLogOut(BotSnapshot const& bot) const
@@ -84,6 +85,31 @@ std::vector<BotPolicy::WhisperReply> BotPolicy::ApplyWhisper(WorldTickSnapshotVi
         if (!_options.WhisperReplies)
             return {};
     }
+    // Talent specs by whisper: "talents spec list" names the specs this bot's class has; "talents spec <key>" makes that spec the one the bot
+    // plays and orders talents for. The talent order spends what the points allow in it (the core takes nothing back without TalentRespec).
+    auto const trim = [](std::string s)
+    {
+        s.erase(0, s.find_first_not_of(" \t"));
+        s.erase(s.find_last_not_of(" \t") + 1);
+        return s;
+    };
+    std::string const cmd = trim(text_case::ToLower(text));
+    if (cmd.rfind("talents spec", 0) == 0 && (cmd.size() == 12 || cmd[12] == ' '))
+    {
+        if (!_whispers.Allow(player, bot, nowMs))
+            return {};
+        std::string const arg = trim(cmd.size() > 12 ? cmd.substr(12) : std::string());
+        std::uint32_t const classId = ClassFor(_options, bot);
+        std::string list;
+        for (std::string const& key : rotation::SpecKeysFor(classId))
+            list += (list.empty() ? "" : ", ") + key + (key == SpecFor(bot, classId) ? " (current)" : "");
+        if (arg.empty() || arg == "list")
+            return { WhisperReply{ bot, player, ClampReply("Specs: " + list + ". Say: talents spec <name>") } };
+        if (rotation::SpecRole(classId, arg) == 0)
+            return { WhisperReply{ bot, player, ClampReply("No spec " + arg + ". Specs: " + list) } };
+        StateOf(bot).SpecOverride = arg;
+        return { WhisperReply{ bot, player, ClampReply("Playing " + arg + " from now on; I'll spend the talent points I can in it.") } };
+    }
     WhisperIntent const intent = ClassifyWhisper(text);
     if (!_options.WhisperReplies || intent == WhisperIntent::Other || (!allowed && !_whispers.Allow(player, bot, nowMs)))
         return {};
@@ -144,6 +170,8 @@ std::span<rotation::Row const> BotPolicy::RowsFor(std::uint32_t classId, std::st
 
 std::string BotPolicy::SpecFor(std::uint64_t botGuid, std::uint32_t classId) const
 {
+    if (auto const known = _bots.find(botGuid); known != _bots.end() && !known->second.SpecOverride.empty())
+        return known->second.SpecOverride;
     if (_options.SpecOf)
         if (std::string spec = _options.SpecOf(botGuid); !spec.empty())
             return spec;
