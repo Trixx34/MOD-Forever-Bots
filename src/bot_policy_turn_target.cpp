@@ -237,9 +237,35 @@ void BotPolicy::TurnTargeting(DecideTick& tick, BotTurn& turn)
     if (turn.partyLeaderBot)
     {
         if (bot.in_combat == 0)
+        {
             state.OnyxiaPullMs = 0;
-        else if (state.OnyxiaPullMs == 0 && IsOnyxiaRef(bot.threat_target_guid))
-            state.OnyxiaPullMs = nowMs;
+            state.OnyxiaPhase = 0;
+            state.OnyxiaLandedMs = 0;
+            state.OnyxiaTankOnHer = false;
+        }
+        else
+        {
+            if (state.OnyxiaPullMs == 0 && IsOnyxiaRef(bot.threat_target_guid))
+                state.OnyxiaPullMs = nowMs;
+            state.OnyxiaTankOnHer = IsOnyxiaRef(bot.threat_target_guid);
+            // Onyxia's phase by her health: logged on each change, and the landing (40%) is stamped once per fight.
+            for (NearbyUnit const& unit : turn.nearby)
+            {
+                if (!unit.is_hostile || unit.health == 0 || unit.max_health == 0 || !IsOnyxiaRef(unit.guid))
+                    continue;
+                int const phase = OnyxiaPhaseOf(100.0f * static_cast<float>(unit.health) / static_cast<float>(unit.max_health));
+                if (phase != state.OnyxiaPhase)
+                {
+                    state.OnyxiaPhase = phase;
+                    if (phase == 3 && state.OnyxiaLandedMs == 0)
+                        state.OnyxiaLandedMs = nowMs;
+                    if (_options.OnEvent)
+                        _options.OnEvent("onyxia_phase: phase=" + std::to_string(phase) + " pct=" +
+                            std::to_string(static_cast<int>(100.0f * static_cast<float>(unit.health) / static_cast<float>(unit.max_health))));
+                }
+                break;
+            }
+        }
     }
     if (targetRef != 0 && turn.Avoided(targetRef))
         targetRef = 0; // it refused us: the bot does not fight it for now
@@ -620,7 +646,9 @@ BotPolicy::TurnFlow BotPolicy::TurnTaming(DecideTick& tick, BotTurn& turn)
     if (!turn.partyLeaderBot && partyMember && IsOnyxiaRef(targetRef) && HealSpellFor(classId, bot.level) == 0 && state.Role_ != BotState::Role::Tank)
     {
         auto const tank = _bots.find(partyLeader);
-        if (tank != _bots.end() && tank->second.OnyxiaPullMs != 0 && nowMs < tank->second.OnyxiaPullMs + kOnyxiaPullHoldMs)
+        // After her landing (40%) the damage dealers hold until the tank has her again: her threat list was reset (study item 2).
+        if (tank != _bots.end() && ((tank->second.OnyxiaPullMs != 0 && nowMs < tank->second.OnyxiaPullMs + kOnyxiaPullHoldMs) ||
+            (tank->second.OnyxiaLandedMs != 0 && !tank->second.OnyxiaTankOnHer)))
         {
             targetRef = 0;
             targetUnit = nullptr;

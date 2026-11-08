@@ -65,6 +65,17 @@ constexpr std::uint64_t kOnyxiaBerserkerCdMs = 30000;
 constexpr std::uint64_t kOnyxiaTauntCdMs = 10000;
 constexpr float kOnyxiaTauntYards = 30.0f;           // Taunt's reach: the tank does not cast it at a farther Onyxia
 constexpr std::uint64_t kOnyxiaPullHoldMs = 3000;    // the raid's damage dealers hold their attacks this long after the tank first gets Onyxia
+// Onyxia's phases by her health (the study's item 3; the snapshot has no aura or spell id on a unit, so the Hover aura and the Deep Breath spell are not read):
+// phase 1 on the ground above 65%, phase 2 in the air from 65% to 40%, phase 3 on the ground from 40% down. She lands at 40%: her threat list resets, so the
+// damage dealers stop until the tank has her again (study item 2).
+constexpr float kOnyxiaFlyPct = 65.0f;
+constexpr float kOnyxiaLandPct = 40.0f;
+inline int OnyxiaPhaseOf(float pct)
+{
+    if (pct > kOnyxiaFlyPct) return 1;
+    if (pct > kOnyxiaLandPct) return 2;
+    return 3;
+}
 inline bool IsOnyxiaRef(std::uint64_t unitRef)
 {
     return unitRef != 0 && forever_module::UnitRefType(unitRef) == 8 && forever_module::UnitRefEntry(unitRef) == kOnyxiaBossEntry;

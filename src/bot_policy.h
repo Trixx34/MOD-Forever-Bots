@@ -477,6 +477,9 @@ private:
         std::uint64_t OnyxiaPullMs = 0;                  // the raid's tank: when it first got Onyxia as its threat target in this fight (0 = not on her, or out of combat)
         std::uint64_t OnyxiaBerserkerAtMs = 0;           // Berserker Rage (the warrior tank): no cast before this
         std::uint64_t OnyxiaTauntAtMs = 0;               // Taunt on Onyxia (the warrior tank): no cast before this
+        int OnyxiaPhase = 0;                             // the raid's tank: Onyxia's phase by her health (0 = not seen in this fight)
+        std::uint64_t OnyxiaLandedMs = 0;                // the raid's tank: when she was first seen at 40% or below in this fight (0 = not landed)
+        bool OnyxiaTankOnHer = false;                    // the raid's tank: its threat target is her now (read by the damage dealers' landing hold)
         std::map<std::pair<std::uint32_t, std::uint64_t>, std::uint64_t> BuffUntilMs; // (spell, recipient reference; 0 = the bot itself) -> when the buff runs out
         std::unordered_map<std::uint32_t, Dot> Dots;     // spell -> effect on a target, while it lasts
         std::optional<std::uint64_t> LastTestCastTick;

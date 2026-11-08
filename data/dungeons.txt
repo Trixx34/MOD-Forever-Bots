@@ -675,15 +675,31 @@ roster 2:1,5:5,8:8,2:9,5:4
 staging 1 -4753.31 -3752.42 48.2
 portal 1 -4750.4 -3754.4 49
 entry 249 30.89 -54.08 -5.03
-duration 1800
+duration 3600
 wipe_recovery 300
-# Standoff points: each is 36 yards short of an Onyxian Warder spawn (12129, Fire Nova 20 yards + reach), on the line from the previous spawn. The route no longer
-# walks onto the spawns: the leader pulls from here and the party, which trails it, stays out of the nova (2026-10-29 wipe).
-go 39.1 -80.2 -13.4
-go -14.4 -104.0 -33.5
-go -98.8 -121.8 -47.0
-go -150.2 -165.8 -59.3
-go -170.3 -195.7 -66.4
+go 31.5 -93.6 -14.6
+go 34.1 -106.7 -20.4
+go 46.7 -106.7 -23.6
+go 48.3 -96.0 -24.2
+go 42.7 -85.3 -25.8
+go 41.1 -82.4 -25.8    # stand-off 1 (shipped point 39.1 -80.2 -13.4 is 12 yd above the floor, off the mesh): Warder 20052050 patrols 46..52, -77..-115
+go 30.1 -78.9 -28.4
+go 18.9 -77.9 -25.8
+go 4.0 -81.9 -24.7
+go -14.4 -104.0 -29.2    # stand-off 2: Warder 20052049 patrols -52..-102, -98..-113
+go -59.5 -104.0 -37.5
+go -82.4 -105.9 -35.4
+go -92.8 -112.5 -38.0
+go -100.9 -119.3 -41.7    # stand-off 3: Warder 20052052 patrols -113..-170, -122..-174
+go -161.1 -168.3 -58.6
+go -163.2 -177.1 -63.4
+go -150.7 -176.3 -60.2
+go -149.3 -166.4 -55.9    # stand-off 4: Warder 20052048 patrols -142..-169, -181..-213
+go -150.7 -176.3 -60.2
+go -170.3 -195.7 -66.2    # shipped point 5 is the SPAWN of the patrolling Warder 20052048 (not a stand-off); the stationary Warder 20052053 stands 32 yd on, at -199.1 -209.8
+go -153.1 -205.3 -66.0
+go -124.0 -215.0 -71.1    # chamber mouth: regroup, rest to full (120 yd from Onyxia, outside her 58; nearest egg 26 yd)
+go -0.9 -217.2 -86.0    # tank spot, north of her spawn: she turns to face north (breath and buffet at the wall), tail to the south
 boss 10184 -4.9 -217.2 -86.7 Onyxia
 end
 dungeon rol

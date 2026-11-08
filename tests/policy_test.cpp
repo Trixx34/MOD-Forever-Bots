@@ -5380,6 +5380,40 @@ void OnyxiaPullHoldsTheDamageDealers()
     CHECK(rogueLate > 0);
 }
 
+// Phases and the landing (study items 2 and 3): at 40% Onyxia lands and her threat list resets, so the damage dealers hold until the tank has her again.
+// The rogue (11) does not attack her while the tank (10) is off her, and does once the tank takes her at 3 s; the phase is read from her health.
+void OnyxiaLandingHoldsDamageDealersUntilTankHasHer()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 3;
+    options.PartyCount = 1;
+    options.WanderWhenIdle = false;
+    options.ClassOf = [](std::uint64_t guid) { return guid == 10 ? 1u : guid == 11 ? 4u : 5u; };
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12 }, options.ClassOf);
+    NearbyUnit boss = Hostile(2, 5.0f, 35);   // landed: 35% of her health
+    boss.guid = MakeUnitRef(8, 10184, 2);
+    for (std::size_t i = 0; i < 3; ++i)
+    {
+        view.bots[i].in_combat = 1;
+        AddNearby(view, i, boss);
+    }
+    int rogueEarly = 0, rogueLate = 0;
+    for (std::uint64_t at = 1000; at < 9000; at += 100)
+    {
+        view.tick_number = at / 100;
+        view.bots[0].threat_target_guid = at >= 3000 ? boss.guid : 0;   // the tank takes her again at 3 s
+        view.bots[1].threat_target_guid = boss.guid;
+        for (BotAction const& action : policy.Decide(view, at))
+        {
+            if (action.bot_guid == 11 && action.target_guid == boss.guid)
+                (at < 3000 ? rogueEarly : rogueLate) += 1;
+        }
+    }
+    CHECK(rogueEarly == 0);
+    CHECK(rogueLate > 0);
+}
+
 // Onyxian Warder (12129): its Fire Nova hits everything within 20 yards, so a ranged raid member backs off to 21+ yards and only the tank melees it, every other member backs off, melee classes too.
 void RaidCasterKitesOutOfWarderNova()
 {
@@ -7570,6 +7604,7 @@ int main()
     OnyxiaTankBerserkerRageOnATimer();
     OnyxiaTankTauntsWhenTheRaidIsOnHer();
     OnyxiaPullHoldsTheDamageDealers();
+    OnyxiaLandingHoldsDamageDealersUntilTankHasHer();
     HealerBandStandSkipsAHazard();
     RaidCasterKitesOutOfWarderNova();
     RaidMemberOnAnotherTargetKitesOutOfWarderNova();
