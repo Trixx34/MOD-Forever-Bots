@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "quest_data.h"
 
+#include <algorithm>
 #include <charconv>
 #include <cstdlib>
 #include <fstream>
+#include <set>
 #include <sstream>
 
 namespace
@@ -176,8 +178,22 @@ QuestData LoadQuestData(std::string const& path, std::vector<std::string>& warni
     std::ifstream file(path);
     if (!file)
     {
-        warnings.push_back("quest file " + path + " cannot be read; quests are off.");
+        warnings.push_back("quest file " + path + " cannot be read; no quests from it.");
         return {};
     }
     return ParseQuestData(file, warnings);
+}
+
+void MergeQuestData(QuestData& base, QuestData const& extra)
+{
+    std::set<std::uint32_t> ids;
+    for (QuestStartDef const& start : extra.Starts)
+        for (QuestDef const& quest : start.Quests)
+            ids.insert(quest.Id);
+    for (QuestStartDef& start : base.Starts)
+        start.Quests.erase(std::remove_if(start.Quests.begin(), start.Quests.end(), [&](QuestDef const& quest) { return ids.count(quest.Id) != 0; }),
+                           start.Quests.end());
+    base.Starts.erase(std::remove_if(base.Starts.begin(), base.Starts.end(), [](QuestStartDef const& start) { return start.Quests.empty(); }),
+                      base.Starts.end());
+    base.Starts.insert(base.Starts.end(), extra.Starts.begin(), extra.Starts.end());
 }

@@ -946,5 +946,7 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
         settings.GrindFile = it->second;
     if (auto const it = config.find("QuestFile"); it != config.end())
         settings.QuestFile = it->second;
+    if (auto const it = config.find("AttunementFile"); it != config.end())
+        settings.AttunementFile = it->second;
     return settings;
 }

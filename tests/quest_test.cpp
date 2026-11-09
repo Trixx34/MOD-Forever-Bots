@@ -6,6 +6,7 @@
 
 #include <cstdio>
 #include <memory>
+#include <set>
 #include <sstream>
 #include <string>
 
@@ -812,6 +813,74 @@ void TrainerVisitWaitsForTheReadingDelay()
     CHECK(later && at - 1000 >= 3000 && at - 1000 <= 12500);
 }
 
+// The Onyxia's Lair attunement (data/attunement_quests.txt): the solo Alliance part, level 60, merged over the world file's quests.
+std::string AttunementPath()
+{
+    return std::string(FOREVER_BOTS_DATA_DIR) + "/attunement_quests.txt";
+}
+
+void AttunementFileIsTheSoloAllianceChain()
+{
+    std::vector<std::string> warnings;
+    QuestData const data = LoadQuestData(AttunementPath(), warnings);
+    CHECK(warnings.empty());
+    CHECK(data.Starts.size() == 4);
+    std::set<std::uint32_t> ids;
+    for (QuestStartDef const& start : data.Starts)
+        for (QuestDef const& quest : start.Quests)
+        {
+            ids.insert(quest.Id);
+            CHECK(quest.MinLevel == 60);
+            CHECK(quest.RaceMask == 2973060173u); // the Alliance races (bits of race ids 1, 3, 4, 7, 11, 22, 25, 29, 30, 32) in the low 32 bits
+        }
+    CHECK(ids == (std::set<std::uint32_t>{ 4182, 4183, 4184, 4185, 4186, 4223, 4224 }));
+}
+
+void AttunementReplacesTheSameQuestsOfTheWorldFile()
+{
+    // The world file has 4182 as a level 54 quest with no minimum level; the attunement's definition is the only one left.
+    std::istringstream in("start Elwynn\nanchor 0 -9000 -100 0\nquest 4182 giver -8377 -2780 193 ender -8377 -2780 193\nreq 4182 level 54\n"
+                          "quest 9 giver -9000 -100 0 ender -9000 -100 0\n");
+    std::vector<std::string> warnings;
+    QuestData world = ParseQuestData(in, warnings);
+    QuestData const attunement = LoadQuestData(AttunementPath(), warnings);
+    MergeQuestData(world, attunement);
+    std::size_t count4182 = 0;
+    std::size_t count9 = 0;
+    for (QuestStartDef const& start : world.Starts)
+    {
+        CHECK(!start.Quests.empty());
+        for (QuestDef const& quest : start.Quests)
+        {
+            count4182 += quest.Id == 4182 ? 1 : 0;
+            count9 += quest.Id == 9 ? 1 : 0;
+            if (quest.Id == 4182)
+                CHECK(quest.MinLevel == 60);
+        }
+    }
+    CHECK(count4182 == 1 && count9 == 1);
+    CHECK(world.Starts.size() == 5); // Elwynn (quest 9) and the four attunement starts
+}
+
+void AttunementIsALevel60AllianceToDo()
+{
+    std::vector<std::string> warnings;
+    auto data = std::make_shared<QuestData>(LoadQuestData(AttunementPath(), warnings));
+    QuestPlanner planner(data);
+    // Helendis Riverhorn gives 4182 at Burning Steppes; a level 59 human is too low, a level 60 human takes it and then 4183, an orc may not.
+    QuestMemory below;
+    CHECK(planner.Next(WorldBot(59, -8377.0f, -2780.0f), below, 1000, QuestBotInfo{ 1, 1 }).Kind == QuestStepKind::None);
+    QuestMemory human;
+    QuestStep step = planner.Next(WorldBot(60, -8377.0f, -2780.0f), human, 1000, QuestBotInfo{ 1, 1 });
+    CHECK(step.Kind == QuestStepKind::Accept && step.Quest == 4182);
+    QuestMemory orc;
+    CHECK(planner.Next(WorldBot(60, -8377.0f, -2780.0f), orc, 1000, QuestBotInfo{ 1, 2 }).Kind == QuestStepKind::None);
+    QuestMemory next;
+    next.Done = { 4182 };
+    step = planner.Next(WorldBot(60, -8377.0f, -2780.0f), next, 1000, QuestBotInfo{ 1, 1 });
+    CHECK(step.Kind == QuestStepKind::Accept && step.Quest == 4183);
+}
+
 int main()
 {
     ReadDelayHoldsTheAcceptForThreeToTwelveSeconds();
@@ -850,6 +919,9 @@ int main()
     PolicyHuntsOnlyTheQuestTargets();
     PolicyWalksToTheHuntingAreaWhenNoTargetIsNear();
     PolicyDefendsAgainstAnyAttackerWhileHunting();
+    AttunementFileIsTheSoloAllianceChain();
+    AttunementReplacesTheSameQuestsOfTheWorldFile();
+    AttunementIsALevel60AllianceToDo();
     if (failures == 0)
         std::printf("quest_test: all passed\n");
     return failures == 0 ? 0 : 1;

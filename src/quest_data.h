@@ -71,3 +71,7 @@ QuestData ParseQuestData(std::istream& in, std::vector<std::string>& warnings);
 
 // Reads the file at `path`; an unreadable file gives empty data and a warning.
 QuestData LoadQuestData(std::string const& path, std::vector<std::string>& warnings);
+
+// Adds the starts of `extra` to `base`. A quest that `extra` defines is first taken out of `base`, so each quest has one definition (the extra one);
+// starts left with no quests are dropped.
+void MergeQuestData(QuestData& base, QuestData const& extra);

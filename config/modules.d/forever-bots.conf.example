@@ -71,6 +71,8 @@ Module.forever-bots.TelemetrySummarySec = 60
 # A whole-world quest file (levels 1 to 60, made by tools/make_world_quests.py, doc/world-quests.md) works the same way: the bot takes quests that suit its
 # level, race and class from the nearest area that has some, and moves on to the next area when one is used up.
 # QuestFile = data/world_quests.txt
+# The Onyxia's Lair attunement (level 60, Alliance; data/attunement_quests.txt beside the module) is merged into QuestFile. Empty turns it off.
+# AttunementFile = data/attunement_quests.txt
 # A walk to a giver that does not move for two minutes is dropped (the bot grinds) unless this is 1. 1 teleports the bot to the giver
 # once; the core still refuses that unless Bot.Actions.Teleport = 1. A refused teleport drops the start either way.
 # QuestTeleport = 0

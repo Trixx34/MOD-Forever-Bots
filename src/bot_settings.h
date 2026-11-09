@@ -158,6 +158,9 @@ struct BotSettings
     std::map<std::uint32_t, std::vector<std::array<float, 3>>> Hubs;
     // Quests (M5): the starter quest data file (config key QuestFile, see quest_data.h). Empty turns quests off.
     std::string QuestFile;
+    // The Onyxia's Lair attunement (config key AttunementFile, data/attunement_quests.txt beside the module): its quests replace the same quests in
+    // QuestFile and are taken at level 60 only. Empty turns the attunement off. Used only when QuestFile is set.
+    std::string AttunementFile = "data/attunement_quests.txt";
     // QuestTeleport (0 or 1, off by default): a quest walk that has not moved for two minutes teleports to the giver. Needs
     // Bot.Actions.Teleport = 1 in the core. Off, that start is dropped and the bot grinds instead of retrying a refused teleport.
     bool QuestTeleport = false;

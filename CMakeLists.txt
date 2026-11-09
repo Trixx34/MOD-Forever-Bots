@@ -77,6 +77,7 @@ add_test(NAME raid COMMAND raid_test)
 
 add_executable(quest_test tests/quest_test.cpp)
 target_link_libraries(quest_test PRIVATE forever_bots_policy)
+target_compile_definitions(quest_test PRIVATE FOREVER_BOTS_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data")
 add_test(NAME quest COMMAND quest_test)
 
 add_executable(chat_test tests/chat_test.cpp)
