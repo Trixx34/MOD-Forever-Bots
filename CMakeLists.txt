@@ -136,6 +136,13 @@ add_executable(guild_join_test tests/guild_join_test.cpp)
 target_link_libraries(guild_join_test PRIVATE forever_bots_policy)
 add_test(NAME guild_join COMMAND guild_join_test)
 
+add_library(forever_bots_guilds STATIC src/bot_guilds.cpp)
+target_include_directories(forever_bots_guilds PUBLIC src)
+
+add_executable(bot_guilds_test tests/bot_guilds_test.cpp)
+target_link_libraries(bot_guilds_test PRIVATE forever_bots_guilds)
+add_test(NAME bot_guilds COMMAND bot_guilds_test)
+
 add_executable(mail_gifts_test tests/mail_gifts_test.cpp)
 target_link_libraries(mail_gifts_test PRIVATE forever_bots_policy)
 add_test(NAME mail_gifts COMMAND mail_gifts_test)
