@@ -4,6 +4,7 @@
 #pragma once
 
 #include "battlegrounds.h"
+#include "bot_guilds.h"
 #include "duels.h"
 #include "errand_policy.h"
 #include "guild_join.h"
