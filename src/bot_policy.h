@@ -900,6 +900,8 @@ private:
     std::unordered_map<std::uint64_t, bot_guilds::Guild> _botGuilds;     // guild guid -> purpose and faction
     std::unordered_map<std::uint64_t, PendingGuild> _pendingGuilds;      // master guid -> the guild it is creating
     std::unordered_map<std::uint64_t, std::uint64_t> _guildAcceptDueMs;  // invitee guid -> when it accepts
+    struct CreateBlock { std::uint32_t Failures = 0; std::uint64_t UntilMs = 0; };
+    std::unordered_map<std::uint64_t, CreateBlock> _guildCreateBlocks;   // master guid -> its unconfirmed creates and when it may try again
     std::uint64_t _guildPlanAtMs = 0;
     std::vector<WhisperReply> _whisperReplies;         // queued by Decide (busy refusals), taken by TakeWhisperReplies
     WhisperLimiter _whispers;                          // replies to players (ApplyWhisper and the refusals)

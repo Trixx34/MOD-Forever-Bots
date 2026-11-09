@@ -14,6 +14,8 @@ constexpr std::uint64_t kGuildAcceptDelayMs = 3000;    // an invited bot accepts
 constexpr std::uint64_t kGuildPendingMs = 60000;       // a create whose guild is not in any snapshot after this long is forgotten (the planner tries again)
 constexpr std::uint64_t kGuildOrderBusyMs = 30000;     // a bot with a guild order in flight is left alone for this long
 constexpr std::size_t kGuildOrdersPerPlan = 6;
+constexpr std::uint64_t kGuildCreateBlockMs = 120000;   // a master whose create was never confirmed (the core refused it) waits this long, doubled per failure
+constexpr std::uint32_t kGuildCreateBlockDoublings = 5; // ...up to 32 times that
 }  // namespace
 
 void BotPolicy::DriveGuilds(forever_module::WorldTickSnapshotView const& view, std::uint64_t nowMs)
@@ -68,11 +70,24 @@ void BotPolicy::DriveGuilds(forever_module::WorldTickSnapshotView const& view, s
         auto const pending = _pendingGuilds.find(bot.guid);
         if (pending == _pendingGuilds.end() || bot.guild_guid == 0)
             continue;
+        _guildCreateBlocks.erase(bot.guid);
         _botGuilds[bot.guild_guid] = bot_guilds::Guild{ bot.guild_guid, pending->second.Kind, pending->second.Alliance };
         _pendingGuilds.erase(pending);
     }
+    // A create nobody confirmed was most likely refused (social orders off, name taken): its master is left out of the next plans for a while, so the
+    // same refused masters do not take every plan's create slots and starve the creates behind them.
     for (auto it = _pendingGuilds.begin(); it != _pendingGuilds.end();)
-        it = nowMs - it->second.SinceMs > kGuildPendingMs ? _pendingGuilds.erase(it) : std::next(it);
+    {
+        if (nowMs - it->second.SinceMs <= kGuildPendingMs)
+        {
+            ++it;
+            continue;
+        }
+        CreateBlock& block = _guildCreateBlocks[it->first];
+        block.Failures = std::min(block.Failures + 1, kGuildCreateBlockDoublings + 1);
+        block.UntilMs = nowMs + (kGuildCreateBlockMs << (block.Failures - 1));
+        it = _pendingGuilds.erase(it);
+    }
 
     std::vector<bot_guilds::Guild> guilds;
     guilds.reserve(_botGuilds.size());
@@ -106,6 +121,8 @@ void BotPolicy::DriveGuilds(forever_module::WorldTickSnapshotView const& view, s
             break;
         std::uint64_t const master = created.Master;
         if (busy(master))
+            continue;
+        if (auto const blocked = _guildCreateBlocks.find(master); blocked != _guildCreateBlocks.end() && blocked->second.UntilMs > nowMs)
             continue;
         social::Order order;
         order.What = social::Kind::Guild;
