@@ -3,16 +3,20 @@
 #include "bot_guilds.h"
 
 #include <algorithm>
+#include <charconv>
 #include <cstdio>
+#include <limits>
 #include <map>
 #include <set>
+#include <system_error>
 
 namespace bot_guilds {
 
 namespace {
 
-constexpr std::uint32_t kMinSize = 2;
-constexpr std::uint32_t kMaxSize = 40;
+constexpr std::uint32_t kMinRaidSize = 2;
+constexpr std::uint32_t kMaxRaidSize = 40;
+constexpr std::uint32_t kUncapped = std::numeric_limits<std::uint32_t>::max();
 
 char const* TagOf(Purpose kind)
 {
@@ -25,6 +29,34 @@ char const* TagOf(Purpose kind)
     return "BotGuild";
 }
 
+std::uint32_t CapacityOf(Settings const& settings, Purpose kind)
+{
+    return kind == Purpose::Raiding ? EffectiveRaidSize(settings) : kUncapped;
+}
+
+// Reads one integer key: a value out of range is clamped and reported; a value that is not a number is reported and ignored.
+void ReadKey(std::unordered_map<std::string, std::string> const& config, char const* key, std::uint32_t min, std::uint32_t max, std::uint32_t& value,
+             std::vector<std::string>& warnings)
+{
+    auto const it = config.find(key);
+    if (it == config.end())
+        return;
+    std::uint64_t parsed = 0;
+    auto const& text = it->second;
+    auto const [end, ec] = std::from_chars(text.data(), text.data() + text.size(), parsed);
+    if (ec != std::errc() || end != text.data() + text.size())
+    {
+        warnings.push_back(std::string(key) + " is not a number; the default is kept");
+        return;
+    }
+    if (parsed < min || parsed > max)
+    {
+        warnings.push_back(std::string(key) + " is out of range and is clamped");
+        parsed = std::clamp<std::uint64_t>(parsed, min, max);
+    }
+    value = static_cast<std::uint32_t>(parsed);
+}
+
 // A bot that changes guild: the guild it leaves (0 none) and the purpose it joins (nullopt: it leaves and joins nothing).
 struct Pending
 {
@@ -35,14 +67,54 @@ struct Pending
 
 }  // namespace
 
-std::uint32_t EffectiveGuildSize(Settings const& settings)
+Settings LoadSettings(std::unordered_map<std::string, std::string> const& config, std::vector<std::string>& warnings)
 {
-    return std::clamp(settings.GuildSize, kMinSize, kMaxSize);
+    Settings settings;
+    auto const enabled = config.find("Bot.Guilds.Enabled");
+    if (enabled != config.end())
+        settings.Enabled = enabled->second == "1" || enabled->second == "true";
+    ReadKey(config, "Bot.Guilds.LevelCap", 1, 255, settings.LevelCap, warnings);
+    ReadKey(config, "Bot.Guilds.RaidMinLevel", 1, 255, settings.RaidMinLevel, warnings);
+    ReadKey(config, "Bot.Guilds.LevelingShare", 0, 100, settings.LevelingShare, warnings);
+    ReadKey(config, "Bot.Guilds.RaidingShare", 0, 100, settings.RaidingShare, warnings);
+    ReadKey(config, "Bot.Guilds.UtilityShare", 0, 100, settings.UtilityShare, warnings);
+    ReadKey(config, "Bot.Guilds.RaidSize", kMinRaidSize, kMaxRaidSize, settings.RaidSize, warnings);
+    if (settings.LevelingShare + settings.RaidingShare + settings.UtilityShare != 100)
+    {
+        warnings.push_back("Bot.Guilds shares do not add up to 100; 60/20/20 is used");
+        settings.LevelingShare = 60;
+        settings.RaidingShare = 20;
+        settings.UtilityShare = 20;
+    }
+    return settings;
+}
+
+std::uint32_t EffectiveRaidSize(Settings const& settings)
+{
+    return std::clamp(settings.RaidSize, kMinRaidSize, kMaxRaidSize);
+}
+
+Purpose ShareOf(Settings const& settings, std::uint64_t guid)
+{
+    std::uint64_t const total = static_cast<std::uint64_t>(settings.LevelingShare) + settings.RaidingShare + settings.UtilityShare;
+    if (total == 0)
+        return Purpose::Leveling;
+    std::uint64_t const r = guid % total;
+    if (r < settings.LevelingShare)
+        return Purpose::Leveling;
+    if (r < static_cast<std::uint64_t>(settings.LevelingShare) + settings.RaidingShare)
+        return Purpose::Raiding;
+    return Purpose::Utility;
+}
+
+Purpose WantOf(Settings const& settings, Bot const& bot)
+{
+    return bot.Want ? *bot.Want : ShareOf(settings, bot.Guid);
 }
 
 bool RaidQualified(Settings const& settings, Bot const& bot)
 {
-    if (bot.Level < settings.LevelCap)
+    if (bot.Level < settings.RaidMinLevel)
         return false;
     return !settings.RaidQualified || settings.RaidQualified(bot);
 }
@@ -50,7 +122,8 @@ bool RaidQualified(Settings const& settings, Bot const& bot)
 Plan PlanMoves(Settings const& settings, std::vector<Guild> const& guilds, std::vector<Bot> const& pool)
 {
     Plan plan;
-    std::uint32_t const size = EffectiveGuildSize(settings);
+    if (!settings.Enabled)
+        return plan;
 
     // Bots by guid (the first listed wins), and the known guilds by guid.
     std::map<std::uint64_t, Bot const*> bots;
@@ -90,20 +163,17 @@ Plan PlanMoves(Settings const& settings, std::vector<Guild> const& guilds, std::
         if (bot->Guild != 0)
             current = known.at(bot->Guild)->Kind;
 
-        bool const stays = current && bot->Want && *bot->Want == *current &&
-                           !(*current == Purpose::Leveling && bot->Level >= settings.LevelCap);
+        Purpose const want = WantOf(settings, *bot);
+        bool const stays = current && want == *current && !(want == Purpose::Leveling && bot->Level >= settings.LevelCap);
         if (stays)
             continue;
 
         std::optional<Purpose> target;
-        if (bot->Want)
+        switch (want)
         {
-            switch (*bot->Want)
-            {
-                case Purpose::Leveling: if (bot->Level < settings.LevelCap) target = Purpose::Leveling; break;
-                case Purpose::Utility: target = Purpose::Utility; break;
-                case Purpose::Raiding: if (RaidQualified(settings, *bot)) target = Purpose::Raiding; break;
-            }
+            case Purpose::Leveling: if (bot->Level < settings.LevelCap) target = Purpose::Leveling; break;
+            case Purpose::Utility: target = Purpose::Utility; break;
+            case Purpose::Raiding: if (RaidQualified(settings, *bot)) target = Purpose::Raiding; break;
         }
         if (!current && !target)
             continue;
@@ -127,10 +197,11 @@ Plan PlanMoves(Settings const& settings, std::vector<Guild> const& guilds, std::
         move.From = p.From;
         if (p.Target)
         {
+            std::uint32_t const capacity = CapacityOf(settings, *p.Target);
             std::uint64_t guildGuid = 0;
             for (auto const& [guid, guild] : known)
             {
-                if (guild->Kind == *p.Target && guild->Alliance == p.Member->Alliance && mixed.count(guid) == 0 && count[guid] < size)
+                if (guild->Kind == *p.Target && guild->Alliance == p.Member->Alliance && mixed.count(guid) == 0 && count[guid] < capacity)
                 {
                     guildGuid = guid;
                     break;
@@ -145,7 +216,7 @@ Plan PlanMoves(Settings const& settings, std::vector<Guild> const& guilds, std::
             {
                 std::pair<Purpose, bool> key{ *p.Target, p.Member->Alliance };
                 auto open = openNew.find(key);
-                if (open == openNew.end() || plan.Created[open->second].Members.size() >= size)
+                if (open == openNew.end() || plan.Created[open->second].Members.size() >= capacity)
                 {
                     NewGuild created;
                     created.Kind = *p.Target;

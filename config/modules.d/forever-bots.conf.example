@@ -343,3 +343,14 @@ Module.forever-bots.TelemetrySummarySec = 60
 # Module.forever-bots.FishingSpotFile = /srv/forever/sim/modules_runtime/forever-bots/data/fishing_spots.txt
 # Module.forever-bots.RareHunts = 0
 # Module.forever-bots.RareHuntFile = /srv/forever/sim/modules_runtime/forever-bots/data/rare_hunts.txt
+
+# Bot guilds (off by default; the planner in src/bot_guilds.cpp). Three purposes: leveling (bots below LevelCap, released at the cap, empty guilds dissolved,
+# not capped in size), utility (dungeons, professions, auction house; long-term, not capped) and raiding (RaidMinLevel and qualified; capped at RaidSize).
+# A bot with no set purpose takes its purpose from its guid and these shares (percent, must add up to 100).
+# Bot.Guilds.Enabled = 0
+# Bot.Guilds.LevelCap = 60
+# Bot.Guilds.RaidMinLevel = 60
+# Bot.Guilds.LevelingShare = 60
+# Bot.Guilds.RaidingShare = 20
+# Bot.Guilds.UtilityShare = 20
+# Bot.Guilds.RaidSize = 40
