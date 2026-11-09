@@ -2578,6 +2578,53 @@ void EachPartyWalksItsOwnDungeonsRoute()
     CHECK(walkOf(one, 12) == 500.0f && walkOf(one, 22) == 500.0f);
 }
 
+// The tank's own health (below kTankRestPct, 80 %) holds its pulls on its own clock, past the party hold's 45 s cap and up to kPullHoldAbsMaxMs (180 s), and the
+// pull comes once its health is back. Run 5 of 2026-11-08: the tank, revived at 49 %, pulled a Warder in the second it came back, 47 deaths in the hour.
+bool Logged(std::vector<std::string> const& events, char const* prefix);
+
+void ALowTankPullsNothingUntilItsHealthIsBack()
+{
+    std::vector<std::string> events;
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.PartyCount = 1;
+    options.ClassOf = WarriorLeads;
+    options.Route = { Point{ 100.0f, 0.0f, 0.0f } };
+    options.OnEvent = [&events](std::string const& text) { events.push_back(text); };
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 }, WarriorLeads);
+    NearbyUnit const hostile = Hostile(7, 15.0f, 100);
+    for (std::size_t i = 0; i < view.bots.size(); ++i)
+    {
+        view.bots[i].group_role = view.bots[i].guid == 12 ? 2 : 1;
+        view.bots[i].group_leader_guid = (std::uint64_t(2) << 56) | 12;
+        view.bots[i].max_power = 0;
+        AddNearby(view, i, hostile);
+    }
+    view.bots[2].health = 490;   // the leader (12) at 49 %
+    auto const pulls = [&](std::vector<BotAction> const& actions)
+    {
+        return HasAction(actions, 12, ActionType::kFollow, hostile.guid) || HasAction(actions, 12, ActionType::kAttackTarget, hostile.guid);
+    };
+    bool early = false;
+    for (std::uint64_t at = 1000; at <= 170000; at += 1000)
+    {
+        view.tick_number = at / 100;
+        early = early || pulls(policy.Decide(view, at));
+    }
+    CHECK(!early);
+    CHECK(Logged(events, "tank_rest: leader=12"));
+    view.bots[2].health = 1000;   // healed
+    bool later = false;
+    for (std::uint64_t at = 171000; at <= 200000 && !later; at += 1000)
+    {
+        view.tick_number = at / 100;
+        later = pulls(policy.Decide(view, at));
+    }
+    CHECK(later);
+}
+
 // 0.44.14: the waits give up 45 s (pull hold) / 60 s (route) after the party's health plus mana last rose, and at 180 s at the latest while it keeps rising.
 void ThePullHoldEndsAfterNoRiseAndAtTheAbsoluteCap()
 {
@@ -7798,6 +7845,7 @@ int main()
     AHeldHealerLogsConsumeCheckAndDrinks();
     ACastResultInTheDeadminesLogsTheWantedCost();
     ThePullHoldEndsAfterNoRiseAndAtTheAbsoluteCap();
+    ALowTankPullsNothingUntilItsHealthIsBack();
     TwoDruidsDoNotBothCastThePartyBuff();
     AFailingBuffBacksOffLongerEachTime();
     HubTimeoutTriesTheNextHubSoonerThanAnArrival();

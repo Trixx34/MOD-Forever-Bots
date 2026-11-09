@@ -200,6 +200,22 @@ void BotPolicy::TurnQuestsAndHold(DecideTick& tick, BotTurn& turn)
                 state.HoldLastNotReadyMs = nowMs;
             }
             dungeonHold = !ready ? (nowMs - std::max(state.HoldSinceMs, state.HoldProgressMs) < kPullHoldMaxMs && nowMs - state.HoldSinceMs < kPullHoldAbsMaxMs) : false;
+            // The tank's own health holds its pulls on a clock of its own, which starts when it is low: the party hold's caps count from when the party first
+            // was not ready, often minutes before. Run 5 of 2026-11-08 (69beef2): the tank (161), revived at 49% (2604/5209), pulled a Warder in the same
+            // second as its route_hold why=health (00:08:54, 00:12:27, 00:15:57), and died 47 times in the hour.
+            if (bot.max_health > 0 && BelowPct(bot.health, bot.max_health, kTankRestPct))
+            {
+                if (state.TankRestSinceMs == 0)
+                {
+                    state.TankRestSinceMs = nowMs;
+                    if (_options.OnEvent)
+                        _options.OnEvent("tank_rest: leader=" + std::to_string(bot.guid) + " hp_pct=" + std::to_string(HealthPct(bot, 0)));
+                }
+                if (nowMs - state.TankRestSinceMs < kPullHoldAbsMaxMs)
+                    dungeonHold = true;
+            }
+            else
+                state.TankRestSinceMs = 0;
         }
         else
         {

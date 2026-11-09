@@ -309,6 +309,7 @@ constexpr std::uint32_t kRecoveryRisePct = 8;        // a rise counts as recover
 constexpr std::uint64_t kRecoveryWindowMs = 10000;
 constexpr std::uint64_t kPullHoldAbsMaxMs = 180000;  // 0.44.14: the hold is cut off here even while the party still recovers (the 45 s cap below counts from the last rise)
 constexpr std::uint64_t kPullHoldMaxMs = 45000;     // the party never waits longer than this for itself
+constexpr std::uint32_t kTankRestPct = 80;          // a dungeon party leader (the tank) below this health pulls nothing until it is back above, up to kPullHoldAbsMaxMs
 
 
 // Recovery tracking for the mana and pull waits: true when the summed resource `sum` (of `alive` living members, `maxSum` at most) has risen by

@@ -632,6 +632,18 @@ BotSnapshot const* BotPolicy::LeaderRejoinMember(DecideTick const& tick, std::ui
 {
     // A member with a live Onyxian Warder inside its Fire Nova reach is passed over while another one is clear: the leader came back at half health next to
     // the member nearest its corpse, in the Warder that had killed it, and died 10 s later (2026-11-08 21:22:05, bot 121 next to 150).
+    // The Warders any member of the party sees: a member's own nearby list is often full of the raid's pets and totems (DecideTick::LeaderNearby), so the
+    // one standing next to it may only be in another member's list.
+    std::vector<std::pair<float, float>> warders;
+    tick.ForEachPartyMember(leaderGuid, [&](BotSnapshot const& member)
+    {
+        if (member.map_id != mapId)
+            return;
+        if (auto const at = tick.indexOf.find(member.guid); at != tick.indexOf.end())
+            for (NearbyUnit const& unit : tick.view.NearbyOf(at->second))
+                if (IsLiveMob(unit) && forever_module::UnitRefEntry(unit.guid) == kOnyxianWarderEntry)
+                    warders.emplace_back(unit.pos_x, unit.pos_y);
+    });
     BotSnapshot const* best = nullptr;
     bool bestClear = false;
     float bestDistance = std::numeric_limits<float>::max();
@@ -640,11 +652,9 @@ BotSnapshot const* BotPolicy::LeaderRejoinMember(DecideTick const& tick, std::ui
         if (member.guid == leaderGuid || member.life_state != 0 || member.in_combat != 0 || member.map_id != mapId)
             return;
         bool clear = true;
-        if (auto const at = tick.indexOf.find(member.guid); at != tick.indexOf.end())
-            for (NearbyUnit const& unit : tick.view.NearbyOf(at->second))
-                if (IsLiveMob(unit) && forever_module::UnitRefEntry(unit.guid) == kOnyxianWarderEntry &&
-                    std::hypot(unit.pos_x - member.pos_x, unit.pos_y - member.pos_y) <= kFireNovaYards)
-                    clear = false;
+        for (auto const& [wx, wy] : warders)
+            if (std::hypot(wx - member.pos_x, wy - member.pos_y) <= kFireNovaYards)
+                clear = false;
         float const distance = std::hypot(member.pos_x - x, member.pos_y - y);
         if ((clear && !bestClear) || (clear == bestClear && distance < bestDistance))
         {

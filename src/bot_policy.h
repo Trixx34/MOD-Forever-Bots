@@ -690,6 +690,7 @@ private:
         std::uint64_t HealLosUntilMs = 0;
         std::uint64_t WarderLogMs = 0;                   // last time the warder_near / kite diagnostic line was written for this bot (one per 5 s)
         std::uint64_t WarderUnseenLogMs = 0;             // last time the warder_unseen diagnostic line was written for this bot (one per 30 s)
+        std::uint64_t TankRestSinceMs = 0;               // a dungeon party leader below kTankRestPct out of combat: since when it holds its pulls (0: not resting)
         std::unordered_set<std::uint64_t> WardersSeenDead; // the Onyxian Warders a party leader has seen dead (warder_dead is logged once for each)
         std::uint64_t LosRepositionTarget = 0;            // target of a healer DPS cast refused for LoS; move to clear it before retrying
         std::uint64_t HoldLastNotReadyMs = 0;            // the last tick the party was not ready (the pull hold ends after kPullHoldClearMs of readiness)
