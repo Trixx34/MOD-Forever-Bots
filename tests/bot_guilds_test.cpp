@@ -295,9 +295,9 @@ void PoolSplitFollowsTheShares()
 void ConfigLoadsAndClamps()
 {
     std::vector<std::string> warnings;
-    std::unordered_map<std::string, std::string> ok = { { "Bot.Guilds.Enabled", "1" }, { "Bot.Guilds.LevelingShare", "50" },
-                                                        { "Bot.Guilds.RaidingShare", "30" }, { "Bot.Guilds.UtilityShare", "20" },
-                                                        { "Bot.Guilds.RaidSize", "25" } };
+    std::unordered_map<std::string, std::string> ok = { { "GuildsEnabled", "1" }, { "GuildsLevelingShare", "50" },
+                                                        { "GuildsRaidingShare", "30" }, { "GuildsUtilityShare", "20" },
+                                                        { "GuildsRaidSize", "25" } };
     Settings settings = LoadSettings(ok, warnings);
     CHECK(settings.Enabled);
     CHECK(settings.LevelingShare == 50 && settings.RaidingShare == 30 && settings.UtilityShare == 20);
@@ -306,8 +306,8 @@ void ConfigLoadsAndClamps()
     CHECK(warnings.empty());
 
     std::vector<std::string> bad;
-    std::unordered_map<std::string, std::string> wrong = { { "Bot.Guilds.RaidSize", "100" }, { "Bot.Guilds.LevelCap", "abc" },
-                                                           { "Bot.Guilds.LevelingShare", "70" } };   // 70+20+20 != 100
+    std::unordered_map<std::string, std::string> wrong = { { "GuildsRaidSize", "100" }, { "GuildsLevelCap", "abc" },
+                                                           { "GuildsLevelingShare", "70" } };   // 70+20+20 != 100
     Settings fallback = LoadSettings(wrong, bad);
     CHECK(!fallback.Enabled);                         // off by default
     CHECK(fallback.RaidSize == 40);                   // clamped

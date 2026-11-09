@@ -48,6 +48,7 @@
 #include "guild_join.h"
 #include "mail_gifts.h"
 #include "social_actions.h"
+#include "bot_guilds.h"
 #include "dungeon_events.h"
 #include "errand_trainers.h"
 #include "supply_policy.h"
@@ -202,6 +203,7 @@ struct PolicyOptions
     duels::Settings Duels;
     battlegrounds::Settings Battlegrounds;
     guild::Settings GuildJoin;
+    bot_guilds::Settings Guilds;          // GuildsEnabled: the pool of bots is planned into guilds (DriveGuilds)
     gifts::Settings MailGifts;
     // Creature entry -> rank (0 first): the dungeon's kill priority. The damage dealers of a dungeon party fight the best-ranked live hostile next to the tank's target.
     std::map<std::uint32_t, std::uint32_t> KillPriority;
@@ -837,6 +839,8 @@ private:
     void TurnRestAndConsume(DecideTick& tick, BotTurn& turn);
     void TurnTrainAndParty(DecideTick& tick, BotTurn& turn);
     void TurnSocial(DecideTick& tick, BotTurn& turn);
+    // Bot guilds (GuildsEnabled): plans the pool of online bots every kGuildPlanMs and queues the create, invite and leave orders the plan asks for.
+    void DriveGuilds(forever_module::WorldTickSnapshotView const& view, std::uint64_t nowMs);
     void TurnAdvisor(DecideTick& tick, BotTurn& turn);   // the advisor features (bot_policy_advisor.cpp); out of combat only
     void TurnLootTaxiMount(DecideTick& tick, BotTurn& turn);
     void TurnSendMove(DecideTick& tick, BotTurn& turn);
@@ -890,6 +894,13 @@ private:
     lfg_queue_fill::Limiter _lfgQueueLimiter;           // one bot per queue per cooldown
     std::vector<advisor::Order> _advisorOrders;        // queued by the advisor features (bot_policy_advisor.cpp), taken by TakeAdvisorOrders
     std::vector<social::Order> _socialOrders;          // queued by Decide (TurnSocial), taken by TakeSocialOrders
+    // Bot guilds state. A guild the policy created or found is listed with its purpose and faction; a create waits (PendingGuild) until the master's
+    // snapshot shows the new guild's id; an invited bot accepts a few seconds later (accept due).
+    struct PendingGuild { bot_guilds::Purpose Kind = bot_guilds::Purpose::Leveling; bool Alliance = false; std::uint64_t SinceMs = 0; };
+    std::unordered_map<std::uint64_t, bot_guilds::Guild> _botGuilds;     // guild guid -> purpose and faction
+    std::unordered_map<std::uint64_t, PendingGuild> _pendingGuilds;      // master guid -> the guild it is creating
+    std::unordered_map<std::uint64_t, std::uint64_t> _guildAcceptDueMs;  // invitee guid -> when it accepts
+    std::uint64_t _guildPlanAtMs = 0;
     std::vector<WhisperReply> _whisperReplies;         // queued by Decide (busy refusals), taken by TakeWhisperReplies
     WhisperLimiter _whispers;                          // replies to players (ApplyWhisper and the refusals)
     // Why the bot cannot take an invite or a trade now (chat_reply.h); None when it is free. Uses the snapshot and the module state for the bot.

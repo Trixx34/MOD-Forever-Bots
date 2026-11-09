@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "bot_settings.h"
 
+#include "bot_guilds.h"
 #include "bot_pick.h"
 #include "text_number.h"
 
@@ -721,6 +722,7 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadKey(config, "InnPowerBelowPct", 0, 100, settings.InnDowntime.PowerBelowPct, warnings);
     ReadKey(config, "InnMaxRestMin", 1, 120, settings.InnDowntime.MaxRestMin, warnings);
     ReadBool(config, "GuildJoin", settings.GuildJoin.Enabled, warnings);
+    settings.Guilds = bot_guilds::LoadSettings(config, warnings);
     ReadBool(config, "MailGifts", settings.MailGifts.Enabled, warnings);
     ReadKey(config, "MailGiftDailyCap", 0, 20, settings.MailGifts.DailyCap, warnings);
     ReadBool(config, "Supplies", settings.Supplies.Enabled, warnings);

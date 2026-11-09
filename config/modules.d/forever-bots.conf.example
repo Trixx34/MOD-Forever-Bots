@@ -130,6 +130,16 @@ Module.forever-bots.TelemetrySummarySec = 60
 # InnPowerBelowPct = 30
 # InnMaxRestMin = 10
 # GuildJoin = 0
+# Bot guilds (protocol 24: the core runs GuildAction create and invite). The pool of online bots is planned into guilds of three purposes: leveling
+# (below GuildsLevelCap, leaves at the cap; not capped), utility (not capped) and raiding (RaidMinLevel and up; at most GuildsRaidSize bots). Each guild has one
+# faction. Off by default: nothing is planned or sent.
+# GuildsEnabled = 0
+# GuildsLevelCap = 60
+# GuildsRaidMinLevel = 60
+# GuildsRaidSize = 40
+# GuildsLevelingShare = 60
+# GuildsRaidingShare = 20
+# GuildsUtilityShare = 20
 # MailGifts = 0
 # MailGiftDailyCap = 1
 # AutoGearEveryLevels = 5

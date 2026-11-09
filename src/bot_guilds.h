@@ -6,8 +6,8 @@
 //   Utility   dungeons, professions, auction house. Long-term: a bot stays until its want changes. Not capped in size.
 //   Raiding   a bot joins only at RaidMinLevel or more and when RaidQualified. Capped at RaidSize bots. It stays until its want changes.
 //
-// The pool split: a bot with no Want set gets its purpose from its guid and the shares (Bot.Guilds.LevelingShare, RaidingShare, UtilityShare; 60/20/20).
-// A bot whose Want is set (by the policy) keeps it. Bot.Guilds.Enabled is off by default: then PlanMoves plans nothing.
+// The pool split: a bot with no Want set gets its purpose from its guid and the shares (GuildsLevelingShare, RaidingShare, UtilityShare; 60/20/20).
+// A bot whose Want is set (by the policy) keeps it. GuildsEnabled is off by default: then PlanMoves plans nothing.
 //
 // PlanMoves is the one function that decides membership. It returns one Move per bot that changes, with the guild it leaves (From) and the guild it joins
 // (To, or a new guild by index). A bot appears once, so it is never in two guilds at once. Running PlanMoves on the result of the moves gives no moves.
@@ -33,18 +33,18 @@ struct Bot;
 
 struct Settings
 {
-    bool Enabled = false;               // Bot.Guilds.Enabled
-    std::uint32_t LevelCap = 60;        // Bot.Guilds.LevelCap: a leveling bot at this level leaves
-    std::uint32_t RaidMinLevel = 60;    // Bot.Guilds.RaidMinLevel: a raiding bot must be at least this
-    std::uint32_t LevelingShare = 60;   // Bot.Guilds.LevelingShare (percent of the pool)
-    std::uint32_t RaidingShare = 20;    // Bot.Guilds.RaidingShare
-    std::uint32_t UtilityShare = 20;    // Bot.Guilds.UtilityShare
-    std::uint32_t RaidSize = 40;        // Bot.Guilds.RaidSize: bots per raiding guild (2 to 40)
+    bool Enabled = false;               // GuildsEnabled
+    std::uint32_t LevelCap = 60;        // GuildsLevelCap: a leveling bot at this level leaves
+    std::uint32_t RaidMinLevel = 60;    // GuildsRaidMinLevel: a raiding bot must be at least this
+    std::uint32_t LevelingShare = 60;   // GuildsLevelingShare (percent of the pool)
+    std::uint32_t RaidingShare = 20;    // GuildsRaidingShare
+    std::uint32_t UtilityShare = 20;    // GuildsUtilityShare
+    std::uint32_t RaidSize = 40;        // GuildsRaidSize: bots per raiding guild (2 to 40)
     // The raiding check beyond the level (attunement, gear). Empty: the level alone qualifies.
     std::function<bool(Bot const&)> RaidQualified;
 };
 
-// Reads the Bot.Guilds.* keys from the config map. A bad value is clamped and reported in warnings; shares that do not add up to 100 are replaced by 60/20/20.
+// Reads the Guilds* keys from the config map. A bad value is clamped and reported in warnings; shares that do not add up to 100 are replaced by 60/20/20.
 Settings LoadSettings(std::unordered_map<std::string, std::string> const& config, std::vector<std::string>& warnings);
 
 // A guild the caller knows (a bot guild). Guid is its guild id in the core, Alliance its one faction.

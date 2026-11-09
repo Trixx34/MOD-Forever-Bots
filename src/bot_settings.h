@@ -208,6 +208,7 @@ struct BotSettings
     battlegrounds::Settings Battlegrounds;
     inn::Settings InnDowntime;
     guild::Settings GuildJoin;
+    bot_guilds::Settings Guilds;            // GuildsEnabled and the GuildsLevelCap, GuildsRaidMinLevel, GuildsLevelingShare, ... keys (bot_guilds.h)
     gifts::Settings MailGifts;
     // Realism features without combat (docs/bot-realism-backlog.md items 2 to 5; all off by default): IdleFidget*, ReadDelay*, PassingBuff*, TownAfk*; the
     // round-number auction price is in Auction (AuctionRoundStep, AuctionRoundMaxPct).

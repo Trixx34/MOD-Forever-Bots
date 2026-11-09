@@ -27,6 +27,7 @@ struct Order
     std::uint64_t Player = 0;       // Duel: the other duelist. Gift: the recipient (raw character guid counters)
     std::uint32_t Id = 0;           // Battleground: the BattlemasterList id
     std::uint64_t Seed = 0;         // Gift: spreads the choice of the stack
+    std::string Text;               // Guild create (op 3): the new guild's name
 };
 
 struct Outcome

@@ -70,15 +70,15 @@ struct Pending
 Settings LoadSettings(std::unordered_map<std::string, std::string> const& config, std::vector<std::string>& warnings)
 {
     Settings settings;
-    auto const enabled = config.find("Bot.Guilds.Enabled");
+    auto const enabled = config.find("GuildsEnabled");
     if (enabled != config.end())
         settings.Enabled = enabled->second == "1" || enabled->second == "true";
-    ReadKey(config, "Bot.Guilds.LevelCap", 1, 255, settings.LevelCap, warnings);
-    ReadKey(config, "Bot.Guilds.RaidMinLevel", 1, 255, settings.RaidMinLevel, warnings);
-    ReadKey(config, "Bot.Guilds.LevelingShare", 0, 100, settings.LevelingShare, warnings);
-    ReadKey(config, "Bot.Guilds.RaidingShare", 0, 100, settings.RaidingShare, warnings);
-    ReadKey(config, "Bot.Guilds.UtilityShare", 0, 100, settings.UtilityShare, warnings);
-    ReadKey(config, "Bot.Guilds.RaidSize", kMinRaidSize, kMaxRaidSize, settings.RaidSize, warnings);
+    ReadKey(config, "GuildsLevelCap", 1, 255, settings.LevelCap, warnings);
+    ReadKey(config, "GuildsRaidMinLevel", 1, 255, settings.RaidMinLevel, warnings);
+    ReadKey(config, "GuildsLevelingShare", 0, 100, settings.LevelingShare, warnings);
+    ReadKey(config, "GuildsRaidingShare", 0, 100, settings.RaidingShare, warnings);
+    ReadKey(config, "GuildsUtilityShare", 0, 100, settings.UtilityShare, warnings);
+    ReadKey(config, "GuildsRaidSize", kMinRaidSize, kMaxRaidSize, settings.RaidSize, warnings);
     if (settings.LevelingShare + settings.RaidingShare + settings.UtilityShare != 100)
     {
         warnings.push_back("Bot.Guilds shares do not add up to 100; 60/20/20 is used");

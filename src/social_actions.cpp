@@ -56,7 +56,12 @@ bool Send(ModuleClient& client, Order const& order, Done done)
             client.BotBattleground(order.Bot, static_cast<ModuleClient::BattlegroundOp>(order.Op), order.Id, answer);
             return true;
         case Kind::Guild:
-            client.BotGuild(order.Bot, static_cast<ModuleClient::GuildOp>(order.Op), answer);
+            if (order.Op == 3) // create (protocol 23): the bot becomes the master of a new guild named Text
+                client.BotGuildCreate(order.Bot, order.Text, answer);
+            else if (order.Op == 4) // invite (protocol 24): the bot invites the character Player to its guild
+                client.BotGuildInvite(order.Bot, order.Player, answer);
+            else
+                client.BotGuild(order.Bot, static_cast<ModuleClient::GuildOp>(order.Op), answer);
             return true;
         case Kind::Gift:
         {
