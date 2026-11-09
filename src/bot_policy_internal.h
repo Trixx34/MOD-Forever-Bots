@@ -63,6 +63,8 @@ constexpr std::uint32_t kOnyxianWarderEntry = 12129;
 constexpr std::uint32_t kOnyxiaBossEntry = 10184;   // Onyxia herself, the lair's last boss (data/dungeons/249-onyxias-lair.json)
 constexpr std::uint32_t kBerserkerRageSpell = 18499; // warrior tank: the fear break in Onyxia's phase 3 (study item 6); 30 s cooldown
 constexpr std::uint32_t kTauntSpell = 355;           // warrior tank: re-taunts Onyxia when the raid is on her and the tank is not
+constexpr float kOffTankTauntYards = 30.0f;          // the off-tank taunts a Warder that hits another member from up to this far (Taunt's range)
+constexpr std::uint64_t kOffTankTauntCdMs = 10000;   // and not again for this long (Taunt's cooldown)
 constexpr std::uint64_t kOnyxiaBerserkerCdMs = 30000;
 constexpr std::uint64_t kOnyxiaTauntCdMs = 10000;
 constexpr float kOnyxiaTauntYards = 30.0f;           // Taunt's reach: the tank does not cast it at a farther Onyxia
@@ -649,6 +651,22 @@ struct BotPolicy::DecideTick
         return view.NearbyOf(at->second);
     }
 
+    // A live unit in the nearby list of any online member of a leader's party on the given map (the leader included), or null.
+    NearbyUnit const* PartySees(std::uint64_t leaderGuid, std::uint32_t mapId, std::uint64_t guid) const
+    {
+        NearbyUnit const* found = nullptr;
+        ForParty(leaderGuid, [&](BotSnapshot const& member)
+        {
+            if (found || member.map_id != mapId)
+                return;
+            if (auto const at = indexOf.find(member.guid); at != indexOf.end())
+                for (NearbyUnit const& unit : view.NearbyOf(at->second))
+                    if (unit.guid == guid && unit.health > 0)
+                        found = &unit;
+        });
+        return found;
+    }
+
     // A leader or inviter reference that is one of this module's bots, as against a human player (both are players to the core).
     bool IsOurBot(std::uint64_t ref) const;
 
@@ -701,6 +719,7 @@ struct BotPolicy::BotTurn
     std::uint64_t partyLeader = 0;
     bool partyLeaderBot = false;
     bool partyMember = false;
+    bool offTank = false;                                 // the party's first warrior member after its leader: holds a Warder off the raid (TurnRevivedAndRoles)
     bool routeOn = false;
     PolicyOptions::ScenarioRoute const* scenario = nullptr;
     bool returningToDungeon = false;

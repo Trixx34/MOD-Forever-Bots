@@ -327,6 +327,55 @@ void BotPolicy::TurnTargeting(DecideTick& tick, BotTurn& turn)
         else if (targetRef == 0 && !turn.Avoided(state.ForcedTarget))
             targetRef = state.ForcedTarget;
     }
+    // The off-tank (turn.offTank): a live Onyxian Warder whose newest hit landed on another member (not the tank, while the tank lives) is its target, and it
+    // taunts it off that member. Run 5 of 2026-11-08: 385 deaths to 12129, most of them members a Warder had turned on while the one tank was dead or busy.
+    if (turn.offTank && bot.life_state == 0 && !turn.returningToDungeon)
+    {
+        bool const leaderUp = leaderSnap && leaderSnap->life_state == 0;
+        std::uint64_t pickUp = 0;
+        float pickYards = std::numeric_limits<float>::max();
+        tick.ForParty(partyLeader, [&](BotSnapshot const& member)
+        {
+            if (member.guid == bot.guid || (leaderUp && member.guid == partyLeader) || member.life_state != 0 || member.in_combat == 0 ||
+                member.map_id != bot.map_id || member.damage_hit_count == 0)
+                return;
+            std::uint64_t const source = member.damage_hits[member.damage_hit_count - 1].source_guid;
+            if (forever_module::UnitRefType(source) != 8 || forever_module::UnitRefEntry(source) != kOnyxianWarderEntry || turn.Avoided(source))
+                return;
+            NearbyUnit const* warder = tick.PartySees(partyLeader, bot.map_id, source);
+            if (!warder || !IsLiveMob(*warder))
+                return;
+            float const yards = std::hypot(warder->pos_x - bot.pos_x, warder->pos_y - bot.pos_y);
+            if (yards < pickYards)
+            {
+                pickYards = yards;
+                pickUp = source;
+            }
+        });
+        if (pickUp != 0)
+        {
+            targetRef = pickUp;
+            if (state.OffTankTarget != pickUp)
+            {
+                state.OffTankTarget = pickUp;
+                if (_options.OnEvent)
+                    _options.OnEvent("offtank_pickup: bot=" + std::to_string(bot.guid) + " warder=" + std::to_string(pickUp) + " yards=" + std::to_string(int(pickYards)) +
+                                     " leader_up=" + std::to_string(leaderUp ? 1 : 0));
+            }
+            if (bot.threat_target_guid != pickUp && pickYards <= kOffTankTauntYards && nowMs >= state.OffTankTauntAtMs && nowMs >= state.NextCastMs && !IsCasting(bot))
+            {
+                BotAction taunt;
+                taunt.bot_guid = bot.guid;
+                taunt.type = ActionType::kCastSpell;
+                taunt.spell_id = kTauntSpell;
+                taunt.target_guid = pickUp;
+                tick.actions.push_back(taunt);
+                state.CastTarget[kTauntSpell] = pickUp;
+                state.OffTankTauntAtMs = nowMs + kOffTankTauntCdMs;
+                state.NextCastMs = nowMs + kGlobalCooldownMs;
+            }
+        }
+    }
     if (targetRef == 0 && partyMember && leaderSnap && leaderSnap->threat_target_guid != 0 && !tankHeadStart && !noSelfPull &&
         !turn.Avoided(leaderSnap->threat_target_guid))
     {
@@ -658,11 +707,14 @@ BotPolicy::TurnFlow BotPolicy::TurnTaming(DecideTick& tick, BotTurn& turn)
         for (NearbyUnit const& unit : nearby)
             if (unit.guid == targetRef)
                 targetUnit = &unit;
-        // The leader's target, seen only in the leader's view (TurnTargeting's assist): the same unit, so the bot's range and kite work from its position.
+        // The leader's target, seen only in the leader's view (TurnTargeting's assist), or the off-tank's Warder seen by another member: the same unit, so the
+        // bot's range and kite work from its position.
         if (!targetUnit && partyMember)
             for (NearbyUnit const& unit : tick.LeaderNearby(partyLeader, bot.map_id))
                 if (unit.guid == targetRef)
                     targetUnit = &unit;
+        if (!targetUnit && turn.offTank)
+            targetUnit = tick.PartySees(partyLeader, bot.map_id, targetRef);
     }
     else if (NearbyUnit const* hostile = (dungeonHold || noSelfPull || tameNow || (stagingHold && bot.in_combat == 0)) ? nullptr
                  : PullTarget(bot, nearby, turn.AvoidedFn(), bot.in_combat != 0, huntEntries, routeOn, leashed))

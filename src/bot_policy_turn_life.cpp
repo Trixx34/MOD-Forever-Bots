@@ -321,6 +321,17 @@ void BotPolicy::TurnRevivedAndRoles(DecideTick& tick, BotTurn& turn)
     turn.partyLeaderBot = partyLeader != 0 && partyLeader == bot.guid;
     auto const& partyLeaderBot = turn.partyLeaderBot;
     turn.partyMember = partyLeader != 0 && !partyLeaderBot;
+    // The off-tank: the party's first warrior member after its leader (in guid order, the roster's second warrior; the raid roster's first entries are its
+    // warriors). With an Onyxian Warder it does not kite: it picks up a Warder that hits another member, and holds one while the leader is dead.
+    turn.offTank = false;
+    if (turn.partyMember && ClassFor(_options, bot.guid) == kWarriorClass)
+        if (auto const members = tick.membersOf.find(partyLeader); members != tick.membersOf.end())
+            for (std::uint64_t member : members->second)
+                if (ClassFor(_options, member) == kWarriorClass)
+                {
+                    turn.offTank = member == bot.guid;
+                    break;
+                }
     auto const& partyMember = turn.partyMember;
     turn.routeOn = IsRouteActive(bot.guid) || (partyLeader != 0 && tankLed.count(partyLeader) != 0);   // the dungeon party rules apply to this bot
     auto const& routeOn = turn.routeOn;
