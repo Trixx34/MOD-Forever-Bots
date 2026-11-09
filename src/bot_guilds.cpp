@@ -14,14 +14,24 @@ namespace {
 constexpr std::uint32_t kMinSize = 2;
 constexpr std::uint32_t kMaxSize = 40;
 
-// The faction a guild's bots are of: 1 Alliance, 2 Horde, 3 both (mixed, never changed).
-int SideOf(std::vector<Bot const*> const& members)
+char const* TagOf(Purpose kind)
 {
-    bool alliance = false, horde = false;
-    for (Bot const* bot : members)
-        (bot->Alliance ? alliance : horde) = true;
-    return alliance && horde ? 3 : (alliance ? 1 : 2);
+    switch (kind)
+    {
+        case Purpose::Leveling: return "BotLvl";
+        case Purpose::Utility: return "BotUtil";
+        case Purpose::Raiding: return "BotRaid";
+    }
+    return "BotGuild";
 }
+
+// A bot that changes guild: the guild it leaves (0 none) and the purpose it joins (nullopt: it leaves and joins nothing).
+struct Pending
+{
+    Bot const* Member;
+    std::uint64_t From;
+    std::optional<Purpose> Target;
+};
 
 }  // namespace
 
@@ -30,103 +40,181 @@ std::uint32_t EffectiveGuildSize(Settings const& settings)
     return std::clamp(settings.GuildSize, kMinSize, kMaxSize);
 }
 
-Plan PlanGuilds(Settings const& settings, std::vector<Bot> const& pool)
+bool RaidQualified(Settings const& settings, Bot const& bot)
+{
+    if (bot.Level < settings.LevelCap)
+        return false;
+    return !settings.RaidQualified || settings.RaidQualified(bot);
+}
+
+Plan PlanMoves(Settings const& settings, std::vector<Guild> const& guilds, std::vector<Bot> const& pool)
 {
     Plan plan;
     std::uint32_t const size = EffectiveGuildSize(settings);
 
-    // The bots already in a guild, by guild, and the unplaced bots. A guid listed twice counts once.
-    std::map<std::uint64_t, std::vector<Bot const*>> byGuild;
-    std::set<std::uint64_t> seen;
-    std::vector<Bot const*> unplaced;
+    // Bots by guid (the first listed wins), and the known guilds by guid.
+    std::map<std::uint64_t, Bot const*> bots;
     for (Bot const& bot : pool)
-    {
-        if (bot.Guid == 0 || !seen.insert(bot.Guid).second)
-            continue;
-        if (bot.Guild == 0)
-            unplaced.push_back(&bot);
-        else
-            byGuild[bot.Guild].push_back(&bot);
-    }
+        if (bot.Guid != 0)
+            bots.emplace(bot.Guid, &bot);
+    std::map<std::uint64_t, Guild const*> known;
+    for (Guild const& guild : guilds)
+        if (guild.Guid != 0)
+            known.emplace(guild.Guid, &guild);
 
-    // Guilds with bots of both factions are not touched. Guilds per faction count for the names of the new ones.
-    std::map<std::uint64_t, int> sideOfGuild;   // guild -> 1, 2 or 3
-    std::uint32_t guildsPerSide[3] = { 0, 0, 0 };   // index 0 Alliance, 1 Horde (the 3 is mixed, not used)
-    std::map<std::uint64_t, std::uint32_t> fill;    // members per guild, for the guilds that take joins
-    for (auto const& [guild, members] : byGuild)
+    // The factions in each known guild (bit 1 Alliance, bit 2 Horde). A guild with both is mixed: left alone, and nobody joins it.
+    std::map<std::uint64_t, int> sides;
+    std::map<std::uint64_t, std::uint32_t> count;   // bots in each known guild, as the plan goes
+    for (auto const& [guid, bot] : bots)
     {
-        int side = SideOf(members);
-        sideOfGuild[guild] = side;
-        if (side == 3)
-        {
-            plan.MixedGuilds.push_back(guild);
+        if (bot->Guild == 0 || known.count(bot->Guild) == 0)
             continue;
+        sides[bot->Guild] |= bot->Alliance ? 1 : 2;
+        count[bot->Guild] += 1;
+    }
+    std::set<std::uint64_t> mixed;
+    for (auto const& [guild, bits] : sides)
+        if (bits == 3)
+        {
+            mixed.insert(guild);
+            plan.Mixed.push_back(guild);
         }
-        guildsPerSide[side == 1 ? 0 : 1] += 1;
-        fill[guild] = static_cast<std::uint32_t>(members.size());
-    }
 
-    for (int side = 1; side <= 2; ++side)
+    // Pass A: who stays, who leaves, and where each leaver or unguilded bot should go.
+    std::vector<Pending> pending;
+    for (auto const& [guid, bot] : bots)
     {
-        bool const alliance = side == 1;
-        std::vector<Bot const*> todo;
-        for (Bot const* bot : unplaced)
-            if (bot->Alliance == alliance)
-                todo.push_back(bot);
-        std::sort(todo.begin(), todo.end(), [](Bot const* a, Bot const* b) { return a->Guid < b->Guid; });
-        if (todo.empty())
+        if (bot->Guild != 0 && (known.count(bot->Guild) == 0 || mixed.count(bot->Guild)))
+            continue;                                   // a guild this plan does not manage
+        std::optional<Purpose> current;
+        if (bot->Guild != 0)
+            current = known.at(bot->Guild)->Kind;
+
+        bool const stays = current && bot->Want && *bot->Want == *current &&
+                           !(*current == Purpose::Leveling && bot->Level >= settings.LevelCap);
+        if (stays)
             continue;
 
-        // Fill the guilds of this faction that have room, lowest guild guid first.
-        std::size_t next = 0;
-        for (auto& [guild, count] : fill)
+        std::optional<Purpose> target;
+        if (bot->Want)
         {
-            if (next == todo.size())
-                break;
-            if (sideOfGuild[guild] != side)
-                continue;
-            while (count < size && next < todo.size())
+            switch (*bot->Want)
             {
-                plan.Joins.push_back({ todo[next]->Guid, guild });
-                ++next;
-                ++count;
+                case Purpose::Leveling: if (bot->Level < settings.LevelCap) target = Purpose::Leveling; break;
+                case Purpose::Utility: target = Purpose::Utility; break;
+                case Purpose::Raiding: if (RaidQualified(settings, *bot)) target = Purpose::Raiding; break;
             }
         }
-
-        // The rest make new guilds of `size` in guid order. The first of each is its master.
-        std::uint32_t ordinal = guildsPerSide[side == 1 ? 0 : 1];
-        while (next < todo.size())
-        {
-            NewGuild created;
-            created.Alliance = alliance;
-            ++ordinal;
-            char name[32];
-            std::snprintf(name, sizeof(name), "BotGuild %c%03u", alliance ? 'A' : 'H', static_cast<unsigned>(ordinal));
-            created.Name = name;
-            for (std::uint32_t i = 0; i < size && next < todo.size(); ++i, ++next)
-                created.Members.push_back(todo[next]->Guid);
-            created.Master = created.Members.front();
-            plan.Created.push_back(std::move(created));
-        }
+        if (!current && !target)
+            continue;
+        if (current)
+            count[bot->Guild] -= 1;
+        pending.push_back({ bot, bot->Guild, target });
     }
 
-    std::sort(plan.MixedGuilds.begin(), plan.MixedGuilds.end());
+    // Pass B: the placements. A guild with room of the purpose and faction takes the bot (lowest guid first); otherwise the bot starts or fills a new one.
+    std::map<std::pair<Purpose, bool>, int> openNew;      // (purpose, faction) -> index of the new guild still taking members
+    std::map<std::pair<Purpose, bool>, std::uint32_t> madeNew;
+    std::map<std::pair<Purpose, bool>, std::uint32_t> existingOfKind;
+    for (auto const& [guid, guild] : known)
+        existingOfKind[{ guild->Kind, guild->Alliance }] += 1;
+
+    std::map<std::uint64_t, Move> moves;
+    for (Pending const& p : pending)
+    {
+        Move move;
+        move.Bot = p.Member->Guid;
+        move.From = p.From;
+        if (p.Target)
+        {
+            std::uint64_t guildGuid = 0;
+            for (auto const& [guid, guild] : known)
+            {
+                if (guild->Kind == *p.Target && guild->Alliance == p.Member->Alliance && mixed.count(guid) == 0 && count[guid] < size)
+                {
+                    guildGuid = guid;
+                    break;
+                }
+            }
+            if (guildGuid != 0)
+            {
+                move.To = guildGuid;
+                count[guildGuid] += 1;
+            }
+            else
+            {
+                std::pair<Purpose, bool> key{ *p.Target, p.Member->Alliance };
+                auto open = openNew.find(key);
+                if (open == openNew.end() || plan.Created[open->second].Members.size() >= size)
+                {
+                    NewGuild created;
+                    created.Kind = *p.Target;
+                    created.Alliance = p.Member->Alliance;
+                    std::uint32_t ordinal = existingOfKind[key] + (++madeNew[key]);
+                    char name[48];
+                    std::snprintf(name, sizeof(name), "%s %c%03u", TagOf(*p.Target), created.Alliance ? 'A' : 'H', static_cast<unsigned>(ordinal));
+                    created.Name = name;
+                    plan.Created.push_back(created);
+                    openNew[key] = static_cast<int>(plan.Created.size()) - 1;
+                }
+                NewGuild& group = plan.Created[openNew[key]];
+                group.Members.push_back(p.Member->Guid);
+                group.Master = group.Members.front();
+                move.NewGuild = openNew[key];
+            }
+        }
+        moves[move.Bot] = move;
+    }
+
+    for (Pending const& p : pending)
+        plan.Moves.push_back(moves.at(p.Member->Guid));
+
+    // Empty leveling guilds are dissolved; utility and raiding guilds are kept.
+    for (auto const& [guid, guild] : known)
+        if (guild->Kind == Purpose::Leveling && mixed.count(guid) == 0 && count[guid] == 0)
+            plan.Dissolved.push_back(guid);
+
     return plan;
 }
 
-std::vector<std::uint64_t> OnlineGuildMates(std::vector<Bot> const& pool, std::uint64_t self, std::uint32_t minLevel)
+std::vector<std::uint64_t> GuildMates(Settings const& settings, std::vector<Guild> const& guilds, std::vector<Bot> const& pool, std::uint64_t self,
+                                      MateQuery const& query)
 {
     std::vector<std::uint64_t> mates;
     Bot const* me = nullptr;
     for (Bot const& bot : pool)
         if (bot.Guid == self)
+        {
             me = &bot;
-    if (me == nullptr || me->Guild == 0)
+            break;
+        }
+    if (me == nullptr)
         return mates;
+
+    std::map<std::uint64_t, Guild const*> known;
+    for (Guild const& guild : guilds)
+        if (guild.Guid != 0)
+            known.emplace(guild.Guid, &guild);
+
+    std::set<std::uint64_t> found;
     for (Bot const& bot : pool)
-        if (bot.Guid != self && bot.Guild == me->Guild && bot.Alliance == me->Alliance && bot.Online && bot.Level >= minLevel)
-            mates.push_back(bot.Guid);
-    std::sort(mates.begin(), mates.end());
+    {
+        if (bot.Guid == 0 || bot.Guid == self || bot.Guild == 0)
+            continue;
+        if (query.OnlineOnly && !bot.Online)
+            continue;
+        if (bot.Level < query.MinLevel || bot.Alliance != me->Alliance)
+            continue;
+        auto guild = known.find(bot.Guild);
+        if (guild == known.end() || guild->second->Kind != query.Kind)
+            continue;
+        if (query.SameGuildOnly && (me->Guild == 0 || bot.Guild != me->Guild))
+            continue;
+        if (query.RaidReadyOnly && !RaidQualified(settings, bot))
+            continue;
+        found.insert(bot.Guid);
+    }
+    mates.assign(found.begin(), found.end());
     return mates;
 }
 
