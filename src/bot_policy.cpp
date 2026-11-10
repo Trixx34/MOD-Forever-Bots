@@ -532,6 +532,34 @@ void BotPolicy::PlanParties(WorldTickSnapshotView const& view, std::unordered_ma
                     }
             }
         }
+        // PartyViewPlanner (layout 25): the core's shared party view adds what the bots-only merge cannot see: human members (they count for the tank
+        // role and the positions), a tank the view knows by role, and the loose mobs on non-tanks. With no view (the core's Bot.Snapshot.PartyView off,
+        // an older core, the group not built) nothing changes: the bots-only lists above are used as they are.
+        if (_options.PartyViewPlanner)
+        {
+            auto const leaderAt = indexOf.find(entry.first);
+            forever_module::PartyView const* const partyView = leaderAt == indexOf.end() ? nullptr : view.PartyViewOf(leaderAt->second);
+            if (partyView != nullptr)
+            {
+                for (party_planner::Member const& fromView : party_view::PlannerMembersOf(view, *partyView))
+                {
+                    auto const mine = std::find_if(members.begin(), members.end(), [&](party_planner::Member const& m) { return m.Guid == fromView.Guid; });
+                    if (mine == members.end())
+                        members.push_back(fromView); // a human: no interrupt row, no crowd control, never assigned a job
+                    else if (fromView.Tank)
+                        mine->Tank = true;
+                }
+                for (party_view::LooseMob const& loose : party_view::LooseMobsOf(view, *partyView))
+                {
+                    if (enemies.size() >= 64 || !seen.insert(loose.Unit).second)
+                        continue;
+                    party_planner::Enemy enemy;
+                    enemy.Ref = loose.Unit;
+                    enemy.Engaged = true; // it is on a member already
+                    enemies.push_back(enemy);
+                }
+            }
+        }
         party_planner::Plan(_options.PartyPlanner, members, enemies, nowMs, _partyOrders[entry.first]);
     }
 }

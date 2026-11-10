@@ -281,6 +281,7 @@ struct BotSettings
     // are off until each has a run of its own that shows a gain.
     bool TacticFocus = false, TacticInterrupt = false, TacticHeal = false, TacticRest = false, TacticRecover = false, TacticCc = false;
     bool PartyPlanner = true;     // the party planner (party_planner.h): its own key, PartyPlanner = 0 turns it off
+    bool PartyViewPlanner = false; // PartyViewPlanner = 1: the planner also reads the core's shared party view (needs the core's Bot.Snapshot.PartyView); default off
     // Bounded policy-lab knobs; defaults match the built-in dungeon policy.
     std::uint32_t DungeonHealBelowPct = 55;
     std::uint32_t DungeonTankHealBelowPct = 75;

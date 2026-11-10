@@ -29,6 +29,7 @@
 #pragma once
 
 #include "party_planner.h"
+#include "party_view_adapter.h"
 #include "role_profile.h"
 #include "forever_module/tier2_session.h"
 #include "chat_commands.h"
@@ -232,6 +233,8 @@ struct PolicyOptions
     bool TacticCc = true;
     // The party planner (party_planner.h): on by default (Module.forever-bots.PartyPlanner = 0 turns it off).
     party_planner::Settings PartyPlanner{ true };
+    // PartyViewPlanner: the planner also reads the core's shared party view (layout 25: humans, tank roles, loose mobs); off = the bots-only merge.
+    bool PartyViewPlanner = false;
     // Bounded knobs for offline dungeon-policy experiments; defaults preserve current behavior.
     std::uint32_t DungeonHealBelowPct = 55;
     std::uint32_t DungeonTankHealBelowPct = 75;

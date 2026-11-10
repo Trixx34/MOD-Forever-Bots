@@ -344,6 +344,10 @@ Module.forever-bots.TelemetrySummarySec = 60
 # Party planner (party_planner.h): one plan per party every 400 ms, the nearest ready kicker assigned to each cast, crowd control split between casters. On by default; it acts through
 # the interrupt and cc tactics (DungeonTactics), so with those off it changes nothing. 0 = off, every bot picks its own jobs as before. doc/dungeon-strategy.md.
 # Module.forever-bots.PartyPlanner = 0
+#
+# PartyViewPlanner = 1: the planner also reads the core's shared party view (layout 25; needs Bot.Snapshot.PartyView = 1 in the core): human
+# members, tank roles known by role, and the loose mobs on non-tanks. Default 0 (the bots-only merge); without a view it changes nothing.
+# Module.forever-bots.PartyViewPlanner = 1
 
 # Mounts: a bot asks to mount up for a long walk only from MountMinLevel (default 40: classic riding is learned at 40; 0 = any level).
 # Module.forever-bots.MountMinLevel = 40

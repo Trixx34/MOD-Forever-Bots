@@ -808,6 +808,7 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
         }
     }
     ReadBool(config, "PartyPlanner", settings.PartyPlanner, warnings);
+    ReadBool(config, "PartyViewPlanner", settings.PartyViewPlanner, warnings);
     ReadBool(config, "Crafting", settings.Crafting, warnings);
     ReadBool(config, "ActionStats", settings.ActionStats, warnings);
     ReadKey(config, "MountMinLevel", 0, 80, settings.MountMinLevel, warnings);
