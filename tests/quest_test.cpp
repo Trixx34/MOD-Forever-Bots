@@ -861,10 +861,28 @@ void ALevel60ListFallsBackToTheSidesLevelingList()
     CHECK(AcceptedAt(policy, bot, 1000) == 200);
 }
 
+void AMemoryBuiltOnTheLevelingListSurvivesTheSwitchToTheLevel60List()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.SideOf = [](std::uint64_t) -> std::uint8_t { return 1; };
+    // Three starts: the bot works the third (index 2). The level 60 list has one start, so index 2 is out of its range.
+    options.QuestLists[1][0] = OneQuest("start A\nanchor 0 -5000.0 -162.6 82.0\nquest 200 giver -5000.0 -162.6 82.0 ender -5000.0 -162.6 82.0\n"
+                                        "start B\nanchor 0 -3000.0 -162.6 82.0\nquest 201 giver -3000.0 -162.6 82.0 ender -3000.0 -162.6 82.0\n"
+                                        "start C\nanchor 0 -8902.6 -162.6 82.0\nquest 202 giver -8902.6 -162.6 82.0 ender -8902.6 -162.6 82.0\n");
+    options.QuestLists[1][1] = OneQuest("start Ally60\nanchor 0 -8902.6 -162.6 82.0\nquest 300 giver -8902.6 -162.6 82.0 ender -8902.6 -162.6 82.0\n");
+    BotPolicy policy(options);
+
+    BotSnapshot bot = Bot(-8902.6f, -162.6f);
+    CHECK(AcceptedAt(policy, bot, 1000) == 202);           // the memory now points at index 2 of the leveling list
+    bot.level = 60;
+    CHECK(AcceptedAt(policy, bot, 100000) == 300);         // no out of range read, the memory starts again on the new list
+}
+
 int main()
 {
     QuestListsFollowTheBotsSideAndLevelBand();
     ALevel60ListFallsBackToTheSidesLevelingList();
+    AMemoryBuiltOnTheLevelingListSurvivesTheSwitchToTheLevel60List();
     ReadDelayHoldsTheAcceptForThreeToTwelveSeconds();
     NoReadDelayByDefault();
     TrainerVisitWaitsForTheReadingDelay();

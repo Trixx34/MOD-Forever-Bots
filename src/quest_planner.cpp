@@ -113,6 +113,16 @@ QuestStep QuestPlanner::Next(BotSnapshot const& bot, QuestMemory& memory, std::u
     QuestStep none;
     if (!Enabled())
         return none;
+    if (memory.List != _data.get())
+    {
+        // The bot moved to another list (level 60): the indices and progress of the old one mean nothing here. Done, BlockedUntilMs,
+        // Refusals, PendingHandIn and RefusedHandIns are quest-id based and stay.
+        memory.List = _data.get();
+        memory.StartIndex = -2;
+        memory.NoRouteUntilMs.clear();
+        memory.AreaIndex.clear();
+        memory.Progress.clear();
+    }
     memory.WalkingToStart = false;
 
     // A hand-in that was sent and whose quest is out of the log is done.
@@ -219,7 +229,7 @@ QuestStep QuestPlanner::Next(BotSnapshot const& bot, QuestMemory& memory, std::u
 
     // The current start first (it keeps a bot working its zone), then the starts of its map by distance.
     std::vector<std::size_t> order;
-    if (memory.StartIndex >= 0)
+    if (memory.StartIndex >= 0 && std::size_t(memory.StartIndex) < _data->Starts.size())
         order.push_back(std::size_t(memory.StartIndex));
     std::vector<std::pair<float, std::size_t>> byDistance;
     for (std::size_t i = 0; i < _data->Starts.size(); ++i)

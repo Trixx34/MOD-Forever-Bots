@@ -49,6 +49,7 @@ struct QuestStep
 // What the planner remembers about one bot.
 struct QuestMemory
 {
+    QuestData const* List = nullptr;                    // the data the start and area indices below refer to (reset when the planner's list changes)
     int StartIndex = -2;                                // -2 not looked up yet, -1 no start for this bot
     std::set<std::uint32_t> Done;                       // quests handed in
     std::map<std::uint32_t, std::uint64_t> BlockedUntilMs;
