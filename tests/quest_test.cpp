@@ -878,6 +878,51 @@ void AMemoryBuiltOnTheLevelingListSurvivesTheSwitchToTheLevel60List()
     CHECK(AcceptedAt(policy, bot, 100000) == 300);         // no out of range read, the memory starts again on the new list
 }
 
+void ABotThatTurns60StillHandsInALevelingQuestFromItsLog()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.SideOf = [](std::uint64_t) -> std::uint8_t { return 1; };
+    // The leveling list has three starts (the bot works the third, index 2), the level 60 list one: an index of the old list is out of range there.
+    options.QuestLists[1][0] = OneQuest("start A\nanchor 0 -5000.0 -162.6 82.0\nquest 200 giver -5000.0 -162.6 82.0 ender -5000.0 -162.6 82.0\n"
+                                        "start B\nanchor 0 -3000.0 -162.6 82.0\nquest 201 giver -3000.0 -162.6 82.0 ender -3000.0 -162.6 82.0\n"
+                                        "start C\nanchor 0 -8902.6 -162.6 82.0\nquest 202 giver -8902.6 -162.6 82.0 ender -8902.6 -162.6 82.0\n");
+    options.QuestLists[1][1] = OneQuest("start Ally60\nanchor 0 -8902.6 -162.6 82.0\nquest 300 giver -8902.6 -162.6 82.0 ender -8902.6 -162.6 82.0\n");
+    BotPolicy policy(options);
+
+    BotSnapshot bot = Bot(-8902.6f, -162.6f);
+    bot.level = 59;
+    CHECK(AcceptedAt(policy, bot, 1000) == 202);
+    LogQuest(bot, 202, 2);                                 // complete, still in the log when the bot turns 60
+    bot.level = 60;
+    std::uint32_t handedIn = 0;
+    std::uint32_t accepted = 0;
+    for (BotAction const& action : policy.Decide(OneBotView(bot, {}), 100000))
+        if (action.type == ActionType::kQuest)
+        {
+            if ((action.spell_id >> 24) == kQuestHandIn)
+                handedIn = action.spell_id & 0xFFFFFF;
+            if ((action.spell_id >> 24) == kQuestAccept)
+                accepted = action.spell_id & 0xFFFFFF;
+        }
+    CHECK(handedIn == 202);
+    CHECK(accepted == 0);                                  // the hand-in comes before any new quest
+}
+
+void TheLevel60PlannerKnowsTheLevelingListButTakesNothingNewFromIt()
+{
+    auto const leveling = OneQuest("start A\nanchor 0 -8902.6 -162.6 82.0\nquest 200 giver -8902.6 -162.6 82.0 ender -8902.6 -162.6 82.0\n");
+    auto const sixty = OneQuest("start B\nanchor 0 -8902.6 -162.6 82.0\nquest 300 giver -8902.6 -162.6 82.0 ender -8902.6 -162.6 82.0\n");
+    QuestPlanner planner(sixty, leveling);
+    QuestMemory memory;
+    BotSnapshot bot = Bot(-8902.6f, -162.6f);
+    bot.level = 60;
+    QuestStep step = planner.Next(bot, memory, 1000);
+    CHECK(step.Kind == QuestStepKind::Accept && step.Quest == 300);   // never 200, which is only known
+    LogQuest(bot, 200, 2);
+    step = planner.Next(bot, memory, 100000);
+    CHECK(step.Kind == QuestStepKind::HandIn && step.Quest == 200);
+}
+
 void APartyOnlySideIsUsedForTheQuestList()
 {
     PolicyOptions options = AggressiveOptions();
@@ -895,6 +940,8 @@ int main()
     QuestListsFollowTheBotsSideAndLevelBand();
     ALevel60ListFallsBackToTheSidesLevelingList();
     AMemoryBuiltOnTheLevelingListSurvivesTheSwitchToTheLevel60List();
+    ABotThatTurns60StillHandsInALevelingQuestFromItsLog();
+    TheLevel60PlannerKnowsTheLevelingListButTakesNothingNewFromIt();
     APartyOnlySideIsUsedForTheQuestList();
     ReadDelayHoldsTheAcceptForThreeToTwelveSeconds();
     NoReadDelayByDefault();

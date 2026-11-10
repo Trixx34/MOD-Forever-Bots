@@ -50,19 +50,21 @@ QuestStep WalkOrAct(BotSnapshot const& bot, QuestMemory const& memory, QuestPoin
 
 } // namespace
 
-QuestPlanner::QuestPlanner(std::shared_ptr<QuestData const> data) : _data(std::move(data))
+QuestPlanner::QuestPlanner(std::shared_ptr<QuestData const> data, std::shared_ptr<QuestData const> alsoKnown)
+    : _data(std::move(data)), _alsoKnown(std::move(alsoKnown))
 {
-    if (!_data)
-        return;
-    for (std::size_t i = 0; i < _data->Starts.size(); ++i)
-        for (std::size_t q = 0; q < _data->Starts[i].Quests.size(); ++q)
-            _index.try_emplace(_data->Starts[i].Quests[q].Id, std::make_pair(i, q));
+    // The list the planner works from first, so a quest in both is the one of that list.
+    for (QuestData const* list : { _data.get(), _alsoKnown.get() })
+        if (list)
+            for (QuestStartDef const& start : list->Starts)
+                for (QuestDef const& quest : start.Quests)
+                    _index.try_emplace(quest.Id, &quest);
 }
 
 QuestDef const* QuestPlanner::Lookup(std::uint32_t quest) const
 {
     auto const at = _index.find(quest);
-    return at == _index.end() ? nullptr : &_data->Starts[at->second.first].Quests[at->second.second];
+    return at == _index.end() ? nullptr : at->second;
 }
 
 int QuestPlanner::FindStart(BotSnapshot const& bot) const
@@ -115,13 +117,12 @@ QuestStep QuestPlanner::Next(BotSnapshot const& bot, QuestMemory& memory, std::u
         return none;
     if (memory.List != _data.get())
     {
-        // The bot moved to another list (level 60): the indices and progress of the old one mean nothing here. Done, BlockedUntilMs,
-        // Refusals, PendingHandIn and RefusedHandIns are quest-id based and stay.
+        // The bot moved to another list (level 60): the start indices of the old one mean nothing here. Everything keyed by quest id (Done,
+        // BlockedUntilMs, Refusals, PendingHandIn, RefusedHandIns, Progress, AreaIndex) stays: the quests of the old list that are in the log
+        // are still known to the planner (alsoKnown), and AreaIndex is taken modulo the area count.
         memory.List = _data.get();
         memory.StartIndex = -2;
         memory.NoRouteUntilMs.clear();
-        memory.AreaIndex.clear();
-        memory.Progress.clear();
     }
     memory.WalkingToStart = false;
 

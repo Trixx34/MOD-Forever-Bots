@@ -135,7 +135,12 @@ std::array<QuestPlanner, 6> BotPolicy::MakeQuestSets(PolicyOptions const& option
             return options.QuestLists[side][0];
         return options.Quests;
     };
-    return { QuestPlanner(data(0, 0)), QuestPlanner(data(0, 1)), QuestPlanner(data(1, 0)), QuestPlanner(data(1, 1)), QuestPlanner(data(2, 0)), QuestPlanner(data(2, 1)) };
+    // The level 60 planner also knows the leveling list, so a bot that turns 60 can still hand in or abandon the quests in its log.
+    auto const planner = [&](std::size_t side, std::size_t band)
+    {
+        return band == 0 ? QuestPlanner(data(side, 0)) : QuestPlanner(data(side, 1), data(side, 0));
+    };
+    return { planner(0, 0), planner(0, 1), planner(1, 0), planner(1, 1), planner(2, 0), planner(2, 1) };
 }
 
 QuestPlanner const& BotPolicy::QuestsFor(BotSnapshot const& bot) const

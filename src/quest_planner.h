@@ -102,7 +102,9 @@ constexpr std::uint32_t QuestCode(std::uint32_t operation, std::uint32_t quest) 
 class QuestPlanner
 {
 public:
-    explicit QuestPlanner(std::shared_ptr<QuestData const> data);
+    // `data` is the list the planner picks new quests from. `alsoKnown` (the leveling list, for the level 60 planner) is only looked up: a quest of it
+    // in the bot's log is still handed in, hunted and abandoned, but no new quest is taken from it.
+    explicit QuestPlanner(std::shared_ptr<QuestData const> data, std::shared_ptr<QuestData const> alsoKnown = nullptr);
 
     bool Enabled() const { return _data && !_data->Starts.empty(); }
 
@@ -134,5 +136,6 @@ private:
     static bool Taken(QuestMemory const& memory, forever_module::BotSnapshot const& bot, std::uint32_t quest, std::uint64_t nowMs);
 
     std::shared_ptr<QuestData const> _data;
-    std::map<std::uint32_t, std::pair<std::size_t, std::size_t>> _index; // quest id -> (start, quest) of its first definition
+    std::shared_ptr<QuestData const> _alsoKnown; // kept alive for the pointers in _index
+    std::map<std::uint32_t, QuestDef const*> _index; // quest id -> its first definition (in `data`, else in `alsoKnown`); the lists are immutable
 };
