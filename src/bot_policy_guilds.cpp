@@ -67,10 +67,11 @@ void BotPolicy::DriveGuilds(forever_module::WorldTickSnapshotView const& view, s
     // A create becomes a known guild once its master's snapshot shows the guild id; a create nobody confirms is forgotten.
     for (BotSnapshot const& bot : view.bots)
     {
+        if (bot.guild_guid != 0)
+            _guildCreateBlocks.erase(bot.guid);   // also when the pending entry expired before the create was seen
         auto const pending = _pendingGuilds.find(bot.guid);
         if (pending == _pendingGuilds.end() || bot.guild_guid == 0)
             continue;
-        _guildCreateBlocks.erase(bot.guid);
         _botGuilds[bot.guild_guid] = bot_guilds::Guild{ bot.guild_guid, pending->second.Kind, pending->second.Alliance };
         _pendingGuilds.erase(pending);
     }
