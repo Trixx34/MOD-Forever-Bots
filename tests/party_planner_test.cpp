@@ -217,6 +217,29 @@ void KillTargetOrder()
     CHECK(o.KillTarget == 0);
 }
 
+// Heals: the neediest member first (an emergency before the tank), each to the nearest free healer in range; one member per healer.
+void HealsAreAssignedOneToEach()
+{
+    Member healerA; healerA.Guid = 1; healerA.CanHeal = true; healerA.X = 0;
+    Member healerB; healerB.Guid = 2; healerB.CanHeal = true; healerB.X = 20;
+    Member tank; tank.Guid = 3; tank.Tank = true; tank.InCombat = true; tank.HealPct = 50; tank.X = 1;
+    Member hurt; hurt.Guid = 4; hurt.HealPct = 10; hurt.X = 21;
+    Member fine; fine.Guid = 5; fine.HealPct = 95; fine.X = 2;
+    Order o;
+    Plan(On(), { healerA, healerB, tank, hurt, fine }, {}, 1000, o);
+    CHECK(o.Heals.size() == 2);
+    CHECK(o.Heals[0].Target == 4 && o.Heals[0].Bot == 2);   // the emergency goes to the nearest healer
+    CHECK(o.Heals[1].Target == 3 && o.Heals[1].Bot == 1);   // then the tank to the one left
+    CHECK(!HealAssignedElsewhere(&o, 1, 3));                // healer A holds the tank
+    CHECK(HealAssignedElsewhere(&o, 1, 4));                 // and leaves the emergency to B
+    CHECK(!HealAssignedElsewhere(&o, 1, 5));                // nobody needs the full-health member: no claim
+    CHECK(!HealAssignedElsewhere(nullptr, 1, 4));
+    // a healer out of range of the patient does not take it
+    Member farHealer = healerA; farHealer.X = 200;
+    Plan(On(), { farHealer, hurt }, {}, 2000, o);
+    CHECK(o.Heals.empty());
+}
+
 } // namespace
 
 int main()
@@ -231,6 +254,7 @@ int main()
     CrowdControlRespectsHeldUnitsAndSpellType();
     CastSeenIsForgotten();
     KillTargetOrder();
+    HealsAreAssignedOneToEach();
     if (failures)
     {
         std::printf("%d failure(s)\n", failures);

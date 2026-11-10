@@ -17,6 +17,10 @@ struct Settings
     std::uint64_t PlanIntervalMs = 400;     // a party's plan is recomputed at most this often
     std::uint64_t BackupDelayMs = 700;      // a backup kicker may fire only once the cast has been in view this long without a kick
     std::size_t MaxCcAssignments = 2;
+    std::uint32_t HealBelowPct = 60;        // a member at or above this share needs no heal (the caller sets the healers' own threshold)
+    std::uint32_t EmergencyPct = 20;        // below this share a member comes before the tank
+    std::uint32_t TankHealBelowPct = 55;    // the tank (or leader) in combat is healed below this share
+    float HealRangeYards = 30.0f;
 };
 
 // One party member as the planner sees it.
@@ -31,6 +35,10 @@ struct Member
     std::uint32_t CcSpell = 0;              // the class's crowd control spell for its level, 0 for none
     bool CcReady = true;
     std::uint64_t Holding = 0;              // the unit it holds right now (its crowd control still running), 0 for none
+    bool CanHeal = false;                   // a healer: a heal spell for its level and not playing the tank or damage role
+    std::uint32_t HealPct = 100;            // its health share
+    bool InCombat = false;
+    bool Leader = false;                    // the party leader, who tanks in a dungeon run (the healers' "tank")
 };
 
 // One hostile unit in the party's merged view.
@@ -54,6 +62,12 @@ struct InterruptAssignment
     std::uint8_t Rank = 0;                  // 0 first choice, 1 backup
 };
 
+struct HealAssignment
+{
+    std::uint64_t Bot = 0;                  // the healer
+    std::uint64_t Target = 0;               // the member it heals
+};
+
 struct CcAssignment
 {
     std::uint64_t Bot = 0;
@@ -66,6 +80,7 @@ struct Order
     std::uint64_t MainTank = 0;             // kept while the bot is alive and a member; otherwise the first tank
     std::vector<InterruptAssignment> Interrupts;
     std::vector<CcAssignment> CrowdControl;
+    std::vector<HealAssignment> Heals;      // one member per healer, the neediest first; a member nobody needs to heal is not listed
     std::uint64_t KillTarget = 0;           // the unit the damage dealers share: best kill rank, then a caster, then the weakest; never one that is held
     std::unordered_map<std::uint64_t, std::uint64_t> CastSeenMs;   // casting target -> when the plan first saw it casting
     std::uint64_t LastPlannedMs = 0;
@@ -83,6 +98,9 @@ bool IsAssignedInterrupt(Order const* order, std::uint64_t bot, std::uint64_t ta
 
 // The shared kill target of the plan, 0 for none (also with no plan).
 std::uint64_t KillTargetOf(Order const* order);
+
+// True when the plan gives `member` to another healer and `bot` has no assignment for it: the healer leaves that member alone.
+bool HealAssignedElsewhere(Order const* order, std::uint64_t bot, std::uint64_t member);
 
 // The unit a bot is to hold, 0 if the plan holds none for it.
 std::uint64_t CcTargetFor(Order const* order, std::uint64_t bot);

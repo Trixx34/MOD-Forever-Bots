@@ -110,6 +110,46 @@ bool Plan(Settings const& settings, std::vector<Member> const& members, std::vec
         order.CrowdControl.push_back({ m->Guid, best->Ref });
     }
 
+    // Heals: the members who need one, the emergencies first (lowest share), then the tank in combat, then the lowest share; each goes to the
+    // nearest free healer in range. A healer holds one member, so two healers never pick the same one in the same tick.
+    order.Heals.clear();
+    std::vector<Member const*> needy;
+    for (Member const& m : members)
+    {
+        bool const tanking = (m.Tank || m.Leader) && m.InCombat;
+        if (m.Alive && (m.HealPct < settings.EmergencyPct || m.HealPct < (tanking ? settings.TankHealBelowPct : settings.HealBelowPct)))
+            needy.push_back(&m);
+    }
+    auto const urgency = [&settings](Member const* m)
+    {
+        int const tier = m->HealPct < settings.EmergencyPct ? 0 : ((m->Tank || m->Leader) && m->InCombat && m->HealPct < settings.TankHealBelowPct) ? 1 : 2;
+        return std::make_tuple(tier, m->HealPct, m->Guid);
+    };
+    std::sort(needy.begin(), needy.end(), [&urgency](Member const* a, Member const* b) { return urgency(a) < urgency(b); });
+    std::unordered_set<std::uint64_t> busyHealers;
+    for (Member const* patient : needy)
+    {
+        Member const* best = nullptr;
+        float bestD = 0.0f;
+        for (Member const& h : members)
+        {
+            if (!h.Alive || !h.CanHeal || busyHealers.count(h.Guid))
+                continue;
+            float const d = std::hypot(h.X - patient->X, h.Y - patient->Y);
+            if (d > settings.HealRangeYards)
+                continue;
+            if (!best || d < bestD || (d == bestD && h.Guid < best->Guid))
+            {
+                best = &h;
+                bestD = d;
+            }
+        }
+        if (!best)
+            continue;
+        busyHealers.insert(best->Guid);
+        order.Heals.push_back({ best->Guid, patient->Guid });
+    }
+
     // Kill target: of the pack's units that nobody holds, the best kill rank, then a caster, then the weakest (lowest ref on a tie).
     order.KillTarget = 0;
     Enemy const* kill = nullptr;
@@ -124,6 +164,22 @@ bool Plan(Settings const& settings, std::vector<Member> const& members, std::vec
     if (kill)
         order.KillTarget = kill->Ref;
     return true;
+}
+
+bool HealAssignedElsewhere(Order const* order, std::uint64_t bot, std::uint64_t member)
+{
+    if (!order)
+        return false;
+    bool other = false;
+    for (HealAssignment const& a : order->Heals)
+    {
+        if (a.Target != member)
+            continue;
+        if (a.Bot == bot)
+            return false;
+        other = true;
+    }
+    return other;
 }
 
 std::uint64_t KillTargetOf(Order const* order)

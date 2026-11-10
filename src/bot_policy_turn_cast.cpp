@@ -113,7 +113,10 @@ BotPolicy::TurnFlow BotPolicy::PartyHeal(DecideTick& tick, BotTurn& turn)
                 return;
             std::uint64_t const pct = std::uint64_t(member.health) * 100 / member.max_health;
             if (pct < kPrayerBelowPct)
-                ++lowCount;
+                ++lowCount;   // counted before the assignment check: Prayer of Healing looks at the whole party, whoever else heals a member
+            // The party planner gave this member to another healer (party_planner.h): leave it, the same as a claim.
+            if (party_planner::HealAssignedElsewhere(tick.PlanOf(partyLeader), bot.guid, member.guid))
+                return;
             if (member.guid == partyLeader)
             {
                 tankMember = &member;

@@ -449,6 +449,11 @@ void BotPolicy::PlanParties(WorldTickSnapshotView const& view, std::unordered_ma
             member.X = snap.pos_x;
             member.Y = snap.pos_y;
             // paladin, rogue, shaman, mage: the classes with an interrupt row (the same list as TurnTargeting's focus scan)
+            member.InCombat = snap.in_combat != 0;
+            member.Leader = guid == entry.first;
+            member.HealPct = snap.max_health != 0 ? static_cast<std::uint32_t>(std::uint64_t(snap.health) * 100 / snap.max_health) : 100u;
+            member.CanHeal = (known == _bots.end() || (known->second.Role_ != BotState::Role::Dps && known->second.Role_ != BotState::Role::Tank)) &&
+                             HealSpellFor(classId, snap.level) != 0;
             member.CanInterrupt = _options.TacticInterrupt && (classId == 2 || classId == 4 || classId == 7 || classId == 8);
             member.InterruptReady = known == _bots.end() || nowMs >= known->second.NextCastMs;
             member.CcSpell = _options.TacticCc ? CcSpellForClass(classId) : 0;
@@ -560,7 +565,13 @@ void BotPolicy::PlanParties(WorldTickSnapshotView const& view, std::unordered_ma
                 }
             }
         }
-        party_planner::Plan(_options.PartyPlanner, members, enemies, nowMs, _partyOrders[entry.first]);
+        // The healers' own thresholds (PartyHeal), so the plan lists exactly the members a healer would heal.
+        party_planner::Settings settings = _options.PartyPlanner;
+        settings.HealBelowPct = (IsRouteActive(entry.first) && _options.TacticHeal) ? _options.DungeonHealBelowPct : kHealBelowPct;
+        settings.EmergencyPct = kEmergencyHealBelowPct;
+        settings.TankHealBelowPct = _options.DungeonTankHealBelowPct;
+        settings.HealRangeYards = kHealRangeYards;
+        party_planner::Plan(settings, members, enemies, nowMs, _partyOrders[entry.first]);
     }
 }
 
