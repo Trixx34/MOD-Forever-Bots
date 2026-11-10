@@ -102,6 +102,32 @@ void BotPolicy::TurnAdvisor(DecideTick& tick, BotTurn& turn)
     // Capital inspection (CityInspect) and quest group invites (QuestInvite): both look at the players near an idle bot.
     bool const calm = turn.idle && bot.group_role != 1;
     // The facts come from the snapshot (layout 23): BotSnapshot::in_capital and item_level, NearbyUnit::item_level and shared_objective.
+    if (calm && _options.CityGreet.Enabled && bot.in_capital && _options.Pools && !_options.Pools->CityGreetings.empty())
+    {
+        // The auction house: the auctioneer within 10 yards of the bot (snapshot layout 20).
+        bool const atAuction = bot.auctioneer_valid != 0 && std::hypot(bot.auctioneer_x - bot.pos_x, bot.auctioneer_y - bot.pos_y) <= 10.0f;
+        std::vector<std::string> const& pool = atAuction && !_options.Pools->AuctionTalk.empty() ? _options.Pools->AuctionTalk : _options.Pools->CityGreetings;
+        for (forever_module::NearbyUnit const& unit : turn.nearby)
+        {
+            if (forever_module::UnitRefType(unit.guid) != 2 || unit.is_hostile)
+                continue;
+            city_greet::Facts facts;
+            facts.Idle = true;
+            facts.InCapital = true;
+            facts.Distance = rotation::DistanceYards(bot, unit);
+            std::uint32_t draw = 0;
+            if (_cityGreet.Try(_options.CityGreet, facts, seed, bot.guid, unit.guid & forever_module::kUnitRefCounterMask, bot.map_id, nowMs, draw))
+            {
+                advisor::Order order;
+                order.What = advisor::Kind::Say;
+                order.Bot = bot.guid;
+                order.Target = unit.guid & forever_module::kUnitRefCounterMask;
+                order.Text = pool[draw % pool.size()];
+                _advisorOrders.push_back(std::move(order));
+                break;
+            }
+        }
+    }
     if (calm && ((_options.CityInspect.Enabled && bot.in_capital) || _options.QuestInvite.Enabled))
     {
         bool const inCapital = _options.CityInspect.Enabled && bot.in_capital != 0;

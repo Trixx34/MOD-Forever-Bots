@@ -575,7 +575,10 @@ void main_detail::PumpTier2(forever_module::Tier2Session& session, std::atomic<b
                 AppendSales(*extras.Sell, settings, view, actions, session.MaxActions(), nowMs(), extras.Alts);
             // Every source's moves pass the gate: a move to a place the core just found no route to is not sent again before the pause is over.
             for (forever_module::BotSnapshot const& bot : view.bots)
-                moveGate.Observe(bot.guid, bot.last_action_type, bot.last_action_status, bot.last_action_sequence, nowMs());
+            {
+                moveGate.Observe(bot.guid, bot.last_action_type, bot.last_action_status, bot.last_action_sequence, nowMs(), bot.pos_x, bot.pos_y);
+                moveGate.Progress(bot.guid, bot.pos_x, bot.pos_y, nowMs());
+            }
             moveGate.Filter(actions, nowMs());
             actionsTotal += actions.size();
             if (settings.ActionStats)

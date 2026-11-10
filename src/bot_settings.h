@@ -24,6 +24,7 @@
 #include "path_jitter.h"
 #include "guild_milestone.h"
 #include "city_inspect.h"
+#include "city_greet.h"
 #include "quest_invite.h"
 #include "realism.h"
 #include "taxi_policy.h"
@@ -233,6 +234,9 @@ struct BotSettings
     guild_milestone::Settings GuildMilestone;
     std::string GuildMilestoneFile = "data/guild_milestones.txt";
     city_inspect::Settings CityInspect;
+    city_greet::Settings CityGreet;
+    std::string CityGreetFile = "data/city_greetings.txt";
+    std::string AuctionTalkFile = "data/auction_talk.txt";
     quest_invite::Settings QuestInvite;
     // ADVISOR-MEMBERS
     // Supplies (layout 15, config keys Supplies, SupplyAmmoLow, SupplyAmmoTarget, SupplyFoodLow, SupplyFoodTarget, SupplyDrinkLow, SupplyDrinkTarget,

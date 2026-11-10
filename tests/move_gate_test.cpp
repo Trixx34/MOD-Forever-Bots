@@ -84,6 +84,29 @@ void TheSameAnswerIsCountedOnce()
     CHECK(Sent(gate, { Move(1, 100, 200) }, 5200) == 1);                       // still 5 s, not doubled
 }
 
+// A long walk refused as "no route" is often a first leg: the bot walks as far as the mesh path reaches. When it is 25 yards nearer, the hold is lifted.
+void AWalkThatMadeProgressIsReleasedAtOnce()
+{
+    move_gate::MoveGate gate;
+    Sent(gate, { Move(1, 1000, 0) }, 0);
+    gate.Observe(1, kMove, BotActionStatus::kNoRoute, 1, 100, 0, 0);           // 1,000 yards away: held for 5 s
+    gate.Progress(1, 10, 0, 1000);                                             // only 10 yards on
+    CHECK(Sent(gate, { Move(1, 1000, 0) }, 1100) == 0);
+    gate.Progress(1, 300, 0, 4000);                                            // the leg ended 300 yards on
+    CHECK(Sent(gate, { Move(1, 1000, 0) }, 4100) == 1);                        // the next leg goes out before the 5 s are over
+    gate.Observe(1, kMove, BotActionStatus::kNoRoute, 2, 4200, 300, 0);        // refused again: 5 s again, not 10
+    CHECK(Sent(gate, { Move(1, 1000, 0) }, 9300) == 1);
+}
+
+void AShortWalkIsNotReleasedByProgress()
+{
+    move_gate::MoveGate gate;
+    Sent(gate, { Move(1, 100, 0) }, 0);
+    gate.Observe(1, kMove, BotActionStatus::kNoRoute, 1, 100, 0, 0);           // 100 yards: not a long walk
+    gate.Progress(1, 60, 0, 1000);
+    CHECK(Sent(gate, { Move(1, 100, 0) }, 1100) == 0);
+}
+
 } // namespace
 
 int main()
@@ -92,6 +115,8 @@ int main()
     OtherBotsAndOtherActionsAreNotHeld();
     AnAppliedMoveEndsTheRunOfRefusals();
     TheSameAnswerIsCountedOnce();
+    AWalkThatMadeProgressIsReleasedAtOnce();
+    AShortWalkIsNotReleasedByProgress();
     if (failures == 0)
         std::printf("move_gate_test: all checks passed\n");
     return failures == 0 ? 0 : 1;

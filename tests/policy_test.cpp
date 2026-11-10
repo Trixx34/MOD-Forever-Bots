@@ -2059,7 +2059,51 @@ void ANoRouteAnswerEndsTheWalkInsteadOfBeingSentEveryTick()
     view.bots[0].last_action_sequence = 7;
     CHECK(WalkTo(policy.Decide(view, 30100), 10) < 0.0f);      // the core found no route: the walk is over
     CHECK(WalkTo(policy.Decide(view, 30150), 10) < 0.0f);      // and it is not sent again on the next tick
+    // 500 yards is a long walk: the answer may be a first leg only. The bot has not moved after the settle time, so the route is really missing.
+    policy.Decide(view, 34000);
     CHECK(WalkTo(policy.Decide(view, 80000), 10) == 900.0f);   // after the short pause for a walk that failed: the next hub
+}
+
+// A long walk the core answered with "no route" is a partial path: the bot walked as far as the mesh reaches. While each leg brings it nearer the same
+// move is sent again from where it stopped; a leg that went nowhere gives the walk up.
+void ALongWalkWithNoRouteIsChainedWhileItMakesProgress()
+{
+    BotPolicy policy = HubPolicy();
+    WorldTickSnapshotView view = OnMap(1);
+    policy.Decide(view, 0);
+    CHECK(WalkTo(AfterMount(policy, view, 30000), 10) == 500.0f);
+    view.bots[0].last_action_type = std::uint8_t(ActionType::kMoveTo);
+    view.bots[0].last_action_status = BotActionStatus::kNoRoute;
+    view.bots[0].last_action_sequence = 7;
+    CHECK(WalkTo(policy.Decide(view, 30100), 10) < 0.0f);       // nothing is sent again at once
+    view.bots[0].moving = 1;
+    CHECK(WalkTo(policy.Decide(view, 36000), 10) < 0.0f);       // still walking: no judgement
+    view.bots[0].moving = 0;
+    view.bots[0].pos_x = 300.0f;                                // the first leg ended 300 yards on, 200 short of the hub
+    CHECK(WalkTo(policy.Decide(view, 40000), 10) == 500.0f);    // the same move goes out again from there
+    view.bots[0].last_action_sequence = 8;                      // the core again: still no full route
+    CHECK(WalkTo(policy.Decide(view, 40100), 10) < 0.0f);
+    view.bots[0].pos_x = 420.0f;                                // the second leg
+    CHECK(WalkTo(policy.Decide(view, 45000), 10) == 500.0f);
+    view.bots[0].last_action_sequence = 9;
+    CHECK(WalkTo(policy.Decide(view, 45100), 10) < 0.0f);
+    CHECK(WalkTo(policy.Decide(view, 50000), 10) < 0.0f);       // this leg went nowhere (no progress): the route is missing, the walk is given up
+    CHECK(WalkTo(policy.Decide(view, 51000), 10) < 0.0f);       // and the refused place is not sent for the pause
+}
+
+void AShortWalkWithNoRouteIsNotChained()
+{
+    BotPolicy policy = HubPolicy();
+    WorldTickSnapshotView view = OnMap(1);
+    view.bots[0].pos_x = 355.0f;                                // 145 yards from the hub at 500
+    policy.Decide(view, 0);
+    CHECK(WalkTo(AfterMount(policy, view, 30000), 10) == 500.0f);
+    view.bots[0].last_action_type = std::uint8_t(ActionType::kMoveTo);
+    view.bots[0].last_action_status = BotActionStatus::kNoRoute;
+    view.bots[0].last_action_sequence = 7;
+    policy.Decide(view, 30100);
+    view.bots[0].pos_x = 440.0f;                                // it did walk, but a short refusal is a plain refusal: no second send
+    CHECK(WalkTo(policy.Decide(view, 36000), 10) != 500.0f);    // not the same move again (the walk is over; the next hub may follow)
 }
 
 // A random explore point the core has no route to (the point is at the bot's height, and often on ground the navmesh does not cover) is retried
@@ -7659,6 +7703,8 @@ int main()
     IdleBotWandersToAHubAfterAWhile();
     ArrivalMovesOnToTheNextHubAfterAnInterval();
     ANoRouteAnswerEndsTheWalkInsteadOfBeingSentEveryTick();
+    ALongWalkWithNoRouteIsChainedWhileItMakesProgress();
+    AShortWalkWithNoRouteIsNotChained();
     ARefusedExplorePointIsRetriedNearerAtOnce();
     ABlacksmithAsksForItsLineAndWalksToAnAnvilWhenTheRecipeNeedsOne();
     ANeedsFocusAnswerWithNoRouteOrNoTableEndsInAWait();

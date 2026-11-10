@@ -203,6 +203,12 @@ Module.forever-bots.TelemetrySummarySec = 60
 #                         the player; the item levels and the capital test come from the core's snapshot (protocol 22, layout 23): inert on an older core)
 # CityInspectChancePct = 5
 # CityInspectZoneMax = 2 (emotes a minute over all bots of one map; and no more than one bot per player per 5 minutes)
+# CityGreet = 0          (an idle bot in a capital that sees a player within 12 yards now and then says a line to the player in /say; a bot at the auction
+#                         house, the auctioneer within 10 yards, uses data/auction_talk.txt; one bot per player per 10 minutes)
+# CityGreetChancePct = 5
+# CityGreetZoneMax = 2   (lines a minute over all bots of one map)
+# CityGreetFile = data/city_greetings.txt
+# AuctionTalkFile = data/auction_talk.txt
 # QuestInvite = 0        (an idle bot and a human on the same quest objective, the human within 30 yards: the bot invites the human to its group, once per
 #                         human per 30 minutes, never within 2 hours of a decline; the shared objective comes from the snapshot and a decline from the protocol 22
 #                         event GroupScript.OnInviteDeclined)

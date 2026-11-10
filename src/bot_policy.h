@@ -62,6 +62,7 @@
 #include "path_jitter.h"
 #include "guild_milestone.h"
 #include "city_inspect.h"
+#include "city_greet.h"
 #include "quest_invite.h"
 #include "realism.h"
 #include "taxi_policy.h"
@@ -324,6 +325,7 @@ struct PolicyOptions
     path_jitter::Settings PathJitter;
     guild_milestone::Settings GuildMilestone;
     city_inspect::Settings CityInspect;
+    city_greet::Settings CityGreet;
     quest_invite::Settings QuestInvite;
     // ADVISOR-OPTIONS
     // Advisor features (docs: config/modules.d/forever-bots.conf.example, "Advisor features"; each off by default). The line pools are read once at start.
@@ -561,6 +563,14 @@ private:
         std::uint64_t WalkBlockedAtMs = 0;               // when a move got the answer "no route": the walk (grind spot, hub, exploring) that began before it is over, and the bot picks another later
         std::uint64_t NoRouteLoggedMs = 0;               // when a no-route refusal of any action was last written to the log (diagnostics)
         std::uint32_t NoRouteSequence = 0;               // the last kNoRoute result read (last_action_sequence)
+        // A long walk the core answered with kNoRoute still moved the bot as far as the navmesh reaches (a partial path: the mesh path is capped, not missing). While the
+        // bot makes progress towards the destination the walk is chained: the same move is sent again from where the bot stopped (PartialChainTick).
+        bool PartialActive = false;                      // a chained long walk is under way
+        Point PartialDest{};                             // its destination
+        float PartialLastYards = 0.0f;                   // the bot's distance to it when the last leg began
+        std::uint32_t PartialLegs = 0;                   // legs chained so far
+        std::uint64_t PartialSettleMs = 0;               // the leg is judged (stopped or still moving) not before this time
+        std::uint64_t PartialLegStartMs = 0;             // when the current leg began
         std::uint64_t GrindRetryAtMs = 0;                // no grind spot on this map for this level: explore on foot until this time, then look again
         std::uint32_t HubFailures = 0;                   // hub walks in a row that ended without arriving
         std::uint32_t ExploreStep = 0;                   // random walks made, for the direction of the next
@@ -784,6 +794,9 @@ private:
 
     void ReadResult(BotState& state, forever_module::BotSnapshot const& bot, std::uint64_t nowMs);
     void ReadCastResult(BotState& state, forever_module::BotSnapshot const& bot, std::uint64_t nowMs); // the cast half of ReadResult
+    bool NotePartialLeg(BotState& state, forever_module::BotSnapshot const& bot, std::uint64_t nowMs);  // a kNoRoute for a long walk: chained (true) or a plain refusal (false)
+    void PartialChainTick(BotState& state, forever_module::BotSnapshot const& bot, std::uint64_t nowMs); // sends the next leg of a chained walk, or gives the walk up when a leg went nowhere
+    void NoteMoveRefused(BotState& state, forever_module::BotSnapshot const& bot, std::uint64_t nowMs); // the bookkeeping of a refused walk: pause, refused places, quest start blocked
 
     // Parties (M8): cuts the bots of `view` into parties of _options.PartySize (one faction each, the lowest-guid
     // bots first), picks each party's leader (a set tank role, else a warrior with no role set), and fills
@@ -892,6 +905,7 @@ private:
     whisper_matrix::Matrix _whisperMatrix;                      // repeat avoidance of the matrix replies
     std::vector<whisper_matrix::Template> _whisperTemplates;    // parsed from Pools->WhisperReplies on first use
     bool _whisperTemplatesLoaded = false;
+    city_greet::Greeter _cityGreet;                             // limits of the capital greetings
     city_inspect::Inspector _cityInspect;                       // limits of the capital emotes
     quest_invite::Memory _questInvite;                          // who was invited and who declined
     guild_milestone::Speaker _guildSpeaker;                     // one bot answers one level event
