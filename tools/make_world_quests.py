@@ -8,14 +8,18 @@ Inputs (tab-separated, one record per line, a header line is skipped; see the do
   npcs.tsv        quest  role  creature  map  x  y  z           role start or end (every spawn of the giver or ender; the first on the quest's map is used)
   targets.tsv     quest  creature  map  x  y  z                 spawn points of the creatures a quest asks for (the hunting areas)
   drops.tsv       item  creature                               which creatures drop a quest item (for 'bring an item' objectives)
+  givers.tsv      quest  faction                              optional: the creature_template.faction of each creature that gives the quest (tools/export_giver_factions.sql);
+                                                              with --side a quest whose givers all belong to the other side (tools/faction_sides.tsv) is left out
 
 Quests are grouped into starts: the givers are cut into square cells (--cell yards, default 500) per map, and each cell with quests becomes a start
 whose anchor is the average position of its givers. Inside a start the quests are ordered by quest level, then by the order of their chains.
+With --side and givers.tsv, quests whose creature givers all belong to the other side are skipped too (the race masks are 0 on many quests).
 Skipped: quests with a type other than kill or item (exploration, talk, use object, escort ...), quests for a group (suggestedGroup > 1), quests on
 maps outside --maps, quests with no giver or ender on one map, and quests whose objectives name no creature with a known spawn.
 """
 import argparse
 import math
+import os
 import sys
 from collections import defaultdict
 
@@ -48,6 +52,16 @@ def num(text, default=0):
 # Standard race ids as mask bits (bit id-1): Human 1, Dwarf 3, Night Elf 4, Gnome 7 are Alliance; Orc 2, Undead 5, Tauren 6, Troll 8 are Horde. A mask that also
 # names a race above 8 (a custom race) is kept for both sides.
 SIDE_RACES = {"alliance": 0b01001101, "horde": 0b10110010}
+
+
+def load_faction_sides():
+    # tools/faction_sides.tsv: creature faction id -> alliance / horde; an id that is not listed is neutral.
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "faction_sides.tsv")
+    sides = {}
+    for _, p in rows(path):
+        if len(p) >= 2 and p[1] in ("alliance", "horde"):
+            sides[num(p[0])] = p[1]
+    return sides
 
 
 def mask_or_any(value):
@@ -100,6 +114,15 @@ def main():
         if len(p) >= 2:
             drops[num(p[0])].add(num(p[1]))
 
+    # Giver sides: a quest is kept out of a side's list when all its creature givers belong to the other side. A neutral giver (a faction that is in
+    # neither side's list, or one the table does not know) or a giver of each side keeps it in both lists. No givers.tsv means no filter.
+    giver_sides = defaultdict(set)
+    if args.side and os.path.exists(f"{d}/givers.tsv"):
+        faction_sides = load_faction_sides()
+        for _, p in rows(f"{d}/givers.tsv"):
+            if len(p) >= 2:
+                giver_sides[num(p[0])].add(faction_sides.get(num(p[1]), "neutral"))
+
     built = {}
     skipped = defaultdict(int)
     explained = []   # (quest, level, reason, detail)
@@ -119,6 +142,9 @@ def main():
             continue
         if args.side and info["races"] and not (info["races"] & SIDE_RACES[args.side]) and info["races"] >> 8 == 0:
             skip(qid, "other faction", f"races mask {info['races']}")
+            continue
+        if args.side and giver_sides[qid] == {"horde" if args.side == "alliance" else "alliance"}:
+            skip(qid, "giver of the other side", "givers: " + ",".join(sorted(giver_sides[qid])))
             continue
         giver = next(((m, x, y, z) for m, x, y, z in npcs[qid]["start"] if m in maps), None)
         if not giver:
