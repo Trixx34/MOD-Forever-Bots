@@ -878,11 +878,24 @@ void AMemoryBuiltOnTheLevelingListSurvivesTheSwitchToTheLevel60List()
     CHECK(AcceptedAt(policy, bot, 100000) == 300);         // no out of range read, the memory starts again on the new list
 }
 
+void APartyOnlySideIsUsedForTheQuestList()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.SideOf = [](std::uint64_t) -> std::uint8_t { return 0; };      // a custom race: the plain side lookup does not know it
+    options.PartySideOf = [](std::uint64_t) -> std::uint8_t { return 1; }; // the party lookup does
+    options.Quests = OneQuest("start Any\nanchor 0 -8902.6 -162.6 82.0\nquest 100 giver -8902.6 -162.6 82.0 ender -8902.6 -162.6 82.0\n");
+    options.QuestLists[1][0] = OneQuest("start Ally\nanchor 0 -8902.6 -162.6 82.0\nquest 200 giver -8902.6 -162.6 82.0 ender -8902.6 -162.6 82.0\n");
+    BotPolicy policy(options);
+    BotSnapshot bot = Bot(-8902.6f, -162.6f);
+    CHECK(AcceptedAt(policy, bot, 1000) == 200);
+}
+
 int main()
 {
     QuestListsFollowTheBotsSideAndLevelBand();
     ALevel60ListFallsBackToTheSidesLevelingList();
     AMemoryBuiltOnTheLevelingListSurvivesTheSwitchToTheLevel60List();
+    APartyOnlySideIsUsedForTheQuestList();
     ReadDelayHoldsTheAcceptForThreeToTwelveSeconds();
     NoReadDelayByDefault();
     TrainerVisitWaitsForTheReadingDelay();

@@ -140,7 +140,7 @@ std::array<QuestPlanner, 6> BotPolicy::MakeQuestSets(PolicyOptions const& option
 
 QuestPlanner const& BotPolicy::QuestsFor(BotSnapshot const& bot) const
 {
-    std::size_t side = _options.SideOf ? _options.SideOf(bot.guid) : 0;
+    std::size_t side = _options.PartySideOf ? _options.PartySideOf(bot.guid) : (_options.SideOf ? _options.SideOf(bot.guid) : 0);
     if (side > 2)
         side = 0;
     return _questSets[side * 2 + (bot.level >= 60 ? 1 : 0)];
