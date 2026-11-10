@@ -150,16 +150,16 @@ void LooseMobsAndTaunt()
     CHECK(loose.size() == 1);
     if (loose.size() == 1)
         CHECK(loose[0].Unit == kMobB && loose[0].Victim == kHealer && loose[0].SinceMs == 300 && loose[0].VictimIsHealer);
-    CHECK(party_view::TauntTargetFor(view, party, 11) == kMobB);
+    CHECK(party_view::TauntTargetFor(view, party, kTank) == kMobB);
     // the tank's own victim is never its taunt target
     WorldTickSnapshotView onOwn = view;
     onOwn.party_views[0].loose_mobs[0].unit_ref = kMobA;
-    CHECK(party_view::TauntTargetFor(onOwn, onOwn.party_views[0], 11) == 0);
+    CHECK(party_view::TauntTargetFor(onOwn, onOwn.party_views[0], kTank) == 0);
     // no loose mobs (Bot.Snapshot.PartyThreat off): nothing
     WorldTickSnapshotView quiet = view;
     quiet.party_views[0].loose_count = 0;
     CHECK(party_view::LooseMobsOf(quiet, quiet.party_views[0]).empty());
-    CHECK(party_view::TauntTargetFor(quiet, quiet.party_views[0], 11) == 0);
+    CHECK(party_view::TauntTargetFor(quiet, quiet.party_views[0], kTank) == 0);
 }
 
 void Dispels()
