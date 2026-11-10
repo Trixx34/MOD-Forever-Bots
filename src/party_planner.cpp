@@ -78,19 +78,27 @@ bool Plan(Settings const& settings, std::vector<Member> const& members, std::vec
     // protected or engaged one is never held.
     order.CrowdControl.clear();
     std::unordered_set<std::uint64_t> held;
+    std::size_t holding = 0;
+    for (Member const& m : members)
+        if (m.Alive && m.Holding != 0)
+        {
+            held.insert(m.Holding);     // a unit already held is not given to a second caster
+            ++holding;
+        }
     std::vector<Member const*> casterMembers;
     for (Member const& m : members)
-        if (m.Alive && m.CcSpell != 0 && m.CcReady)
+        if (m.Alive && m.CcSpell != 0 && m.CcReady && m.Holding == 0)
             casterMembers.push_back(&m);
     std::sort(casterMembers.begin(), casterMembers.end(), [](Member const* a, Member const* b) { return a->Guid < b->Guid; });
     for (Member const* m : casterMembers)
     {
-        if (order.CrowdControl.size() >= settings.MaxCcAssignments)
+        if (holding + order.CrowdControl.size() >= settings.MaxCcAssignments)
             break;
         Enemy const* best = nullptr;
         for (Enemy const& e : enemies)
         {
-            if (e.Casting || e.Engaged || e.Protected || !e.CcEligible || held.count(e.Ref))
+            if (e.Casting || e.Engaged || e.Protected || held.count(e.Ref) ||
+                std::find(e.CcSpells.begin(), e.CcSpells.end(), m->CcSpell) == e.CcSpells.end())
                 continue;
             if (!best || Dist(*m, e) < Dist(*m, *best) || (Dist(*m, e) == Dist(*m, *best) && e.Ref < best->Ref))
                 best = &e;

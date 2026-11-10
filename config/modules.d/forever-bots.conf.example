@@ -341,6 +341,10 @@ Module.forever-bots.TelemetrySummarySec = 60
 # Module.forever-bots.AvoidGroundEffects = 1
 # Module.forever-bots.AvoidSpellsFile = /srv/forever/sim/modules_runtime/forever-bots/data/avoid_spells.txt
 
+# Party planner (party_planner.h): one plan per party every 400 ms, the nearest ready kicker assigned to each cast, crowd control split between casters. On by default; it acts through
+# the interrupt and cc tactics (DungeonTactics), so with those off it changes nothing. 0 = off, every bot picks its own jobs as before. doc/dungeon-strategy.md.
+# Module.forever-bots.PartyPlanner = 0
+
 # Mounts: a bot asks to mount up for a long walk only from MountMinLevel (default 40: classic riding is learned at 40; 0 = any level).
 # Module.forever-bots.MountMinLevel = 40
 

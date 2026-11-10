@@ -1,7 +1,7 @@
 // The party planner (Phase 2 of the 2026-11-10 bot AI plan): a plan for one party, made once per interval from the whole party's view, instead
 // of each bot taking the first free job in guid order. Plain structs and free functions, no SDK dependency, unit-tested with hand-built input
 // (tests/party_planner_test.cpp). The Turn* steps read the plan first and fall back to their own scan when there is none, so a party with the
-// planner off (the default, DungeonTactics "planner") behaves as before.
+// planner off (Module.forever-bots.PartyPlanner = 0; it is on by default) behaves as before.
 #pragma once
 
 #include <cstddef>
@@ -30,6 +30,7 @@ struct Member
     bool InterruptReady = true;             // not on cooldown (the caller's NextCast / retry state)
     std::uint32_t CcSpell = 0;              // the class's crowd control spell for its level, 0 for none
     bool CcReady = true;
+    std::uint64_t Holding = 0;              // the unit it holds right now (its crowd control still running), 0 for none
 };
 
 // One hostile unit in the party's merged view.
@@ -40,7 +41,7 @@ struct Enemy
     bool Casting = false;
     bool Engaged = false;                   // already fought by the party
     bool Protected = false;                 // never held: the dungeon's kill priority, a boss
-    bool CcEligible = true;                 // a creature type the member's spell affects (the caller decides; one flag for the party's CC spell)
+    std::vector<std::uint32_t> CcSpells;    // the crowd control spells that may hold it (creature type, not a boss, not the kill priority, in the tank's pack)
 };
 
 struct InterruptAssignment

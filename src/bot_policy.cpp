@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+#include <algorithm>
+#include <cmath>
 #include "bot_policy_internal.h"
 #include "text_case.h"
 
@@ -450,6 +452,24 @@ void BotPolicy::PlanParties(WorldTickSnapshotView const& view, std::unordered_ma
             member.CanInterrupt = _options.TacticInterrupt && (classId == 2 || classId == 4 || classId == 7 || classId == 8);
             member.InterruptReady = known == _bots.end() || nowMs >= known->second.NextCastMs;
             member.CcSpell = _options.TacticCc ? CcSpellForClass(classId) : 0;
+            if (member.CcSpell != 0)
+            {
+                // below the spell's learn level the class holds nothing
+                std::uint32_t const learn = CcLearnLevel(member.CcSpell);
+                if (snap.level != 0 && snap.level < learn)
+                    member.CcSpell = 0;
+                if (known != _bots.end())
+                {
+                    auto const mine = known->second.Dots.find(member.CcSpell);
+                    if (mine != known->second.Dots.end() && nowMs < mine->second.UntilMs)
+                        member.Holding = mine->second.Target;
+                    auto const retry = known->second.RetryAtMs.find(member.CcSpell);
+                    if (retry != known->second.RetryAtMs.end() && nowMs < retry->second)
+                        member.CcReady = false;
+                }
+                if (snap.in_combat == 0 && member.Holding == 0 && snap.threat_target_guid == 0)
+                    member.CcReady = true;
+            }
             members.push_back(member);
             if (!member.Alive)
                 continue;
@@ -464,6 +484,47 @@ void BotPolicy::PlanParties(WorldTickSnapshotView const& view, std::unordered_ma
                 enemy.Casting = unit.casting != 0;
                 enemy.Engaged = engagedRefs.count(unit.guid) != 0;
                 enemies.push_back(enemy);
+            }
+        }
+        // Which crowd control spells may hold each unit: the same rules as the lone-bot scan (TurnCrowdControl): live, not a boss, not the
+        // dungeon's kill priority, of a type the spell affects, and in the tank's pack (near the leader's target).
+        if (_options.TacticCc)
+        {
+            auto const leaderAt = indexOf.find(entry.first);
+            if (leaderAt != indexOf.end() && view.bots[leaderAt->second].threat_target_guid != 0)
+            {
+                BotSnapshot const& leaderSnap = view.bots[leaderAt->second];
+                PolicyOptions::ScenarioRoute const& scenario = ScenarioOf(entry.first);
+                NearbyUnit const* tankTarget = nullptr;
+                // the leader's own list first; a member that sees the unit when the leader's list does not (16 slots) will do
+                for (std::uint64_t guid : guids)
+                {
+                    auto const at = indexOf.find(guid);
+                    if (tankTarget != nullptr || at == indexOf.end())
+                        continue;
+                    for (NearbyUnit const& unit : view.NearbyOf(at->second))
+                        if (unit.guid == leaderSnap.threat_target_guid)
+                        {
+                            tankTarget = &unit;
+                            break;
+                        }
+                }
+                if (tankTarget)
+                    for (party_planner::Enemy& enemy : enemies)
+                    {
+                        std::uint32_t const unitEntry = forever_module::UnitRefEntry(enemy.Ref);
+                        bool boss = false;
+                        for (auto const& bossAt : scenario.RouteBossAt)
+                            if (bossAt.second == unitEntry)
+                                boss = true;
+                        if (boss || scenario.KillPriority.find(unitEntry) != scenario.KillPriority.end() ||
+                            std::hypot(enemy.X - tankTarget->pos_x, enemy.Y - tankTarget->pos_y) > kFocusPackYards)
+                            continue;
+                        for (party_planner::Member const& m : members)
+                            if (m.CcSpell != 0 && CcAffects(m.CcSpell, CreatureTypeOf(unitEntry)) &&
+                                std::find(enemy.CcSpells.begin(), enemy.CcSpells.end(), m.CcSpell) == enemy.CcSpells.end())
+                                enemy.CcSpells.push_back(m.CcSpell);
+                    }
             }
         }
         party_planner::Plan(_options.PartyPlanner, members, enemies, nowMs, _partyOrders[entry.first]);

@@ -131,20 +131,57 @@ void CrowdControlDoesNotDoubleBook()
     Enemy e1;
     e1.Ref = 20;
     e1.X = 2;
+    e1.CcSpells = { 118 };
     Enemy e2;
     e2.Ref = 21;
     e2.X = 30;
+    e2.CcSpells = { 118 };
     Enemy engaged;
     engaged.Ref = 22;
     engaged.X = 1;
     engaged.Engaged = true;
+    engaged.CcSpells = { 118 };
     Enemy casting = Caster(23, 1);
+    casting.CcSpells = { 118 };
     Plan(s, { a, b }, { e1, e2, engaged, casting }, 1000, o);
     CHECK(o.CrowdControl.size() == 2);
     CHECK(CcTargetFor(&o, 1) == 20);
     CHECK(CcTargetFor(&o, 2) == 21);                     // the nearer one is already held
     CHECK(CcTargetFor(&o, 99) == 0);
     CHECK(CcTargetFor(nullptr, 1) == 0);
+}
+
+void CrowdControlRespectsHeldUnitsAndSpellType()
+{
+    Settings s = On();
+    Order o;
+    Member a;
+    a.Guid = 1;
+    a.CcSpell = 118;
+    Member b;
+    b.Guid = 2;
+    b.CcSpell = 118;
+    b.Holding = 20;                                      // already holds unit 20
+    Enemy held;
+    held.Ref = 20;
+    held.CcSpells = { 118 };
+    Enemy fresh;
+    fresh.Ref = 21;
+    fresh.X = 5;
+    fresh.CcSpells = { 118 };
+    Enemy wrongType;
+    wrongType.Ref = 22;
+    wrongType.CcSpells = { 9999 };                       // a spell this member does not have
+    Plan(s, { a, b }, { held, wrongType, fresh }, 1000, o);
+    CHECK(o.CrowdControl.size() == 1);
+    CHECK(CcTargetFor(&o, 1) == 21);
+    CHECK(CcTargetFor(&o, 2) == 0);                      // b is busy holding
+    // the limit counts what is already held
+    Settings one = On();
+    one.MaxCcAssignments = 1;
+    Order p;
+    Plan(one, { a, b }, { held, fresh }, 1000, p);
+    CHECK(p.CrowdControl.empty());
 }
 
 void CastSeenIsForgotten()
@@ -168,6 +205,7 @@ int main()
     UncoveredTargetFallsBackToTheClaimMap();
     MainTankIsKept();
     CrowdControlDoesNotDoubleBook();
+    CrowdControlRespectsHeldUnitsAndSpellType();
     CastSeenIsForgotten();
     if (failures)
     {

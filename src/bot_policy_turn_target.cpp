@@ -484,7 +484,14 @@ BotPolicy::TurnFlow BotPolicy::TurnCrowdControl(DecideTick& tick, BotTurn& turn)
                 NearbyUnit const* held = mine != state.Dots.end() ? FindLiveMob(nearby, mine->second.Target) : nullptr;
                 bool const dueForRefresh = held != nullptr && nowMs + kCcRefreshBeforeMs >= mine->second.UntilMs;
                 NearbyUnit const* candidate = (held != nullptr && dueForRefresh) ? held : nullptr;
-                if (held == nullptr)
+                party_planner::Order const* const plan = tick.PlanOf(partyLeader);
+                if (held == nullptr && plan != nullptr)
+                {
+                    // The party planner (party_planner.h) says which unit this bot holds, and lets two casters hold two units at once.
+                    if (std::uint64_t const planned = party_planner::CcTargetFor(plan, bot.guid); planned != 0)
+                        candidate = FindLiveMob(nearby, planned);
+                }
+                else if (held == nullptr)
                 {
                     // Someone else of this party already holds a unit: only one of the pack is held at a time.
                     bool otherHolder = false;

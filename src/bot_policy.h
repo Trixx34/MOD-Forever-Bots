@@ -230,8 +230,8 @@ struct PolicyOptions
     // Demon or Elemental only); one bot, one unit, the same "one at a time" rule as interrupt. Maintained for as long as the fight runs (recast a little
     // before the hold would run out); nothing to hold (no learned spell, or no pack member of a type it affects) does nothing, not an error.
     bool TacticCc = true;
-    // The party planner (party_planner.h): off by default, DungeonTactics "planner".
-    party_planner::Settings PartyPlanner;
+    // The party planner (party_planner.h): on by default (Module.forever-bots.PartyPlanner = 0 turns it off).
+    party_planner::Settings PartyPlanner{ true };
     // Bounded knobs for offline dungeon-policy experiments; defaults preserve current behavior.
     std::uint32_t DungeonHealBelowPct = 55;
     std::uint32_t DungeonTankHealBelowPct = 75;

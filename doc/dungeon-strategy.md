@@ -110,7 +110,7 @@ owner dies. The Warlock is taken from up to 35 yards from the tank's target (it 
 
 ### Dungeon tactics (`Module.forever-bots.DungeonTactics`)
 
-A comma list of `focus`, `interrupt`, `heal`, `rest`, `cc`, `planner`, or `all` / `none` (default: none, until a sim run shows a gain). Each is a rule of a dungeon party that can be measured on its own:
+A comma list of `focus`, `interrupt`, `heal`, `rest`, `cc`, or `all` / `none` (default: none, until a sim run shows a gain). Each is a rule of a dungeon party that can be measured on its own:
 
 | Tactic | What it does |
 |---|---|
@@ -119,7 +119,8 @@ A comma list of `focus`, `interrupt`, `heal`, `rest`, `cc`, `planner`, or `all` 
 | `heal` | a healer heals a party member below 75 % health (60 % without the tactic); the tank first, as before |
 | `rest` | the leader pulls the next pack only when every member has 90 % health and 80 % mana (80 / 60 without the tactic) |
 | `cc` | a rogue (Sap), mage (Polymorph) or warlock (Banish) holds one extra member of the tank's pack that nobody has engaged yet and that is not the dungeon's own `kill_priority`; one bot, one unit at a time, the same rule `interrupt` uses. Sap and Polymorph only affect a Humanoid; Banish only a Demon or Elemental; a pack with nothing of a type the party's classes can hold does nothing, not an error. Sap and Polymorph are learned well under either shipped dungeon's spawn level (Deadmines 23, Ragefire Chasm 18); Banish is not (it needs level 28) and today has no Demon or Elemental to use it on in either dungeon either -- kept for a later, higher-level dungeon |
-| `planner` | not part of `all`. A party plan (`party_planner.h`) made every 400 ms from the whole party's merged view: the nearest ready kicker is assigned to each casting unit, with a backup that may fire after 700 ms; with a plan, only the assigned kicker turns on the caster. The main tank and the crowd-control assignments are computed and tested but not read yet; kill focus is not planned yet. Needs `interrupt`. Without `planner` nothing changes. |
+
+The party planner (`Module.forever-bots.PartyPlanner`, default 1; 0 turns it off): `party_planner.h` makes one plan per party every 400 ms from the merged view of all members. The nearest ready kicker is assigned to each casting unit, with a backup that may fire after 700 ms; with a plan only the assigned kicker turns on the caster. Crowd control: each ready caster is assigned a pack unit its spell affects (not a boss, not the kill priority, not engaged, not casting), two holds at a time, and a unit already held is not given to a second caster. It acts only through the `interrupt` and `cc` tactics, so with those off it changes nothing. The main tank is planned and tested but not read yet; kill focus and heal focus are not planned yet.
 
 Always on, not a tactic: a dungeon party's dead wait 60 s for the healer before they release their spirit (20 s in other parties; 90 s before 0.31.0). The route leader also waits for every mana user of the party to have 80% mana (`route_hold why=mana`, 150 s at most).
 
