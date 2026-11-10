@@ -475,7 +475,7 @@ void BotPolicy::PartialChainTick(BotState& state, BotSnapshot const& bot, std::u
     ++state.RouteNoRoute;
     NoteMoveRefused(state, bot, nowMs);
     state.QuestTeleportSent = false;
-    _quests.NoteNoRoute(state.Quest, nowMs);
+    QuestsFor(bot).NoteNoRoute(state.Quest, nowMs);
 }
 
 void BotPolicy::ReadCastResult(BotState& state, BotSnapshot const& bot, std::uint64_t nowMs)
