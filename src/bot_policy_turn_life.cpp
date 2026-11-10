@@ -17,6 +17,7 @@ BotPolicy::TurnFlow BotPolicy::TurnBegin(DecideTick& tick, BotTurn& turn)
     turn.stagingHold = _stagingHoldFn && _stagingHoldFn(bot.guid);
     auto const& stagingHold = turn.stagingHold;
     ReadResult(state, bot, nowMs);
+    PartialChainTick(state, bot, nowMs);
     // A level-dungeon or LFG teleport was just ordered: the snapshot still shows the old place, so no other order until it has taken effect.
     if (nowMs < state.LevelHoldUntilMs)
         return TurnFlow::kSkip;

@@ -7,6 +7,12 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
         return;
     state.LastSequence = bot.last_action_sequence;
 
+    // A long walk the core found no full route for is chained while it makes progress (NotePartialLeg); a walk that was applied ends the chain.
+    bool const moveNoRoute = bot.last_action_type == uint8_t(ActionType::kMoveTo) && bot.last_action_status == BotActionStatus::kNoRoute;
+    if (bot.last_action_type == uint8_t(ActionType::kMoveTo) && bot.last_action_status == BotActionStatus::kApplied)
+        state.PartialActive = false;
+    bool const chained = moveNoRoute && NotePartialLeg(state, bot, nowMs);
+
     // A LoS recovery walk whose navmesh route failed cannot clear the wall; leave that target
     // for a while instead of issuing the same impossible reposition every tick.
     if (state.LosRepositionTarget != 0 && bot.last_action_type == uint8_t(ActionType::kMoveTo) &&
@@ -19,7 +25,7 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
     }
 
     // A town errand whose walk to the trainer has no route: the trip cannot be made, so it fails.
-    if (state.Errand && bot.last_action_type == uint8_t(ActionType::kMoveTo) && bot.last_action_status == BotActionStatus::kNoRoute)
+    if (state.Errand && moveNoRoute && !chained)
     {
         state.ErrandResult = ErrandOutcome::kFailed;
         state.Errand.reset();
@@ -136,7 +142,7 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
         _options.OnEvent("no_route: bot=" + std::to_string(bot.guid) + " " + what + " pos=" + std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) + "," +
                          std::to_string(int(bot.pos_z)) + " in_combat=" + std::to_string(bot.in_combat) + " route_index=" + std::to_string(state.RouteIndex));
     }
-    bool const noRoute = bot.last_action_type == uint8_t(ActionType::kMoveTo) && bot.last_action_status == BotActionStatus::kNoRoute;
+    bool const noRoute = moveNoRoute && !chained;
     bool const teleportRefused = bot.last_action_type == uint8_t(ActionType::kTeleport) &&
                                  bot.last_action_status != BotActionStatus::kApplied && bot.last_action_status != BotActionStatus::kNone;
     // A dungeon leader counts these against its current waypoint (kRouteNoRouteSkip). A move to the very place the bot already stands at is refused for lack of a route too (a
@@ -148,29 +154,7 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
     {
         state.NoRouteSequence = bot.last_action_sequence;
         if (noRoute)
-        {
-            state.WalkBlockedAtMs = nowMs;
-            // The same refused move must not be sent again every tick (it was 26 times a second for 220 bots): the place is blocked for a pause that
-            // doubles with every refusal in a row, 5 s up to 2 minutes.
-            if (state.LastMove)
-            {
-                bool const same = state.NoRouteUntilMs != 0 && std::hypot(state.NoRouteDest.X - state.LastMove->Dest.X, state.NoRouteDest.Y - state.LastMove->Dest.Y) < kNoRouteSameYards;
-                state.NoRouteStreak = same ? std::min<std::uint32_t>(state.NoRouteStreak + 1, 6) : 1;
-                state.NoRouteDest = state.LastMove->Dest;
-                state.NoRouteUntilMs = nowMs + (kNoRoutePauseMs << (state.NoRouteStreak - 1));
-                // The kite tries one point after another, and only the last refusal blocked: with two points it went back and forth between them (2026-10-30: 91,000 refusals in
-                // 15 minutes). Every refused point is kept for a while, so the circle is walked through and the bot then stands.
-                std::erase_if(state.RefusedPlaces, [nowMs](auto const& place) { return place.second <= nowMs; });
-                if (state.RefusedPlaces.size() >= kRefusedPlacesKept)
-                    state.RefusedPlaces.erase(state.RefusedPlaces.begin());
-                state.RefusedPlaces.emplace_back(state.LastMove->Dest, nowMs + kRefusedPlaceMs);
-                // A walk to a grind spot the core has no route to: reported to the shared list, which blocks the spot for every bot once enough bots agree.
-                if (state.Wandering && state.GrindSpotIndex != std::size_t(-1) && _options.Grind && state.GrindSpotIndex < _options.Grind->Spots.size() &&
-                    std::hypot(state.GrindTarget.X - state.LastMove->Dest.X, state.GrindTarget.Y - state.LastMove->Dest.Y) < 1.0f &&
-                    _grindBlocks.Report(state.GrindSpotIndex, bot.guid, nowMs) && _options.OnEvent)
-                    _options.OnEvent("grind_spot_blocked: spot=" + std::to_string(state.GrindSpotIndex) + " minutes=" + std::to_string(kGrindBlockMs / 60000));
-            }
-        }
+            NoteMoveRefused(state, bot, nowMs);
         state.QuestTeleportSent = false;
         _quests.NoteNoRoute(state.Quest, nowMs);
         if (teleportRefused && _options.OnEvent)
@@ -392,6 +376,108 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
 
 // The answer to a cast (ActionType::kCastSpell): the Deadmines cost log, the resurrect and pet spells, the refusals by status, and the upkeep buffs' back-off.
 // Split from ReadResult (which has already taken the sequence): a spell with no id, or any other action type, is not read here.
+void BotPolicy::NoteMoveRefused(BotState& state, BotSnapshot const& bot, std::uint64_t nowMs)
+{
+    state.WalkBlockedAtMs = nowMs;
+    // The same refused move must not be sent again every tick (it was 26 times a second for 220 bots): the place is blocked for a pause that
+    // doubles with every refusal in a row, 5 s up to 2 minutes.
+    if (state.LastMove)
+    {
+        bool const same = state.NoRouteUntilMs != 0 && std::hypot(state.NoRouteDest.X - state.LastMove->Dest.X, state.NoRouteDest.Y - state.LastMove->Dest.Y) < kNoRouteSameYards;
+        state.NoRouteStreak = same ? std::min<std::uint32_t>(state.NoRouteStreak + 1, 6) : 1;
+        state.NoRouteDest = state.LastMove->Dest;
+        state.NoRouteUntilMs = nowMs + (kNoRoutePauseMs << (state.NoRouteStreak - 1));
+        // The kite tries one point after another, and only the last refusal blocked: with two points it went back and forth between them (2026-10-30: 91,000 refusals in
+        // 15 minutes). Every refused point is kept for a while, so the circle is walked through and the bot then stands.
+        std::erase_if(state.RefusedPlaces, [nowMs](auto const& place) { return place.second <= nowMs; });
+        if (state.RefusedPlaces.size() >= kRefusedPlacesKept)
+            state.RefusedPlaces.erase(state.RefusedPlaces.begin());
+        state.RefusedPlaces.emplace_back(state.LastMove->Dest, nowMs + kRefusedPlaceMs);
+        // A walk to a grind spot the core has no route to: reported to the shared list, which blocks the spot for every bot once enough bots agree.
+        if (state.Wandering && state.GrindSpotIndex != std::size_t(-1) && _options.Grind && state.GrindSpotIndex < _options.Grind->Spots.size() &&
+            std::hypot(state.GrindTarget.X - state.LastMove->Dest.X, state.GrindTarget.Y - state.LastMove->Dest.Y) < 1.0f &&
+            _grindBlocks.Report(state.GrindSpotIndex, bot.guid, nowMs) && _options.OnEvent)
+            _options.OnEvent("grind_spot_blocked: spot=" + std::to_string(state.GrindSpotIndex) + " minutes=" + std::to_string(kGrindBlockMs / 60000));
+    }
+
+}
+
+// A kNoRoute answer for a walk of kPartialMinYards or more. The core starts the move anyway and the bot walks as far as the navmesh path reaches, and a long path is
+// capped, so the answer often means "a first leg only" (2026-11-09/10 sim: 62,000 refusals for walks over 300 yards, 39,000 over 1,000, each ending the walk). The
+// first such answer starts a chain and gives nothing up; PartialChainTick judges each leg.
+bool BotPolicy::NotePartialLeg(BotState& state, BotSnapshot const& bot, std::uint64_t nowMs)
+{
+    // A dungeon or raid route has its own handling of refusals (skip, rewind, teleport): it is left as it is.
+    if (!state.LastMove || state.LastMove->Target != 0 || IsRouteActive(bot.guid))
+        return false;
+    float const toDest = std::hypot(bot.pos_x - state.LastMove->Dest.X, bot.pos_y - state.LastMove->Dest.Y);
+    if (toDest < kPartialMinYards)
+    {
+        state.PartialActive = false;
+        return false;
+    }
+    bool const same = state.PartialActive && std::hypot(state.PartialDest.X - state.LastMove->Dest.X, state.PartialDest.Y - state.LastMove->Dest.Y) < kNoRouteSameYards;
+    if (!same)
+    {
+        state.PartialActive = true;
+        state.PartialDest = state.LastMove->Dest;
+        state.PartialLastYards = toDest;
+        state.PartialLegs = 0;
+    }
+    else if (state.PartialLegs >= kPartialLegsMax)
+    {
+        state.PartialActive = false;
+        return false;
+    }
+    state.PartialSettleMs = nowMs + kPartialSettleMs;
+    state.PartialLegStartMs = nowMs;
+    return true;
+}
+
+void BotPolicy::PartialChainTick(BotState& state, BotSnapshot const& bot, std::uint64_t nowMs)
+{
+    if (!state.PartialActive)
+        return;
+    // The chain is for the move that was sent last; when the bot has been given something else to do, it is over (nothing is blocked).
+    bool const stillThatWalk = state.Last && state.Last->Type == ActionType::kMoveTo && state.LastMove &&
+                               std::hypot(state.LastMove->Dest.X - state.PartialDest.X, state.LastMove->Dest.Y - state.PartialDest.Y) < 1.0f &&
+                               std::hypot(state.Last->Dest.X - state.PartialDest.X, state.Last->Dest.Y - state.PartialDest.Y) < 1.0f;
+    if (!stillThatWalk || bot.life_state != 0 || nowMs - state.PartialLegStartMs > kPartialLegMaxMs)
+    {
+        state.PartialActive = false;
+        return;
+    }
+    if (nowMs < state.PartialSettleMs || bot.moving != 0 || bot.in_combat != 0)
+        return;
+    float const toDest = std::hypot(bot.pos_x - state.PartialDest.X, bot.pos_y - state.PartialDest.Y);
+    if (toDest <= kPartialArrivedYards)
+    {
+        state.PartialActive = false;
+        return;
+    }
+    if (state.PartialLastYards - toDest >= kPartialProgressYards)
+    {
+        // The leg brought the bot nearer: the same move is sent again from here.
+        ++state.PartialLegs;
+        if (_options.OnEvent)
+            _options.OnEvent("walk_chained: bot=" + std::to_string(bot.guid) + " leg=" + std::to_string(state.PartialLegs) + " to_dest=" + std::to_string(int(toDest)) +
+                             " gained=" + std::to_string(int(state.PartialLastYards - toDest)) + " pos=" + std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)));
+        state.PartialLastYards = toDest;
+        state.PartialSettleMs = nowMs + kPartialSettleMs;
+        state.PartialLegStartMs = nowMs;
+        state.Last.reset(); // the move is the same, so it would not be sent again otherwise
+        return;
+    }
+    // The leg went nowhere: the route is really missing. The walk is refused now, as it would have been at the first answer.
+    state.PartialActive = false;
+    if (_options.OnEvent)
+        _options.OnEvent("walk_chain_ended: bot=" + std::to_string(bot.guid) + " legs=" + std::to_string(state.PartialLegs) + " to_dest=" + std::to_string(int(toDest)));
+    ++state.RouteNoRoute;
+    NoteMoveRefused(state, bot, nowMs);
+    state.QuestTeleportSent = false;
+    _quests.NoteNoRoute(state.Quest, nowMs);
+}
+
 void BotPolicy::ReadCastResult(BotState& state, BotSnapshot const& bot, std::uint64_t nowMs)
 {
     if (bot.last_action_type != uint8_t(ActionType::kCastSpell) || bot.last_action_spell == 0)
