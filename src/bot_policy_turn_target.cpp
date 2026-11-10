@@ -388,8 +388,8 @@ void BotPolicy::TurnTargeting(DecideTick& tick, BotTurn& turn)
             // A casting unit nobody has already claimed: InterruptTaken reads the claim a party member's rotation sets the moment it
             // actually sends a kick at this target (TurnRotation, bot_policy_turn_cast.cpp), so a second bot that could also
             // interrupt reaches past it for one that is still free, instead of every capable bot piling onto the one cast.
-            auto const interruptable = [interruptNow, nowMs, this](NearbyUnit const& unit)
-            { return interruptNow && unit.casting != 0 && !InterruptTaken(unit.guid, nowMs); };
+            auto const interruptable = [interruptNow, nowMs, this, &tick, &bot, partyLeader](NearbyUnit const& unit)
+            { return interruptNow && unit.casting != 0 && !InterruptTaken(unit.guid, nowMs) && (!tick.PlanOf(partyLeader) || party_planner::IsAssignedInterrupt(tick.PlanOf(partyLeader), bot.guid, unit.guid)); };
             if (routeOn && HealSpellFor(classId, bot.level) == 0 && ((_options.TacticFocus && !scenario.KillPriority.empty()) || interruptNow || golemNearby || voidwalkerNearby || summonNearby))
             {
                 auto const rankOf = [this, &scenario](NearbyUnit const& unit)

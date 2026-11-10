@@ -650,6 +650,15 @@ struct BotPolicy::DecideTick
     std::unordered_map<std::uint64_t, std::uint64_t>& leaderOf;                // bot guid -> its party's leader
     std::unordered_map<std::uint64_t, std::vector<std::uint64_t>>& membersOf;  // leader guid -> the other members
     std::unordered_set<std::uint64_t> const& tankLed;                         // the tanks leading their group ("tank lead")
+    std::unordered_map<std::uint64_t, party_planner::Order> const* partyOrders = nullptr; // each party's plan (null with the planner off)
+
+    party_planner::Order const* PlanOf(std::uint64_t leaderGuid) const
+    {
+        if (!partyOrders)
+            return nullptr;
+        auto const at = partyOrders->find(leaderGuid);
+        return at != partyOrders->end() ? &at->second : nullptr;
+    }
 
     // The nearby list of a party's leader when it is online and on the given map, else empty. A member's own list (16 slots: 4 players, then the closest creatures)
     // can be full of the raid's pets and totems, so a Warder the tank is fighting a few yards away is not in it (2026-11-08 20:03-20:05: 39 members logged no

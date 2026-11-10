@@ -1,0 +1,179 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Unit tests for the party planner (party_planner.h). No core needed.
+#include "party_planner.h"
+
+#include <cstdio>
+
+using namespace party_planner;
+
+namespace {
+
+int failures = 0;
+
+#define CHECK(cond)                                                    \
+    do {                                                               \
+        if (!(cond)) {                                                 \
+            ++failures;                                                \
+            std::printf("FAIL %s:%d: %s\n", __FILE__, __LINE__, #cond); \
+        }                                                              \
+    } while (0)
+
+Settings On()
+{
+    Settings s;
+    s.Enabled = true;
+    return s;
+}
+
+Member Kicker(std::uint64_t guid, float x)
+{
+    Member m;
+    m.Guid = guid;
+    m.CanInterrupt = true;
+    m.X = x;
+    return m;
+}
+
+Enemy Caster(std::uint64_t ref, float x)
+{
+    Enemy e;
+    e.Ref = ref;
+    e.X = x;
+    e.Casting = true;
+    return e;
+}
+
+void Disabled()
+{
+    Settings s;
+    Order o;
+    CHECK(!Plan(s, { Kicker(1, 0) }, { Caster(10, 5) }, 1000, o));
+    CHECK(o.Interrupts.empty());
+}
+
+void Throttle()
+{
+    Settings s = On();
+    Order o;
+    CHECK(Plan(s, { Kicker(1, 0) }, { Caster(10, 5) }, 1000, o));
+    CHECK(!Plan(s, { Kicker(1, 0) }, { Caster(10, 5) }, 1200, o));
+    CHECK(Plan(s, { Kicker(1, 0) }, { Caster(10, 5) }, 1400, o));
+}
+
+void NearestKickerWinsAndBackupIsNamed()
+{
+    Settings s = On();
+    Order o;
+    // bot 1 (earlier in guid order) is far; bot 2 is near the caster
+    Plan(s, { Kicker(1, 50), Kicker(2, 3) }, { Caster(10, 0) }, 1000, o);
+    CHECK(o.Interrupts.size() == 2);
+    CHECK(o.Interrupts[0].Bot == 2 && o.Interrupts[0].Rank == 0 && o.Interrupts[0].Target == 10);
+    CHECK(o.Interrupts[1].Bot == 1 && o.Interrupts[1].Rank == 1);
+    CHECK(MayInterrupt(s, &o, 2, 10, 1000));
+    CHECK(!MayInterrupt(s, &o, 1, 10, 1000));          // the backup waits
+    CHECK(MayInterrupt(s, &o, 1, 10, 1000 + s.BackupDelayMs));
+    CHECK(IsAssignedInterrupt(&o, 2, 10) && IsAssignedInterrupt(&o, 1, 10));
+}
+
+void KickerOnCooldownIsSkippedAndOneJobEach()
+{
+    Settings s = On();
+    Order o;
+    Member far = Kicker(1, 50);
+    Member near = Kicker(2, 1);
+    near.InterruptReady = false;
+    Plan(s, { far, near }, { Caster(10, 0), Caster(11, 2) }, 1000, o);
+    for (InterruptAssignment const& a : o.Interrupts)
+        CHECK(a.Bot == 1);
+    CHECK(o.Interrupts.size() == 1);                     // one ready kicker holds one job
+}
+
+void UncoveredTargetFallsBackToTheClaimMap()
+{
+    Settings s = On();
+    Order o;
+    Plan(s, { Kicker(1, 0) }, { Caster(10, 5) }, 1000, o);
+    CHECK(MayInterrupt(s, &o, 1, 99, 1000));             // not in the plan
+    CHECK(MayInterrupt(s, nullptr, 7, 10, 1000));        // no plan at all
+}
+
+void MainTankIsKept()
+{
+    Settings s = On();
+    Order o;
+    Member t1;
+    t1.Guid = 5;
+    t1.Tank = true;
+    Member t2;
+    t2.Guid = 3;
+    t2.Tank = true;
+    Plan(s, { t2, t1 }, {}, 1000, o);
+    CHECK(o.MainTank == 3);
+    Plan(s, { t1, t2 }, {}, 2000, o);
+    CHECK(o.MainTank == 3);                              // not re-elected
+    t2.Alive = false;
+    Plan(s, { t1, t2 }, {}, 3000, o);
+    CHECK(o.MainTank == 5);
+}
+
+void CrowdControlDoesNotDoubleBook()
+{
+    Settings s = On();
+    Order o;
+    Member a;
+    a.Guid = 1;
+    a.CcSpell = 118;
+    a.X = 0;
+    Member b;
+    b.Guid = 2;
+    b.CcSpell = 118;
+    b.X = 1;
+    Enemy e1;
+    e1.Ref = 20;
+    e1.X = 2;
+    Enemy e2;
+    e2.Ref = 21;
+    e2.X = 30;
+    Enemy engaged;
+    engaged.Ref = 22;
+    engaged.X = 1;
+    engaged.Engaged = true;
+    Enemy casting = Caster(23, 1);
+    Plan(s, { a, b }, { e1, e2, engaged, casting }, 1000, o);
+    CHECK(o.CrowdControl.size() == 2);
+    CHECK(CcTargetFor(&o, 1) == 20);
+    CHECK(CcTargetFor(&o, 2) == 21);                     // the nearer one is already held
+    CHECK(CcTargetFor(&o, 99) == 0);
+    CHECK(CcTargetFor(nullptr, 1) == 0);
+}
+
+void CastSeenIsForgotten()
+{
+    Settings s = On();
+    Order o;
+    Plan(s, { Kicker(1, 0) }, { Caster(10, 5) }, 1000, o);
+    CHECK(o.CastSeenMs.count(10) == 1);
+    Plan(s, { Kicker(1, 0) }, {}, 2000, o);
+    CHECK(o.CastSeenMs.empty());
+}
+
+} // namespace
+
+int main()
+{
+    Disabled();
+    Throttle();
+    NearestKickerWinsAndBackupIsNamed();
+    KickerOnCooldownIsSkippedAndOneJobEach();
+    UncoveredTargetFallsBackToTheClaimMap();
+    MainTankIsKept();
+    CrowdControlDoesNotDoubleBook();
+    CastSeenIsForgotten();
+    if (failures)
+    {
+        std::printf("%d failure(s)\n", failures);
+        return 1;
+    }
+    std::printf("party_planner_test: all passed\n");
+    return 0;
+}

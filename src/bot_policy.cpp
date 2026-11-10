@@ -412,6 +412,64 @@ void BotPolicy::BuildParties(WorldTickSnapshotView const& view,
     }
 }
 
+void BotPolicy::PlanParties(WorldTickSnapshotView const& view, std::unordered_map<std::uint64_t, std::size_t> const& indexOf,
+                            std::unordered_map<std::uint64_t, std::vector<std::uint64_t>> const& membersOf, std::uint64_t nowMs)
+{
+    for (auto const& entry : membersOf)
+    {
+        std::vector<std::uint64_t> guids{ entry.first };
+        guids.insert(guids.end(), entry.second.begin(), entry.second.end());
+        std::vector<party_planner::Member> members;
+        std::vector<party_planner::Enemy> enemies;
+        std::unordered_set<std::uint64_t> seen;
+        std::unordered_set<std::uint64_t> engagedRefs;
+        for (std::uint64_t guid : guids)
+        {
+            auto const at = indexOf.find(guid);
+            if (at == indexOf.end())
+                continue;
+            BotSnapshot const& snap = view.bots[at->second];
+            if (snap.life_state == 0 && snap.in_combat != 0 && snap.threat_target_guid != 0)
+                engagedRefs.insert(snap.threat_target_guid);
+        }
+        for (std::uint64_t guid : guids)
+        {
+            auto const at = indexOf.find(guid);
+            if (at == indexOf.end())
+                continue;
+            BotSnapshot const& snap = view.bots[at->second];
+            std::uint32_t const classId = ClassFor(_options, guid);
+            auto const known = _bots.find(guid);
+            party_planner::Member member;
+            member.Guid = guid;
+            member.Alive = snap.life_state == 0;
+            member.Tank = known != _bots.end() && known->second.Role_ == BotState::Role::Tank;
+            member.X = snap.pos_x;
+            member.Y = snap.pos_y;
+            // paladin, rogue, shaman, mage: the classes with an interrupt row (the same list as TurnTargeting's focus scan)
+            member.CanInterrupt = _options.TacticInterrupt && (classId == 2 || classId == 4 || classId == 7 || classId == 8);
+            member.InterruptReady = known == _bots.end() || nowMs >= known->second.NextCastMs;
+            member.CcSpell = _options.TacticCc ? CcSpellForClass(classId) : 0;
+            members.push_back(member);
+            if (!member.Alive)
+                continue;
+            for (NearbyUnit const& unit : view.NearbyOf(at->second))
+            {
+                if (!unit.is_hostile || unit.health == 0 || !IsLiveMob(unit) || !seen.insert(unit.guid).second || enemies.size() >= 64)
+                    continue;
+                party_planner::Enemy enemy;
+                enemy.Ref = unit.guid;
+                enemy.X = unit.pos_x;
+                enemy.Y = unit.pos_y;
+                enemy.Casting = unit.casting != 0;
+                enemy.Engaged = engagedRefs.count(unit.guid) != 0;
+                enemies.push_back(enemy);
+            }
+        }
+        party_planner::Plan(_options.PartyPlanner, members, enemies, nowMs, _partyOrders[entry.first]);
+    }
+}
+
 std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std::uint64_t nowMs)
 {
     std::vector<BotAction> actions;
@@ -478,7 +536,12 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         }
     }
 
-    DecideTick tick{ view, nowMs, actions, present, indexOf, leaderOf, membersOf, tankLed };
+    if (_options.PartyPlanner.Enabled)
+        PlanParties(view, indexOf, membersOf, nowMs);
+    for (auto it = _partyOrders.begin(); it != _partyOrders.end();)
+        it = membersOf.count(it->first) ? std::next(it) : _partyOrders.erase(it);
+
+    DecideTick tick{ view, nowMs, actions, present, indexOf, leaderOf, membersOf, tankLed, _options.PartyPlanner.Enabled ? &_partyOrders : nullptr };
 
     // ==== Per-bot decision loop ====
     // Order within one bot's turn: read its last action's result, handle ground-effect avoidance and line-of-sight

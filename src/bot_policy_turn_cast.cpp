@@ -881,7 +881,8 @@ BotPolicy::TurnFlow BotPolicy::TurnRotation(DecideTick& tick, BotTurn& turn)
         if (!rotation::Allowed(row, facts))
             continue;
         // Only one member of the party stops a cast: when a party member already claimed this target's interrupt, this bot uses its next row.
-        if (rotation::RowHasCondition(row, rotation::Cond::TargetCasting) && InterruptTaken(targetRef, nowMs))
+        if (rotation::RowHasCondition(row, rotation::Cond::TargetCasting) &&
+            (InterruptTaken(targetRef, nowMs) || !party_planner::MayInterrupt(_options.PartyPlanner, tick.PlanOf(partyLeader), bot.guid, targetRef, nowMs)))
             continue;
         // The effect is still up (on the target, or on the bot for a self buff): recasting only refreshes it.
         auto const dot = state.Dots.find(row.Spell);

@@ -28,6 +28,7 @@
 // when it has none of its own. Party actions are sent only out of combat.
 #pragma once
 
+#include "party_planner.h"
 #include "role_profile.h"
 #include "forever_module/tier2_session.h"
 #include "chat_commands.h"
@@ -229,6 +230,8 @@ struct PolicyOptions
     // Demon or Elemental only); one bot, one unit, the same "one at a time" rule as interrupt. Maintained for as long as the fight runs (recast a little
     // before the hold would run out); nothing to hold (no learned spell, or no pack member of a type it affects) does nothing, not an error.
     bool TacticCc = true;
+    // The party planner (party_planner.h): off by default, DungeonTactics "planner".
+    party_planner::Settings PartyPlanner;
     // Bounded knobs for offline dungeon-policy experiments; defaults preserve current behavior.
     std::uint32_t DungeonHealBelowPct = 55;
     std::uint32_t DungeonTankHealBelowPct = 75;
@@ -804,6 +807,9 @@ private:
     // `leaderOf` (every partied bot's leader) and `membersOf` (a leader's other members). Pulled out of Decide
     // because it is a self-contained computation over `view` and _options with no side effects beyond its two
     // out-parameters — unlike the rest of Decide, which threads per-tick fight state through the whole function.
+    // The party planner (party_planner.h): one plan per party leader, from the members' merged view. Called by Decide with the planner on.
+    void PlanParties(forever_module::WorldTickSnapshotView const& view, std::unordered_map<std::uint64_t, std::size_t> const& indexOf,
+                     std::unordered_map<std::uint64_t, std::vector<std::uint64_t>> const& membersOf, std::uint64_t nowMs);
     void BuildParties(forever_module::WorldTickSnapshotView const& view,
                        std::unordered_map<std::uint64_t, std::size_t> const& indexOf,
                        std::unordered_map<std::uint64_t, std::uint64_t>& leaderOf,
@@ -967,6 +973,7 @@ private:
         std::uint64_t UntilMs = 0;
     };
     std::unordered_map<std::uint64_t, InterruptClaim> _interruptClaims; // target unit reference -> claim
+    std::unordered_map<std::uint64_t, party_planner::Order> _partyOrders; // party leader guid -> its plan (Phase 2)
     PolicyOptions _options;
     // One planner per (side, band): index side * 2 + band.
     static std::array<QuestPlanner, 6> MakeQuestSets(PolicyOptions const& options);
