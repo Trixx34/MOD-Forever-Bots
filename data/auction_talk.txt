@@ -1,0 +1,6 @@
+# One line per remark a bot says (/say) to a player near it at the auction house. Lines over 255 bytes are skipped.
+Prices on the auction house are crazy today.
+Anything good on the auction house lately?
+I keep checking the auction house, nothing worth buying.
+Hello! Selling or buying today?
+Hey, the auction house is full of cheap herbs right now.

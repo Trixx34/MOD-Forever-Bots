@@ -22,6 +22,8 @@ struct Pools
     std::vector<std::string> PartyMana;
     std::vector<std::string> WhisperReplies;      // keyword|state|text, see whisper_matrix.h
     std::vector<std::string> GuildMilestones;
+    std::vector<std::string> CityGreetings;       // /say to a player nearby in a capital
+    std::vector<std::string> AuctionTalk;         // the same at the auction house
 };
 
 }  // namespace advisor

@@ -61,6 +61,7 @@
 #include "path_jitter.h"
 #include "guild_milestone.h"
 #include "city_inspect.h"
+#include "city_greet.h"
 #include "quest_invite.h"
 #include "realism.h"
 #include "taxi_policy.h"
@@ -308,6 +309,7 @@ struct PolicyOptions
     path_jitter::Settings PathJitter;
     guild_milestone::Settings GuildMilestone;
     city_inspect::Settings CityInspect;
+    city_greet::Settings CityGreet;
     quest_invite::Settings QuestInvite;
     // ADVISOR-OPTIONS
     // Advisor features (docs: config/modules.d/forever-bots.conf.example, "Advisor features"; each off by default). The line pools are read once at start.
@@ -858,6 +860,7 @@ private:
     whisper_matrix::Matrix _whisperMatrix;                      // repeat avoidance of the matrix replies
     std::vector<whisper_matrix::Template> _whisperTemplates;    // parsed from Pools->WhisperReplies on first use
     bool _whisperTemplatesLoaded = false;
+    city_greet::Greeter _cityGreet;                             // limits of the capital greetings
     city_inspect::Inspector _cityInspect;                       // limits of the capital emotes
     quest_invite::Memory _questInvite;                          // who was invited and who declined
     guild_milestone::Speaker _guildSpeaker;                     // one bot answers one level event

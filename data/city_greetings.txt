@@ -1,0 +1,9 @@
+# One line per greeting a bot says (/say) to a player nearby in a capital. Lines over 255 bytes are skipped.
+Hello there!
+Hi, how's it going?
+Hey, good to see someone around.
+Greetings, traveler.
+Hail and well met.
+Busy day in the city, isn't it?
+Hello! Off to adventure?
+Hey there, need anything?

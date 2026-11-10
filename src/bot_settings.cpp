@@ -705,6 +705,13 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadBool(config, "CityInspect", settings.CityInspect.Enabled, warnings);
     ReadKey(config, "CityInspectChancePct", 0, 100, settings.CityInspect.ChancePct, warnings);
     ReadKey(config, "CityInspectZoneMax", 0, 100, settings.CityInspect.ZoneMax, warnings);
+    ReadBool(config, "CityGreet", settings.CityGreet.Enabled, warnings);
+    ReadKey(config, "CityGreetChancePct", 0, 100, settings.CityGreet.ChancePct, warnings);
+    ReadKey(config, "CityGreetZoneMax", 0, 100, settings.CityGreet.ZoneMax, warnings);
+    if (auto const it = config.find("CityGreetFile"); it != config.end())
+        settings.CityGreetFile = it->second;
+    if (auto const it = config.find("AuctionTalkFile"); it != config.end())
+        settings.AuctionTalkFile = it->second;
     ReadBool(config, "QuestInvite", settings.QuestInvite.Enabled, warnings);
     // ADVISOR-KEYS
     ReadBool(config, "InnDowntime", settings.InnDowntime.Enabled, warnings);

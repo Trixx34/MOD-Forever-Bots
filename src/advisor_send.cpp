@@ -30,6 +30,11 @@ bool Send(forever_module::ModuleClient& client, Order const& order)
                 return false;
             client.BotSpeak(order.Bot, ModuleClient::SpeakKind::kGuild, 0, order.Text);
             return true;
+        case Kind::Say:
+            if (order.Text.empty())
+                return false;
+            client.BotSpeak(order.Bot, ModuleClient::SpeakKind::kSay, 0, order.Text);
+            return true;
         case Kind::TradeSay:
             if (order.Text.empty())
                 return false;
