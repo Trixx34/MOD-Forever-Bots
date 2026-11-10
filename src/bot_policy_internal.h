@@ -660,6 +660,14 @@ struct BotPolicy::DecideTick
         return at != partyOrders->end() ? &at->second : nullptr;
     }
 
+    // Layout 25: the core's shared view of a bot's group (null when the bot has none, the core's Bot.Snapshot.PartyView is off, or the bot is not in
+    // this tick's view). The planner adapter (party_view_adapter.h) turns it into planner inputs; nothing reads it yet.
+    forever_module::PartyView const* PartyViewOf(std::uint64_t botGuid) const
+    {
+        auto const at = indexOf.find(botGuid);
+        return at != indexOf.end() ? view.PartyViewOf(at->second) : nullptr;
+    }
+
     // The nearby list of a party's leader when it is online and on the given map, else empty. A member's own list (16 slots: 4 players, then the closest creatures)
     // can be full of the raid's pets and totems, so a Warder the tank is fighting a few yards away is not in it (2026-11-08 20:03-20:05: 39 members logged no
     // warder_near while the tank fought one, and none assisted it).
