@@ -121,7 +121,7 @@ void BotPolicy::DriveGuilds(forever_module::WorldTickSnapshotView const& view, s
         if (queued >= kGuildOrdersPerPlan || created.Members.empty())
             break;
         std::uint64_t const master = created.Master;
-        if (busy(master))
+        if (busy(master) || _pendingGuilds.count(master))   // a create in flight is not sent again (it would restart the pending clock and no block would ever be set)
             continue;
         if (auto const blocked = _guildCreateBlocks.find(master); blocked != _guildCreateBlocks.end() && blocked->second.UntilMs > nowMs)
             continue;
