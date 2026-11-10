@@ -1035,9 +1035,9 @@ void BotPolicy::MoveForQuestOrGoto(DecideTick& tick, BotTurn& turn)
             else if (stuck)
             {
                 if (questStep.StartGiver)
-                    _quests.NoteNoRoute(state.Quest, nowMs);
+                    QuestsFor(bot).NoteNoRoute(state.Quest, nowMs);
                 else
-                    _quests.NoteWalkStuck(state.Quest, questStep.Quest, nowMs); // a hand-in or hunting walk with no route: left alone for a while, the bot grinds
+                    QuestsFor(bot).NoteWalkStuck(state.Quest, questStep.Quest, nowMs); // a hand-in or hunting walk with no route: left alone for a while, the bot grinds
 
                 state.QuestTeleportSent = false;
                 state.WalkStillSinceMs = 0;
@@ -1098,7 +1098,7 @@ void BotPolicy::MoveForQuestOrGoto(DecideTick& tick, BotTurn& turn)
             if (operation == kQuestReward && _options.OnEvent)
                 _options.OnEvent("quest_reward: bot=" + std::to_string(bot.guid) + " quest=" + std::to_string(questStep.Quest) + " kind=class_quest level=" +
                                  std::to_string(bot.level) + " map=" + std::to_string(bot.map_id));
-            _quests.NoteSent(state.Quest, operation, questStep.Quest, nowMs);
+            QuestsFor(bot).NoteSent(state.Quest, operation, questStep.Quest, nowMs);
             wanted = Decision{ ActionType::kStop, 0 };
             break;
         }

@@ -45,6 +45,11 @@ def num(text, default=0):
         return default
 
 
+# Standard race ids as mask bits (bit id-1): Human 1, Dwarf 3, Night Elf 4, Gnome 7 are Alliance; Orc 2, Undead 5, Tauren 6, Troll 8 are Horde. A mask that also
+# names a race above 8 (a custom race) is kept for both sides.
+SIDE_RACES = {"alliance": 0b01001101, "horde": 0b10110010}
+
+
 def mask_or_any(value):
     # AllowableRaces / AllowableClasses: 0 or negative mean any; so does a value with every bit set (-1 stored unsigned). A wider mask is cut to 32 bits
     # (the module has race and class ids up to 32); a mask with no bit in those 32 means any.
@@ -61,6 +66,7 @@ def main():
     parser.add_argument("--areas", type=int, default=3, help="hunting areas per quest")
     parser.add_argument("--min-level", type=int, default=1)
     parser.add_argument("--max-level", type=int, default=60)
+    parser.add_argument("--side", choices=["alliance", "horde"], help="keep only quests the side's races may take (a quest open to every race stays in both lists)")
     parser.add_argument("--explain", help="write one line per skipped quest (quest, level, reason, detail) to this file, and print a breakdown of the reasons")
     args = parser.parse_args()
     maps = {int(m) for m in args.maps.split(",") if m}
@@ -110,6 +116,9 @@ def main():
             continue
         if not (args.min_level <= info["level"] <= args.max_level):
             skip(qid, "level")
+            continue
+        if args.side and info["races"] and not (info["races"] & SIDE_RACES[args.side]) and info["races"] >> 8 == 0:
+            skip(qid, "other faction", f"races mask {info['races']}")
             continue
         giver = next(((m, x, y, z) for m, x, y, z in npcs[qid]["start"] if m in maps), None)
         if not giver:

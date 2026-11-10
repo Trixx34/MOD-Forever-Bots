@@ -112,7 +112,7 @@ void BotPolicy::TurnShopping(DecideTick& tick, BotTurn& turn)
             if (state.ServiceUrgent)
             {
                 state.ServiceUrgent = false;
-                _quests.NoteServiced(state.Quest); // the bags are emptier: the refused hand-ins are tried again
+                QuestsFor(bot).NoteServiced(state.Quest); // the bags are emptier: the refused hand-ins are tried again
             }
             BotAction vendor;
             vendor.bot_guid = bot.guid;

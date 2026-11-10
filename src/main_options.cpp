@@ -188,6 +188,23 @@ void LoadPolicyTables(PolicyOptions& policyOptions, BotSettings& settings)
         std::cerr << "forever-bots: quests: " << quests->Starts.size() << " start(s) from " << settings.QuestFile << "\n";
         policyOptions.Quests = std::move(quests);
     }
+    {
+        // Faction and level 60 lists (side 1 Alliance, 2 Horde; band 1 = level 60).
+        struct ListFile { std::string const* Path; std::size_t Side; std::size_t Band; };
+        ListFile const lists[] = { { &settings.QuestFileAlliance, 1, 0 }, { &settings.QuestFileHorde, 2, 0 },
+                                   { &settings.QuestFileAlliance60, 1, 1 }, { &settings.QuestFileHorde60, 2, 1 } };
+        for (ListFile const& list : lists)
+        {
+            if (list.Path->empty())
+                continue;
+            std::vector<std::string> warnings;
+            auto data = std::make_shared<QuestData>(LoadQuestData(*list.Path, warnings));
+            for (std::string const& warning : warnings)
+                std::cerr << "forever-bots: " << warning << "\n";
+            std::cerr << "forever-bots: quests: " << data->Starts.size() << " start(s) from " << *list.Path << " (side " << list.Side << ", band " << list.Band << ")\n";
+            policyOptions.QuestLists[list.Side][list.Band] = std::move(data);
+        }
+    }
     policyOptions.QuestTeleport = settings.QuestTeleport;
     if (!settings.TameBeastFile.empty())
     {

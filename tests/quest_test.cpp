@@ -812,8 +812,59 @@ void TrainerVisitWaitsForTheReadingDelay()
     CHECK(later && at - 1000 >= 3000 && at - 1000 <= 12500);
 }
 
+// ---- lists per faction and band ----
+
+std::shared_ptr<QuestData const> OneQuest(char const* text)
+{
+    std::istringstream in(text);
+    std::vector<std::string> warnings;
+    return std::make_shared<QuestData>(ParseQuestData(in, warnings));
+}
+
+// The quest the bot would accept at the giver it stands next to (0 when none is sent).
+std::uint32_t AcceptedAt(BotPolicy& policy, BotSnapshot const& bot, std::uint64_t nowMs)
+{
+    for (BotAction const& action : policy.Decide(OneBotView(bot, {}), nowMs))
+        if (action.type == ActionType::kQuest && (action.spell_id >> 24) == kQuestAccept)
+            return action.spell_id & 0xFFFFFF;
+    return 0;
+}
+
+void QuestListsFollowTheBotsSideAndLevelBand()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.SideOf = [](std::uint64_t guid) -> std::uint8_t { return guid <= 10 ? 1 : 2; };
+    options.Quests = OneQuest("start Any\nanchor 0 -8902.6 -162.6 82.0\nquest 100 giver -8902.6 -162.6 82.0 ender -8902.6 -162.6 82.0\n");
+    options.QuestLists[1][0] = OneQuest("start Ally\nanchor 0 -8902.6 -162.6 82.0\nquest 200 giver -8902.6 -162.6 82.0 ender -8902.6 -162.6 82.0\n");
+    options.QuestLists[1][1] = OneQuest("start Ally60\nanchor 0 -8902.6 -162.6 82.0\nquest 300 giver -8902.6 -162.6 82.0 ender -8902.6 -162.6 82.0\n");
+    BotPolicy policy(options);
+
+    BotSnapshot ally = Bot(-8902.6f, -162.6f);   // guid 10: Alliance
+    CHECK(AcceptedAt(policy, ally, 1000) == 200);          // the Alliance leveling list
+    BotSnapshot ally60 = Bot(-8902.6f, -162.6f);
+    ally60.guid = 9;
+    ally60.level = 60;
+    CHECK(AcceptedAt(policy, ally60, 2000) == 300);        // the Alliance level 60 list
+    BotSnapshot horde = Bot(-8902.6f, -162.6f);
+    horde.guid = 11;                                       // Horde has no list of its own: the general one
+    CHECK(AcceptedAt(policy, horde, 3000) == 100);
+}
+
+void ALevel60ListFallsBackToTheSidesLevelingList()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.SideOf = [](std::uint64_t) -> std::uint8_t { return 1; };
+    options.QuestLists[1][0] = OneQuest("start Ally\nanchor 0 -8902.6 -162.6 82.0\nquest 200 giver -8902.6 -162.6 82.0 ender -8902.6 -162.6 82.0\n");
+    BotPolicy policy(options);
+    BotSnapshot bot = Bot(-8902.6f, -162.6f);
+    bot.level = 60;
+    CHECK(AcceptedAt(policy, bot, 1000) == 200);
+}
+
 int main()
 {
+    QuestListsFollowTheBotsSideAndLevelBand();
+    ALevel60ListFallsBackToTheSidesLevelingList();
     ReadDelayHoldsTheAcceptForThreeToTwelveSeconds();
     NoReadDelayByDefault();
     TrainerVisitWaitsForTheReadingDelay();

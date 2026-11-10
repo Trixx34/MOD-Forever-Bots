@@ -159,6 +159,9 @@ struct BotSettings
     std::map<std::uint32_t, std::vector<std::array<float, 3>>> Hubs;
     // Quests (M5): the starter quest data file (config key QuestFile, see quest_data.h). Empty turns quests off.
     std::string QuestFile;
+    // Per faction and band (config keys QuestFileAlliance, QuestFileHorde, QuestFileAlliance60, QuestFileHorde60): a bot of that side uses the list; from level 60 the
+    // "60" list. Empty keys fall back (level 60 -> the side's leveling list -> QuestFile).
+    std::string QuestFileAlliance, QuestFileHorde, QuestFileAlliance60, QuestFileHorde60;
     // QuestTeleport (0 or 1, off by default): a quest walk that has not moved for two minutes teleports to the giver. Needs
     // Bot.Actions.Teleport = 1 in the core. Off, that start is dropped and the bot grinds instead of retrying a refused teleport.
     bool QuestTeleport = false;

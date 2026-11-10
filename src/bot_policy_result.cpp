@@ -172,7 +172,7 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
             }
         }
         state.QuestTeleportSent = false;
-        _quests.NoteNoRoute(state.Quest, nowMs);
+        QuestsFor(bot).NoteNoRoute(state.Quest, nowMs);
         if (teleportRefused && _options.OnEvent)
             _options.OnEvent("quest_walk_blocked: bot=" + std::to_string(bot.guid) + " reason=teleport_refused status=" +
                              ActionStatusName(bot.last_action_status));
@@ -206,7 +206,7 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
             if (_options.OnEvent)
                 _options.OnEvent("quest_paused: bot=" + std::to_string(bot.guid) + " reason=refused_run minutes=" + std::to_string(kQuestPauseMs / 60000));
         }
-        if (_quests.NoteRefused(state.Quest, nowMs))
+        if (QuestsFor(bot).NoteRefused(state.Quest, nowMs))
         {
             // A hand-in the core refused: the reward did not fit in the bags. A bot with quest work is never idle, so the vendor visit that
             // empties the bags (sell, equip) is not left to the idle bot's turn.

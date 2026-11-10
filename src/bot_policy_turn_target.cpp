@@ -27,9 +27,9 @@ void BotPolicy::TurnQuestsAndHold(DecideTick& tick, BotTurn& turn)
     auto& questStep = turn.questStep;
     turn.routeBusy = false;
     auto& routeBusy = turn.routeBusy;
-    bool const questsAllowed = _quests.Enabled() && !partyMember && !stagingHold && !(IsRouteActive(bot.guid) && scenario.RouteMap != 0) /* a dungeon run: the leader walks the route, not to a quest giver */ && !lowHealth && bot.in_combat == 0 && !state.ChatStay && state.ChatFollow == 0 && nowMs >= state.QuestPausedUntilMs;
+    bool const questsAllowed = QuestsFor(bot).Enabled() && !partyMember && !stagingHold && !(IsRouteActive(bot.guid) && scenario.RouteMap != 0) /* a dungeon run: the leader walks the route, not to a quest giver */ && !lowHealth && bot.in_combat == 0 && !state.ChatStay && state.ChatFollow == 0 && nowMs >= state.QuestPausedUntilMs;
     if (questsAllowed)
-        questStep = _quests.Next(bot, state.Quest, nowMs, QuestBotInfo{ classId, _options.RaceOf ? _options.RaceOf(bot.guid) : 0u });
+        questStep = QuestsFor(bot).Next(bot, state.Quest, nowMs, QuestBotInfo{ classId, _options.RaceOf ? _options.RaceOf(bot.guid) : 0u });
     // Every five minutes, what the quest planner is doing for this bot and what keeps it from doing more (the events are the only record,
     // since a planner that takes no quest logs nothing otherwise).
     if (_options.OnEvent && nowMs - state.QuestDiagAtMs >= 300000)
@@ -37,7 +37,7 @@ void BotPolicy::TurnQuestsAndHold(DecideTick& tick, BotTurn& turn)
         state.QuestDiagAtMs = nowMs;
         static constexpr char const* kinds[] = { "none", "walk_to", "accept", "hand_in", "hunt", "abandon", "reward", "wait" };
         _options.OnEvent("quest_state: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id) +
-                         " allowed=" + std::to_string(questsAllowed) + " enabled=" + std::to_string(_quests.Enabled()) +
+                         " allowed=" + std::to_string(questsAllowed) + " enabled=" + std::to_string(QuestsFor(bot).Enabled()) +
                          " party=" + std::to_string(partyMember) + " low_health=" + std::to_string(lowHealth) + " in_combat=" + std::to_string(bot.in_combat) +
                          " chat_stay=" + std::to_string(state.ChatStay) + " chat_follow=" + std::to_string(state.ChatFollow != 0) +
                          " step=" + kinds[int(questStep.Kind)] + " quest=" + std::to_string(questStep.Quest) +

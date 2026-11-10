@@ -125,6 +125,27 @@ std::vector<BotPolicy::WhisperReply> BotPolicy::TakeWhisperReplies()
     return out;
 }
 
+std::array<QuestPlanner, 6> BotPolicy::MakeQuestSets(PolicyOptions const& options)
+{
+    auto const data = [&](std::size_t side, std::size_t band) -> std::shared_ptr<QuestData const>
+    {
+        if (options.QuestLists[side][band])
+            return options.QuestLists[side][band];
+        if (band == 1 && options.QuestLists[side][0])
+            return options.QuestLists[side][0];
+        return options.Quests;
+    };
+    return { QuestPlanner(data(0, 0)), QuestPlanner(data(0, 1)), QuestPlanner(data(1, 0)), QuestPlanner(data(1, 1)), QuestPlanner(data(2, 0)), QuestPlanner(data(2, 1)) };
+}
+
+QuestPlanner const& BotPolicy::QuestsFor(BotSnapshot const& bot) const
+{
+    std::size_t side = _options.SideOf ? _options.SideOf(bot.guid) : 0;
+    if (side > 2)
+        side = 0;
+    return _questSets[side * 2 + (bot.level >= 60 ? 1 : 0)];
+}
+
 std::vector<std::uint64_t> BotPolicy::BusyBots(WorldTickSnapshotView const& view) const
 {
     std::vector<std::uint64_t> busy;

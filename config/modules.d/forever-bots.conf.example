@@ -71,6 +71,12 @@ Module.forever-bots.TelemetrySummarySec = 60
 # A whole-world quest file (levels 1 to 60, made by tools/make_world_quests.py, doc/world-quests.md) works the same way: the bot takes quests that suit its
 # level, race and class from the nearest area that has some, and moves on to the next area when one is used up.
 # QuestFile = data/world_quests.txt
+# Quest lists per faction and band (all optional; a missing one falls back: level 60 list -> the side's leveling list -> QuestFile). A bot uses the list of its
+# side (Alliance or Horde); from level 60 it uses the "60" list. Made with tools/make_world_quests.py --side alliance|horde and --min-level 60.
+# QuestFileAlliance = data/world_quests_alliance.txt
+# QuestFileHorde = data/world_quests_horde.txt
+# QuestFileAlliance60 = data/world_quests_alliance_60.txt
+# QuestFileHorde60 = data/world_quests_horde_60.txt
 # A walk to a giver that does not move for two minutes is dropped (the bot grinds) unless this is 1. 1 teleports the bot to the giver
 # once; the core still refuses that unless Bot.Actions.Teleport = 1. A refused teleport drops the start either way.
 # QuestTeleport = 0

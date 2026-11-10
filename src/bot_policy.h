@@ -66,6 +66,7 @@
 #include "realism.h"
 #include "taxi_policy.h"
 
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <map>
@@ -150,6 +151,9 @@ struct PolicyOptions
     std::map<std::uint32_t, std::vector<Point>> HubsByMap;
     // Quests (M5): the starter quest data. Unset or empty means the bots do no quests and grind as before.
     std::shared_ptr<QuestData const> Quests;
+    // Quest lists per faction and band (side 0 unknown, 1 Alliance, 2 Horde; band 0 leveling, 1 level 60). A missing list falls back to the same side's
+    // leveling list (band 1 only), then to `Quests`.
+    std::shared_ptr<QuestData const> QuestLists[3][2];
     // A quest walk that has not moved for two minutes teleports to the giver when this is set. Off by default: the core refuses
     // the teleport unless Bot.Actions.Teleport is on, and retrying it held level-1 bots in walk_to. With this off, that start is
     // dropped the same way a no-route move is, and the bot grinds. A refused teleport drops the start either way.
@@ -333,7 +337,7 @@ char const* ActionStatusName(forever_module::BotActionStatus status);
 class BotPolicy
 {
 public:
-    explicit BotPolicy(PolicyOptions options = {}) : _options(options), _quests(options.Quests), _scenarioRoute(ScenarioRouteOf(options)),
+    explicit BotPolicy(PolicyOptions options = {}) : _options(options), _questSets(MakeQuestSets(options)), _scenarioRoute(ScenarioRouteOf(options)),
                                                      _whispers(options.WhisperCooldownMs, options.WhisperMaxPerMin) {}
 
     // Actions for the bots in `view`. nowMs is a monotonic clock in milliseconds (cooldowns, retries, fight time).
@@ -935,7 +939,11 @@ private:
     };
     std::unordered_map<std::uint64_t, HealClaim> _healClaims; // member bot guid -> claim
     PolicyOptions _options;
-    QuestPlanner _quests;
+    // One planner per (side, band): index side * 2 + band.
+    static std::array<QuestPlanner, 6> MakeQuestSets(PolicyOptions const& options);
+    std::array<QuestPlanner, 6> _questSets;
+    // The planner for this bot: its side (SideOf) and its band (level 60 or more is band 1).
+    QuestPlanner const& QuestsFor(forever_module::BotSnapshot const& bot) const;
     GrindBlocklist _grindBlocks;                     // grind spots no bot can reach, shared by all bots
     // The single-dungeon route of the options, and the per-bot one when several dungeons run (SetScenarioRouteFor).
     static PolicyOptions::ScenarioRoute ScenarioRouteOf(PolicyOptions const& options);
