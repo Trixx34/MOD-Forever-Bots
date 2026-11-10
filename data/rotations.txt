@@ -1,7 +1,7 @@
 # Rotations. Made by tools/make_rotations.py from the spec and the core's ability dump. Format: src/combat_rotation.h
 
 class 1
-row 5308 level 24 self_aura_below 71 1 target range 0 5   # Execute: ranks [5308, 20658, 20660, 20661, 20662]
+row 5308 level 24 self_aura_below 71 1 target_hp_below 20 target range 0 5   # Execute: ranks [5308, 20658, 20660, 20661, 20662]
 row 355 level 10 enemies 2 target range 0 5   # Taunt: ranks [355]
 row 2687 level 10 self_power_below 20 self   # Bloodrage: ranks [2687]
 row 1329555 level 1 self_power_below 30 self   # Reckless Swings: ranks [1329555]
@@ -19,7 +19,7 @@ buff 6673 level 1 duration 120 self ranks 5242,6192,6673,11549,11550,11551   # B
 buff 71 level 10 duration 120 self in_party   # Defensive Stance: ranks [71]
 
 class 1 spec prot
-row 5308 level 24 self_aura_below 71 1 target range 0 5   # Execute: ranks [5308, 20658, 20660, 20661, 20662]
+row 5308 level 24 self_aura_below 71 1 target_hp_below 20 target range 0 5   # Execute: ranks [5308, 20658, 20660, 20661, 20662]
 row 355 level 10 enemies 2 target range 0 5   # Taunt: ranks [355]
 row 2687 level 10 self_power_below 20 self   # Bloodrage: ranks [2687]
 row 1329555 level 1 self_power_below 30 self   # Reckless Swings: ranks [1329555]

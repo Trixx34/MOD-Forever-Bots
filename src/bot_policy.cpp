@@ -594,22 +594,15 @@ std::set<std::uint64_t> BotPolicy::PartyEngagedTargets(DecideTick const& tick, s
     return targets;
 }
 
-// Whether another member of this bot's party is already stopping a cast. The snapshot says who casts what, and a member with
-// casting_spell set is mid-cast (cast_remaining_ms is 0 for a spell in flight, which the core still counts as casting).
-// Only the party is looked at, so the cost does not grow with the bot count.
-bool BotPolicy::InterruptTaken(DecideTick const& tick, BotSnapshot const& bot, std::uint64_t leaderGuid) const
+// Whether a hostile's interrupt is already somebody's job: a claim set by TurnRotation the moment a party member's rotation
+// actually sends a row with Cond::TargetCasting at this target (bot_policy_turn_cast.cpp). Replaces a scan of other members'
+// casting_spell: every interrupt this module's rotations use (Kick, Hammer of Justice, Earth Shock, Rebuke...) is an instant
+// cast in classic, so casting_spell is back to 0 well before the next bot decides, and the scan almost never saw it
+// (2026-11-10 report, "the one-interrupt-per-party dedup almost never fires").
+bool BotPolicy::InterruptTaken(std::uint64_t targetRef, std::uint64_t nowMs) const
 {
-    if (leaderGuid == 0)
-        return false; // not in a party of this module's: nobody to coordinate with
-    bool taken = false;
-    tick.ForParty(leaderGuid, [&](BotSnapshot const& member)
-    {
-        if (member.guid == bot.guid || member.life_state != 0 || member.casting_spell == 0)
-            return;
-        if (IsInterruptSpell(member.casting_spell))
-            taken = true;
-    });
-    return taken;
+    auto const claim = _interruptClaims.find(targetRef);
+    return claim != _interruptClaims.end() && nowMs < claim->second.UntilMs;
 }
 
 float BotPolicy::PartyRouteLegDistance(std::uint64_t leaderGuid, std::uint32_t mapId, float x, float y) const

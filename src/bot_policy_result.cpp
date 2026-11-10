@@ -583,8 +583,23 @@ void BotPolicy::ReadCastResult(BotState& state, BotSnapshot const& bot, std::uin
     }
     if (bot.last_action_status == BotActionStatus::kNoLineOfSight)
     {
-        state.CloserUntilMs = nowMs + kCloserAfterLosMs; // walls between them: close in rather than cast through them
         auto const cast = state.CastTarget.find(spell);
+        // A healer's heal on a party member that it cannot see (319 refusals on the 2026-10-29 Onyxia run, with the healers holding
+        // still at the Warder stand-off): it is allowed to move for a few seconds to find the member again (TurnMoveSetup's
+        // healLosPoint, TurnMoveChoice's "heal_los" branch).
+        bool const healOnAlly = cast != state.CastTarget.end() && cast->second != 0 && forever_module::UnitRefType(cast->second) == kPlayerType &&
+                                state.Role_ != BotState::Role::Dps && HealSpellFor(ClassFor(_options, bot.guid), bot.level) != 0;
+        if (healOnAlly)
+        {
+            state.HealLosTarget = cast->second;
+            state.HealLosUntilMs = nowMs + kHealLosMoveMs;
+        }
+        else
+            // Walls between the bot and its own attack target: close in rather than cast through them. Not set for the heal-on-ally
+            // case above: CloserUntilMs feeds MoveToTarget's approach distance, which is the bot's own attack target, not the ally it
+            // was trying to heal; setting it there used to pull a line-of-sight-blocked healer toward the enemy it was fighting
+            // instead of toward the member it could not see (2026-11-10 report, "a healer's recovery walks toward the enemy").
+            state.CloserUntilMs = nowMs + kCloserAfterLosMs;
         if (cast != state.CastTarget.end() && cast->second != 0 &&
             ClassFor(_options, bot.guid) == 5 && (spell == 585 || spell == 589 || spell == 8092))
         {
@@ -593,14 +608,6 @@ void BotPolicy::ReadCastResult(BotState& state, BotSnapshot const& bot, std::uin
             if (_options.OnEvent)
                 _options.OnEvent("healer_dps_los_refused: healer=" + std::to_string(bot.guid) + " spell=" +
                                  std::to_string(spell) + " target=" + std::to_string(cast->second));
-        }
-        // A healer's heal on a party member that it cannot see (319 refusals on the 2026-10-29 Onyxia run, with the healers holding still at the Warder stand-off): it
-        // is allowed to move for a few seconds to find the member again (the Warder branch of the policy below).
-        if (cast != state.CastTarget.end() && cast->second != 0 && forever_module::UnitRefType(cast->second) == kPlayerType &&
-            state.Role_ != BotState::Role::Dps && HealSpellFor(ClassFor(_options, bot.guid), bot.level) != 0)
-        {
-            state.HealLosTarget = cast->second;
-            state.HealLosUntilMs = nowMs + kHealLosMoveMs;
         }
         if (++state.LosRefusals >= kLosRefusalsAvoid && cast != state.CastTarget.end() && cast->second != 0)
         {
@@ -633,7 +640,7 @@ void BotPolicy::ReadCastResult(BotState& state, BotSnapshot const& bot, std::uin
                 state.ComboTarget = cast->second;
             }
         }
-        if (spell == kEviscerate || spell == kRupture || spell == kSliceAndDice)
+        if (spell == kEviscerate || spell == kRupture || spell == kSliceAndDice || spell == kFerociousBite)
             state.ComboPoints = 0; // a finisher spends every combo point
     }
 

@@ -74,7 +74,10 @@ BotPolicy::TurnFlow BotPolicy::PartyHeal(DecideTick& tick, BotTurn& turn)
     BotState& state = turn.state;
     auto const& classId = turn.classId;
     auto const& partyLeader = turn.partyLeader;
-    std::uint32_t const healSpell = state.Role_ == BotState::Role::Dps ? 0u : HealSpellFor(classId, bot.level);
+    // A bot explicitly playing the tank never casts its class's heal spell from here: it has aggro and a target to hold, not
+    // a party to triage (a paladin or druid given the tank role used to run PartyHeal like a healer; 2026-11-10 report, "a
+    // paladin or druid tank does not auto-attack; it behaves like a healer").
+    std::uint32_t const healSpell = (state.Role_ == BotState::Role::Dps || state.Role_ == BotState::Role::Tank) ? 0u : HealSpellFor(classId, bot.level);
     auto const retry = healSpell != 0 ? state.RetryAtMs.find(healSpell) : state.RetryAtMs.end();
     // Payment is checked per spell below, so a cheaper heal is not held back by the one this healer cannot afford yet.
     if (healSpell != 0 && (retry == state.RetryAtMs.end() || nowMs >= retry->second))
@@ -167,10 +170,20 @@ BotPolicy::TurnFlow BotPolicy::PartyHeal(DecideTick& tick, BotTurn& turn)
             }
         };
         consider(bot);
+        // A bot's party leader, from the tick's shared map; a route-active leader with no module party of its own (a
+        // "tank lead" or level-dungeon run, which only needs IsRouteActive to reach this function, not partyLeader != 0) has no
+        // entry there, so it is its own group, the same fallback healGroup above uses. Previously dereferenced leaderOf.find's
+        // result unchecked, which was undefined behaviour for exactly that bot (2026-11-10 report, item 17); and separately read
+        // every other bot's entry with leaderOf[other.guid], which silently inserted a zero entry for every bot guid this ever
+        // ran across that was not already in the map, since leaderOf is a live reference into the tick's shared state, not a copy.
         auto const lead = leaderOf.find(bot.guid);
+        std::uint64_t const leadGuid = lead != leaderOf.end() ? lead->second : bot.guid;
         for (BotSnapshot const& other : view.bots)
-            if (other.guid != bot.guid && leaderOf.count(other.guid) && leaderOf[other.guid] == lead->second)
+        {
+            auto const otherLead = leaderOf.find(other.guid);
+            if (other.guid != bot.guid && otherLead != leaderOf.end() && otherLead->second == leadGuid)
                 consider(other);
+        }
         // Priority: emergency > tank holding aggro > shield > normal
         std::uint32_t spellToCast = 0;
         BotSnapshot const* target = nullptr;
@@ -546,7 +559,7 @@ void BotPolicy::TurnUpkeepBuffs(DecideTick& tick, BotTurn& turn)
             if (!row.Buff || !RowInLevelRange(row, bot.level))
                 continue;
             // A buff row may carry a condition: a stance only in a party (in_party), a pet summon only with no pet (no_pet).
-            if (row.When.Condition != rotation::Cond::Always && !rotation::Allowed(row.When, buffFacts))
+            if (!rotation::Allowed(row, buffFacts))
                 continue;
             auto const retry = state.RetryAtMs.find(row.Spell);
             if (retry != state.RetryAtMs.end() && nowMs < retry->second)
@@ -555,7 +568,7 @@ void BotPolicy::TurnUpkeepBuffs(DecideTick& tick, BotTurn& turn)
                 continue; // a warrior has no rage out of combat: Battle Shout waits until it has some, instead of a cast the core refuses
             // A pet summon (no_pet) is due whenever the snapshot shows no pet: the party claim and the buff timer below would hold it off for the
             // spell's duration (an hour), long after the demon died. The cast in progress and the global cooldown stop it being sent twice.
-            if (row.When.Condition == rotation::Cond::NoPet)
+            if (rotation::RowHasCondition(row, rotation::Cond::NoPet))
             {
                 BotAction summon;
                 summon.bot_guid = bot.guid;
@@ -652,7 +665,7 @@ void BotPolicy::TurnUpkeepBuffs(DecideTick& tick, BotTurn& turn)
                 {
                     if (!row.Buff || !row.Party || !RowInLevelRange(row, bot.level))
                         continue;
-                    if (row.When.Condition != rotation::Cond::Always)
+                    if (row.When.Condition != rotation::Cond::Always || row.When2.Condition != rotation::Cond::Always)
                         continue;
                     auto const retry = state.RetryAtMs.find(row.Spell);
                     if (retry != state.RetryAtMs.end() && nowMs < retry->second)
@@ -762,11 +775,15 @@ BotPolicy::TurnFlow BotPolicy::TurnRotation(DecideTick& tick, BotTurn& turn)
     auto const& partyLeader = turn.partyLeader;
     auto& targetUnit = turn.targetUnit;
     auto& targetRef = turn.targetRef;
-    auto& hasTarget = turn.hasTarget;
     auto const& distance = turn.distance;
     auto& wanted = turn.wanted;
 
-    if (!hasTarget)
+    // Nothing to cast at: stop here. Not "!hasTarget" (which also folds in the below-30%-health disengage, bot_policy_turn_target.cpp's
+    // lowHealth): that used to stop the whole rotation at low health, including a bot's own defensive and self-heal rows (Shield Block,
+    // Evasion, Holy Light on self...) at exactly the point they matter most (2026-11-10 report, "a bot below 30% health stops all
+    // ability use"). A solo bot that low still disengages (TurnMoveChoice's flee branch); this only lets it also use what it has while
+    // it does.
+    if (targetRef == 0)
     {
         state.AutoShotTarget = 0; // the fight is over: Auto Shot stopped with it
         return TurnFlow::kSkip;
@@ -861,10 +878,10 @@ BotPolicy::TurnFlow BotPolicy::TurnRotation(DecideTick& tick, BotTurn& turn)
             continue;
         if (row.OnTarget && row.MaxRange > 0.0f && castDistance > (row.MaxRange > kRangeSlackYards * 2.0f ? row.MaxRange - kRangeSlackYards : row.MaxRange))
             continue;
-        if (!rotation::Allowed(row.When, facts))
+        if (!rotation::Allowed(row, facts))
             continue;
-        // Only one member of the party stops a cast: when a party member is already casting an interrupt, this bot uses its next row.
-        if (row.When.Condition == rotation::Cond::TargetCasting && InterruptTaken(tick, bot, partyLeader))
+        // Only one member of the party stops a cast: when a party member already claimed this target's interrupt, this bot uses its next row.
+        if (rotation::RowHasCondition(row, rotation::Cond::TargetCasting) && InterruptTaken(targetRef, nowMs))
             continue;
         // The effect is still up (on the target, or on the bot for a self buff): recasting only refreshes it.
         auto const dot = state.Dots.find(row.Spell);
@@ -893,6 +910,16 @@ BotPolicy::TurnFlow BotPolicy::TurnRotation(DecideTick& tick, BotTurn& turn)
         actions.push_back(cast);
         state.CastTarget[row.Spell] = cast.target_guid;
         state.NextCastMs = nowMs + kGlobalCooldownMs;
+        // Claim this target's interrupt so another party member's rotation reaches past it for one still free (read by
+        // InterruptTaken; see _interruptClaims). Bounded the same way as the heal and buff claim maps: expired entries are
+        // dropped once there are enough of them to be worth the scan, so a long-running server does not grow this forever.
+        if (rotation::RowHasCondition(row, rotation::Cond::TargetCasting) && cast.target_guid != 0)
+        {
+            if (_interruptClaims.size() > 256)
+                for (auto it = _interruptClaims.begin(); it != _interruptClaims.end();)
+                    it = nowMs >= it->second.UntilMs ? _interruptClaims.erase(it) : std::next(it);
+            _interruptClaims[cast.target_guid] = InterruptClaim{ partyLeader, nowMs + kInterruptClaimMs };
+        }
         break;
     }
     return TurnFlow::kNext;

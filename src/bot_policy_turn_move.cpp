@@ -100,9 +100,12 @@ void BotPolicy::TurnMoveChoice(DecideTick& tick, BotTurn& turn)
         if (!kiteFound && warderLog)
             _options.OnEvent("kite_none: bot=" + std::to_string(bot.guid) + " all 6 points blocked (no route, refused or hazard)");
     }
-    else if (partyMember && bot.in_combat != 0 && nowMs < state.HealLosUntilMs && state.HealLosTarget != 0 && aoeWarder != nullptr && healLosPoint)
+    else if (partyMember && bot.in_combat != 0 && nowMs < state.HealLosUntilMs && state.HealLosTarget != 0 && healLosPoint)
     {
-        // A healer whose heal was refused for line of sight steps to where it may see the member, but never into the Fire Nova.
+        // A healer whose heal was refused for line of sight steps to where it may see the member, never into an Onyxian Warder's Fire
+        // Nova when one is near (TurnMoveSetup's healLosPoint already keeps clear of those). Used to need a Warder nearby to run at
+        // all, so outside that one fight a line-of-sight-refused heal left the healer walking toward its own attack target instead
+        // of the party member it could not see (2026-11-10 report, "a healer's recovery walks toward the enemy").
         wanted = Decision{ ActionType::kMoveTo, 0, *healLosPoint };
         moveWhy = "heal_los";
     }
@@ -120,6 +123,7 @@ void BotPolicy::MoveToTarget(DecideTick& tick, BotTurn& turn)
     BotSnapshot const& bot = turn.bot;
     BotState& state = turn.state;
     auto const& classId = turn.classId;
+    auto const& spec = turn.spec;
     auto const& partyLeader = turn.partyLeader;
     auto const& partyMember = turn.partyMember;
     auto& targetUnit = turn.targetUnit;
@@ -141,28 +145,34 @@ void BotPolicy::MoveToTarget(DecideTick& tick, BotTurn& turn)
                   " hp=" + std::to_string(bot.health) + "/" + std::to_string(bot.max_health) +
                   " power=" + std::to_string(bot.power) + "/" + std::to_string(bot.max_power) +
                   " target=" + std::to_string(forever_module::UnitRefEntry(targetRef)) + RouteYardsField(turn));
-        // Layout 13: the pet is in the snapshot, so it can be sent at this fight's target. Once per fight, so a
-        // long one does not repeat the order. A core that reports no pet never gets this action.
-        if (PetOf(bot) == PetKnown::kOut)
-        {
-            BotAction petGo;
-            petGo.bot_guid = bot.guid;
-            petGo.type = ActionType::kPetCommand;
-            petGo.spell_id = kPetAttack;
-            petGo.target_guid = targetRef;
-            actions.push_back(petGo);
-            state.PetCommanded = true;
-        }
+    }
+    // Layout 13: the pet is in the snapshot, so it can be sent at this fight's target, and (since the core now allows pet
+    // commands in combat, not only at the fight's start) sent again whenever the target changes: a loose mob picked up mid-fight,
+    // a target switch, or a party member's pull the bot then assists. Previously only sent once, when the fight began, so a
+    // pulled-while-already-fighting hunter or warlock pet stayed on its first target (or stood idle) for the rest of the fight
+    // (2026-11-10 report, "a pet is never redirected mid-fight"). A core that reports no pet never gets this action.
+    if (targetRef != 0 && targetRef != state.PetAttackTarget && PetOf(bot) == PetKnown::kOut)
+    {
+        BotAction petGo;
+        petGo.bot_guid = bot.guid;
+        petGo.type = ActionType::kPetCommand;
+        petGo.spell_id = kPetAttack;
+        petGo.target_guid = targetRef;
+        actions.push_back(petGo);
+        state.PetCommanded = true;
+        state.PetAttackTarget = targetRef;
     }
     // A party healer supports from range: it does not close to melee, and it does not auto-attack (below). A heal has a long range,
     // so it stays where the party's casters stand even when its mana is spent: walking into the pack only puts it in the boss's
     // cleave and gives it the tank's aggro (the 2026-10-23 Deadmines run: healers at 0 power meleed for 1-4k and took 2-9k).
-    bool const healerSupport = partyLeader != 0 && state.Role_ != BotState::Role::Dps &&
+    // Not a bot explicitly playing the tank: a paladin or druid given the tank role holds threat and does white damage like any
+    // other tank, not healer support (2026-10-10 report, "a paladin or druid tank does not auto-attack").
+    bool const healerSupport = partyLeader != 0 && state.Role_ != BotState::Role::Dps && state.Role_ != BotState::Role::Tank &&
                                HealSpellFor(classId, bot.level) != 0;
     // A ranged bot that has run out of power closes to melee range: its spells are spent.
     bool const outOfPower = bot.max_power > 0 && BelowPct(bot.power, bot.max_power, kOutOfPowerPct);
     // A hunter with no ammunition cannot shoot (the core refuses every ranged attack): it closes to melee range as well.
-    float approach = (outOfPower || NoAmmo(bot, classId)) && !healerSupport ? kMeleeApproachYards : rotation::ApproachYards(classId);
+    float approach = (outOfPower || NoAmmo(bot, classId)) && !healerSupport ? kMeleeApproachYards : rotation::ApproachYards(classId, spec);
     if (nowMs < state.CloserUntilMs)
         approach = std::min(approach, kMeleeApproachYards + 1.0f);
     if (nowMs < state.RangeCloserUntilMs)
@@ -174,7 +184,7 @@ void BotPolicy::MoveToTarget(DecideTick& tick, BotTurn& turn)
     // Onyxia herself: the bot's role band (healer, ranged or melee) sets how close it comes. It closes to the band's far edge, and a healer or ranged bot
     // that is nearer than the band's near edge kites back to its middle. A melee bot's band is its close range (2-9), so it only closes.
     bool const bossTarget = partyMember && targetUnit && forever_module::UnitRefEntry(targetUnit->guid) == kOnyxiaBossEntry;
-    StandBand const band = healerSupport ? kHealerBand : rotation::ApproachYards(classId) <= kMeleeApproachYards + 0.5f ? kMeleeBand : kRangedBand;
+    StandBand const band = healerSupport ? kHealerBand : rotation::ApproachYards(classId, spec) <= kMeleeApproachYards + 0.5f ? kMeleeBand : kRangedBand;
     bool const bossBandKite = bossTarget && band.Min > kMeleeBand.Max;
     if (bossTarget)
         approach = std::min(approach, band.Max);
@@ -339,6 +349,7 @@ void BotPolicy::MoveWithoutTarget(DecideTick& tick, BotTurn& turn)
         back.spell_id = kPetFollow; // not Stay: a pet left standing where the fight ended is left behind when the party walks on
         actions.push_back(back);
         state.PetCommanded = false;
+        state.PetAttackTarget = 0;
     }
     state.InFight = false;
     wanted = followRef ? Decision{ ActionType::kFollow, followRef } : Decision{ ActionType::kStop, 0 };

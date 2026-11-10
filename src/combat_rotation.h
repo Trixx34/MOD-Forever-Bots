@@ -83,7 +83,18 @@ struct Row
     bool Buff = false;              // an upkeep spell cast out of combat, not part of the fight rotation
     bool Party = false;             // a buff: cast on every member of the bot's group (itself included), not only on the bot
     std::vector<std::uint32_t> Ranks; // a buff: every rank's spell id. The core casts the highest rank known, so the aura on the bot carries that id, not Spell's
+    // A second condition, ANDed with When (both must pass): a row whose data-file line names two conditions (e.g. "combo 5
+    // target_strong 1") needs both, not just the last one the parser saw. Always when the row only has one condition (the
+    // common case) or none.
+    Rule When2 = Rule{ Cond::Always, 0 };
 };
+
+// A row's whole condition: When, and When2 too when it is set. Use this instead of Allowed(row.When, ...) so a row with two
+// conditions is not silently judged by only the first.
+bool Allowed(Row const& row, Facts const& facts);
+
+// Whether `row`'s condition (When, or When2) is `cond`: a check that does not miss the condition when it is the row's second one.
+bool RowHasCondition(Row const& row, Cond cond);
 
 // Rotations read from a file (data/rotations.txt, made by tools/make_rotations.py), per class id. A class missing from the file keeps the built-in rows.
 //   class <id> [spec <key>]            the rows below belong to the class, or to one spec of it (a spec with no block uses the class's)
@@ -133,7 +144,9 @@ std::span<Row const> RowsForClass(std::uint32_t classId);
 std::uint32_t LearnLevel(std::uint32_t spell);
 
 // How far the bot approaches its target before it attacks or casts: 25 yards for the ranged classes, 5 for the rest.
-float ApproachYards(std::uint32_t classId);
+// `spec` (default empty, meaning "use the class's default") lets a melee-only spec of an otherwise ranged class close in:
+// enhancement shaman, both feral druid specs, and survival hunter.
+float ApproachYards(std::uint32_t classId, std::string const& spec = {});
 
 // Distance in yards on the ground between the bot and a unit in the snapshot.
 float DistanceYards(forever_module::BotSnapshot const& bot, forever_module::NearbyUnit const& unit);

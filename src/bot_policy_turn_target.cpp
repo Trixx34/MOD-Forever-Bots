@@ -343,7 +343,7 @@ void BotPolicy::TurnTargeting(DecideTick& tick, BotTurn& turn)
             // Focus fire (the dungeon's kill priority): a damage dealer fights the best-ranked live hostile of the tank's pack, not just the tank's own target: the casters
             // and healers of the pack first (the dungeon file's kill_priority), then any unit that is casting right now, then the weakest.
             bool const canInterrupt = classId == 2 || classId == 4 || classId == 7 || classId == 8; // paladin, rogue, shaman, mage: an interrupt row in the rotation
-            bool const interruptNow = _options.TacticInterrupt && canInterrupt && !InterruptTaken(tick, bot, partyLeader);
+            bool const interruptNow = _options.TacticInterrupt && canInterrupt;
             // Deadmines Foundry (Gilnid): a Goblin Engineer (622) casts Summon Remote-Controlled Golem (3605), an add that is immune to most
             // abilities and despawns only when its summoner dies (Wowhead's Deadmines guide: "kill the GOBLIN first"). The snapshot does not
             // say which spell a nearby unit is casting (NearbyUnit::casting is a bool), so this cannot be limited to that one cast; instead,
@@ -385,6 +385,11 @@ void BotPolicy::TurnTargeting(DecideTick& tick, BotTurn& turn)
                 std::uint32_t const entry = forever_module::UnitRefEntry(unit.guid);
                 return (golemNearby && entry == kGoblinEngineerEntry) || (voidwalkerNearby && entry == kSearingBladeWarlockEntry) || isSummon(unit);
             };
+            // A casting unit nobody has already claimed: InterruptTaken reads the claim a party member's rotation sets the moment it
+            // actually sends a kick at this target (TurnRotation, bot_policy_turn_cast.cpp), so a second bot that could also
+            // interrupt reaches past it for one that is still free, instead of every capable bot piling onto the one cast.
+            auto const interruptable = [interruptNow, nowMs, this](NearbyUnit const& unit)
+            { return interruptNow && unit.casting != 0 && !InterruptTaken(unit.guid, nowMs); };
             if (routeOn && HealSpellFor(classId, bot.level) == 0 && ((_options.TacticFocus && !scenario.KillPriority.empty()) || interruptNow || golemNearby || voidwalkerNearby || summonNearby))
             {
                 auto const rankOf = [this, &scenario](NearbyUnit const& unit)
@@ -395,12 +400,12 @@ void BotPolicy::TurnTargeting(DecideTick& tick, BotTurn& turn)
                     return at == scenario.KillPriority.end() ? std::uint32_t(1000) : at->second;
                 };
                 NearbyUnit const* best = assist;
-                // A bot that can interrupt turns on a casting unit of the pack first (its rotation then fires the interrupt at its target); then
-                // an engineer with a golem already up (see above); then the priority list; then the casters; then the weakest.
-                auto const keyOf = [&rankOf, &isSummonerToKill, interruptNow](NearbyUnit const& unit)
+                // A bot that can interrupt turns on an unclaimed casting unit of the pack first (its rotation then fires the interrupt
+                // at its target); then an engineer with a golem already up (see above); then the priority list; then the casters; then the weakest.
+                auto const keyOf = [&rankOf, &isSummonerToKill, &interruptable](NearbyUnit const& unit)
                 {
                     int tier = 2;
-                    if (interruptNow && unit.casting != 0)
+                    if (interruptable(unit))
                         tier = 0;
                     else if (isSummonerToKill(unit))
                         tier = 1;
@@ -417,7 +422,7 @@ void BotPolicy::TurnTargeting(DecideTick& tick, BotTurn& turn)
                 bool const atEngagementCap = engaged.size() >= kMaxDungeonEngaged;
                 auto const reachable = [&](NearbyUnit const& unit)
                 {
-                    bool const specialTier = (interruptNow && unit.casting != 0) || isSummonerToKill(unit) || rankOf(unit) != 1000;
+                    bool const specialTier = interruptable(unit) || isSummonerToKill(unit) || rankOf(unit) != 1000;
                     return specialTier || engaged.count(unit.guid) != 0 || !atEngagementCap;
                 };
                 for (NearbyUnit const& unit : nearby)
@@ -434,7 +439,7 @@ void BotPolicy::TurnTargeting(DecideTick& tick, BotTurn& turn)
                     {
                         bool const engineerUnderGolemPressure = golemNearby && forever_module::UnitRefEntry(best->guid) == kGoblinEngineerEntry;
                         state.FocusLoggedFor = best->guid;
-                        _options.OnEvent(std::string(interruptNow && best->casting != 0 ? "interrupt_target: bot=" : engineerUnderGolemPressure ? "golem_engineer: bot=" : "focus: bot=") + std::to_string(bot.guid) + " entry=" + std::to_string(forever_module::UnitRefEntry(best->guid)) + " instead_of=" +
+                        _options.OnEvent(std::string(interruptable(*best) ? "interrupt_target: bot=" : engineerUnderGolemPressure ? "golem_engineer: bot=" : "focus: bot=") + std::to_string(bot.guid) + " entry=" + std::to_string(forever_module::UnitRefEntry(best->guid)) + " instead_of=" +
                                          std::to_string(forever_module::UnitRefEntry(assist->guid)) + (best->casting != 0 ? " casting" : ""));
                     }
                 }
@@ -503,8 +508,21 @@ BotPolicy::TurnFlow BotPolicy::TurnCrowdControl(DecideTick& tick, BotTurn& turn)
                         if (tankTarget != nullptr)
                         {
                             std::set<std::uint64_t> const engaged = PartyEngagedTargets(tick, partyLeader);
+                            // A dungeon boss is never a cc target: classic bosses are cc-immune, and the only sign of "boss" the
+                            // snapshot gives (NearbyUnit::elite) also covers a non-boss elite the spell can hold perfectly well
+                            // (2026-11-10 report, "crowd control requires non-elite targets", which excluded most dungeon trash).
+                            // The dungeon file's own boss list says which entries those are; its kill_priority and the engaged
+                            // set already keep the bot from holding whatever the party is actually fighting.
+                            auto const isBoss = [&scenario](std::uint32_t entry)
+                            {
+                                for (auto const& bossAt : scenario.RouteBossAt)
+                                    if (bossAt.second == entry)
+                                        return true;
+                                return false;
+                            };
                             for (NearbyUnit const& unit : nearby)
-                                if (unit.is_hostile && unit.health != 0 && IsLiveMob(unit) && !turn.Avoided(unit.guid) && unit.elite == 0 &&
+                                if (unit.is_hostile && unit.health != 0 && IsLiveMob(unit) && !turn.Avoided(unit.guid) &&
+                                    !isBoss(forever_module::UnitRefEntry(unit.guid)) &&
                                     unit.casting == 0 && // a casting unit is interrupt's to pick, not held mid-cast for nothing
                                     engaged.count(unit.guid) == 0 &&
                                     scenario.KillPriority.find(forever_module::UnitRefEntry(unit.guid)) == scenario.KillPriority.end() &&
@@ -972,7 +990,12 @@ void BotPolicy::TurnMoveSetup(DecideTick& tick, BotTurn& turn)
                                  " other_creatures=" + std::to_string(others));
             }
         }
-        if (bot.in_combat != 0 && nowMs < state.HealLosUntilMs && state.HealLosTarget != 0 && aoeWarder)
+        // A healer's heal was refused for line of sight on the party member it targets (not only near an Onyxian Warder, which is
+        // handled above): step toward that member, or to either side of the line to it, whichever stays clear of a Warder's Fire
+        // Nova (the only hazard this function knows about) when one happens to be near. 2026-11-10 report: with this gated on an
+        // Onyxian Warder being in view, a line-of-sight-refused heal anywhere else fell through to MoveToTarget and walked the
+        // healer toward its own attack target instead, since that function has no idea the bot actually needs to see an ally.
+        if (bot.in_combat != 0 && nowMs < state.HealLosUntilMs && state.HealLosTarget != 0)
             for (BotSnapshot const& other : view.bots)
                 if (PlayerRef(other.guid) == state.HealLosTarget && other.map_id == bot.map_id)
                 {

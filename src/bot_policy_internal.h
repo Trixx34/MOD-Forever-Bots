@@ -218,6 +218,15 @@ constexpr std::uint32_t kHemorrhage = 16511;
 constexpr std::uint32_t kRupture = 1943;
 constexpr std::uint32_t kSliceAndDice = 5171;
 
+// The cat-form druid's builders (data/rotations.txt, class 11 spec feral_cat), one combo point each like Sinister Strike:
+// Claw (rank 1 1082), Rake (1822) and Shred (5221). Ferocious Bite (22568) is their finisher, like the rogue's Eviscerate.
+// Previously only rogue builders were counted, so a feral_cat bot never gained combo points and Ferocious Bite's `combo 5`
+// row could never fire (2026-11-10 report, "Feral Ferocious Bite combo 5 can never fire").
+constexpr std::uint32_t kClaw = 1082;
+constexpr std::uint32_t kRake = 1822;
+constexpr std::uint32_t kShred = 5221;
+constexpr std::uint32_t kFerociousBite = 22568;
+
 // Combo points a rogue spell adds on its target when it lands, 0 for any other spell.
 std::uint32_t ComboPointsGained(std::uint32_t spell);
 // A ranged bot below this share of its power walks to melee range and fights there, since its spells are spent.
@@ -355,6 +364,10 @@ constexpr std::uint32_t kDungeonDrinkBelowPct = 50;  // drink at 50% mana (was 3
 constexpr std::uint32_t kDungeonDrinkUpToPct = 95;   // drink up to 95% (was 85%)
 // How long a heal claim on a member lasts: one global cooldown and the cast, so a second healer looks elsewhere meanwhile.
 constexpr std::uint64_t kHealClaimMs = 2500;
+// How long an interrupt claim on a hostile lasts: one global cooldown and the cast, the same reasoning as a heal claim. A kick
+// that actually lands ends the cast, so Cond::TargetCasting stops being true on its own well before the claim would run out;
+// this only covers the gap between the bot sending the cast and the next snapshot showing the result.
+constexpr std::uint64_t kInterruptClaimMs = 2500;
 constexpr float kHealRangeYards = 30.0f;
 constexpr float kBuffRangeYards = 30.0f;            // a party buff reaches members this close
 constexpr std::size_t kGrindMemory = 2;           // grind spots remembered as just visited
@@ -480,10 +493,6 @@ std::uint32_t HealSpellFor(std::uint32_t classId, std::uint32_t level);
 std::uint32_t ResurrectSpellFor(std::uint32_t classId, std::uint32_t level);
 
 bool IsResurrectSpell(std::uint32_t spell);
-
-// The spells that stop a cast in progress (rotation rows with Cond::TargetCasting). When several party members know one, only
-// one may use it on the same cast: a second kick lands on nothing and both casts are wasted.
-bool IsInterruptSpell(std::uint32_t spell);
 
 // The creature type the cc tactic needs (world database's creature_template.type) to pick a spell that can affect a pack member.
 // The snapshot has no such field (forever_module::NearbyUnit, tier2_layout.h): the core does not report a unit's creature type at

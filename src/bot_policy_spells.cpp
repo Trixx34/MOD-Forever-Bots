@@ -15,7 +15,7 @@ std::uint32_t ComboPointsGained(std::uint32_t spell)
 {
     if (spell == kMutilate)
         return 2;
-    return spell == kSinisterStrike || spell == kSaberSlash || spell == kHemorrhage ? 1 : 0;
+    return spell == kSinisterStrike || spell == kSaberSlash || spell == kHemorrhage || spell == kClaw || spell == kRake || spell == kShred ? 1 : 0;
 }
 
 bool IsCasting(BotSnapshot const& bot)
@@ -62,11 +62,6 @@ std::uint32_t ResurrectSpellFor(std::uint32_t classId, std::uint32_t level)
 bool IsResurrectSpell(std::uint32_t spell)
 {
     return spell == kResurrection || spell == kRedemption || spell == kAncestralSpirit;
-}
-
-bool IsInterruptSpell(std::uint32_t spell)
-{
-    return spell == 853 || spell == 1766 || spell == 8042; // Hammer of Justice, Kick, Earth Shock
 }
 
 CreatureType CreatureTypeOf(std::uint32_t entry)

@@ -515,6 +515,7 @@ private:
         bool TameNotKnown = false;                       // Tame Beast came back "not known": the hunter has not learned it, so it is no stored-pet refusal and casting again is pointless for a while
         std::uint64_t TamePetUntilMs = 0;
         bool PetCommanded = false;                       // the pet has been sent at this fight's target (layout 13)
+        std::uint64_t PetAttackTarget = 0;               // the target the last kPetAttack was sent for (0: none sent yet this fight)
         bool Sitting = false;                            // sat down to rest; stands before it moves or fights
         std::uint64_t RestRetryAtMs = 0;                 // a refused sit is not tried again before this
         bool Mounted = false;                            // the bot is mounted: travel is faster, combat dismounts it
@@ -877,7 +878,9 @@ private:
     bool IsRezzer(forever_module::BotSnapshot const& member) const;
     bool PartyFighting(DecideTick const& tick, std::uint64_t leaderGuid) const;
     std::set<std::uint64_t> PartyEngagedTargets(DecideTick const& tick, std::uint64_t leaderGuid) const;
-    bool InterruptTaken(DecideTick const& tick, forever_module::BotSnapshot const& bot, std::uint64_t leaderGuid) const;
+    // Whether this hostile's interrupt is already claimed by a party member's rotation (set in TurnRotation the moment it sends
+    // a row with Cond::TargetCasting, not inferred from another member's cast bar: see _interruptClaims).
+    bool InterruptTaken(std::uint64_t targetRef, std::uint64_t nowMs) const;
     std::uint8_t DeadWait(DecideTick const& tick, std::uint64_t leaderGuid) const;
     // The combat-drift leash (DungeonPullLeashYards, DungeonChaseLeashYards): how far (x, y) is from the leg of the route this party's leader walks (infinity: no
     // route known, or past its end), and whether a hostile there is off the leash (farther than `yards` from that leg and, with `orLeader`, from the living leader).
@@ -952,6 +955,18 @@ private:
         std::uint64_t UntilMs = 0;
     };
     std::unordered_map<std::uint64_t, HealClaim> _healClaims; // member bot guid -> claim
+    // Which hostile a party's interrupt is already aimed at, and until when: InterruptTaken used to look for another member's
+    // casting_spell among a two-entry table (Hammer of Justice, Kick, Earth Shock), but every one of those is an instant cast in
+    // classic, so it is 0 again well before the next bot decides -- two or three members kicked the same cast in a row, and a
+    // bot with no interrupt of its own was never told someone already had it (2026-11-10 report, "the one-interrupt-per-party
+    // dedup almost never fires"). This is set the moment a bot's rotation actually sends an interrupt row, not inferred from
+    // a cast bar.
+    struct InterruptClaim
+    {
+        std::uint64_t Group = 0;
+        std::uint64_t UntilMs = 0;
+    };
+    std::unordered_map<std::uint64_t, InterruptClaim> _interruptClaims; // target unit reference -> claim
     PolicyOptions _options;
     // One planner per (side, band): index side * 2 + band.
     static std::array<QuestPlanner, 6> MakeQuestSets(PolicyOptions const& options);

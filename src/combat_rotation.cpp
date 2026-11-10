@@ -134,6 +134,18 @@ bool Allowed(Rule const& rule, Facts const& f)
     return false;
 }
 
+bool Allowed(Row const& row, Facts const& f)
+{
+    // Both conditions must pass when the row has two (When2 past its Cond::Always default): a row written with two condition
+    // keywords, e.g. "combo 5 target_strong 1", means their AND, not just the one the parser saw last.
+    return Allowed(row.When, f) && (row.When2.Condition == Cond::Always || Allowed(row.When2, f));
+}
+
+bool RowHasCondition(Row const& row, Cond cond)
+{
+    return row.When.Condition == cond || row.When2.Condition == cond;
+}
+
 namespace {
 
 struct SpecInfo
@@ -257,8 +269,18 @@ std::uint32_t LearnLevel(std::uint32_t spell)
 }
 
 // Yards a bot approaches its target to: casters and hunters stand off at range, melee classes close to 5 yards.
-float ApproachYards(std::uint32_t classId)
+// A spec can be a melee-only build of an otherwise ranged class: enhancement shaman (Stormstrike), both feral druid
+// specs (Shred, Claw, Rake, Ferocious Bite, Maul, Lacerate), and survival hunter (Raptor Strike, Mongoose Bite,
+// Counterattack, Strider Kick). Their rotation rows are all short range, so approaching only to the class's ranged
+// distance left every one of those rows dead: the bot never came close enough to use them (2026-11-10 report,
+// "approach distance is set per class, not spec"). `spec` is empty for a bot whose spec is not known (not in a
+// scenario roster, or the call site has none to give): such a bot gets its class's default distance, as before.
+float ApproachYards(std::uint32_t classId, std::string const& spec)
 {
+    if ((classId == kShamanClass && spec == "enh") ||
+        (classId == kDruidClass && (spec == "feral_tank" || spec == "feral_cat")) ||
+        (classId == kHunterClass && spec == "sv"))
+        return 5.0f;
     switch (classId)
     {
         case kHunterClass:
@@ -391,6 +413,18 @@ RotationData ParseRotationData(std::istream& in, std::vector<std::string>& warni
         std::size_t i = 1;
         bool ok = t.size() >= 3 && Whole(t[i++], row.Spell) && row.Spell != 0;
         bool targetGiven = false;
+        // A condition keyword fills When first, then When2: a row naming two conditions (e.g. "combo 5 target_strong 1")
+        // needs both, not just the second one silently replacing the first. A third condition keyword is a format error
+        // (dropped below, same as any other bad row): the data has nowhere left to put it.
+        auto const setCond = [&](Rule const& r)
+        {
+            if (row.When.Condition == Cond::Always)
+                row.When = r;
+            else if (row.When2.Condition == Cond::Always)
+                row.When2 = r;
+            else
+                ok = false;
+        };
         while (ok && i < t.size())
         {
             std::string const& key = t[i++];
@@ -421,26 +455,26 @@ RotationData ParseRotationData(std::istream& in, std::vector<std::string>& warni
                 }
             }
             else if (key == "range") ok = i + 1 < t.size() && Decimal(t[i++], row.MinRange) && Decimal(t[i++], row.MaxRange);
-            else if (key == "always") row.When = Rule{ Cond::Always, 0 };
-            else if (key == "target_casting") row.When = Rule{ Cond::TargetCasting, 0 };
-            else if (key == "target_hp_above") { ok = arg(n); row.When = Rule{ Cond::TargetHpAbove, std::int32_t(n) }; }
-            else if (key == "target_hp_below") { ok = arg(n); row.When = Rule{ Cond::TargetHpBelow, std::int32_t(n) }; }
-            else if (key == "self_hp_below") { ok = arg(n); row.When = Rule{ Cond::SelfHpBelow, std::int32_t(n) }; }
-            else if (key == "self_power_below") { ok = arg(n); row.When = Rule{ Cond::SelfPowerBelow, std::int32_t(n) }; }
-            else if (key == "self_power_above") { ok = arg(n); row.When = Rule{ Cond::SelfPowerAbove, std::int32_t(n) }; }
-            else if (key == "enemies") { ok = arg(n); row.When = Rule{ Cond::EnemiesAtLeast, std::int32_t(n) }; }
-            else if (key == "opener") { ok = arg(n); row.When = Rule{ Cond::Opener, std::int32_t(n) }; }
-            else if (key == "target_strong") { ok = arg(n); row.When = Rule{ Cond::TargetStrong, std::int32_t(n) }; }
-            else if (key == "combo") { ok = arg(n); row.When = Rule{ Cond::ComboPointsAtLeast, std::int32_t(n) }; }
-            else if (key == "enemies_below") { ok = arg(n); row.When = Rule{ Cond::EnemiesBelow, std::int32_t(n) }; }
-            else if (key == "in_party") row.When = Rule{ Cond::InParty, 0 };
-            else if (key == "no_pet") row.When = Rule{ Cond::NoPet, 0 };
+            else if (key == "always") {} // no condition at all: the default already, and never consumes a When/When2 slot
+            else if (key == "target_casting") setCond(Rule{ Cond::TargetCasting, 0 });
+            else if (key == "target_hp_above") { ok = arg(n); setCond(Rule{ Cond::TargetHpAbove, std::int32_t(n) }); }
+            else if (key == "target_hp_below") { ok = arg(n); setCond(Rule{ Cond::TargetHpBelow, std::int32_t(n) }); }
+            else if (key == "self_hp_below") { ok = arg(n); setCond(Rule{ Cond::SelfHpBelow, std::int32_t(n) }); }
+            else if (key == "self_power_below") { ok = arg(n); setCond(Rule{ Cond::SelfPowerBelow, std::int32_t(n) }); }
+            else if (key == "self_power_above") { ok = arg(n); setCond(Rule{ Cond::SelfPowerAbove, std::int32_t(n) }); }
+            else if (key == "enemies") { ok = arg(n); setCond(Rule{ Cond::EnemiesAtLeast, std::int32_t(n) }); }
+            else if (key == "opener") { ok = arg(n); setCond(Rule{ Cond::Opener, std::int32_t(n) }); }
+            else if (key == "target_strong") { ok = arg(n); setCond(Rule{ Cond::TargetStrong, std::int32_t(n) }); }
+            else if (key == "combo") { ok = arg(n); setCond(Rule{ Cond::ComboPointsAtLeast, std::int32_t(n) }); }
+            else if (key == "enemies_below") { ok = arg(n); setCond(Rule{ Cond::EnemiesBelow, std::int32_t(n) }); }
+            else if (key == "in_party") setCond(Rule{ Cond::InParty, 0 });
+            else if (key == "no_pet") setCond(Rule{ Cond::NoPet, 0 });
             else if (key == "self_aura_below" || key == "self_aura_at_least")
             {
                 std::uint32_t spell = 0;
                 std::uint32_t stacks = 0;
                 ok = arg(spell) && arg(stacks) && spell != 0 && stacks != 0;
-                row.When = Rule{ key == "self_aura_below" ? Cond::SelfAuraBelow : Cond::SelfAuraAtLeast, std::int32_t(spell), std::int32_t(stacks) };
+                setCond(Rule{ key == "self_aura_below" ? Cond::SelfAuraBelow : Cond::SelfAuraAtLeast, std::int32_t(spell), std::int32_t(stacks) });
             }
             else ok = false;
         }
