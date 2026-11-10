@@ -194,6 +194,29 @@ void CastSeenIsForgotten()
     CHECK(o.CastSeenMs.empty());
 }
 
+// Kill target: the pack's best kill rank first, then a caster, then the weakest; a held unit and a unit outside the pack are never picked.
+void KillTargetOrder()
+{
+    Enemy weak;  weak.Ref = 10; weak.InPack = true; weak.Health = 50;
+    Enemy strong; strong.Ref = 11; strong.InPack = true; strong.Health = 500;
+    Enemy caster; caster.Ref = 12; caster.InPack = true; caster.Health = 400; caster.Casting = true;
+    Enemy listed; listed.Ref = 13; listed.InPack = true; listed.Health = 900; listed.KillRank = 2;
+    Enemy far;   far.Ref = 14; far.Health = 1;
+    Order o;
+    Plan(On(), {}, { weak, strong, far }, 1000, o);
+    CHECK(o.KillTarget == 10);                       // the weakest of the pack, not the far unit
+    Plan(On(), {}, { weak, strong, caster, far }, 2000, o);
+    CHECK(o.KillTarget == 12);                       // a caster before the weakest
+    Plan(On(), {}, { weak, strong, caster, listed }, 3000, o);
+    CHECK(o.KillTarget == 13);                       // the dungeon's kill priority before all
+    Member holder; holder.Guid = 1; holder.Holding = 13;
+    Plan(On(), { holder }, { weak, strong, caster, listed }, 4000, o);
+    CHECK(o.KillTarget == 12);                       // a held unit is left alone
+    CHECK(KillTargetOf(&o) == 12 && KillTargetOf(nullptr) == 0);
+    Plan(On(), {}, {}, 5000, o);
+    CHECK(o.KillTarget == 0);
+}
+
 } // namespace
 
 int main()
@@ -207,6 +230,7 @@ int main()
     CrowdControlDoesNotDoubleBook();
     CrowdControlRespectsHeldUnitsAndSpellType();
     CastSeenIsForgotten();
+    KillTargetOrder();
     if (failures)
     {
         std::printf("%d failure(s)\n", failures);

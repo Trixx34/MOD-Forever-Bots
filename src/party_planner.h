@@ -41,6 +41,9 @@ struct Enemy
     bool Casting = false;
     bool Engaged = false;                   // already fought by the party
     bool Protected = false;                 // never held: the dungeon's kill priority, a boss
+    bool InPack = false;                    // in the tank's pack (the tank's target or near it): a candidate for the shared kill target
+    std::uint32_t KillRank = 1000;          // the dungeon file's kill priority (lower first), 1000 for an unlisted unit
+    std::uint64_t Health = 0;
     std::vector<std::uint32_t> CcSpells;    // the crowd control spells that may hold it (creature type, not a boss, not the kill priority, in the tank's pack)
 };
 
@@ -63,6 +66,7 @@ struct Order
     std::uint64_t MainTank = 0;             // kept while the bot is alive and a member; otherwise the first tank
     std::vector<InterruptAssignment> Interrupts;
     std::vector<CcAssignment> CrowdControl;
+    std::uint64_t KillTarget = 0;           // the unit the damage dealers share: best kill rank, then a caster, then the weakest; never one that is held
     std::unordered_map<std::uint64_t, std::uint64_t> CastSeenMs;   // casting target -> when the plan first saw it casting
     std::uint64_t LastPlannedMs = 0;
 };
@@ -76,6 +80,9 @@ bool MayInterrupt(Settings const& settings, Order const* order, std::uint64_t bo
 
 // Whether the plan names `bot` for this target at all (any rank): used by targeting to turn on the caster only for the assigned kickers.
 bool IsAssignedInterrupt(Order const* order, std::uint64_t bot, std::uint64_t target);
+
+// The shared kill target of the plan, 0 for none (also with no plan).
+std::uint64_t KillTargetOf(Order const* order);
 
 // The unit a bot is to hold, 0 if the plan holds none for it.
 std::uint64_t CcTargetFor(Order const* order, std::uint64_t bot);

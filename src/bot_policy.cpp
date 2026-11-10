@@ -482,13 +482,13 @@ void BotPolicy::PlanParties(WorldTickSnapshotView const& view, std::unordered_ma
                 enemy.X = unit.pos_x;
                 enemy.Y = unit.pos_y;
                 enemy.Casting = unit.casting != 0;
+                enemy.Health = unit.health;
                 enemy.Engaged = engagedRefs.count(unit.guid) != 0;
                 enemies.push_back(enemy);
             }
         }
-        // Which crowd control spells may hold each unit: the same rules as the lone-bot scan (TurnCrowdControl): live, not a boss, not the
-        // dungeon's kill priority, of a type the spell affects, and in the tank's pack (near the leader's target).
-        if (_options.TacticCc)
+        // Which units are of the tank's pack, and which crowd control spells may hold each: the same rules as the lone-bot scan (TurnCrowdControl): live,
+        // not a boss, not the dungeon's kill priority, of a type the spell affects, and in the tank's pack (near the leader's target).
         {
             auto const leaderAt = indexOf.find(entry.first);
             if (leaderAt != indexOf.end() && view.bots[leaderAt->second].threat_target_guid != 0)
@@ -517,13 +517,18 @@ void BotPolicy::PlanParties(WorldTickSnapshotView const& view, std::unordered_ma
                         for (auto const& bossAt : scenario.RouteBossAt)
                             if (bossAt.second == unitEntry)
                                 boss = true;
-                        if (boss || scenario.KillPriority.find(unitEntry) != scenario.KillPriority.end() ||
-                            std::hypot(enemy.X - tankTarget->pos_x, enemy.Y - tankTarget->pos_y) > kFocusPackYards)
-                            continue;
-                        for (party_planner::Member const& m : members)
-                            if (m.CcSpell != 0 && CcAffects(m.CcSpell, CreatureTypeOf(unitEntry)) &&
-                                std::find(enemy.CcSpells.begin(), enemy.CcSpells.end(), m.CcSpell) == enemy.CcSpells.end())
-                                enemy.CcSpells.push_back(m.CcSpell);
+                        auto const priority = scenario.KillPriority.find(unitEntry);
+                        bool const listed = priority != scenario.KillPriority.end();
+                        bool const inPack = enemy.Ref == tankTarget->guid ||
+                                            std::hypot(enemy.X - tankTarget->pos_x, enemy.Y - tankTarget->pos_y) <= kFocusPackYards;
+                        enemy.InPack = inPack;
+                        if (_options.TacticFocus && listed)
+                            enemy.KillRank = priority->second;
+                        if (_options.TacticCc && !boss && !listed && inPack)
+                            for (party_planner::Member const& m : members)
+                                if (m.CcSpell != 0 && CcAffects(m.CcSpell, CreatureTypeOf(unitEntry)) &&
+                                    std::find(enemy.CcSpells.begin(), enemy.CcSpells.end(), m.CcSpell) == enemy.CcSpells.end())
+                                    enemy.CcSpells.push_back(m.CcSpell);
                     }
             }
         }

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <tuple>
 #include <unordered_set>
 
 namespace party_planner {
@@ -108,7 +109,26 @@ bool Plan(Settings const& settings, std::vector<Member> const& members, std::vec
         held.insert(best->Ref);
         order.CrowdControl.push_back({ m->Guid, best->Ref });
     }
+
+    // Kill target: of the pack's units that nobody holds, the best kill rank, then a caster, then the weakest (lowest ref on a tie).
+    order.KillTarget = 0;
+    Enemy const* kill = nullptr;
+    auto const keyOf = [](Enemy const& e) { return std::make_tuple(e.KillRank, e.Casting ? 0 : 1, e.Health, e.Ref); };
+    for (Enemy const& e : enemies)
+    {
+        if (!e.InPack || e.Health == 0 || held.count(e.Ref))
+            continue;
+        if (!kill || keyOf(e) < keyOf(*kill))
+            kill = &e;
+    }
+    if (kill)
+        order.KillTarget = kill->Ref;
     return true;
+}
+
+std::uint64_t KillTargetOf(Order const* order)
+{
+    return order ? order->KillTarget : 0;
 }
 
 bool IsAssignedInterrupt(Order const* order, std::uint64_t bot, std::uint64_t target)

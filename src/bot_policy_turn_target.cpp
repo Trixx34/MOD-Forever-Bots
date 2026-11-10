@@ -402,14 +402,17 @@ void BotPolicy::TurnTargeting(DecideTick& tick, BotTurn& turn)
                 NearbyUnit const* best = assist;
                 // A bot that can interrupt turns on an unclaimed casting unit of the pack first (its rotation then fires the interrupt
                 // at its target); then an engineer with a golem already up (see above); then the priority list; then the casters; then the weakest.
-                auto const keyOf = [&rankOf, &isSummonerToKill, &interruptable](NearbyUnit const& unit)
+                // The party planner's shared kill target breaks a tie of the rank before the caster and the weakest, so the damage dealers
+                // (whose lists differ) pick the same unit; with no plan it is 0 and nothing changes.
+                std::uint64_t const plannedKill = party_planner::KillTargetOf(tick.PlanOf(partyLeader));
+                auto const keyOf = [&rankOf, &isSummonerToKill, &interruptable, plannedKill](NearbyUnit const& unit)
                 {
                     int tier = 2;
                     if (interruptable(unit))
                         tier = 0;
                     else if (isSummonerToKill(unit))
                         tier = 1;
-                    return std::make_tuple(tier, rankOf(unit), unit.casting != 0 ? 0 : 1, unit.health);
+                    return std::make_tuple(tier, rankOf(unit), plannedKill != 0 && unit.guid == plannedKill ? 0 : 1, unit.casting != 0 ? 0 : 1, unit.health);
                 };
                 // kMaxDungeonEngaged: past this many distinct hostiles already fought, the scan no longer reaches for a hostile nobody told
                 // the party about (an unlisted creature it just happens to notice nearby, rank 1000 below); it still freely re-targets among
