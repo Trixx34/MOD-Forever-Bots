@@ -41,7 +41,7 @@ void CHECK(bool cond, char const* what, int line)
 #define CHECK_AT(cond) CHECK((cond), #cond, __LINE__)
 
 constexpr std::size_t kBotCount = 1500;    // the ceiling the module asks the core for (kMaxBotsCeiling is 2500; the sim runs 1500)
-constexpr std::size_t kNearby = 16;        // the nearby units the module asks for
+constexpr std::size_t kNearby = 32;        // the nearby units the module asks for
 constexpr std::uint32_t kPartySize = 5;
 constexpr std::uint32_t kParties = 300;
 constexpr int kTicks = 12;

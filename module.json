@@ -1,14 +1,14 @@
 {
   "name": "forever-bots",
   "version": "0.45.4",
-  "protocol_version": "24",
+  "protocol_version": "25",
   "tier1": {
     "hooks": ["CommandScript", "PlayerScript.OnChat", "PlayerScript.OnBotTrade", "PlayerScript.OnLootItem", "LfgScript.OnQueueUpdate", "GuildScript.OnMemberLevel", "GroupScript.OnInviteDeclined"]
   },
   "tier2": {
     "participates": true,
     "requested_max_bots": 2500,
-    "requested_max_nearby_units": 16,
+    "requested_max_nearby_units": 32,
     "requested_max_actions": 5000,
     "requested_tick_interval": 1
   }

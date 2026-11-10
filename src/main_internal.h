@@ -64,7 +64,7 @@ namespace main_detail {
 // Tier 2 bounds asked for at handshake. The core may grant less. Handshake comes before config, so the bot count asked
 // for here is the ceiling; MaxBots from config limits how many bots are actually spawned. Every bot may act each tick, so
 // the action buffer holds two actions per bot ceiling slot.
-constexpr std::uint32_t kRequestedNearbyUnits = 16;
+constexpr std::uint32_t kRequestedNearbyUnits = 32;
 constexpr std::uint32_t kRequestedActions = 2 * kMaxBotsCeiling;
 
 constexpr std::chrono::milliseconds kPumpInterval(5);
