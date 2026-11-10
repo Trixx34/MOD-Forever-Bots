@@ -15,7 +15,7 @@ constexpr std::uint64_t kGuildPendingMs = 60000;       // a create whose guild i
 constexpr std::uint64_t kGuildOrderBusyMs = 30000;     // a bot with a guild order in flight is left alone for this long
 constexpr std::size_t kGuildOrdersPerPlan = 6;
 constexpr std::uint64_t kGuildCreateBlockMs = 120000;   // a master whose create was never confirmed (the core refused it) waits this long, doubled per failure
-constexpr std::uint32_t kGuildCreateBlockDoublings = 5; // ...up to 32 times that
+constexpr std::uint32_t kGuildCreateBlockDoublings = 3; // ...up to 8 times that: 120, 240, 480, then 960 s (16 minutes) at most
 }  // namespace
 
 void BotPolicy::DriveGuilds(forever_module::WorldTickSnapshotView const& view, std::uint64_t nowMs)
@@ -67,10 +67,11 @@ void BotPolicy::DriveGuilds(forever_module::WorldTickSnapshotView const& view, s
     // A create becomes a known guild once its master's snapshot shows the guild id; a create nobody confirms is forgotten.
     for (BotSnapshot const& bot : view.bots)
     {
+        if (bot.guild_guid != 0)
+            _guildCreateBlocks.erase(bot.guid);   // also when the pending entry expired before the create was seen
         auto const pending = _pendingGuilds.find(bot.guid);
         if (pending == _pendingGuilds.end() || bot.guild_guid == 0)
             continue;
-        _guildCreateBlocks.erase(bot.guid);
         _botGuilds[bot.guild_guid] = bot_guilds::Guild{ bot.guild_guid, pending->second.Kind, pending->second.Alliance };
         _pendingGuilds.erase(pending);
     }
@@ -120,7 +121,7 @@ void BotPolicy::DriveGuilds(forever_module::WorldTickSnapshotView const& view, s
         if (queued >= kGuildOrdersPerPlan || created.Members.empty())
             break;
         std::uint64_t const master = created.Master;
-        if (busy(master))
+        if (busy(master) || _pendingGuilds.count(master))   // a create in flight is not sent again (it would restart the pending clock and no block would ever be set)
             continue;
         if (auto const blocked = _guildCreateBlocks.find(master); blocked != _guildCreateBlocks.end() && blocked->second.UntilMs > nowMs)
             continue;
