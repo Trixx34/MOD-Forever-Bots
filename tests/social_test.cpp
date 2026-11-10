@@ -255,6 +255,47 @@ void BattlegroundsAreSentWhenOnAndNotWhenOff()
     CHECK(social::PickBattleground(9, 0) == 0 && social::PickBattleground(15, 3) == 2 && social::IsBattlegroundMap(529) && !social::IsBattlegroundMap(0));
 }
 
+// A master whose create is never confirmed (snapshots keep guild_guid 0): count the creates it is sent over time.
+void GuildCreateCooldown()
+{
+    PolicyOptions on = Quiet();
+    on.Guilds.Enabled = true;
+    BotPolicy policy(on);
+    auto view = [&](std::uint32_t masterGuild)
+    {
+        WorldTickSnapshotView v = View(20, 0, {}, 1);
+        v.bots[0].guild_guid = masterGuild;
+        BotSnapshot second = v.bots[0];
+        second.guid = 2;
+        second.guild_guid = 0;
+        v.bots.push_back(second);
+        return v;
+    };
+    auto creates = [&](std::uint64_t now)
+    {
+        policy.Decide(view(0), now);
+        int count = 0;
+        for (social::Order const& order : policy.TakeSocialOrders())
+            if (order.What == social::Kind::Guild && order.Op == 3 && order.Bot == 1)
+                ++count;
+        return count;
+    };
+    std::uint64_t const t0 = kNow;
+    CHECK(creates(t0) == 1);
+    CHECK(creates(t0 + 30000) == 0);    // the create is in flight
+    CHECK(creates(t0 + 60000) == 0);
+    CHECK(creates(t0 + 90000) == 0);    // pending expired here: blocked for 120 s
+    CHECK(creates(t0 + 180000) == 0);
+    CHECK(creates(t0 + 210000) == 1);   // the block is over: tried again
+    CHECK(creates(t0 + 300000) == 0);   // missed a second time: blocked for 240 s (until t0 + 540 s)
+    CHECK(creates(t0 + 510000) == 0);
+    CHECK(creates(t0 + 540000) == 1);
+    // The master shows a guild: the create is confirmed and no further create is planned for it (it has a guild now).
+    policy.Decide(view(77), t0 + 570000);
+    policy.TakeSocialOrders();
+    CHECK(creates(t0 + 600000) == 0);
+}
+
 void GuildAnswersAreSentWhenOnAndNotWhenOff()
 {
     PolicyOptions on = Quiet();
@@ -381,6 +422,7 @@ int main()
 {
     DuelsAreSentWhenOnAndNotWhenOff();
     BattlegroundsAreSentWhenOnAndNotWhenOff();
+    GuildCreateCooldown();
     GuildAnswersAreSentWhenOnAndNotWhenOff();
     GiftsAreSentWhenOnAndNotWhenOff();
     PickGiftChoosesSmallStacksOnly();
