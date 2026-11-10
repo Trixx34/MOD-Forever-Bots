@@ -15,7 +15,7 @@ constexpr std::uint64_t kGuildPendingMs = 60000;       // a create whose guild i
 constexpr std::uint64_t kGuildOrderBusyMs = 30000;     // a bot with a guild order in flight is left alone for this long
 constexpr std::size_t kGuildOrdersPerPlan = 6;
 constexpr std::uint64_t kGuildCreateBlockMs = 120000;   // a master whose create was never confirmed (the core refused it) waits this long, doubled per failure
-constexpr std::uint32_t kGuildCreateBlockDoublings = 5; // ...up to 32 times that
+constexpr std::uint32_t kGuildCreateBlockDoublings = 3; // ...up to 8 times that: 120, 240, 480, then 960 s (16 minutes) at most
 }  // namespace
 
 void BotPolicy::DriveGuilds(forever_module::WorldTickSnapshotView const& view, std::uint64_t nowMs)

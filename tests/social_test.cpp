@@ -290,10 +290,19 @@ void GuildCreateCooldown()
     CHECK(creates(t0 + 300000) == 0);   // missed a second time: blocked for 240 s (until t0 + 540 s)
     CHECK(creates(t0 + 510000) == 0);
     CHECK(creates(t0 + 540000) == 1);
+    CHECK(creates(t0 + 630000) == 0);   // missed a third time: blocked for 480 s (until t0 + 1110 s)
+    CHECK(creates(t0 + 1080000) == 0);
+    CHECK(creates(t0 + 1110000) == 1);
+    CHECK(creates(t0 + 1200000) == 0);  // missed a fourth time: blocked for 960 s (until t0 + 2160 s)
+    CHECK(creates(t0 + 2130000) == 0);
+    CHECK(creates(t0 + 2160000) == 1);
+    CHECK(creates(t0 + 2250000) == 0);  // missed a fifth time: the block stays at 960 s, 16 minutes at most (until t0 + 3210 s)
+    CHECK(creates(t0 + 3180000) == 0);
+    CHECK(creates(t0 + 3210000) == 1);
     // The master shows a guild: the create is confirmed and no further create is planned for it (it has a guild now).
-    policy.Decide(view(77), t0 + 570000);
+    policy.Decide(view(77), t0 + 3240000);
     policy.TakeSocialOrders();
-    CHECK(creates(t0 + 600000) == 0);
+    CHECK(creates(t0 + 3270000) == 0);
 }
 
 void GuildAnswersAreSentWhenOnAndNotWhenOff()
