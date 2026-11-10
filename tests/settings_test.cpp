@@ -44,6 +44,16 @@ void ChatSettings()
     CHECK(on.ChatCommands && on.ChatOrders && on.ChatControl && on.QuestTeleport && warnings.empty());
 }
 
+void QuestListSettings()
+{
+    std::vector<std::string> warnings;
+    BotSettings const off = ParseBotSettings({}, warnings);
+    CHECK(off.QuestFileAlliance.empty() && off.QuestFileHorde.empty() && off.QuestFileAlliance60.empty() && off.QuestFileHorde60.empty());
+    BotSettings const on = ParseBotSettings({ { "QuestFileAlliance", "a.txt" }, { "QuestFileHorde", "h.txt" }, { "QuestFileAlliance60", "a60.txt" }, { "QuestFileHorde60", "h60.txt" } }, warnings);
+    CHECK(on.QuestFileAlliance == "a.txt" && on.QuestFileHorde == "h.txt" && on.QuestFileAlliance60 == "a60.txt" && on.QuestFileHorde60 == "h60.txt");
+    CHECK(on.QuestFile.empty() && warnings.empty());
+}
+
 void LevelDungeonSettings()
 {
     std::vector<std::string> warnings;
@@ -516,6 +526,7 @@ int main()
     CombatDriftSettings();
     ErrandSettings();
     ChatSettings();
+    QuestListSettings();
     LevelDungeonSettings();
     SayAndSupplySettings();
     DefaultsWhenEmpty();
