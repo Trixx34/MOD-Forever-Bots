@@ -356,7 +356,7 @@ struct BotSettings
 };
 
 // The most parties a scenario runs at once, over all its dungeons.
-constexpr std::uint32_t kMaxScenarioParties = 40;
+constexpr std::uint32_t kMaxScenarioParties = 200;
 
 // One entry of a Scenario list ("dm:10").
 struct ScenarioListItem

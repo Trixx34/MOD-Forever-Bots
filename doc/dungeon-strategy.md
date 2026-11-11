@@ -133,7 +133,7 @@ result line (`scenario dm#2: ...`); the core makes one instance per group. The b
 ### Several dungeons in one run (`Scenario = dm:10,rfc:10`, bots 0.29.0)
 
 `Module.forever-bots.Scenario` takes a list of dungeon ids with their number of parties: `Scenario = dm:10,rfc:10` runs 10 parties in the Deadmines and 10 in
-Ragefire Chasm in the same hour. At most 40 parties in all: the entry that goes past 40 is shortened (a warning says so) and the ones after it are dropped. Each
+Ragefire Chasm in the same hour. At most 200 parties in all: the entry that goes past 200 is shortened (a warning says so) and the ones after it are dropped. Each
 listed dungeon takes its roster, level, staging, portal, entry, route, bosses, events and kill priority from its own dungeon file; `Dungeon` is not needed (and
 is ignored). One key for one dungeon of the list is set with the dungeon's id after a dot:
 
