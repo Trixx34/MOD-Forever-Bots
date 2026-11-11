@@ -67,7 +67,9 @@ add_executable(trade_test tests/trade_test.cpp)
 target_link_libraries(trade_test PRIVATE forever_bots_trade)
 add_test(NAME trade COMMAND trade_test)
 
-add_executable(policy_test tests/policy_test.cpp)
+add_executable(policy_test tests/policy_test.cpp
+    tests/policy_test_01.cpp tests/policy_test_02.cpp tests/policy_test_03.cpp tests/policy_test_04.cpp
+    tests/policy_test_05.cpp tests/policy_test_06.cpp tests/policy_test_07.cpp tests/policy_test_08.cpp)
 target_link_libraries(policy_test PRIVATE forever_bots_policy)
 add_test(NAME policy COMMAND policy_test)
 
