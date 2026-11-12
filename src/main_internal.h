@@ -330,6 +330,7 @@ struct PumpExtras
     };
     std::vector<ScenarioDungeon> Scenarios;
     std::string ScenarioResultFile;
+    std::string RunTelemetryDir; // RunTelemetryDir: where run-telemetry.log goes ("" = off)
     std::shared_ptr<CommandQueue> Commands;
 };
 

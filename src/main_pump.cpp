@@ -31,6 +31,7 @@ void main_detail::PumpTier2(forever_module::Tier2Session& session, std::atomic<b
             lastPhases.push_back(ScenarioPhase::Done);
         }
     std::vector<bool> phaseLogged(directors.size(), false);
+    run_telemetry::RunFile runFile(extras.RunTelemetryDir);
     bool sawSnapshot = false;
     std::uint64_t lastTick = 0;
     std::uint64_t presenceFedMs = 0;
@@ -577,6 +578,15 @@ void main_detail::PumpTier2(forever_module::Tier2Session& session, std::atomic<b
                     if (actions[i].type == forever_module::ActionType::kTeleport)
                         std::cerr << "forever-bots: scenario " << name << ": teleport bot " << actions[i].bot_guid << " to map "
                                   << actions[i].spell_id << " (" << actions[i].dest_x << ", " << actions[i].dest_y << ", " << actions[i].dest_z << ")\n";
+                for (std::string const& line : director.TakeTelemetry())
+                {
+                    std::cerr << "forever-bots: event " << line << "\n";
+                    std::string warn;
+                    runFile.Append(line, nowMs(), std::time(nullptr), &warn);
+                    if (!warn.empty())
+                        std::cerr << "forever-bots: warning: " << warn << "\n";
+                }
+                runFile.Flush(nowMs());
                 for (std::string const& boss : director.TakeNewBossKills())
                     std::cerr << "forever-bots: scenario " << name << ": boss killed: " << boss << "\n";
                 if (auto const result = director.TakeResult())

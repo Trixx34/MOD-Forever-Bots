@@ -358,6 +358,9 @@ struct BotSettings
     // replaces the shipped one (doc/dungeon-strategy.md). Both are read again when the config is reloaded.
     std::string DungeonDataDir;
     std::string DungeonDir;
+    // RunTelemetryDir (absolute directory path, default empty = off): the party_tl:, party_stalled: and boss_attempt: lines of a scenario run are also appended to
+    // <dir>/run-telemetry.log (doc/dungeon-strategy.md, "Telemetry"). A relative path is refused with a warning. (The key TelemetryFile is the bots' CSV, a different file.)
+    std::string RunTelemetryDir;
     std::string DungeonEventsFile;
     // Flight points (layout 17; config keys Taxi, TaxiMinWalkYards, TaxiMasterMaxYards, TaxiBlockedSec; off by default): a bot that is not in a party replaces a walk
     // of at least TaxiMinWalkYards with a flight from a flight master within TaxiMasterMaxYards that lies on the way. Needs Bot.Taxi.Enabled in the core (on by default).

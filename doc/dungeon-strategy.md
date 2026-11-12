@@ -257,3 +257,36 @@ What is still self-election after this change: leader election in `BuildParties`
 **BFD healer lag (`route_hold why=health` for minutes).** Journal count since 11-12 00:00: 1,915 `route_hold` lines with `why=health`, many with `farthest_yards` of 200 to 350 (for example bot 371 at 73 % health, farthest member 251 yards; bot 221 at 50 %, 350 yards). The leader holds until its own health is 80 %; only a healer heals it, and a healer 250 yards behind never comes (it follows at its own pace, resting or drinking). Implemented (small, off the walking path): **healer fetch** in `RouteWalkOn` (`bot_policy_turn_move.cpp`): the leader out of combat, below `kRouteMinHealthPct`, no dead member to wait for, holds `kHealerFetchAfterMs` (45 s); then, if no healer (member with a heal spell, not a dps or tank role) is within `kHealerFetchYards` (45 yards, 2D), it walks to the nearest healer (`move_why healer_fetch`, log `healer_fetch: bot= healer= yards= hp_pct= held_ms=`). Within 45 yards the existing healer top-up (`kRouteTopUpPct`) takes over and the leader goes on. The walk goes back along ground the party has cleared. Unit test `ALeaderWalksBackToAFarHealer`. What the sim must check: `healer_fetch` lines appear, the matching `route_hold why=health` runs shrink from 10 minutes to about a minute, and no leader dies on the way back (`died:` with `last_decision` a move shortly after `healer_fetch`).
 
 **Ghost teleport stagger.** `GhostTeleportPerSecond` (default 2, 0 = off): the module sends at most that many ghost teleports (corpse run limit, four-minute timeout, other-map corpse, dungeon entrance, to leader or member) in one second for the whole policy; a bot that does not get a slot tries again on the next tick. A ghost teleport the core refuses (`Bot.Teleport.GhostNeedsInstance`) clears `RunTimeoutTeleported`, restarts the run clock and is tried again after the usual 60 s (`corpse_run_teleport_refused:` in the log); before, the flag stayed set and the ghost only walked until `corpse_run_failed`.
+
+## Telemetry
+
+A scenario run (dungeon or raid) writes three kinds of event lines, so a run can be analysed and replayed from a file and not only from the journal. They are in the journal
+(`forever-bots: event party_tl: ...`) in every case. With `Module.forever-bots.RunTelemetryDir = /absolute/dir` the same lines, with an ISO time in front
+(`2026-11-12T10:00:30Z party_tl: ...`), are also appended to `<dir>/run-telemetry.log` (empty = off; a relative path is refused with a warning; a folder that cannot be opened
+gives one warning and the file stays off). The file is opened once, written buffered and flushed every 30 s; it is never rotated, so point it at a folder you clean.
+(`TelemetryFile` is the bots' CSV, a different file.)
+
+All lines start with `scenario=<name> party=<n> variant= t_s=<seconds since the party's run start>`. `variant` is reserved for a later strategy variant and is empty today.
+Fields come in a fixed order; new fields are only added at the end.
+
+| Line | When | Fields after the common ones |
+|---|---|---|
+| `party_tl:` | one per party every 30 s of scenario time (never per bot) | `leader=<guid> map= pos=x,y,z step=<fight\|walk\|dead\|rest\|far\|idle> route=<point>/<total> target=<creature entry of the leader's target, 0 none> alive=<n>/<n> fight=<members in a fight> last=<marker>` |
+| `party_stalled:` | no progress (boss kill or a route point advanced) for 300 s, then again every further 300 s | `cause= no_progress_s= pulls= route_refusals= rest_s= dead_s= fight_s= stalls=<n so far> route= last=` |
+| `boss_attempt:` | when a member fights a boss of the dungeon file (`stage=start`), and when the boss dies or the fight is over (`stage=end`) | `boss=<name, spaces as _> stage=start\|end dur_s= deaths=<deaths during the attempt> outcome=open\|killed\|aborted` |
+
+`last=` is the last progress marker: `boss:<name>@<t_s>` or `route:<point>@<t_s>` (`route:0@0` before the first point). `step` is the time state of the result line's `time_s=`.
+
+The stall cause is one of `fight_churn` (10 or more fight starts since the last progress: the pull churn of `pull_unreachable`), `route_refusals` (5 or more moves of the leader refused
+or without a route), `resting` (a member below the ready health or mana for 40 % of the window or more: the regroup wait), `dead_members` (members down for 40 % or more),
+`unknown`. The counters of the window since the last progress (or the last verdict) are in the line. The highest ratio over its threshold wins. A boss fight that lasts over
+300 s counts as no progress and shows as `unknown` or `fight_churn`.
+
+The scenario's result line gets `stalled=<n> last_stall=<cause>@<t_s>` after `time_s=` when the party stalled at least once; it is left out otherwise.
+
+Read a run with `tools/run_telemetry.py run-telemetry.log` (or a journal file, or `-` for standard input; `--party dm#2` for one party): per party the time per step, the route
+point reached in 5 minute buckets, the stalls with their cause and the boss attempts. Or by hand:
+
+    grep -h 'party_stalled:' run-telemetry.log                                   # every stall
+    grep -h 'party_tl: scenario=sfk party=3 ' run-telemetry.log | awk '{print $6, $10, $11}'   # t_s, step, route of one party (field 1 is the ISO time)
+    awk '/boss_attempt:/ && /stage=end/ {print $7, $9, $10, $11}' run-telemetry.log   # boss, duration, deaths, outcome

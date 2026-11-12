@@ -14,6 +14,7 @@
 #pragma once
 
 #include "forever_module/tier2_session.h"
+#include "run_telemetry.h"
 
 #include <array>
 #include <cstdint>
@@ -129,6 +130,10 @@ struct ScenarioResult
     std::optional<std::uint32_t> OnyxiaHealthPct;
     // Where the run's time went (ms per state, in kTimeStateNames order): time_s= in the result line. See TimeState.
     std::array<std::uint64_t, 6> StateMs = {};
+    // Run telemetry: the party_stalled: verdicts of the run (stalled=N last_stall=<cause>@<t_s> in the result line; nothing when there was none).
+    std::uint32_t Stalled = 0;
+    std::string LastStallCause;
+    std::uint64_t LastStallS = 0;
     std::vector<std::pair<std::uint32_t, std::uint32_t>> Party; // race and class id of each member, in the order first seen
 };
 
@@ -231,12 +236,18 @@ public:
     // (the same entries, names and times); false for an entry the plan does not list. Repeats are harmless.
     bool NoteBossKill(std::uint32_t entry, std::uint64_t nowMs);
 
+    // The telemetry lines made since the last call (party_tl:, party_stalled:, boss_attempt:; run_telemetry.h), oldest first.
+    std::vector<std::string> TakeTelemetry();
+
     // The creature entries of the bosses seen dead so far.
     std::set<std::uint32_t> const& KilledBossEntries() const { return _bossKilledEntries; }
 
 private:
     void Finish(std::string outcome, std::uint64_t nowMs);
     void MarkBossKilled(std::uint32_t entry, std::string const& name, std::uint64_t nowMs);
+    // Run telemetry, once per Running tick: the timeline, the stall verdict and the boss attempts. step is the tick's time state name.
+    void TrackRun(forever_module::WorldTickSnapshotView const& view, forever_module::BotSnapshot const* leader, char const* step, std::uint64_t nowMs);
+    void NoteProgress(std::uint64_t nowMs, bool boss, std::string const& name, std::uint32_t point);
     // The config guard (ScenarioPlan::VerifyConfig): reads the grant results of the dressing, and sends the teleport probe until the core applies one.
     void CheckConfig(forever_module::WorldTickSnapshotView const& view, std::uint64_t nowMs, std::vector<forever_module::BotAction>& actions);
 
@@ -314,6 +325,24 @@ private:
     std::optional<ScenarioResult> _result;
     bool _resultTaken = false;
     std::uint64_t _lastTick = ~0ull;
+    // Run telemetry (run_telemetry.h).
+    run_telemetry::StallTracker _stall;
+    run_telemetry::StallCounters _window;               // counted since the last progress or verdict
+    run_telemetry::Progress _lastProgress;
+    std::uint64_t _windowSinceMs = 0;
+    std::uint64_t _timelineAtS = 0;                     // the 30 s slot of the last party_tl:
+    const char* _step = "idle";                         // the time state of the last Running tick
+    std::string _lastStallCause;
+    std::uint64_t _lastStallS = 0;
+    std::map<std::uint64_t, bool> _inCombat;            // bot -> in combat at the last tick (a fight start is a change from false to true)
+    std::map<std::uint64_t, std::uint32_t> _moveSeq;    // leader guid -> last action sequence looked at
+    bool _attemptOpen = false;
+    std::uint32_t _attemptEntry = 0;
+    std::string _attemptBoss;
+    std::uint64_t _attemptStartMs = 0;
+    std::uint64_t _attemptLastFightMs = 0;
+    std::uint32_t _attemptDeaths0 = 0;
+    std::vector<std::string> _telemetry;
 };
 
 // One line of text for the log: "scenario <name>: outcome=... furthest=3/7 deaths=2 alive=3/5 events=3 revived=1 wipes=0 ghosts=0 run=412s",
