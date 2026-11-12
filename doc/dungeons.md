@@ -21,8 +21,8 @@ scenario director and the party policy already do the work; this slice adds the 
 |---|---|
 | Spawn tank, healer and three dps, dress them, form the party | scenario phases Waiting, Dressing, Grouping |
 | Enter the instance | scenario phase Entering: the core teleports the leader to `entry`, then the members (needs `Bot.Actions.Teleport = 1`). Walking to the portal is not implemented |
-| The tank leads and pulls pack by pack | party leader walks the route (`PolicyOptions::Route`); it pulls only when every living member has 80% health, mana users 60% mana, and all are within 30 yards (it sits to recover, at most two minutes) |
-| The healer prioritises the tank | a healer class heals the party member below 60% health; the tank is who loses health first. There is no explicit "tank first" ordering when several members are hurt (the lowest-health member is healed) |
+| The tank leads and pulls pack by pack | party leader walks the route (`PolicyOptions::Route`); it pulls only when every living member has 90% health, mana users 85% mana (80% / 60% with the `rest` tactic off), and all are within 30 yards (it sits to recover, 45 s without progress and 180 s at most) |
+| The healer prioritises the tank | a healer class heals the party member below 60% health (55% with the `heal` tactic on); the leader (the tank) with a target is healed first, below 75% (`DungeonTankHealBelowPct`); otherwise the lowest-health member is healed |
 | Dps assist the tank's target | members do not pull and join a fight 2.5 s after the tank, on the leader's target |
 | Loot | the bot loots creatures it fought (core loot rules) |
 | Wipe and corpse run | dead bots release; a ghost of a dungeon party is teleported to the instance `entry` and revived there by its leader (since 0.24.0), and walks back to its corpse only when no revive comes within 90 seconds (since 0.26.0; 180 before); `wipe_recovery` keeps the run going while a bot may come back |
@@ -161,6 +161,6 @@ documents 1 party, 2 raid, 3 whisper; the module treats 4 and 5 as the public ch
 - Walking from the city to the portal (instead of teleporting to the entry) is not implemented; `portal` is used only for ghosts.
 - Pack-by-pack control is the policy's: it pulls what is near the route, not a list of packs. There is no line-of-sight pulling, crowd control,
   boss mechanics, interrupt logic or add handling beyond the normal rotation. A tank that cannot hold threat is not detected.
-- Healing uses the existing 60% rule, with no mana or cooldown planning beyond the party's rest rule before a pull.
+- Healing uses a health threshold (60%, 55% with the `heal` tactic; the tank 75%), with no mana or cooldown planning beyond the party's rest rule before a pull.
 - No re-entry after a `wipe` outcome (the run ends); a second attempt means a new run.
 - Only one dungeon at a time, with one party.
