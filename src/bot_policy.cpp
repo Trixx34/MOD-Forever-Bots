@@ -426,6 +426,10 @@ void BotPolicy::PlanParties(WorldTickSnapshotView const& view, std::unordered_ma
         std::vector<party_planner::Enemy> enemies;
         std::unordered_set<std::uint64_t> seen;
         std::unordered_set<std::uint64_t> engagedRefs;
+        raid_rules::Table const* const rules = _options.RaidRules.get();
+        std::uint32_t mapId = 0;
+        if (auto const leaderIndex = indexOf.find(entry.first); leaderIndex != indexOf.end())
+            mapId = view.bots[leaderIndex->second].map_id;
         for (std::uint64_t guid : guids)
         {
             auto const at = indexOf.find(guid);
@@ -476,6 +480,32 @@ void BotPolicy::PlanParties(WorldTickSnapshotView const& view, std::unordered_ma
                 if (snap.in_combat == 0 && member.Holding == 0 && snap.threat_target_guid == 0)
                     member.CcReady = true;
             }
+            if (rules != nullptr && member.Alive)
+            {
+                // the raid rules: which dispel kinds the class can take at its level, the auras it carries that the table wants dispelled, and its swap aura stacks
+                for (std::uint8_t kind = 1; kind <= 4; ++kind)
+                    if (DispelSpellFor(classId, snap.level, kind) != 0)
+                        member.DispelKinds |= 1u << kind;
+                member.DispelReady = known == _bots.end() || nowMs >= known->second.NextCastMs;
+                for (std::size_t a = 0; a < snap.aura_count && a < forever_module::kMaxAuras; ++a)
+                {
+                    std::uint32_t const spell = snap.auras[a].spell_id;
+                    if (spell == 0)
+                        continue;
+                    if (auto const kind = rules->DispelKindOf(mapId, spell))
+                        member.Debuffs.push_back({ spell, static_cast<std::uint8_t>(*kind) });
+                    if (rules->SwapStacks(mapId, spell))
+                        member.SwapStacks = std::max(member.SwapStacks, snap.auras[a].stacks);
+                }
+            }
+            if (member.Alive)
+            {
+                // the party buffs the member's class casts on its group (the upkeep rows with party set): one caster for each member
+                std::string const spec = SpecFor(guid, classId);
+                for (rotation::Row const& row : RowsFor(classId, spec))
+                    if (row.Buff && row.Party && RowInLevelRange(row, snap.level) && std::find(member.BuffSpells.begin(), member.BuffSpells.end(), row.Spell) == member.BuffSpells.end())
+                        member.BuffSpells.push_back(row.Spell);
+            }
             members.push_back(member);
             if (!member.Alive)
                 continue;
@@ -490,9 +520,22 @@ void BotPolicy::PlanParties(WorldTickSnapshotView const& view, std::unordered_ma
                 enemy.Casting = unit.casting != 0;
                 enemy.Health = unit.health;
                 enemy.Engaged = engagedRefs.count(unit.guid) != 0;
+                if (rules != nullptr)
+                {
+                    enemy.InterruptFirst = unit.casting != 0 && rules->InterruptFirst(mapId, unit.cast_spell_id);
+                    enemy.NoAoe = rules->NoAoe(mapId, forever_module::UnitRefEntry(unit.guid));
+                }
                 enemies.push_back(enemy);
             }
         }
+        // The raid rules' tank swap: while the boss of a swap row is in view every member carries the row's stack count as its threshold.
+        if (rules != nullptr)
+            if (raid_rules::MapRules const* mapRules = rules->Find(mapId))
+                for (raid_rules::TankSwap const& swap : mapRules->Swaps)
+                    for (party_planner::Enemy const& enemy : enemies)
+                        if (forever_module::UnitRefEntry(enemy.Ref) == swap.Boss)
+                            for (party_planner::Member& m : members)
+                                m.SwapAt = swap.Stacks;
         // Which units are of the tank's pack, and which crowd control spells may hold each: the same rules as the lone-bot scan (TurnCrowdControl): live,
         // not a boss, not the dungeon's kill priority, of a type the spell affects, and in the tank's pack (near the leader's target).
         {
@@ -688,6 +731,8 @@ void BotPolicy::DecideBot(DecideTick& tick, std::size_t i)
     if (TurnCrowdControl(tick, turn) == TurnFlow::kSkip)
         return;
     if (TurnOnyxiaCasts(tick, turn) == TurnFlow::kSkip)
+        return;
+    if (TurnRaidRules(tick, turn) == TurnFlow::kSkip)
         return;
     if (TurnTaming(tick, turn) == TurnFlow::kSkip)
         return;

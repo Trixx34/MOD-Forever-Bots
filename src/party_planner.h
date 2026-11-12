@@ -21,6 +21,7 @@ struct Settings
     std::uint32_t EmergencyPct = 20;        // below this share a member comes before the tank
     std::uint32_t TankHealBelowPct = 55;    // the tank (or leader) in combat is healed below this share
     float HealRangeYards = 30.0f;
+    float BuffRangeYards = 30.0f;           // a party buff reaches members this close
 };
 
 // One party member as the planner sees it.
@@ -39,6 +40,18 @@ struct Member
     std::uint32_t HealPct = 100;            // its health share
     bool InCombat = false;
     bool Leader = false;                    // the party leader, who tanks in a dungeon run (the healers' "tank")
+    // Raid rules (raid_rules.h). DispelKinds: bit k set when the member can dispel the kind k (1 magic, 2 curse, 3 disease, 4 poison, the SDK's dispel_type values).
+    std::uint32_t DispelKinds = 0;
+    bool DispelReady = true;
+    struct Debuff
+    {
+        std::uint32_t Spell = 0;
+        std::uint8_t Kind = 0;              // the dispel kind the rule table gives the aura
+    };
+    std::vector<Debuff> Debuffs;            // the member's auras that the rule table wants dispelled (the caller filters)
+    std::vector<std::uint32_t> BuffSpells;  // the party buff spells (upkeep rows) the member can cast at its level
+    std::uint32_t SwapStacks = 0;           // stacks of the rule table's tank swap aura on the member
+    std::uint32_t SwapAt = 0;               // the stack count at which a tank holding it is swapped, 0 for no swap rule in this fight
 };
 
 // One hostile unit in the party's merged view.
@@ -51,6 +64,8 @@ struct Enemy
     bool Protected = false;                 // never held: the dungeon's kill priority, a boss
     bool InPack = false;                    // in the tank's pack (the tank's target or near it): a candidate for the shared kill target
     std::uint32_t KillRank = 1000;          // the dungeon file's kill priority (lower first), 1000 for an unlisted unit
+    bool InterruptFirst = false;            // its cast is one the raid rules list to interrupt before any other cast
+    bool NoAoe = false;                     // the raid rules say nobody uses area damage while it fights
     std::uint64_t Health = 0;
     std::vector<std::uint32_t> CcSpells;    // the crowd control spells that may hold it (creature type, not a boss, not the kill priority, in the tank's pack)
 };
@@ -68,6 +83,21 @@ struct HealAssignment
     std::uint64_t Target = 0;               // the member it heals
 };
 
+struct DispelAssignment
+{
+    std::uint64_t Bot = 0;                  // the dispeller
+    std::uint64_t Target = 0;               // the member with the debuff
+    std::uint32_t Aura = 0;
+    std::uint8_t Kind = 0;
+};
+
+struct BuffAssignment
+{
+    std::uint64_t Bot = 0;                  // the caster
+    std::uint64_t Recipient = 0;            // the member (a player guid, not a unit reference)
+    std::uint32_t Spell = 0;
+};
+
 struct CcAssignment
 {
     std::uint64_t Bot = 0;
@@ -77,7 +107,11 @@ struct CcAssignment
 // One party's plan, kept across ticks under its leader.
 struct Order
 {
-    std::uint64_t MainTank = 0;             // kept while the bot is alive and a member; otherwise the first tank
+    std::uint64_t MainTank = 0;             // kept while the bot is alive and a member; otherwise the first tank. A tank holding its swap aura at SwapAt stacks hands it to another tank
+    std::vector<BuffAssignment> Buffs;      // one caster for each (party buff spell, member): an other offering member in reach: the one with the fewest members so far, then the nearest, then the lowest guid
+    bool TankSwapped = false;               // true while MainTank was handed over because of the swap aura (the new main tank takes the boss: taunt)
+    bool NoAoe = false;                     // an enemy in view has the no-area-damage rule
+    std::vector<DispelAssignment> Dispels;  // one member per dispeller, the lowest guid first; a healer on an emergency heal is not given one
     std::vector<InterruptAssignment> Interrupts;
     std::vector<CcAssignment> CrowdControl;
     std::vector<HealAssignment> Heals;      // one member per healer, the neediest first; a member nobody needs to heal is not listed
@@ -101,6 +135,15 @@ std::uint64_t KillTargetOf(Order const* order);
 
 // True when the plan gives `member` to another healer and `bot` has no assignment for it: the healer leaves that member alone.
 bool HealAssignedElsewhere(Order const* order, std::uint64_t bot, std::uint64_t member);
+
+// True when the plan gives `recipient` this buff spell to another caster: the bot leaves that member's buff to it (the buff claims still guard a pair the plan does not cover).
+bool BuffAssignedElsewhere(Order const* order, std::uint64_t bot, std::uint32_t spell, std::uint64_t recipient);
+
+// The dispel the plan gives `bot`, nullptr for none.
+DispelAssignment const* DispelFor(Order const* order, std::uint64_t bot);
+
+// Whether the plan says nobody uses area damage now (the raid rules' noaoe row); false with no plan.
+bool NoAoeNow(Order const* order);
 
 // The unit a bot is to hold, 0 if the plan holds none for it.
 std::uint64_t CcTargetFor(Order const* order, std::uint64_t bot);

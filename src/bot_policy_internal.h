@@ -101,6 +101,7 @@ constexpr float kReviveWarderYards = kFireNovaYards;  // a ghost of a dungeon pa
 constexpr std::uint64_t kReviveWarderLogMs = 30000;
 constexpr float kFleeYards = 15.0f;          // below 30% health: flees while a threat is this close
 constexpr std::uint64_t kGlobalCooldownMs = 1500;
+constexpr std::uint64_t kDispelRetryMs = 2500;      // a bot sends the same dispel again no sooner than this (raid rules)
 constexpr std::uint64_t kRetryMs = 1000;     // out of range, invalid target, refused, not enough power
 constexpr std::uint64_t kCooldownRetryMs = 2000;
 constexpr float kRangeSlackYards = 2.0f;        // a ranged row is used this far inside its range: the snapshot is a tick old and the units move
@@ -514,6 +515,8 @@ CreatureType CreatureTypeOf(std::uint32_t entry);
 // no other class has a single-target hold in this module's scope today (a priest's Shackle Undead, a hunter's Freezing Trap and a
 // druid's Entangling Roots are not: this change is scoped to the three the task names).
 std::uint32_t CcSpellForClass(std::uint32_t classId);
+// The class's dispel spell for a kind (1 magic, 2 curse, 3 disease, 4 poison; the SDK's dispel_type), 0 when the class has none at that level (level 0 = unknown: any).
+std::uint32_t DispelSpellFor(std::uint32_t classId, std::uint32_t level, std::uint8_t kind);
 
 // The level the Forever trainers teach a cc spell at (trainer_spell, verified 2026-10-27 against the test world database; the same
 // levels as this file's SpellCostFile dump, data/spell_costs.txt). Sap and Polymorph are both well below either shipped dungeon's

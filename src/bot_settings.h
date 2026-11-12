@@ -323,6 +323,8 @@ struct BotSettings
     // known to be hostile. The dungeon files' bosses[].strategy.avoid_spells and avoid (fixed zones) add to it for their map.
     bool AvoidGroundEffects = false;
     std::string AvoidSpellsFile;
+    // RaidRulesFile (absolute path, data/raid_rules.txt; empty = none): the raid rule table, see raid_rules.h and the README.
+    std::string RaidRulesFile;
     // CorpseRunTeleportSec (0 = off, else 10..3600): a ghost whose corpse run takes longer is put at its corpse (needs Bot.Actions.Teleport).
     std::uint32_t CorpseRunTeleportSec = 60;
     // Combat drift of dungeon parties (0.45.0; PolicyOptions has the details). DungeonPullLeashYards (0 = off, else 10..80): the route leader pulls only hostiles this

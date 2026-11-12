@@ -75,6 +75,23 @@ void PolicyFromSettings(PolicyOptions& policyOptions, BotSettings& settings)
             policyOptions.GatherNodes = std::move(nodes);
         }
     }
+    if (!settings.RaidRulesFile.empty())
+    {
+        std::ifstream rulesFile(settings.RaidRulesFile);
+        std::stringstream rulesText;
+        rulesText << rulesFile.rdbuf();
+        std::vector<std::string> rulesErrors;
+        auto rules = std::make_shared<raid_rules::Table>(raid_rules::Parse(rulesText.str(), rulesErrors));
+        for (std::string const& error : rulesErrors)
+            std::cerr << "forever-bots: RaidRulesFile: " << error << "\n";
+        if (!rulesFile || rules->Empty())
+            std::cerr << "forever-bots: RaidRulesFile: cannot read '" << settings.RaidRulesFile << "' (or it holds no row); no raid rules\n";
+        else
+        {
+            std::cerr << "forever-bots: raid rules: " << rules->MapCount() << " map(s) from " << settings.RaidRulesFile << "\n";
+            policyOptions.RaidRules = std::move(rules);
+        }
+    }
     policyOptions.AvoidGroundEffects = settings.AvoidGroundEffects;
     if (settings.AvoidGroundEffects)
     {
@@ -310,6 +327,9 @@ void SetUpScenario(PolicyOptions& policyOptions, PumpExtras& extras, BotSettings
         route.RouteMap = static_cast<std::uint32_t>(scenario.Entry[0]);
         for (std::size_t i = 0; i < scenario.KillPriority.size(); ++i)
             route.KillPriority.emplace(scenario.KillPriority[i], std::uint32_t(i));
+        // the raid rule table's adds of this map (the dungeon file's own ranks stay)
+        if (policyOptions.RaidRules)
+            raid_rules::MergeKillPriority(*policyOptions.RaidRules, route.RouteMap, route.KillPriority);
         // The dungeon's summons only where DungeonSummons lists this scenario (off by default: the route then looks as it did before).
         if (std::find(settings.DungeonSummons.begin(), settings.DungeonSummons.end(), scenario.Name) != settings.DungeonSummons.end())
             route.Summons = scenario.Summons;

@@ -38,6 +38,7 @@
 #include "grind_data.h"
 #include "level_dungeon.h"
 #include "ground_avoid.h"
+#include "raid_rules.h"
 #include "quest_planner.h"
 #include "quest_group.h"
 #include "spell_costs.h"
@@ -138,6 +139,9 @@ struct PolicyOptions
     // out of it. Off by default (the core must fill the snapshot: Bot.Snapshot.GroundEffects = 1). AvoidSpells: data/avoid_spells.txt.
     bool AvoidGroundEffects = false;
     std::shared_ptr<ground_avoid::AvoidTable const> AvoidSpells;
+    // The raid rule table (RaidRulesFile, raid_rules.h): the planner reads the interrupt-first casts, the dispel kinds, the tank swap aura and the no-AoE rule from it; the add
+    // ranks are merged into each scenario's KillPriority at start; the ground-effect spells of its avoid rows join the hazard circles. Null = none.
+    std::shared_ptr<raid_rules::Table const> RaidRules;
     // The level from which a bot asks to mount up for a long walk (riding is learned at 40 in classic). 0 = any level (the policy tests).
     std::uint32_t MountMinLevel = 0;
     // SDK 0.18: with Crafting, the bot also makes things for the crafting profession it has (Blacksmithing, Leatherworking, Alchemy, Tailoring, Engineering, Smelting),
@@ -493,6 +497,7 @@ private:
         std::unordered_map<std::uint32_t, std::uint64_t> CastTarget; // spell -> target of the last cast sent for it
         std::uint64_t OnyxiaPullMs = 0;                  // the raid's tank: when it first got Onyxia as its threat target in this fight (0 = not on her, or out of combat)
         std::uint64_t OnyxiaBerserkerAtMs = 0;           // Berserker Rage (the warrior tank): no cast before this
+        std::uint64_t SwapTauntAtMs = 0;                 // Taunt after a tank swap (raid rules): no cast before this
         std::uint64_t OnyxiaTauntAtMs = 0;               // Taunt on Onyxia (the warrior tank): no cast before this
         int OnyxiaPhase = 0;                             // the raid's tank: Onyxia's phase by her health (0 = not seen in this fight)
         std::uint64_t OnyxiaLandedMs = 0;                // the raid's tank: when she was first seen at 40% or below in this fight (0 = not landed)
@@ -852,6 +857,7 @@ private:
     void TurnTargeting(DecideTick& tick, BotTurn& turn);
     TurnFlow TurnCrowdControl(DecideTick& tick, BotTurn& turn);
     TurnFlow TurnOnyxiaCasts(DecideTick& tick, BotTurn& turn);
+    TurnFlow TurnRaidRules(DecideTick& tick, BotTurn& turn);
     TurnFlow TurnTaming(DecideTick& tick, BotTurn& turn);
     void TurnFightWatch(DecideTick& tick, BotTurn& turn);
     void TurnMoveSetup(DecideTick& tick, BotTurn& turn);

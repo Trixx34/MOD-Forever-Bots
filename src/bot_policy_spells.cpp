@@ -48,6 +48,44 @@ std::uint32_t HealSpellFor(std::uint32_t classId, std::uint32_t level)
     }
 }
 
+std::uint32_t DispelSpellFor(std::uint32_t classId, std::uint32_t level, std::uint8_t kind)
+{
+    // Spell ids are the first rank of each spell (the core casts the highest rank the bot knows); the level is where the class learns it. The ids are from memory:
+    // confirm them against the core's spell data on the first sim run that counts on them.
+    auto const has = [level](std::uint32_t need) { return level == 0 || level >= need; };
+    switch (classId)
+    {
+        case 5: // priest: Dispel Magic (18), Cure Disease (14)
+            if (kind == 1 && has(18))
+                return 527;
+            if (kind == 3 && has(14))
+                return 528;
+            return 0;
+        case 2: // paladin: Cleanse (42) takes magic as well, Purify (8) poison and disease
+            if (kind == 1 && has(42))
+                return 4987;
+            if ((kind == 3 || kind == 4) && has(8))
+                return 1152;
+            return 0;
+        case 8: // mage: Remove Lesser Curse (18)
+            return kind == 2 && has(18) ? 475u : 0u;
+        case 11: // druid: Remove Curse (24), Cure Poison (14)
+            if (kind == 2 && has(24))
+                return 2782;
+            if (kind == 4 && has(14))
+                return 8946;
+            return 0;
+        case 7: // shaman: Cure Poison (16), Cure Disease (22)
+            if (kind == 4 && has(16))
+                return 526;
+            if (kind == 3 && has(22))
+                return 2870;
+            return 0;
+        default:
+            return 0;
+    }
+}
+
 std::uint32_t ResurrectSpellFor(std::uint32_t classId, std::uint32_t level)
 {
     switch (classId)

@@ -585,14 +585,17 @@ void BotPolicy::TurnUpkeepBuffs(DecideTick& tick, BotTurn& turn)
                 break;
             }
             // The recipients: the bot itself (reference 0), and for a party buff the members of its group that are alive and close.
-            std::vector<std::uint64_t> recipients{ 0 };
+            std::vector<std::pair<std::uint64_t, std::uint64_t>> recipients{ { 0, bot.guid } };   // (the cast's target reference, the member's guid)
             if (row.Party)
                 for (BotSnapshot const& other : view.bots)
                     if (other.guid != bot.guid && other.life_state == 0 && other.group_leader_guid != 0 && other.group_leader_guid == bot.group_leader_guid &&
                         Distance2d(bot, other) <= kBuffRangeYards)
-                        recipients.push_back(PlayerRef(other.guid));
-            for (std::uint64_t recipient : recipients)
+                        recipients.push_back({ PlayerRef(other.guid), other.guid });
+            for (auto const& [recipient, recipientGuid] : recipients)
             {
+                // The party planner gave this member's buff to a closer caster: leave it (the claims below still guard a pair the plan does not cover).
+                if (recipient != 0 && party_planner::BuffAssignedElsewhere(tick.PlanOf(turn.partyLeader), bot.guid, row.Spell, recipientGuid))
+                    continue;
                 // The bot's own buff is read from the snapshot's auras (layout 13): a buff another player cast over it,
                 // or one it lost to a death, is now seen as the fact it is. A party member's buff is not in this bot's
                 // snapshot, so its timer and the party claim carry it.
@@ -925,6 +928,71 @@ BotPolicy::TurnFlow BotPolicy::TurnRotation(DecideTick& tick, BotTurn& turn)
             _interruptClaims[cast.target_guid] = InterruptClaim{ partyLeader, nowMs + kInterruptClaimMs };
         }
         break;
+    }
+    return TurnFlow::kNext;
+}
+
+// The raid rules' two jobs outside the interrupt and kill focus: a dispel the party planner gave this bot (the debuff kinds of data/raid_rules.txt), and the taunt of the
+// new main tank after the planner swapped the tanks on the rule table's debuff (Pierce Armor on Jeklik). Both are a single instant cast, and neither runs without the
+// RaidRulesFile and a plan.
+BotPolicy::TurnFlow BotPolicy::TurnRaidRules(DecideTick& tick, BotTurn& turn)
+{
+    if (!_options.RaidRules)
+        return TurnFlow::kNext;
+    std::uint64_t const nowMs = tick.nowMs;
+    BotSnapshot const& bot = turn.bot;
+    BotState& state = turn.state;
+    if (turn.partyLeader == 0 || bot.life_state != 0 || nowMs < state.NextCastMs || IsCasting(bot))
+        return TurnFlow::kNext;
+    party_planner::Order const* const plan = tick.PlanOf(turn.partyLeader);
+    if (plan == nullptr)
+        return TurnFlow::kNext;
+
+    if (plan->TankSwapped && plan->MainTank == bot.guid && turn.classId == kWarriorClass && bot.in_combat != 0 && nowMs >= state.SwapTauntAtMs)
+    {
+        for (NearbyUnit const& unit : turn.nearby)
+            if (unit.is_hostile && unit.health != 0 && unit.guid != bot.threat_target_guid &&
+                _options.RaidRules->IsBoss(bot.map_id, forever_module::UnitRefEntry(unit.guid)) &&
+                std::hypot(unit.pos_x - bot.pos_x, unit.pos_y - bot.pos_y) <= kOnyxiaTauntYards)
+            {
+                BotAction taunt;
+                taunt.bot_guid = bot.guid;
+                taunt.type = ActionType::kCastSpell;
+                taunt.spell_id = kTauntSpell;
+                taunt.target_guid = unit.guid;
+                tick.actions.push_back(taunt);
+                state.CastTarget[kTauntSpell] = unit.guid;
+                state.SwapTauntAtMs = nowMs + kOnyxiaTauntCdMs;
+                state.NextCastMs = nowMs + kGlobalCooldownMs;
+                if (_options.OnEvent)
+                    _options.OnEvent("raid_swap_taunt: bot=" + std::to_string(bot.guid) + " boss=" + std::to_string(forever_module::UnitRefEntry(unit.guid)));
+                return TurnFlow::kSkip;
+            }
+    }
+
+    if (party_planner::DispelAssignment const* const job = party_planner::DispelFor(plan, bot.guid))
+    {
+        std::uint32_t const spell = DispelSpellFor(turn.classId, bot.level, job->Kind);
+        auto const retry = state.RetryAtMs.find(spell);
+        auto const patient = tick.indexOf.find(job->Target);
+        if (spell == 0 || (retry != state.RetryAtMs.end() && nowMs < retry->second) || patient == tick.indexOf.end())
+            return TurnFlow::kNext;
+        BotSnapshot const& member = tick.view.bots[patient->second];
+        if (member.life_state != 0 || Distance2d(bot, member) > kHealRangeYards)
+            return TurnFlow::kNext;
+        BotAction dispel;
+        dispel.bot_guid = bot.guid;
+        dispel.type = ActionType::kCastSpell;
+        dispel.spell_id = spell;
+        dispel.target_guid = member.guid == bot.guid ? 0 : PlayerRef(member.guid);
+        tick.actions.push_back(dispel);
+        state.CastTarget[spell] = dispel.target_guid;
+        state.RetryAtMs[spell] = nowMs + kDispelRetryMs;   // the aura is still listed for a tick or two after the cast
+        state.NextCastMs = nowMs + kGlobalCooldownMs;
+        if (_options.OnEvent)
+            _options.OnEvent("raid_dispel: bot=" + std::to_string(bot.guid) + " spell=" + std::to_string(spell) + " target=" + std::to_string(member.guid) +
+                             " aura=" + std::to_string(job->Aura));
+        return TurnFlow::kSkip;
     }
     return TurnFlow::kNext;
 }
