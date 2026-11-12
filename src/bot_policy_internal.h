@@ -362,6 +362,7 @@ constexpr std::uint64_t kRegroupStuckMs = 10000;    // a member out of range thi
 constexpr std::uint64_t kConsumeLogMs = 30000;     // consume_check: one line per held bot per 30 s
 constexpr std::uint64_t kRegroupLogMs = 15000;      // a regroup logs where every member stands this often (regroup_members, 0.44.5)
 constexpr std::uint64_t kTankHeadStartMs = 2500;    // the others join a fight this long after the tank started it, so the tank has the threat
+constexpr std::uint64_t kThreatDropRetryMs = 20000;  // a bot tries its threat-drop ability (Fade, Feign Death, Feint, Cower) at most this often
 // Healing: a healer class heals the party member with the lowest health below this share, within this range.
 constexpr std::uint32_t kHealBelowPct = 60;
 // The tank (the party leader) is kept alive first while it holds a target, even a little below this.
@@ -525,6 +526,8 @@ CreatureType CreatureTypeOf(std::uint32_t entry);
 std::uint32_t CcSpellForClass(std::uint32_t classId);
 // The class's dispel spell for a kind (1 magic, 2 curse, 3 disease, 4 poison; the SDK's dispel_type), 0 when the class has none at that level (level 0 = unknown: any).
 std::uint32_t DispelSpellFor(std::uint32_t classId, std::uint32_t level, std::uint8_t kind);
+// The class's threat-drop spell (priest Fade, hunter Feign Death, rogue Feint, druid Cower), 0 when the class has none at this level. onTarget is set when the cast goes at the target.
+std::uint32_t ThreatDropSpellFor(std::uint32_t classId, std::uint32_t level, bool& onTarget);
 
 // The level the Forever trainers teach a cc spell at (trainer_spell, verified 2026-10-27 against the test world database; the same
 // levels as this file's SpellCostFile dump, data/spell_costs.txt). Sap and Polymorph are both well below either shipped dungeon's

@@ -234,6 +234,18 @@ Module.forever-bots.TelemetrySummarySec = 60
 # Needs Bot.Vendor.SellGear = 1 in the core, which refuses the sale otherwise; each sale is logged there as vendor_sell_gear.
 # VendorSellGear = 1
 
+# DPS threat discipline (on by default; needs Bot.Snapshot.Threat in the core, else the threat fields stay empty and nothing happens): a damage dealer in a party
+# whose threat on its target reaches ThreatHoldPct percent of the top stops attacking that target until it is at or under ThreatReleasePct, for at most
+# ThreatHoldMaxSec seconds (then it fights for as long again before it may hold anew). Not for the tank, a healer or a solo bot, not while the target is under
+# ThreatNearDeathPct percent health, and not while the target is already attacking the bot (holding then does nothing). ThreatDropAbilities: a bot that is on top of
+# the threat list or has the target's attention also uses its class's threat drop (priest Fade, hunter Feign Death, rogue Feint, druid Cower) when it has one.
+# ThreatHold = 1
+# ThreatHoldPct = 90          (1-100)
+# ThreatReleasePct = 70       (0-99, under ThreatHoldPct)
+# ThreatHoldMaxSec = 8        (1-60)
+# ThreatNearDeathPct = 15     (0-100: 0 holds to the end)
+# ThreatDropAbilities = 1
+
 # Supplies (layout 15, off by default): a bot short of ammunition, food or drink walks to the nearest vendor that sells what it can use and buys,
 # and a resting bot eats or drinks what it carries. Needs Bot.Actions.Supplies in the core (on by default there). A hunter with no ammunition
 # fights in melee until it has bought some. A trip that bought nothing (no money, the vendor out of stock) is tried again later, after a longer wait each time.

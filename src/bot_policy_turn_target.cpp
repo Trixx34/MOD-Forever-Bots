@@ -717,6 +717,69 @@ BotPolicy::TurnFlow BotPolicy::TurnTaming(DecideTick& tick, BotTurn& turn)
             targetUnit = nullptr;
         }
     }
+    // DPS threat discipline (plan section 3.3, layout 24 threat fields): a damage dealer of a party whose threat on its target nears the top holds its attacks until the
+    // tank is ahead again, and uses its class's threat drop when it has the target's attention. Not the tank, a healer, or a solo bot.
+    if (_options.ThreatHold && partyMember && targetRef != 0)
+    {
+        bool const dps = state.Role_ == BotState::Role::Dps ||
+                         (state.Role_ == BotState::Role::Auto && classId != kWarriorClass && HealSpellFor(classId, bot.level) == 0);
+        if (state.ThreatHoldRef != 0 && state.ThreatHoldRef != targetRef)
+            state.ThreatHoldRef = 0; // another target: a new decision
+        if (dps && targetUnit && targetUnit->is_hostile && targetUnit->threat_top_ref != 0)
+        {
+            std::uint32_t const pct = targetUnit->bot_threat_pct; // 255: the bot is on top
+            bool const hasAggro = targetUnit->victim_ref == PlayerRef(bot.guid);
+            bool const nearDeath = targetUnit->max_health != 0 && std::uint64_t(targetUnit->health) * 100 < std::uint64_t(targetUnit->max_health) * _options.ThreatNearDeathPct;
+            if (state.ThreatHoldRef == 0)
+            {
+                if (nowMs >= state.ThreatGraceUntilMs && pct >= _options.ThreatHoldPct && !hasAggro && !nearDeath)
+                {
+                    state.ThreatHoldRef = targetRef;
+                    state.ThreatHoldSinceMs = nowMs;
+                    if (_options.OnEvent)
+                        _options.OnEvent("threat_hold: bot=" + std::to_string(bot.guid) + " target=" + std::to_string(targetRef) + " pct=" + std::to_string(pct));
+                }
+            }
+            else if (pct <= _options.ThreatReleasePct || hasAggro || nearDeath)
+                state.ThreatHoldRef = 0;
+            else if (nowMs - state.ThreatHoldSinceMs >= _options.ThreatHoldMaxMs)
+            {
+                state.ThreatHoldRef = 0;
+                state.ThreatGraceUntilMs = nowMs + _options.ThreatHoldMaxMs;
+            }
+            // The drop ability: on top of the list (100% and above) or the target's attention is on the bot.
+            if (_options.ThreatDropAbilities && (hasAggro || pct >= 100) && !nearDeath && nowMs >= state.ThreatDropAtMs && nowMs >= state.NextCastMs && !IsCasting(bot))
+            {
+                bool onTarget = false;
+                std::uint32_t const spell = ThreatDropSpellFor(classId, bot.level, onTarget);
+                bool cooling = false;
+                for (forever_module::SpellCooldown const& cooldown : bot.spell_cooldowns)
+                    cooling = cooling || (cooldown.spell_id == spell && cooldown.remaining_ms != 0);
+                auto const retry = state.RetryAtMs.find(spell);
+                if (spell != 0 && !cooling && (retry == state.RetryAtMs.end() || nowMs >= retry->second) && CanPay(_options.SpellCosts.get(), spell, bot))
+                {
+                    BotAction drop;
+                    drop.bot_guid = bot.guid;
+                    drop.type = ActionType::kCastSpell;
+                    drop.spell_id = spell;
+                    drop.target_guid = onTarget ? targetRef : 0;
+                    tick.actions.push_back(drop);
+                    state.CastTarget[spell] = drop.target_guid;
+                    state.NextCastMs = nowMs + kGlobalCooldownMs;
+                    state.ThreatDropAtMs = nowMs + kThreatDropRetryMs;
+                    if (_options.OnEvent)
+                        _options.OnEvent("threat_drop: bot=" + std::to_string(bot.guid) + " spell=" + std::to_string(spell) + " pct=" + std::to_string(pct));
+                }
+            }
+            if (state.ThreatHoldRef != 0)
+            {
+                targetRef = 0;
+                targetUnit = nullptr;
+            }
+        }
+        else if (state.ThreatHoldRef != 0 && !dps)
+            state.ThreatHoldRef = 0;
+    }
     turn.hasTarget = targetRef != 0 && !lowHealth;
     auto& hasTarget = turn.hasTarget;
 

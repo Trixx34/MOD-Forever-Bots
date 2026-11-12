@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Policy tests, part 8 of 8 (split out of policy_test.cpp; the helpers are in policy_test_support.h).
 #include "policy_test_support.h"
+#include "bot_policy_internal.h"
 
 namespace {
 
@@ -282,6 +283,142 @@ void TelegraphEscapeCasterMidCastMovesOnlyForLethalOrByConfig()
     CHECK(GroundMoves(byConfig.Decide(castingView(18392), 1000)).size() == 1);
 }
 
+// DPS threat discipline (layout 24 threat fields). A party of a warrior tank (10), a rogue (11) and a mage (12) fights one mob; the mob's threat fields are set per test.
+struct ThreatRun
+{
+    int rogueAttacks = 0;
+    int mageAttacks = 0;
+    int tankAttacks = 0;
+    int rogueFeint = 0;
+    int priestFade = 0;
+};
+
+ThreatRun RunThreat(std::uint32_t pct, std::uint32_t mobHealthPct, bool mobOnRogue, std::function<void(PolicyOptions&)> tweak = nullptr, std::uint64_t spanMs = 3000,
+                    std::function<std::uint32_t(std::uint64_t at)> pctAt = nullptr, std::uint32_t rogueClass = 4)
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 3;
+    options.PartyCount = 1;
+    options.WanderWhenIdle = false;
+    options.ClassOf = [rogueClass](std::uint64_t guid) { return guid == 10 ? 1u : guid == 11 ? rogueClass : 8u; };
+    if (tweak)
+        tweak(options);
+    BotPolicy policy(options);
+    ThreatRun run;
+    for (std::uint64_t at = 1000; at < 1000 + spanMs; at += 100)
+    {
+        WorldTickSnapshotView view = PartyView({ 10, 11, 12 }, options.ClassOf);
+        view.tick_number = at / 100;
+        NearbyUnit mob = Hostile(2, 5.0f, mobHealthPct);
+        mob.threat_top_ref = 1;
+        mob.bot_threat_pct = std::uint8_t(pctAt ? pctAt(at) : pct);
+        mob.victim_ref = mobOnRogue ? MakeUnitRef(2, 0, 11) : MakeUnitRef(2, 0, 10);
+        for (std::size_t i = 0; i < 3; ++i)
+        {
+            view.bots[i].threat_target_guid = mob.guid;
+            view.bots[i].in_combat = 1;
+            AddNearby(view, i, mob);
+        }
+        for (BotAction const& action : policy.Decide(view, at))
+        {
+            if (action.type != ActionType::kAttackTarget && action.type != ActionType::kCastSpell)
+                continue;
+            if (action.bot_guid == 10)
+                ++run.tankAttacks;
+            if (action.bot_guid == 11 && action.spell_id == 1966)
+                ++run.rogueFeint;
+            else if (action.bot_guid == 11 && action.target_guid == mob.guid)
+                ++run.rogueAttacks;
+            if (action.bot_guid == 11 && action.spell_id == 586)
+                ++run.priestFade;
+            if (action.bot_guid == 12 && action.target_guid == mob.guid)
+                ++run.mageAttacks;
+        }
+    }
+    return run;
+}
+
+void ThreatHoldStopsADpsAtTheThreshold()
+{
+    ThreatRun const low = RunThreat(60, 100, false);
+    CHECK(low.rogueAttacks > 0 && low.mageAttacks > 0 && low.tankAttacks > 0);
+    ThreatRun const high = RunThreat(95, 100, false);
+    CHECK(high.rogueAttacks == 0 && high.mageAttacks == 0);   // both damage dealers hold
+    CHECK(high.tankAttacks > 0);                              // the tank never does
+    ThreatRun const exact = RunThreat(90, 100, false);
+    CHECK(exact.rogueAttacks == 0);
+}
+
+void ThreatHoldIsOffByTheSettingAndNeedsAParty()
+{
+    CHECK(RunThreat(95, 100, false, [](PolicyOptions& o) { o.ThreatHold = false; }).rogueAttacks > 0);
+    CHECK(RunThreat(95, 100, false, [](PolicyOptions& o) { o.ThreatHoldPct = 98; }).rogueAttacks > 0);   // a higher threshold
+    // A solo bot: no party, so no hold.
+    PolicyOptions options = AggressiveOptions();
+    options.ClassOf = [](std::uint64_t) { return 4u; };
+    BotPolicy solo(options);
+    NearbyUnit mob = Hostile(2, 5.0f, 100);
+    mob.threat_top_ref = 1;
+    mob.bot_threat_pct = 99;
+    WorldTickSnapshotView view = View(1, mob.guid, { mob });
+    view.bots[0].in_combat = 1;
+    int attacks = 0;
+    for (std::uint64_t at = 1000; at < 2000; at += 100)
+    {
+        view.tick_number = at / 100;
+        for (BotAction const& action : solo.Decide(view, at))
+            if (action.type == ActionType::kAttackTarget || (action.type == ActionType::kCastSpell && action.target_guid == mob.guid))
+                ++attacks;
+    }
+    CHECK(attacks > 0);
+}
+
+void ThreatHoldReleasesAtTheLowerMarkAndEndsOnANearlyDeadTarget()
+{
+    // 95% until 1.5 s, then 60%: attacks resume after the release.
+    auto const falling = [](std::uint64_t at) { return at < 2500 ? 95u : 60u; };
+    ThreatRun const run = RunThreat(0, 100, false, nullptr, 3000, falling);
+    CHECK(run.rogueAttacks > 0);
+    ThreatRun const early = RunThreat(0, 100, false, nullptr, 1500, falling);
+    CHECK(early.rogueAttacks == 0);
+    // 75% sits between the marks: holding goes on once started.
+    auto const between = [](std::uint64_t at) { return at < 1500 ? 95u : 75u; };
+    CHECK(RunThreat(0, 100, false, nullptr, 3000, between).rogueAttacks == 0);
+    // A target under 15% health: attacks go on at any threat.
+    CHECK(RunThreat(99, 10, false).rogueAttacks > 0);
+    // ThreatNearDeathPct = 0 holds to the end.
+    CHECK(RunThreat(99, 10, false, [](PolicyOptions& o) { o.ThreatNearDeathPct = 0; }).rogueAttacks == 0);
+}
+
+void ThreatHoldRunsOutAfterItsMaximum()
+{
+    ThreatRun const run = RunThreat(95, 100, false, [](PolicyOptions& o) { o.ThreatHoldMaxMs = 2000; }, 5000);
+    CHECK(run.rogueAttacks > 0);   // 2 s hold, then 2 s of fighting regardless
+    ThreatRun const during = RunThreat(95, 100, false, [](PolicyOptions& o) { o.ThreatHoldMaxMs = 2000; }, 1900);
+    CHECK(during.rogueAttacks == 0);
+}
+
+void AThreatDropAbilityIsUsedWhenTheMobIsOnTheBot()
+{
+    // The mob is on the rogue at 100%+: Feint, once (the retry delay), and no hold because holding does nothing; the attacks go on.
+    ThreatRun const run = RunThreat(255, 100, true, nullptr, 3000);
+    CHECK(run.rogueFeint == 1);
+    CHECK(run.rogueAttacks > 0);
+    CHECK(RunThreat(255, 100, true, [](PolicyOptions& o) { o.ThreatDropAbilities = false; }).rogueFeint == 0);
+}
+
+void ThreatDropSpellsFollowTheClass()
+{
+    bool onTarget = false;
+    CHECK(bot_policy_detail::ThreatDropSpellFor(5, 20, onTarget) == 586 && !onTarget);    // priest Fade
+    CHECK(bot_policy_detail::ThreatDropSpellFor(3, 40, onTarget) == 5384 && !onTarget);   // hunter Feign Death
+    CHECK(bot_policy_detail::ThreatDropSpellFor(4, 20, onTarget) == 1966 && onTarget);    // rogue Feint
+    CHECK(bot_policy_detail::ThreatDropSpellFor(11, 40, onTarget) == 8998 && onTarget);   // druid Cower
+    CHECK(bot_policy_detail::ThreatDropSpellFor(4, 10, onTarget) == 0);                   // not learned yet
+    CHECK(bot_policy_detail::ThreatDropSpellFor(1, 60, onTarget) == 0);                   // the warrior has none
+    CHECK(bot_policy_detail::ThreatDropSpellFor(8, 60, onTarget) == 0);                   // nor the mage
+}
+
 } // namespace
 
 void RunPolicyTestsPart8()
@@ -299,4 +436,10 @@ void RunPolicyTestsPart8()
     TelegraphEscapeIsOffOutsideRaidMapsOrWhenSwitchedOff();
     TelegraphEscapeTankHoldsUnlessLethalOrFrontal();
     TelegraphEscapeCasterMidCastMovesOnlyForLethalOrByConfig();
+    ThreatHoldStopsADpsAtTheThreshold();
+    ThreatHoldIsOffByTheSettingAndNeedsAParty();
+    ThreatHoldReleasesAtTheLowerMarkAndEndsOnANearlyDeadTarget();
+    ThreatHoldRunsOutAfterItsMaximum();
+    AThreatDropAbilityIsUsedWhenTheMobIsOnTheBot();
+    ThreatDropSpellsFollowTheClass();
 }
