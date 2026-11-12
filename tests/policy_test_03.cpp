@@ -541,6 +541,38 @@ void ABossPointWhoseBossDiedElsewhereIsPassed()
     CHECK(passed);
 }
 
+// 2026-11-12 (Shadowfang Keep): a leader on a floor above the boss point (z 100 over Rethilgore's room at z 82, 5 yards away on the map) has not reached it: it does not
+// pass the points before it, does not stand under the boss for kBossHoldMs, and walks on to the point. On the point's own floor it holds as before.
+void ALeaderOnAnotherFloorHasNotReachedTheBossPoint()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.ClassOf = WarriorLeads;
+    options.Route = { Point{ 100.0f, 0.0f, 82.0f }, Point{ 104.0f, 0.0f, 82.0f }, Point{ 180.0f, 0.0f, 82.0f } };
+    options.RouteBossAt[1] = 644;
+    std::vector<std::string> events;
+    options.OnEvent = [&events](std::string const& line) { events.push_back(line); };
+    auto const at = [](float z)
+    {
+        WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+        for (BotSnapshot& bot : view.bots)
+        {
+            bot.pos_x = 104.0f;
+            bot.pos_z = z;
+        }
+        return view;
+    };
+    BotPolicy above(options);
+    above.SetRouteActive(true);
+    CHECK(LeaderWalk(above.Decide(at(100.0f), 0)) == 100.0f); // on the roof: walks to point 0, nothing passed
+    for (std::string const& line : events)
+        CHECK(line.rfind("route_passed", 0) != 0);
+    BotPolicy below(options);
+    below.SetRouteActive(true);
+    below.Decide(at(83.0f), 0);
+    CHECK(LeaderWalk(below.Decide(at(83.0f), 1000)) < 0.0f); // on the floor: it is at the boss point and waits for the boss
+}
+
 // 0.44.17: past the last route point with a boss of the route not dead (Stockade: bosses_missing at 23/23), the leader walks back to that boss point, waits there, and
 // after the sweep (kBossSweepMaxMs) or the kill it stands at the end.
 void TheLeaderSweepsBackToAMissingBoss()
@@ -934,6 +966,7 @@ void RunPolicyTestsPart3()
     ATeleportEventDoesNotSnapPastALivingBoss();
     TheLeaderWaitsAtABossPointUntilTheBossIsDead();
     ABossPointWhoseBossDiedElsewhereIsPassed();
+    ALeaderOnAnotherFloorHasNotReachedTheBossPoint();
     TheLeaderSweepsBackToAMissingBoss();
     ABossPointIsNeverSkippedForNoRoute();
     ALeaderSkipsAWaypointWithNoRoute();

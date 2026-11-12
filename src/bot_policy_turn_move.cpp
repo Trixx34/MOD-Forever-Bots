@@ -847,7 +847,8 @@ void BotPolicy::RouteWalkOn(DecideTick& tick, BotTurn& turn, RouteLeg& route)
     };
     while (!eventBusy && !recovering && state.RouteIndex + 1 < routePoints->size() && bossPointOpen(state.RouteIndex) &&
            DistanceTo(bot, (*routePoints)[state.RouteIndex]) > kRoutePointReachYards &&
-           DistanceTo(bot, (*routePoints)[state.RouteIndex + 1]) <= kRouteSkipAheadYards)
+           DistanceTo(bot, (*routePoints)[state.RouteIndex + 1]) <= kRouteSkipAheadYards &&
+           std::fabs(bot.pos_z - (*routePoints)[state.RouteIndex + 1].Z) <= kRouteSkipMaxZYards)
     {
         if (_options.OnEvent)
             _options.OnEvent("route_passed: bot=" + std::to_string(bot.guid) + " point=" + std::to_string(state.RouteIndex) + "/" + std::to_string(routePoints->size()) +
@@ -860,7 +861,7 @@ void BotPolicy::RouteWalkOn(DecideTick& tick, BotTurn& turn, RouteLeg& route)
     {
         float const dx = bot.pos_x - waypoint->X;
         float const dy = bot.pos_y - waypoint->Y;
-        if (std::sqrt(dx * dx + dy * dy) <= kRoutePointReachYards)
+        if (std::sqrt(dx * dx + dy * dy) <= kRoutePointReachYards && std::fabs(bot.pos_z - waypoint->Z) <= kRouteReachMaxZYards)
         {
             // At a boss point the leader stays until that boss is dead, so the party fights it where it stands (the pull logic takes what is near). A boss that
             // is not there to be fought, after kBossHoldMs, is given up and the route goes on.

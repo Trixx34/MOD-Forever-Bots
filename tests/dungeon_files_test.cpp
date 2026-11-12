@@ -633,6 +633,24 @@ void GnomereganRouteRosterAndDuration()
     CHECK(horde.Scenarios.size() == 1 && horde.Scenarios[0].Roster.size() == 5 && horde.Scenarios[0].Roster[0][0] == 2);
 }
 
+// Blackfathom Deeps (2026-11-12): a kill_priority with the Twilight casters of the room before Kelris (Shadowmage, Elementalist, Aquamancer, Loreseeker). The route is unchanged.
+void BlackfathomDeepsKillPriority()
+{
+    std::string const root = FOREVER_BOTS_SOURCE_DIR;
+    std::vector<std::string> warnings;
+    std::vector<Dungeon> const json = LoadDungeonDir(root + "/data/dungeons", true, warnings);
+    CHECK(warnings.empty());
+    Dungeon const* b = nullptr;
+    for (Dungeon const& d : json)
+        if (d.MapId() == 48)
+            b = &d;
+    CHECK(b != nullptr && b->Id == "bfd");
+    if (!b)
+        return;
+    CHECK(b->KillPriority == (std::vector<std::uint32_t>{ 4813, 4814, 4811, 4812 }));
+    CHECK(b->Route.size() == 60);
+}
+
 // Razorfen Downs (bots 0.45.2): a kill_priority with the Skeletal Summoner and its Shadowcaster first, then the Freezing Spirit, the Captain and the
 // casters (2026-11-07 sim journal: the Spirit was the top killer of the first two halls). The route is unchanged. The sim's list run hands it to rfd only.
 void RazorfenDownsKillPriority()
@@ -707,6 +725,7 @@ int main()
     CutOffBossesAreBridgedByTeleportEvents();
     GnomereganRouteRosterAndDuration();
     RazorfenDownsKillPriority();
+    BlackfathomDeepsKillPriority();
     ConfigKeysNameTheFolders();
     if (failures != 0)
     {

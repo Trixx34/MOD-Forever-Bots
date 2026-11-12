@@ -87,6 +87,11 @@
     { "x": -845.9, "y": -421.1, "z": -33.0 },
     { "x": -848.4, "y": -453.9, "z": -33.9, "boss": 4829 }  // boss: Aku'mai
   ],
+  // Kill order for the room before Twilight Lord Kelris (route points 48-53, the last place the overnight parties of 2026-11-12 reached: every one of the 14 stopped
+  // there at 49 to 54 of 60 with 3 of 6 bosses, 5 deaths each, killers 4813, 4814 and 4827). The room holds 7 Twilight Shadowmages (Dominate Mind 7645, Shadow Bolt 9613,
+  // a summon 12746), 6 Twilight Elementalists (spell list 13728, 15039, 12548, 11824), 3 Twilight Aquamancers (Frostbolt 9672) and 3 Twilight Loreseekers. The casters
+  // are taken first, the Shadowmage (it takes a party member over) before the rest; the melee (Twilight Reaver) stay with the tank. Used with the `focus` tactic.
+  "kill_priority": [4813, 4814, 4811, 4812],
   // The bosses, in the order the route meets them. "strategy" holds the tactics for each boss: pull, tank_position, interrupt, dispel, avoid, avoid_spells, kill_order,
   // notes. Fields the bots act on today are listed in doc/dungeon-strategy.md ("what bots do today"); the others are kept but not used yet.
   "bosses": [

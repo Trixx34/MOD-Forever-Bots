@@ -278,6 +278,12 @@ constexpr std::uint32_t kRepairBelowPct = 50;    // worn gear below this durabil
 // The fights draw the leader past route points: when it is this close to the next point, the one it was heading for (not a boss point) is dropped, so it never walks back
 // for it (it did, through the whole dungeon by the pathfinder's only route, with the party standing behind).
 constexpr float kRouteSkipAheadYards = 25.0f;
+// ... and only when it is on the same floor as that point (2026-11-12): the route's X/Y test alone let a leader on the roof level of Shadowfang Keep (z 100, over
+// Rethilgore's room, z 82) count as having reached Rethilgore's point 5 yards away on the map, pass the three points before it, and stand there for kBossHoldMs
+// under the boss (boss_missed, then Rethilgore, Silverlaine and Springvale left out in 4 of 14 overnight runs). Reaching a point takes kRouteReachMaxZYards, passing
+// one kRouteSkipMaxZYards (the route climbs 7 yards between its stair points, so this is wider than the other; the two floors above are 17 to 19 yards apart).
+constexpr float kRouteReachMaxZYards = 10.0f;
+constexpr float kRouteSkipMaxZYards = 12.0f;
 // A party member in a fight does not chase a target farther than this (a creature that flees at low health runs on for hundreds of yards and takes the chaser away from
 // its party, onto the next packs): the target is avoided for a while and the bot stands.
 constexpr float kPartyChaseYards = 45.0f;

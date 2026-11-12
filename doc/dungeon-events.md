@@ -43,6 +43,12 @@ others never pull and join the fight, a healer keeps the tank healed. The tank w
 It holds at each boss point until that boss is seen dead (a creature of that entry with no health, seen by the tank or any member), never skips a boss for lack of a route, and gives
 a boss up after 3 minutes if it never shows.
 
+A route point counts as reached (and the points before it as passed) only when the leader is on the same floor: within 6 yards on the map and 10 yards in height of the point
+(passing a point: the next point within 25 yards on the map and 12 in height). Before, the map distance alone counted: in Shadowfang Keep a leader on the roof level (z 100)
+over Rethilgore's room (z 82) was credited with reaching his point, passed the three points before it, and stood under him for 3 minutes (`boss_missed`); the party then went on
+without him, and the courtyard door event that follows his death never ran (the journal of the overnight run of 2026-11-12 shows it for one party; Rethilgore was also
+missing from 3 more of the 14 runs, which ended `bosses_missing` or timed out at 37/37).
+
 - Started in the middle of a dungeon it takes the route from the point nearest to where it stands.
 - `tank lead off`, `stop`, or leaving the dungeon (a map with no route) ends it; it does not start again by itself.
 - Not in a dungeon with a known route: the bot says so ("not in a dungeon with a known route").
