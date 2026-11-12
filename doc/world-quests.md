@@ -117,6 +117,11 @@ other side is not used (the generator takes the next spawn of the quest on the m
 `tools/faction_sides.tsv`. Without `npc_factions.tsv` the NPC filter is off. The check is in `tests/world_data_test.py` (a hand-made export with Horde,
 Alliance and neutral NPCs). Regenerated 2026-11-12 from the sim world database: Alliance 944 quests (was 953), Horde 895 (894), 60 lists 343 and 327.
 
+Map 2991 (start map of races 95 and 96, levels 1 to 13) was missing because `--maps` defaulted to `0,1`. Regenerated 2026-11-12 from the sim world database with
+`--maps 0,1,2991` (the same four lists and the whole-world file): Alliance 1012 quests (was 945), Horde 968 (895), 60 lists 344 and 328, 14 and 15 new `W2991` starts.
+Commands: leveling `--side <s> --maps 0,1,2991 --max-level 59`, level 60 `--side <s> --maps 0,1,2991 --min-level 60`, whole world `--maps 0,1,2991`. The sim and prod
+have mmaps for map 2991 (34 files on the sim). Not yet seen on the sim: a bot from race 95 or 96 taking a quest at 4098/1849 (`quest_state` step other than `none`).
+
 ## Quest completion on the sim (analysis 2026-11-12)
 
 Read-only look at the sim journal (3 days) and the bots telemetry files:
