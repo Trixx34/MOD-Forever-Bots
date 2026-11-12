@@ -860,6 +860,7 @@ BotPolicy::TurnFlow BotPolicy::TurnRotation(DecideTick& tick, BotTurn& turn)
         }
     }
 
+    bool const noAoe = party_planner::NoAoeNow(tick.PlanOf(partyLeader));
     for (rotation::Row const& row : RowsFor(classId, spec))
     {
         if (row.Buff)
@@ -870,6 +871,8 @@ BotPolicy::TurnFlow BotPolicy::TurnRotation(DecideTick& tick, BotTurn& turn)
             continue; // a ranged attack of a hunter with no ammunition: refused by the core, so only the melee rows are used
         if (row.MaxLevel != 0 && bot.level > row.MaxLevel)
             continue; // a better spell has replaced it
+        if (noAoe && rotation::IsAoeRow(row))
+            continue; // the raid rules' noaoe fight: no area damage now
         // Not learned yet: below the level a trainer teaches it (the rotation file's level, else the built-in table). (A level of 0 is unknown.)
         if (bot.level != 0 && (row.MinLevel != 0 ? row.MinLevel : rotation::LearnLevel(row.Spell)) > bot.level)
             continue;

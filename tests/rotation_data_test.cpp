@@ -586,8 +586,68 @@ void TheShippedFilesLoadCleanly()
 
 } // namespace
 
+void AnAoeRowIsSkippedWhileTheRaidRuleSaysNoAoe()
+{
+    // Arcane Explosion (1449, a built-in area spell) is the first row, Frostbolt the second. A fight with a noaoe row (map 249, boss entry 7) skips the first.
+    auto run = [](char const* rules) {
+        std::vector<std::string> warnings;
+        PolicyOptions options;
+        options.ClassOf = ClassOf;
+        options.PartySize = 3;
+        options.PartyCount = 1;
+        options.Rotations = Parse("class 8\nrow 1449 always self\nrow 116 always target range 0 30\n", warnings);
+        if (rules)
+        {
+            std::vector<std::string> errors;
+            options.RaidRules = std::make_shared<raid_rules::Table>(raid_rules::Parse(rules, errors));
+        }
+        BotPolicy policy(options);
+        WorldTickSnapshotView view = Group(40);
+        for (BotSnapshot& bot : view.bots)
+        {
+            bot.map_id = 249;
+            bot.group_leader_guid = 0;   // a party of our own bots: warrior 11 leads, the mage 10 follows and the planner runs
+        }
+        NearbyUnit mob;
+        mob.guid = MakeUnitRef(8, 7, 3);
+        mob.pos_x = 5.0f;
+        mob.health = 100;
+        mob.is_hostile = true;
+        view.nearby[0] = mob;
+        view.bots[0].nearby_count = 1;
+        view.bots[0].threat_target_guid = mob.guid;
+        view.bots[0].in_combat = 1;
+        std::vector<BotAction> actions = policy.Decide(view, 1000);
+        actions = policy.Decide(view, 1500);
+        view.tick_number = 3;
+        std::vector<BotAction> later = policy.Decide(view, 3000);
+        actions.insert(actions.end(), later.begin(), later.end());
+        bool aoe = false, bolt = false;
+        for (BotAction const& action : actions)
+            if (action.bot_guid == 10 && action.type == ActionType::kCastSpell)
+                (action.spell_id == 1449 ? aoe : bolt) |= (action.spell_id == 1449 || action.spell_id == 116);
+        return std::pair<bool, bool>(aoe, bolt);
+    };
+    auto const plain = run(nullptr);
+    CHECK(plain.first);                                        // without the rule the area spell is the first row
+    auto const quiet = run("noaoe|249|7|The Boss\n");
+    CHECK(!quiet.first && quiet.second);                       // with it the bolt is cast and the area spell is not
+}
+
+void TheAoeKeywordAndTheBuiltInSet()
+{
+    std::vector<std::string> warnings;
+    auto const data = Parse("class 8\nrow 999 aoe always self\nrow 1449 always self\nrow 116 always target range 0 30\n", warnings);
+    CHECK(warnings.empty());
+    auto const& rows = data->ByClass.at(8);
+    CHECK(rows.size() == 3 && rotation::IsAoeRow(rows[0]) && rotation::IsAoeRow(rows[1]) && !rotation::IsAoeRow(rows[2]));
+    CHECK(rows[0].Aoe && !rows[1].Aoe);
+}
+
 int main()
 {
+    AnAoeRowIsSkippedWhileTheRaidRuleSaysNoAoe();
+    TheAoeKeywordAndTheBuiltInSet();
     ParsesRowsAndBuffs();
     ABuffTheBotCannotPayForIsNotCast();
     ABuffRunningAtAnyRankCountsAsUp();

@@ -87,7 +87,13 @@ struct Row
     // target_strong 1") needs both, not just the last one the parser saw. Always when the row only has one condition (the
     // common case) or none.
     Rule When2 = Rule{ Cond::Always, 0 };
+    // Area damage: skipped while the raid rules' `noaoe` fight is on (party_planner::NoAoeNow). Set by the `aoe` keyword of a rotation file row; IsAoeRow also knows the area spells below.
+    bool Aoe = false;
 };
+
+// Whether the row hits an area: its Aoe flag, or its spell is one of the built-in area-damage spells (Cleave, Thunder Clap, Swipe, Multi-Shot, Blizzard, Flamestrike, Arcane Explosion, Cone of Cold,
+// Frost Nova, Chain Lightning, Consecration, Fire Nova, Magma Totem, Shockwave, Blade Flurry; every rank). Rotation rows carry the first rank's id.
+bool IsAoeRow(Row const& row);
 
 // A row's whole condition: When, and When2 too when it is set. Use this instead of Allowed(row.When, ...) so a row with two
 // conditions is not silently judged by only the first.
@@ -98,7 +104,7 @@ bool RowHasCondition(Row const& row, Cond cond);
 
 // Rotations read from a file (data/rotations.txt, made by tools/make_rotations.py), per class id. A class missing from the file keeps the built-in rows.
 //   class <id> [spec <key>]            the rows below belong to the class, or to one spec of it (a spec with no block uses the class's)
-//   row <spell> [level <n>] [maxlevel <n>] [duration <sec>] <condition> self|target [range <min> <max>]       a fight spell, in priority order
+//   row <spell> [level <n>] [aoe] [maxlevel <n>] [duration <sec>] <condition> self|target [range <min> <max>]       a fight spell, in priority order
 //   buff <spell> [level <n>] [maxlevel <n>] duration <sec> self|party [ranks <id,id,...>]                    an upkeep spell, cast out of combat when it has run out;
 //                                                                                                           ranks: the spell ids of every rank (the aura shows the rank cast)
 // Conditions: always | target_hp_above N | target_hp_below N | self_hp_below N | self_power_below N | self_power_above N | enemies N |

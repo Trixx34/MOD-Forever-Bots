@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <cmath>
 #include <fstream>
+#include <set>
 #include <sstream>
 
 using forever_module::BotSnapshot;
@@ -132,6 +133,28 @@ bool Allowed(Rule const& rule, Facts const& f)
         case Cond::SelfAuraAtLeast: return AuraStacks(f, std::uint32_t(rule.Param)) >= std::uint32_t(std::max(rule.Param2, 1));
     }
     return false;
+}
+
+bool IsAoeRow(Row const& row)
+{
+    static std::set<std::uint32_t> const kAoe = {
+        1449, 8437, 8438, 8439, 10201, 10202,                  // Arcane Explosion
+        13877,                                                  // Blade Flurry
+        10, 6141, 8427, 10185, 10186, 10187,                    // Blizzard
+        421, 930, 2860, 10605,                                  // Chain Lightning
+        845, 7369, 11608, 11609, 20569,                         // Cleave
+        120, 8492, 10159, 10160, 10161,                         // Cone of Cold
+        20116, 20922, 20923, 20924, 26573,                      // Consecration
+        408341, 408342, 408343, 408344, 408345,                 // Fire Nova
+        2120, 2121, 8422, 8423, 10215, 10216,                   // Flamestrike
+        122, 865, 6131, 10230,                                  // Frost Nova
+        8190, 10585, 10586, 10587,                              // Magma Totem
+        2643,                                                   // Multi-Shot
+        440488,                                                 // Shockwave
+        769, 779, 780, 9754, 9908,                              // Swipe
+        6343, 8198, 8204, 8205, 11580, 11581,                   // Thunder Clap
+    };
+    return row.Aoe || kAoe.count(row.Spell) != 0;
 }
 
 bool Allowed(Row const& row, Facts const& f)
@@ -455,6 +478,7 @@ RotationData ParseRotationData(std::istream& in, std::vector<std::string>& warni
                 }
             }
             else if (key == "range") ok = i + 1 < t.size() && Decimal(t[i++], row.MinRange) && Decimal(t[i++], row.MaxRange);
+            else if (key == "aoe") row.Aoe = true;   // area damage: skipped in a noaoe fight
             else if (key == "always") {} // no condition at all: the default already, and never consumes a When/When2 slot
             else if (key == "target_casting") setCond(Rule{ Cond::TargetCasting, 0 });
             else if (key == "target_hp_above") { ok = arg(n); setCond(Rule{ Cond::TargetHpAbove, std::int32_t(n) }); }
