@@ -379,6 +379,9 @@ constexpr std::uint64_t kHealClaimMs = 2500;
 // that actually lands ends the cast, so Cond::TargetCasting stops being true on its own well before the claim would run out;
 // this only covers the gap between the bot sending the cast and the next snapshot showing the result.
 constexpr std::uint64_t kInterruptClaimMs = 2500;
+// A cast with less than this left (NearbyUnit::cast_remaining_ms, Bot.Snapshot.CastInfo) ends before an interrupt sent now lands (a tick plus the
+// core's latency): the row is skipped and the cooldown kept for the next cast. 0 left means "not reported", never "about to end".
+constexpr std::uint32_t kInterruptMinRemainingMs = 300;
 constexpr float kHealRangeYards = 30.0f;
 constexpr float kBuffRangeYards = 30.0f;            // a party buff reaches members this close
 constexpr std::size_t kGrindMemory = 2;           // grind spots remembered as just visited

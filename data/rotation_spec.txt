@@ -14,6 +14,7 @@
 
 class 1
 # The default warrior: the protection rows, which a warrior in a party needs (a solo warrior stays in Battle Stance and keeps Execute).
+row "Shield Bash" target_casting self_aura_at_least 71 1 target range 0 5   # interrupt, Defensive Stance with a shield (the warrior's only stance in a party); one bot kicks per cast (planner claim)
 row "Execute" self_aura_below 71 1 target_hp_below 20 target range 0 5    # not while in Defensive Stance: the core refuses it there
 row "Taunt" enemies 2 target range 0 5
 row "Bloodrage" self_power_below 20 self
@@ -34,6 +35,7 @@ buff "Defensive Stance" duration 120 self in_party
 class 1 spec prot
 # Protection (tank). Charge on engage, Shield Block liberally (rage-neutral with Shield Specialization) to proc Revenge, Thunder Clap in Defensive Stance, Sunder Armor in a group,
 # Rend only late (the guide: when already high on threat), Heroic Strike with spare rage. Taunt against two or more enemies. Retaliation against several.
+row "Shield Bash" target_casting self_aura_at_least 71 1 target range 0 5   # interrupt, Defensive Stance with a shield (the warrior's only stance in a party); one bot kicks per cast (planner claim)
 row "Execute" self_aura_below 71 1 target_hp_below 20 target range 0 5
 row "Taunt" enemies 2 target range 0 5
 row "Bloodrage" self_power_below 20 self
@@ -56,6 +58,7 @@ buff "Defensive Stance" duration 120 self in_party
 class 1 spec arms
 # Arms (damage). Sweeping Strikes against two, Overpower after a dodge (refused otherwise), Mortal Strike from level 48, Rend, Sunder Armor in a group, Execute at the end.
 # Berserker Stance comes from the level 30 class quest and is not cast; the warrior stays in Battle Stance.
+row "Pummel" target_casting self_aura_at_least 2458 1 target range 0 5   # interrupt, Berserker Stance only: the module never enters it, so this fires for a warrior that someone put there
 row "Execute" target_hp_below 20 target range 0 5
 row "Bloodrage" self_power_below 20 self
 row "Reckless Swings" self_power_below 30 self   # Forever: the next melee attacks generate extra rage
@@ -74,6 +77,7 @@ buff "Battle Shout" duration 120 self
 class 1 spec fury
 # Fury (damage). Death Wish and Bloodthirst (talents: refused until learned), Execute, Overpower (rage-efficient), Sunder Armor as a debuff; Cleave and Heroic Strike only with
 # lots of rage (the guide calls them rage-inefficient). Whirlwind and Berserker Rage need Berserker Stance and are not cast.
+row "Pummel" target_casting self_aura_at_least 2458 1 target range 0 5   # interrupt, Berserker Stance only: the module never enters it, so this fires for a warrior that someone put there
 row "Execute" target_hp_below 20 target range 0 5
 row "Bloodrage" self_power_below 20 self
 row "Reckless Swings" self_power_below 30 self   # Forever: the next melee attacks generate extra rage

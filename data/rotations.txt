@@ -1,6 +1,7 @@
 # Rotations. Made by tools/make_rotations.py from the spec and the core's ability dump. Format: src/combat_rotation.h
 
 class 1
+row 72 level 12 target_casting self_aura_at_least 71 1 target range 0 5   # Shield Bash: ranks [72, 1671, 1672]
 row 5308 level 24 self_aura_below 71 1 target_hp_below 20 target range 0 5   # Execute: ranks [5308, 20658, 20660, 20661, 20662]
 row 355 level 10 enemies 2 target range 0 5   # Taunt: ranks [355]
 row 2687 level 10 self_power_below 20 self   # Bloodrage: ranks [2687]
@@ -19,6 +20,7 @@ buff 6673 level 1 duration 120 self ranks 5242,6192,6673,11549,11550,11551   # B
 buff 71 level 10 duration 120 self in_party   # Defensive Stance: ranks [71]
 
 class 1 spec prot
+row 72 level 12 target_casting self_aura_at_least 71 1 target range 0 5   # Shield Bash: ranks [72, 1671, 1672]
 row 5308 level 24 self_aura_below 71 1 target_hp_below 20 target range 0 5   # Execute: ranks [5308, 20658, 20660, 20661, 20662]
 row 355 level 10 enemies 2 target range 0 5   # Taunt: ranks [355]
 row 2687 level 10 self_power_below 20 self   # Bloodrage: ranks [2687]
@@ -39,6 +41,7 @@ buff 6673 level 1 duration 120 self ranks 5242,6192,6673,11549,11550,11551   # B
 buff 71 level 10 duration 120 self in_party   # Defensive Stance: ranks [71]
 
 class 1 spec arms
+row 6552 level 38 target_casting self_aura_at_least 2458 1 target range 0 5   # Pummel: ranks [6552, 6554]
 row 5308 level 24 target_hp_below 20 target range 0 5   # Execute: ranks [5308, 20658, 20660, 20661, 20662]
 row 2687 level 10 self_power_below 20 self   # Bloodrage: ranks [2687]
 row 1329555 level 1 self_power_below 30 self   # Reckless Swings: ranks [1329555]
@@ -55,6 +58,7 @@ row 78 level 1 self_power_above 40 target range 0 5   # Heroic Strike: ranks [78
 buff 6673 level 1 duration 120 self ranks 5242,6192,6673,11549,11550,11551   # Battle Shout: ranks [5242, 6192, 6673, 11549, 11550, 11551]
 
 class 1 spec fury
+row 6552 level 38 target_casting self_aura_at_least 2458 1 target range 0 5   # Pummel: ranks [6552, 6554]
 row 5308 level 24 target_hp_below 20 target range 0 5   # Execute: ranks [5308, 20658, 20660, 20661, 20662]
 row 2687 level 10 self_power_below 20 self   # Bloodrage: ranks [2687]
 row 1329555 level 1 self_power_below 30 self   # Reckless Swings: ranks [1329555]

@@ -889,6 +889,10 @@ BotPolicy::TurnFlow BotPolicy::TurnRotation(DecideTick& tick, BotTurn& turn)
             continue;
         if (!rotation::Allowed(row, facts))
             continue;
+        // A cast that ends before the kick lands is left alone (the field is 0 when the core does not report it: then no gate).
+        if (rotation::RowHasCondition(row, rotation::Cond::TargetCasting) && targetUnit && targetUnit->cast_remaining_ms != 0 &&
+            targetUnit->cast_remaining_ms < kInterruptMinRemainingMs)
+            continue;
         // Only one member of the party stops a cast: when a party member already claimed this target's interrupt, this bot uses its next row.
         if (rotation::RowHasCondition(row, rotation::Cond::TargetCasting) &&
             (InterruptTaken(targetRef, nowMs) || !party_planner::MayInterrupt(_options.PartyPlanner, tick.PlanOf(partyLeader), bot.guid, targetRef, nowMs)))
