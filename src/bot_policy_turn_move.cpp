@@ -146,6 +146,33 @@ void BotPolicy::MoveToTarget(DecideTick& tick, BotTurn& turn)
                   " hp=" + std::to_string(bot.health) + "/" + std::to_string(bot.max_health) +
                   " power=" + std::to_string(bot.power) + "/" + std::to_string(bot.max_power) +
                   " target=" + std::to_string(forever_module::UnitRefEntry(targetRef)) + RouteYardsField(turn));
+        // Pull churn: the same few fights started over and over from one spot with nothing killed (see kPullChurnCount). The targets, and every
+        // live unit of their kinds in view, are left alone for as long as a stalled fight's target, and the fight ends this tick.
+        if (NotePullChurn(state.PullChurnSinceMs, state.PullChurnCount, state.PullChurnX, state.PullChurnY, state.PullChurnTargets, nowMs,
+                          bot.pos_x, bot.pos_y, targetRef))
+        {
+            std::vector<std::uint32_t> entries;
+            for (std::uint64_t const ref : state.PullChurnTargets)
+                entries.push_back(forever_module::UnitRefEntry(ref));
+            for (std::uint64_t const ref : state.PullChurnTargets)
+                AvoidStalledUnit(state.AvoidUntilMs, state.StallCount, ref, nowMs);
+            for (NearbyUnit const& unit : turn.nearby)
+                if (IsLiveMob(unit) && std::find(entries.begin(), entries.end(), forever_module::UnitRefEntry(unit.guid)) != entries.end() &&
+                    state.AvoidUntilMs.find(unit.guid) == state.AvoidUntilMs.end())
+                    AvoidStalledUnit(state.AvoidUntilMs, state.StallCount, unit.guid, nowMs);
+            if (_options.OnEvent)
+                _options.OnEvent("pull_unreachable: bot=" + std::to_string(bot.guid) + " pulls=" + std::to_string(state.PullChurnCount) + " targets=" +
+                                 std::to_string(state.PullChurnTargets.size()) + " first_entry=" + std::to_string(entries.empty() ? 0u : entries.front()) +
+                                 " at=" + std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) + "," + std::to_string(int(bot.pos_z)));
+            state.PullChurnCount = 0;
+            state.PullChurnTargets.clear();
+            state.InFight = false;
+            targetRef = 0;
+            targetUnit = nullptr;
+            wanted = Decision{ ActionType::kStop, 0 };
+            moveWhy = "pull_unreachable";
+            return;
+        }
     }
     // Layout 13: the pet is in the snapshot, so it can be sent at this fight's target, and (since the core now allows pet
     // commands in combat, not only at the fight's start) sent again whenever the target changes: a loose mob picked up mid-fight,

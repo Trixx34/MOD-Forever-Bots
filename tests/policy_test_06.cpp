@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Policy tests, part 6 of 8 (split out of policy_test.cpp; the helpers are in policy_test_support.h).
 #include "policy_test_support.h"
+#include "bot_policy_internal.h"
 
 namespace {
 
@@ -924,6 +925,31 @@ void TheRouteWaitsForTheHealersMana()
     CHECK(walks(full.Decide(view, 0), 12));
 }
 
+// The 2026-11-12 sfk stall: a leader whose fight starts and ends again and again on mobs it cannot reach. The churn watchdog leaves them alone.
+void PullChurnLeavesUnreachableTargetsAlone()
+{
+    std::uint64_t sinceMs = 0;
+    std::uint32_t count = 0;
+    float wx = 0.0f, wy = 0.0f;
+    std::vector<std::uint64_t> targets;
+    bool fired = false;
+    for (int i = 0; i < 12 && !fired; ++i)
+        fired = bot_policy_detail::NotePullChurn(sinceMs, count, wx, wy, targets, 1000 + i * 3000, -262.0f, 2284.0f, i % 2 ? 111u : 222u);
+    CHECK(fired);
+    CHECK(count == 8);                 // the eighth start inside the minute
+    CHECK(targets.size() == 2);        // two distinct targets
+    // The same starts spread over more than a minute never fire.
+    sinceMs = 0; count = 0; targets.clear(); fired = false;
+    for (int i = 0; i < 12; ++i)
+        fired = fired || bot_policy_detail::NotePullChurn(sinceMs, count, wx, wy, targets, 1000 + i * 20000, -262.0f, 2284.0f, 111u);
+    CHECK(!fired);
+    // Nor starts that move on: each one 30 yards from the last.
+    sinceMs = 0; count = 0; targets.clear(); fired = false;
+    for (int i = 0; i < 12; ++i)
+        fired = fired || bot_policy_detail::NotePullChurn(sinceMs, count, wx, wy, targets, 1000 + i * 3000, -262.0f + 30.0f * i, 2284.0f, 111u);
+    CHECK(!fired);
+}
+
 } // namespace
 
 void RunPolicyTestsPart6()
@@ -961,4 +987,5 @@ void RunPolicyTestsPart6()
     TankIsHealedBeforeTheLowestMember();
     TheRouteLeaderIsHealedUpOutOfAFight();
     TheRouteWaitsForTheHealersMana();
+    PullChurnLeavesUnreachableTargetsAlone();
 }

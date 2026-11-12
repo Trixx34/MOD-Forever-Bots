@@ -398,6 +398,7 @@ void SetUpScenario(PolicyOptions& policyOptions, PumpExtras& extras, BotSettings
     policyOptions.PortalPoint = first.PortalPoint;
     policyOptions.PortalInsideMap = first.PortalInsideMap;
     extras.ScenarioResultFile = settings.Scenario.ResultFile;
+    extras.RunTelemetryDir = settings.RunTelemetryDir;
 }
 
 } // namespace main_detail

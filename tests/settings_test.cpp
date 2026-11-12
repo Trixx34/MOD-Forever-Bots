@@ -544,6 +544,21 @@ void RealismSettings()
     CHECK(warnings.empty());
 }
 
+void RunTelemetryDirSetting()
+{
+    std::vector<std::string> warnings;
+    CHECK(ParseBotSettings({}, warnings).RunTelemetryDir.empty()); // off by default
+    CHECK(warnings.empty());
+    BotSettings const on = ParseBotSettings({ { "RunTelemetryDir", "/var/log/forever/sim" } }, warnings);
+    CHECK(on.RunTelemetryDir == "/var/log/forever/sim" && warnings.empty());
+    std::vector<std::string> bad;
+    BotSettings const rel = ParseBotSettings({ { "RunTelemetryDir", "logs/here" } }, bad);
+    CHECK(rel.RunTelemetryDir.empty()); // a relative path is refused with one warning
+    CHECK(bad.size() == 1 && bad[0].find("RunTelemetryDir") != std::string::npos);
+    // The CSV key of the same family is untouched.
+    CHECK(ParseBotSettings({}, warnings).TelemetryFile == "forever-bots-telemetry.csv");
+}
+
 int main()
 {
     RealismSettings();
@@ -554,6 +569,7 @@ int main()
     QuestListSettings();
     LevelDungeonSettings();
     SayAndSupplySettings();
+    RunTelemetryDirSetting();
     DefaultsWhenEmpty();
     TelemetrySettings();
     ReadsValidValues();

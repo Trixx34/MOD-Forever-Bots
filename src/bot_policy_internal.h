@@ -400,6 +400,12 @@ constexpr std::uint64_t kAcceptIgnoreMs = 60000;
 constexpr std::uint64_t kFightStallMs = 45000;       // a fight in which neither side's health went down this long is given up (the telemetry calls 60 s "stuck")
 constexpr std::uint64_t kStallAvoidMs = 300000;      // a target the fight stalled against is left alone 5 minutes, 10, 20, then 40 at most
 constexpr std::uint32_t kMaxStallDoublings = 3;
+// Pull churn watchdog (2026-11-12 sfk run: a leader started a fight 8300 times in an hour on two mobs on a lower floor, never advancing, so the
+// fight watchdog, which needs one target for kFightStallMs, never fired): this many fights started within the window, inside the radius,
+// with no kill, and the targets are left alone as for a stalled fight.
+constexpr std::uint32_t kPullChurnCount = 8;
+constexpr std::uint64_t kPullChurnWindowMs = 60000;
+constexpr float kPullChurnYards = 12.0f;
 constexpr std::uint32_t kRestManaBelowPct = 40;      // an idle mana user below this sits down to drink in the open
 constexpr std::uint32_t kRestManaUntilPct = 90;      // and stays sat until it has this much
 constexpr std::uint64_t kManaRestMaxMs = 120000;     // but never longer than this at a time
@@ -638,6 +644,12 @@ void AvoidUnit(std::unordered_map<std::uint64_t, std::uint64_t>& avoidUntil, std
 // out of reach or bugged, and the bot has nothing to gain by coming back to it every two minutes (a mage did that for an hour and a half).
 void AvoidStalledUnit(std::unordered_map<std::uint64_t, std::uint64_t>& avoidUntil, std::unordered_map<std::uint64_t, std::uint32_t>& count,
                       std::uint64_t ref, std::uint64_t nowMs);
+
+// Notes a fight start at (x, y) on `target` in the churn window. True once kPullChurnCount fights started within kPullChurnWindowMs and
+// kPullChurnYards: `targets` then holds the distinct targets to leave alone and the window is cleared. A start outside the radius or after
+// the window begins a new window.
+bool NotePullChurn(std::uint64_t& sinceMs, std::uint32_t& count, float& windowX, float& windowY, std::vector<std::uint64_t>& targets,
+                   std::uint64_t nowMs, float x, float y, std::uint64_t target);
 
 // The live creature in `units` with this reference, or nullptr.
 NearbyUnit const* FindLiveMob(std::span<NearbyUnit const> units, std::uint64_t guid);

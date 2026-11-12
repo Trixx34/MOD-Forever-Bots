@@ -45,6 +45,7 @@ SCEN_BOT = re.compile(r"forever-bots: scenario bot (?P<guid>\d+) race (?P<race>\
 RESULT = re.compile(r"forever-bots: scenario (?P<name>[\w.-]+?)(?:#(?P<party>\d+))?: outcome=(?P<outcome>\S+) furthest=(?P<furthest>\d+)/(?P<route>\d+) deaths=(?P<deaths>\d+) "
                     r"alive=(?P<alive>\d+)/(?P<roster>\d+) events=(?P<events>\d+) revived=(?P<revived>\d+) wipes=(?P<wipes>\d+) ghosts=(?P<ghosts>\d+) run=(?P<run>\d+)s"
                     r"(?: party=(?P<party_formed>\w+))?(?: bosses=(?P<killed>\d+)/(?P<total>\d+) killed=(?P<names>.*))?")
+STALLED = re.compile(r" stalled=(?P<stalled>\d+) last_stall=(?P<cause>\S+)@(?P<at>\d+)")  # run telemetry fields of a result line (absent when the party never stalled)
 DIED = re.compile(r"forever-bots: event died: bot=(?P<bot>\d+) life=(?P<life>\d+) map=(?P<map>\d+)\s+(?:pos=(?P<pos>[\d-]+,[\d-]+)\s+)?last_decision=(?P<action>\S+).* killer_entry=(?P<killer>\S+)\s+in_combat=(?P<combat>\d)")
 PULL = re.compile(r"forever-bots: event pull: bot=(?P<bot>\d+) map=(?P<map>\d+) pos=(?P<pos>[\d-]+,[\d-]+) hp=(?P<hp>\d+)/(?P<hpmax>\d+) power=(?P<power>\d+)/(?P<powermax>\d+) target=(?P<target>\d+)")
 GHOST = re.compile(r"forever-bots: event ghost: bot=(?P<bot>\d+)")
@@ -91,6 +92,8 @@ def read(lines, since=None):
             key = m["party"] or "1"
             party = parties.setdefault(key, Party(key))
             party.result = m.groupdict()
+            stall = STALLED.search(line)
+            party.result.update(stalled=stall["stalled"] if stall else "0", last_stall=f"{stall['cause']}@{stall['at']}s" if stall else "")
             party.result_at = t
             continue
         m = SCEN.search(line)
@@ -209,7 +212,8 @@ def report(parties, names, total_bosses):
         r = party.result
         if r:
             print(f"   result       outcome={r['outcome']} furthest={r['furthest']}/{r['route']} deaths={r['deaths']} death_events={r['events']} revived={r['revived']} "
-                  f"wipes={r['wipes']} ghosts={r['ghosts']} run={r['run']}s bosses={r['killed'] or 0}/{r['total'] or total_bosses}")
+                  f"wipes={r['wipes']} ghosts={r['ghosts']} run={r['run']}s bosses={r['killed'] or 0}/{r['total'] or total_bosses}"
+                  + (f" stalled={r['stalled']} last_stall={r['last_stall']}" if r.get("stalled", "0") != "0" else ""))
         else:
             print("   result       (none yet: still running, or the run did not end in this log)")
         refusals = ", ".join(f"{count}x {what}" for what, count in party.refusals.most_common(4)) or "none"

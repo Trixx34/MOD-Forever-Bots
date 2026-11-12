@@ -66,7 +66,172 @@ void ScenarioDirector::MarkBossKilled(std::uint32_t entry, std::string const& na
     {
         _bossKills.push_back(name);
         _bossKillMs.emplace_back(name, _runStartMs != 0 && nowMs >= _runStartMs ? nowMs - _runStartMs : 0);
+        if (_runStartMs != 0)
+        {
+            NoteProgress(nowMs, true, name, 0);
+            if (_attemptOpen)
+            {
+                run_telemetry::BossAttempt end;
+                end.TS = (nowMs - _runStartMs) / 1000;
+                end.Boss = _attemptBoss;
+                end.End = true;
+                end.DurS = nowMs >= _attemptStartMs ? (nowMs - _attemptStartMs) / 1000 : 0;
+                end.Deaths = _deathEvents - _attemptDeaths0;
+                end.Outcome = _attemptEntry == entry ? "killed" : "aborted";
+                _telemetry.push_back(run_telemetry::FormatBossAttempt({ _plan.Name, "" }, end));
+                _attemptOpen = false;
+            }
+        }
     }
+}
+
+// Progress of the run for the stall rule: a boss kill or a route point advanced. Starts a new counting window.
+void ScenarioDirector::NoteProgress(std::uint64_t nowMs, bool boss, std::string const& name, std::uint32_t point)
+{
+    _stall.NoteProgress(nowMs);
+    _lastProgress.IsBoss = boss;
+    _lastProgress.Name = name;
+    _lastProgress.Point = point;
+    _lastProgress.AtS = _runStartMs != 0 && nowMs >= _runStartMs ? (nowMs - _runStartMs) / 1000 : 0;
+    _window = {};
+    _windowSinceMs = nowMs;
+}
+
+std::vector<std::string> ScenarioDirector::TakeTelemetry()
+{
+    std::vector<std::string> lines;
+    lines.swap(_telemetry);
+    return lines;
+}
+
+// Called once per Running tick, after the progress and the boss kills of the tick are known. Bounded output: one party_tl: per 30 s, a party_stalled: per 300 s
+// without progress, two boss_attempt: lines per attempt. No per-bot lines.
+void ScenarioDirector::TrackRun(forever_module::WorldTickSnapshotView const& view, BotSnapshot const* leader, char const* step, std::uint64_t nowMs)
+{
+    if (_runStartMs == 0 || nowMs < _runStartMs)
+        return;
+    constexpr std::size_t kTelemetryQueueMax = 256;
+    std::vector<BotSnapshot> const& bots = view.bots;
+    std::uint64_t const tS = (nowMs - _runStartMs) / 1000;
+    run_telemetry::PartyId const id{ _plan.Name, "" };
+    _step = step;
+
+    std::uint32_t alive = 0, inFight = 0;
+    for (BotSnapshot const& bot : bots)
+    {
+        alive += bot.life_state == 0;
+        bool const fighting = bot.life_state == 0 && bot.in_combat != 0;
+        inFight += fighting;
+        bool& was = _inCombat[bot.guid];
+        if (fighting && !was)
+            ++_window.Pulls;
+        was = fighting;
+    }
+    if (leader)
+    {
+        auto const [seen, fresh] = _moveSeq.try_emplace(leader->guid, leader->last_action_sequence);
+        if (!fresh && seen->second != leader->last_action_sequence)
+        {
+            seen->second = leader->last_action_sequence;
+            if (leader->last_action_type == static_cast<std::uint8_t>(ActionType::kMoveTo) &&
+                (leader->last_action_status == forever_module::BotActionStatus::kNoRoute || leader->last_action_status == forever_module::BotActionStatus::kRefused))
+                ++_window.RouteRefusals;
+        }
+    }
+
+    // Boss attempts: the start is a member in a fight with a boss of the plan in view and alive; the end is its death (MarkBossKilled) or the fight being over.
+    if (!_plan.Bosses.empty())
+    {
+        if (!_attemptOpen && inFight != 0)
+        {
+            for (std::size_t b = 0; b < bots.size() && !_attemptOpen; ++b)
+                for (forever_module::NearbyUnit const& unit : view.NearbyOf(b))
+                {
+                    if (unit.health == 0 || forever_module::UnitRefType(unit.guid) != 8)
+                        continue;
+                    std::uint32_t const entry = forever_module::UnitRefEntry(unit.guid);
+                    if (_bossKilledEntries.count(entry))
+                        continue;
+                    auto const boss = std::find_if(_plan.Bosses.begin(), _plan.Bosses.end(), [entry](auto const& pair) { return pair.first == entry; });
+                    if (boss == _plan.Bosses.end())
+                        continue;
+                    _attemptOpen = true;
+                    _attemptEntry = entry;
+                    _attemptBoss = boss->second;
+                    _attemptStartMs = nowMs;
+                    _attemptLastFightMs = nowMs;
+                    _attemptDeaths0 = _deathEvents;
+                    run_telemetry::BossAttempt start;
+                    start.TS = tS;
+                    start.Boss = _attemptBoss;
+                    start.Outcome = "open";
+                    _telemetry.push_back(run_telemetry::FormatBossAttempt(id, start));
+                    break;
+                }
+        }
+        else if (_attemptOpen)
+        {
+            if (inFight != 0)
+                _attemptLastFightMs = nowMs;
+            if (inFight == 0 && (alive == 0 || nowMs - _attemptLastFightMs >= run_telemetry::kAttemptEndIdleMs))
+            {
+                run_telemetry::BossAttempt end;
+                end.TS = tS;
+                end.Boss = _attemptBoss;
+                end.End = true;
+                end.DurS = (_attemptLastFightMs - _attemptStartMs) / 1000;
+                end.Deaths = _deathEvents - _attemptDeaths0;
+                end.Outcome = "aborted";
+                _telemetry.push_back(run_telemetry::FormatBossAttempt(id, end));
+                _attemptOpen = false;
+            }
+        }
+    }
+
+    // The stall verdict.
+    if (_stall.Check(nowMs))
+    {
+        run_telemetry::Stall stall;
+        stall.TS = tS;
+        _window.WindowMs = nowMs - _windowSinceMs;
+        stall.Counters = _window;
+        stall.Cause = run_telemetry::StallCause(_window);
+        stall.NoProgressS = (nowMs - _stall.LastProgressMs()) / 1000;
+        stall.Count = _stall.Count();
+        stall.Point = _furthest;
+        stall.Points = std::uint32_t(_plan.Route.size());
+        stall.Last = _lastProgress;
+        _telemetry.push_back(run_telemetry::FormatStall(id, stall));
+        _lastStallCause = stall.Cause;
+        _lastStallS = tS;
+        _window = {};
+        _windowSinceMs = nowMs;
+    }
+
+    // The timeline.
+    std::uint64_t const slot = nowMs - _runStartMs >= run_telemetry::kTimelineEveryMs ? (nowMs - _runStartMs) / run_telemetry::kTimelineEveryMs : 0;
+    if (slot > _timelineAtS && leader)
+    {
+        _timelineAtS = slot;
+        run_telemetry::Timeline line;
+        line.TS = tS;
+        line.Leader = leader->guid;
+        line.Map = leader->map_id;
+        line.X = leader->pos_x;
+        line.Y = leader->pos_y;
+        line.Z = leader->pos_z;
+        line.Step = _step;
+        line.Point = _furthest;
+        line.Points = std::uint32_t(_plan.Route.size());
+        line.Target = forever_module::UnitRefEntry(leader->threat_target_guid);
+        line.Alive = alive;
+        line.Total = std::uint32_t(bots.size());
+        line.InFight = inFight;
+        line.Last = _lastProgress;
+        _telemetry.push_back(run_telemetry::FormatTimeline(id, line));
+    }
+    if (_telemetry.size() > kTelemetryQueueMax)
+        _telemetry.erase(_telemetry.begin(), _telemetry.begin() + std::ptrdiff_t(_telemetry.size() - kTelemetryQueueMax));
 }
 
 bool ScenarioDirector::NoteBossKill(std::uint32_t entry, std::uint64_t nowMs)
@@ -113,6 +278,9 @@ void ScenarioDirector::Finish(std::string outcome, std::uint64_t nowMs)
     result.BossKillMs = _bossKillMs;
     result.OnyxiaHealthPct = _onyxiaHealthPct;
     result.StateMs = _stateMs;
+    result.Stalled = _stall.Count();
+    result.LastStallCause = _lastStallCause;
+    result.LastStallS = _lastStallS;
     for (auto const& [guid, dead] : _everDead)
         if (dead)
             ++result.Deaths;
@@ -663,6 +831,8 @@ void ScenarioDirector::Decide(forever_module::WorldTickSnapshotView const& view,
                 if (startNow && bots.size() >= _plan.RosterSize)
                 {
                     _runStartMs = nowMs;
+                    _stall.Start(nowMs);
+                    _windowSinceMs = nowMs;
                     enter(ScenarioPhase::Running);
                     break;
                 }
@@ -695,6 +865,7 @@ void ScenarioDirector::Decide(forever_module::WorldTickSnapshotView const& view,
             // up: the old test let every living member count while the leader was up (and nobody while it was down), the reverse of the rule above, so a
             // member chasing a pack across the dungeon moved the progress.
             bool const leaderUp = leader && leader->life_state == 0;
+            std::uint32_t const furthestBefore = _furthest;
             for (bool advanced = true; advanced;)
             {
                 advanced = false;
@@ -711,6 +882,8 @@ void ScenarioDirector::Decide(forever_module::WorldTickSnapshotView const& view,
                         }
                 }
             }
+            if (_furthest > furthestBefore)
+                NoteProgress(nowMs, false, "", _furthest);
             // Where the time goes: one state for this tick (see TimeState).
             if (leader)
             {
@@ -745,6 +918,14 @@ void ScenarioDirector::Decide(forever_module::WorldTickSnapshotView const& view,
                     else if (far)
                         state = TimeState::Far;
                     _stateMs[std::size_t(state)] += nowMs - _stateLastMs;
+                    _step = kTimeStateNames[std::size_t(state)];
+                    std::uint64_t const dt = nowMs - _stateLastMs;
+                    if (state == TimeState::Rest)
+                        _window.RestMs += dt;
+                    else if (state == TimeState::Dead)
+                        _window.DeadMs += dt;
+                    else if (state == TimeState::Fight)
+                        _window.FightMs += dt;
                 }
                 _stateLastMs = nowMs;
             }
@@ -763,6 +944,7 @@ void ScenarioDirector::Decide(forever_module::WorldTickSnapshotView const& view,
                             }
                     }
             }
+            TrackRun(view, leader, _step, nowMs);
             // Onyxia's health (onyxia_hp=): the last sighting by any bot, and 0 for her corpse. Only in the Onyxia raid (her entry is one of the bosses).
             if (std::any_of(_plan.Bosses.begin(), _plan.Bosses.end(), [](auto const& boss) { return boss.first == kOnyxiaBossEntry; }))
             {
@@ -912,6 +1094,8 @@ std::string FormatScenarioResult(ScenarioResult const& result)
                 out << (i ? "," : "") << kTimeStateNames[i] << ":" << result.StateMs[i] / 1000;
         }
     }
+    if (std::string const stall = run_telemetry::FormatResultFields(result.Stalled, result.LastStallCause, result.LastStallS); !stall.empty())
+        out << " " << stall;
     // 40-man raid support (doc 108): raid=1 groups=<n> for a raid scenario, nothing extra for a dungeon one (acceptance criteria).
     if (result.Raid)
         out << " raid=1 groups=" << result.Groups;

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // bot_policy_detail helpers: units, distances, pulls and stand points (declared in bot_policy_internal.h).
 #include "bot_policy_internal.h"
+#include <algorithm>
+#include <cmath>
 
 namespace bot_policy_detail {
 
@@ -161,6 +163,23 @@ void AvoidStalledUnit(std::unordered_map<std::uint64_t, std::uint64_t>& avoidUnt
     std::uint32_t const times = ++count[ref];
     std::uint32_t const doublings = std::min<std::uint32_t>(times - 1, kMaxStallDoublings);
     avoidUntil[ref] = nowMs + (kStallAvoidMs << doublings);
+}
+
+bool NotePullChurn(std::uint64_t& sinceMs, std::uint32_t& count, float& windowX, float& windowY, std::vector<std::uint64_t>& targets,
+                   std::uint64_t nowMs, float x, float y, std::uint64_t target)
+{
+    if (count == 0 || nowMs - sinceMs > kPullChurnWindowMs || std::hypot(x - windowX, y - windowY) > kPullChurnYards)
+    {
+        sinceMs = nowMs;
+        count = 0;
+        windowX = x;
+        windowY = y;
+        targets.clear();
+    }
+    ++count;
+    if (std::find(targets.begin(), targets.end(), target) == targets.end() && targets.size() < 16)
+        targets.push_back(target);
+    return count >= kPullChurnCount;
 }
 
 NearbyUnit const* FindLiveMob(std::span<NearbyUnit const> units, std::uint64_t guid)

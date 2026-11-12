@@ -1,0 +1,9 @@
+2026-11-12T10:00:30Z party_tl: scenario=dm party=1 variant= t_s=30 leader=11 map=36 pos=-14.5,-380.2,62.0 step=walk route=1/40 target=0 alive=5/5 fight=0 last=route:1@20
+2026-11-12T10:01:00Z party_tl: scenario=dm party=1 variant= t_s=60 leader=11 map=36 pos=-20.0,-300.0,60.0 step=fight route=3/40 target=644 alive=5/5 fight=2 last=route:3@55
+2026-11-12T10:01:10Z boss_attempt: scenario=dm party=1 variant= t_s=70 boss=Rhahk'Zor stage=start dur_s=0 deaths=0 outcome=open
+2026-11-12T10:01:30Z party_tl: scenario=dm party=1 variant= t_s=90 leader=11 map=36 pos=-20.0,-300.0,60.0 step=fight route=3/40 target=644 alive=4/5 fight=4 last=route:3@55
+Nov 12 10:02:00 sim forever-bots: event boss_attempt: scenario=dm party=1 variant= t_s=100 boss=Rhahk'Zor stage=end dur_s=30 deaths=1 outcome=killed
+2026-11-12T10:02:00Z party_tl: scenario=dm party=1 variant= t_s=120 leader=11 map=36 pos=-20.0,-300.0,60.0 step=rest route=3/40 target=0 alive=5/5 fight=0 last=boss:Rhahk'Zor@100
+2026-11-12T10:02:30Z party_tl: scenario=dm party=2 variant= t_s=30 leader=21 map=36 pos=-14.5,-380.2,62.0 step=walk route=1/40 target=0 alive=5/5 fight=0 last=route:1@20
+2026-11-12T10:07:00Z party_stalled: scenario=dm party=2 variant= t_s=320 cause=fight_churn no_progress_s=300 pulls=14 route_refusals=0 rest_s=10 dead_s=0 fight_s=200 stalls=1 route=1/40 last=route:1@20
+2026-11-12T10:12:00Z party_tl: scenario=dm party=2 variant= t_s=620 leader=21 map=36 pos=-14.5,-380.2,62.0 step=fight route=1/40 target=0 alive=5/5 fight=3 last=route:1@20
