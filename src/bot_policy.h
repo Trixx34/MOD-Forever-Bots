@@ -933,6 +933,8 @@ private:
     struct CreateBlock { std::uint32_t Failures = 0; std::uint64_t UntilMs = 0; };
     std::unordered_map<std::uint64_t, CreateBlock> _guildCreateBlocks;   // master guid -> its unconfirmed creates and when it may try again
     std::uint64_t _guildPlanAtMs = 0;
+    std::size_t _guildCreateCursor = 0;   // where the next plan starts walking its creates and moves (round robin)
+    std::size_t _guildMoveCursor = 0;
     std::vector<WhisperReply> _whisperReplies;         // queued by Decide (busy refusals), taken by TakeWhisperReplies
     WhisperLimiter _whispers;                          // replies to players (ApplyWhisper and the refusals)
     // Why the bot cannot take an invite or a trade now (chat_reply.h); None when it is free. Uses the snapshot and the module state for the bot.
