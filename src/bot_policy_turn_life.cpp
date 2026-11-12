@@ -283,7 +283,7 @@ void BotPolicy::TurnRevivedAndRoles(DecideTick& tick, BotTurn& turn)
                 away.dest_y = spot.Y;
                 away.dest_z = spot.Z;
                 actions.push_back(away);
-                state.EscapeUntilMs = nowMs + kDeathLoopMs;
+                state.EscapeUntilMs = nowMs + kDeathLoopCooldownMs;
                 state.Wandering = false;
                 state.GrindVisited.push_back(index);
                 if (state.GrindVisited.size() > kGrindMemory)
