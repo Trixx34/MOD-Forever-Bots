@@ -156,7 +156,7 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
         if (noRoute)
             NoteMoveRefused(state, bot, nowMs);
         state.QuestTeleportSent = false;
-        QuestsFor(bot).NoteNoRoute(state.Quest, nowMs);
+        QuestsFor(bot).NoteNoRoute(state.Quest, nowMs, &bot);
         if (teleportRefused && _options.OnEvent)
             _options.OnEvent("quest_walk_blocked: bot=" + std::to_string(bot.guid) + " reason=teleport_refused status=" +
                              ActionStatusName(bot.last_action_status));
@@ -475,7 +475,7 @@ void BotPolicy::PartialChainTick(BotState& state, BotSnapshot const& bot, std::u
     ++state.RouteNoRoute;
     NoteMoveRefused(state, bot, nowMs);
     state.QuestTeleportSent = false;
-    QuestsFor(bot).NoteNoRoute(state.Quest, nowMs);
+    QuestsFor(bot).NoteNoRoute(state.Quest, nowMs, &bot);
 }
 
 void BotPolicy::ReadCastResult(BotState& state, BotSnapshot const& bot, std::uint64_t nowMs)

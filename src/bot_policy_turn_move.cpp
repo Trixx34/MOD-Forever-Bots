@@ -1046,7 +1046,7 @@ void BotPolicy::MoveForQuestOrGoto(DecideTick& tick, BotTurn& turn)
             else if (stuck)
             {
                 if (questStep.StartGiver)
-                    QuestsFor(bot).NoteNoRoute(state.Quest, nowMs);
+                    QuestsFor(bot).NoteNoRoute(state.Quest, nowMs, &bot);
                 else
                     QuestsFor(bot).NoteWalkStuck(state.Quest, questStep.Quest, nowMs); // a hand-in or hunting walk with no route: left alone for a while, the bot grinds
 
@@ -1113,6 +1113,10 @@ void BotPolicy::MoveForQuestOrGoto(DecideTick& tick, BotTurn& turn)
             wanted = Decision{ ActionType::kStop, 0 };
             break;
         }
+        case QuestStepKind::WaitGroup:
+            // Waiting for a party: stand where the bot is (the leader of the party invites the partners; DriveQuestGroups).
+            wanted = Decision{ ActionType::kStop, 0 };
+            break;
         case QuestStepKind::Wait:
         case QuestStepKind::None:
             break;
