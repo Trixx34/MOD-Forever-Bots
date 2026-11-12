@@ -1140,6 +1140,85 @@ void HealerKitesToOnyxiaBand()
 
 } // namespace
 
+// Ghost teleport hold: a dungeon ghost is not put back beside a live hostile at its destination (the leader), for GhostTeleportHoldMaxMs at most; a bot that died
+// DeathLockoutCount times in the window waits DeathLockoutHoldMs more; GhostTeleportHold = 0 is the old behaviour.
+void AGhostTeleportWaitsForAHostileAndALockout()
+{
+    auto const build = [](bool hostile, bool ghost)
+    {
+        WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 });
+        for (BotSnapshot& bot : v.bots)
+            bot.map_id = 36;
+        if (ghost)
+        {
+            Ghost(v.bots[3], 0.0f, 36, 50.0f);
+            v.bots[3].map_id = 0;                                              // the ghost is outside, at the graveyard
+        }
+        if (hostile)
+            AddNearby(v, 2, HostileAt(7, 10.0f, 0.0f));                        // 10 yards from the leader, the destination
+        return v;
+    };
+    auto const policyOf = [](std::vector<std::string>* events, bool hold)
+    {
+        PolicyOptions options = DeadOptions(events, AllWarriors);
+        options.GhostTeleportHold = hold;
+        return options;
+    };
+    // a hostile at the destination: held, one line in 10 s; teleports once it is gone
+    std::vector<std::string> events;
+    BotPolicy policy(policyOf(&events, true));
+    policy.SetRouteActive(true);
+    CHECK(!TeleportOf(policy.Decide(build(true, true), 1000), 13).has_value());
+    CHECK(Logged(events, "ghost_teleport_hold: bot=13 reason=hostile"));
+    CHECK(!TeleportOf(policy.Decide(build(true, true), 5000), 13).has_value());
+    std::size_t holds = 0;                                                     // one line in the first 10 s
+    for (std::string const& event : events)
+        holds += event.rfind("ghost_teleport_hold:", 0) == 0 ? 1 : 0;
+    CHECK(holds == 1);
+    CHECK(!TeleportOf(policy.Decide(build(true, true), 100000), 13).has_value());   // still held 99 s in
+    CHECK(TeleportOf(policy.Decide(build(false, true), 101000), 13).has_value());   // the hostile is gone
+    // the hold ends at the maximum: 120 s after the first decision the ghost goes anyway
+    BotPolicy expiring(policyOf(nullptr, true));
+    expiring.SetRouteActive(true);
+    CHECK(!TeleportOf(expiring.Decide(build(true, true), 1000), 13).has_value());
+    CHECK(!TeleportOf(expiring.Decide(build(true, true), 120000), 13).has_value());
+    CHECK(TeleportOf(expiring.Decide(build(true, true), 121500), 13).has_value());
+    // no hostile and few deaths: no hold, no line
+    std::vector<std::string> quiet;
+    BotPolicy calm(policyOf(&quiet, true));
+    calm.SetRouteActive(true);
+    CHECK(TeleportOf(calm.Decide(build(false, true), 1000), 13).has_value());
+    CHECK(!Logged(quiet, "ghost_teleport_hold:"));
+    // off: the old behaviour, a hostile does not hold
+    BotPolicy off(policyOf(nullptr, false));
+    off.SetRouteActive(true);
+    CHECK(TeleportOf(off.Decide(build(true, true), 1000), 13).has_value());
+    // lockout: the 4th death in 10 minutes waits 90 s with no hostile near; the first three do not
+    std::vector<std::string> lockEvents;
+    BotPolicy lock(policyOf(&lockEvents, true));
+    lock.SetRouteActive(true);
+    for (std::uint64_t death = 0; death < 3; ++death)
+    {
+        CHECK(TeleportOf(lock.Decide(build(false, true), 1000 + death * 20000), 13).has_value());
+        lock.Decide(build(false, false), 10000 + death * 20000);               // revived
+    }
+    CHECK(!Logged(lockEvents, "ghost_teleport_hold:"));
+    CHECK(!TeleportOf(lock.Decide(build(false, true), 61000), 13).has_value());
+    CHECK(Logged(lockEvents, "ghost_teleport_hold: bot=13 reason=lockout"));
+    CHECK(!TeleportOf(lock.Decide(build(false, true), 150000), 13).has_value());
+    CHECK(TeleportOf(lock.Decide(build(false, true), 152000), 13).has_value());
+    // DeathLockoutCount = 0: no lockout
+    PolicyOptions noLock = policyOf(nullptr, true);
+    noLock.DeathLockoutCount = 0;
+    BotPolicy none(noLock);
+    none.SetRouteActive(true);
+    for (std::uint64_t death = 0; death < 4; ++death)
+    {
+        CHECK(TeleportOf(none.Decide(build(false, true), 1000 + death * 20000), 13).has_value());
+        none.Decide(build(false, false), 10000 + death * 20000);
+    }
+}
+
 void RunPolicyTestsPart5()
 {
     AutoShotIsNotReissuedWhileActive();
@@ -1195,4 +1274,5 @@ void RunPolicyTestsPart5()
     HealerKitesToOnyxiaBand();
     ADeadLeadersGhostIsNotHeldByAWarderNearAMember();
     ACorpseDoesNotReleaseUnderARunningResurrect();
+    AGhostTeleportWaitsForAHostileAndALockout();
 }

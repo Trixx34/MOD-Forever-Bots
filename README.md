@@ -56,6 +56,11 @@ line to the module's stderr. A config reload updates the ramp, the random picks 
 | `CorpseRunTeleportSec` | 60 | A ghost whose corpse run takes longer is put at its corpse (the teleport needs `Bot.Actions.Teleport`); the four-minute teleport is brought forward to this. 0 is off (10 to 3600); a ghost already at its corpse is left alone |
 | `DungeonPullLeashYards` | 30 | A dungeon party's route leader, out of a fight, pulls only a hostile within this many yards of the leg of the route it walks (0 is off, 10 to 80) |
 | `DungeonChaseLeashYards` | 40 | A dungeon party's bot does not walk after, or pick in a fight, a hostile farther than this from both that leg and its leader (a fled creature, the next pack); a member goes back to its leader instead (0 is off, 10 to 80) |
+| `GhostTeleportHold` | 1 | A dungeon ghost's entrance or party teleport waits while a live hostile is within 30 yards of the destination (event `ghost_teleport_hold: ... reason=hostile`, at most one per 10 s per bot); 0 teleports at once as before |
+| `GhostTeleportHoldMaxMs` | 120000 | The longest a ghost is held for a hostile, per death (1000 to 3600000) |
+| `DeathLockoutCount` | 4 | A bot that died this many times within `DeathLockoutWindowMs` waits `DeathLockoutHoldMs` more before its ghost teleport (`reason=lockout`); 0 is off (2 to 50) |
+| `DeathLockoutWindowMs` | 600000 | The lockout window (10000 to 86400000) |
+| `DeathLockoutHoldMs` | 90000 | The extra wait of a locked-out bot (0 to 3600000) |
 | `DungeonLeaderRejoin` | 1 | A dead route leader comes back next to its quiet party (its corpse is stood up beside a member with the recover tactic and `DungeonReviveOutOfCombat`; its ghost waits up to 60 s for the party's fight, then is teleported next to a living member), not alone at the entrance; 0 is the entrance as before |
 | `QuestTeleport` | 0 | A quest walk stuck for two minutes teleports to its giver (needs `Bot.Actions.Teleport = 1`); 0 drops the start and grinds instead |
 | `TrainEverySec` | 0 (off) | Seconds between trainer checks, also after a level-up (0, or 60 to 86400) |

@@ -103,6 +103,16 @@ void BotPolicy::DeadRecord(DecideTick& tick, BotTurn& turn)
         state.Inside = false;
         state.RunFailed = false;
         state.RunTimeoutTeleported = false;
+        state.GhostHoldSinceMs = 0;
+        state.GhostHoldLoggedMs = 0;
+        state.DeathHistoryMs.push_back(nowMs);
+        {
+            std::uint64_t const keepMs = std::max<std::uint64_t>(_options.DeathLockoutWindowMs, 1);
+            std::size_t drop = 0;
+            while (drop < state.DeathHistoryMs.size() && nowMs - state.DeathHistoryMs[drop] > keepMs)
+                ++drop;
+            state.DeathHistoryMs.erase(state.DeathHistoryMs.begin(), state.DeathHistoryMs.begin() + drop);
+        }
         state.DeathTimesMs[0] = state.DeathTimesMs[1];
         state.DeathTimesMs[1] = state.DeathTimesMs[2];
         state.DeathTimesMs[2] = nowMs;
@@ -202,6 +212,55 @@ bool BotPolicy::ReviveGuardHolds(DecideTick& tick, BotTurn& turn, BotSnapshot co
                          std::to_string(state.ReviveWindowCount) + " waited_ms=" + std::to_string(nowMs - state.DeathMs));
     }
     return held;
+}
+
+// Ghost teleport hold: a dungeon ghost is not put back beside the pack that killed it (the 2026-11-12 zulgurub run: 2815 deaths in 60 min). Held while (hostile) a live
+// hostile stands within kReviveHostileYards of the destination, seen by any living bot of the map, for GhostTeleportHoldMaxMs from the first decision of this death at most,
+// and (lockout) for DeathLockoutHoldMs after the first decision when the bot died DeathLockoutCount times within DeathLockoutWindowMs. True: hold back.
+bool BotPolicy::GhostTeleportHeld(DecideTick& tick, BotTurn& turn, std::uint32_t map, Point const& dest, char const* what)
+{
+    if (!_options.GhostTeleportHold)
+        return false;
+    std::uint64_t const nowMs = tick.nowMs;
+    BotState& state = turn.state;
+    if (state.GhostHoldSinceMs == 0)
+        state.GhostHoldSinceMs = nowMs;
+    std::uint64_t const heldMs = nowMs - state.GhostHoldSinceMs;
+    char const* reason = nullptr;
+    if (_options.DeathLockoutCount != 0 && _options.DeathLockoutHoldMs != 0 && heldMs < _options.DeathLockoutHoldMs)
+    {
+        std::uint32_t recent = 0;
+        for (std::uint64_t const at : state.DeathHistoryMs)
+            if (nowMs - at <= _options.DeathLockoutWindowMs)
+                ++recent;
+        if (recent >= _options.DeathLockoutCount)
+            reason = "lockout";
+    }
+    if (!reason && heldMs < _options.GhostTeleportHoldMaxMs)
+    {
+        WorldTickSnapshotView const& view = tick.view;
+        for (std::size_t i = 0; i < view.bots.size() && !reason; ++i)
+        {
+            BotSnapshot const& watcher = view.bots[i];
+            if (watcher.map_id != map || watcher.life_state != 0 || std::hypot(watcher.pos_x - dest.X, watcher.pos_y - dest.Y) > kReviveHostileYards + 60.0f)
+                continue;
+            for (NearbyUnit const& unit : view.NearbyOf(i))
+                if (IsLiveMob(unit) && std::hypot(unit.pos_x - dest.X, unit.pos_y - dest.Y) <= kReviveHostileYards)
+                {
+                    reason = "hostile";
+                    break;
+                }
+        }
+    }
+    if (!reason)
+        return false;
+    if (_options.OnEvent && (state.GhostHoldLoggedMs == 0 || nowMs - state.GhostHoldLoggedMs >= kGhostHoldLogMs))
+    {
+        state.GhostHoldLoggedMs = nowMs;
+        _options.OnEvent(std::string("ghost_teleport_hold: bot=") + std::to_string(turn.bot.guid) + " reason=" + reason + " dest=" + what + " map=" + std::to_string(map) +
+                         " deaths=" + std::to_string(state.DeathHistoryMs.size()) + " held_ms=" + std::to_string(heldMs) + " waited_ms=" + std::to_string(nowMs - state.DeathMs));
+    }
+    return true;
 }
 
 // A corpse: the leader's revive (Recover tactic), or the release once no resurrect is coming.
@@ -498,7 +557,7 @@ void BotPolicy::DeadGhostRun(DecideTick& tick, BotTurn& turn)
     {
         BotSnapshot const& leader = view.bots[leaderAt->second];
         bool const withLeader = bot.map_id == leader.map_id && DistanceTo(bot, Point{ leader.pos_x, leader.pos_y, leader.pos_z }) <= kEntryYards;
-        if (!withLeader && nowMs >= state.CorpseTeleportRetryMs && GhostTeleportSlot(nowMs))
+        if (!withLeader && nowMs >= state.CorpseTeleportRetryMs && !GhostTeleportHeld(tick, turn, leader.map_id, Point{ leader.pos_x, leader.pos_y, leader.pos_z }, "leader") && GhostTeleportSlot(nowMs))
         {
             state.CorpseTeleportRetryMs = nowMs + kEntryTeleportRetryMs;
             BotAction toLeader;
@@ -553,9 +612,13 @@ void BotPolicy::DeadGhostRun(DecideTick& tick, BotTurn& turn)
             return;
         }
     }
-    if (instanceParty && entryOf != _options.DungeonsByMap.end() && entryOf->second.HasEntry && nowMs - state.EntrySinceMs < kDungeonEntryWaitMs)
+    bool entryHeld = false;
+    if (instanceParty && entryOf != _options.DungeonsByMap.end() && entryOf->second.HasEntry && !atEntry && nowMs >= state.CorpseTeleportRetryMs)
+        entryHeld = GhostTeleportHeld(tick, turn, bot.corpse_map, entryOf->second.Entry, "entrance");
+    // A held ghost keeps waiting past kDungeonEntryWaitMs: the corpse run would walk it to the pack as well.
+    if (instanceParty && entryOf != _options.DungeonsByMap.end() && entryOf->second.HasEntry && (nowMs - state.EntrySinceMs < kDungeonEntryWaitMs || entryHeld))
     {
-        if (!atEntry && nowMs >= state.CorpseTeleportRetryMs && GhostTeleportSlot(nowMs))
+        if (!atEntry && !entryHeld && nowMs >= state.CorpseTeleportRetryMs && GhostTeleportSlot(nowMs))
         {
             state.CorpseTeleportRetryMs = nowMs + kEntryTeleportRetryMs;
             BotAction entry;

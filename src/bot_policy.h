@@ -328,6 +328,14 @@ struct PolicyOptions
     std::uint64_t CorpseRunTeleportMs = 60000;
     // At most this many ghost teleports (corpse, entrance, leader) a second for the whole policy; 0 = no limit. Config GhostTeleportPerSecond.
     std::uint32_t GhostTeleportPerSecond = 2;
+    // Ghost teleport hold (config GhostTeleportHold, GhostTeleportHoldMaxMs, DeathLockoutCount, DeathLockoutWindowMs, DeathLockoutHoldMs): the entrance and party teleports of a
+    // dungeon ghost wait while a live hostile stands near the destination (at most GhostTeleportHoldMaxMs per death), and a bot that died DeathLockoutCount times within
+    // DeathLockoutWindowMs waits DeathLockoutHoldMs more. The 2026-11-12 zulgurub run: 2815 deaths in 60 min, each ghost put back at the pack that killed it.
+    bool GhostTeleportHold = true;
+    std::uint64_t GhostTeleportHoldMaxMs = 120000;
+    std::uint32_t DeathLockoutCount = 4;                // 0 = no lockout
+    std::uint64_t DeathLockoutWindowMs = 600000;
+    std::uint64_t DeathLockoutHoldMs = 90000;
     std::uint64_t WaitForRezMs = 20000;         // the party waits this long for a corpse to be resurrected (20 s: a rez that has not come by then is not coming)
     std::uint64_t WaitForGhostMs = 180000;      // and this long after the ghost entered the corpse's map
     // Supplies (layout 15): a bot short of ammunition, food or drink walks to a vendor that sells it and buys, and eats or drinks while resting.
@@ -848,6 +856,9 @@ private:
         std::uint64_t InsideSinceMs = 0;                 // the ghost is on the corpse's map since
         bool RunFailed = false;
         bool RunTimeoutTeleported = false;               // the ghost was put at its corpse once after a run that took too long (a corpse far away, or a route that goes nowhere)
+        std::vector<std::uint64_t> DeathHistoryMs;       // recent death times (newest last), for the DeathLockoutCount lockout; trimmed to DeathLockoutWindowMs
+        std::uint64_t GhostHoldSinceMs = 0;              // when this death's ghost first came to a teleport decision (0 = not yet): the hold limits count from here
+        std::uint64_t GhostHoldLoggedMs = 0;             // the last ghost_teleport_hold line
         std::uint64_t DeathTimesMs[3] = { 0, 0, 0 };     // when this bot last died (newest last): two deaths close together mean it dies where it stands up (DeathLoopMs)
         std::uint32_t LastKillerEntry = 0;               // the entry of the creature that killed the bot last (0 = none seen)
         bool KillerRepeat = false;                       // the last death was to the same creature entry as the one before: a death loop one death sooner
@@ -903,6 +914,7 @@ private:
     TurnFlow DeadCorpse(DecideTick& tick, BotTurn& turn);
     TurnFlow DeadHeldByWarder(DecideTick& tick, BotTurn& turn);
     bool ReviveGuardHolds(DecideTick& tick, BotTurn& turn, forever_module::BotSnapshot const& member);
+    bool GhostTeleportHeld(DecideTick& tick, BotTurn& turn, std::uint32_t map, Point const& dest, char const* what);
     TurnFlow DeadReviveByLeader(DecideTick& tick, BotTurn& turn);
     void DeadGhostRun(DecideTick& tick, BotTurn& turn);
     void DeadEmit(DecideTick& tick, BotTurn& turn, Decision const& wantedDead);

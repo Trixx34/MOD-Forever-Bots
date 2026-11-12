@@ -801,6 +801,14 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
         settings.GhostTeleportPerSecond = 0;
     else
         ReadKey(config, "GhostTeleportPerSecond", 1, 100, settings.GhostTeleportPerSecond, warnings);
+    ReadBool(config, "GhostTeleportHold", settings.GhostTeleportHold, warnings);
+    ReadKey(config, "GhostTeleportHoldMaxMs", 1000, 3600000, settings.GhostTeleportHoldMaxMs, warnings);
+    if (auto const lockout = config.find("DeathLockoutCount"); lockout != config.end() && lockout->second == "0")
+        settings.DeathLockoutCount = 0; // explicitly off
+    else
+        ReadKey(config, "DeathLockoutCount", 2, 50, settings.DeathLockoutCount, warnings);
+    ReadKey(config, "DeathLockoutWindowMs", 10000, 86400000, settings.DeathLockoutWindowMs, warnings);
+    ReadKey(config, "DeathLockoutHoldMs", 0, 3600000, settings.DeathLockoutHoldMs, warnings);
     if (auto const teleport = config.find("CorpseRunTeleportSec"); teleport != config.end() && teleport->second == "0")
         settings.CorpseRunTeleportSec = 0; // explicitly off: the ghost walks on, and is put at its corpse after CorpseRunTimeoutMs
     else

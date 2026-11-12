@@ -350,6 +350,14 @@ struct BotSettings
     std::uint32_t CorpseRunTeleportSec = 60;
     // GhostTeleportPerSecond (0 = no limit, else 1..100; default 2): at most this many ghost teleports a second, so a wiped raid does not teleport 20 ghosts in one tick.
     std::uint32_t GhostTeleportPerSecond = 2;
+    // GhostTeleportHold (default 1): a dungeon ghost's entrance/party teleport waits while a live hostile is within 30 yards of the destination, GhostTeleportHoldMaxMs
+    // (default 120000, 1000..3600000) at most per death. DeathLockoutCount (default 4, 0 = off, else 2..50) deaths within DeathLockoutWindowMs (default 600000, 10000..86400000)
+    // make the bot wait DeathLockoutHoldMs (default 90000, 0..3600000) more before the teleport.
+    bool GhostTeleportHold = true;
+    std::uint32_t GhostTeleportHoldMaxMs = 120000;
+    std::uint32_t DeathLockoutCount = 4;
+    std::uint32_t DeathLockoutWindowMs = 600000;
+    std::uint32_t DeathLockoutHoldMs = 90000;
     // Combat drift of dungeon parties (0.45.0; PolicyOptions has the details). DungeonPullLeashYards (0 = off, else 10..80): the route leader pulls only hostiles this
     // close to the leg of the route it walks. DungeonChaseLeashYards (0 = off, else 10..80): a party bot does not chase or pick a hostile farther than this from both
     // that leg and its leader. DungeonLeaderRejoin = 1: a dead leader comes back next to its quiet party, not alone at the entrance.

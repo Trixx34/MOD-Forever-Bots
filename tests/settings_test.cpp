@@ -530,6 +530,21 @@ void CorpseRunTeleportSettings()
     CHECK(warnings.size() == 1);
 }
 
+// GhostTeleportHold and the death lockout: defaults, overrides, bad values keep the default with a warning.
+void GhostTeleportHoldSettings()
+{
+    std::vector<std::string> warnings;
+    BotSettings const defaults = ParseBotSettings({}, warnings);
+    CHECK(defaults.GhostTeleportHold && defaults.GhostTeleportHoldMaxMs == 120000 && defaults.DeathLockoutCount == 4 && defaults.DeathLockoutWindowMs == 600000 &&
+          defaults.DeathLockoutHoldMs == 90000 && warnings.empty());
+    BotSettings const set = ParseBotSettings({ { "GhostTeleportHold", "0" }, { "GhostTeleportHoldMaxMs", "30000" }, { "DeathLockoutCount", "0" },
+                                               { "DeathLockoutWindowMs", "300000" }, { "DeathLockoutHoldMs", "0" } }, warnings);
+    CHECK(!set.GhostTeleportHold && set.GhostTeleportHoldMaxMs == 30000 && set.DeathLockoutCount == 0 && set.DeathLockoutWindowMs == 300000 && set.DeathLockoutHoldMs == 0);
+    CHECK(warnings.empty());
+    BotSettings const bad = ParseBotSettings({ { "GhostTeleportHoldMaxMs", "5" }, { "DeathLockoutCount", "1" } }, warnings);
+    CHECK(bad.GhostTeleportHoldMaxMs == 120000 && bad.DeathLockoutCount == 4 && warnings.size() == 2);
+}
+
 void RealismSettings()
 {
     std::vector<std::string> warnings;
@@ -563,6 +578,7 @@ int main()
 {
     RealismSettings();
     CorpseRunTeleportSettings();
+    GhostTeleportHoldSettings();
     CombatDriftSettings();
     ErrandSettings();
     ChatSettings();
