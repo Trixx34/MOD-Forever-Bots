@@ -17,14 +17,15 @@ The format is our own; no table or code of another project was copied.
 | `noaoe` | `map|boss_entry|name` (0 = whole map) | `Order::NoAoe`, readable through `party_planner::NoAoeNow`; **no rotation reads it yet** |
 | `frontal` | `map|boss_entry|spell_id|name` | parsed and kept (`Table::IsFrontal`); **no tank positioning uses it yet** |
 
-Dispel spells by class (`DispelSpellFor`, first ranks, ids from memory, confirm against the core's spell data): priest Dispel Magic 527 and Cure Disease 528; paladin Cleanse 4987 (magic, level 42) and Purify 1152 (poison, disease); mage Remove Lesser Curse 475; druid Remove Curse 2782 and Cure Poison 8946; shaman Cure Poison 526 and Cure Disease 2870.
+Dispel spells by class (`DispelSpellFor`, first ranks; ids, dispel kinds and learn levels **verified 2026-11-12** against SpellName/SpellEffect/SpellLevels of the client data): priest Dispel Magic 527 and Cure Disease 528; paladin Cleanse 4987 (magic, level 42) and Purify 1152 (poison, disease); mage Remove Lesser Curse 475; druid Remove Curse 2782 and Cure Poison 8946; shaman Cure Poison 526 and Cure Disease 2870.
 A healer on an emergency heal (a member below 20 %) is not given a dispel. A bot reads its **own** auras from its snapshot (`auras[]`, up to 16), so a member's debuff is seen when that member is one of the module's bots.
 
 ## What ships
 
 Onyxia's Lair (249): the whelps first, then the wardens and the lair guards; Fireball and Deep Breath as `avoid` rows (casts with a landing area, not persistent ground effects: **they only matter if the core reports them as a ground effect**, see the gaps); Wing Buffet and Flame Breath as `frontal` rows; fear needs no tremor totem or fear ward from the party, so no row.
 Zul'Gurub (309): interrupt Great Heal 23954 and 24208, Drain Life 24300, Mind Flay 23953; bats 11368 and 14965 first; dispel Curse of Blood 16098 (curse) and Shadow Word: Pain 23952 (magic); Liquid Fire (object 177764, radius 6); swap on Pierce Armor 12097 at 3 stacks for Jeklik 14517.
-The Onyxia spell ids (marked `(check)` in the file) were written from memory.
+Spell ids verified 2026-11-12 against `SpellName.db2` and `SpellEffect.db2` (and the sim world DB `creature_template_spell` for Onyxia): Fireball 18392; Wing Buffet 18500; Flame Breath 18435 (also in Onyxia's spell list); the Deep Breath is eight spells named `Breath` (17086, 18351, 18564, 18576, 18584, 18596, 18609, 18617; one per flight direction, all `avoid` rows now; 18351 and 18564 are in her creature_template_spell, the rest are the same effect shape with trigger chains); the Zul'Gurub ids by name. No `(check)` mark is left in the file.
+**Still open:** Bellowing Roar is 22686 in the spell data (18431 does not exist there; no row uses it). Which of the eight Breath spells a telegraph carries, and that Onyxia's script casts all eight, is read from the names and effect shape only: confirm with the `telegraph_escape:` log line on the first Onyxia run. The Fireball and the frontal radius values (8, and the breath's 35) are our estimates, not data.
 
 ## Gaps (what the snapshot does not offer)
 

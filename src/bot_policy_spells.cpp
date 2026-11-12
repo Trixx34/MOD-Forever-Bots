@@ -50,8 +50,8 @@ std::uint32_t HealSpellFor(std::uint32_t classId, std::uint32_t level)
 
 std::uint32_t DispelSpellFor(std::uint32_t classId, std::uint32_t level, std::uint8_t kind)
 {
-    // Spell ids are the first rank of each spell (the core casts the highest rank the bot knows); the level is where the class learns it. The ids are from memory:
-    // confirm them against the core's spell data on the first sim run that counts on them.
+    // Spell ids are the first rank of each spell (the core casts the highest rank the bot knows); the level is where the class learns it. The ids and levels were checked on 2026-11-12 against
+    // SpellName, SpellEffect (effect 38, the dispel kind in the misc value) and SpellLevels of the client data.
     auto const has = [level](std::uint32_t need) { return level == 0 || level >= need; };
     switch (classId)
     {

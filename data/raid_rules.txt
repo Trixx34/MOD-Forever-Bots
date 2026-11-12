@@ -8,20 +8,30 @@
 #   swap|map|boss_entry|aura_id|stacks|name
 #   noaoe|map|boss_entry|name                    boss_entry 0 = every fight on the map
 #   frontal|map|boss_entry|spell_id|name
-# Spell ids marked (check) were written from memory and have to be confirmed against the core's spell data before a sim run counts on them.
+# A spell id marked (check) was written from memory and is not yet confirmed against the spell data (none left: see doc/raid-rules.md).
 
 # ---- Onyxia's Lair (map 249, 40-man) ----
 boss|249|10184|Onyxia
 add|249|11262|0|Onyxian Whelp
 add|249|12129|1|Onyxian Warder
 add|249|12458|2|Onyxian Lair Guard
-# Fireball (random target, splash) and Deep Breath (the raid steps out of the line); both are casts with a landing area, not ground objects (check)
-avoid|249|spell|18392|8|Fireball splash (check)
-avoid|249|spell|17086|35|Deep Breath (check)
+# Fireball (random target, splash) and Deep Breath (the raid steps out of the line); both are casts with a landing area, not ground objects.
+# Verified against SpellName/SpellEffect.db2 (2026-11-12): 18392 Fireball (direct damage); the eight "Breath" spells 17086, 18351, 18564, 18576, 18584, 18596, 18609, 18617 are
+# the eight flight directions of the Deep Breath (each: school damage plus a trigger spell). 18351 and 18564 are in Onyxia's creature_template_spell; the other six are the
+# remaining directions (same effect shape, names and trigger chains); which one a telegraph carries depends on the flight, so all eight are rows.
+avoid|249|spell|18392|8|Fireball splash
+avoid|249|spell|17086|35|Deep Breath
+avoid|249|spell|18351|35|Deep Breath
+avoid|249|spell|18564|35|Deep Breath
+avoid|249|spell|18576|35|Deep Breath
+avoid|249|spell|18584|35|Deep Breath
+avoid|249|spell|18596|35|Deep Breath
+avoid|249|spell|18609|35|Deep Breath
+avoid|249|spell|18617|35|Deep Breath
 # Wing Buffet and Flame Breath hit what stands in front of her: the tank holds her turned away from the raid (data only for now)
-frontal|249|10184|18500|Wing Buffet (check)
-frontal|249|10184|18435|Flame Breath (check)
-# Bellowing Roar (fear, 18431, check): no tremor totem or fear ward is required of the party; nothing is listed on purpose.
+frontal|249|10184|18500|Wing Buffet
+frontal|249|10184|18435|Flame Breath
+# Bellowing Roar (fear; the spell data has it as 22686, 18431 does not exist there): no tremor totem or fear ward is required of the party; nothing is listed on purpose.
 
 # ---- Zul'Gurub (map 309, 20-man) ----
 boss|309|14517|High Priestess Jeklik
