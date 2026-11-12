@@ -782,6 +782,10 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
             ReadKey(config, key, 10, 80, *value, warnings);
     }
     ReadBool(config, "DungeonLeaderRejoin", settings.DungeonLeaderRejoin, warnings);
+    if (auto const perSecond = config.find("GhostTeleportPerSecond"); perSecond != config.end() && perSecond->second == "0")
+        settings.GhostTeleportPerSecond = 0;
+    else
+        ReadKey(config, "GhostTeleportPerSecond", 1, 100, settings.GhostTeleportPerSecond, warnings);
     if (auto const teleport = config.find("CorpseRunTeleportSec"); teleport != config.end() && teleport->second == "0")
         settings.CorpseRunTeleportSec = 0; // explicitly off: the ghost walks on, and is put at its corpse after CorpseRunTimeoutMs
     else

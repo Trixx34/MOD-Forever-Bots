@@ -189,6 +189,21 @@ char const* ActionStatusName(BotActionStatus status)
 }
 
 // Reads the result of the bot's last action, once per sequence number, and sets when the spell may be tried again.
+bool BotPolicy::GhostTeleportSlot(std::uint64_t nowMs)
+{
+    if (_options.GhostTeleportPerSecond == 0)
+        return true;
+    if (nowMs - _ghostTeleportSecondMs >= 1000 || nowMs < _ghostTeleportSecondMs)
+    {
+        _ghostTeleportSecondMs = nowMs;
+        _ghostTeleportsInSecond = 0;
+    }
+    if (_ghostTeleportsInSecond >= _options.GhostTeleportPerSecond)
+        return false;
+    ++_ghostTeleportsInSecond;
+    return true;
+}
+
 std::span<rotation::Row const> BotPolicy::RowsFor(std::uint32_t classId, std::string const& spec) const
 {
     if (_options.Rotations)

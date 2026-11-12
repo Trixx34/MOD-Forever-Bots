@@ -463,6 +463,18 @@ void BotPolicy::DeadGhostRun(DecideTick& tick, BotTurn& turn)
         DeadRunFailed(tick, turn, "no_corpse");
         return;
     }
+    // A ghost teleport the core refused (Bot.Teleport.GhostNeedsInstance: the instance the ghost died in is gone) must not leave RunTimeoutTeleported set for good: the flag stops
+    // every later timeout teleport, and the ghost then only walks until DeadRunFailed. The flag is cleared, the run clock restarts, and the next try comes after the usual wait.
+    if (state.RunTimeoutTeleported && bot.last_action_type == uint8_t(ActionType::kTeleport) && bot.last_action_status != BotActionStatus::kApplied &&
+        bot.last_action_status != BotActionStatus::kNone && bot.last_action_sequence != state.GhostRefusedSeq)
+    {
+        state.GhostRefusedSeq = bot.last_action_sequence;
+        state.RunTimeoutTeleported = false;
+        state.RunStartMs = nowMs;
+        state.CorpseTeleportRetryMs = nowMs + kCorpseTeleportRetryMs;
+        LogEvent("corpse_run_teleport_refused: bot=" + std::to_string(bot.guid) + " map=" + std::to_string(bot.map_id) + " corpse_map=" + std::to_string(bot.corpse_map) +
+              " status=" + ActionStatusName(bot.last_action_status));
+    }
     // A ghost of a dungeon party goes back to the instance entrance and is revived there (the owner's rule of 2026-10-25), not walked back to its corpse.
     // Outside the instance it is teleported in, and inside it is put at the entrance when it is further off. It waits there for the leader's revive
     // (the revive above). Only when no revive comes within kDungeonEntryWaitMs does the ghost fall back to its corpse run.
@@ -479,7 +491,7 @@ void BotPolicy::DeadGhostRun(DecideTick& tick, BotTurn& turn)
     {
         BotSnapshot const& leader = view.bots[leaderAt->second];
         bool const withLeader = bot.map_id == leader.map_id && DistanceTo(bot, Point{ leader.pos_x, leader.pos_y, leader.pos_z }) <= kEntryYards;
-        if (!withLeader && nowMs >= state.CorpseTeleportRetryMs)
+        if (!withLeader && nowMs >= state.CorpseTeleportRetryMs && GhostTeleportSlot(nowMs))
         {
             state.CorpseTeleportRetryMs = nowMs + kEntryTeleportRetryMs;
             BotAction toLeader;
@@ -507,7 +519,7 @@ void BotPolicy::DeadGhostRun(DecideTick& tick, BotTurn& turn)
         if (!fighting && member)
         {
             bool const withMember = bot.map_id == member->map_id && DistanceTo(bot, Point{ member->pos_x, member->pos_y, member->pos_z }) <= kEntryYards;
-            if (!withMember && nowMs >= state.CorpseTeleportRetryMs)
+            if (!withMember && nowMs >= state.CorpseTeleportRetryMs && GhostTeleportSlot(nowMs))
             {
                 state.CorpseTeleportRetryMs = nowMs + kEntryTeleportRetryMs;
                 BotAction toMember;
@@ -536,7 +548,7 @@ void BotPolicy::DeadGhostRun(DecideTick& tick, BotTurn& turn)
     }
     if (instanceParty && entryOf != _options.DungeonsByMap.end() && entryOf->second.HasEntry && nowMs - state.EntrySinceMs < kDungeonEntryWaitMs)
     {
-        if (!atEntry && nowMs >= state.CorpseTeleportRetryMs)
+        if (!atEntry && nowMs >= state.CorpseTeleportRetryMs && GhostTeleportSlot(nowMs))
         {
             state.CorpseTeleportRetryMs = nowMs + kEntryTeleportRetryMs;
             BotAction entry;
@@ -565,7 +577,7 @@ void BotPolicy::DeadGhostRun(DecideTick& tick, BotTurn& turn)
     // Sentinel Hill graveyard, its walk to the door refused for "no route"): the ghost is put at its corpse now, the same teleport as the four-minute timeout
     // below, brought forward. A ghost already at its corpse (waiting out the core's reclaim delay, or a hostile beside it) is not on a run any more: left alone.
     bool const atCorpse = bot.map_id == bot.corpse_map && DistanceTo(bot, Point{ bot.corpse_x, bot.corpse_y, bot.corpse_z }) <= kReclaimYards;
-    if (_options.CorpseRunTeleportMs != 0 && !state.RunTimeoutTeleported && !atCorpse && nowMs - state.RunStartMs > _options.CorpseRunTeleportMs)
+    if (_options.CorpseRunTeleportMs != 0 && !state.RunTimeoutTeleported && !atCorpse && nowMs - state.RunStartMs > _options.CorpseRunTeleportMs && GhostTeleportSlot(nowMs))
     {
         state.RunTimeoutTeleported = true;
         state.RunStartMs = nowMs;
@@ -585,7 +597,11 @@ void BotPolicy::DeadGhostRun(DecideTick& tick, BotTurn& turn)
     {
         // Four minutes of walking and the corpse is not reached: the ghost is put at the corpse once (the core does not refuse a teleport for a ghost),
         // and the run starts over. A ghost that gave up here stayed a ghost for good (34 bots in 55 minutes on the sim).
-        if (!state.RunTimeoutTeleported)
+        if (!state.RunTimeoutTeleported && !GhostTeleportSlot(nowMs))
+        {
+            // over this second's ghost teleports (GhostTeleportPerSecond): the next tick tries again
+        }
+        else if (!state.RunTimeoutTeleported)
         {
             state.RunTimeoutTeleported = true;
             state.RunStartMs = nowMs;
@@ -601,8 +617,11 @@ void BotPolicy::DeadGhostRun(DecideTick& tick, BotTurn& turn)
                   " reason=timeout");
             return;
         }
-        DeadRunFailed(tick, turn, "timeout");
-        return;
+        else
+        {
+            DeadRunFailed(tick, turn, "timeout");
+            return;
+        }
     }
     Point const corpse{ bot.corpse_x, bot.corpse_y, bot.corpse_z };
     if (bot.map_id == bot.corpse_map)
@@ -651,7 +670,7 @@ void BotPolicy::DeadGhostRun(DecideTick& tick, BotTurn& turn)
     }
     else if (PolicyOptions::ScenarioRoute const& own = ScenarioOf(bot.guid); own.HasPortal && bot.map_id == own.PortalMap && bot.corpse_map == own.PortalInsideMap)
         DeadEmit(tick, turn, Decision{ ActionType::kMoveTo, 0, own.PortalPoint });
-    else if (nowMs >= state.CorpseTeleportRetryMs)
+    else if (nowMs >= state.CorpseTeleportRetryMs && GhostTeleportSlot(nowMs))
     {
         // No way on foot to the corpse's map (run 9: a member that died in the dungeon was left on the outside map and idled for 45 minutes
         // after the run failed). The core does not refuse a teleport for a ghost (only one in combat), so the ghost is put at its corpse.

@@ -322,6 +322,8 @@ struct PolicyOptions
     std::uint64_t CorpseRunTimeoutMs = 240000;  // a ghost that has not reached its corpse by then gives up
     // A corpse run that takes longer than this (config CorpseRunTeleportSec, 0 = off) puts the ghost at its corpse (the CorpseRunTimeoutMs teleport, brought forward).
     std::uint64_t CorpseRunTeleportMs = 60000;
+    // At most this many ghost teleports (corpse, entrance, leader) a second for the whole policy; 0 = no limit. Config GhostTeleportPerSecond.
+    std::uint32_t GhostTeleportPerSecond = 2;
     std::uint64_t WaitForRezMs = 20000;         // the party waits this long for a corpse to be resurrected (20 s: a rez that has not come by then is not coming)
     std::uint64_t WaitForGhostMs = 180000;      // and this long after the ghost entered the corpse's map
     // Supplies (layout 15): a bot short of ammunition, food or drink walks to a vendor that sells it and buys, and eats or drinks while resting.
@@ -573,6 +575,7 @@ private:
         std::uint32_t QuestWaitSize = 0;                 // the party size that quest wants
         std::uint64_t QuestWaitAtMs = 0;                 // when the planner last said so (a wait older than a few seconds is over)
         std::uint64_t QuestDiagAtMs = 0;                 // when the quest line was last written (quest_state event)
+        std::uint32_t GhostRefusedSeq = 0;               // the last refused ghost teleport answer handled (by its action sequence)
         std::uint32_t TeleportLoggedSequence = 0;        // the last teleport result written to the log
         Point NoRouteDest{};                             // the destination of the last move the core found no route to
         std::uint64_t NoRouteUntilMs = 0;                // a move to (about) that place is not sent before this time
@@ -934,6 +937,11 @@ private:
         return at->second;
     }
 
+    // Ghost teleports (to a corpse, the entrance, the leader) are limited to GhostTeleportPerSecond in each second: a wiped raid of 20 ghosts teleported in one tick
+    // made the core create instances and load grids at once (the 2026-11-09 world-thread stall). True and counted when one may go now.
+    bool GhostTeleportSlot(std::uint64_t nowMs);
+    std::uint64_t _ghostTeleportSecondMs = 0;
+    std::uint32_t _ghostTeleportsInSecond = 0;
     std::unordered_map<std::uint64_t, BotState> _bots; // bot guid -> state
     std::vector<TalentOrder> _talentOrders;            // queued by Decide, taken by TakeTalentOrders
     std::vector<TalentOrder> _respecOrders;            // queued by Decide (TalentRespec), taken by TakeRespecOrders

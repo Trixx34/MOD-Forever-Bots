@@ -135,16 +135,53 @@ void AWipedPartysGhostsArePutAtTheirCorpsesAfterAMinute()
     std::vector<BotAction> const first = policy.Decide(v, 1000);
     CHECK(HasAction(first, 13, ActionType::kMoveTo) && !TeleportOf(first, 13).has_value()); // to the door first
     CHECK(!TeleportOf(policy.Decide(v, 50000), 13).has_value());
-    std::vector<BotAction> const later = policy.Decide(v, 61500);
-    for (std::uint64_t guid : { 10, 11, 12, 13, 14 })
+    // GhostTeleportPerSecond = 2: the five ghosts go two, two and one in successive seconds, each once.
+    std::set<std::uint64_t> sent;
+    for (std::uint64_t at : { 61500ull, 61700ull, 62600ull, 63700ull })
     {
-        std::optional<BotAction> const teleport = TeleportOf(later, guid);
-        CHECK(teleport.has_value() && teleport->spell_id == 36 && teleport->dest_x == 50.0f);
-        CHECK(!HasAction(later, guid, ActionType::kRevive));
+        std::vector<BotAction> const later = policy.Decide(v, at);
+        std::size_t inTick = 0;
+        for (std::uint64_t guid : { 10, 11, 12, 13, 14 })
+        {
+            std::optional<BotAction> const teleport = TeleportOf(later, guid);
+            if (!teleport)
+                continue;
+            ++inTick;
+            CHECK(teleport->spell_id == 36 && teleport->dest_x == 50.0f);
+            CHECK(sent.insert(guid).second);                                             // not twice
+        }
+        CHECK(inTick <= 2);
+        CHECK(at != 61500ull || inTick == 2);
+        CHECK(at != 61700ull || inTick == 0);                                            // the same second: no third
+        for (std::uint64_t guid : { 10, 11, 12, 13, 14 })
+            CHECK(!HasAction(later, guid, ActionType::kRevive));
     }
+    CHECK(sent.size() == 5);
     CHECK(Logged(events, "corpse_run_teleport:"));
     CHECK(LoggedWith(events, "reason=run_limit"));
     CHECK(!TeleportOf(policy.Decide(v, 70000), 13).has_value());                         // once
+}
+
+// A ghost teleport the core refused (the instance it died in is gone) does not leave the ghost without a later try: RunTimeoutTeleported is cleared and the next
+// teleport comes a minute after the refusal.
+void ARefusedGhostTeleportIsTriedAgainLater()
+{
+    std::vector<std::string> events;
+    PolicyOptions options = DeadOptions(&events);
+    options.GhostTeleportPerSecond = 0;
+    BotPolicy policy(options);
+    WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 });
+    Ghost(v.bots[3], 0.0f, 0, 3000.0f);
+    policy.Decide(v, 1000);
+    CHECK(TeleportOf(policy.Decide(v, 61500), 13).has_value());
+    v.bots[3].last_action_type = std::uint8_t(ActionType::kTeleport);
+    v.bots[3].last_action_status = forever_module::BotActionStatus::kRefused;
+    v.bots[3].last_action_sequence = 7;
+    std::vector<BotAction> const refused = policy.Decide(v, 62500);
+    CHECK(!TeleportOf(refused, 13).has_value());
+    CHECK(Logged(events, "corpse_run_teleport_refused:"));
+    CHECK(!TeleportOf(policy.Decide(v, 100000), 13).has_value());                        // not before the minute is up again
+    CHECK(TeleportOf(policy.Decide(v, 123000), 13).has_value());                         // tried again
 }
 
 // A bot that stands up among what killed it and dies again three times within two minutes is put at a grind spot for its level, away from the corpse.
@@ -933,6 +970,7 @@ void RunPolicyTestsPart5()
     HunterMendsItsPetInALongFight();
     HostileOnAnotherLevelIsNotPulled();
     ALongCorpseRunEndsInATeleportToTheCorpse();
+    ARefusedGhostTeleportIsTriedAgainLater();
     AWipedPartysGhostsArePutAtTheirCorpsesAfterAMinute();
     DeathLoopMovesTheBotToAGrindSpot();
     CorpseReleasesAtOnceWithoutARezzer();
