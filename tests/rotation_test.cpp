@@ -130,6 +130,20 @@ void RangedClassesApproachToRange()
     CHECK(rotation::ApproachYards(2) == 5.0f);   // paladin
 }
 
+// Bug #2 of the 2026-11-10 report: a melee spec of an otherwise ranged class closes to melee; an unknown spec keeps the class default.
+void MeleeSpecsOfRangedClassesApproachToMelee()
+{
+    CHECK(rotation::ApproachYards(7, "enh") == 5.0f);          // enhancement shaman
+    CHECK(rotation::ApproachYards(7, "ele") == 25.0f);         // elemental shaman stays at range
+    CHECK(rotation::ApproachYards(7) == 25.0f);                // no spec: class default
+    CHECK(rotation::ApproachYards(11, "feral_tank") == 5.0f);
+    CHECK(rotation::ApproachYards(11, "feral_cat") == 5.0f);
+    CHECK(rotation::ApproachYards(11, "balance") == 25.0f);
+    CHECK(rotation::ApproachYards(3, "sv") == 5.0f);           // survival hunter
+    CHECK(rotation::ApproachYards(3, "mm") == 25.0f);
+    CHECK(rotation::ApproachYards(1, "arms") == 5.0f);         // a melee class is unchanged
+}
+
 void LearnLevelsFollowTheTrainerData()
 {
     CHECK(rotation::LearnLevel(772) == 4);     // Rend
@@ -143,6 +157,7 @@ void LearnLevelsFollowTheTrainerData()
 int main()
 {
     LearnLevelsFollowTheTrainerData();
+    MeleeSpecsOfRangedClassesApproachToMelee();
     EveryClassHasRows();
     RangedClassesApproachToRange();
     Conditions();

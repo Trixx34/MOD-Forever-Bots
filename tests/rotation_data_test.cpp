@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Unit tests for rotations read from a file: the parser, fight rows with levels and durations, and out-of-combat buffs. No core needed.
 #include "bot_policy.h"
+#include "bot_policy_internal.h"
 #include "combat_rotation.h"
 #include "tame_beasts.h"
 
 #include <algorithm>
 #include <cstdio>
+#include <fstream>
 #include <sstream>
 
 using forever_module::ActionType;
@@ -584,6 +586,72 @@ void TheShippedFilesLoadCleanly()
     CHECK(beasts.ByEntry.count(157) == 1 && beasts.ByEntry.count(834) == 1 && beasts.ByEntry.count(213) == 1);   // Goretusk, Coyote, Starving Dire Wolf (Westfall)
 }
 
+// Bug #4 of the 2026-11-10 report: a row with two condition keywords keeps both (When and When2, ANDed); a third is a format error.
+void ARowKeepsTwoConditions()
+{
+    std::vector<std::string> warnings;
+    auto const data = Parse(
+        "class 4\n"
+        "row 100 combo 5 target_strong 1 target range 0 5\n"
+        "row 101 always target_hp_below 20 target range 0 5\n"     // always takes no slot
+        "row 102 combo 5 target_strong 1 in_party target range 0 5\n", // three conditions: dropped
+        warnings);
+    auto const& rows = data->ByClass.at(4);
+    CHECK(rows.size() == 2 && warnings.size() == 1);
+    rotation::Row const& two = rows[0];
+    CHECK(two.When.Condition == rotation::Cond::ComboPointsAtLeast && two.When2.Condition == rotation::Cond::TargetStrong);
+    CHECK(rotation::RowHasCondition(two, rotation::Cond::TargetStrong) && !rotation::RowHasCondition(two, rotation::Cond::InParty));
+    rotation::Facts f;
+    f.ComboPoints = 5;
+    f.TargetElite = false;
+    f.TargetLevelDiff = 0;
+    CHECK(!rotation::Allowed(two, f));         // five combo points but not a strong target
+    f.TargetElite = true;
+    CHECK(rotation::Allowed(two, f));
+    f.ComboPoints = 4;
+    CHECK(!rotation::Allowed(two, f));         // strong target but too few points
+    CHECK(rows[1].When.Condition == rotation::Cond::TargetHpBelow && rows[1].When2.Condition == rotation::Cond::Always);
+}
+
+// Bug #9: Execute needs target_hp_below 20 in the generated file and in its spec (the generator input), and the feral builders give combo points.
+void ExecuteHasItsHealthConditionAndFeralBuildersGiveComboPoints()
+{
+    std::string const root = FOREVER_BOTS_SOURCE_DIR;
+    std::vector<std::string> warnings;
+    rotation::RotationData const data = rotation::LoadRotationData(root + "/data/rotations.txt", warnings);
+    int executes = 0;
+    auto const count = [&](std::vector<rotation::Row> const& rows)
+    {
+        for (rotation::Row const& row : rows)
+            if (row.Spell == 5308)
+            {
+                ++executes;
+                CHECK(rotation::RowHasCondition(row, rotation::Cond::TargetHpBelow) &&
+                      (row.When.Condition == rotation::Cond::TargetHpBelow ? row.When.Param : row.When2.Param) == 20);
+            }
+    };
+    for (auto const& [cls, rows] : data.ByClass)
+        count(rows);
+    for (auto const& [key, rows] : data.BySpec)
+        count(rows);
+    CHECK(executes == 4);   // default, prot, arms, fury
+
+    std::ifstream spec(root + "/data/rotation_spec.txt");
+    std::string line;
+    int specExecutes = 0;
+    while (std::getline(spec, line))
+        if (line.rfind("row \"Execute\"", 0) == 0)
+        {
+            ++specExecutes;
+            CHECK(line.find("target_hp_below 20") != std::string::npos);
+        }
+    CHECK(specExecutes == executes);
+
+    using namespace bot_policy_detail;
+    CHECK(ComboPointsGained(kClaw) == 1 && ComboPointsGained(kRake) == 1 && ComboPointsGained(kShred) == 1);
+    CHECK(ComboPointsGained(kFerociousBite) == 0);   // a finisher, it spends points
+}
+
 } // namespace
 
 void AnAoeRowIsSkippedWhileTheRaidRuleSaysNoAoe()
@@ -668,6 +736,8 @@ int main()
     ADemonIsSummonedOnlyWithNoPetAndFallsBack();
     AStanceIsHeldOnlyInAParty();
     TheShippedFilesLoadCleanly();
+    ARowKeepsTwoConditions();
+    ExecuteHasItsHealthConditionAndFeralBuildersGiveComboPoints();
     if (failures == 0)
         std::printf("rotation_data_test: all checks passed\n");
     return failures == 0 ? 0 : 1;
