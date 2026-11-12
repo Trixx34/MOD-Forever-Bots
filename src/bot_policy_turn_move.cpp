@@ -897,6 +897,7 @@ void BotPolicy::RouteWalkOn(DecideTick& tick, BotTurn& turn, RouteLeg& route)
     }
     if (waypoint && together && strong && manaReady)
     {
+        state.RouteHealthHoldSinceMs = 0;
         wanted = Decision{ ActionType::kMoveTo, 0, *waypoint };
         moveWhy = "*waypoint";
         routeBusy = true;
@@ -940,6 +941,47 @@ void BotPolicy::RouteWalkOn(DecideTick& tick, BotTurn& turn, RouteLeg& route)
     else
     {
         state.RouteStallSinceMs = 0;
+        // Healer fetch: the leader holds below kRouteMinHealthPct and only a healer heals it, but the healer may be far behind (the 2026-11-12 BFD runs stood ten
+        // minutes in route_hold why=health with the healer 200 to 350 yards away). After kHealerFetchAfterMs the leader walks back toward the nearest healer that is
+        // farther than kHealerFetchYards; inside it the healer's top-up (kRouteTopUpPct) takes over as before.
+        if (waypoint && !strong && bot.in_combat == 0 && deadWaitKind == 0)
+        {
+            if (state.RouteHealthHoldSinceMs == 0)
+                state.RouteHealthHoldSinceMs = nowMs;
+            else if (nowMs - state.RouteHealthHoldSinceMs >= kHealerFetchAfterMs)
+            {
+                BotSnapshot const* healer = nullptr;
+                float healerYards = 0.0f;
+                bool healerNear = false;
+                tick.ForEachPartyMember(bot.guid, [&](BotSnapshot const& member)
+                {
+                    if (member.life_state != 0 || member.map_id != bot.map_id)
+                        return;
+                    auto const known = _bots.find(member.guid);
+                    bool const role = known == _bots.end() || (known->second.Role_ != BotState::Role::Dps && known->second.Role_ != BotState::Role::Tank);
+                    if (!role || HealSpellFor(ClassFor(_options, member.guid), member.level) == 0)
+                        return;
+                    float const yards = Distance2d(bot, member);
+                    healerNear = healerNear || yards <= kHealerFetchYards;
+                    if (!healer || yards < healerYards)
+                    {
+                        healer = &member;
+                        healerYards = yards;
+                    }
+                });
+                if (healer && !healerNear)
+                {
+                    wanted = Decision{ ActionType::kMoveTo, 0, Point{ healer->pos_x, healer->pos_y, healer->pos_z } };
+                    moveWhy = "healer_fetch";
+                    routeBusy = true;
+                    if (_options.OnEvent && nowMs - state.RouteHoldLoggedMs >= kRouteHoldLogMs)
+                        _options.OnEvent("healer_fetch: bot=" + std::to_string(bot.guid) + " healer=" + std::to_string(healer->guid) + " yards=" + std::to_string(int(healerYards)) +
+                                         " hp_pct=" + std::to_string(HealthPct(bot, 100)) + " held_ms=" + std::to_string(nowMs - state.RouteHealthHoldSinceMs));
+                }
+            }
+        }
+        else
+            state.RouteHealthHoldSinceMs = 0;
         // Why the leader does not walk on, out of combat, at most every kRouteHoldLogMs: its health, a dead member, or the member farthest behind.
         if (waypoint && bot.in_combat == 0 && _options.OnEvent && nowMs - state.RouteHoldLoggedMs >= kRouteHoldLogMs)
         {

@@ -259,6 +259,47 @@ void ALeaderThatDoesNotMoveIsNoticed()
     CHECK(named);
 }
 
+// A leader below 80 % health holds for its healer; a healer far behind is fetched: after kHealerFetchAfterMs the leader walks back to it (healer_fetch), not before,
+// and not when a healer is near.
+void ALeaderWalksBackToAFarHealer()
+{
+    auto const make = [](float healerX, std::vector<std::string>& events)
+    {
+        PolicyOptions options = AggressiveOptions();
+        options.PartySize = 5;
+        options.ClassOf = WarriorLeads;
+        options.Route = { Point{ 100.0f, 0.0f, 0.0f }, Point{ 140.0f, 0.0f, 0.0f } };
+        options.OnEvent = [&events](std::string const& line) { events.push_back(line); };
+        return std::make_pair(std::make_unique<BotPolicy>(options), healerX);
+    };
+    auto const run = [&](float healerX, std::uint64_t until, std::vector<std::string>& events)
+    {
+        auto [policy, x] = make(healerX, events);
+        policy->SetRouteActive(true);
+        WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+        for (BotSnapshot& bot : view.bots)
+            bot.pos_x = bot.guid == 12 ? 50.0f : x;
+        view.bots[2].health = 500;                                      // the leader, 50 %
+        view.bots[2].max_health = 1000;
+        float walk = -1.0f;
+        for (std::uint64_t now = 0; now <= until; now += 1000)
+            if (float const sent = LeaderWalk(policy->Decide(view, now)); sent == x)
+                walk = sent;                                           // the walk order is sent once, when it changes
+        return walk;
+    };
+    std::vector<std::string> events;
+    CHECK(run(-300.0f, 30000, events) != -300.0f);                      // too early
+    CHECK(events.empty() || events.back().rfind("healer_fetch:", 0) != 0);
+    events.clear();
+    CHECK(run(-300.0f, 60000, events) == -300.0f);                      // the healers are 350 yards behind: walk to one
+    bool fetched = false;
+    for (std::string const& line : events)
+        fetched = fetched || line.rfind("healer_fetch: bot=12", 0) == 0;
+    CHECK(fetched);
+    events.clear();
+    CHECK(run(30.0f, 60000, events) != 30.0f);                          // a healer 20 yards away: the leader stays, the top-up heals it
+}
+
 // Regroup (0.35.0): a member out of range for kRegroupStuckMs is stuck. The leader holds for it until then, then walks on without it, and the
 // regroup ends when the party is ready again after the member is back.
 void ARegroupStopsWaitingForAStuckMember()
@@ -926,6 +967,7 @@ void RunPolicyTestsPart4()
     ALeaderAtTheEntranceGoesToAFightingPartyAfterAWhile();
     ARevivedLeaderRestsAtTheEntranceBeforeItGoesToItsParty();
     ALeaderThatDoesNotMoveIsNoticed();
+    ALeaderWalksBackToAFarHealer();
     HealerHealsTheHurtMember();
     HealerHealsItselfWithoutATarget();
     PriestWithNoLineOfSightRepositionsBeforeRetryingDps();

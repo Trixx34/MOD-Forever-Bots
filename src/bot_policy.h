@@ -685,6 +685,7 @@ private:
         std::uint64_t RouteWalkLoggedMs = 0;             // when the leader's walk along the route was last written to the log (route_walk)
         std::uint32_t RouteNoRoute = 0;                  // moves in a row to the current dungeon waypoint that the core found no route for
         Point RouteStallAt{};                            // where the leader stood when its walk along the route was last seen to move
+        std::uint64_t RouteHealthHoldSinceMs = 0;        // since when the leader holds for its own health out of combat (0 = not holding): the healer-fetch rule
         std::uint64_t RouteStallSinceMs = 0;             // since when it has stood there while walking (0 = not walking)
         std::uint64_t RouteManaProgressMs = 0;           // 0.44.14: the last tick the party's summed mana rose while the leader waited (kRouteManaMaxMs counts from here)
         std::uint64_t RouteManaBaseSum = 0, RouteManaBaseMs = 0; // RecoveryProgress baseline of the wait (cleared when the wait ends)

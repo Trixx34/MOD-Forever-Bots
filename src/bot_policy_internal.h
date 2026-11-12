@@ -310,6 +310,8 @@ constexpr std::uint32_t kSapSpell = 6770;
 constexpr std::uint32_t kPolymorphSpell = 118;
 constexpr std::uint32_t kBanishSpell = 710;
 constexpr std::uint64_t kCcRefreshBeforeMs = 3000;
+constexpr float kHealerFetchYards = 45.0f;       // a leader below kRouteMinHealthPct whose nearest healer is farther than this (2D) walks back to it after kHealerFetchAfterMs
+constexpr std::uint64_t kHealerFetchAfterMs = 45000;  // 2026-11-12 sim: parties stood 10 minutes in route_hold why=health with the healer 200 to 350 yards behind, nobody to heal the leader
 constexpr float kRouteWaitYards = 30.0f;         // the leader waits for a member farther behind than this
 constexpr std::uint32_t kRouteMinHealthPct = 80; // and for its own health to be at least this
 constexpr std::uint32_t kRouteMinManaPct = 70;   // the leader walks on only when every mana user of the party has at least this much mana (the healer walked into fights at 3%)
