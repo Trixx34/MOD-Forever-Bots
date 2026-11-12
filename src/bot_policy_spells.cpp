@@ -86,6 +86,22 @@ std::uint32_t DispelSpellFor(std::uint32_t classId, std::uint32_t level, std::ui
     }
 }
 
+std::uint32_t ThreatDropSpellFor(std::uint32_t classId, std::uint32_t level, bool& onTarget)
+{
+    // First ranks (the core casts the highest known); levels from data/spell_costs.txt. Vanish and Soulshatter are not used: Vanish drops the bot out of the fight and into stealth,
+    // and the spell cost data of this client has no Soulshatter.
+    auto const has = [level](std::uint32_t need) { return level == 0 || level >= need; };
+    onTarget = false;
+    switch (classId)
+    {
+        case 5: return has(8) ? 586u : 0u;      // priest: Fade
+        case 3: return has(30) ? 5384u : 0u;    // hunter: Feign Death
+        case 4: onTarget = true; return has(16) ? 1966u : 0u;   // rogue: Feint
+        case 11: onTarget = true; return has(28) ? 8998u : 0u;  // druid: Cower (cat form; refused otherwise)
+        default: return 0;
+    }
+}
+
 std::uint32_t ResurrectSpellFor(std::uint32_t classId, std::uint32_t level)
 {
     switch (classId)

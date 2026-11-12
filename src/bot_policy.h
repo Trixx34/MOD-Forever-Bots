@@ -335,6 +335,16 @@ struct PolicyOptions
     // Config VendorSellGear (default off; needs Bot.Vendor.SellGear in the core): a vendor visit also sells the bag gear the worn gear outclasses (kVendor bit 2048
     // with the bot's gear profile in bits 12-14). The core judges it by the item numbers, never by item id.
     bool VendorSellGear = false;
+    // DPS threat discipline (layout 24 threat fields; needs Bot.Snapshot.Threat in the core, else nothing is read): a damage dealer in a party whose threat on its target is at
+    // or above ThreatHoldPct percent of the top holds its attacks until it is at or under ThreatReleasePct, for at most ThreatHoldMaxMs (then it fights ThreatHoldMaxMs
+    // regardless), unless the target is under ThreatNearDeathPct health. Never the tank, a healer, or a solo bot. ThreatDropAbilities: a bot that has the target's aggro
+    // (or is top of its threat list) also uses Fade, Feign Death, Feint or Cower where its class has one.
+    bool ThreatHold = true;
+    std::uint32_t ThreatHoldPct = 90;
+    std::uint32_t ThreatReleasePct = 70;
+    std::uint64_t ThreatHoldMaxMs = 8000;
+    std::uint32_t ThreatNearDeathPct = 15;
+    bool ThreatDropAbilities = true;
     // Flight points (layout 17, taxi_policy.h): a long walk becomes a flight from the nearest flight master. Off by default.
     taxi::Settings Taxi;
     // Realism features without combat (realism.h; off by default).
@@ -505,6 +515,10 @@ private:
         std::optional<Decision> LastMove;                // the last kMoveTo sent: the walk a no-route result refers to (Last can be a stop sent after it)
         bool InFight = false;
         std::uint64_t FightStartMs = 0;
+        std::uint64_t ThreatHoldRef = 0;                 // the target a threat hold is on (0 = not holding)
+        std::uint64_t ThreatHoldSinceMs = 0;
+        std::uint64_t ThreatGraceUntilMs = 0;            // a hold that ran out its maximum: no new hold until then
+        std::uint64_t ThreatDropAtMs = 0;                // a threat-drop ability may be tried again at this time
         std::uint64_t NextCastMs = 0;                    // global cooldown: no rotation cast before this
         std::uint32_t LastSequence = 0;                  // last action result seen
         std::unordered_map<std::uint32_t, std::uint64_t> RetryAtMs; // spell -> time it may be cast again

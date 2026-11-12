@@ -39,6 +39,16 @@ void ChatSettings()
 {
     std::vector<std::string> warnings;
     CHECK(ParseBotSettings({}, warnings).VendorSellGear && !ParseBotSettings({ { "VendorSellGear", "0" } }, warnings).VendorSellGear); // on by default
+    BotSettings const threatDefault = ParseBotSettings({}, warnings);
+    CHECK(threatDefault.ThreatHold && threatDefault.ThreatHoldPct == 90 && threatDefault.ThreatReleasePct == 70 && threatDefault.ThreatHoldMaxSec == 8 &&
+          threatDefault.ThreatNearDeathPct == 15 && threatDefault.ThreatDropAbilities);
+    BotSettings const threatSet = ParseBotSettings({ { "ThreatHold", "0" }, { "ThreatHoldPct", "80" }, { "ThreatReleasePct", "50" }, { "ThreatHoldMaxSec", "5" },
+                                                     { "ThreatNearDeathPct", "25" }, { "ThreatDropAbilities", "0" } }, warnings);
+    CHECK(!threatSet.ThreatHold && threatSet.ThreatHoldPct == 80 && threatSet.ThreatReleasePct == 50 && threatSet.ThreatHoldMaxSec == 5 && threatSet.ThreatNearDeathPct == 25 &&
+          !threatSet.ThreatDropAbilities);
+    std::vector<std::string> threatWarnings;
+    BotSettings const threatBad = ParseBotSettings({ { "ThreatHoldPct", "60" }, { "ThreatReleasePct", "80" } }, threatWarnings);
+    CHECK(threatBad.ThreatReleasePct == 59 && !threatWarnings.empty());   // a release mark at or over the hold mark is pulled under it
     BotSettings const off = ParseBotSettings({}, warnings);
     CHECK(!off.ChatCommands && !off.ChatOrders && !off.ChatControl && !off.QuestTeleport); // all off by default
     BotSettings const on = ParseBotSettings({ { "ChatCommands", "1" }, { "ChatOrders", "1" }, { "ChatControl", "1" }, { "QuestTeleport", "1" } }, warnings);

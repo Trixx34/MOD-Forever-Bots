@@ -13,6 +13,12 @@ void PolicyFromSettings(PolicyOptions& policyOptions, BotSettings& settings)
     policyOptions.TrainEveryMs = std::uint64_t(settings.TrainEverySec) * 1000;
     policyOptions.Supplies = settings.Supplies;
     policyOptions.VendorSellGear = settings.VendorSellGear;
+    policyOptions.ThreatHold = settings.ThreatHold;
+    policyOptions.ThreatHoldPct = settings.ThreatHoldPct;
+    policyOptions.ThreatReleasePct = settings.ThreatReleasePct;
+    policyOptions.ThreatHoldMaxMs = std::uint64_t(settings.ThreatHoldMaxSec) * 1000;
+    policyOptions.ThreatNearDeathPct = settings.ThreatNearDeathPct;
+    policyOptions.ThreatDropAbilities = settings.ThreatDropAbilities;
     policyOptions.DungeonTeleport = settings.DungeonTeleport;
     policyOptions.LevelDungeons = settings.LevelDungeons && settings.Scenarios.empty();   // a scenario run drives its own parties
     policyOptions.LevelDungeonRuns = settings.LevelDungeonRuns;

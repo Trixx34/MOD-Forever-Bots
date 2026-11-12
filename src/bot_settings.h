@@ -253,6 +253,13 @@ struct BotSettings
     supply::Settings Supplies;
     // VendorSellGear (default on; needs Bot.Vendor.SellGear in the core): a vendor visit also sells the bag gear the worn gear outclasses.
     bool VendorSellGear = true;
+    // DPS threat discipline (config keys ThreatHold, ThreatHoldPct, ThreatReleasePct, ThreatHoldMaxSec, ThreatNearDeathPct, ThreatDropAbilities); see PolicyOptions.
+    bool ThreatHold = true;
+    std::uint32_t ThreatHoldPct = 90;
+    std::uint32_t ThreatReleasePct = 70;
+    std::uint32_t ThreatHoldMaxSec = 8;
+    std::uint32_t ThreatNearDeathPct = 15;
+    bool ThreatDropAbilities = true;
     // Presence (config keys Presence, PresenceOnlineMinMin, PresenceOnlineMaxMin, PresenceOfflineMinMin, PresenceOfflineMaxMin, PresenceMinOnline,
     // PresenceMaxOnline, PresenceDayPercent; off by default): bots log off and on like players, see bot_presence.h. Needs Bot.Presence.LogoutOnRelease
     // in the core, or a released bot stays in the world.
