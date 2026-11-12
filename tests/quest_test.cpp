@@ -196,6 +196,66 @@ void RefusalBlocksTheQuestForAWhile()
     CHECK(step.Quest == 783);
 }
 
+// Refusal reasons (protocol 27, ActionReason): the accept is blocked by what the core said.
+void RefusalReasonsBlockByCause()
+{
+    QuestPlanner planner(Data());
+    BotSnapshot bot = Bot(-8933.0f, -136.0f);
+    // Class or race (3), level too high (2), already done (6): never.
+    for (std::uint32_t reason : { 3u, 2u, 6u })
+    {
+        QuestMemory memory;
+        planner.NoteSent(memory, kQuestAccept, 783, 1000);
+        planner.NoteRefused(memory, 1000, reason, 1);
+        CHECK(planner.Next(bot, memory, 1000 + 3 * 24 * 3600000ull).Quest != 783);
+        // a second refusal changes nothing (it is not counted up)
+        CHECK(memory.Refusals.count(783) == 0);
+    }
+    // Level too low (1): not before the next level, then at once.
+    {
+        QuestMemory memory;
+        planner.NoteSent(memory, kQuestAccept, 783, 1000);
+        planner.NoteRefused(memory, 1000, 1, 1);
+        CHECK(planner.Next(bot, memory, 2000000000ull).Quest != 783); // level 1 still, however long the wait
+        bot.level = 2;
+        CHECK(planner.Next(bot, memory, 3000).Quest == 783);
+        bot.level = 1;
+    }
+    // A prerequisite (4): until another quest is done, or an hour.
+    {
+        QuestMemory memory;
+        planner.NoteSent(memory, kQuestAccept, 783, 1000);
+        planner.NoteRefused(memory, 1000, 4, 1);
+        CHECK(planner.Next(bot, memory, 5000).Quest != 783);
+        memory.Done.insert(999);
+        CHECK(planner.Next(bot, memory, 6000).Quest == 783);
+        // refused again for the same reason: waits for the next one
+        planner.NoteSent(memory, kQuestAccept, 783, 7000);
+        planner.NoteRefused(memory, 7000, 4, 1);
+        CHECK(planner.Next(bot, memory, 8000).Quest != 783);
+        CHECK(planner.Next(bot, memory, 7000 + kBlockPrerequisiteMs + 1).Quest == 783);
+    }
+    // A full log (5) and full bags (9): a short wait.
+    for (std::uint32_t reason : { 5u, 9u })
+    {
+        QuestMemory memory;
+        planner.NoteSent(memory, kQuestAccept, 783, 1000);
+        planner.NoteRefused(memory, 1000, reason, 1);
+        CHECK(planner.Next(bot, memory, 5000).Quest != 783);
+        CHECK(planner.Next(bot, memory, 1000 + kBlockLogFullMs + 1).Quest == 783);
+    }
+    // No reason (an older core): the old ten minutes. A hand-in's reason is ignored.
+    {
+        QuestMemory memory;
+        planner.NoteSent(memory, kQuestAccept, 783, 1000);
+        planner.NoteRefused(memory, 1000, 0, 1);
+        CHECK(memory.BlockedUntilMs[783] == 1000 + kBlockAfterAcceptRefusalMs);
+        planner.NoteSent(memory, kQuestHandIn, 7, 1000);
+        planner.NoteRefused(memory, 1000, 3, 1);
+        CHECK(memory.BlockedUntilMs[7] == 1000 + kBlockAfterRefusalMs);
+    }
+}
+
 void NoStartOnAnotherMapMeansNoQuests()
 {
     QuestPlanner planner(Data());
@@ -692,6 +752,37 @@ void StuckQuestWalkTeleportsOnceThenDropsTheStart()
     CHECK(!WalksToGiver(second));
 }
 
+// Protocol 27: the policy reads the reason of a refused accept from the result ring and the quest is not sent again (class or race: never).
+void PolicyReadsTheRefusalReasonFromTheResultRing()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.Quests = Data();
+    options.WanderWhenIdle = false;
+    std::string refusedEvent;
+    options.OnEvent = [&](std::string const& text) { if (text.rfind("quest_refused", 0) == 0) refusedEvent = text; };
+    BotPolicy policy(options);
+    BotSnapshot bot = Bot(-8933.5f, -136.5f);
+    auto const accept = [](std::vector<BotAction> const& actions, std::uint32_t quest)
+    {
+        for (BotAction const& action : actions)
+            if (action.type == ActionType::kQuest && action.spell_id == QuestCode(kQuestAccept, quest))
+                return true;
+        return false;
+    };
+    CHECK(accept(policy.Decide(OneBotView(bot, {}), 1000), 783));
+    bot.last_action_sequence = 1;
+    bot.last_action_type = std::uint8_t(ActionType::kQuest);
+    bot.last_action_status = forever_module::BotActionStatus::kRefused;
+    bot.results[0].type = std::uint8_t(ActionType::kQuest);
+    bot.results[0].status = std::uint8_t(forever_module::BotActionStatus::kRefused);
+    bot.results[0].reason = std::uint16_t(forever_module::ActionReason::kWrongClassOrRace);
+    bot.results[0].sequence = 1;
+    policy.Decide(OneBotView(bot, {}), 5000);
+    CHECK(refusedEvent.find("reason=3") != std::string::npos);
+    for (std::uint64_t now = 10000; now < 10000 + 7 * 3600000ull; now += 600000)
+        CHECK(!accept(policy.Decide(OneBotView(bot, {}), now), 783));
+}
+
 } // namespace
 
 // ---- no route and far world starts ----
@@ -1042,6 +1133,7 @@ int main()
     RefusedHandInSendsTheBotToAVendor();
     ARunOfRefusedQuestActionsPausesTheQuestEngine();
     HandInRefusalsBlockLessThanOtherRefusals();
+    PolicyReadsTheRefusalReasonFromTheResultRing();
     ParserReadsTheFormat();
     ParserDropsBadLines();
     FarBotWalksToTheGiverThenAccepts();
@@ -1061,6 +1153,7 @@ int main()
     LogFullMeansNoNewQuest();
     QuestsOfAnotherStartInTheLogAreStillWorked();
     RefusalsBlockLongerEachTime();
+    RefusalReasonsBlockByCause();
     WideMasksAreCutOrTreatedAsAny();
     PolicyWalksToTheGiverAndSendsTheAccept();
     PolicyHuntsOnlyTheQuestTargets();

@@ -170,13 +170,22 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
         if (bot.last_action_sequence == state.QuestSeenSeq)
             return;
         state.QuestSeenSeq = bot.last_action_sequence;
+        // Protocol 27: the core says why it refused (ActionReason in the result ring, 0 from an older core). The planner blocks the quest by that reason.
+        std::uint32_t reason = 0;
+        for (auto const& result : bot.results)
+            if (result.sequence != 0 && result.sequence == bot.last_action_sequence)
+            {
+                reason = result.reason;
+                break;
+            }
         // The core does not echo the quest in the snapshot (last_action_spell is 0 for a quest action), so the quest is the one the planner sent last.
         // The planner knows the kind too: a hand-in or reward is its PendingHandIn, anything else is an accept or an abandon.
         if (_options.OnEvent && state.Quest.LastActionQuest != 0)
         {
             std::string const kind = state.Quest.PendingHandIn == state.Quest.LastActionQuest ? "hand_in" : "accept_or_abandon";
             _options.OnEvent("quest_refused: bot=" + std::to_string(bot.guid) + " quest=" + std::to_string(state.Quest.LastActionQuest) + " kind=" + kind +
-                             " bag_free=" + std::to_string(bot.bag_free_slots) + " bag_room=" + (bot.bag_free_slots > 0 ? "yes" : "no"));
+                             " bag_free=" + std::to_string(bot.bag_free_slots) + " bag_room=" + (bot.bag_free_slots > 0 ? "yes" : "no") +
+                             " reason=" + std::to_string(reason));
         }
         if (nowMs - state.QuestWindowMs > kQuestWindowMs)
         {
@@ -190,7 +199,7 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
             if (_options.OnEvent)
                 _options.OnEvent("quest_paused: bot=" + std::to_string(bot.guid) + " reason=refused_run minutes=" + std::to_string(kQuestPauseMs / 60000));
         }
-        if (QuestsFor(bot).NoteRefused(state.Quest, nowMs))
+        if (QuestsFor(bot).NoteRefused(state.Quest, nowMs, reason, bot.level))
         {
             // A hand-in the core refused: the reward did not fit in the bags. A bot with quest work is never idle, so the vendor visit that
             // empties the bags (sell, equip) is not left to the idle bot's turn.

@@ -76,6 +76,8 @@ struct QuestMemory
     std::map<std::uint32_t, std::uint64_t> GroupWaitSinceMs; // group quest -> since when the bot waits for its party
     std::set<std::uint32_t> NearEnough;                 // quests whose giver or ender could not be walked to but is near: the accept or hand-in is tried from here
     std::set<std::uint32_t> RefusedHandIns;             // quests whose hand-in was refused since the last vendor visit
+    std::map<std::uint32_t, std::uint32_t> RetryAtLevel;   // quest -> not tried before the bot has this level (refused: level too low)
+    std::map<std::uint32_t, std::size_t> RetryAfterDone;   // quest -> not tried before more quests are done than this (refused: a prerequisite missing)
 };
 
 // Who the bot is, for the quests' race and class limits. 0 = unknown (no limit applied).
@@ -97,6 +99,12 @@ constexpr std::uint64_t kBlockAfterRefusalMs = 60000;
 constexpr std::uint64_t kBlockAfterAcceptRefusalMs = 600000; // a refused accept: ten minutes (an hour kept bots away from quests they could take once the core allowed it)
 constexpr std::uint64_t kStuckMs = 600000;              // no progress for 10 minutes: abandon
 constexpr std::uint64_t kBlockAfterAbandonMs = 3600000;
+// Refusal reasons (ActionResult::reason, protocol 27): what a refused accept is blocked for, by the reason the core gave.
+constexpr std::uint64_t kBlockNeverMs = 3153600000000ull;       // class or race, already done, level too high: it will not change (about 100 years)
+constexpr std::uint64_t kBlockPrerequisiteMs = 3600000;         // a prerequisite is missing: until another quest is done, at the latest after an hour
+constexpr std::uint64_t kBlockLogFullMs = 120000;               // the quest log is full: a short wait
+constexpr std::uint64_t kBlockBagsFullMs = 60000;               // the bags are full (a vendor visit empties them): a short wait
+constexpr std::uint64_t kBlockSkillOrReputationMs = 3600000;    // a skill or reputation is short: an hour
 constexpr std::uint64_t kWalkStuckBlockMs = 900000;          // a quest whose walk is stuck (no route to its ender or hunting ground) is left alone this long
 constexpr float kWorldStartRadiusYards = 2000.0f;      // a world start (its quests carry levels) is walked to from up to this far (see kStartRadiusYards)
 constexpr std::uint64_t kNoRouteBlockMs = 1800000;     // a start whose giver the core found no route to is left alone for this long
@@ -137,7 +145,10 @@ public:
 
     // The result of the last quest action the core reported: a refusal blocks the quest for a while. Returns true when the refused action
     // was a hand-in: the reward did not fit (bags full), which a visit to a vendor fixes.
-    bool NoteRefused(QuestMemory& memory, std::uint64_t nowMs) const;
+    // `reason` is the core's ActionReason of the refusal (0 = none given, the old behaviour) and `botLevel` the bot's level: a refused accept is then blocked
+    // by its reason (never for class or race and already done; until the next level for level too low; until another quest is done for a prerequisite;
+    // a short wait for a full log or full bags). A refused hand-in is not split by reason.
+    bool NoteRefused(QuestMemory& memory, std::uint64_t nowMs, std::uint32_t reason = 0, std::uint32_t botLevel = 0) const;
 
     // The bot has been to a vendor (its bags are emptier): the quests blocked by refusals are tried again.
     void NoteServiced(QuestMemory& memory) const;

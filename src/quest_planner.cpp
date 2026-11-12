@@ -110,7 +110,15 @@ bool QuestPlanner::Eligible(QuestDef const& quest, BotSnapshot const& bot, Quest
 
 bool QuestPlanner::Taken(QuestMemory const& memory, BotSnapshot const& bot, std::uint32_t quest, std::uint64_t nowMs)
 {
-    return memory.Done.count(quest) || InLog(bot, quest) || Blocked(memory, quest, nowMs);
+    if (memory.Done.count(quest) || InLog(bot, quest))
+        return true;
+    // A refused accept for a missing prerequisite is lifted as soon as another quest is done (RetryAfterDone), before its block runs out.
+    auto const done = memory.RetryAfterDone.find(quest);
+    bool const lifted = done != memory.RetryAfterDone.end() && memory.Done.size() > done->second;
+    if (!lifted && Blocked(memory, quest, nowMs))
+        return true;
+    auto const level = memory.RetryAtLevel.find(quest);
+    return level != memory.RetryAtLevel.end() && bot.level < level->second;
 }
 
 QuestStep QuestPlanner::Next(BotSnapshot const& bot, QuestMemory& memory, std::uint64_t nowMs, QuestBotInfo const& info) const
@@ -376,11 +384,51 @@ void QuestPlanner::NoteWalkStuck(QuestMemory& memory, std::uint32_t quest, std::
         memory.BlockedUntilMs[quest] = nowMs + kWalkStuckBlockMs;
 }
 
-bool QuestPlanner::NoteRefused(QuestMemory& memory, std::uint64_t nowMs) const
+bool QuestPlanner::NoteRefused(QuestMemory& memory, std::uint64_t nowMs, std::uint32_t reason, std::uint32_t botLevel) const
 {
     if (memory.LastActionQuest == 0)
         return false;
     bool const handIn = memory.PendingHandIn == memory.LastActionQuest;
+    std::uint32_t const quest = memory.LastActionQuest;
+    memory.RetryAfterDone.erase(quest);
+    memory.RetryAtLevel.erase(quest);
+    if (!handIn && !memory.LastActionAbandon && reason != 0)
+    {
+        // The reasons of ActionReason (tier2_layout.h). The refusal is not counted in Refusals: the block does not grow, it is what the reason says.
+        std::uint64_t block = 0;
+        switch (reason)
+        {
+            case 1: // level too low: when the bot has a level more
+                memory.RetryAtLevel[quest] = botLevel + 1;
+                block = kBlockNeverMs;
+                break;
+            case 2: // level too high
+            case 3: // class or race
+                block = kBlockNeverMs;
+                break;
+            case 6: // already done
+                block = kBlockNeverMs;
+                break;
+            case 4: // prerequisite: when another quest is done
+                memory.RetryAfterDone[quest] = memory.Done.size();
+                block = kBlockPrerequisiteMs;
+                break;
+            case 5: block = kBlockLogFullMs; break;
+            case 7: block = kBlockBagsFullMs; break; // already on the quest: the log catches up in a moment
+            case 8: block = kBlockSkillOrReputationMs; break;
+            case 9: block = kBlockBagsFullMs; break;
+            default: break; // no giver, other: the generic blocks below
+        }
+        if (block != 0)
+        {
+            // Level too low is lifted by the level, not by the clock: the block is dropped and RetryAtLevel holds the quest back (Taken).
+            if (reason == 1)
+                memory.BlockedUntilMs.erase(quest);
+            else
+                memory.BlockedUntilMs[quest] = nowMs + block;
+            return false;
+        }
+    }
     // The block grows with every refusal of the same quest: a minute, ten minutes, then an hour (done long ago, a prerequisite missing, not for
     // this bot). A refused hand-in is most often a full bag, which the bot fixes at a vendor and which says nothing against the quest, so a
     // hand-in is blocked a minute for its first two refusals.
