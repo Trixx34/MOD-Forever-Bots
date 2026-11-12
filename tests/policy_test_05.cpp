@@ -222,6 +222,84 @@ void DeathLoopMovesTheBotToAGrindSpot(std::uint64_t cycleMs = 8000)
     CHECK(Logged(events, "death_loop_escape:"));
 }
 
+// Prod 2026-11-12: a bot that dies twice to the same creature entry within kDeathLoopMs is moved on at its second death, not its third.
+void ASecondDeathToTheSameCreatureMovesTheBot(std::uint32_t secondKiller)
+{
+    std::vector<std::string> warnings;
+    std::istringstream spots("spot 0 40 0 0 1 10 0\nspot 0 5000 0 0 1 10 0\n");
+    PolicyOptions options = AggressiveOptions();
+    options.Grind = std::make_shared<GrindData>(ParseGrindData(spots, warnings));
+    BotPolicy policy(options);
+    std::uint64_t now = 1000;
+    bool teleported = false;
+    for (int death = 0; death < 2; ++death)
+    {
+        std::uint32_t const entry = death == 0 ? 1998u : secondKiller;
+        WorldTickSnapshotView dead = View(1, 0, { Hostile(entry, 3.0f, 100) });
+        dead.nearby[0].guid = MakeUnitRef(8, entry, 1);
+        dead.bots[0].level = 2;
+        Corpse(dead.bots[0], 10.0f);
+        policy.Decide(dead, now);
+        now += 3000;
+        WorldTickSnapshotView up = View(1, 0, {});
+        up.bots[0].level = 2;
+        up.bots[0].pos_x = 10.0f;
+        for (BotAction const& action : policy.Decide(up, now))
+            teleported = teleported || (death == 1 && action.type == ActionType::kTeleport && action.dest_x == 5000.0f);
+        now += 60000;
+    }
+    CHECK(teleported == (secondKiller == 1998u));
+}
+
+// Prod 2026-11-12: a bot a reclaim brought up at 50% health pulled at once and died again. A solo bot out of combat under kRecoverPullPct rests first.
+void AHurtSoloBotRestsBeforeItPulls()
+{
+    auto const build = [](std::uint32_t health, float mobX)
+    {
+        WorldTickSnapshotView view = View(1, 0, { Hostile(7, mobX, 100) });
+        view.bots[0].health = health;
+        view.bots[0].level = 3;
+        view.nearby[0].level = 3;
+        return view;
+    };
+    // 50% health, a creature 40 yards off (outside kRecoverSafeYards): no attack, and it sits down.
+    {
+        BotPolicy policy(AggressiveOptions());
+        auto const actions = policy.Decide(build(500, 40.0f), 1000);
+        CHECK(!HasAction(actions, kBot, ActionType::kAttackTarget));
+        bool sits = false;
+        for (BotAction const& action : actions)
+            sits = sits || (action.type == ActionType::kRest && action.spell_id == 1);
+        CHECK(sits);
+    }
+    // 50% health, a creature 10 yards off: the bot walks away from it, does not attack.
+    {
+        BotPolicy policy(AggressiveOptions());
+        auto const actions = policy.Decide(build(500, 10.0f), 1000);
+        CHECK(!HasAction(actions, kBot, ActionType::kAttackTarget));
+        CHECK(HasAction(actions, kBot, ActionType::kMoveTo));
+    }
+    // Healthy: it pulls.
+    {
+        BotPolicy policy(AggressiveOptions());
+        CHECK(HasAction(policy.Decide(build(1000, 5.0f), 1000), kBot, ActionType::kAttackTarget));
+    }
+    // The hold has a limit: after kRecoverHoldMs (150 s) of staying hurt the bot pulls anyway.
+    {
+        BotPolicy policy(AggressiveOptions());
+        policy.Decide(build(500, 5.0f), 1000);
+        CHECK(!HasAction(policy.Decide(build(500, 5.0f), 1000 + 149000ull), kBot, ActionType::kAttackTarget));
+        CHECK(HasAction(policy.Decide(build(500, 5.0f), 1000 + 151000ull), kBot, ActionType::kAttackTarget));
+    }
+    // Attacked while hurt: it defends itself.
+    {
+        BotPolicy policy(AggressiveOptions());
+        WorldTickSnapshotView view = build(500, 5.0f);
+        view.bots[0].in_combat = 1;
+        CHECK(HasAction(policy.Decide(view, 1000), kBot, ActionType::kAttackTarget));
+    }
+}
+
 void CorpseReleasesAtOnceWithoutARezzer()
 {
     std::vector<std::string> events;
@@ -974,6 +1052,9 @@ void RunPolicyTestsPart5()
     AWipedPartysGhostsArePutAtTheirCorpsesAfterAMinute();
     DeathLoopMovesTheBotToAGrindSpot();
     DeathLoopMovesTheBotToAGrindSpot(62000);   // prod: one death a minute, three deaths span two minutes
+    ASecondDeathToTheSameCreatureMovesTheBot(1998);
+    ASecondDeathToTheSameCreatureMovesTheBot(3099);
+    AHurtSoloBotRestsBeforeItPulls();
     CorpseReleasesAtOnceWithoutARezzer();
     CorpseReleasesWhenTheWholePartyIsDown();
     ReleaseIsHeldInCombatUpToTheCap();

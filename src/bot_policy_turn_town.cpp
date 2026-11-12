@@ -506,7 +506,13 @@ void BotPolicy::TurnRestAndConsume(DecideTick& tick, BotTurn& turn)
     bool const drinkCap = dungeonDrink ? profile.DrinkUpToPct : (state.Sitting ? kPartyReadySitHealthPct : (_options.TacticRest ? profile.ReadyPowerPct : kPartyReadyPowerOldPct));
     bool const manaStillLow = state.Sitting && dungeonDrink &&
                               BelowPct(bot.power, bot.max_power, drinkCap);
-    bool const sitWanted = (idle || holdIdle) && (state.Sitting ? (stillHurt || manaLow || manaStillLow || manaResting) : (hurtEnough || healthLow || manaLow || manaResting)) &&
+    // A hurt solo bot (kRecoverPullPct, or under the disengage mark) with no live creature close sits to recover even with one in view: `idle` needs nothing the bot would pull
+    // in view, which kept a bot that stood up at 50% health standing (prod 2026-11-12).
+    bool hurtQuiet = turn.lowHealth && bot.in_combat == 0 && !hasTarget && wanted.Type == ActionType::kStop && !routeBusy && !dungeonHold && !partyMember;
+    for (NearbyUnit const& unit : nearby)
+        if (hurtQuiet && IsLiveMob(unit) && rotation::DistanceYards(bot, unit) < kRecoverSafeYards)
+            hurtQuiet = false;
+    bool const sitWanted = (idle || holdIdle || hurtQuiet) && (state.Sitting ? (stillHurt || manaLow || manaStillLow || manaResting) : (hurtEnough || healthLow || manaLow || manaResting)) &&
                            nowMs >= state.RestRetryAtMs;
     if (sitWanted != state.Sitting)
     {

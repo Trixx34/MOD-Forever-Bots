@@ -265,9 +265,10 @@ void BotPolicy::TurnRevivedAndRoles(DecideTick& tick, BotTurn& turn)
 
         // A death loop: the bot stands up among what killed it and dies again (a party member following a leader into a zone far above its level, a
         // grind spot with something strong on it; 470 of 942 deaths in 55 minutes on the sim, 17 bots dying every few seconds). The third death within
-        // kDeathLoopMs puts the bot at the nearest grind spot for its level that is not near its corpse.
-        if (!stagingHold && _options.Grind && !_options.Grind->Spots.empty() && bot.level != 0 && state.DeathTimesMs[0] != 0 &&
-            nowMs - state.DeathTimesMs[0] <= kDeathLoopMs && nowMs >= state.EscapeUntilMs)
+        // kDeathLoopMs, or the second one to the same creature entry within it, puts the bot at the nearest grind spot for its level that is not near its corpse.
+        if (!stagingHold && _options.Grind && !_options.Grind->Spots.empty() && bot.level != 0 && nowMs >= state.EscapeUntilMs &&
+            ((state.DeathTimesMs[0] != 0 && nowMs - state.DeathTimesMs[0] <= kDeathLoopMs) ||
+             (state.KillerRepeat && state.DeathTimesMs[1] != 0 && nowMs - state.DeathTimesMs[1] <= kDeathLoopMs)))
         {
             std::vector<std::size_t> const spots = GrindSpotsForBot(state, bot, nowMs);
             for (std::size_t const index : spots)
@@ -325,6 +326,22 @@ void BotPolicy::TurnRevivedAndRoles(DecideTick& tick, BotTurn& turn)
     auto const& partyMember = turn.partyMember;
     turn.routeOn = IsRouteActive(bot.guid) || (partyLeader != 0 && tankLed.count(partyLeader) != 0);   // the dungeon party rules apply to this bot
     auto const& routeOn = turn.routeOn;
+    // A solo bot out of combat that is hurt (a reclaim brings it up at 50% health) rests before it fights or walks to a quest giver, up to kRecoverHoldMs: it is
+    // treated as low on health (no target, no quest, away from a creature that is near, then sits). Prod 2026-11-12: revived at 49%, a bot pulled at once and died
+    // to the same creature again, 812 deaths in 90 minutes.
+    if (partyLeader == 0 && !routeOn && bot.in_combat == 0 && bot.threat_target_guid == 0 && bot.max_health > 0 && BelowPct(bot.health, bot.max_health, kRecoverPullPct))
+    {
+        if (state.RecoverSinceMs == 0)
+            state.RecoverSinceMs = nowMs;
+        turn.hurtRest = nowMs - state.RecoverSinceMs < kRecoverHoldMs;
+    }
+    else
+    {
+        state.RecoverSinceMs = 0;
+        turn.hurtRest = false;
+    }
+    if (turn.hurtRest)
+        turn.lowHealth = true;
     // A dungeon party's bot on the outside map (a wipe left it at the graveyard, a rescue teleport was refused in combat): it goes back
     // through the instance door and starts no fight on the way. The owner's rule of 2026-10-22: a bot of a dungeon party must not be
     // able to die outside the dungeon; it comes back as a ghost would and is revived in the dungeon it died in.

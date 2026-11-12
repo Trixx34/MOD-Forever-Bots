@@ -86,7 +86,9 @@ void RetreatWithNoPlayerStillFlees()
 void ThirtyPercentIsNotLow()
 {
     BotPolicy policy(AggressiveOptions());
-    auto actions = policy.Decide(Hurt(300, { Unit(8, 2, 5.0f, true) }));
+    WorldTickSnapshotView view = Hurt(300, { Unit(8, 2, 5.0f, true) });
+    view.bots[0].in_combat = 1;   // attacked: a hurt bot out of combat rests first (kRecoverPullPct)
+    auto actions = policy.Decide(view);
     CHECK(actions.size() == 1 && actions[0].type == ActionType::kAttackTarget);
 }
 
