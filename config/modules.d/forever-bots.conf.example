@@ -229,10 +229,10 @@ Module.forever-bots.TelemetrySummarySec = 60
 # AuctionRoundStep = 0   (copper; 10000 rounds a goods unit price to a gold, half a gold or just under; 0 = off)
 # AuctionRoundMaxPct = 5 (how far the rounded price may lie from the computed one, and never below the vendor price)
 #
-# VendorSellGear (protocol 27, off by default): a vendor visit also sells the bag gear the worn gear outclasses (green or lower, usable, not a quest or set item,
+# VendorSellGear (protocol 27, on by default): a vendor visit also sells the bag gear the worn gear outclasses (green or lower, usable, not a quest or set item,
 # every slot of its type worn by an item with a higher item level and score, judged by the item numbers with the stat list of the bot's spec; never by item id).
 # Needs Bot.Vendor.SellGear = 1 in the core, which refuses the sale otherwise; each sale is logged there as vendor_sell_gear.
-# VendorSellGear = 0
+# VendorSellGear = 1
 
 # Supplies (layout 15, off by default): a bot short of ammunition, food or drink walks to the nearest vendor that sells what it can use and buys,
 # and a resting bot eats or drinks what it carries. Needs Bot.Actions.Supplies in the core (on by default there). A hunter with no ammunition

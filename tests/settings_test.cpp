@@ -38,7 +38,7 @@ void ReadsValidValues()
 void ChatSettings()
 {
     std::vector<std::string> warnings;
-    CHECK(!ParseBotSettings({}, warnings).VendorSellGear && ParseBotSettings({ { "VendorSellGear", "1" } }, warnings).VendorSellGear); // off by default
+    CHECK(ParseBotSettings({}, warnings).VendorSellGear && !ParseBotSettings({ { "VendorSellGear", "0" } }, warnings).VendorSellGear); // on by default
     BotSettings const off = ParseBotSettings({}, warnings);
     CHECK(!off.ChatCommands && !off.ChatOrders && !off.ChatControl && !off.QuestTeleport); // all off by default
     BotSettings const on = ParseBotSettings({ { "ChatCommands", "1" }, { "ChatOrders", "1" }, { "ChatControl", "1" }, { "QuestTeleport", "1" } }, warnings);
