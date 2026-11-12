@@ -212,6 +212,14 @@ Module.forever-bots.TelemetrySummarySec = 60
 # QuestInvite = 0        (an idle bot and a human on the same quest objective, the human within 30 yards: the bot invites the human to its group, once per
 #                         human per 30 minutes, never within 2 hours of a decline; the shared objective comes from the snapshot and a decline from the protocol 22
 #                         event GroupScript.OnInviteDeclined)
+# QuestGroups = 0        (group quests: quests marked 'group <n>' in the level 60 lists are taken, and the bot waits for a party of n. The lowest guid of the bots
+#                         waiting for the same quest leads: it invites free bots in range that have the quest in their log, then guild mates, through the
+#                         group action; the party walks behind the leader, who hands in; the party is disbanded when the quest leaves the leader's log. A wait
+#                         with no party for QuestGroupWaitMinutes abandons the quest, which is then left alone for an hour. Needs QuestFile or the QuestFile*
+#                         lists built with `make_world_quests.py --groups`)
+# QuestGroupWaitMinutes = 10
+# QuestGroupRangeYards = 150
+# QuestGroupGuildHelpers = 1  (guild mates without the quest join the party too)
 # ADVISOR-DOCS-ANCHOR
 # AuctionRoundStep = 0   (copper; 10000 rounds a goods unit price to a gold, half a gold or just under; 0 = off)
 # AuctionRoundMaxPct = 5 (how far the rounded price may lie from the computed one, and never below the vendor price)

@@ -39,6 +39,7 @@
 #include "level_dungeon.h"
 #include "ground_avoid.h"
 #include "quest_planner.h"
+#include "quest_group.h"
 #include "spell_costs.h"
 #include "tame_beasts.h"
 #include "crafting_foci.h"
@@ -161,6 +162,8 @@ struct PolicyOptions
     // the teleport unless Bot.Actions.Teleport is on, and retrying it held level-1 bots in walk_to. With this off, that start is
     // dropped the same way a no-route move is, and the bot grinds. A refused teleport drops the start either way.
     bool QuestTeleport = false;
+    // Group quests (config QuestGroups, off by default; quest_group.h): quests marked 'group <n>' are taken, and the bot waits for a party of n.
+    quest_group::Settings QuestGroups;
     // Dungeon recovery by teleport (config DungeonTeleport; needs Bot.Actions.Teleport in the core, so for tests and scenarios): a leader that has no route to a waypoint is put
     // back on the route once, and a member that has lost its leader (far away, or on another level) is put next to it. Off by default.
     bool DungeonTeleport = false;
@@ -556,6 +559,9 @@ private:
         bool ServiceUrgent = false;                      // a quest hand-in was refused (bags full): go to a vendor now, even with quest work to do
         float DiagX = 0.0f, DiagY = 0.0f;                // where the bot was at the last stuck check
         std::uint64_t DiagAtMs = 0;                      // when the stuck check last ran
+        std::uint32_t QuestWaitQuest = 0;                // the group quest the planner is waiting a party for (WaitGroup step), 0 = none
+        std::uint32_t QuestWaitSize = 0;                 // the party size that quest wants
+        std::uint64_t QuestWaitAtMs = 0;                 // when the planner last said so (a wait older than a few seconds is over)
         std::uint64_t QuestDiagAtMs = 0;                 // when the quest line was last written (quest_state event)
         std::uint32_t TeleportLoggedSequence = 0;        // the last teleport result written to the log
         Point NoRouteDest{};                             // the destination of the last move the core found no route to
@@ -1010,6 +1016,12 @@ private:
                             std::vector<forever_module::BotAction>& actions);
     // LFG fill (config LfgFill): a human's party short of a tank or a healer is offered free bots (lfg_fill.h). Each offer sends the bot next to the party and
     // queues its whisper (TakeWhispers).
+    // Group quests (config QuestGroups): invites partners for the bots that wait for a party (quest_group.h), answers those invites, makes the party follow
+    // its leader (leaderOf and membersOf), and disbands the party when the leader's quest has left its log.
+    void DriveQuestGroups(forever_module::WorldTickSnapshotView const& view, std::unordered_map<std::uint64_t, std::size_t> const& indexOf,
+                          std::unordered_map<std::uint64_t, std::uint64_t>& leaderOf, std::unordered_map<std::uint64_t, std::vector<std::uint64_t>>& membersOf,
+                          std::uint64_t nowMs, std::vector<forever_module::BotAction>& actions);
+    std::map<std::uint64_t, std::uint32_t> _questGroupLeaders; // leader bot guid -> the group quest it leads a party for
     void DriveLfgFill(forever_module::WorldTickSnapshotView const& view, std::unordered_map<std::uint64_t, std::size_t> const& indexOf, std::uint64_t nowMs,
                       std::vector<forever_module::BotAction>& actions);
     struct LevelDungeonRun

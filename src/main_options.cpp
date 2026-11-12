@@ -214,6 +214,7 @@ void LoadPolicyTables(PolicyOptions& policyOptions, BotSettings& settings)
         }
     }
     policyOptions.QuestTeleport = settings.QuestTeleport;
+    policyOptions.QuestGroups = settings.QuestGroups;
     if (!settings.TameBeastFile.empty())
     {
         std::vector<std::string> tameWarnings;

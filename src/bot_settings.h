@@ -4,6 +4,7 @@
 #pragma once
 
 #include "battlegrounds.h"
+#include "quest_group.h"
 #include "bot_guilds.h"
 #include "duels.h"
 #include "errand_policy.h"
@@ -238,6 +239,8 @@ struct BotSettings
     std::string CityGreetFile = "data/city_greetings.txt";
     std::string AuctionTalkFile = "data/auction_talk.txt";
     quest_invite::Settings QuestInvite;
+    // Group quests (config QuestGroups, off by default; quest_group.h). WaitMs is QuestGroupWaitMinutes in minutes.
+    quest_group::Settings QuestGroups;
     // ADVISOR-MEMBERS
     // Supplies (layout 15, config keys Supplies, SupplyAmmoLow, SupplyAmmoTarget, SupplyFoodLow, SupplyFoodTarget, SupplyDrinkLow, SupplyDrinkTarget,
     // SupplyTripSec; off by default): bots buy ammunition, food and drink at vendors that sell what they can use, and eat and drink while resting.

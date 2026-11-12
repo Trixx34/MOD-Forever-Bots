@@ -714,6 +714,16 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     if (auto const it = config.find("AuctionTalkFile"); it != config.end())
         settings.AuctionTalkFile = it->second;
     ReadBool(config, "QuestInvite", settings.QuestInvite.Enabled, warnings);
+    ReadBool(config, "QuestGroups", settings.QuestGroups.Enabled, warnings);
+    ReadBool(config, "QuestGroupGuildHelpers", settings.QuestGroups.GuildHelpers, warnings);
+    {
+        std::uint32_t minutes = std::uint32_t(settings.QuestGroups.WaitMs / 60000);
+        ReadKey(config, "QuestGroupWaitMinutes", 1, 120, minutes, warnings);
+        settings.QuestGroups.WaitMs = std::uint64_t(minutes) * 60000;
+        std::uint32_t range = std::uint32_t(settings.QuestGroups.RangeYards);
+        ReadKey(config, "QuestGroupRangeYards", 10, 1000, range, warnings);
+        settings.QuestGroups.RangeYards = float(range);
+    }
     // ADVISOR-KEYS
     ReadBool(config, "InnDowntime", settings.InnDowntime.Enabled, warnings);
     ReadBool(config, "ScenarioConfigGuard", settings.ScenarioConfigGuard, warnings);
