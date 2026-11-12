@@ -333,6 +333,9 @@ Module.forever-bots.TelemetrySummarySec = 60
 # DungeonTankHealBelowPct = 75
 #                            (out of a fight the route leader is also healed up to 90%, whatever these say: it walks on only at 80%; since 0.30.0)
 # HealerDpsManaPct = 40
+# HealerCombatManaPct = 25   (a healer in a party fight keeps this share of its mana for heals: its attack rows such as Smite stop below it; 0 = no floor, 0 to 80; bug 11)
+# TankPickup = 1   (a tank taunts the mobs that are on party members, and uses Challenging Shout or Roar for two or more; needs PartyViewPlanner = 1 and the core's
+#                   Bot.Snapshot.PartyView and PartyThreat; 0 = off)
 # HealerLosMoveYards = 6
 # Combat drift of dungeon parties (0.45.0; a scenario or "tank lead" party with a route; the 2026-11-07 sim's fights pulled leaders 60-250 yards off the route):
 # DungeonPullLeashYards = 30   (the route leader, out of a fight, pulls only a hostile within this many yards of the leg of the route it walks; 0 = off, else 10..80)

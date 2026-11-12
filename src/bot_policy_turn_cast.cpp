@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // BotPolicy::Decide, a bot's turn, its casts: heal orders, party healing and resurrects, the hunter pet, upkeep buffs, crafting and the rotation (the steps DecideBot runs in order; bot_policy.cpp).
 #include "bot_policy_internal.h"
+#include "party_view_adapter.h"
 
 BotPolicy::TurnFlow BotPolicy::TurnForcedHeal(DecideTick& tick, BotTurn& turn)
 {
@@ -768,6 +769,17 @@ void BotPolicy::TurnCraftGather(DecideTick& tick, BotTurn& turn)
     }
 }
 
+// Whether a healer in a party fight is below its combat mana floor (HealerCombatManaPct): a healer class (a role that heals, a spell to heal with) in a group, in combat, with a
+// mana pool. Out of combat the old window (HealerDpsManaPct) still applies; this is the in-combat counterpart.
+bool BotPolicy::HealerBelowManaFloor(BotSnapshot const& bot, BotState const& state, std::uint32_t classId, std::uint64_t partyLeader) const
+{
+    if (_options.HealerCombatManaPct == 0 || partyLeader == 0 || bot.in_combat == 0 || bot.max_power == 0)
+        return false;
+    if (state.Role_ == BotState::Role::Dps || state.Role_ == BotState::Role::Tank || HealSpellFor(classId, bot.level) == 0)
+        return false;
+    return std::uint64_t(bot.power) * 100 < std::uint64_t(bot.max_power) * _options.HealerCombatManaPct;
+}
+
 BotPolicy::TurnFlow BotPolicy::TurnRotation(DecideTick& tick, BotTurn& turn)
 {
     WorldTickSnapshotView const& view = tick.view;
@@ -861,10 +873,14 @@ BotPolicy::TurnFlow BotPolicy::TurnRotation(DecideTick& tick, BotTurn& turn)
     }
 
     bool const noAoe = party_planner::NoAoeNow(tick.PlanOf(partyLeader));
+    // Healer mana floor (HealerCombatManaPct, bug 11): a healer in a party fight does not spend its last mana on attacks; the heals (PartyHeal) are not rows and are not held.
+    bool const manaFloor = HealerBelowManaFloor(bot, state, classId, partyLeader);
     for (rotation::Row const& row : RowsFor(classId, spec))
     {
         if (row.Buff)
             continue; // upkeep spells are cast out of combat, below
+        if (manaFloor && row.OnTarget)
+            continue; // below the healer's combat mana floor: attacks wait, self and party spells stay
         if (row.Spell == kAutoShot && state.AutoShotTarget == targetRef)
             continue; // already shooting this target
         if (row.OnTarget && row.MaxRange > kMeleeApproachYards + 1.0f && NoAmmo(bot, classId))
@@ -935,6 +951,99 @@ BotPolicy::TurnFlow BotPolicy::TurnRotation(DecideTick& tick, BotTurn& turn)
             _interruptClaims[cast.target_guid] = InterruptClaim{ partyLeader, nowMs + kInterruptClaimMs };
         }
         break;
+    }
+    return TurnFlow::kNext;
+}
+
+// Tank pickup of loose mobs (plan item 2). The core's party view lists the creatures that are on a member who is not a tank (needs Bot.Snapshot.PartyThreat); this turn lets
+// the tank take them: the single taunt (warrior Taunt, druid Growl) on the first loose mob in reach, the area taunt (Challenging Shout, Challenging Roar) when two or more are
+// loose. A paladin has no taunt in this client's data, so it only follows its own target logic. Acts only with PartyViewPlanner and TankPickup, in combat, one cast per global
+// cooldown; the cooldowns of the spells are read from the snapshot and the retry map, so a taunt that is still cooling is not sent again.
+BotPolicy::TurnFlow BotPolicy::TurnTankPickup(DecideTick& tick, BotTurn& turn)
+{
+    if (!_options.PartyViewPlanner || !_options.TankPickup)
+        return TurnFlow::kNext;
+    std::uint64_t const nowMs = tick.nowMs;
+    BotSnapshot const& bot = turn.bot;
+    BotState& state = turn.state;
+    std::uint32_t const classId = turn.classId;
+    bool const tankRole = state.Role_ == BotState::Role::Tank || (state.Role_ == BotState::Role::Auto && classId == kWarriorClass && _options.PartySize != 0);
+    if (!tankRole || bot.in_combat == 0 || bot.life_state != 0 || nowMs < state.NextCastMs || IsCasting(bot))
+        return TurnFlow::kNext;
+    std::uint32_t single = 0, area = 0;
+    if (classId == kWarriorClass)
+        single = kTauntSpell, area = kChallengingShoutSpell;
+    else if (classId == kDruidClass_)
+        single = kGrowlSpell, area = kChallengingRoarSpell;
+    if (single == 0)
+        return TurnFlow::kNext;
+    auto const at = tick.indexOf.find(bot.guid);
+    forever_module::PartyView const* const party = at == tick.indexOf.end() ? nullptr : tick.view.PartyViewOf(at->second);
+    if (party == nullptr)
+        return TurnFlow::kNext;
+    std::vector<party_view::LooseMob> const loose = party_view::LooseMobsOf(tick.view, *party);
+    if (loose.empty())
+        return TurnFlow::kNext;
+    auto const usable = [&](std::uint32_t spell)
+    {
+        if (bot.level != 0 && rotation::LearnLevel(spell) > bot.level)
+            return false;
+        auto const retry = state.RetryAtMs.find(spell);
+        if (retry != state.RetryAtMs.end() && nowMs < retry->second)
+            return false;
+        for (forever_module::SpellCooldown const& cooldown : bot.spell_cooldowns)
+            if (cooldown.spell_id == spell && cooldown.remaining_ms != 0)
+                return false;
+        return CanPay(_options.SpellCosts.get(), spell, bot);
+    };
+    auto const near = [&](std::uint64_t ref, float yards)
+    {
+        for (NearbyUnit const& unit : turn.nearby)
+            if (unit.guid == ref)
+                return unit.health != 0 && std::hypot(unit.pos_x - bot.pos_x, unit.pos_y - bot.pos_y) <= yards;
+        return false;
+    };
+    // The area taunt: two or more loose mobs, most of them around the tank.
+    if (loose.size() >= 2 && nowMs >= state.PickupAoeAtMs && usable(area))
+    {
+        std::size_t inReach = 0;
+        for (party_view::LooseMob const& mob : loose)
+            inReach += near(mob.Unit, kAreaTauntYards) ? 1 : 0;
+        if (inReach >= 2)
+        {
+            BotAction cast;
+            cast.bot_guid = bot.guid;
+            cast.type = ActionType::kCastSpell;
+            cast.spell_id = area;
+            cast.target_guid = 0;
+            tick.actions.push_back(cast);
+            state.CastTarget[area] = 0;
+            state.PickupAoeAtMs = nowMs + kPickupAoeRetryMs;
+            state.NextCastMs = nowMs + kGlobalCooldownMs;
+            if (_options.OnEvent)
+                _options.OnEvent("tank_pickup: bot=" + std::to_string(bot.guid) + " spell=" + std::to_string(area) + " loose=" + std::to_string(loose.size()));
+            return TurnFlow::kSkip;
+        }
+    }
+    if (nowMs >= state.PickupAtMs && usable(single))
+    {
+        std::uint64_t const target = party_view::TauntTargetFor(tick.view, *party, PlayerRef(bot.guid));
+        if (target != 0 && near(target, kOnyxiaTauntYards))
+        {
+            BotAction cast;
+            cast.bot_guid = bot.guid;
+            cast.type = ActionType::kCastSpell;
+            cast.spell_id = single;
+            cast.target_guid = target;
+            tick.actions.push_back(cast);
+            state.CastTarget[single] = target;
+            state.PickupAtMs = nowMs + kPickupRetryMs;
+            state.NextCastMs = nowMs + kGlobalCooldownMs;
+            if (_options.OnEvent)
+                _options.OnEvent("tank_pickup: bot=" + std::to_string(bot.guid) + " spell=" + std::to_string(single) + " target=" + std::to_string(target) +
+                                 " loose=" + std::to_string(loose.size()));
+            return TurnFlow::kSkip;
+        }
     }
     return TurnFlow::kNext;
 }

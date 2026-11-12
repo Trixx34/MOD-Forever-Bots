@@ -17,6 +17,7 @@ class 1
 row "Shield Bash" target_casting self_aura_at_least 71 1 target range 0 5   # interrupt, Defensive Stance with a shield (the warrior's only stance in a party); one bot kicks per cast (planner claim)
 row "Execute" self_aura_below 71 1 target_hp_below 20 target range 0 5    # not while in Defensive Stance: the core refuses it there
 row "Taunt" enemies 2 target range 0 5
+row "Challenging Shout" enemies 4 self           # AoE taunt, 10 min cooldown; the tank turn also casts it when two or more mobs are loose (TankPickup)
 row "Bloodrage" self_power_below 20 self
 row "Reckless Swings" self_power_below 30 self   # Forever: the next melee attacks generate extra rage
 row "Charge" opener 8 target range 8 25
@@ -38,6 +39,7 @@ class 1 spec prot
 row "Shield Bash" target_casting self_aura_at_least 71 1 target range 0 5   # interrupt, Defensive Stance with a shield (the warrior's only stance in a party); one bot kicks per cast (planner claim)
 row "Execute" self_aura_below 71 1 target_hp_below 20 target range 0 5
 row "Taunt" enemies 2 target range 0 5
+row "Challenging Shout" enemies 4 self           # AoE taunt, 10 min cooldown; the tank turn also casts it when two or more mobs are loose (TankPickup)
 row "Bloodrage" self_power_below 20 self
 row "Reckless Swings" self_power_below 30 self   # Forever: the next melee attacks generate extra rage
 row "Charge" opener 8 target range 8 25
@@ -520,6 +522,7 @@ class 11 spec feral_tank
 # Feral tank (Bear Form from level 10): Faerie Fire to pull, Growl against two or more, Demoralizing Roar and Swipe for several, Maul as the rage spender, Thorns for threat. The form is an upkeep
 # buff that is cast only when the bot's aura list does not show it (a form cast while in the form would end it): check on the sim that the snapshot reports the form aura.
 row "Growl" enemies 2 target range 0 5
+row "Challenging Roar" enemies 4 self            # AoE taunt, 10 min cooldown; the tank turn also casts it when two or more mobs are loose (TankPickup)
 row "Enrage" self_power_below 20 self
 row "Faerie Fire" duration 40 opener 3 target range 0 30
 row "Demoralizing Roar" enemies 3 self duration 30

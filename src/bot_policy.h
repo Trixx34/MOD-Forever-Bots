@@ -249,6 +249,10 @@ struct PolicyOptions
     std::uint32_t DungeonHealBelowPct = 55;
     std::uint32_t DungeonTankHealBelowPct = 75;
     std::uint32_t HealerDpsManaPct = 40;
+    // HealerCombatManaPct: in a party fight a healer's attack rows (Smite and the like) stop below this share of its mana, so the mana is left for heals. 0 = no floor.
+    std::uint32_t HealerCombatManaPct = 25;
+    // TankPickup: the tank turn taunts a mob that is on a non-tank (the party view's loose mobs), and uses the area taunt for two or more. Acts only with PartyViewPlanner.
+    bool TankPickup = true;
     std::uint32_t HealerLosMoveYards = 6;
     // Combat drift (0.45.0; the 2026-11-07 sim: fights took 1000-1600 s of each 1800 s run and pulled the leaders 60-250 yards off their route). 0 = off here (the
     // tests); the module's settings turn them on by default. DungeonPullLeashYards: the route leader, out of a fight, pulls only a hostile within this many yards of
@@ -507,6 +511,8 @@ private:
         std::unordered_map<std::uint32_t, std::uint64_t> CastTarget; // spell -> target of the last cast sent for it
         std::uint64_t OnyxiaPullMs = 0;                  // the raid's tank: when it first got Onyxia as its threat target in this fight (0 = not on her, or out of combat)
         std::uint64_t OnyxiaBerserkerAtMs = 0;           // Berserker Rage (the warrior tank): no cast before this
+        std::uint64_t PickupAtMs = 0;                    // tank pickup of a loose mob (single taunt): no cast before this
+        std::uint64_t PickupAoeAtMs = 0;                 // tank pickup, the area taunt (Challenging Shout or Roar): no cast before this
         std::uint64_t SwapTauntAtMs = 0;                 // Taunt after a tank swap (raid rules): no cast before this
         std::uint64_t OnyxiaTauntAtMs = 0;               // Taunt on Onyxia (the warrior tank): no cast before this
         int OnyxiaPhase = 0;                             // the raid's tank: Onyxia's phase by her health (0 = not seen in this fight)
@@ -880,6 +886,7 @@ private:
     TurnFlow TurnCrowdControl(DecideTick& tick, BotTurn& turn);
     TurnFlow TurnOnyxiaCasts(DecideTick& tick, BotTurn& turn);
     TurnFlow TurnRaidRules(DecideTick& tick, BotTurn& turn);
+    TurnFlow TurnTankPickup(DecideTick& tick, BotTurn& turn);   // taunts the mobs that are on party members (bot_policy_turn_cast.cpp)
     TurnFlow TurnTaming(DecideTick& tick, BotTurn& turn);
     void TurnFightWatch(DecideTick& tick, BotTurn& turn);
     void TurnMoveSetup(DecideTick& tick, BotTurn& turn);
@@ -915,6 +922,7 @@ private:
     void TurnUpkeepBuffs(DecideTick& tick, BotTurn& turn);
     void TurnCraftGather(DecideTick& tick, BotTurn& turn);
     TurnFlow TurnRotation(DecideTick& tick, BotTurn& turn);
+    bool HealerBelowManaFloor(forever_module::BotSnapshot const& bot, BotState const& state, std::uint32_t classId, std::uint64_t partyLeader) const;
     // What the steps ask about the bots of this tick.
     bool IsRouteActive(std::uint64_t guid) const;
     std::set<std::uint32_t> const& KilledBossesOf(std::uint64_t guid) const;

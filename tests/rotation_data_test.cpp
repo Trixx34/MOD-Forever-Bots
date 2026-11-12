@@ -573,6 +573,7 @@ void TheShippedFilesLoadCleanly()
     CHECK(has(rowsOf(9, "demonology"), 712, true) && has(rowsOf(9, "demonology"), 697, true) && has(rowsOf(9, "demonology"), 688, true));  // Succubus, Voidwalker, Imp
     CHECK(has(rowsOf(9, "affliction"), 697, true) && !has(rowsOf(9, "affliction"), 712, true));                                           // the Voidwalker holds threat
     CHECK(has(rowsOf(1, "prot"), 71, true) && has(rowsOf(1, "prot"), 355, false) && has(rowsOf(1, "prot"), 2565, false) && has(rowsOf(1, "prot"), 6572, false));
+    CHECK(has(rowsOf(1, "prot"), 1161, false) && has(rowsOf(1, ""), 1161, false) && has(rowsOf(11, "feral_tank"), 5209, false));   // Challenging Shout and Roar
     CHECK(has(rowsOf(3, "bm"), 1293241, false) && has(rowsOf(3, "bm"), 19434, false) && has(rowsOf(3, "bm"), 3044, false));
     for (auto const& [key, rows] : data.BySpec)
         for (rotation::Row const& row : rows)

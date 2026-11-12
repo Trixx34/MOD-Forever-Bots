@@ -309,6 +309,7 @@ void DungeonLearningKnobsAreBounded()
     std::vector<std::string> warnings;
     BotSettings const defaults = ParseBotSettings({}, warnings);
     CHECK(defaults.DungeonHealBelowPct == 55 && defaults.DungeonTankHealBelowPct == 75);
+    CHECK(defaults.HealerCombatManaPct == 25 && defaults.TankPickup && !defaults.PartyViewPlanner);
     CHECK(defaults.HealerDpsManaPct == 40 && defaults.HealerLosMoveYards == 6 && warnings.empty());
 
     BotSettings const candidate = ParseBotSettings({ { "DungeonHealBelowPct", "60" }, { "DungeonTankHealBelowPct", "80" },
@@ -320,6 +321,11 @@ void DungeonLearningKnobsAreBounded()
                                                     { "HealerDpsManaPct", "0" }, { "HealerLosMoveYards", "99" } }, warnings);
     CHECK(refused.DungeonHealBelowPct == 55 && refused.DungeonTankHealBelowPct == 75);
     CHECK(refused.HealerDpsManaPct == 40 && refused.HealerLosMoveYards == 6 && warnings.size() == 4);
+    warnings.clear();
+    BotSettings const tuned = ParseBotSettings({ { "HealerCombatManaPct", "0" }, { "TankPickup", "0" }, { "PartyViewPlanner", "1" } }, warnings);
+    CHECK(tuned.HealerCombatManaPct == 0 && !tuned.TankPickup && tuned.PartyViewPlanner && warnings.empty());
+    BotSettings const tooHigh = ParseBotSettings({ { "HealerCombatManaPct", "95" } }, warnings);
+    CHECK(tooHigh.HealerCombatManaPct == 25 && warnings.size() == 1);
 }
 
 // 0.45.0: the combat-drift settings. On by default (30 and 40 yards, the leader's rejoin); 0 turns a leash off, and a value outside 10..80 keeps the default with a warning.
