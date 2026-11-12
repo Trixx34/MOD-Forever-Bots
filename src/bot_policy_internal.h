@@ -768,6 +768,7 @@ struct BotPolicy::BotTurn
     std::optional<Point> kiteEntry{};
     bool enemyNear = false;                               // TurnIdle
     std::size_t actionsAtStart = 0;                       // the tick's action count when this bot's turn began (DecideBot)
+    bool transportHold = false;                           // TurnTransport: a passenger (or one about to board): no world-coordinate move
     bool idle = false;
     supply::Facts supplyFacts{};                          // TurnShopping
     bool manaUser = false;                                // TurnWander

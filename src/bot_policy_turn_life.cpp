@@ -482,3 +482,65 @@ void BotPolicy::TurnTalentsAndGear(DecideTick& tick, BotTurn& turn)
         }
     }
 }
+
+// TransportRide: ride with the leader (doc/transports.md). A bot whose leader stands on a ship, zeppelin or elevator is ordered onto it (kTransport spell 3), a bot that
+// rides while the leader does not is ordered off (spell 2). A passenger takes no world-coordinate move (turn.transportHold, see DecideBot and TurnSendMove).
+void BotPolicy::TurnTransport(DecideTick& tick, BotTurn& turn)
+{
+    if (!_options.TransportRide.Enabled)
+        return;
+    BotSnapshot const& bot = turn.bot;
+    BotState& state = turn.state;
+    std::uint64_t const nowMs = tick.nowMs;
+
+    transport_ride::Facts facts;
+    facts.Alive = bot.life_state == 0;
+    facts.InCombat = bot.in_combat != 0;
+    facts.InFlight = bot.in_flight != 0;
+    facts.Swimming = (bot.movement_flags & transport_ride::kFlagSwimming) != 0;
+    facts.InGroup = bot.group_role != 0;
+    facts.IsLeader = bot.group_role == 2;
+    facts.BotOnTransport = transport_ride::OnTransport(bot.movement_flags, bot.transport_guid);
+    facts.BotTransportEntry = std::uint32_t(bot.transport_guid);
+    if (facts.InGroup && !facts.IsLeader)
+    {
+        forever_module::PartyView const* const party = tick.view.PartyViewOf(turn.i);
+        if (party)
+        {
+            for (forever_module::PartyMember const& member : tick.view.MembersOf(*party))
+            {
+                if (member.guid != party->leader_ref && (member.member_flags & forever_module::kPartyMemberLeader) == 0)
+                    continue;
+                // The leader's transport counts only while it is on the bot's own map or the bot is to be brought over: the core decides the map.
+                facts.LeaderKnown = member.online != 0;
+                facts.LeaderTransportEntry = member.transport_entry;
+                break;
+            }
+        }
+    }
+
+    // Events when the bot gets on or off a transport.
+    bool const riding = facts.BotOnTransport;
+    if (riding != state.TransportRiding)
+    {
+        state.TransportRiding = riding;
+        if (_options.OnEvent)
+            _options.OnEvent(std::string(riding ? "transport_board" : "transport_leave") + ": bot=" + std::to_string(bot.guid) + " map=" + std::to_string(bot.map_id) +
+                             " transport=" + std::to_string(bot.transport_guid));
+    }
+
+    transport_ride::Order const order = transport_ride::Decide(_options.TransportRide, facts);
+    if (riding)
+        turn.transportHold = true;
+    if (order == transport_ride::Order::kNone || !transport_ride::Due(nowMs, state.TransportNextMs))
+        return;
+
+    BotAction action;
+    action.bot_guid = bot.guid;
+    action.type = ActionType::kTransport;
+    action.spell_id = order == transport_ride::Order::kJoin ? transport_ride::kJoinSpell : transport_ride::kLeaveSpell;
+    tick.actions.push_back(action);
+    state.TransportNextMs = transport_ride::NextAfter(_options.TransportRide, nowMs, false);
+    if (order == transport_ride::Order::kJoin)
+        turn.transportHold = true; // the snapshot still shows the old place: no walk this turn that the boarding would undo
+}

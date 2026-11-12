@@ -391,3 +391,7 @@ add_test(NAME city_inspect COMMAND city_inspect_test)
 add_executable(quest_invite_test tests/quest_invite_test.cpp)
 target_link_libraries(quest_invite_test PRIVATE forever_bots_policy)
 add_test(NAME quest_invite COMMAND quest_invite_test)
+
+add_executable(transport_ride_test tests/transport_ride_test.cpp)
+target_include_directories(transport_ride_test PRIVATE src)
+add_test(NAME transport_ride COMMAND transport_ride_test)
