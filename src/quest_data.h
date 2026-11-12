@@ -12,6 +12,10 @@
 //   area <quest> <x> <y> <z>           a place to look for the quest's targets (repeat for several)
 //   reward <quest>                     a class quest: the bot completes it with its reward and does no objectives (the GM command
 //                                      `.quest reward` does the same); its giver and ender are still walked to
+//   startfrom <quest> item <entry>     the quest starts from a quest-starting item the bot carries (no giver NPC): the accept is kQuest operation 5 and
+//                                      needs no walk, it is tried where the bot stands (the core refuses it, reason no-giver, when the bot has no such item)
+//   startfrom <quest> object <entry>   the quest starts from a game object of that entry (no creature giver): the bot walks to the quest's 'giver' point,
+//                                      which must then be the place of the object, and the accept is operation 5 with the object entry
 //   req <quest> [minlevel <n>] [level <n>] [prev <quest>] [races <mask>] [classes <mask>]
 //                                      who may do the quest (optional; for the whole-world quest files): the least level to accept it, the quest's own
 //                                      level (a bot well above it skips the quest), the quest that must be handed in before it (tried later, not
@@ -51,6 +55,8 @@ struct QuestDef
     std::uint32_t RaceMask = 0;               // 0 = any race
     std::uint32_t ClassMask = 0;              // 0 = any class
     std::uint32_t Group = 0;                  // the quest's suggested group size (a 'group <n>' pair of the req record): 2 or more = the bot needs a party of that many (config QuestGroups)
+    std::uint32_t StartItem = 0;              // the quest starts from this quest-starting item (startfrom <quest> item): operation 5, no walk
+    std::uint32_t StartObject = 0;            // the quest starts from the game object of this entry (startfrom <quest> object): operation 5 at the giver point
     bool Reward = false;                      // a class quest: completed with its reward, no objectives
 };
 

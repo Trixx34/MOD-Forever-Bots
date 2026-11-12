@@ -256,6 +256,48 @@ void RefusalReasonsBlockByCause()
     }
 }
 
+// Protocol 27, kQuest operation 5: a quest that starts from an item the bot carries or from a game object (the Onyxia attunement chain has no creature giver).
+// The entries here are made up for the test; the data files carry no startfrom rows (the item and object entries of 4903, 7761 and 7781 are not known).
+char const* kStartFromData =
+    "start Test\nanchor 0 100 100 0\n"
+    "quest 9001 giver 100 100 0 ender 100 100 0\n"
+    "startfrom 9001 item 55555\n"
+    "quest 9002 giver 150 100 0 ender 150 100 0\n"
+    "startfrom 9002 object 77777\n";
+
+void StartFromParsesAndDropsBadRows()
+{
+    std::istringstream in(std::string(kStartFromData) + "startfrom 9001 npc 5\nstartfrom 9999 item 5\nstartfrom 9001 item 0\nstartfrom 9001\n");
+    std::vector<std::string> warnings;
+    QuestData const data = ParseQuestData(in, warnings);
+    CHECK(warnings.size() == 4);
+    CHECK(data.Starts.size() == 1 && data.Starts[0].Quests.size() == 2);
+    CHECK(data.Starts[0].Quests[0].StartItem == 55555 && data.Starts[0].Quests[0].StartObject == 0);
+    CHECK(data.Starts[0].Quests[1].StartObject == 77777 && data.Starts[0].Quests[1].StartItem == 0);
+}
+
+void StartFromQuestsAreSentAsOperationFive()
+{
+    std::istringstream in(kStartFromData);
+    std::vector<std::string> warnings;
+    auto data = std::make_shared<QuestData>(ParseQuestData(in, warnings));
+    QuestPlanner planner(data);
+    QuestMemory memory;
+    // The item quest first, from where the bot stands (it is 20 yards from the anchor, no walk).
+    BotSnapshot bot = Bot(120.0f, 100.0f);
+    QuestStep step = planner.Next(bot, memory, 1000);
+    CHECK(step.Kind == QuestStepKind::Accept && step.Quest == 9001 && step.StartFrom && step.StartEntry == 0);
+    // Refused (no item, reason 10): blocked, then the object quest is walked to and sent with the object entry.
+    planner.NoteSent(memory, kQuestStartFrom, 9001, 1000);
+    planner.NoteRefused(memory, 1000, 10, 1);
+    step = planner.Next(bot, memory, 10000);
+    CHECK(step.Kind == QuestStepKind::WalkTo && step.Quest == 9002 && step.Dest.X == 150.0f);
+    bot = Bot(150.0f, 100.0f);
+    step = planner.Next(bot, memory, 10000);
+    CHECK(step.Kind == QuestStepKind::Accept && step.Quest == 9002 && step.StartFrom && step.StartEntry == 77777);
+
+}
+
 void NoStartOnAnotherMapMeansNoQuests()
 {
     QuestPlanner planner(Data());
@@ -783,6 +825,33 @@ void PolicyReadsTheRefusalReasonFromTheResultRing()
         CHECK(!accept(policy.Decide(OneBotView(bot, {}), now), 783));
 }
 
+void PolicySendsStartFromWithTheObjectEntry()
+{
+    std::istringstream in(kStartFromData);
+    std::vector<std::string> warnings;
+    auto data = std::make_shared<QuestData>(ParseQuestData(in, warnings));
+    PolicyOptions options = AggressiveOptions();
+    options.Quests = data;
+    options.WanderWhenIdle = false;
+    BotPolicy policy(options);
+    BotSnapshot at = Bot(150.0f, 100.0f);
+    LogQuest(at, 9001, 1); // the item quest is in the log already: only the object quest is left
+    auto const actions = policy.Decide(OneBotView(at, {}), 1000);
+    bool sent = false;
+    for (BotAction const& action : actions)
+        if (action.type == ActionType::kQuest)
+        {
+            sent = true;
+            CHECK(action.spell_id == QuestCode(kQuestStartFrom, 9002) && action.target_guid == 77777);
+        }
+    CHECK(sent);
+    // A plain accept stays operation 1 with no target.
+    BotPolicy plain([&] { PolicyOptions o = AggressiveOptions(); o.Quests = Data(); o.WanderWhenIdle = false; return o; }());
+    for (BotAction const& action : plain.Decide(OneBotView(Bot(-8933.5f, -136.5f), {}), 1000))
+        if (action.type == ActionType::kQuest)
+            CHECK(action.spell_id == QuestCode(kQuestAccept, 783) && action.target_guid == 0);
+}
+
 } // namespace
 
 // ---- no route and far world starts ----
@@ -1154,6 +1223,9 @@ int main()
     QuestsOfAnotherStartInTheLogAreStillWorked();
     RefusalsBlockLongerEachTime();
     RefusalReasonsBlockByCause();
+    StartFromParsesAndDropsBadRows();
+    StartFromQuestsAreSentAsOperationFive();
+    PolicySendsStartFromWithTheObjectEntry();
     WideMasksAreCutOrTreatedAsAny();
     PolicyWalksToTheGiverAndSendsTheAccept();
     PolicyHuntsOnlyTheQuestTargets();

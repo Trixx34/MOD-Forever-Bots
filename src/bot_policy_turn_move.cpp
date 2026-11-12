@@ -1133,11 +1133,13 @@ void BotPolicy::MoveForQuestOrGoto(DecideTick& tick, BotTurn& turn)
             BotAction quest;
             quest.bot_guid = bot.guid;
             quest.type = ActionType::kQuest;
-            std::uint32_t const operation = questStep.Kind == QuestStepKind::Accept ? kQuestAccept
+            std::uint32_t const operation = questStep.Kind == QuestStepKind::Accept ? (questStep.StartFrom ? kQuestStartFrom : kQuestAccept)
                                             : questStep.Kind == QuestStepKind::HandIn  ? kQuestHandIn
                                             : questStep.Kind == QuestStepKind::Reward ? kQuestReward
                                                                                       : kQuestAbandon;
             quest.spell_id = QuestCode(operation, questStep.Quest);
+            if (operation == kQuestStartFrom)
+                quest.target_guid = questStep.StartEntry; // the game object's entry (0: the quest-starting item the bot carries)
             // A stop first when the bot was walking, so the quest action is the last one applied and its answer is the one the policy reads.
             if (!(state.Last && state.Last->Type == ActionType::kStop))
             {

@@ -322,7 +322,12 @@ QuestStep QuestPlanner::Next(BotSnapshot const& bot, QuestMemory& memory, std::u
             if (QuestDef const* quest = pick(start, prevDone))
             {
                 memory.StartIndex = int(index);
-                QuestStep step = WalkOrAct(bot, memory, quest->Giver, QuestStepKind::Accept, quest->Id, nowMs);
+                // A quest that starts from an item the bot carries needs no walk (the accept is tried where it stands); one that starts from a game
+                // object walks to the object's place (the giver point). Both are sent as kQuestStartFrom (operation 5).
+                bool const fromItem = quest->StartItem != 0 && quest->StartObject == 0;
+                QuestStep step = WalkOrAct(bot, memory, fromItem ? QuestPoint{ bot.pos_x, bot.pos_y, bot.pos_z } : quest->Giver, QuestStepKind::Accept, quest->Id, nowMs);
+                step.StartFrom = quest->StartItem != 0 || quest->StartObject != 0;
+                step.StartEntry = quest->StartObject;
                 step.StartGiver = true;
                 memory.WalkingToStart = step.Kind == QuestStepKind::WalkTo;
                 return walking(step);

@@ -45,6 +45,8 @@ struct QuestStep
     QuestPoint Dest;
     std::vector<std::uint32_t> Entries;
     std::uint32_t GroupSize = 0;      // WaitGroup: the party size the quest wants
+    std::uint32_t StartEntry = 0; // Accept: the quest starts from an item or a game object (kQuestStartFrom): the object's entry, 0 for an item
+    bool StartFrom = false;       // Accept: send operation kQuestStartFrom instead of kQuestAccept
     bool StartGiver = false; // the walk is to the giver of a quest start on the bot's map (not a turn-in or a hunt)
 };
 
@@ -118,6 +120,7 @@ constexpr std::uint32_t kQuestAccept = 1;
 constexpr std::uint32_t kQuestHandIn = 2;
 constexpr std::uint32_t kQuestAbandon = 3;
 constexpr std::uint32_t kQuestReward = 4;
+constexpr std::uint32_t kQuestStartFrom = 5;   // protocol 27: start from a carried quest-starting item, or from the game object whose entry is target_guid
 constexpr std::uint32_t QuestCode(std::uint32_t operation, std::uint32_t quest) { return (operation << 24) | (quest & 0xFFFFFF); }
 
 // Group quests (config QuestGroups, off by default): quests with a 'group <n>' marker are taken only when this is on; the bot then waits for a party of n.

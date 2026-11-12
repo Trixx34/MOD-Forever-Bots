@@ -157,6 +157,19 @@ are completed with their reward). Without `QuestGroups` the planner ignores such
 joins for the quest level. So the 60 lists made today hold no group quest, and the feature is covered by unit tests only. To get group quests into the lists a level
 source for them is needed (the content tuning of the hotfix database, or a hand-kept level file).
 
+## Quests that start from an item or a game object (protocol 27)
+
+The core's kQuest operation 5 (SDK `QuestStartFromItemOrObject`) starts a quest from the quest-starting item the bot carries or, with no such item, from the game
+object whose entry is `target_guid` within interaction range. The module sends it for a quest with a `startfrom` row in the quest data (see `quest_data.h`):
+
+    startfrom <quest> item <entry>      # no walk: tried where the bot stands; the core refuses (reason no giver) when the bot has no such item
+    startfrom <quest> object <entry>    # the bot walks to the quest's `giver` point (the object's place), then operation 5 with the object entry
+
+A refusal is read by reason like any accept (`ActionReason`): no giver is blocked ten minutes, then an hour, then six hours. **No data row exists yet**: the item and
+object entries of 4903, 7761 and 7781 are not in the module's data and were not invented. They need the `quest_template.StartItem` and the game object that
+`gameobject_queststarter` names, from the world database; once known, add `startfrom` rows after the `quest` lines of the three quests (and the object's position as
+the giver point). Until then the chain is not started by the bots.
+
 ## Onyxia attunement chain: what is missing (2026-11-12)
 
 The chain (quests 4903, 7761, 7781, 4241, 4941, 6568, 6570, 6502, 6602, 6569, 6601) does not fit the planner for these reasons,

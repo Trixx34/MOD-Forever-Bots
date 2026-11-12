@@ -117,6 +117,19 @@ QuestData ParseQuestData(std::istream& in, std::vector<std::string>& warnings)
             else
                 drop("reward needs <quest>, for a quest defined above");
         }
+        else if (keyword == "startfrom")
+        {
+            std::uint32_t id = 0;
+            std::uint32_t entry = 0;
+            std::string kind;
+            QuestDef* quest = nullptr;
+            if (line >> id >> kind >> entry && entry != 0 && (kind == "item" || kind == "object") && (quest = FindQuest(start, id)))
+            {
+                (kind == "item" ? quest->StartItem : quest->StartObject) = entry;
+            }
+            else
+                drop("startfrom needs <quest> item|object <entry>, for a quest defined above");
+        }
         else if (keyword == "req")
         {
             std::uint32_t id = 0;
