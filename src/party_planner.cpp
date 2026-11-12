@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <utility>
 #include <tuple>
 #include <unordered_set>
 
@@ -29,6 +30,24 @@ bool Plan(Settings const& settings, std::vector<Member> const& members, std::vec
     for (Member const& m : members)
         if (m.Guid == order.MainTank && m.Alive && m.Tank)
             keep = true;
+    // Tank swap: the main tank holds the swap aura at its stack count, another tank with fewer stacks takes over.
+    order.TankSwapped = false;
+    if (keep)
+        for (Member const& m : members)
+            if (m.Guid == order.MainTank && m.SwapAt != 0 && m.SwapStacks >= m.SwapAt)
+            {
+                Member const* next = nullptr;
+                for (Member const& other : members)
+                    if (other.Alive && other.Tank && other.Guid != m.Guid && other.SwapStacks < other.SwapAt &&
+                        (!next || other.SwapStacks < next->SwapStacks || (other.SwapStacks == next->SwapStacks && other.Guid < next->Guid)))
+                        next = &other;
+                if (next)
+                {
+                    order.MainTank = next->Guid;
+                    order.TankSwapped = true;
+                }
+                break;
+            }
     if (!keep)
     {
         order.MainTank = 0;
@@ -57,7 +76,9 @@ bool Plan(Settings const& settings, std::vector<Member> const& members, std::vec
     for (Enemy const& e : enemies)
         if (e.Casting)
             casters.push_back(&e);
-    std::sort(casters.begin(), casters.end(), [](Enemy const* a, Enemy const* b) { return a->Ref < b->Ref; });
+    // The rule table's interrupt-first casts take the nearest kickers first.
+    std::sort(casters.begin(), casters.end(), [](Enemy const* a, Enemy const* b)
+    { return std::make_pair(a->InterruptFirst ? 0 : 1, a->Ref) < std::make_pair(b->InterruptFirst ? 0 : 1, b->Ref); });
     for (std::uint8_t rank = 0; rank < 2; ++rank)
         for (Enemy const* caster : casters)
         {
@@ -150,6 +171,89 @@ bool Plan(Settings const& settings, std::vector<Member> const& members, std::vec
         order.Heals.push_back({ best->Guid, patient->Guid });
     }
 
+    // Dispels: each member with a debuff the rule table wants dispelled (the lowest guid first, its first such debuff) goes to the nearest ready member that can dispel its
+    // kind and is not on an emergency heal. A dispeller holds one member.
+    order.Dispels.clear();
+    std::unordered_set<std::uint64_t> emergencyHealers;
+    for (HealAssignment const& heal : order.Heals)
+        for (Member const& m : members)
+            if (m.Guid == heal.Target && m.HealPct < settings.EmergencyPct)
+                emergencyHealers.insert(heal.Bot);
+    std::vector<Member const*> afflicted;
+    for (Member const& m : members)
+        if (m.Alive && !m.Debuffs.empty())
+            afflicted.push_back(&m);
+    std::sort(afflicted.begin(), afflicted.end(), [](Member const* a, Member const* b) { return a->Guid < b->Guid; });
+    std::unordered_set<std::uint64_t> dispellers;
+    for (Member const* patient : afflicted)
+        for (Member::Debuff const& debuff : patient->Debuffs)
+        {
+            Member const* best = nullptr;
+            float bestD = 0.0f;
+            for (Member const& d : members)
+            {
+                if (!d.Alive || !d.DispelReady || debuff.Kind >= 32 || (d.DispelKinds & (1u << debuff.Kind)) == 0 || dispellers.count(d.Guid) || emergencyHealers.count(d.Guid))
+                    continue;
+                float const dist = std::hypot(d.X - patient->X, d.Y - patient->Y);
+                if (dist > settings.HealRangeYards)
+                    continue;
+                if (!best || dist < bestD || (dist == bestD && d.Guid < best->Guid))
+                {
+                    best = &d;
+                    bestD = dist;
+                }
+            }
+            if (!best)
+                continue;
+            dispellers.insert(best->Guid);
+            order.Dispels.push_back({ best->Guid, patient->Guid, debuff.Spell, debuff.Kind });
+            break;      // one job per afflicted member per plan
+        }
+
+    // Buffs: for each party buff spell some member offers, each living member gets it from a living member that offers it and is within reach, the one with the fewest members so far, then the nearest (a member's own cast on itself is not planned).
+    order.Buffs.clear();
+    std::vector<std::uint32_t> buffSpells;
+    for (Member const& m : members)
+        if (m.Alive)
+            for (std::uint32_t spell : m.BuffSpells)
+                if (std::find(buffSpells.begin(), buffSpells.end(), spell) == buffSpells.end())
+                    buffSpells.push_back(spell);
+    std::sort(buffSpells.begin(), buffSpells.end());
+    for (std::uint32_t spell : buffSpells)
+    {
+        std::unordered_map<std::uint64_t, int> load;    // members already given to a caster, so the casts spread over the casters and go out in the same tick
+        for (Member const& recipient : members)
+        {
+            if (!recipient.Alive)
+                continue;
+            Member const* best = nullptr;
+            float bestD = 0.0f;
+            for (Member const& caster : members)
+            {
+                if (!caster.Alive || caster.Guid == recipient.Guid || std::find(caster.BuffSpells.begin(), caster.BuffSpells.end(), spell) == caster.BuffSpells.end())
+                    continue;
+                float const d = std::hypot(caster.X - recipient.X, caster.Y - recipient.Y);
+                if (d > settings.BuffRangeYards)
+                    continue;
+                if (!best || std::make_tuple(load[caster.Guid], d, caster.Guid) < std::make_tuple(load[best->Guid], bestD, best->Guid))
+                {
+                    best = &caster;
+                    bestD = d;
+                }
+            }
+            if (best)
+            {
+                ++load[best->Guid];
+                order.Buffs.push_back({ best->Guid, recipient.Guid, spell });
+            }
+        }
+    }
+
+    order.NoAoe = false;
+    for (Enemy const& e : enemies)
+        if (e.NoAoe && e.Health != 0)
+            order.NoAoe = true;
+
     // Kill target: of the pack's units that nobody holds, the best kill rank, then a caster, then the weakest (lowest ref on a tie).
     order.KillTarget = 0;
     Enemy const* kill = nullptr;
@@ -215,6 +319,31 @@ bool MayInterrupt(Settings const& settings, Order const* order, std::uint64_t bo
         return seen != order->CastSeenMs.end() && nowMs >= seen->second + settings.BackupDelayMs;
     }
     return !planned;    // a target the plan did not cover is left to the claim map
+}
+
+bool BuffAssignedElsewhere(Order const* order, std::uint64_t bot, std::uint32_t spell, std::uint64_t recipient)
+{
+    if (!order)
+        return false;
+    for (BuffAssignment const& a : order->Buffs)
+        if (a.Spell == spell && a.Recipient == recipient)
+            return a.Bot != bot;
+    return false;
+}
+
+DispelAssignment const* DispelFor(Order const* order, std::uint64_t bot)
+{
+    if (!order)
+        return nullptr;
+    for (DispelAssignment const& a : order->Dispels)
+        if (a.Bot == bot)
+            return &a;
+    return nullptr;
+}
+
+bool NoAoeNow(Order const* order)
+{
+    return order && order->NoAoe;
 }
 
 std::uint64_t CcTargetFor(Order const* order, std::uint64_t bot)

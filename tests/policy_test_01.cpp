@@ -423,6 +423,32 @@ void BotInAGroundEffectWalksOut()
     }
 }
 
+void RaidRulesAvoidSpellGivesTheRadius()
+{
+    // A spell of the raid rule table's avoid rows is harmful even when its caster is not known hostile, with the rule's radius (a 12-yard circle here, not the snapshot's 2).
+    PolicyOptions options = AggressiveOptions();
+    options.AvoidGroundEffects = true;
+    std::vector<std::string> errors;
+    options.RaidRules = std::make_shared<raid_rules::Table>(raid_rules::Parse("avoid|249|spell|18392|12|Fireball splash\n", errors));
+    CHECK(errors.empty());
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = View(1, 0, {});
+    view.bots[0].map_id = 249;
+    SetGroundEffect(view, 18392, 2.0f, 0.0f, 2.0f, 0);
+    auto const moves = GroundMoves(policy.Decide(view, 1000));
+    CHECK(moves.size() == 1);
+    if (moves.size() == 1)
+    {
+        float const dx = moves[0].dest_x - 2.0f, dy = moves[0].dest_y;
+        CHECK(std::sqrt(dx * dx + dy * dy) >= 15.0f - 0.01f);        // the rule's 12 yards plus the 3-yard margin
+    }
+    // the same spell with no rule table: not hostile, no walk
+    PolicyOptions plain = AggressiveOptions();
+    plain.AvoidGroundEffects = true;
+    BotPolicy without(plain);
+    CHECK(GroundMoves(without.Decide(view, 1000)).empty());
+}
+
 void GroundEffectsAreIgnoredWhenOffOrNotHarmful()
 {
     // Off (the default): no walk.
@@ -990,6 +1016,7 @@ void RunPolicyTestsPart1()
     StandsBeforeAFight();
     BotInAGroundEffectWalksOut();
     GroundEffectsAreIgnoredWhenOffOrNotHarmful();
+    RaidRulesAvoidSpellGivesTheRadius();
     DungeonFileZonesAndSpellsAreAvoided();
     RefusedSitIsRetriedLater();
     OverPullIsSkipped();

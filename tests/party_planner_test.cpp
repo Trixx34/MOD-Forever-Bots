@@ -242,6 +242,186 @@ void HealsAreAssignedOneToEach()
 
 } // namespace
 
+void InterruptFirstCastTakesTheNearestKicker()
+{
+    Settings s = On();
+    Order o;
+    // two casters, one kicker
+    Enemy plain = Caster(10, 0);
+    Enemy listed = Caster(20, 40);
+    listed.InterruptFirst = true;
+    Plan(s, { Kicker(1, 1) }, { plain, listed }, 1000, o);
+    CHECK(o.Interrupts.size() == 1);                       // one kicker, one job: the listed cast gets it although its ref is higher
+    CHECK(o.Interrupts[0].Target == 20 && o.Interrupts[0].Rank == 0);
+    CHECK(IsAssignedInterrupt(&o, 1, 20));
+    CHECK(!IsAssignedInterrupt(&o, 1, 10));
+}
+
+Member Dispeller(std::uint64_t guid, float x, std::uint32_t kinds)
+{
+    Member m;
+    m.Guid = guid;
+    m.X = x;
+    m.DispelKinds = kinds;
+    return m;
+}
+
+Member Afflicted(std::uint64_t guid, float x, std::uint32_t spell, std::uint8_t kind)
+{
+    Member m;
+    m.Guid = guid;
+    m.X = x;
+    m.Debuffs.push_back({ spell, kind });
+    return m;
+}
+
+void DispelsGoToTheNearestCapableMember()
+{
+    Settings s = On();
+    Order o;
+    // a mage (curse, bit 2) far, a druid (curse + poison) near; the cursed member is at x=0
+    Member mage = Dispeller(1, 25, 1u << 2);
+    Member druid = Dispeller(2, 5, (1u << 2) | (1u << 4));
+    Member cursed = Afflicted(3, 0, 16098, 2);
+    Plan(s, { mage, druid, cursed }, {}, 1000, o);
+    CHECK(o.Dispels.size() == 1);
+    CHECK(o.Dispels[0].Bot == 2 && o.Dispels[0].Target == 3 && o.Dispels[0].Aura == 16098 && o.Dispels[0].Kind == 2);
+    CHECK(DispelFor(&o, 2) != nullptr && DispelFor(&o, 1) == nullptr);
+    CHECK(DispelFor(nullptr, 2) == nullptr);
+}
+
+void DispelNeedsTheKindARangeAndNoEmergency()
+{
+    Settings s = On();
+    Order o;
+    Member poisoned = Afflicted(3, 0, 5, 4);
+    // a mage cannot take a poison
+    Plan(s, { Dispeller(1, 2, 1u << 2), poisoned }, {}, 1000, o);
+    CHECK(o.Dispels.empty());
+    // too far
+    Plan(s, { Dispeller(1, 80, 1u << 4), poisoned }, {}, 1500, o);
+    CHECK(o.Dispels.empty());
+    // not ready
+    Member slow = Dispeller(1, 2, 1u << 4);
+    slow.DispelReady = false;
+    Plan(s, { slow, poisoned }, {}, 2000, o);
+    CHECK(o.Dispels.empty());
+    // a healer on an emergency heal keeps healing: a member at 10 % is next to it
+    Member healer = Dispeller(1, 2, 1u << 4);
+    healer.CanHeal = true;
+    Member dying;
+    dying.Guid = 4;
+    dying.X = 3;
+    dying.HealPct = 10;
+    Plan(s, { healer, poisoned, dying }, {}, 2500, o);
+    CHECK(o.Heals.size() == 1 && o.Heals[0].Bot == 1 && o.Heals[0].Target == 4);
+    CHECK(o.Dispels.empty());
+    // one dispeller, two afflicted members: the lower guid first, the other waits
+    Plan(s, { Dispeller(1, 2, 1u << 4), Afflicted(3, 0, 5, 4), Afflicted(5, 1, 5, 4) }, {}, 3000, o);
+    CHECK(o.Dispels.size() == 1 && o.Dispels[0].Target == 3);
+}
+
+Member Tank(std::uint64_t guid, std::uint32_t stacks, std::uint32_t at)
+{
+    Member m;
+    m.Guid = guid;
+    m.Tank = true;
+    m.SwapStacks = stacks;
+    m.SwapAt = at;
+    return m;
+}
+
+void TankSwapOnTheDebuff()
+{
+    Settings s = On();
+    Order o;
+    Plan(s, { Tank(1, 0, 3), Tank(2, 0, 3) }, {}, 1000, o);
+    CHECK(o.MainTank == 1 && !o.TankSwapped);
+    Plan(s, { Tank(1, 2, 3), Tank(2, 0, 3) }, {}, 1500, o);
+    CHECK(o.MainTank == 1 && !o.TankSwapped);               // below the threshold
+    Plan(s, { Tank(1, 3, 3), Tank(2, 0, 3) }, {}, 2000, o);
+    CHECK(o.MainTank == 2 && o.TankSwapped);                // at the threshold: handed over
+    Plan(s, { Tank(1, 1, 3), Tank(2, 1, 3) }, {}, 2500, o);
+    CHECK(o.MainTank == 2 && !o.TankSwapped);               // the new tank stays until it has the stacks itself
+    Plan(s, { Tank(1, 0, 3), Tank(2, 3, 3) }, {}, 3000, o);
+    CHECK(o.MainTank == 1 && o.TankSwapped);
+    // no second tank: nobody to hand it to
+    Order solo;
+    Plan(s, { Tank(1, 5, 3) }, {}, 1000, solo);
+    CHECK(solo.MainTank == 1 && !solo.TankSwapped);
+    // no rule (SwapAt 0): never swaps
+    Order plain;
+    Plan(s, { Tank(1, 9, 0), Tank(2, 0, 0) }, {}, 1000, plain);
+    Plan(s, { Tank(1, 9, 0), Tank(2, 0, 0) }, {}, 2000, plain);
+    CHECK(plain.MainTank == 1 && !plain.TankSwapped);
+}
+
+void NoAoeFlag()
+{
+    Settings s = On();
+    Order o;
+    Enemy e = Caster(10, 0);
+    e.Health = 100;
+    e.NoAoe = true;
+    Plan(s, { Kicker(1, 0) }, { e }, 1000, o);
+    CHECK(NoAoeNow(&o));
+    Plan(s, { Kicker(1, 0) }, { Caster(10, 0) }, 1500, o);
+    CHECK(!NoAoeNow(&o));
+    CHECK(!NoAoeNow(nullptr));
+}
+
+Member Buffer(std::uint64_t guid, float x, std::vector<std::uint32_t> spells)
+{
+    Member m;
+    m.Guid = guid;
+    m.X = x;
+    m.BuffSpells = spells;
+    return m;
+}
+
+void BuffsGoToTheNearestOffer()
+{
+    Settings s = On();
+    Order o;
+    // two priests (Fortitude 1243) at x=0 and x=100, a warrior at x=98 that offers nothing, a mage at 1
+    Plan(s, { Buffer(1, 0, { 1243 }), Buffer(2, 100, { 1243 }), Buffer(3, 98, {}), Buffer(4, 1, {}) }, {}, 1000, o);
+    CHECK(!BuffAssignedElsewhere(&o, 1, 1243, 4));          // priest 1 buffs the mage
+    CHECK(BuffAssignedElsewhere(&o, 2, 1243, 4));           // priest 2 leaves it
+    CHECK(!BuffAssignedElsewhere(&o, 2, 1243, 3));          // priest 2 buffs the warrior next to it
+    CHECK(BuffAssignedElsewhere(&o, 1, 1243, 3));           // priest 1 is out of reach of the warrior: it is priest 2's
+    CHECK(!BuffAssignedElsewhere(nullptr, 1, 1243, 4));
+    CHECK(!BuffAssignedElsewhere(&o, 1, 5555, 4));          // a spell nobody offers: not covered
+}
+
+void BuffsSpreadOverTheCasters()
+{
+    Settings s = On();
+    Order o;
+    Plan(s, { Buffer(1, 0, { 1126 }), Buffer(2, 0, { 1126 }), Buffer(3, 0, { 1126 }), Buffer(4, 0, { 1126 }), Buffer(5, 0, { 1126 }) }, {}, 1000, o);
+    CHECK(o.Buffs.size() == 5);
+    std::unordered_map<std::uint64_t, int> perCaster;
+    for (BuffAssignment const& a : o.Buffs)
+        ++perCaster[a.Bot];
+    for (auto const& entry : perCaster)
+        CHECK(entry.second <= 2);                           // five members over five casters: nobody carries them all
+    CHECK(perCaster.size() >= 3);
+}
+
+void BuffsIgnoreTheDeadAndTheFar()
+{
+    Settings s = On();
+    Order o;
+    Member dead = Buffer(1, 0, { 1243 });
+    dead.Alive = false;
+    Plan(s, { dead, Buffer(2, 5, { 1243 }), Buffer(3, 0, {}) }, {}, 1000, o);
+    CHECK(BuffAssignedElsewhere(&o, 1, 1243, 3));           // the dead caster is not the one
+    CHECK(!BuffAssignedElsewhere(&o, 2, 1243, 3));
+    Order far;
+    Plan(s, { Buffer(1, 0, { 1243 }), Buffer(3, 500, {}) }, {}, 1000, far);
+    CHECK(!BuffAssignedElsewhere(&far, 2, 1243, 3));        // nobody in reach: not covered, anyone may
+    CHECK(far.Buffs.empty());
+}
+
 int main()
 {
     Disabled();
@@ -255,6 +435,14 @@ int main()
     CastSeenIsForgotten();
     KillTargetOrder();
     HealsAreAssignedOneToEach();
+    InterruptFirstCastTakesTheNearestKicker();
+    DispelsGoToTheNearestCapableMember();
+    DispelNeedsTheKindARangeAndNoEmergency();
+    TankSwapOnTheDebuff();
+    NoAoeFlag();
+    BuffsGoToTheNearestOffer();
+    BuffsSpreadOverTheCasters();
+    BuffsIgnoreTheDeadAndTheFar();
     if (failures)
     {
         std::printf("%d failure(s)\n", failures);

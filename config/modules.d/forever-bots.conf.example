@@ -348,6 +348,11 @@ Module.forever-bots.TelemetrySummarySec = 60
 # PartyViewPlanner = 1: the planner also reads the core's shared party view (layout 25; needs Bot.Snapshot.PartyView = 1 in the core): human
 # members, tank roles known by role, and the loose mobs on non-tanks. Default 0 (the bots-only merge); without a view it changes nothing.
 # Module.forever-bots.PartyViewPlanner = 1
+#
+# RaidRulesFile (absolute path; data/raid_rules.txt): the raid rule table. Per raid map (Onyxia's Lair 249, Zul'Gurub 309 ship): the adds to kill first, the casts to interrupt
+# first, the dispel kind of an aura (curse, magic, poison, disease), ground effects to step out of (needs AvoidGroundEffects = 1 and the core's Bot.Snapshot.GroundEffects = 1),
+# the debuff that swaps the tanks and the no-area-damage fights. The party planner reads it, so it needs PartyPlanner on (the default). Empty = no rules. doc/raid-rules.md.
+# Module.forever-bots.RaidRulesFile = /srv/forever/sim/modules_runtime/forever-bots/data/raid_rules.txt
 
 # Mounts: a bot asks to mount up for a long walk only from MountMinLevel (default 40: classic riding is learned at 40; 0 = any level).
 # Module.forever-bots.MountMinLevel = 40

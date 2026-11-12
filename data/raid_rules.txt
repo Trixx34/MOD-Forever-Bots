@@ -1,0 +1,48 @@
+# Raid rules (src/raid_rules.h, config RaidRulesFile): per raid map the adds to kill first, the casts to interrupt first, the dispel kind of an aura, the ground
+# areas to stay out of, the debuff that swaps the tanks, and the no-area-damage fights. Format and the meaning of each row: raid_rules.h and README.md.
+#   boss|map|entry|name
+#   add|map|entry|rank|name                      rank 0 first
+#   interrupt|map|spell_id|name
+#   dispel|map|aura_id|magic/curse/disease/poison|name
+#   avoid|map|spell/object|id|radius|name
+#   swap|map|boss_entry|aura_id|stacks|name
+#   noaoe|map|boss_entry|name                    boss_entry 0 = every fight on the map
+#   frontal|map|boss_entry|spell_id|name
+# Spell ids marked (check) were written from memory and have to be confirmed against the core's spell data before a sim run counts on them.
+
+# ---- Onyxia's Lair (map 249, 40-man) ----
+boss|249|10184|Onyxia
+add|249|11262|0|Onyxian Whelp
+add|249|12129|1|Onyxian Warder
+add|249|12458|2|Onyxian Lair Guard
+# Fireball (random target, splash) and Deep Breath (the raid steps out of the line); both are casts with a landing area, not ground objects (check)
+avoid|249|spell|18392|8|Fireball splash (check)
+avoid|249|spell|17086|35|Deep Breath (check)
+# Wing Buffet and Flame Breath hit what stands in front of her: the tank holds her turned away from the raid (data only for now)
+frontal|249|10184|18500|Wing Buffet (check)
+frontal|249|10184|18435|Flame Breath (check)
+# Bellowing Roar (fear, 18431, check): no tremor totem or fear ward is required of the party; nothing is listed on purpose.
+
+# ---- Zul'Gurub (map 309, 20-man) ----
+boss|309|14517|High Priestess Jeklik
+boss|309|14507|High Priest Venoxis
+boss|309|14510|High Priestess Mar'li
+boss|309|11382|Bloodlord Mandokir
+boss|309|14509|High Priest Thekal
+boss|309|14515|High Priestess Arlokk
+boss|309|11380|Jin'do the Hexxer
+boss|309|14834|Hakkar
+# Bloodseeker bats of Jeklik first
+add|309|11368|0|Bloodseeker Bat
+add|309|14965|0|Bloodseeker Bat
+# Great Heal (Gurubashi priests, Jeklik), Drain Life, Mind Flay
+interrupt|309|23954|Great Heal
+interrupt|309|24208|Great Heal
+interrupt|309|24300|Drain Life
+interrupt|309|23953|Mind Flay
+dispel|309|16098|curse|Curse of Blood
+dispel|309|23952|magic|Shadow Word: Pain
+# Liquid Fire is a game object: needs game objects in the snapshot (gap, see README)
+avoid|309|object|177764|6|Liquid Fire
+# Pierce Armor on the tank of Jeklik: swap after 3 stacks
+swap|309|14517|12097|3|Pierce Armor

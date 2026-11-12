@@ -816,6 +816,8 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadBool(config, "AvoidGroundEffects", settings.AvoidGroundEffects, warnings);
     if (auto const it = config.find("AvoidSpellsFile"); it != config.end())
         settings.AvoidSpellsFile = it->second;
+    if (auto const it = config.find("RaidRulesFile"); it != config.end())
+        settings.RaidRulesFile = it->second;
     if (auto const it = config.find("CraftingFociFile"); it != config.end())
         settings.CraftingFociFile = it->second;
     ReadBool(config, "GatherWalk", settings.GatherWalk, warnings);

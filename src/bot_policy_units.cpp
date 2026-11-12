@@ -226,6 +226,13 @@ std::vector<ground_avoid::Circle> HazardCircles(PolicyOptions const& options, Bo
             if (radius <= 0.0f)
                 radius = options.AvoidSpells->Radius(effect.spell_id);
         }
+        if (options.RaidRules)
+            for (raid_rules::AvoidZone const& zone : options.RaidRules->AvoidOf(bot.map_id, false))
+                if (zone.Id == effect.spell_id)
+                {
+                    harmful = true;
+                    radius = zone.Radius;   // the rule's radius wins: it is the one written for this fight
+                }
         if (!harmful && hasDungeon)
             harmful = std::find(dungeon->second.AvoidSpells.begin(), dungeon->second.AvoidSpells.end(), effect.spell_id) != dungeon->second.AvoidSpells.end();
         if (!harmful)
