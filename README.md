@@ -62,6 +62,18 @@ line to the module's stderr. A config reload updates the ramp, the random picks 
 | `Hub<map>_<n>` | none | Hub positions `"x y z"` per map, in order |
 | `TestSpell` | 0 (off) | A spell cast at the target every few ticks instead of the rotation, to test the cast path |
 | `TelemetryFile`, `TelemetryMaxMB`, `TelemetryKeep`, `TelemetrySummarySec` | `forever-bots-telemetry.csv`, 64, 5, 60 | The telemetry file (empty turns it off), its rotation, and the summary interval |
+| `ScenarioParties`, `ScenarioWipeRecovery`, `ScenarioWipeRecoverySec`, `ScenarioMinAlive`, `ScenarioLeaderDeadAbandonSec`, `ScenarioConfigGuard` | 1, 0, 300, 0, 0, 0 | Scenario control: parties run at once (1 to 200), whether a wipe waits for ghosts to come back and for how long, the understrength stop, the dead-leader abandon time, and the teleport guard (`config_refused`) |
+| `ScenarioPortal`, `ScenarioBossAt`, `ScenarioKillPriority`, `ScenarioSummons`, `ScenarioTameSpot` | none | The dungeon facts of a scenario (door, boss per route point, kill order, summons, taming place); they win over the dungeon file |
+| `DungeonSummons`, `DungeonTactics`, `DungeonDataDir`, `DungeonEventsFile`, `DungeonTeleport`, `DungeonReviveOutOfCombat` | empty, `none`, `dungeons` beside `DungeonFile`, empty, 0, 0 | Summon-first scenario names, the dungeon party tactics switched on, the shipped dungeon JSON folder, the events table, teleport of lost bots, revive out of combat |
+| `LevelDungeons`, `LevelDungeonRuns`, `LfgCommand` | 1, 2, 1 | Levelling parties run each dungeon at its max level (1 to 5 runs per dungeon); `LFG <dungeon>` in chat brings free bots |
+| `ActionStats`, `AggressiveStart` | 0, 0 | The per-minute `actions_top` log; bots start Aggressive |
+| `PartyPercent`, `RandomPct` | 30, 25 | Share of bots in parties (0 to 100) and the random variation of timers and walks (0 to 90 percent) |
+| `BracketsEnabled`, `BracketTargets`, `BracketSpotCap`, `BracketStalledMinutes`, `BracketMoveDown`, `RetireLevel60` | 0, `1-9:25,...,60:5`, 0, 0, 0, `off` | Level brackets: on/off, weight per bracket, bots per grind spot, stall minutes, move a stalled bot down, release at 60 |
+| `Presence`, `PresenceOnlineMinMin`, `PresenceOnlineMaxMin`, `PresenceOfflineMinMin`, `PresenceOfflineMaxMin`, `PresenceMinOnline`, `PresenceMaxOnline`, `PresenceDayPercent` | 0, 60, 240, 30, 240, 0, 0, evening-heavy 24 values | Bots log off and on like players: session and absence length in minutes, floor and cap of bots online, the share online per hour |
+| `SupplyPotions`, `SupplyBandages`, `SupplyReagents`, `SupplyHealthPotionLow`, `SupplyManaPotionLow`, `SupplyBandageLow`, `UseHealthPotionBelowPct`, `UseManaPotionBelowPct`, `UseBandageBelowPct` | 0, 0, 0, 1, 1, 3, 35, 25, 60 | Potions, bandages and reagents: on/off, the count that sends a bot shopping, and the health or mana percent at which they are used |
+| `SellVendor`, `SellEverySec`, `SellPerVisit` | 0, 1800, 8 | Selling white items to a vendor: on/off, seconds between visits, items per visit |
+| `ErrandDailyMin`, `ErrandGapMin`, `ErrandMaxMin`, `ErrandPerCity`, `ErrandStartsPerTick`, `ErrandTrainerFile` | 60, 120, 60, 2, 2, `data/errand_trainers.txt` | Town errands: minutes per day, gap, length, bots per capital, starts per tick, trainer table |
+| `SpellCostFile` | empty | Spell cost table; empty = no cost check |
 
 The core has its own bot limits in `worldserver.conf`: `Bot.Login.MaxPerSecond`, `Bot.Limit.MaxBots`, `Bot.Limit.MaxWorldDiffMs`,
 `Bot.Limit.MaxDbQueue`, `Bot.Run.StopTime`, `Bot.Spread.SpacingYards`, `Bot.Spread.MaxRadiusYards` and the `Modules.Tier2.*` keys.

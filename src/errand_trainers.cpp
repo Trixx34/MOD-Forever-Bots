@@ -21,11 +21,7 @@ std::vector<std::string_view> Split(std::string_view text, char sep)
 
 std::string_view Trim(std::string_view text)
 {
-    while (!text.empty() && (text.front() == ' ' || text.front() == '\t' || text.front() == '\r'))
-        text.remove_prefix(1);
-    while (!text.empty() && (text.back() == ' ' || text.back() == '\t' || text.back() == '\r'))
-        text.remove_suffix(1);
-    return text;
+    return text_split::TrimBlanks(text);
 }
 
 bool ParseUnsigned(std::string_view text, std::uint64_t& value)

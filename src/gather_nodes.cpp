@@ -13,19 +13,7 @@ namespace {
 
 bool ParseUnsigned(std::string_view text, std::uint32_t& out)
 {
-    if (text.empty() || text.size() > 10)
-        return false;
-    std::uint64_t value = 0;
-    for (char c : text)
-    {
-        if (c < '0' || c > '9')
-            return false;
-        value = value * 10 + std::uint64_t(c - '0');
-    }
-    if (value > std::numeric_limits<std::uint32_t>::max())
-        return false;
-    out = std::uint32_t(value);
-    return true;
+    return text_split::ParseUint32(text, out);
 }
 
 } // namespace

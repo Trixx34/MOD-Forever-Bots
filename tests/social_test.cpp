@@ -16,6 +16,7 @@
 #include <array>
 #include <cstdio>
 #include <cstring>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -305,6 +306,42 @@ void GuildCreateCooldown()
     CHECK(creates(t0 + 3270000) == 0);
 }
 
+// Ten raiding masters, the core refuses every create: each plan sends at most 3 creates, and the masters come round (none is retried before all had a turn).
+void GuildCreatesRotateAmongMasters()
+{
+    PolicyOptions on = Quiet();
+    on.Guilds.Enabled = true;
+    on.Guilds.LevelingShare = 0;
+    on.Guilds.UtilityShare = 0;
+    on.Guilds.RaidingShare = 100;
+    on.Guilds.RaidSize = 2;
+    on.Guilds.RaidMinLevel = 1;
+    BotPolicy policy(on);
+    WorldTickSnapshotView v = View(20, 0, {}, 1);
+    for (std::uint64_t guid = 2; guid <= 20; ++guid)
+    {
+        BotSnapshot b = v.bots[0];
+        b.guid = guid;
+        v.bots.push_back(b);
+    }
+    std::set<std::uint64_t> seen;
+    std::uint64_t now = kNow;
+    for (int plan = 0; plan < 4; ++plan, now += 30000)
+    {
+        policy.Decide(v, now);
+        std::vector<std::uint64_t> masters;
+        for (social::Order const& order : policy.TakeSocialOrders())
+            if (order.What == social::Kind::Guild && order.Op == 3)
+                masters.push_back(order.Bot);
+        CHECK(masters.size() <= 3);
+        if (plan < 3)
+            CHECK(masters.size() == 3);
+        for (std::uint64_t const master : masters)
+            CHECK(seen.insert(master).second);   // nobody is asked twice while others have not had a turn
+    }
+    CHECK(seen.size() == 10);
+}
+
 void GuildAnswersAreSentWhenOnAndNotWhenOff()
 {
     PolicyOptions on = Quiet();
@@ -432,6 +469,7 @@ int main()
     DuelsAreSentWhenOnAndNotWhenOff();
     BattlegroundsAreSentWhenOnAndNotWhenOff();
     GuildCreateCooldown();
+    GuildCreatesRotateAmongMasters();
     GuildAnswersAreSentWhenOnAndNotWhenOff();
     GiftsAreSentWhenOnAndNotWhenOff();
     PickGiftChoosesSmallStacksOnly();

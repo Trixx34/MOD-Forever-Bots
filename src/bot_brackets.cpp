@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "bot_brackets.h"
+#include "text_split.h"
 
 #include <algorithm>
 #include <cmath>
@@ -12,11 +13,7 @@ namespace {
 
 std::string Trim(std::string const& text)
 {
-    auto const first = text.find_first_not_of(" \t\r");
-    if (first == std::string::npos)
-        return {};
-    auto const last = text.find_last_not_of(" \t\r");
-    return text.substr(first, last - first + 1);
+    return std::string(text_split::TrimBlanks(text));
 }
 
 // Index of a bracket label, or kCount when the label is unknown.

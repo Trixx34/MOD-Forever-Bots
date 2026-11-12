@@ -14,6 +14,7 @@ constexpr std::uint64_t kGuildAcceptDelayMs = 3000;    // an invited bot accepts
 constexpr std::uint64_t kGuildPendingMs = 60000;       // a create whose guild is not in any snapshot after this long is forgotten (the planner tries again)
 constexpr std::uint64_t kGuildOrderBusyMs = 30000;     // a bot with a guild order in flight is left alone for this long
 constexpr std::size_t kGuildOrdersPerPlan = 6;
+constexpr std::size_t kGuildCreatesPerPlan = 3;         // creates may take half of a plan: the invites and leaves behind them always get slots
 constexpr std::uint64_t kGuildCreateBlockMs = 120000;   // a master whose create was never confirmed (the core refused it) waits this long, doubled per failure
 constexpr std::uint32_t kGuildCreateBlockDoublings = 3; // ...up to 8 times that: 120, 240, 480, then 960 s (16 minutes) at most
 }  // namespace
@@ -115,11 +116,19 @@ void BotPolicy::DriveGuilds(forever_module::WorldTickSnapshotView const& view, s
 
     std::size_t queued = 0;
 
+    // Fairness: each list is walked from where the last plan stopped (a cursor), not from its front, so a bot or master that cannot act (refused,
+    // busy) never holds the same first slots plan after plan. Entries that are skipped do not count against the cap.
     // Creates: the master (the lowest guid of the new guild's members) names it. Its other members join once the guild is known.
-    for (bot_guilds::NewGuild const& created : plan.Created)
+    std::size_t creates = 0;
+    std::size_t const createCount = plan.Created.size();
+    for (std::size_t step = 0; step < createCount; ++step)
     {
-        if (queued >= kGuildOrdersPerPlan || created.Members.empty())
+        std::size_t const index = (_guildCreateCursor + step) % createCount;
+        bot_guilds::NewGuild const& created = plan.Created[index];
+        if (creates >= kGuildCreatesPerPlan || queued >= kGuildOrdersPerPlan)
             break;
+        if (created.Members.empty())
+            continue;
         std::uint64_t const master = created.Master;
         if (busy(master) || _pendingGuilds.count(master))   // a create in flight is not sent again (it would restart the pending clock and no block would ever be set)
             continue;
@@ -133,12 +142,17 @@ void BotPolicy::DriveGuilds(forever_module::WorldTickSnapshotView const& view, s
         queue(order);
         _pendingGuilds[master] = PendingGuild{ created.Kind, created.Alliance, nowMs };
         ++queued;
+        ++creates;
+        _guildCreateCursor = index + 1;
     }
 
     // Moves: a bot in a guild leaves it first (a switch is a leave now and a join on a later plan); a bot with no guild is invited into its guild by the
     // lowest-guid member that is online and free. Joins into a guild created in this plan wait for the next plan, when the guild's id is known.
-    for (bot_guilds::Move const& move : plan.Moves)
+    std::size_t const moveCount = plan.Moves.size();
+    for (std::size_t step = 0; step < moveCount; ++step)
     {
+        std::size_t const index = (_guildMoveCursor + step) % moveCount;
+        bot_guilds::Move const& move = plan.Moves[index];
         if (queued >= kGuildOrdersPerPlan)
             break;
         if (move.NewGuild >= 0)
@@ -153,6 +167,7 @@ void BotPolicy::DriveGuilds(forever_module::WorldTickSnapshotView const& view, s
             leave.Bot = move.Bot;
             queue(leave);
             ++queued;
+            _guildMoveCursor = index + 1;
             continue;
         }
         if (move.To == 0)
@@ -173,5 +188,6 @@ void BotPolicy::DriveGuilds(forever_module::WorldTickSnapshotView const& view, s
         queue(invite);
         _guildAcceptDueMs[move.Bot] = nowMs + kGuildAcceptDelayMs;
         ++queued;
+        _guildMoveCursor = index + 1;
     }
 }
