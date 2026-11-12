@@ -1256,3 +1256,4 @@ void RunPolicyTestsPart5();
 void RunPolicyTestsPart6();
 void RunPolicyTestsPart7();
 void RunPolicyTestsPart8();
+void RunPolicyTestsPart9();

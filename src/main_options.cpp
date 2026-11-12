@@ -42,6 +42,8 @@ void PolicyFromSettings(PolicyOptions& policyOptions, BotSettings& settings)
     policyOptions.DungeonHealBelowPct = settings.DungeonHealBelowPct;
     policyOptions.DungeonTankHealBelowPct = settings.DungeonTankHealBelowPct;
     policyOptions.HealerDpsManaPct = settings.HealerDpsManaPct;
+    policyOptions.HealerCombatManaPct = settings.HealerCombatManaPct;
+    policyOptions.TankPickup = settings.TankPickup;
     policyOptions.HealerLosMoveYards = settings.HealerLosMoveYards;
     policyOptions.Gathering = settings.Gathering;
     if (!settings.CraftingFociFile.empty())

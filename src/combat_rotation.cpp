@@ -287,6 +287,10 @@ std::uint32_t LearnLevel(std::uint32_t spell)
         case 1160: return 14;  // Demoralizing Shout
         case 845: return 20;   // Cleave
         case 5308: return 24;  // Execute
+        case 355: return 10;   // Taunt
+        case 6795: return 10;  // Growl
+        case 1161: return 26;  // Challenging Shout
+        case 5209: return 28;  // Challenging Roar
         default: return 0;
     }
 }

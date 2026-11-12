@@ -3,6 +3,7 @@
 class 1
 row 5308 level 24 self_aura_below 71 1 target_hp_below 20 target range 0 5   # Execute: ranks [5308, 20658, 20660, 20661, 20662]
 row 355 level 10 enemies 2 target range 0 5   # Taunt: ranks [355]
+row 1161 level 26 enemies 4 self   # Challenging Shout: ranks [1161]
 row 2687 level 10 self_power_below 20 self   # Bloodrage: ranks [2687]
 row 1329555 level 1 self_power_below 30 self   # Reckless Swings: ranks [1329555]
 row 100 level 4 opener 8 target range 8 25   # Charge: ranks [100, 6178, 11578]
@@ -21,6 +22,7 @@ buff 71 level 10 duration 120 self in_party   # Defensive Stance: ranks [71]
 class 1 spec prot
 row 5308 level 24 self_aura_below 71 1 target_hp_below 20 target range 0 5   # Execute: ranks [5308, 20658, 20660, 20661, 20662]
 row 355 level 10 enemies 2 target range 0 5   # Taunt: ranks [355]
+row 1161 level 26 enemies 4 self   # Challenging Shout: ranks [1161]
 row 2687 level 10 self_power_below 20 self   # Bloodrage: ranks [2687]
 row 1329555 level 1 self_power_below 30 self   # Reckless Swings: ranks [1329555]
 row 100 level 4 opener 8 target range 8 25   # Charge: ranks [100, 6178, 11578]
@@ -429,6 +431,7 @@ buff 467 level 6 duration 600 party ranks 467,782,1075,8914,9756,9910   # Thorns
 
 class 11 spec feral_tank
 row 6795 level 10 enemies 2 target range 0 5   # Growl: ranks [6795]
+row 5209 level 28 enemies 4 self   # Challenging Roar: ranks [5209]
 row 5229 level 12 self_power_below 20 self   # Enrage: ranks [5229]
 row 770 level 18 duration 40 opener 3 target range 0 30   # Faerie Fire: ranks [770, 778, 9749, 9907]
 row 99 level 10 enemies 3 self duration 30   # Demoralizing Roar: ranks [99, 1735, 9490, 9747, 9898]

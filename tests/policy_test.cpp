@@ -15,6 +15,7 @@ int main()
     RunPolicyTestsPart6();
     RunPolicyTestsPart7();
     RunPolicyTestsPart8();
+    RunPolicyTestsPart9();
 
     if (failures == 0)
         std::printf("policy_test: all checks passed\n");

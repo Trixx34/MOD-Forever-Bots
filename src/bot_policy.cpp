@@ -607,7 +607,7 @@ void BotPolicy::PlanParties(WorldTickSnapshotView const& view, std::unordered_ma
             {
                 for (party_planner::Member const& fromView : party_view::PlannerMembersOf(view, *partyView))
                 {
-                    auto const mine = std::find_if(members.begin(), members.end(), [&](party_planner::Member const& m) { return m.Guid == fromView.Guid; });
+                    auto const mine = std::find_if(members.begin(), members.end(), [&](party_planner::Member const& m) { return m.Guid == fromView.Guid || PlayerRef(m.Guid) == fromView.Guid; });   // the view names a member by unit ref, the bots-only list by counter
                     if (mine == members.end())
                         members.push_back(fromView); // a human: no interrupt row, no crowd control, never assigned a job
                     else if (fromView.Tank)
@@ -770,6 +770,8 @@ void BotPolicy::DecideBot(DecideTick& tick, std::size_t i)
     if (TurnOnyxiaCasts(tick, turn) == TurnFlow::kSkip)
         return;
     if (TurnRaidRules(tick, turn) == TurnFlow::kSkip)
+        return;
+    if (TurnTankPickup(tick, turn) == TurnFlow::kSkip)
         return;
     if (TurnTaming(tick, turn) == TurnFlow::kSkip)
         return;

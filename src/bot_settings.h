@@ -293,6 +293,8 @@ struct BotSettings
     std::uint32_t DungeonHealBelowPct = 55;
     std::uint32_t DungeonTankHealBelowPct = 75;
     std::uint32_t HealerDpsManaPct = 40;
+    std::uint32_t HealerCombatManaPct = 25; // HealerCombatManaPct: a healer in a party fight keeps this share of its mana for heals (0 = no floor; 0..80)
+    bool TankPickup = true;       // TankPickup: a tank taunts the mobs that are on party members (needs PartyViewPlanner and the core's party view)
     std::uint32_t HealerLosMoveYards = 6;
     // ActionStats = 1: every minute the module logs the ten (bot, action, spell) combinations it sent most often in that minute ("actions_top"), to find a bot that
     // repeats an action every tick. Off by default.
