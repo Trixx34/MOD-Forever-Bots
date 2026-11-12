@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "dungeon_data.h"
+#include "text_split.h"
 #include "dungeon_files.h"
 #include "bot_settings.h"
 #include "text_number.h"
@@ -61,10 +62,7 @@ std::string Join(float const* values, std::size_t count)
 
 std::string Trim(std::string text)
 {
-    auto const first = text.find_first_not_of(" \t\r");
-    if (first == std::string::npos)
-        return {};
-    return text.substr(first, text.find_last_not_of(" \t\r") - first + 1);
+    return std::string(text_split::TrimBlanks(text));
 }
 
 } // namespace
