@@ -106,3 +106,68 @@ formats are the same, so both can also be joined by hand).
 - Objective order: an objective's position in the log is its rank by `Order` (verified for quest 376 only when the sim has run it).
 - Quests that need an item to start (a quest item from a drop), reputation or a skill are not filtered: the core refuses them and the block escalates.
 - Spawn points are used as hunting areas as they are; creatures behind walls or in water are tried and left after the usual give-up time.
+
+## Quest lists per faction and band, and the faction of the NPCs (2026-11-12)
+
+`make_world_quests.py --side alliance|horde` keeps a quest out of a side's list in three ways: the race mask (when it names only the other side), the
+giver creatures (all of them belong to the other side, `givers.tsv`), and, since this change, per NPC: a giver or ender spawn whose creature belongs to the
+other side is not used (the generator takes the next spawn of the quest on the map), and a quest with no usable giver or ender spawn is left out
+("giver hostile to the side", "ender hostile to the side"). The faction of a creature comes from `npc_factions.tsv` (creature entry, `creature_template.faction`;
+`tools/export_world_quests.py` writes it with `givers.tsv` when the dump has `creature_template`; the MySQL queries are in `tools/export_giver_factions.sql`) and
+`tools/faction_sides.tsv`. Without `npc_factions.tsv` the NPC filter is off. The check is in `tests/world_data_test.py` (a hand-made export with Horde,
+Alliance and neutral NPCs). Regenerated 2026-11-12 from the sim world database: Alliance 944 quests (was 953), Horde 895 (894), 60 lists 343 and 327.
+
+## Quest completion on the sim (analysis 2026-11-12)
+
+Read-only look at the sim journal (3 days) and the bots telemetry files:
+
+- Quests do complete: `forever-bots-telemetry.csv*` holds 5,660 `quest_done` lines (hand-ins and quest-leaves of a complete quest) over four of its five rotated
+  files, none in the newest. The newest file and the last 6 hours of the journal come from the dungeon scenarios (maps 389, 36, 48, 43 ...): there every
+  quest line says `allowed=0 party=1`, so the planner has nothing to do. "No `quest_done` in 2 hours" is a run with scenarios, not a broken quest path.
+- The accepts the core refuses: 14,700 `quest_refused kind=accept_or_abandon` in 3 days (the core's own log says `bot cannot take the quest` for the 497 that
+  it logs), 976 hand-in refusals (`bag_room=no` in 654). The ten most refused quests are class quests (792, 1463, 1516, 5648 ...) and level-1 starter quests.
+  The refusing code is `Player::CanTakeQuest` (status, exclusive group, class, race, level, skill, reputation, previous quest, conditions). The module cannot see
+  which test failed (the core's reason string is in the core log only) and its `Done` memory is lost at every restart, so a quest handed in on an earlier run is
+  tried again. Change: a refused accept is now blocked 10 minutes the first time, one hour the second time and six hours from the third.
+- The no-route flood: 280,000 `no_route ... cause=to_point` events in 3 days. Only a start's giver walk was handled (`NoteNoRoute` blocked the start for 30
+  minutes); the walk to the ender of a quest in the log or to a hunting area was not, and a hunting quest ignored the block that `NoteWalkStuck` set
+  (the planner's step 2 never looked at it). Changes: the hunt step honours the block; a no-route answer on a hunt moves to the quest's next area and three in a
+  row block the quest (`kNoRouteWalksBlock`, 15 minutes), the same for the walk to an ender; a giver or ender within 9 yards that the core has no route to is
+  tried from where the bot stands (the core measures the reach from the NPC's edge, and some NPCs stand behind a counter or on an object).
+- Not fixable in the module: a core that answers no route for a target that stands on no navmesh tile; the 0,0,0 destinations (1,075 events) come from another
+  feature, not from quests.
+
+## Group quests (Stage B, config QuestGroups, off by default)
+
+A quest for a party (`SuggestedGroupNum` 2 or more) is kept by `make_world_quests.py --groups` with `group <n>` in its `req` record (class quests keep no marker: they
+are completed with their reward). Without `QuestGroups` the planner ignores such quests, so lists made with the flag are safe to load. With `QuestGroups = 1`:
+
+1. The bot accepts the quest like any other. In the log, with its party smaller than `n`, the planner's step is **WaitGroup** (the bot stands still; the wait does
+   not count as "stuck"). After `QuestGroupWaitMinutes` (10) without a party the step is Abandon: the quest is left alone for an hour and the bot goes on.
+2. `quest_group.h` picks the leader: of the bots in WaitGroup for the same quest, the lowest guid that is not in another bot's party. It invites, until the party has `n`
+   members, the free bots within `QuestGroupRangeYards` (150) on its map that have the same quest in their log (nearest first), then its guild mates
+   (`QuestGroupGuildHelpers`). The invite is the group action; an invitee accepts an invite from a registered leader at once (not in a fight). Events:
+   `quest_group_invite`, `quest_group_disband`.
+3. The party follows its leader the way a tank-led party does (the policy puts it in the leader/member tables). Members do no quest work of their own; the
+   leader hunts and hands in.
+4. When the quest is out of the leader's log (handed in, abandoned) every member leaves the party; a member that completed the quest with the party then hands it
+   in at the ender on its own, as a free bot.
+
+**Data gap.** The sim world database has 502 quests with `SuggestedGroupNum` > 1, and none of them has a row in `quest_template_classic_level`, which the generator
+joins for the quest level. So the 60 lists made today hold no group quest, and the feature is covered by unit tests only. To get group quests into the lists a level
+source for them is needed (the content tuning of the hotfix database, or a hand-kept level file).
+
+## Onyxia attunement chain: what is missing (2026-11-12)
+
+The chain (quests 4903, 7761, 7781, 4241, 4941, 6568, 6570, 6502, 6602, 6569, 6601) does not fit the planner for these reasons,
+from `--explain`: 4903, 7761, 7781 have no creature giver; 4241, 4941, 6568, 6570 end on another map (230, 1, 0); 6502, 6602, 6569, 6601 need items from creatures on
+another map. What the module could do itself, and what stops it, checked against the SDK (`tier2_layout.h`, layout 25) and the core (`ModuleBotActions.cpp`):
+
+| Need | Module side | Missing |
+| --- | --- | --- |
+| Accept a quest that starts from an item or a game object | the planner can walk to the object (data format has no object giver yet) | the core's `QuestAction` accepts only from a creature (`NearestQuestNpc` looks at `hasQuest` of creatures). Needs a kQuest operation 5 (accept from the game object or item named in `target_guid`) or a `kUseItem` that triggers `ItemTemplate::StartQuest`. `kUseObject` exists but is gated by `Bot.Actions.UseObject` and only clicks. |
+| Know that the bot holds a quest item (the items from the other map) | - | a snapshot field with the bag's count of a given entry (the snapshot has ammo only). Without it a collect objective on another map cannot be told from "not yet looted"; the quest log counts do show it once the quest is in the log, so only the item-started quests need it. |
+| Hop to another map for the ender (230, 1, 0) | `kTeleport` (map, x, y, z) with `Bot.Actions.Teleport`; a `hop` step plus an `ender map` field in the data format | nothing in the SDK; the sim must run with `Bot.Actions.Teleport = 1`, and a dungeon map needs the party/instance entry that `level_dungeon.cpp` does (a bare teleport into an instance map is refused unless the bot is in the party's instance) |
+| Boss-kill step (Drakkisath, Rend and the like) | the dungeon runner knows boss deaths (`dungeon_events`) | a link from a quest objective to a dungeon run: the quest's creature kill objective in the log is progress enough, but the bot has to be in the dungeon party for it |
+
+Nothing of this was invented in code. The first change to ask of the core is the kQuest operation 5 (object or item start); the second the bag-count snapshot field.
