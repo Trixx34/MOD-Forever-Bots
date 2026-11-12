@@ -669,6 +669,25 @@ void BotPolicy::DecideBot(DecideTick& tick, std::size_t i)
     tick.present.insert(bot.guid);
     BotTurn turn{ i, bot, StateOf(bot.guid), tick.nowMs };
     turn.actionsAtStart = tick.actions.size();
+    // A passenger is carried by its transport: whatever step asked it to walk to a world point, the kMoveTo is dropped when the turn ends (TurnTransport sets
+    // the hold), and the bot's remembered last order is cleared so the walk is sent again once it is off the deck.
+    struct TransportMoveFilter
+    {
+        BotTurn& turn;
+        std::vector<BotAction>& actions;
+        ~TransportMoveFilter()
+        {
+            if (!turn.transportHold)
+                return;
+            auto const first = actions.begin() + std::ptrdiff_t(std::min(turn.actionsAtStart, actions.size()));
+            auto const removed = std::remove_if(first, actions.end(), [&](BotAction const& a) { return a.bot_guid == turn.bot.guid && a.type == ActionType::kMoveTo; });
+            if (removed != actions.end())
+            {
+                actions.erase(removed, actions.end());
+                turn.state.Last.reset();
+            }
+        }
+    } transportMoveFilter{ turn, tick.actions };
     if (TurnBegin(tick, turn) == TurnFlow::kSkip)
         return;
     if (TurnGroundEffects(tick, turn) == TurnFlow::kSkip)
@@ -677,6 +696,7 @@ void BotPolicy::DecideBot(DecideTick& tick, std::size_t i)
     if (TurnDead(tick, turn) == TurnFlow::kSkip)
         return;
     TurnRevivedAndRoles(tick, turn);
+    TurnTransport(tick, turn);
     TurnTalentsAndGear(tick, turn);
     TurnQuestsAndHold(tick, turn);
     TurnTargeting(tick, turn);

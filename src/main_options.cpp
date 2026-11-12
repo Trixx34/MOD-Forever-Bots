@@ -146,6 +146,7 @@ void LoadPolicyTables(PolicyOptions& policyOptions, BotSettings& settings)
     policyOptions.PathJitter = settings.PathJitter;
     policyOptions.GuildMilestone = settings.GuildMilestone;
     policyOptions.CityInspect = settings.CityInspect;
+    policyOptions.TransportRide = settings.TransportRide;
     policyOptions.CityGreet = settings.CityGreet;
     policyOptions.QuestInvite = settings.QuestInvite;
     // ADVISOR-COPY

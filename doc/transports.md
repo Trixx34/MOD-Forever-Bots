@@ -78,6 +78,21 @@ Status: design only. No module code was written because every part needs an SDK 
    login after a restart of the sim, not only for players).
 5. Metrics: boarding success rate, time to board, bots left behind when the ship leaves.
 
+## Implemented (module 0.47.0, off by default)
+
+`src/transport_ride.h` (pure rules, `tests/transport_ride_test.cpp`) and `BotPolicy::TurnTransport` (after `TurnRevivedAndRoles`). Config `TransportRide`,
+`TransportRideEveryMs` (5000), `TransportRideBackoffMs` (30000). Needs the core's `Bot.Actions.Transport = 1` and `Bot.Snapshot.PartyView = 1`.
+
+- A bot in a group, not its leader, alive, not in combat, not swimming, not on a flight, whose leader (the party view member with the leader flag, online) has
+  `transport_entry != 0` and which is not aboard that transport: `kTransport` spell 3 (join the leader's transport). The core brings the bot to the leader's
+  map when needed and refuses a leader in an instance.
+- The leader on no transport while the bot rides (outside combat): spell 2 (leave).
+- A passenger gets no `kMoveTo`: `turn.transportHold` turns the step's move into a stop, and `DecideBot` drops any `kMoveTo` pushed in the turn and clears the
+  remembered last order. The hold lasts while the snapshot says on-transport and for the turn of a join order.
+- A refused order (`kRefused`, `kInvalidTarget`) backs the bot off for `TransportRideBackoffMs`; out of range and busy retry after `TransportRideEveryMs`.
+  Events: `transport_board`, `transport_leave`, `transport_refused`.
+- Not done: a bot that leads (a leading bot never rides by itself), board by entry for a lone bot (the action exists in the core, no policy uses it).
+
 ## Risks
 
 - Bots that stand on a deck without being passengers (today's behaviour) are stranded when the ship leaves; with the action they would be moved

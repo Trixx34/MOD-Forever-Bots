@@ -30,6 +30,7 @@
 
 #include "party_planner.h"
 #include "party_view_adapter.h"
+#include "transport_ride.h"
 #include "role_profile.h"
 #include "forever_module/tier2_session.h"
 #include "chat_commands.h"
@@ -333,6 +334,8 @@ struct PolicyOptions
     city_inspect::Settings CityInspect;
     city_greet::Settings CityGreet;
     quest_invite::Settings QuestInvite;
+    // TransportRide: a bot rides the ship, zeppelin or elevator its group leader stands on (kTransport; needs the core's Bot.Actions.Transport and Bot.Snapshot.PartyView).
+    transport_ride::Settings TransportRide;
     // ADVISOR-OPTIONS
     // Advisor features (docs: config/modules.d/forever-bots.conf.example, "Advisor features"; each off by default). The line pools are read once at start.
     std::shared_ptr<advisor::Pools const> Pools;
@@ -603,6 +606,8 @@ private:
         Point ExploreTarget;
         std::uint64_t InviteAcceptAtMs = 0;              // a player's invite is not answered again before this
         std::uint64_t PartyRetryAtMs = 0;                // a party action is not sent again before this
+        std::uint64_t TransportNextMs = 0;               // TransportRide: the next kTransport order is not sent before this
+        bool TransportRiding = false;                    // TransportRide: the bot was a passenger at its last turn (for the board and leave events)
         // 40-man raid support (doc 108), leader-side only. RaidConvertRetryAtMs paces the repeated ConvertToRaid asks (its success is
         // not visible in the snapshot -- no is_raid field -- so it is simply retried at a slow pace, harmless once already a raid).
         // RaidSubgroupSent/RaidAssignRetryAtMs remember, per member, the subgroup last asked for and when it may be asked again, so a
@@ -841,6 +846,7 @@ private:
     void DeadRunFailed(DecideTick& tick, BotTurn& turn, char const* why);
     void LogEvent(std::string const& text) const;
     void TurnRevivedAndRoles(DecideTick& tick, BotTurn& turn);
+    void TurnTransport(DecideTick& tick, BotTurn& turn); // TransportRide (bot_policy_turn_life.cpp)
     void TurnTalentsAndGear(DecideTick& tick, BotTurn& turn);
     void TurnQuestsAndHold(DecideTick& tick, BotTurn& turn);
     void TurnTargeting(DecideTick& tick, BotTurn& turn);
@@ -850,7 +856,7 @@ private:
     void TurnFightWatch(DecideTick& tick, BotTurn& turn);
     void TurnMoveSetup(DecideTick& tick, BotTurn& turn);
     void TurnMoveChoice(DecideTick& tick, BotTurn& turn);
-    // TurnMoveChoice's parts (bot_policy_turn_move.cpp). RouteLeg (bot_policy_internal.h) is what the parts of the route leader's walk share.
+    // TurnMoveChoice's parts (bot_policy_turn_life.cpp). RouteLeg (bot_policy_internal.h) is what the parts of the route leader's walk share.
     struct RouteLeg;
     void MoveToTarget(DecideTick& tick, BotTurn& turn);
     void MoveWithoutTarget(DecideTick& tick, BotTurn& turn);

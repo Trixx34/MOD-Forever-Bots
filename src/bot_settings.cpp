@@ -706,6 +706,9 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadBool(config, "CityInspect", settings.CityInspect.Enabled, warnings);
     ReadKey(config, "CityInspectChancePct", 0, 100, settings.CityInspect.ChancePct, warnings);
     ReadKey(config, "CityInspectZoneMax", 0, 100, settings.CityInspect.ZoneMax, warnings);
+    ReadBool(config, "TransportRide", settings.TransportRide.Enabled, warnings);
+    ReadKey(config, "TransportRideEveryMs", 1000, 60000, settings.TransportRide.EveryMs, warnings);
+    ReadKey(config, "TransportRideBackoffMs", 5000, 600000, settings.TransportRide.BackoffMs, warnings);
     ReadBool(config, "CityGreet", settings.CityGreet.Enabled, warnings);
     ReadKey(config, "CityGreetChancePct", 0, 100, settings.CityGreet.ChancePct, warnings);
     ReadKey(config, "CityGreetZoneMax", 0, 100, settings.CityGreet.ZoneMax, warnings);

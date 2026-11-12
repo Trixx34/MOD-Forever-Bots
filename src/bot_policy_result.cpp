@@ -200,6 +200,18 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
         return;
     }
 
+    // A kTransport order refused (the core's Bot.Actions.Transport off, the leader on no transport, a bot in combat, too far from the leader): the next one waits.
+    // Out of range and busy are short waits (the bot is walking closer); any other refusal backs off for TransportRideBackoffMs.
+    if (bot.last_action_type == uint8_t(ActionType::kTransport) && bot.last_action_status != BotActionStatus::kApplied && bot.last_action_status != BotActionStatus::kNone)
+    {
+        bool const brief = bot.last_action_status == BotActionStatus::kOutOfRange || bot.last_action_status == BotActionStatus::kBusy;
+        state.TransportNextMs = nowMs + (brief ? _options.TransportRide.EveryMs : _options.TransportRide.BackoffMs);
+        if (_options.OnEvent)
+            _options.OnEvent("transport_refused: bot=" + std::to_string(bot.guid) + " status=" + ActionStatusName(bot.last_action_status) + " map=" + std::to_string(bot.map_id) +
+                             " transport=" + std::to_string(bot.transport_guid));
+        return;
+    }
+
     // A party action refused (no invite waiting, a full party): the party waits a moment before the next one.
     if (bot.last_action_type == uint8_t(ActionType::kGroup) && bot.last_action_status == BotActionStatus::kRefused)
     {

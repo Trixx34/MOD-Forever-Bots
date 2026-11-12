@@ -959,6 +959,10 @@ void BotPolicy::TurnSendMove(DecideTick& tick, BotTurn& turn)
     auto& aoeWarder = turn.aoeWarder;
     auto& kiteEntry = turn.kiteEntry;
 
+    // A passenger is carried by its transport, a walk to a world point would take it off the deck (TransportRide): it stops instead.
+    if (turn.transportHold && wanted.Type == ActionType::kMoveTo)
+        wanted = Decision{};
+
     // Stacking: a follower that stands on a lower-guid bot of its map (both out of combat) steps about 2.5 yards off, so bots do not stand
     // inside each other. Only the higher guid steps, so one of the two stays put; a party leader (partyLeader 0) never steps, it holds its
     // point. Idle bots only: a walk to a point is the policy's own choice.
