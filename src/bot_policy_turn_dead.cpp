@@ -122,6 +122,9 @@ void BotPolicy::DeadRecord(DecideTick& tick, BotTurn& turn)
                 killer = &unit;
         if (!killer)
             killer = Closest(bot, nearby, IsLiveMob);
+        std::uint32_t const killerEntry = killer ? forever_module::UnitRefEntry(killer->guid) : 0u;
+        state.KillerRepeat = killerEntry != 0 && killerEntry == state.LastKillerEntry;
+        state.LastKillerEntry = killerEntry;
         LogEvent("died: bot=" + std::to_string(bot.guid) + " life=" + std::to_string(bot.life_state) + " map=" + std::to_string(bot.map_id) +
               " pos=" + std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) +
               " last_decision=" + (state.Last ? std::to_string(int(state.Last->Type)) : std::string("none")) +

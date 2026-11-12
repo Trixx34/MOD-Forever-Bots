@@ -47,15 +47,16 @@ void BotPolicy::TurnMoveChoice(DecideTick& tick, BotTurn& turn)
             threat = Closest(bot, nearby, IsLiveMob);
         float const away = threat ? (threat == targetUnit ? distance : rotation::DistanceYards(bot, *threat))
                                   : std::numeric_limits<float>::max();
-        if (threat && away < kFleeYards)
+        float const fleeYards = turn.hurtRest ? kRecoverSafeYards : kFleeYards;
+        if (threat && away < fleeYards)
         {
             float const dx = bot.pos_x - threat->pos_x;
             float const dy = bot.pos_y - threat->pos_y;
             float const dist = std::sqrt(dx * dx + dy * dy);
             if (dist > 0.0f)
             {
-                Point flee{ threat->pos_x + dx / dist * kFleeYards,
-                            threat->pos_y + dy / dist * kFleeYards,
+                Point flee{ threat->pos_x + dx / dist * fleeYards,
+                            threat->pos_y + dy / dist * fleeYards,
                             bot.pos_z };
                 wanted = Decision{ ActionType::kMoveTo, 0, flee };
                 moveWhy = "flee";

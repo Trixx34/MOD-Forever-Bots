@@ -468,6 +468,9 @@ constexpr float kSummonerReachYards = 35.0f; // how far from the tank's target t
 constexpr std::uint64_t kReclaimRetryMs = 3000;
 constexpr std::uint64_t kDeathLoopMs = 420000;         // three deaths within this time are a death loop: the bot is moved to a grind spot for its level (prod: a bot dying every ~62 s, so three deaths span ~125 s)
 constexpr std::uint64_t kDeathLoopCooldownMs = 120000; // after an escape the bot is not moved again before this
+constexpr std::uint32_t kRecoverPullPct = 75;           // a solo bot out of combat below this health starts no fight and no quest walk: it backs off and rests first (prod 2026-11-12: bots revived at 49% pulled the creature that had killed them, 812 deaths in 90 minutes)
+constexpr std::uint64_t kRecoverHoldMs = 150000;       // ... for at most this long, so a bot that cannot regenerate does not stand for good
+constexpr float kRecoverSafeYards = 30.0f;              // ... and it sits down only with no live creature this close (it walks away from one that is)
 constexpr float kDeathLoopAwayYards = 400.0f;           // ... one at least this far from where it keeps dying
 constexpr std::uint64_t kCorpseTeleportRetryMs = 15000; // a ghost off its corpse's map with no portal is teleported to the corpse, not again before this
 constexpr std::uint64_t kOutOfCombatReviveRetryMs = 10000; // a ghost of a dungeon party is revived by its leader out of combat, not again before this
@@ -741,6 +744,7 @@ struct BotPolicy::BotTurn
     bool stagingHold = false;                             // TurnBegin
     std::span<NearbyUnit const> nearby{};                 // TurnTargetMemory
     std::uint64_t deadParty = 0;
+    bool hurtRest = false;                              // TurnRevivedAndRoles: hurt and solo, out of combat: rests before it fights (kRecoverPullPct)
     bool lowHealth = false;                               // TurnRevivedAndRoles
     std::uint32_t classId = 0;
     std::string spec{};

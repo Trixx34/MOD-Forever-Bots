@@ -813,6 +813,9 @@ private:
         bool RunFailed = false;
         bool RunTimeoutTeleported = false;               // the ghost was put at its corpse once after a run that took too long (a corpse far away, or a route that goes nowhere)
         std::uint64_t DeathTimesMs[3] = { 0, 0, 0 };     // when this bot last died (newest last): two deaths close together mean it dies where it stands up (DeathLoopMs)
+        std::uint32_t LastKillerEntry = 0;               // the entry of the creature that killed the bot last (0 = none seen)
+        bool KillerRepeat = false;                       // the last death was to the same creature entry as the one before: a death loop one death sooner
+        std::uint64_t RecoverSinceMs = 0;                // since when a solo bot out of combat has been under kRecoverPullPct health (0 = not hurt); kRecoverHoldMs caps the hold
         std::uint64_t EscapeUntilMs = 0;                 // after a death loop the bot is put at a suitable grind spot; not again before this
         float RunStartDist = 0.0f;                       // distance to the corpse at the start (same map), for progress lines
         std::uint32_t RunProgress = 0;                   // 25, 50 or 75: the last progress line written
