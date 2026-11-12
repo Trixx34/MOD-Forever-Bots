@@ -425,6 +425,34 @@ void BotInAGroundEffectWalksOut()
     }
 }
 
+void TrapObjectGroundEffectKind3IsAvoided()
+{
+    // A trap game object arrives as a ground effect of kind 3 (spell_id = the trap's spell). A raid rule `avoid|spell` for that spell makes it harmful whatever the kind:
+    // Jeklik's bomb (trap 19628, radius 5), with the caster not known hostile (a game object has no hostile flag here).
+    PolicyOptions options = AggressiveOptions();
+    options.AvoidGroundEffects = true;
+    std::vector<std::string> errors;
+    options.RaidRules = std::make_shared<raid_rules::Table>(raid_rules::Parse("avoid|309|spell|19628|5|Jeklik bomb\n", errors));
+    CHECK(errors.empty());
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = View(1, 0, {});
+    view.bots[0].map_id = 309;
+    SetGroundEffect(view, 19628, 2.0f, 0.0f, 5.0f, 0);
+    view.bots[0].ground_effects[0].kind = 3;
+    auto const moves = GroundMoves(policy.Decide(view, 1000));
+    CHECK(moves.size() == 1);
+    if (moves.size() == 1)
+    {
+        float const dx = moves[0].dest_x - 2.0f, dy = moves[0].dest_y;
+        CHECK(std::sqrt(dx * dx + dy * dy) >= 8.0f - 0.01f);         // 5 yards plus the 3-yard margin
+    }
+    // a trap spell with no rule is not avoided (hostile 0, not in a table)
+    PolicyOptions plain = AggressiveOptions();
+    plain.AvoidGroundEffects = true;
+    BotPolicy without(plain);
+    CHECK(GroundMoves(without.Decide(view, 2000)).empty());
+}
+
 void RaidRulesAvoidSpellGivesTheRadius()
 {
     // A spell of the raid rule table's avoid rows is harmful even when its caster is not known hostile, with the rule's radius (a 12-yard circle here, not the snapshot's 2).
@@ -1019,6 +1047,7 @@ void RunPolicyTestsPart1()
     BotInAGroundEffectWalksOut();
     GroundEffectsAreIgnoredWhenOffOrNotHarmful();
     RaidRulesAvoidSpellGivesTheRadius();
+    TrapObjectGroundEffectKind3IsAvoided();
     DungeonFileZonesAndSpellsAreAvoided();
     RefusedSitIsRetriedLater();
     OverPullIsSkipped();

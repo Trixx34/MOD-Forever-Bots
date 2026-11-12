@@ -11,7 +11,7 @@
 //   interrupt|map|spell_id|name                a cast the kickers take before any other cast
 //   dispel|map|aura_id|kind|name               kind: magic, curse, disease or poison
 //   avoid|map|spell|spell_id|radius|name       a ground effect (dynamic object or area trigger) of this spell: step out of it
-//   avoid|map|object|entry|radius|name         a game object of this entry: step out of it (the snapshot has no game objects yet, see the README)
+//   avoid|map|object|entry|radius|name         a game object of this entry (kept, not acted on: write a trap game object as a spell row with its trap spell, kind 3 ground effects)
 //   swap|map|boss_entry|aura_id|stacks|name    the tank holding `stacks` of this aura on it is swapped for another tank
 //   noaoe|map|boss_entry|name                  no area damage in this fight (boss_entry 0 = every fight on the map)
 //   frontal|map|boss_entry|spell_id|name       a frontal cast of the boss: the tank keeps the boss turned away from the raid (data only, see the README)

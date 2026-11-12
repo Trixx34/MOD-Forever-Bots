@@ -121,7 +121,18 @@ void TestShippedFile()
     CHECK(*t.AddRank(309, 11368) == 0 && *t.AddRank(309, 14965) == 0);
     CHECK(t.DispelKindOf(309, 16098) == DispelKind::Curse);
     CHECK(t.DispelKindOf(309, 23952) == DispelKind::Magic);
-    CHECK(t.AvoidOf(309, true).size() == 1 && t.AvoidOf(309, true)[0].Id == 177764 && t.AvoidOf(309, true)[0].Radius == 6.0f);
+    // trap objects are spell rows (kind 3 ground effects carry the trap's spell)
+    {
+        auto const zones = t.AvoidOf(309, false);
+        auto radiusOf = [&](std::uint32_t spell) { for (auto const& z : zones) if (z.Id == spell) return z.Radius; return 0.0f; };
+        CHECK(radiusOf(19628) == 5.0f);     // Jeklik's bomb, not 6
+        CHECK(radiusOf(23972) == 3.5f);     // Liquid Fire is GO 180125 / trap 23972
+        CHECK(t.AvoidOf(309, true).empty());
+        auto const mc = t.AvoidOf(409, false);
+        bool lava = false, burst = false;
+        for (auto const& z : mc) { lava = lava || (z.Id == 19428 && z.Radius == 2.5f); burst = burst || z.Id == 21158; }
+        CHECK(lava && burst);
+    }
     CHECK(t.SwapStacks(309, 12097).has_value());
     CHECK(t.IsBoss(309, 14517));
 }

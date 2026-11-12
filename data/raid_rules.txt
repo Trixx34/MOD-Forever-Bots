@@ -52,7 +52,14 @@ interrupt|309|24300|Drain Life
 interrupt|309|23953|Mind Flay
 dispel|309|16098|curse|Curse of Blood
 dispel|309|23952|magic|Shadow Word: Pain
-# Liquid Fire is a game object: needs game objects in the snapshot (gap, see README)
-avoid|309|object|177764|6|Liquid Fire
+# Trap game objects reach the snapshot as ground effects of kind 3 whose spell_id is the trap's spell (core Bot.Snapshot.GroundEffects.GameObjects), so they are
+# spell rows: Jeklik's bomb (summon 19629, GO 177764, trap 19628, radius 5) and Liquid Fire (summon 23971, GO 180125, trap 23972, radius 3.5)
+avoid|309|spell|19628|5|Jeklik bomb (Inferno, GO 177764)
+avoid|309|spell|23972|3.5|Liquid Fire (GO 180125)
 # Pierce Armor on the tank of Jeklik: swap after 3 stacks
 swap|309|14517|12097|3|Pierce Armor
+
+# Molten Core: trap game objects (kind 3 ground effects, trap spell ids). Magmadar's Lava Bomb: GO 177704, trap 19428. Ragnaros' Lava Burst: GO 178088, trap 21158,
+# radius is an estimate (not yet read from the spell data); a rule's radius overrides the snapshot's
+avoid|409|spell|19428|2.5|Lava Bomb (GO 177704)
+avoid|409|spell|21158|4|Lava Burst (GO 178088)
