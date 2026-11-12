@@ -730,6 +730,88 @@ void NoRouteAtTheGiverIsIgnored()
     CHECK(memory.StartIndex == 0); // the start is kept: the planner was not walking to it
 }
 
+void RefusedAcceptsBlockLongerEachTime()
+{
+    QuestPlanner planner(World());
+    QuestMemory memory;
+    planner.NoteSent(memory, kQuestAccept, 100, 0);
+    planner.NoteRefused(memory, 0);
+    CHECK(memory.BlockedUntilMs[100] == kBlockAfterAcceptRefusalMs);
+    planner.NoteSent(memory, kQuestAccept, 100, 0);
+    planner.NoteRefused(memory, 0);
+    CHECK(memory.BlockedUntilMs[100] == kBlockAfterAcceptRefusal2Ms);
+    planner.NoteSent(memory, kQuestAccept, 100, 0);
+    planner.NoteRefused(memory, 0);
+    CHECK(memory.BlockedUntilMs[100] == kBlockAfterAcceptRefusal3Ms);
+}
+
+void ABlockedHuntingQuestIsLeftAloneAndTheBotGrinds()
+{
+    QuestPlanner planner(Data());
+    QuestMemory memory;
+    BotSnapshot bot = Bot(-8900.0f, -160.0f);
+    LogQuest(bot, 7, 1, 2);
+    CHECK(planner.Next(bot, memory, 1000).Kind == QuestStepKind::Hunt);
+    planner.NoteWalkStuck(memory, 7, 2000);
+    CHECK(planner.Next(bot, memory, 3000).Kind != QuestStepKind::Hunt); // blocked: quest 783 may be taken, but no hunt
+    CHECK(planner.Next(bot, memory, 2000 + kWalkStuckBlockMs + 1).Kind == QuestStepKind::Abandon); // no progress for the whole block: given up
+}
+
+void NoRouteToAHuntingAreaMovesOnAndThenBlocksTheQuest()
+{
+    QuestPlanner planner(Data());
+    QuestMemory memory;
+    BotSnapshot bot = Bot(-8900.0f, -160.0f);
+    LogQuest(bot, 7, 1, 2);
+    QuestStep step = planner.Next(bot, memory, 1000);
+    CHECK(step.Kind == QuestStepKind::Hunt && step.Dest.X == -8796.8f);
+    planner.NoteNoRoute(memory, 1100, &bot); // far from the area: the next area
+    step = planner.Next(bot, memory, 1200);
+    CHECK(step.Kind == QuestStepKind::Hunt && step.Dest.X == -8810.7f);
+    planner.NoteNoRoute(memory, 1300, &bot);
+    planner.Next(bot, memory, 1400);
+    planner.NoteNoRoute(memory, 1500, &bot); // the third answer in a row
+    CHECK(memory.BlockedUntilMs.count(7) == 1 && memory.BlockedUntilMs[7] == 1500 + kWalkStuckBlockMs);
+}
+
+void NoRouteToAnEnderBlocksTheHandInAfterThreeAnswers()
+{
+    QuestPlanner planner(World());
+    QuestMemory memory;
+    BotSnapshot bot = WorldBot(5, -9300.0f, -100.0f);
+    LogQuest(bot, 100, 2); // complete: walk to the ender 300 yards away
+    for (int i = 0; i < 3; ++i)
+    {
+        CHECK(planner.Next(bot, memory, 1000 + i).Kind == QuestStepKind::WalkTo);
+        planner.NoteNoRoute(memory, 1000 + i, &bot);
+    }
+    CHECK(planner.Next(bot, memory, 1100).Quest != 100); // blocked: the planner works on something else
+}
+
+void ANearGiverWithoutARouteIsTriedFromWhereTheBotStands()
+{
+    // The giver of quest 783 stands 7 yards off (behind a counter): the walk finds no route, so the accept is sent from here.
+    QuestPlanner planner(Data());
+    QuestMemory memory;
+    BotSnapshot const bot = Bot(-8933.5f + 7.0f, -136.5f);
+    QuestStep step = planner.Next(bot, memory, 1000);
+    CHECK(step.Kind == QuestStepKind::WalkTo && step.Quest == 783);
+    planner.NoteNoRoute(memory, 1100, &bot);
+    step = planner.Next(bot, memory, 4000);
+    CHECK(step.Kind == QuestStepKind::Accept && step.Quest == 783);
+    CHECK(memory.NoRouteUntilMs.empty()); // the start was not blocked
+    // A refused answer there blocks the quest as usual, and the planner goes on.
+    planner.NoteSent(memory, kQuestAccept, 783, 4000);
+    planner.NoteRefused(memory, 4100);
+    CHECK(planner.Next(bot, memory, 8000).Quest != 783);
+    // The second no-route (not near: 40 yards) blocks the start.
+    QuestMemory far;
+    BotSnapshot const farBot = Bot(-8933.5f + 40.0f, -136.5f);
+    planner.Next(farBot, far, 1000);
+    planner.NoteNoRoute(far, 1100, &farBot);
+    CHECK(far.NoRouteUntilMs.size() == 1);
+}
+
 void AStuckWalkToAnEnderBlocksThatQuestForAWhile()
 {
     QuestPlanner planner(World());
@@ -952,6 +1034,11 @@ int main()
     WorldStartFarAwayIsNotWalkedTo();
     NoRouteToAStartGiverBlocksThatStart();
     NoRouteAtTheGiverIsIgnored();
+    RefusedAcceptsBlockLongerEachTime();
+    ABlockedHuntingQuestIsLeftAloneAndTheBotGrinds();
+    NoRouteToAHuntingAreaMovesOnAndThenBlocksTheQuest();
+    NoRouteToAnEnderBlocksTheHandInAfterThreeAnswers();
+    ANearGiverWithoutARouteIsTriedFromWhereTheBotStands();
     RefusedHandInSendsTheBotToAVendor();
     ARunOfRefusedQuestActionsPausesTheQuestEngine();
     HandInRefusalsBlockLessThanOtherRefusals();

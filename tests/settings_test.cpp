@@ -42,6 +42,9 @@ void ChatSettings()
     CHECK(!off.ChatCommands && !off.ChatOrders && !off.ChatControl && !off.QuestTeleport); // all off by default
     BotSettings const on = ParseBotSettings({ { "ChatCommands", "1" }, { "ChatOrders", "1" }, { "ChatControl", "1" }, { "QuestTeleport", "1" } }, warnings);
     CHECK(on.ChatCommands && on.ChatOrders && on.ChatControl && on.QuestTeleport && warnings.empty());
+    CHECK(!off.QuestGroups.Enabled && off.QuestGroups.WaitMs == 600000 && off.QuestGroups.RangeYards == 150.0f); // group quests are off by default
+    BotSettings const groups = ParseBotSettings({ { "QuestGroups", "1" }, { "QuestGroupWaitMinutes", "5" }, { "QuestGroupRangeYards", "80" }, { "QuestGroupGuildHelpers", "0" } }, warnings);
+    CHECK(groups.QuestGroups.Enabled && groups.QuestGroups.WaitMs == 300000 && groups.QuestGroups.RangeYards == 80.0f && !groups.QuestGroups.GuildHelpers && warnings.empty());
 }
 
 void QuestListSettings()

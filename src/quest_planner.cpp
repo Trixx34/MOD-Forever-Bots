@@ -39,7 +39,8 @@ QuestStep WalkOrAct(BotSnapshot const& bot, QuestMemory const& memory, QuestPoin
     QuestStep step;
     step.Quest = quest;
     step.Dest = where;
-    if (Distance2d(bot, where) > kQuestReachYards)
+    float const reach = memory.NearEnough.count(quest) ? kQuestNearTryYards : kQuestReachYards;
+    if (Distance2d(bot, where) > reach)
     {
         step.Kind = QuestStepKind::WalkTo;
         return step;
@@ -50,8 +51,8 @@ QuestStep WalkOrAct(BotSnapshot const& bot, QuestMemory const& memory, QuestPoin
 
 } // namespace
 
-QuestPlanner::QuestPlanner(std::shared_ptr<QuestData const> data, std::shared_ptr<QuestData const> alsoKnown)
-    : _data(std::move(data)), _alsoKnown(std::move(alsoKnown))
+QuestPlanner::QuestPlanner(std::shared_ptr<QuestData const> data, std::shared_ptr<QuestData const> alsoKnown, QuestPlannerOptions options)
+    : _options(options), _data(std::move(data)), _alsoKnown(std::move(alsoKnown))
 {
     // The list the planner works from first, so a quest in both is the one of that list.
     for (QuestData const* list : { _data.get(), _alsoKnown.get() })
@@ -86,8 +87,10 @@ int QuestPlanner::FindStart(BotSnapshot const& bot) const
     return best;
 }
 
-bool QuestPlanner::Eligible(QuestDef const& quest, BotSnapshot const& bot, QuestBotInfo const& info)
+bool QuestPlanner::Eligible(QuestDef const& quest, BotSnapshot const& bot, QuestBotInfo const& info) const
 {
+    if (quest.Group > 1 && !_options.GroupQuests)
+        return false; // a quest for a party: only with QuestGroups on
     std::uint32_t const level = bot.level;
     if (level != 0)
     {
@@ -125,6 +128,9 @@ QuestStep QuestPlanner::Next(BotSnapshot const& bot, QuestMemory& memory, std::u
         memory.NoRouteUntilMs.clear();
     }
     memory.WalkingToStart = false;
+    memory.LastWalkQuest = 0;
+    memory.LastWalkKind = QuestStepKind::None;
+    // Remember the step if it is a walk, for NoteNoRoute (a lambda around the returns below would hide the early exits, so each walk sets it).
 
     // A hand-in that was sent and whose quest is out of the log is done.
     if (memory.PendingHandIn != 0 && !InLog(bot, memory.PendingHandIn))
@@ -150,15 +156,30 @@ QuestStep QuestPlanner::Next(BotSnapshot const& bot, QuestMemory& memory, std::u
             sum += count;
         auto [at, inserted] = memory.Progress.try_emplace(quest->Id);
         if (inserted || at->second.Sum != sum)
+        {
             at->second = QuestMemory::ProgressInfo{ sum, nowMs };
+            memory.NoRouteCount.erase(quest->Id); // it moved: the walks work
+        }
     }
+
+    // What NoteNoRoute needs to know about a step that walks.
+    auto const walking = [&](QuestStep const& step) -> QuestStep
+    {
+        if (step.Kind == QuestStepKind::WalkTo || step.Kind == QuestStepKind::Hunt)
+        {
+            memory.LastWalkQuest = step.Quest;
+            memory.LastWalkKind = step.Kind;
+            memory.LastWalkDest = step.Dest;
+        }
+        return step;
+    };
 
     // 1. A complete quest: hand it in.
     for (QuestDef const* quest : logged)
     {
         QuestEntry const* entry = InLog(bot, quest->Id);
         if (entry->status == 2 && !Blocked(memory, quest->Id, nowMs))
-            return WalkOrAct(bot, memory, quest->Ender, QuestStepKind::HandIn, quest->Id, nowMs);
+            return walking(WalkOrAct(bot, memory, quest->Ender, QuestStepKind::HandIn, quest->Id, nowMs));
     }
 
     // 1b. A class quest in the log: complete it with its reward and no objectives, wherever the bot is (the GM command `.quest reward`).
@@ -179,6 +200,29 @@ QuestStep QuestPlanner::Next(BotSnapshot const& bot, QuestMemory& memory, std::u
         QuestEntry const* entry = InLog(bot, quest->Id);
         if (entry->status != 1)
             continue;
+        if (quest->Group > 1 && _options.GroupQuests && !Blocked(memory, quest->Id, nowMs))
+        {
+            // A quest for a party: wait until the bot's party has the size the quest wants (the policy invites partners), give up after the wait.
+            if (bot.group_size >= quest->Group)
+                memory.GroupWaitSinceMs.erase(quest->Id);
+            else
+            {
+                std::uint64_t const since = memory.GroupWaitSinceMs.try_emplace(quest->Id, nowMs).first->second;
+                QuestStep step;
+                step.Quest = quest->Id;
+                if (nowMs - since > _options.GroupWaitMs)
+                {
+                    memory.GroupWaitSinceMs.erase(quest->Id);
+                    step.Kind = nowMs >= memory.NextActionMs ? QuestStepKind::Abandon : QuestStepKind::Wait;
+                    return step;
+                }
+                memory.Progress[quest->Id].SinceMs = nowMs; // waiting is not being stuck
+                step.Kind = QuestStepKind::WaitGroup;
+                step.GroupSize = quest->Group;
+                step.Dest = QuestPoint{ bot.pos_x, bot.pos_y, bot.pos_z };
+                return step;
+            }
+        }
         if (nowMs - memory.Progress[quest->Id].SinceMs > kStuckMs)
         {
             QuestStep step;
@@ -186,6 +230,8 @@ QuestStep QuestPlanner::Next(BotSnapshot const& bot, QuestMemory& memory, std::u
             step.Quest = quest->Id;
             return step;
         }
+        if (Blocked(memory, quest->Id, nowMs))
+            continue; // its walks found no route: left alone (the bot grinds) until the block ends, or the stuck rule above abandons it
         QuestStep step;
         step.Quest = quest->Id;
         for (QuestObjectiveDef const& objective : quest->Objectives)
@@ -207,7 +253,7 @@ QuestStep QuestPlanner::Next(BotSnapshot const& bot, QuestMemory& memory, std::u
         }
         else
             step.Dest = QuestPoint{ bot.pos_x, bot.pos_y, bot.pos_z };
-        return step;
+        return walking(step);
     }
 
     // 3. A new quest to accept, while the log has room. The bot's start is the nearest one on its map that has a quest it can take now; it is
@@ -271,7 +317,7 @@ QuestStep QuestPlanner::Next(BotSnapshot const& bot, QuestMemory& memory, std::u
                 QuestStep step = WalkOrAct(bot, memory, quest->Giver, QuestStepKind::Accept, quest->Id, nowMs);
                 step.StartGiver = true;
                 memory.WalkingToStart = step.Kind == QuestStepKind::WalkTo;
-                return step;
+                return walking(step);
             }
         }
     return none;
@@ -282,22 +328,46 @@ void QuestPlanner::NoteSent(QuestMemory& memory, std::uint32_t operation, std::u
     memory.NextActionMs = nowMs + kQuestActionGapMs;
     memory.LastActionQuest = quest;
     memory.LastActionAbandon = operation == kQuestAbandon;
+    memory.NearEnough.erase(quest);
+    memory.NoRouteCount.erase(quest);
     if (operation == kQuestHandIn || operation == kQuestReward)
         memory.PendingHandIn = quest;
     if (operation == kQuestAbandon)
     {
         memory.BlockedUntilMs[quest] = nowMs + kBlockAfterAbandonMs;
         memory.Progress.erase(quest);
+        memory.GroupWaitSinceMs.erase(quest);
     }
 }
 
-void QuestPlanner::NoteNoRoute(QuestMemory& memory, std::uint64_t nowMs) const
+void QuestPlanner::NoteNoRoute(QuestMemory& memory, std::uint64_t nowMs, BotSnapshot const* bot) const
 {
-    if (!memory.WalkingToStart || memory.StartIndex < 0)
+    // A giver or ender that is near but has no route (it stands behind a counter or on an object): the accept or hand-in is tried from here. The
+    // core measures the reach from the NPC's edge; when it still says no, the refusal blocks the quest as any other.
+    if (bot && memory.LastWalkQuest != 0 && memory.LastWalkKind == QuestStepKind::WalkTo &&
+        Distance2d(*bot, memory.LastWalkDest) <= kQuestNearTryYards && memory.NearEnough.insert(memory.LastWalkQuest).second)
+    {
+        memory.WalkingToStart = false;
         return;
-    memory.NoRouteUntilMs[std::size_t(memory.StartIndex)] = nowMs + kNoRouteBlockMs;
-    memory.StartIndex = -2; // looked up again: the nearest start that is not blocked
-    memory.WalkingToStart = false;
+    }
+    if (memory.WalkingToStart && memory.StartIndex >= 0)
+    {
+        memory.NoRouteUntilMs[std::size_t(memory.StartIndex)] = nowMs + kNoRouteBlockMs;
+        memory.StartIndex = -2; // looked up again: the nearest start that is not blocked
+        memory.WalkingToStart = false;
+        return;
+    }
+    // The walk to a quest's ender or hunting ground. A hunt moves on to the quest's next area; a few answers in a row block the quest.
+    if (memory.LastWalkQuest == 0)
+        return;
+    std::uint32_t const quest = memory.LastWalkQuest;
+    if (memory.LastWalkKind == QuestStepKind::Hunt)
+        ++memory.AreaIndex[quest];
+    if (++memory.NoRouteCount[quest] >= kNoRouteWalksBlock)
+    {
+        memory.BlockedUntilMs[quest] = nowMs + kWalkStuckBlockMs;
+        memory.NoRouteCount.erase(quest);
+    }
 }
 
 void QuestPlanner::NoteWalkStuck(QuestMemory& memory, std::uint32_t quest, std::uint64_t nowMs) const
@@ -319,7 +389,8 @@ bool QuestPlanner::NoteRefused(QuestMemory& memory, std::uint64_t nowMs) const
     // An accept the core refused ("cannot take": not eligible, a prerequisite missing, done long ago) is blocked ten minutes at once: longer than a hand-in's
     // minute, but not an hour, which kept bots from quests they could take once the core allowed it. (Without any block the planner walked bots to the
     // giver of such quests again and again, which fed the no-route flood.)
-    std::uint64_t const block = !handIn && !memory.LastActionAbandon ? kBlockAfterAcceptRefusalMs : step == 1 ? kBlockAfterRefusalMs : step == 2 ? 10 * kBlockAfterRefusalMs : kBlockAfterAbandonMs;
+    std::uint64_t const acceptBlock = times == 1 ? kBlockAfterAcceptRefusalMs : times == 2 ? kBlockAfterAcceptRefusal2Ms : kBlockAfterAcceptRefusal3Ms;
+    std::uint64_t const block = !handIn && !memory.LastActionAbandon ? acceptBlock : step == 1 ? kBlockAfterRefusalMs : step == 2 ? 10 * kBlockAfterRefusalMs : kBlockAfterAbandonMs;
     memory.BlockedUntilMs[memory.LastActionQuest] = nowMs + block;
     if (handIn)
     {

@@ -159,11 +159,13 @@ QuestData ParseQuestData(std::istream& in, std::vector<std::string>& warnings)
                     quest->RaceMask = value;
                 else if (key == "classes")
                     quest->ClassMask = value;
+                else if (key == "group")
+                    quest->Group = value;
                 else
                     ok = false;
             }
             if (!ok)
-                drop("req takes 'minlevel|level|prev|races|classes <number>' pairs");
+                drop("req takes 'minlevel|level|prev|races|classes|group <number>' pairs");
         }
         else
             drop("unknown record");

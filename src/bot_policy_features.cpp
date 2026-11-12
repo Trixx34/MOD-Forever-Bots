@@ -551,3 +551,140 @@ role_profile::Profile BotPolicy::ProfileOfBot(std::uint64_t guid) const
     }
     return role_profile::ProfileFor(ClassFor(_options, guid), role);
 }
+
+void BotPolicy::DriveQuestGroups(WorldTickSnapshotView const& view, std::unordered_map<std::uint64_t, std::size_t> const& indexOf,
+                                 std::unordered_map<std::uint64_t, std::uint64_t>& leaderOf,
+                                 std::unordered_map<std::uint64_t, std::vector<std::uint64_t>>& membersOf, std::uint64_t nowMs,
+                                 std::vector<BotAction>& actions)
+{
+    constexpr std::uint64_t kWaitFreshMs = 5000; // the planner's "waiting for a party" is this fresh or it is over
+    auto const event = [&](std::string const& text)
+    {
+        if (_options.OnEvent)
+            _options.OnEvent(text);
+    };
+    auto const leave = [&](BotSnapshot const& bot)
+    {
+        BotAction action;
+        action.bot_guid = bot.guid;
+        action.type = ActionType::kGroup;
+        action.spell_id = kGroupLeave;
+        actions.push_back(action);
+    };
+    auto const inLog = [](BotSnapshot const& bot, std::uint32_t quest)
+    {
+        for (std::size_t i = 0; i < bot.quest_count && i < forever_module::kMaxQuestLog; ++i)
+            if (bot.quests[i].quest_id == quest)
+                return true;
+        return false;
+    };
+
+    // 1. Leaders whose quest is out of the log (done, abandoned) or who went offline: the party is disbanded, every member leaves, and the bots are free again
+    // (a member that completed the quest with the party hands it in on its own).
+    for (auto it = _questGroupLeaders.begin(); it != _questGroupLeaders.end();)
+    {
+        auto const at = indexOf.find(it->first);
+        if (at == indexOf.end())
+        {
+            it = _questGroupLeaders.erase(it);
+            continue;
+        }
+        BotSnapshot const& leader = view.bots[at->second];
+        if (inLog(leader, it->second))
+        {
+            ++it;
+            continue;
+        }
+        if (leader.group_role != 0 && leader.group_leader_guid != 0)
+        {
+            for (BotSnapshot const& other : view.bots)
+                if (other.guid != leader.guid && other.group_leader_guid == leader.group_leader_guid)
+                    leave(other);
+            leave(leader);
+        }
+        event("quest_group_disband: leader=" + std::to_string(leader.guid) + " quest=" + std::to_string(it->second) + " size=" + std::to_string(leader.group_size));
+        it = _questGroupLeaders.erase(it);
+    }
+
+    // 2. Who invites whom.
+    std::vector<quest_group::Candidate> candidates;
+    candidates.reserve(view.bots.size());
+    for (BotSnapshot const& bot : view.bots)
+    {
+        quest_group::Candidate c;
+        c.Guid = bot.guid;
+        c.Map = bot.map_id;
+        c.X = bot.pos_x;
+        c.Y = bot.pos_y;
+        c.Level = bot.level;
+        c.Guild = bot.guild_guid;
+        for (std::size_t i = 0; i < bot.quest_count && i < forever_module::kMaxQuestLog; ++i)
+            c.Log.push_back(bot.quests[i].quest_id);
+        c.PartySize = bot.group_size;
+        c.Leads = bot.group_role == 2 && _questGroupLeaders.count(bot.guid) != 0;
+        bool const rostered = leaderOf.count(bot.guid) != 0;
+        auto const known = _bots.find(bot.guid);
+        if (known != _bots.end() && !rostered && nowMs - known->second.QuestWaitAtMs <= kWaitFreshMs && known->second.QuestWaitQuest != 0)
+        {
+            c.Waiting = known->second.QuestWaitQuest;
+            c.WantSize = known->second.QuestWaitSize;
+        }
+        bool const calm = known == _bots.end() || (!known->second.ChatStay && known->second.ChatFollow == 0);
+        c.Free = bot.life_state == 0 && bot.in_combat == 0 && bot.group_role == 0 && bot.group_invite_from == 0 && !rostered && !IsRouteActive(bot.guid) && calm;
+        candidates.push_back(std::move(c));
+    }
+    for (quest_group::Invite const& invite : quest_group::PlanInvites(_options.QuestGroups, candidates))
+    {
+        BotState& leaderState = StateOf(invite.Leader);
+        auto const sent = leaderState.InvitedAtMs.find(invite.Invitee);
+        _questGroupLeaders[invite.Leader] = invite.Quest;
+        if (sent != leaderState.InvitedAtMs.end() && nowMs < sent->second + kInviteRetryMs)
+            continue;
+        BotAction action;
+        action.bot_guid = invite.Leader;
+        action.type = ActionType::kGroup;
+        action.spell_id = kGroupInvite;
+        action.target_guid = PlayerRef(invite.Invitee);
+        actions.push_back(action);
+        leaderState.InvitedAtMs[invite.Invitee] = nowMs;
+        event("quest_group_invite: leader=" + std::to_string(invite.Leader) + " bot=" + std::to_string(invite.Invitee) + " quest=" + std::to_string(invite.Quest));
+    }
+
+    // 3. An invite from a quest-group leader is accepted (the invitee is free, not in a fight).
+    for (BotSnapshot const& bot : view.bots)
+    {
+        if (bot.group_invite_from == 0 || bot.group_role != 0 || bot.in_combat != 0 || bot.life_state != 0)
+            continue;
+        std::uint64_t const inviter = bot.group_invite_from & forever_module::kUnitRefCounterMask;
+        if (_questGroupLeaders.count(inviter) == 0)
+            continue;
+        BotState& state = StateOf(bot.guid);
+        if (nowMs < state.InviteAcceptAtMs)
+            continue;
+        BotAction accept;
+        accept.bot_guid = bot.guid;
+        accept.type = ActionType::kGroup;
+        accept.spell_id = kGroupAccept;
+        actions.push_back(accept);
+        state.InviteAcceptAtMs = nowMs + kAcceptInviteRetryMs;
+    }
+
+    // 4. The members of a leader's party follow the leader (as in a tank-led party); the leader walks the quest.
+    for (auto const& [leaderGuid, quest] : _questGroupLeaders)
+    {
+        auto const at = indexOf.find(leaderGuid);
+        if (at == indexOf.end() || leaderOf.count(leaderGuid) != 0)
+            continue;
+        BotSnapshot const& leader = view.bots[at->second];
+        if (leader.group_role != 2 || leader.group_leader_guid == 0)
+            continue;
+        leaderOf[leaderGuid] = leaderGuid;
+        membersOf[leaderGuid].clear();
+        for (BotSnapshot const& other : view.bots)
+            if (other.guid != leaderGuid && other.group_leader_guid == leader.group_leader_guid && leaderOf.count(other.guid) == 0)
+            {
+                leaderOf[other.guid] = leaderGuid;
+                membersOf[leaderGuid].push_back(other.guid);
+            }
+    }
+}

@@ -35,6 +35,7 @@ enum class QuestStepKind
     Abandon,   // send the abandon for Quest
     Reward,    // send the reward for Quest: a class quest completed with its reward, no objectives, from anywhere (no walk)
     Wait,      // stand still: an action was just sent and the log has not caught up
+    WaitGroup, // a group quest in the log (Quest, GroupSize): wait for the party (the policy looks for partners); the wait times out into an abandon (config QuestGroups)
 };
 
 struct QuestStep
@@ -43,6 +44,7 @@ struct QuestStep
     std::uint32_t Quest = 0;
     QuestPoint Dest;
     std::vector<std::uint32_t> Entries;
+    std::uint32_t GroupSize = 0;      // WaitGroup: the party size the quest wants
     bool StartGiver = false; // the walk is to the giver of a quest start on the bot's map (not a turn-in or a hunt)
 };
 
@@ -67,6 +69,12 @@ struct QuestMemory
     std::map<std::uint32_t, std::uint32_t> Refusals;    // quest -> how many accepts or hand-ins the core refused (the block grows with it)
     std::map<std::size_t, std::uint64_t> NoRouteUntilMs; // start index -> not walked to before this (the core found no route to its giver)
     bool WalkingToStart = false;                        // the step from the last Next is the walk to a start's giver
+    std::uint32_t LastWalkQuest = 0;                    // the quest of the last walk or hunt step the planner gave (0 = the last step was neither)
+    QuestStepKind LastWalkKind = QuestStepKind::None;   // WalkTo or Hunt, for LastWalkQuest
+    QuestPoint LastWalkDest;                            // where that step walks to
+    std::map<std::uint32_t, std::uint32_t> NoRouteCount; // quest -> no-route answers in a row on its walks (ender, giver or hunting ground)
+    std::map<std::uint32_t, std::uint64_t> GroupWaitSinceMs; // group quest -> since when the bot waits for its party
+    std::set<std::uint32_t> NearEnough;                 // quests whose giver or ender could not be walked to but is near: the accept or hand-in is tried from here
     std::set<std::uint32_t> RefusedHandIns;             // quests whose hand-in was refused since the last vendor visit
 };
 
@@ -78,6 +86,11 @@ struct QuestBotInfo
 };
 
 constexpr float kQuestReachYards = 4.0f;                // the core allows 5 yards for talking to an NPC
+constexpr float kQuestNearTryYards = 9.0f;              // a giver or ender this near that the core has no route to (it stands behind a counter or on an object) is tried from here:
+                                                        // the core measures the reach from the NPC's edge, so the action can still work
+constexpr std::uint32_t kNoRouteWalksBlock = 3;         // this many no-route answers in a row on one quest's walks block the quest (kWalkStuckBlockMs)
+constexpr std::uint64_t kBlockAfterAcceptRefusal2Ms = 3600000;  // the second refused accept of a quest: an hour
+constexpr std::uint64_t kBlockAfterAcceptRefusal3Ms = 21600000; // the third and later: six hours (rewarded long ago, wrong class or race, a missing chain step: it will not change)
 constexpr float kAreaReachYards = 15.0f;                // a hunting area is searched when the bot is this close
 constexpr std::uint64_t kQuestActionGapMs = 3000;       // wait this long after sending an accept or hand-in
 constexpr std::uint64_t kBlockAfterRefusalMs = 60000;
@@ -99,12 +112,20 @@ constexpr std::uint32_t kQuestAbandon = 3;
 constexpr std::uint32_t kQuestReward = 4;
 constexpr std::uint32_t QuestCode(std::uint32_t operation, std::uint32_t quest) { return (operation << 24) | (quest & 0xFFFFFF); }
 
+// Group quests (config QuestGroups, off by default): quests with a 'group <n>' marker are taken only when this is on; the bot then waits for a party of n.
+struct QuestPlannerOptions
+{
+    bool GroupQuests = false;
+    std::uint64_t GroupWaitMs = 600000;     // the wait for a party ends here: the quest is abandoned and left alone for kBlockAfterAbandonMs
+};
+
 class QuestPlanner
 {
 public:
     // `data` is the list the planner picks new quests from. `alsoKnown` (the leveling list, for the level 60 planner) is only looked up: a quest of it
     // in the bot's log is still handed in, hunted and abandoned, but no new quest is taken from it.
-    explicit QuestPlanner(std::shared_ptr<QuestData const> data, std::shared_ptr<QuestData const> alsoKnown = nullptr);
+    explicit QuestPlanner(std::shared_ptr<QuestData const> data, std::shared_ptr<QuestData const> alsoKnown = nullptr, QuestPlannerOptions options = {});
+    QuestPlannerOptions const& Options() const { return _options; }
 
     bool Enabled() const { return _data && !_data->Starts.empty(); }
 
@@ -123,18 +144,21 @@ public:
 
     // The core found no route for the move to the step's destination (kNoRoute). When that was the walk to a start's giver, the start is left
     // alone for kNoRouteBlockMs and the planner looks for the next start.
-    void NoteNoRoute(QuestMemory& memory, std::uint64_t nowMs) const;
+    // With `bot` given, a giver or ender within kQuestNearTryYards is tried from where the bot stands instead; the walk to a quest's ender or hunting
+    // ground counts the answers (the hunting area moves on, and kNoRouteWalksBlock in a row block the quest).
+    void NoteNoRoute(QuestMemory& memory, std::uint64_t nowMs, forever_module::BotSnapshot const* bot = nullptr) const;
     // The walk to a quest in the log (its ender, or its hunting ground) got nowhere for a long time: the quest is left alone for kWalkStuckBlockMs.
     void NoteWalkStuck(QuestMemory& memory, std::uint32_t quest, std::uint64_t nowMs) const;
 
 private:
     int FindStart(forever_module::BotSnapshot const& bot) const;
     // Whether the bot may take the quest now (everything but the log, done and blocked checks).
-    static bool Eligible(QuestDef const& quest, forever_module::BotSnapshot const& bot, QuestBotInfo const& info);
+    bool Eligible(QuestDef const& quest, forever_module::BotSnapshot const& bot, QuestBotInfo const& info) const;
     QuestDef const* Lookup(std::uint32_t quest) const;
     // Whether the bot's log or memory says the quest is done.
     static bool Taken(QuestMemory const& memory, forever_module::BotSnapshot const& bot, std::uint32_t quest, std::uint64_t nowMs);
 
+    QuestPlannerOptions _options;
     std::shared_ptr<QuestData const> _data;
     std::shared_ptr<QuestData const> _alsoKnown; // kept alive for the pointers in _index
     std::map<std::uint32_t, QuestDef const*> _index; // quest id -> its first definition (in `data`, else in `alsoKnown`); the lists are immutable

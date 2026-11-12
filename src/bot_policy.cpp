@@ -140,7 +140,8 @@ std::array<QuestPlanner, 6> BotPolicy::MakeQuestSets(PolicyOptions const& option
     // The level 60 planner also knows the leveling list, so a bot that turns 60 can still hand in or abandon the quests in its log.
     auto const planner = [&](std::size_t side, std::size_t band)
     {
-        return band == 0 ? QuestPlanner(data(side, 0)) : QuestPlanner(data(side, 1), data(side, 0));
+        QuestPlannerOptions const planning{ options.QuestGroups.Enabled, options.QuestGroups.WaitMs };
+        return band == 0 ? QuestPlanner(data(side, 0), nullptr, planning) : QuestPlanner(data(side, 1), data(side, 0), planning);
     };
     return { planner(0, 0), planner(0, 1), planner(1, 0), planner(1, 1), planner(2, 0), planner(2, 1) };
 }
@@ -625,6 +626,10 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
                 membersOf[tank.guid].push_back(other.guid);
             }
     }
+
+    // Group quests: partners are invited and the party follows its leader like a tank-led one.
+    if (_options.QuestGroups.Enabled)
+        DriveQuestGroups(view, indexOf, leaderOf, membersOf, nowMs, actions);
 
     // A leader that has a target has begun a fight: note it before the members decide, so they see the same start whatever the bot order.
     for (auto const& entry : membersOf)

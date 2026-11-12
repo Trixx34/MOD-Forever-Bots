@@ -30,12 +30,18 @@ void BotPolicy::TurnQuestsAndHold(DecideTick& tick, BotTurn& turn)
     bool const questsAllowed = QuestsFor(bot).Enabled() && !partyMember && !stagingHold && !(IsRouteActive(bot.guid) && scenario.RouteMap != 0) /* a dungeon run: the leader walks the route, not to a quest giver */ && !lowHealth && bot.in_combat == 0 && !state.ChatStay && state.ChatFollow == 0 && nowMs >= state.QuestPausedUntilMs;
     if (questsAllowed)
         questStep = QuestsFor(bot).Next(bot, state.Quest, nowMs, QuestBotInfo{ classId, _options.RaceOf ? _options.RaceOf(bot.guid) : 0u });
+    if (questsAllowed && questStep.Kind == QuestStepKind::WaitGroup)
+    {
+        state.QuestWaitQuest = questStep.Quest;
+        state.QuestWaitSize = questStep.GroupSize;
+        state.QuestWaitAtMs = nowMs;
+    }
     // Every five minutes, what the quest planner is doing for this bot and what keeps it from doing more (the events are the only record,
     // since a planner that takes no quest logs nothing otherwise).
     if (_options.OnEvent && nowMs - state.QuestDiagAtMs >= 300000)
     {
         state.QuestDiagAtMs = nowMs;
-        static constexpr char const* kinds[] = { "none", "walk_to", "accept", "hand_in", "hunt", "abandon", "reward", "wait" };
+        static constexpr char const* kinds[] = { "none", "walk_to", "accept", "hand_in", "hunt", "abandon", "reward", "wait", "wait_group" };
         _options.OnEvent("quest_state: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id) +
                          " allowed=" + std::to_string(questsAllowed) + " enabled=" + std::to_string(QuestsFor(bot).Enabled()) +
                          " party=" + std::to_string(partyMember) + " low_health=" + std::to_string(lowHealth) + " in_combat=" + std::to_string(bot.in_combat) +

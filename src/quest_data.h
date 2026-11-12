@@ -15,7 +15,8 @@
 //   req <quest> [minlevel <n>] [level <n>] [prev <quest>] [races <mask>] [classes <mask>]
 //                                      who may do the quest (optional; for the whole-world quest files): the least level to accept it, the quest's own
 //                                      level (a bot well above it skips the quest), the quest that must be handed in before it (tried later, not
-//                                      refused), and the races and classes that may take it as bit masks (bit n-1 for race or class id n; 0 = any)
+//                                      refused), and the races and classes that may take it as bit masks (bit n-1 for race or class id n; 0 = any), and
+//                                      'group <n>': the quest is meant for a party of n (the planner takes it only with config QuestGroups on)
 #pragma once
 
 #include <cstdint>
@@ -49,6 +50,7 @@ struct QuestDef
     std::uint32_t PrevQuest = 0;              // 0 = none
     std::uint32_t RaceMask = 0;               // 0 = any race
     std::uint32_t ClassMask = 0;              // 0 = any class
+    std::uint32_t Group = 0;                  // the quest's suggested group size (a 'group <n>' pair of the req record): 2 or more = the bot needs a party of that many (config QuestGroups)
     bool Reward = false;                      // a class quest: completed with its reward, no objectives
 };
 

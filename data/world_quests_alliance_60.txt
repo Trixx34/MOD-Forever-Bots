@@ -560,11 +560,6 @@ req 5505 level 60 prev 5803
 quest 6186 giver 944.2 -1458.5 62.6 ender -8440.0 329.4 122.6
 req 6186 level 60 prev 6185
 
-start W0_3_-11   # 1 quests, levels 60-60
-anchor 0 1651.4 -5492.0 102.0
-quest 6147 giver 1651.4 -5492.0 102.0 ender 1871.0 -3212.7 125.3
-req 6147 level 60 prev 6146
-
 start W0_4_-11   # 84 quests, levels 60-60
 anchor 0 2289.4 -5337.4 90.6
 quest 5264 giver 2255.9 -5337.7 86.3 ender 2303.8 -5349.5 91.7

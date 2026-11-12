@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Writes the five exports that tools/make_world_quests.py reads (doc/world-quests.md) from a SQLite file made by tools/dump_to_sqlite.py, so no
 MySQL server is needed. The tables needed: quest_template, quest_template_addon, quest_template_classic_level, quest_objectives, creature,
-creature_queststarter, creature_questender, creature_loot_template, reference_loot_template.
+creature_queststarter, creature_questender, creature_loot_template, reference_loot_template (and creature_template for the faction exports
+of --side).
 
     python3 -I tools/dump_to_sqlite.py world.sql.gz world.sqlite quest_template quest_template_addon quest_template_classic_level quest_objectives \
         creature creature_queststarter creature_questender creature_loot_template reference_loot_template
@@ -76,6 +77,13 @@ def main(argv):
         JOIN temp_drops d ON d.item = o.ObjectID
         JOIN creature cr ON cr.id = d.creature
         WHERE o.Type = 1""")
+    # Faction exports for --side (tools/export_giver_factions.sql does the same on a MySQL server). Needs creature_template; skipped when it is not in the file.
+    if db.execute("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'creature_template'").fetchone():
+        write(db, f"{out}/givers.tsv", """
+            SELECT DISTINCT s.quest, ct.faction FROM creature_queststarter s JOIN creature_template ct ON ct.entry = s.id ORDER BY s.quest, ct.faction""")
+        write(db, f"{out}/npc_factions.tsv", """
+            SELECT DISTINCT ct.entry, ct.faction FROM creature_template ct
+            WHERE ct.entry IN (SELECT id FROM creature_queststarter UNION SELECT id FROM creature_questender) ORDER BY ct.entry""")
     return 0
 
 
