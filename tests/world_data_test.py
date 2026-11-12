@@ -134,6 +134,28 @@ with tempfile.TemporaryDirectory() as tmp:
     result = run(os.path.join(TOOLS, "make_world_quests.py"), out)
     check(result.returncode == 0 and "quest 7 " in result.stdout, "make_world_quests did not keep quest 7: " + result.stdout[:300] + result.stderr[:300])
 
+    # --side with npc_factions.tsv: a giver or ender spawn of the other side is not used; a quest with no usable spawn is left out.
+    side = os.path.join(tmp, "side")
+    os.makedirs(side)
+    def put(name, rows):
+        with open(os.path.join(side, name), "w", encoding="utf-8") as handle:
+            handle.write("".join("\t".join(str(v) for v in row) + "\n" for row in rows))
+    put("quests.tsv", [(1, 5, 0, 0, 0, 0, 0), (2, 5, 0, 0, 0, 0, 0), (3, 5, 0, 0, 0, 0, 0)])
+    put("objectives.tsv", [(q, 0, 0, 6, 3) for q in (1, 2, 3)])
+    # Quest 1: a Horde giver (creature 10) and an Alliance giver (11) on map 0; the first spawn listed is the Horde one. Quest 2: only an Alliance
+    # ender (12). Quest 3: a neutral giver and ender (13).
+    put("npcs.tsv", [(1, "start", 10, 0, 100, 100, 1), (1, "start", 11, 0, 500, 500, 1), (1, "end", 11, 0, 500, 500, 1),
+                     (2, "start", 13, 0, 50, 50, 1), (2, "end", 12, 0, 60, 60, 1), (3, "start", 13, 0, 50, 50, 1), (3, "end", 13, 0, 50, 50, 1)])
+    put("targets.tsv", [(q, 6, 0, 70, 70, 1) for q in (1, 2, 3)])
+    put("drops.tsv", [])
+    put("npc_factions.tsv", [(10, 2), (11, 1), (12, 1), (13, 35)])   # 1 alliance, 2 horde (tools/faction_sides.tsv), 35 neutral
+    for side_name, expect in (("alliance", ["quest 1 giver 500.0 500.0 1.0 ender 500.0 500.0 1.0", "quest 2 ", "quest 3 "]),
+                              ("horde", ["quest 3 "])):
+        result = run(os.path.join(TOOLS, "make_world_quests.py"), side, "--side", side_name)
+        check(result.returncode == 0, "make_world_quests --side failed: " + result.stderr)
+        got = [line for line in result.stdout.splitlines() if line.startswith("quest ")]
+        check(len(got) == len(expect) and all(g.startswith(e) for g, e in zip(sorted(got), sorted(expect))), side_name + " list: " + repr(got))
+
 if failures == 0:
     print("world_data_test: all passed")
 sys.exit(1 if failures else 0)
