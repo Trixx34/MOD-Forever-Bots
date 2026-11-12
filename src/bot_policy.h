@@ -335,6 +335,13 @@ struct PolicyOptions
     // Config VendorSellGear (default off; needs Bot.Vendor.SellGear in the core): a vendor visit also sells the bag gear the worn gear outclasses (kVendor bit 2048
     // with the bot's gear profile in bits 12-14). The core judges it by the item numbers, never by item id.
     bool VendorSellGear = false;
+    // Protocol 28 (config SpiritHealerAfterMs, SpiritHealerOnRepeat): a ghost at its corpse with a live hostile within 30 yards takes the spirit healer (kResurrect spell_id 2)
+    // after the hostile has stood there SpiritHealerAfterMs (0 = never for that reason), or at once when it is the second death to the same creature entry within five minutes
+    // (SpiritHealerOnRepeat). Needs Bot.Actions.SpiritHealer in the core (the core refuses it otherwise and the old hold and reclaim go on).
+    std::uint64_t SpiritHealerAfterMs = 45000;
+    bool SpiritHealerOnRepeat = true;
+    // Protocol 28 (config HealDownrank, default off): a healer casts a lower rank of its heal for a small deficit (kCastSpell with dest_x = 1 names the exact rank).
+    bool HealDownrank = false;
     // DPS threat discipline (layout 24 threat fields; needs Bot.Snapshot.Threat in the core, else nothing is read): a damage dealer in a party whose threat on its target is at
     // or above ThreatHoldPct percent of the top holds its attacks until it is at or under ThreatReleasePct, for at most ThreatHoldMaxMs (then it fights ThreatHoldMaxMs
     // regardless), unless the target is under ThreatNearDeathPct health. Never the tank, a healer, or a solo bot. ThreatDropAbilities: a bot that has the target's aggro
@@ -580,6 +587,11 @@ private:
         std::uint32_t ComboPoints = 0;                   // combo points on ComboTarget, from the bot's own Sinister Strikes
         std::uint64_t ComboTarget = 0;
         std::uint32_t LastTrainLevel = 0;                // the level at the last trainer check
+        std::uint64_t SpiritHealerRetryMs = 0;           // protocol 28: the next kResurrect spell_id 2 (take the spirit healer) not before this
+        std::uint64_t HealDownrankPausedUntilMs = 0;     // protocol 28: the core did not know an exact heal rank (kNotKnown): the heal is cast as before until this
+        bool SpiritHealerActive = false;                 // the ghost is on its way to the spirit healer (kResurrect spell_id 2 is repeated until it stands up)
+        std::uint64_t SpiritHealerRefusedUntilMs = 0;    // the core refused or failed it: the old hold and reclaim until this
+        std::uint32_t SpiritHealerSeenSeq = 0;           // the last action result sequence read for it
         std::uint32_t AcceptRefusals = 0;                // resurrect answers refused in a row
         std::uint64_t AcceptIgnoreFrom = 0;              // the resurrector whose offer is ignored until then
         std::uint64_t AcceptIgnoreUntilMs = 0;           // a resurrect offer is not answered before this (it kept being refused)

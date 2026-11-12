@@ -3,6 +3,7 @@
 // Private to bot_policy*.cpp: the tuning constants and the declarations of the helpers that were an anonymous namespace in bot_policy.cpp, now shared by its
 // split files. The helpers are defined in bot_policy_spells.cpp (spell, class and snapshot facts) and bot_policy_units.cpp (units, distances and places).
 #include "bot_policy.h"
+#include "heal_rank.h"
 
 #include "forever_module/talent_spec.h"
 
@@ -500,7 +501,26 @@ constexpr std::uint64_t kLeaderRecoverMaxWaitMs = 600000;  // a revived leader r
 // killed seven times in a row by the same scout, each time minutes after its reclaim). A ghost therefore waits, up to this long, while a live hostile stands this close to it.
 constexpr float kReclaimDangerYards = 30.0f;
 constexpr std::uint64_t kReclaimDangerWaitMs = 120000;
-constexpr float kReclaimYards = 35.0f;               // the core allows 39 yards; the ghost reclaims from this close
+constexpr float kReclaimYards = 35.0f;
+// Protocol 28: a ghost that would have to reclaim next to a live hostile takes the spirit healer instead (kResurrect spell_id 2: 50% health, resurrection sickness,
+// durability loss, but at the graveyard and not next to the camping mob). SpiritHealerAfterMs is how long the hostile must have stood near the corpse; a second death
+// to the same creature entry within kSpiritHealerRepeatWindowMs takes it at once. A refused or failed answer sends the ghost back to the old hold and reclaim for
+// kSpiritHealerRefusedMs.
+constexpr std::uint64_t kSpiritHealerRepeatWindowMs = 300000;
+constexpr std::uint64_t kSpiritHealerRetryMs = 3000;
+constexpr std::uint64_t kSpiritHealerRefusedMs = 120000;
+constexpr std::uint64_t kHealDownrankPauseMs = 600000;   // after a kNotKnown for an exact heal rank (the level said the bot has it, the core says it has not)
+constexpr std::uint32_t kSpiritHealerSpell = 2;     // kResurrect spell_id: take the spirit healer
+// The pure rule: does a ghost at its corpse, with a live hostile near it since dangerSinceMs (0 = none), take the spirit healer now?
+inline bool SpiritHealerWanted(std::uint64_t afterMs, bool onRepeat, std::uint64_t nowMs, std::uint64_t dangerSinceMs, bool killerRepeat,
+                               std::uint64_t previousDeathMs, std::uint64_t lastDeathMs, std::uint64_t refusedUntilMs)
+{
+    if (dangerSinceMs == 0 || nowMs < refusedUntilMs)
+        return false;
+    if (afterMs != 0 && nowMs >= dangerSinceMs && nowMs - dangerSinceMs >= afterMs)
+        return true;
+    return onRepeat && killerRepeat && previousDeathMs != 0 && lastDeathMs >= previousDeathMs && lastDeathMs - previousDeathMs <= kSpiritHealerRepeatWindowMs;
+}               // the core allows 39 yards; the ghost reclaims from this close
 
 // A cast or channel is in progress. cast_remaining_ms is no test: it is 0 while a spell is in flight (a Fireball after the cast, state
 // "delayed"), which the core still counts as casting and refuses every other cast for ("bot is casting spell N").

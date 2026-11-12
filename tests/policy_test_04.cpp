@@ -452,6 +452,68 @@ void HealerHealsTheHurtMember()
     CHECK(CastsSpell(actions, 10, 2050, PlayerOf(13)));
 }
 
+// Protocol 28 (HealDownrank): the heal is cast at the lowest rank that covers the deficit, named exactly (dest_x = 1); off by default.
+void HealDownrankCastsTheRankThatCoversTheDeficit()
+{
+    auto const run = [](bool downrank, std::uint32_t health, std::uint32_t maxHealth)
+    {
+        PolicyOptions options = AggressiveOptions();
+        options.PartySize = 5;
+        options.PartyCount = 1;
+        options.ClassOf = WarriorLeads;
+        options.HealDownrank = downrank;
+        BotPolicy policy(options);
+        policy.SetRouteActive(true);
+        WorldTickSnapshotView view = LeveledDungeonView(30);   // the priest: Heal from level 16, ranks 2054, 2055 and 6063 by level 30
+        view.bots[3].health = health;      // bot 13: dungeon healers heal below 55 %
+        view.bots[3].max_health = maxHealth;
+        return policy.Decide(view, 1000);
+    };
+    auto const castOf = [](std::vector<BotAction> const& actions) -> BotAction const*
+    {
+        for (BotAction const& action : actions)
+            if (action.type == ActionType::kCastSpell && action.bot_guid == 10)
+                return &action;
+        return nullptr;
+    };
+    std::vector<BotAction> const small = run(true, 400, 800);              // deficit 400 (50 %): rank 2 (406)
+    BotAction const* smallCast = castOf(small);
+    CHECK(smallCast && smallCast->spell_id == 2055 && smallCast->dest_x == 1.0f && smallCast->target_guid == PlayerOf(13));
+    std::vector<BotAction> const big = run(true, 450, 1000);             // deficit 550: no rank is enough, the highest the level allows (6063, 524)
+    BotAction const* bigCast = castOf(big);
+    CHECK(bigCast && bigCast->spell_id == 6063 && bigCast->dest_x == 1.0f);
+    std::vector<BotAction> const off = run(false, 400, 800);               // default: rank 1 named, dest_x 0, the core casts the highest rank known
+    BotAction const* offCast = castOf(off);
+    CHECK(offCast && offCast->spell_id == 2054 && offCast->dest_x == 0.0f);
+}
+
+void HealDownrankPausesAfterAnUnknownRank()
+{
+    std::vector<std::string> events;
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.PartyCount = 1;
+    options.ClassOf = WarriorLeads;
+    options.HealDownrank = true;
+    options.OnEvent = [&events](std::string const& event) { events.push_back(event); };
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    WorldTickSnapshotView view = LeveledDungeonView(30);
+    view.bots[3].health = 400;
+    view.bots[3].max_health = 800;
+    policy.Decide(view, 1000);
+    view.bots[0].last_action_sequence = 4;
+    view.bots[0].last_action_type = uint8_t(ActionType::kCastSpell);
+    view.bots[0].last_action_spell = 2055;
+    view.bots[0].last_action_status = BotActionStatus::kNotKnown;
+    policy.Decide(view, 6000);
+    CHECK(Logged(events, "heal_downrank_off: bot=10 spell=2055"));
+    bool plain = false;
+    for (BotAction const& action : policy.Decide(view, 20000))
+        plain = plain || (action.type == ActionType::kCastSpell && action.bot_guid == 10 && action.spell_id == 2054 && action.dest_x == 0.0f);
+    CHECK(plain);                                                        // the plain heal while paused
+}
+
 void HealerHealsItselfWithoutATarget()
 {
     WorldTickSnapshotView view = DungeonView({ 10, 11, 12, 13, 14 });
@@ -969,6 +1031,8 @@ void RunPolicyTestsPart4()
     ALeaderThatDoesNotMoveIsNoticed();
     ALeaderWalksBackToAFarHealer();
     HealerHealsTheHurtMember();
+    HealDownrankCastsTheRankThatCoversTheDeficit();
+    HealDownrankPausesAfterAnUnknownRank();
     HealerHealsItselfWithoutATarget();
     PriestWithNoLineOfSightRepositionsBeforeRetryingDps();
     NoHealWhileEveryoneIsHealthy();

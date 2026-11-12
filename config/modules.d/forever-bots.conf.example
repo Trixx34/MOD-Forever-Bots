@@ -234,6 +234,19 @@ Module.forever-bots.TelemetrySummarySec = 60
 # Needs Bot.Vendor.SellGear = 1 in the core, which refuses the sale otherwise; each sale is logged there as vendor_sell_gear.
 # VendorSellGear = 1
 
+# Spirit healer (protocol 28; needs Bot.Actions.SpiritHealer = 1 in the core, the default): a ghost that stands at its corpse with a live hostile within 30 yards would
+# reclaim next to it (the reclaimed body comes back at half health, on the spot) and often dies again: a death loop. It takes the spirit healer instead (kResurrect
+# spell_id 2): 50% health, resurrection sickness and a durability loss, but at the graveyard. The core walks the ghost to the nearest spirit healer within 40 yards and
+# falls back to the plain reclaim on a map with none. A refused answer sends the ghost back to the old wait (up to two minutes) and reclaim for two minutes.
+# SpiritHealerAfterMs: how long the hostile must have stood near the corpse before the ghost takes the spirit healer (0 = not for that reason).
+# SpiritHealerAfterMs = 45000
+# SpiritHealerOnRepeat: the second death to the same creature entry within five minutes takes the spirit healer at once, while a hostile is near the corpse.
+# SpiritHealerOnRepeat = 1
+
+# HealDownrank (protocol 28, off by default): a healer casts a lower rank of its heal for a small deficit (kCastSpell with dest_x = 1 names the exact rank; the core
+# answers kNotKnown for a rank the bot has not learned, and the healer then casts the highest rank as before). Saves mana, costs more casts.
+# HealDownrank = 0
+
 # DPS threat discipline (on by default; needs Bot.Snapshot.Threat in the core, else the threat fields stay empty and nothing happens): a damage dealer in a party
 # whose threat on its target reaches ThreatHoldPct percent of the top stops attacking that target until it is at or under ThreatReleasePct, for at most
 # ThreatHoldMaxSec seconds (then it fights for as long again before it may hold anew). Not for the tank, a healer or a solo bot, not while the target is under

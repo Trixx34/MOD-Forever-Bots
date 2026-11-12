@@ -476,9 +476,112 @@ void AGhostDoesNotReclaimNextToAHostile()
     CHECK(!HasAction(policy.Decide(build(true), 1000), 13, ActionType::kReclaimCorpse));
     CHECK(!HasAction(policy.Decide(build(true), 60000), 13, ActionType::kReclaimCorpse));
     CHECK(HasAction(policy.Decide(build(false), 61000), 13, ActionType::kReclaimCorpse));   // the hostile left: back to life
-    BotPolicy stubborn(DeadOptions(nullptr));
+    PolicyOptions stubbornOptions = DeadOptions(nullptr);
+    stubbornOptions.SpiritHealerAfterMs = 0;                   // the spirit healer off: the old hold of two minutes (SpiritHealerAfterAHostileStaysNearTheCorpse has the new rule)
+    BotPolicy stubborn(stubbornOptions);
     CHECK(!HasAction(stubborn.Decide(build(true), 1000), 13, ActionType::kReclaimCorpse));
     CHECK(HasAction(stubborn.Decide(build(true), 122000), 13, ActionType::kReclaimCorpse)); // two minutes: it waits no longer
+}
+
+// Protocol 28: kResurrect spell_id 2 asks the core to take the ghost to the spirit healer.
+bool SpiritHealerAsked(std::vector<BotAction> const& actions, std::uint64_t bot)
+{
+    for (BotAction const& action : actions)
+        if (action.type == ActionType::kResurrect && action.bot_guid == bot && action.spell_id == 2)
+            return true;
+    return false;
+}
+
+WorldTickSnapshotView GhostAtCorpse(bool hostile)
+{
+    WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 });
+    Ghost(v.bots[3], 0.0f, 0, 10.0f);
+    v.bots[3].reclaim_wait_ms = 0;
+    if (hostile)
+        AddNearby(v, 3, Hostile(7, 12.0f, 100));
+    return v;
+}
+
+// A ghost whose corpse a live hostile camps for SpiritHealerAfterMs (45 s) takes the spirit healer, asked again every 3 s, and never reclaims next to the hostile.
+void SpiritHealerAfterAHostileStaysNearTheCorpse()
+{
+    std::vector<std::string> events;
+    BotPolicy policy(DeadOptions(&events));
+    CHECK(!SpiritHealerAsked(policy.Decide(GhostAtCorpse(true), 1000), 13));
+    CHECK(!SpiritHealerAsked(policy.Decide(GhostAtCorpse(true), 30000), 13));              // 29 s: still waiting
+    std::vector<BotAction> const taken = policy.Decide(GhostAtCorpse(true), 47000);        // 46 s of a hostile near the corpse
+    CHECK(SpiritHealerAsked(taken, 13));
+    CHECK(!HasAction(taken, 13, ActionType::kReclaimCorpse));
+    CHECK(Logged(events, "spirit_healer: bot=13"));
+    CHECK(!SpiritHealerAsked(policy.Decide(GhostAtCorpse(true), 48000), 13));              // asked again after 3 s, not before
+    std::vector<BotAction> const again = policy.Decide(GhostAtCorpse(true), 50500);
+    CHECK(SpiritHealerAsked(again, 13));
+    CHECK(!HasAction(again, 13, ActionType::kStop));                                       // no stop: the core walks the ghost to the healer
+    CHECK(!HasAction(policy.Decide(GhostAtCorpse(true), 60000), 13, ActionType::kReclaimCorpse));
+}
+
+void SpiritHealerIsNotTakenWithoutAHostile()
+{
+    BotPolicy policy(DeadOptions(nullptr));
+    CHECK(!SpiritHealerAsked(policy.Decide(GhostAtCorpse(false), 1000), 13));
+    CHECK(!SpiritHealerAsked(policy.Decide(GhostAtCorpse(false), 100000), 13));
+    CHECK(HasAction(policy.Decide(GhostAtCorpse(false), 104000), 13, ActionType::kReclaimCorpse));   // the reclaim of 100 s was sent: retried after 3 s
+    PolicyOptions off = DeadOptions(nullptr);
+    off.SpiritHealerAfterMs = 0;
+    off.SpiritHealerOnRepeat = false;
+    BotPolicy never(off);
+    never.Decide(GhostAtCorpse(true), 1000);
+    CHECK(!SpiritHealerAsked(never.Decide(GhostAtCorpse(true), 100000), 13));              // both rules off
+}
+
+// The second death to the same creature entry within five minutes takes the spirit healer at once (a hostile near the corpse), without the 45 s wait.
+void SpiritHealerOnARepeatedKiller()
+{
+    BotPolicy policy(DeadOptions(nullptr));
+    policy.Decide(GhostAtCorpse(true), 1000);                                              // first death to creature 7
+    policy.Decide(PartyView({ 10, 11, 12, 13, 14 }), 2000);                                // alive again
+    CHECK(SpiritHealerAsked(policy.Decide(GhostAtCorpse(true), 100000), 13));              // second death, 99 s later, same killer
+    PolicyOptions noRepeat = DeadOptions(nullptr);
+    noRepeat.SpiritHealerOnRepeat = false;
+    BotPolicy other(noRepeat);
+    other.Decide(GhostAtCorpse(true), 1000);
+    other.Decide(PartyView({ 10, 11, 12, 13, 14 }), 2000);
+    CHECK(!SpiritHealerAsked(other.Decide(GhostAtCorpse(true), 100000), 13));
+    BotPolicy late(DeadOptions(nullptr));                                                  // the same killer, but six minutes later
+    late.Decide(GhostAtCorpse(true), 1000);
+    late.Decide(PartyView({ 10, 11, 12, 13, 14 }), 2000);
+    CHECK(!SpiritHealerAsked(late.Decide(GhostAtCorpse(true), 400000), 13));
+}
+
+// A refused answer (the core's key is off, a hardcore realm) puts the ghost back on the old hold and reclaim for two minutes.
+void ARefusedSpiritHealerFallsBackToTheReclaim()
+{
+    std::vector<std::string> events;
+    BotPolicy policy(DeadOptions(&events));
+    policy.Decide(GhostAtCorpse(true), 1000);
+    CHECK(SpiritHealerAsked(policy.Decide(GhostAtCorpse(true), 47000), 13));
+    WorldTickSnapshotView refused = GhostAtCorpse(true);
+    refused.bots[3].last_action_sequence = 5;
+    refused.bots[3].last_action_type = uint8_t(ActionType::kResurrect);
+    refused.bots[3].last_action_spell = 2;
+    refused.bots[3].last_action_status = BotActionStatus::kRefused;
+    std::vector<BotAction> const next = policy.Decide(refused, 50500);
+    CHECK(!SpiritHealerAsked(next, 13));
+    CHECK(Logged(events, "death_action_refused: bot=13 action=spirit_healer"));
+    CHECK(!SpiritHealerAsked(policy.Decide(GhostAtCorpse(true), 100000), 13));             // not asked again while the refusal lasts
+    CHECK(!HasAction(policy.Decide(GhostAtCorpse(true), 100000), 13, ActionType::kReclaimCorpse)); // the hold of 120 s since 1 s goes on
+    CHECK(HasAction(policy.Decide(GhostAtCorpse(true), 125000), 13, ActionType::kReclaimCorpse));  // the old rule: the hold ended, it reclaims
+    // kMoving (walking to the healer) is no refusal
+    BotPolicy walking(DeadOptions(nullptr));
+    walking.Decide(GhostAtCorpse(true), 1000);
+    walking.Decide(GhostAtCorpse(true), 47000);
+    WorldTickSnapshotView moving = GhostAtCorpse(true);
+    moving.bots[3].last_action_sequence = 6;
+    moving.bots[3].last_action_type = uint8_t(ActionType::kResurrect);
+    moving.bots[3].last_action_spell = 2;
+    moving.bots[3].last_action_status = BotActionStatus::kMoving;
+    walking.Decide(moving, 50500);
+    CHECK(SpiritHealerAsked(walking.Decide(GhostAtCorpse(true), 54000), 13));
 }
 
 void GhostReclaimsInRadiusAndRetries()
@@ -1066,6 +1169,10 @@ void RunPolicyTestsPart5()
     AnAliveMemberOutsideWalksBackToTheDungeon();
     AGhostDoesNotReclaimNextToAHostile();
     GhostReclaimsInRadiusAndRetries();
+    SpiritHealerAfterAHostileStaysNearTheCorpse();
+    SpiritHealerIsNotTakenWithoutAHostile();
+    SpiritHealerOnARepeatedKiller();
+    ARefusedSpiritHealerFallsBackToTheReclaim();
     GhostCorpseRunTimesOut();
     DeadBotAcceptsAResurrectOffer();
     PriestResurrectsTheDeadMember();

@@ -91,6 +91,10 @@ void BotPolicy::DeadRecord(DecideTick& tick, BotTurn& turn)
         state.AcceptRetryMs = 0;
         state.AcceptedFrom = 0;
         state.ReclaimRetryMs = 0;
+        state.SpiritHealerRetryMs = 0;
+        state.SpiritHealerRefusedUntilMs = 0;
+        state.SpiritHealerActive = false;
+        state.ReclaimDangerSinceMs = 0;
         state.Reclaimed = false;
         state.ReviveRetryMs = 0;
         state.ReviveAttempts = 0;
@@ -627,6 +631,20 @@ void BotPolicy::DeadGhostRun(DecideTick& tick, BotTurn& turn)
         }
     }
     Point const corpse{ bot.corpse_x, bot.corpse_y, bot.corpse_z };
+    // Protocol 28: ask the core to take the ghost to the spirit healer (kResurrect spell_id 2); asked again every kSpiritHealerRetryMs.
+    auto const sendSpiritHealer = [&](float dist)
+    {
+        if (nowMs < state.SpiritHealerRetryMs)
+            return;
+        BotAction spirit;
+        spirit.bot_guid = bot.guid;
+        spirit.type = ActionType::kResurrect;
+        spirit.spell_id = kSpiritHealerSpell;
+        actions.push_back(spirit);
+        state.SpiritHealerRetryMs = nowMs + kSpiritHealerRetryMs;
+        LogEvent("spirit_healer: bot=" + std::to_string(bot.guid) + " dist=" + std::to_string(int(dist)) + " held_ms=" + std::to_string(nowMs - state.ReclaimDangerSinceMs) +
+              " killer_repeat=" + std::to_string(state.KillerRepeat ? 1 : 0));
+    };
     if (bot.map_id == bot.corpse_map)
     {
         float const dist = DistanceTo(bot, corpse);
@@ -644,9 +662,26 @@ void BotPolicy::DeadGhostRun(DecideTick& tick, BotTurn& turn)
                 state.RunProgress = mark;
                 LogEvent("corpse_run_progress: bot=" + std::to_string(bot.guid) + " pct=" + std::to_string(mark) + " dist=" + std::to_string(int(dist)));
             }
+        if (state.SpiritHealerActive)
+        {
+            // On its way to the spirit healer, maybe farther from the corpse than the reclaim distance. A ghost still at the corpse whose hostile has gone reclaims after all
+            // (no durability loss, no sickness).
+            bool hostileNear = false;
+            for (NearbyUnit const& unit : nearby)
+                hostileNear = hostileNear || (IsLiveMob(unit) && rotation::DistanceYards(bot, unit) <= kReclaimDangerYards);
+            if (dist <= kReclaimYards && !hostileNear)
+            {
+                state.SpiritHealerActive = false;
+                state.ReclaimDangerSinceMs = 0;
+            }
+            else
+            {
+                sendSpiritHealer(dist);
+                return;
+            }
+        }
         if (dist <= kReclaimYards)
         {
-            DeadEmit(tick, turn, Decision{ ActionType::kStop, 0 });
             bool danger = false;
             for (NearbyUnit const& unit : nearby)
                 danger = danger || (IsLiveMob(unit) && rotation::DistanceYards(bot, unit) <= kReclaimDangerYards);
@@ -657,6 +692,17 @@ void BotPolicy::DeadGhostRun(DecideTick& tick, BotTurn& turn)
                 state.ReclaimDangerSinceMs = nowMs;
                 LogEvent("reclaim_held: bot=" + std::to_string(bot.guid) + " reason=hostile_near_corpse dist=" + std::to_string(int(dist)));
             }
+            // Protocol 28: a hostile that keeps standing at the corpse (or the same killer again) sends the ghost to the spirit healer, not to the reclaim. From
+            // then on (SpiritHealerActive) it is asked again every few seconds wherever the ghost is, and no stop is sent: the core walks it to the healer.
+            if (state.SpiritHealerActive ||
+                SpiritHealerWanted(_options.SpiritHealerAfterMs, _options.SpiritHealerOnRepeat, nowMs, state.ReclaimDangerSinceMs, state.KillerRepeat,
+                                   state.DeathTimesMs[1], state.DeathTimesMs[2], state.SpiritHealerRefusedUntilMs))
+            {
+                state.SpiritHealerActive = true;
+                sendSpiritHealer(dist);
+                return;
+            }
+            DeadEmit(tick, turn, Decision{ ActionType::kStop, 0 });
             bool const holdForDanger = danger && nowMs - state.ReclaimDangerSinceMs < kReclaimDangerWaitMs;
             if (bot.reclaim_wait_ms == 0 && nowMs >= state.ReclaimRetryMs && !holdForDanger)
             {

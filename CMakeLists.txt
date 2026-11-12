@@ -223,6 +223,10 @@ add_executable(spell_costs_test tests/spell_costs_test.cpp)
 target_link_libraries(spell_costs_test PRIVATE forever_bots_policy)
 add_test(NAME spell_costs COMMAND spell_costs_test)
 
+add_executable(heal_rank_test tests/heal_rank_test.cpp)
+target_link_libraries(heal_rank_test PRIVATE forever_bots_policy)
+add_test(NAME heal_rank COMMAND heal_rank_test)
+
 add_executable(ground_avoid_test tests/ground_avoid_test.cpp)
 target_link_libraries(ground_avoid_test PRIVATE forever_bots_policy)
 target_compile_definitions(ground_avoid_test PRIVATE FOREVER_AVOID_SPELLS_FILE="${CMAKE_CURRENT_SOURCE_DIR}/data/avoid_spells.txt")

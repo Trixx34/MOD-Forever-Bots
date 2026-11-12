@@ -13,6 +13,9 @@ void PolicyFromSettings(PolicyOptions& policyOptions, BotSettings& settings)
     policyOptions.TrainEveryMs = std::uint64_t(settings.TrainEverySec) * 1000;
     policyOptions.Supplies = settings.Supplies;
     policyOptions.VendorSellGear = settings.VendorSellGear;
+    policyOptions.SpiritHealerAfterMs = settings.SpiritHealerAfterMs;
+    policyOptions.SpiritHealerOnRepeat = settings.SpiritHealerOnRepeat;
+    policyOptions.HealDownrank = settings.HealDownrank;
     policyOptions.ThreatHold = settings.ThreatHold;
     policyOptions.ThreatHoldPct = settings.ThreatHoldPct;
     policyOptions.ThreatReleasePct = settings.ThreatReleasePct;

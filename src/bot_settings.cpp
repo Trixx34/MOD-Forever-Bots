@@ -747,6 +747,9 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadKey(config, "MailGiftDailyCap", 0, 20, settings.MailGifts.DailyCap, warnings);
     ReadBool(config, "Supplies", settings.Supplies.Enabled, warnings);
     ReadBool(config, "VendorSellGear", settings.VendorSellGear, warnings);
+    ReadKey(config, "SpiritHealerAfterMs", 0, 3600000, settings.SpiritHealerAfterMs, warnings);
+    ReadBool(config, "SpiritHealerOnRepeat", settings.SpiritHealerOnRepeat, warnings);
+    ReadBool(config, "HealDownrank", settings.HealDownrank, warnings);
     ReadBool(config, "ThreatHold", settings.ThreatHold, warnings);
     ReadKey(config, "ThreatHoldPct", 1, 100, settings.ThreatHoldPct, warnings);
     ReadKey(config, "ThreatReleasePct", 0, 99, settings.ThreatReleasePct, warnings);

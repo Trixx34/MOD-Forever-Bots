@@ -261,6 +261,37 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
         return;
     }
 
+    // Protocol 28 (HealDownrank): an exact heal rank the bot has not learned (the level in the ladder is the trainer's, a bot may be behind): the plain heal (the core casts the
+    // highest rank it knows) for ten minutes.
+    if (bot.last_action_type == uint8_t(ActionType::kCastSpell) && bot.last_action_status == BotActionStatus::kNotKnown && _options.HealDownrank &&
+        heal_ranks::IsLadderSpell(bot.last_action_spell))
+    {
+        state.HealDownrankPausedUntilMs = nowMs + kHealDownrankPauseMs;
+        if (_options.OnEvent)
+            _options.OnEvent("heal_downrank_off: bot=" + std::to_string(bot.guid) + " spell=" + std::to_string(bot.last_action_spell) + " reason=not_known");
+    }
+
+    // Protocol 28: the answer to kResurrect spell_id 2 (take the spirit healer). Applied, still walking to it (kMoving) and a reclaim delay that is not over (kBusy, the
+    // core's fallback on a map with no spirit healer) go on; any other answer (the key is off in the core, a hardcore realm, no corpse in reach) puts the ghost back on the old
+    // hold and reclaim for kSpiritHealerRefusedMs. Read once per result.
+    if (bot.last_action_type == uint8_t(ActionType::kResurrect) && bot.last_action_spell == kSpiritHealerSpell)
+    {
+        if (bot.last_action_sequence != state.SpiritHealerSeenSeq)
+        {
+            state.SpiritHealerSeenSeq = bot.last_action_sequence;
+            BotActionStatus const status = bot.last_action_status;
+            if (status != BotActionStatus::kApplied && status != BotActionStatus::kMoving && status != BotActionStatus::kBusy)
+            {
+                state.SpiritHealerRefusedUntilMs = nowMs + kSpiritHealerRefusedMs;
+                state.SpiritHealerActive = false;
+                state.Last.reset();
+                if (_options.OnEvent)
+                    _options.OnEvent(std::string("death_action_refused: bot=") + std::to_string(bot.guid) + " action=spirit_healer status=" + ActionStatusName(status));
+            }
+        }
+        return;
+    }
+
     // The death actions: a refusal is logged, and the action waits before it is sent again.
     if (bot.last_action_type == uint8_t(ActionType::kReleaseSpirit) || bot.last_action_type == uint8_t(ActionType::kResurrect) ||
         bot.last_action_type == uint8_t(ActionType::kReclaimCorpse))

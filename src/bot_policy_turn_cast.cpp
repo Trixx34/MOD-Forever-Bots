@@ -280,7 +280,21 @@ BotPolicy::TurnFlow BotPolicy::PartyHeal(DecideTick& tick, BotTurn& turn)
                     heal.type = ActionType::kCastSpell;
                     heal.spell_id = spellToCast;
                     heal.target_guid = target->guid == bot.guid ? 0 : PlayerRef(target->guid);
+                    // Protocol 28 (HealDownrank): the direct heal is cast at the rank that covers the target's deficit, named exactly (dest_x = 1); the core answers kNotKnown for a
+                    // rank the bot has not learned, and the downrank then pauses (ReadResult).
+                    std::uint32_t downrank = 0;
+                    if (_options.HealDownrank && spellToCast == healSpell && nowMs >= state.HealDownrankPausedUntilMs && target->max_health > target->health)
+                    {
+                        std::uint32_t const mana = bot.power_type == 0 ? bot.power : std::numeric_limits<std::uint32_t>::max();
+                        downrank = heal_ranks::PickRank(classId, bot.level, target->max_health - target->health, mana);
+                        if (downrank != 0)
+                        {
+                            heal.spell_id = downrank;
+                            heal.dest_x = 1.0f;
+                        }
+                    }
                     actions.push_back(heal);
+                    state.CastTarget[heal.spell_id] = heal.target_guid;
                     state.CastTarget[spellToCast] = heal.target_guid;
                     if (spellToCast == kRenew)
                         state.BuffUntilMs[{ kRenew, PlayerRef(target->guid) }] = nowMs + kRenewMs;
@@ -290,7 +304,7 @@ BotPolicy::TurnFlow BotPolicy::PartyHeal(DecideTick& tick, BotTurn& turn)
                     if (_options.OnEvent)
                         _options.OnEvent("heal: healer=" + std::to_string(bot.guid) + " spell=" + std::to_string(spellToCast) +
                                          " target=" + std::to_string(target->guid) + " target_hp_pct=" + std::to_string(hurtPct) +
-                                         (note.empty() ? "" : " " + note));
+                                         (downrank != 0 ? " rank=" + std::to_string(downrank) : std::string()) + (note.empty() ? "" : " " + note));
                     state.NextCastMs = nowMs + kGlobalCooldownMs;
                 }
                 return TurnFlow::kSkip;

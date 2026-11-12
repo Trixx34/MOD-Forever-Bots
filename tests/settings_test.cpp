@@ -39,6 +39,11 @@ void ChatSettings()
 {
     std::vector<std::string> warnings;
     CHECK(ParseBotSettings({}, warnings).VendorSellGear && !ParseBotSettings({ { "VendorSellGear", "0" } }, warnings).VendorSellGear); // on by default
+    // Protocol 28: the spirit healer rules (45 s, on a repeated killer) are on, the heal downrank is off
+    BotSettings const spiritDefault = ParseBotSettings({}, warnings);
+    CHECK(spiritDefault.SpiritHealerAfterMs == 45000 && spiritDefault.SpiritHealerOnRepeat && !spiritDefault.HealDownrank);
+    BotSettings const spiritSet = ParseBotSettings({ { "SpiritHealerAfterMs", "0" }, { "SpiritHealerOnRepeat", "0" }, { "HealDownrank", "1" } }, warnings);
+    CHECK(spiritSet.SpiritHealerAfterMs == 0 && !spiritSet.SpiritHealerOnRepeat && spiritSet.HealDownrank);
     BotSettings const threatDefault = ParseBotSettings({}, warnings);
     CHECK(threatDefault.ThreatHold && threatDefault.ThreatHoldPct == 90 && threatDefault.ThreatReleasePct == 70 && threatDefault.ThreatHoldMaxSec == 8 &&
           threatDefault.ThreatNearDeathPct == 15 && threatDefault.ThreatDropAbilities);

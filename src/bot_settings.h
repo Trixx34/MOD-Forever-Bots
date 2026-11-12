@@ -253,6 +253,10 @@ struct BotSettings
     supply::Settings Supplies;
     // VendorSellGear (default on; needs Bot.Vendor.SellGear in the core): a vendor visit also sells the bag gear the worn gear outclasses.
     bool VendorSellGear = true;
+    // Protocol 28: SpiritHealerAfterMs (default 45000, 0 = off), SpiritHealerOnRepeat (default on), HealDownrank (default off); see PolicyOptions.
+    std::uint32_t SpiritHealerAfterMs = 45000;
+    bool SpiritHealerOnRepeat = true;
+    bool HealDownrank = false;
     // DPS threat discipline (config keys ThreatHold, ThreatHoldPct, ThreatReleasePct, ThreatHoldMaxSec, ThreatNearDeathPct, ThreatDropAbilities); see PolicyOptions.
     bool ThreatHold = true;
     std::uint32_t ThreatHoldPct = 90;
