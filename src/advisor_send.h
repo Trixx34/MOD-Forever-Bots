@@ -32,6 +32,18 @@ bool Decode(forever_module::EventNotify const& notify, GuildLevel& out);
 // The payload of EventNotify::group_invite_declined() (hook GroupScript.OnInviteDeclined): the player that declined; false when the notify carries none.
 bool DecodeDecline(forever_module::EventNotify const& notify, std::uint64_t& decliner);
 
+// The payload of EventNotify::boss_killed() (hook PlayerScript.OnBossKill, protocol 27): a dungeon boss died to a player, a pet or a charm.
+struct BossKill
+{
+    std::uint32_t Map = 0;
+    std::uint32_t Instance = 0;
+    std::uint32_t Entry = 0;
+    std::uint64_t Killer = 0;       // raw guid counter of the killing player
+    std::uint64_t GroupLeader = 0;  // raw guid counter of the killer's group leader, 0 without a group
+    bool DungeonBoss = false;       // the creature carries the dungeon boss flag
+};
+bool Decode(forever_module::EventNotify const& notify, BossKill& out);
+
 // The payload of EventNotify::lfg_queue() (hook LfgScript.OnQueueUpdate); false when the notify carries none.
 bool Decode(forever_module::EventNotify const& notify, lfg_queue_fill::Queue& out);
 

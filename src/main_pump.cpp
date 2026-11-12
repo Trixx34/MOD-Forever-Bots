@@ -45,6 +45,7 @@ void main_detail::PumpTier2(forever_module::Tier2Session& session, std::atomic<b
     std::unordered_map<std::uint64_t, std::uint32_t> ambientLevel; // bot guid -> the level last seen, for the level-up line
     std::uint64_t ambientMs = 0;                                    // when the last ambient line was scheduled
     ambient::DeathWatch ambientDeaths;                              // a bot that saw another bot die says its local_death line
+    BossKillLog bossKillLog;                                        // the boss kills the core reported (PlayerScript.OnBossKill), deduped
     ambient::BossWatch ambientBosses;                               // a dungeon party that killed a boss says its boss_kill line
     std::size_t ambientCursor = 0;                                  // the bot the next ambient line is tried for
     std::uint32_t ambientTurn = 0;                                  // alternates General and Trade when both are on
@@ -403,6 +404,31 @@ void main_detail::PumpTier2(forever_module::Tier2Session& session, std::atomic<b
                 {
                     std::lock_guard<std::mutex> lock(extras.Commands->Lock);
                     declines.swap(extras.Commands->QuestDeclines);
+                }
+                // Boss kills the core reports (protocol 27): logged once per (map, instance, entry), and credited to the scenario party of the killer's group.
+                std::vector<advisor::BossKill> bossKills;
+                {
+                    std::lock_guard<std::mutex> lock(extras.Commands->Lock);
+                    bossKills.swap(extras.Commands->BossKills);
+                }
+                for (advisor::BossKill const& kill : bossKills)
+                {
+                    if (!bossKillLog.Record(kill.Map, kill.Instance, kill.Entry))
+                        continue;
+                    std::size_t party = directors.size();
+                    for (std::uint64_t const who : { kill.GroupLeader, kill.Killer })
+                    {
+                        auto const at = partyOf.find(who);
+                        if (who != 0 && at != partyOf.end())
+                        {
+                            party = at->second;
+                            break;
+                        }
+                    }
+                    bool const credited = party < directors.size() && directors[party].NoteBossKill(kill.Entry, nowMs());
+                    std::cerr << "forever-bots: boss_kill: map=" << kill.Map << " instance=" << kill.Instance << " entry=" << kill.Entry << " killer=" << kill.Killer
+                              << " leader=" << kill.GroupLeader << " dungeon_boss=" << (kill.DungeonBoss ? 1 : 0) << " known_in_instance=" << bossKillLog.CountIn(kill.Map, kill.Instance)
+                              << " party=" << (party < directors.size() ? directorNames[party] : std::string("none")) << " credited=" << (credited ? 1 : 0) << "\n";
                 }
                 // A declined invite: the player's unit reference (type 2, a player) keeps QuestInvite from inviting it again for two hours.
                 for (std::uint64_t const decliner : declines)

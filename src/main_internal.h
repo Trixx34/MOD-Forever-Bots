@@ -176,6 +176,7 @@ struct CommandQueue
     std::vector<social::Order> Social;
     std::vector<advisor::GuildLevel> GuildLevels;                // guild member level events (GuildScript.OnMemberLevel), for the pump thread
     std::vector<lfg_queue_fill::Queue> LfgQueues;                // dungeon finder queue events (LfgScript.OnQueueUpdate), for the pump thread
+    std::vector<advisor::BossKill> BossKills;                    // boss kill events (PlayerScript.OnBossKill, protocol 27), for the pump thread
     std::vector<std::uint64_t> QuestDeclines;                    // players that declined a group invite (GroupScript.OnInviteDeclined), for the pump thread
     std::vector<advisor::Order> Advisor;                        // advisor orders (advisor_send.h) for the Run() thread to send
     std::vector<social::Outcome> SocialOutcomes;

@@ -22,6 +22,7 @@
 #include <set>
 #include <optional>
 #include <string>
+#include <tuple>
 #include <vector>
 
 struct ScenarioPoint
@@ -190,6 +191,22 @@ constexpr std::size_t kRouteProgressWindow = 8;
 // stored per bot position (max_nearby_units slots each), so they are copied along with the bots, else a director would read another party's creatures.
 forever_module::WorldTickSnapshotView SubsetView(forever_module::WorldTickSnapshotView const& view, std::function<bool(std::uint64_t)> const& keep);
 
+// The boss kills the core reported (PlayerScript.OnBossKill, protocol 27), deduped per (map, instance, creature entry): a kill reported twice, or by several
+// members of the group, counts once.
+class BossKillLog
+{
+public:
+    // True when this (map, instance, entry) was not recorded before.
+    bool Record(std::uint32_t map, std::uint32_t instance, std::uint32_t entry);
+    // How many different bosses were recorded for one instance of a map.
+    std::size_t CountIn(std::uint32_t map, std::uint32_t instance) const;
+    std::size_t Size() const { return _seen.size(); }
+
+private:
+    static constexpr std::size_t kMaxKept = 4096;
+    std::set<std::tuple<std::uint32_t, std::uint32_t, std::uint32_t>> _seen;
+};
+
 class ScenarioDirector
 {
 public:
@@ -210,11 +227,16 @@ public:
     // Bosses seen dead since the last call, by name (for the log as they happen).
     std::vector<std::string> TakeNewBossKills();
 
+    // Protocol 27 (PlayerScript.OnBossKill): the core says a boss of this party's dungeon died. A boss of the plan counts as killed like one seen dead
+    // (the same entries, names and times); false for an entry the plan does not list. Repeats are harmless.
+    bool NoteBossKill(std::uint32_t entry, std::uint64_t nowMs);
+
     // The creature entries of the bosses seen dead so far.
     std::set<std::uint32_t> const& KilledBossEntries() const { return _bossKilledEntries; }
 
 private:
     void Finish(std::string outcome, std::uint64_t nowMs);
+    void MarkBossKilled(std::uint32_t entry, std::string const& name, std::uint64_t nowMs);
     // The config guard (ScenarioPlan::VerifyConfig): reads the grant results of the dressing, and sends the teleport probe until the core applies one.
     void CheckConfig(forever_module::WorldTickSnapshotView const& view, std::uint64_t nowMs, std::vector<forever_module::BotAction>& actions);
 

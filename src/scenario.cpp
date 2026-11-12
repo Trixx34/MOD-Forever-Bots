@@ -59,6 +59,43 @@ BotSnapshot const* LeaderOf(std::vector<BotSnapshot> const& bots)
 
 } // namespace
 
+void ScenarioDirector::MarkBossKilled(std::uint32_t entry, std::string const& name, std::uint64_t nowMs)
+{
+    _bossKilledEntries.insert(entry);
+    if (std::find(_bossKills.begin(), _bossKills.end(), name) == _bossKills.end())
+    {
+        _bossKills.push_back(name);
+        _bossKillMs.emplace_back(name, _runStartMs != 0 && nowMs >= _runStartMs ? nowMs - _runStartMs : 0);
+    }
+}
+
+bool ScenarioDirector::NoteBossKill(std::uint32_t entry, std::uint64_t nowMs)
+{
+    for (auto const& [bossEntry, name] : _plan.Bosses)
+        if (bossEntry == entry)
+        {
+            MarkBossKilled(entry, name, nowMs);
+            return true;
+        }
+    return false;
+}
+
+bool BossKillLog::Record(std::uint32_t map, std::uint32_t instance, std::uint32_t entry)
+{
+    if (_seen.size() >= kMaxKept)
+        _seen.clear(); // a long-running world: forget the oldest rather than grow without bound (a repeat of a very old kill is then logged again)
+    return _seen.insert({ map, instance, entry }).second;
+}
+
+std::size_t BossKillLog::CountIn(std::uint32_t map, std::uint32_t instance) const
+{
+    std::size_t count = 0;
+    for (auto const& [m, i, e] : _seen)
+        if (m == map && i == instance)
+            ++count;
+    return count;
+}
+
 void ScenarioDirector::Finish(std::string outcome, std::uint64_t nowMs)
 {
     ScenarioResult result;
@@ -722,12 +759,7 @@ void ScenarioDirector::Decide(forever_module::WorldTickSnapshotView const& view,
                         for (auto const& [entry, name] : _plan.Bosses)
                             if (entry == forever_module::UnitRefEntry(unit.guid))
                             {
-                                _bossKilledEntries.insert(entry);
-                                if (std::find(_bossKills.begin(), _bossKills.end(), name) == _bossKills.end())
-                                {
-                                    _bossKills.push_back(name);
-                                    _bossKillMs.emplace_back(name, _runStartMs != 0 && nowMs >= _runStartMs ? nowMs - _runStartMs : 0);
-                                }
+                                MarkBossKilled(entry, name, nowMs);
                             }
                     }
             }

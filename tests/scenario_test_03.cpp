@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Scenario tests, part 3 of 4 (split out of scenario_test.cpp; the helpers are in scenario_test_support.h).
+#include "advisor_send.h"
+#include "forever_module/module_client.h"
 #include "scenario_test_support.h"
 
 namespace {
@@ -109,6 +111,52 @@ void SettingsDropAScenarioWithoutARoster()
 
 namespace {
 
+
+// Protocol 27 (PlayerScript.OnBossKill): the core's report credits a boss of the plan without anyone seeing the corpse; an entry of another dungeon does nothing.
+void ABossKillEventCountsLikeASightedCorpse()
+{
+    ScenarioPlan plan = Plan();
+    plan.Bosses = { { 644, "Rhahk'Zor" }, { 646, "Mr. Smite" } };
+    ScenarioDirector director(plan);
+    CHECK(!director.NoteBossKill(9999, 1000)); // not a boss of this plan
+    CHECK(director.KilledBossEntries().empty());
+    CHECK(director.NoteBossKill(646, 2000));
+    CHECK(director.NoteBossKill(646, 3000)); // a repeat changes nothing
+    CHECK(director.KilledBossEntries().size() == 1 && director.KilledBossEntries().count(646) == 1);
+    auto const fresh = director.TakeNewBossKills();
+    CHECK(fresh.size() == 1 && fresh[0] == "Mr. Smite");
+    CHECK(director.TakeNewBossKills().empty());
+}
+
+void TheBossKillLogDedupesPerInstanceAndEntry()
+{
+    BossKillLog log;
+    CHECK(log.Record(36, 5, 644));
+    CHECK(!log.Record(36, 5, 644));   // the same kill reported again
+    CHECK(log.Record(36, 6, 644));    // another instance of the map
+    CHECK(log.Record(36, 5, 646));    // another boss
+    CHECK(log.Record(43, 5, 644));    // another map
+    CHECK(log.CountIn(36, 5) == 2 && log.CountIn(36, 6) == 1 && log.CountIn(1, 1) == 0);
+    for (std::uint32_t i = 0; i < 5000; ++i)
+        log.Record(1, i, 1);
+    CHECK(log.Size() <= 4096); // bounded
+}
+
+void TheBossKillEventIsDecoded()
+{
+    forever_module::EventNotify notify;
+    advisor::BossKill kill;
+    CHECK(!advisor::Decode(notify, kill)); // no boss_killed payload
+    forever_module::BossKilledEvent* event = notify.mutable_boss_killed();
+    event->set_map_id(36);
+    event->set_instance_id(7);
+    event->set_creature_entry(644);
+    event->set_killer_guid(12);
+    event->set_group_leader_guid(10);
+    event->set_dungeon_boss(1);
+    CHECK(advisor::Decode(notify, kill));
+    CHECK(kill.Map == 36 && kill.Instance == 7 && kill.Entry == 644 && kill.Killer == 12 && kill.GroupLeader == 10 && kill.DungeonBoss);
+}
 
 void CountsBossesSeenDead()
 {
@@ -256,6 +304,9 @@ void RunScenarioTestsPart3()
     SettingsReadAScenario();
     SettingsDropAScenarioWithoutARoster();
     CountsBossesSeenDead();
+    ABossKillEventCountsLikeASightedCorpse();
+    TheBossKillLogDedupesPerInstanceAndEntry();
+    TheBossKillEventIsDecoded();
     ReportsOnyxiaHealthInTheOnyxiaRaidOnly();
     CountsWhereTheTimeGoes();
 }

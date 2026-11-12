@@ -63,6 +63,20 @@ bool DecodeDecline(forever_module::EventNotify const& notify, std::uint64_t& dec
     return true;
 }
 
+bool Decode(forever_module::EventNotify const& notify, BossKill& out)
+{
+    if (!notify.has_boss_killed())
+        return false;
+    forever_module::BossKilledEvent const& event = notify.boss_killed();
+    out.Map = event.map_id();
+    out.Instance = event.instance_id();
+    out.Entry = event.creature_entry();
+    out.Killer = event.killer_guid();
+    out.GroupLeader = event.group_leader_guid();
+    out.DungeonBoss = event.dungeon_boss() != 0;
+    return true;
+}
+
 bool Decode(forever_module::EventNotify const& notify, GuildLevel& out)
 {
     if (!notify.has_guild_member_level())

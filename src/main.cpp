@@ -150,7 +150,7 @@ int main(int argc, char** argv)
     manifest.requested_max_nearby_units = kRequestedNearbyUnits;
     manifest.requested_max_actions = kRequestedActions;
     manifest.tier1_hooks = { "CommandScript", "PlayerScript.OnChat", "PlayerScript.OnBotTrade", "PlayerScript.OnLootItem",
-                             "LfgScript.OnQueueUpdate", "GuildScript.OnMemberLevel", "GroupScript.OnInviteDeclined" };   // protocol 21 and 22 events; the handlers do nothing while their feature is off (the settings arrive after the manifest)
+                             "LfgScript.OnQueueUpdate", "GuildScript.OnMemberLevel", "GroupScript.OnInviteDeclined", "PlayerScript.OnBossKill" };   // protocol 21, 22 and 27 events; the handlers do nothing while their feature is off (the settings arrive after the manifest)
 
     forever_module::ModuleClient client(std::move(manifest));
     if (!client.Connect(argv[1]) || !client.Handshake())

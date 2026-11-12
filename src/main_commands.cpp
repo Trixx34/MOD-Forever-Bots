@@ -317,6 +317,15 @@ void SetUpTrade(forever_module::ModuleClient& client, std::shared_ptr<trade::Tra
         if (commands->GuildLevels.size() < 64)
             commands->GuildLevels.push_back(level);
     });
+    client.OnNotify("PlayerScript.OnBossKill", [commands](forever_module::EventNotify const& notify)
+    {
+        advisor::BossKill kill;
+        if (!advisor::Decode(notify, kill))
+            return;
+        std::lock_guard<std::mutex> lock(commands->Lock);
+        if (commands->BossKills.size() < 64)
+            commands->BossKills.push_back(kill);
+    });
     client.OnNotify("GroupScript.OnInviteDeclined", [commands](forever_module::EventNotify const& notify)
     {
         std::uint64_t decliner = 0;
