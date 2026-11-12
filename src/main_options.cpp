@@ -12,6 +12,7 @@ void PolicyFromSettings(PolicyOptions& policyOptions, BotSettings& settings)
     policyOptions.ServiceEveryMs = std::uint64_t(settings.ServiceEverySec) * 1000;
     policyOptions.TrainEveryMs = std::uint64_t(settings.TrainEverySec) * 1000;
     policyOptions.Supplies = settings.Supplies;
+    policyOptions.VendorSellGear = settings.VendorSellGear;
     policyOptions.DungeonTeleport = settings.DungeonTeleport;
     policyOptions.LevelDungeons = settings.LevelDungeons && settings.Scenarios.empty();   // a scenario run drives its own parties
     policyOptions.LevelDungeonRuns = settings.LevelDungeonRuns;

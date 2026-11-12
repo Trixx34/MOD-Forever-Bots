@@ -328,6 +328,9 @@ struct PolicyOptions
     std::uint64_t WaitForGhostMs = 180000;      // and this long after the ghost entered the corpse's map
     // Supplies (layout 15): a bot short of ammunition, food or drink walks to a vendor that sells it and buys, and eats or drinks while resting.
     supply::Settings Supplies;
+    // Config VendorSellGear (default off; needs Bot.Vendor.SellGear in the core): a vendor visit also sells the bag gear the worn gear outclasses (kVendor bit 2048
+    // with the bot's gear profile in bits 12-14). The core judges it by the item numbers, never by item id.
+    bool VendorSellGear = false;
     // Flight points (layout 17, taxi_policy.h): a long walk becomes a flight from the nearest flight master. Off by default.
     taxi::Settings Taxi;
     // Realism features without combat (realism.h; off by default).

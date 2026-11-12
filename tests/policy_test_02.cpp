@@ -647,6 +647,29 @@ void VendorVisitWhenInReach()
     CHECK(!HasAction(actions, 10, ActionType::kMoveTo));
 }
 
+// Protocol 27 (config VendorSellGear): bit 2048 and the gear profile in bits 12-14 only when the key is on.
+void VendorVisitSellsGearOnlyWhenConfigured()
+{
+    for (bool const on : { false, true })
+    {
+        WorldTickSnapshotView view = PartyView({ 10 });
+        SetVendor(view, 100.0f);
+        view.bots[0].pos_x = 98.0f;
+        auto const vendor = FindAction(VendorPolicy(false, on).Decide(view, 0), ActionType::kVendor);
+        CHECK(vendor.has_value());
+        if (!vendor)
+            continue;
+        CHECK(((vendor->spell_id & 2048) != 0) == on);
+        if (on)
+        {
+            CHECK(((vendor->spell_id >> 12) & 7) <= 6);
+            CHECK((vendor->spell_id & ~(7u << 12) & ~2048u) == (FindAction(VendorPolicy().Decide(view, 0), ActionType::kVendor)->spell_id & ~0u)); // the other bits are unchanged
+        }
+        else
+            CHECK(((vendor->spell_id >> 12) & 7) == 0);
+    }
+}
+
 void TravelIsDroppedAfterTheTimeout()
 {
     BotPolicy policy = VendorPolicy();
@@ -954,6 +977,7 @@ void RunPolicyTestsPart2()
     WornGearSendsTheBotToTheRepairman();
     GoodGearGoesToTheNearestVendor();
     VendorVisitWhenInReach();
+    VendorVisitSellsGearOnlyWhenConfigured();
     TravelIsDroppedAfterTheTimeout();
     WalkingBotDoesNotSit();
     PartyMembersDoNotWalkAlone();

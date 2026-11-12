@@ -122,6 +122,9 @@ void BotPolicy::TurnShopping(DecideTick& tick, BotTurn& turn)
             // sells the white junk, not only the grey items.
             if (bot.bag_free_slots <= kBagsLowSlots)
                 vendor.spell_id |= kServiceSellJunk;
+            // Protocol 27 (config VendorSellGear): also the bag gear the worn gear outclasses, judged with the stat list of the bot's spec.
+            if (_options.VendorSellGear)
+                vendor.spell_id |= kServiceSellGear | (rotation::GearProfileFor(turn.classId, turn.spec) << kServiceGearProfileShift);
             // Layout 13: the NPC's guid, not just its position. An older core leaves it 0 and the core resolves the
             // nearest vendor of the map instead.
             vendor.target_guid = needRepair ? bot.repair_guid : bot.vendor_guid;

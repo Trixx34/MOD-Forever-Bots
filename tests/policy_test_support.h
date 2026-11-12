@@ -447,9 +447,10 @@ inline void SetVendor(WorldTickSnapshotView& view, float x)
     }
 }
 
-inline BotPolicy VendorPolicy(bool party = false)
+inline BotPolicy VendorPolicy(bool party = false, bool sellGear = false)
 {
     PolicyOptions options = AggressiveOptions();
+    options.VendorSellGear = sellGear;
     options.ServiceEveryMs = 60000;
     if (party)
     {

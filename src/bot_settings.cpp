@@ -746,6 +746,7 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadBool(config, "MailGifts", settings.MailGifts.Enabled, warnings);
     ReadKey(config, "MailGiftDailyCap", 0, 20, settings.MailGifts.DailyCap, warnings);
     ReadBool(config, "Supplies", settings.Supplies.Enabled, warnings);
+    ReadBool(config, "VendorSellGear", settings.VendorSellGear, warnings);
     ReadKey(config, "SupplyAmmoLow", 0, 1000, settings.Supplies.AmmoLow, warnings);
     ReadKey(config, "SupplyAmmoTarget", 1, 2000, settings.Supplies.AmmoTarget, warnings);
     ReadKey(config, "SupplyFoodLow", 0, 100, settings.Supplies.FoodLow, warnings);
