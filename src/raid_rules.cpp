@@ -211,6 +211,28 @@ bool Table::NoAoe(std::uint32_t map, std::uint32_t bossEntry) const
     return r && (r->NoAoe.count(0) != 0 || r->NoAoe.count(bossEntry) != 0);
 }
 
+bool Table::IsFrontalAny(std::uint32_t map, std::uint32_t spell) const
+{
+    MapRules const* r = Find(map);
+    if (!r)
+        return false;
+    for (auto const& boss : r->Frontal)
+        if (boss.second.count(spell) != 0)
+            return true;
+    return false;
+}
+
+bool Table::IsLethalSpell(std::uint32_t map, std::uint32_t spell) const
+{
+    MapRules const* r = Find(map);
+    if (!r)
+        return false;
+    for (AvoidZone const& zone : r->Avoid)
+        if (!zone.Object && zone.Id == spell)
+            return true;
+    return false;
+}
+
 bool Table::IsFrontal(std::uint32_t map, std::uint32_t bossEntry, std::uint32_t spell) const
 {
     MapRules const* r = Find(map);

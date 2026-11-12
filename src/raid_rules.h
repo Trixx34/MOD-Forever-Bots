@@ -75,6 +75,10 @@ public:
     std::optional<std::uint32_t> SwapStacks(std::uint32_t map, std::uint32_t aura) const;
     bool NoAoe(std::uint32_t map, std::uint32_t bossEntry) const;
     bool IsFrontal(std::uint32_t map, std::uint32_t bossEntry, std::uint32_t spell) const;
+    // A frontal row of any boss of the map names the spell (a telegraph carries a caster ref, not a boss entry).
+    bool IsFrontalAny(std::uint32_t map, std::uint32_t spell) const;
+    // The map lists the spell as an `avoid|spell` row: a lethal-class cast the whole raid steps out of, casters mid-cast included.
+    bool IsLethalSpell(std::uint32_t map, std::uint32_t spell) const;
 
 private:
     std::map<std::uint32_t, MapRules> _maps;

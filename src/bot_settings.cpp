@@ -827,6 +827,8 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadKey(config, "MountMinLevel", 0, 80, settings.MountMinLevel, warnings);
     ReadBool(config, "Gathering", settings.Gathering, warnings);
     ReadBool(config, "AvoidGroundEffects", settings.AvoidGroundEffects, warnings);
+    ReadBool(config, "TelegraphEscape", settings.TelegraphEscape, warnings);
+    ReadBool(config, "TelegraphEscapeCasters", settings.TelegraphEscapeCasters, warnings);
     if (auto const it = config.find("AvoidSpellsFile"); it != config.end())
         settings.AvoidSpellsFile = it->second;
     if (auto const it = config.find("RaidRulesFile"); it != config.end())

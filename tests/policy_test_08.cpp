@@ -196,6 +196,92 @@ void NoScenarioNoDirectorDoesNotCrash()
     }
 }
 
+// ---- Telegraph escape (raid maps only) ----
+PolicyOptions TelegraphOptions(std::uint32_t classId, char const* rules)
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.ClassOf = [classId](std::uint64_t) { return classId; };
+    std::vector<std::string> errors;
+    options.RaidRules = std::make_shared<raid_rules::Table>(raid_rules::Parse(rules, errors));
+    return options;
+}
+
+char const* const kOnyRules = "avoid|249|spell|17086|35|Deep Breath\nfrontal|249|10184|18500|Wing Buffet\n";
+
+WorldTickSnapshotView TelegraphView(std::uint32_t map, std::uint32_t spell, float radius)
+{
+    WorldTickSnapshotView view = View(1, 0, {});
+    view.bots[0].map_id = map;
+    view.bots[0].telegraph_count = 1;
+    forever_module::Telegraph& t = view.bots[0].telegraphs[0];
+    t = forever_module::Telegraph{};
+    t.spell_id = spell;
+    t.x = 3.0f;
+    t.y = 0.0f;
+    t.radius = radius;
+    t.kind = 1;
+    t.cast_remaining_ms = 2000;
+    return view;
+}
+
+void TelegraphEscapeMovesAMeleeOutOnARaidMap()
+{
+    BotPolicy policy(TelegraphOptions(4, kOnyRules));   // a rogue
+    WorldTickSnapshotView view = TelegraphView(249, 18392, 8.0f);   // Fireball splash: not a lethal row
+    auto const moves = GroundMoves(policy.Decide(view, 1000));
+    CHECK(moves.size() == 1);
+    if (moves.size() == 1)
+    {
+        float const dx = moves[0].dest_x - 3.0f, dy = moves[0].dest_y;
+        CHECK(std::sqrt(dx * dx + dy * dy) >= 11.0f - 0.01f);   // radius 8 plus the 3-yard margin
+        CHECK(moves[0].dest_x < 0.0f);
+        // the end point is kept: no second move while the bot walks
+        view.bots[0].pos_x = -2.0f;
+        CHECK(GroundMoves(policy.Decide(view, 1100)).empty());
+    }
+}
+
+void TelegraphEscapeIsOffOutsideRaidMapsOrWhenSwitchedOff()
+{
+    BotPolicy dungeon(TelegraphOptions(4, kOnyRules));
+    CHECK(GroundMoves(dungeon.Decide(TelegraphView(33, 18392, 8.0f), 1000)).empty());   // a map without rules
+    PolicyOptions off = TelegraphOptions(4, kOnyRules);
+    off.TelegraphEscape = false;
+    BotPolicy switchedOff(off);
+    CHECK(GroundMoves(switchedOff.Decide(TelegraphView(249, 18392, 8.0f), 1000)).empty());
+    BotPolicy outside(TelegraphOptions(4, kOnyRules));
+    CHECK(GroundMoves(outside.Decide(TelegraphView(249, 18392, 2.0f), 1000)).empty());   // 3 yards away, radius 2: not inside
+}
+
+void TelegraphEscapeTankHoldsUnlessLethalOrFrontal()
+{
+    BotPolicy tank(TelegraphOptions(1, kOnyRules));   // a warrior in a party: the tank
+    CHECK(GroundMoves(tank.Decide(TelegraphView(249, 18392, 8.0f), 1000)).empty());
+    BotPolicy lethal(TelegraphOptions(1, kOnyRules));
+    CHECK(GroundMoves(lethal.Decide(TelegraphView(249, 17086, 8.0f), 1000)).size() == 1);
+    BotPolicy frontal(TelegraphOptions(1, kOnyRules));
+    CHECK(GroundMoves(frontal.Decide(TelegraphView(249, 18500, 8.0f), 1000)).size() == 1);
+}
+
+void TelegraphEscapeCasterMidCastMovesOnlyForLethalOrByConfig()
+{
+    auto castingView = [](std::uint32_t spell) {
+        WorldTickSnapshotView view = TelegraphView(249, spell, 8.0f);
+        view.bots[0].casting_spell = 2060;
+        view.bots[0].cast_remaining_ms = 1500;
+        return view;
+    };
+    BotPolicy healer(TelegraphOptions(5, kOnyRules));   // a priest mid-heal
+    CHECK(GroundMoves(healer.Decide(castingView(18392), 1000)).empty());
+    BotPolicy lethal(TelegraphOptions(5, kOnyRules));
+    CHECK(GroundMoves(lethal.Decide(castingView(17086), 1000)).size() == 1);
+    PolicyOptions config = TelegraphOptions(5, kOnyRules);
+    config.TelegraphEscapeCasters = true;
+    BotPolicy byConfig(config);
+    CHECK(GroundMoves(byConfig.Decide(castingView(18392), 1000)).size() == 1);
+}
+
 } // namespace
 
 void RunPolicyTestsPart8()
@@ -209,4 +295,8 @@ void RunPolicyTestsPart8()
     WantCostIsAbsentOffTheDeadminesAndMinusOneWithNoCostFile();
     ThePullHoldCapIsReachedAndNotExceededWithFlatMana();
     NoScenarioNoDirectorDoesNotCrash();
+    TelegraphEscapeMovesAMeleeOutOnARaidMap();
+    TelegraphEscapeIsOffOutsideRaidMapsOrWhenSwitchedOff();
+    TelegraphEscapeTankHoldsUnlessLethalOrFrontal();
+    TelegraphEscapeCasterMidCastMovesOnlyForLethalOrByConfig();
 }

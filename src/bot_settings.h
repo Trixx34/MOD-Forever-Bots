@@ -325,6 +325,10 @@ struct BotSettings
     // known to be hostile. The dungeon files' bosses[].strategy.avoid_spells and avoid (fixed zones) add to it for their map.
     bool AvoidGroundEffects = false;
     std::string AvoidSpellsFile;
+    // TelegraphEscape (default ON, only acts on maps that have raid rules): a bot inside the area of an enemy cast (layout 25 telegraphs: Onyxia's Fireball and Deep Breath) steps out.
+    // A tank holds unless the rule table marks the spell lethal (`avoid|spell`) or frontal; a bot mid-cast holds unless the spell is lethal or TelegraphEscapeCasters = 1.
+    bool TelegraphEscape = true;
+    bool TelegraphEscapeCasters = false;
     // RaidRulesFile (absolute path, data/raid_rules.txt; empty = none): the raid rule table, see raid_rules.h and the README.
     std::string RaidRulesFile;
     // CorpseRunTeleportSec (0 = off, else 10..3600): a ghost whose corpse run takes longer is put at its corpse (needs Bot.Actions.Teleport).

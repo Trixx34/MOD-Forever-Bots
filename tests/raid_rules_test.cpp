@@ -56,6 +56,7 @@ void TestRows()
     CHECK(!t.NoAoe(309, 14517));
     CHECK(t.IsFrontal(249, 10184, 18500));
     CHECK(!t.IsFrontal(249, 10184, 18435));
+    CHECK(t.IsFrontalAny(249, 18500) && !t.IsFrontalAny(249, 18435) && !t.IsFrontalAny(1, 18500));
 }
 
 void TestWildcardNoAoe()
@@ -113,6 +114,7 @@ void TestShippedFile()
     // Onyxia: whelps first
     CHECK(t.AddRank(249, 11262).has_value() && *t.AddRank(249, 11262) == 0);
     CHECK(t.IsFrontal(249, 10184, 18500) && t.IsFrontal(249, 10184, 18435));
+    CHECK(t.IsLethalSpell(249, 17086) && !t.IsLethalSpell(249, 18500) && !t.IsLethalSpell(309, 17086));
     // Zul'Gurub rows from the task
     for (std::uint32_t spell : { 23954u, 24208u, 24300u, 23953u })
         CHECK(t.InterruptFirst(309, spell));

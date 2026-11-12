@@ -740,6 +740,8 @@ void BotPolicy::DecideBot(DecideTick& tick, std::size_t i)
         return;
     if (TurnGroundEffects(tick, turn) == TurnFlow::kSkip)
         return;
+    if (TurnTelegraphEscape(tick, turn) == TurnFlow::kSkip)
+        return;
     TurnTargetMemory(tick, turn);
     if (TurnDead(tick, turn) == TurnFlow::kSkip)
         return;

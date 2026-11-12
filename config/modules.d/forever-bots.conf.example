@@ -353,6 +353,10 @@ Module.forever-bots.TelemetrySummarySec = 60
 # (absolute path; data/avoid_spells.txt) lists the dungeon spells that leave one; the dungeon files' bosses[].strategy.avoid_spells and avoid add to it. Off by default. doc/ground-effects.md.
 # Module.forever-bots.AvoidGroundEffects = 1
 # Module.forever-bots.AvoidSpellsFile = /srv/forever/sim/modules_runtime/forever-bots/data/avoid_spells.txt
+# TelegraphEscape (default ON, acts only on maps that have raid rules; needs the core Bot.Snapshot.Telegraphs = 1): a bot inside the area of an enemy cast about to land (Onyxia Fireball,
+# Deep Breath) steps out. A tank holds unless the spell is an `avoid|spell` or `frontal` row; a bot mid-cast holds unless the spell is an `avoid|spell` row or TelegraphEscapeCasters = 1.
+# Module.forever-bots.TelegraphEscape = 1
+# Module.forever-bots.TelegraphEscapeCasters = 0
 
 # Party planner (party_planner.h): one plan per party every 400 ms, the nearest ready kicker assigned to each cast, crowd control split between casters. On by default; it acts through
 # the interrupt and cc tactics (DungeonTactics), so with those off it changes nothing. 0 = off, every bot picks its own jobs as before. doc/dungeon-strategy.md.

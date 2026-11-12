@@ -93,6 +93,8 @@ void PolicyFromSettings(PolicyOptions& policyOptions, BotSettings& settings)
         }
     }
     policyOptions.AvoidGroundEffects = settings.AvoidGroundEffects;
+    policyOptions.TelegraphEscape = settings.TelegraphEscape;
+    policyOptions.TelegraphEscapeCasters = settings.TelegraphEscapeCasters;
     if (settings.AvoidGroundEffects)
     {
         auto avoidTable = std::make_shared<ground_avoid::AvoidTable>();

@@ -29,10 +29,15 @@ The Onyxia spell ids (marked `(check)` in the file) were written from memory.
 ## Gaps (what the snapshot does not offer)
 
 - **Game objects.** `GroundEffect` (layout 21/25) carries a spell id, a position, a radius and a kind (1 dynamic object, 2 area trigger). A game object such as Liquid Fire (177764) has an entry, not a spell, and is not listed. The `object` row is parsed and tested but cannot be matched until the core lists game objects (or says which spell its dynamic object is).
-- **Casts that land on an area** (Fireball, Deep Breath) arrive as `Telegraph` entries (layout 25: circle or cone, `spell_id`, `radius`, `cone_angle`). `party_view_adapter.h` has the geometry (`InsideTelegraph`, `EscapeFrom`), but no policy step moves a bot out of a telegraph yet; the `avoid|spell` rows only act on ground effects.
+- **Casts that land on an area** (Fireball, Deep Breath) arrive as `Telegraph` entries (layout 25: circle or cone, `spell_id`, `radius`, `cone_angle`). Since the telegraph escape (`TurnTelegraphEscape`, below) a bot inside one steps out; the `avoid|spell` rows act on ground effects and also mark a telegraph spell as lethal-class.
 - **Debuffs on bots that are not the module's** (humans) are not in a snapshot; the core's party view (`PartyDebuff`, `dispel_type`) could feed the dispel plan once `PartyViewPlanner` adopts it.
 - **Tank positioning and the no-AoE flag** have no consumer: no coordinates for the room, and the rotation rows have no area-damage marker.
 - **Swap needs a second tank.** With one tank nothing changes; the taunt is warrior only.
+
+## Telegraph escape
+
+`Module.forever-bots.TelegraphEscape` (default ON; it only acts on a map that has rules in the raid rule table, so dungeons and the open world are untouched) and `TelegraphEscapeCasters` (default 0). Needs the core's `Bot.Snapshot.Telegraphs = 1`. The step runs right after the ground-effect step: a bot that stands inside a telegraph (`party_view::TelegraphsHitting`) walks to `EscapeFrom(.., margin 3)`; the end point is kept for 3 s so it does not shift each tick; the log line is `telegraph_escape: bot= map= spell= to=`.
+Who holds: a **tank** (role tank, or a warrior in a party with no role set) holds unless the spell is an `avoid|spell` row (lethal-class) or a `frontal` row of any boss of the map; a bot **mid-cast** (healer or caster) holds unless the spell is an `avoid|spell` row or `TelegraphEscapeCasters = 1`. Everyone else steps out of any telegraph. The tank exception for lethal rows is deliberate: Deep Breath kills a tank as well.
 
 ## Settings
 

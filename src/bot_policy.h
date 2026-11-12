@@ -139,6 +139,8 @@ struct PolicyOptions
     // SDK 0.19 (layout 21): a bot standing inside a harmful ground effect (a dynamic object or area trigger of a hostile caster, or a spell of AvoidSpells) walks
     // out of it. Off by default (the core must fill the snapshot: Bot.Snapshot.GroundEffects = 1). AvoidSpells: data/avoid_spells.txt.
     bool AvoidGroundEffects = false;
+    bool TelegraphEscape = true;          // raid maps only (a map with raid rules): step out of an enemy cast's area (TurnTelegraphEscape)
+    bool TelegraphEscapeCasters = false;  // also a bot that is mid-cast, for a telegraph that is not lethal-class
     std::shared_ptr<ground_avoid::AvoidTable const> AvoidSpells;
     // The raid rule table (RaidRulesFile, raid_rules.h): the planner reads the interrupt-first casts, the dispel kinds, the tank swap aura and the no-AoE rule from it; the add
     // ranks are merged into each scenario's KillPriority at start; the ground-effect spells of its avoid rows join the hazard circles. Null = none.
@@ -579,6 +581,9 @@ private:
         std::uint64_t ReclaimDangerSinceMs = 0;          // since when a live hostile has stood near the ghost at its corpse (0 = none)
         std::uint64_t FocusLoggedFor = 0;                // the unit a focus event was last written for (once per target)
         ground_avoid::Point2 AvoidDest{};                // where the bot is walking to get out of a ground effect, kept for a few seconds so the point does not shift every tick
+        ground_avoid::Point2 TelegraphDest{};            // where the bot walks to leave an enemy cast's area (kept like AvoidDest)
+        std::uint64_t TelegraphSetMs = 0;
+        std::uint64_t TelegraphLoggedMs = 0;
         std::uint64_t AvoidSetMs = 0;                    // when AvoidDest was chosen (0 = none)
         std::uint64_t AvoidLoggedMs = 0;                 // the last avoid_effect line for this bot (at most one per 10 s)
         std::uint64_t WalkBlockedAtMs = 0;               // when a move got the answer "no route": the walk (grind spot, hub, exploring) that began before it is over, and the bot picks another later
@@ -843,6 +848,7 @@ private:
     void DecideBot(DecideTick& tick, std::size_t i);
     TurnFlow TurnBegin(DecideTick& tick, BotTurn& turn);
     TurnFlow TurnGroundEffects(DecideTick& tick, BotTurn& turn);
+    TurnFlow TurnTelegraphEscape(DecideTick& tick, BotTurn& turn);
     void TurnTargetMemory(DecideTick& tick, BotTurn& turn);
     TurnFlow TurnDead(DecideTick& tick, BotTurn& turn);
     // TurnDead's parts, in the order it runs them (bot_policy_turn_dead.cpp).
