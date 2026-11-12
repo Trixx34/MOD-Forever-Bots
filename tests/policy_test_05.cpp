@@ -148,7 +148,7 @@ void AWipedPartysGhostsArePutAtTheirCorpsesAfterAMinute()
 }
 
 // A bot that stands up among what killed it and dies again three times within two minutes is put at a grind spot for its level, away from the corpse.
-void DeathLoopMovesTheBotToAGrindSpot()
+void DeathLoopMovesTheBotToAGrindSpot(std::uint64_t cycleMs = 8000)
 {
     std::vector<std::string> events;
     std::vector<std::string> warnings;
@@ -177,7 +177,7 @@ void DeathLoopMovesTheBotToAGrindSpot()
         up.bots[0].level = 6;
         up.bots[0].pos_x = 10.0f;
         escape = escapeTo(policy.Decide(up, now));
-        now += 5000;
+        now += cycleMs - 3000;
         if (death < 2)
             CHECK(escape < 0.0f);   // the first two deaths are ordinary
     }
@@ -935,6 +935,7 @@ void RunPolicyTestsPart5()
     ALongCorpseRunEndsInATeleportToTheCorpse();
     AWipedPartysGhostsArePutAtTheirCorpsesAfterAMinute();
     DeathLoopMovesTheBotToAGrindSpot();
+    DeathLoopMovesTheBotToAGrindSpot(62000);   // prod: one death a minute, three deaths span two minutes
     CorpseReleasesAtOnceWithoutARezzer();
     CorpseReleasesWhenTheWholePartyIsDown();
     ReleaseIsHeldInCombatUpToTheCap();
