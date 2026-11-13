@@ -254,6 +254,13 @@ struct PolicyOptions
     std::uint32_t HealerCombatManaPct = 25;
     // TankPickup: the tank turn taunts a mob that is on a non-tank (the party view's loose mobs), and uses the area taunt for two or more. Acts only with PartyViewPlanner.
     bool TankPickup = true;
+    // TankLoosePickup: with TankPickup, a route/raid party's tanks elect one tank per loose mob (nearest with a ready taunt, mobs on healers and casters first, in line of sight, within
+    // TankLooseRangeYards), and a tank out of the taunt's reach walks at most TankLooseChaseYards toward it inside the chase leash. TankLooseCooldownMs: between two picks of a tank.
+    // Off here (the tests); the module's settings turn it on.
+    bool TankLoosePickup = false;
+    std::uint64_t TankLooseCooldownMs = 2500;
+    std::uint32_t TankLooseRangeYards = 40;
+    std::uint32_t TankLooseChaseYards = 8;
     // PullTankFirst (dungeon, raid and tank-led parties only: the route rules, never a solo bot or a leveling party): a member waits on the route while the party leader (the
     // tank) has a target but is not yet in combat with it, and assists once the tank is in combat or PullTankHoldMs has passed. A member whose target is already within
     // PullMemberRangeYards of it need not walk and is not held. 0 = off here (the tests); the module's settings turn it on.
@@ -1091,6 +1098,12 @@ private:
         std::uint64_t UntilMs = 0;
     };
     std::unordered_map<std::uint64_t, InterruptClaim> _interruptClaims; // target unit reference -> claim
+    struct LooseClaim
+    {
+        std::uint64_t Tank = 0;    // the bot guid that was elected to take the mob
+        std::uint64_t UntilMs = 0;
+    };
+    std::unordered_map<std::uint64_t, LooseClaim> _looseClaims;          // loose mob unit reference -> the tank elected for it (TankLoosePickup)
     std::unordered_map<std::uint64_t, party_planner::Order> _partyOrders; // party leader guid -> its plan (Phase 2)
     PolicyOptions _options;
     // One planner per (side, band): index side * 2 + band.

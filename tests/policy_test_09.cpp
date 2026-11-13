@@ -129,6 +129,131 @@ void TankPickupNotBelowTheTaunt()
     CHECK(!CastsSpell(policy.Decide(view, 1000), 10, 355, kLooseOne));
 }
 
+// TankLoosePickup: bot 13 is a second warrior in the group (the ZG and Onyxia rosters have several), standing at `secondX`; bot 10 stands at 0.
+auto const kTwoTanks = [](std::uint64_t guid) { return guid == 10 || guid == 13 ? 1u : guid == 11 ? 4u : 5u; };
+
+WorldTickSnapshotView TwoTankView(std::vector<std::uint64_t> const& loose, float looseX, float secondX)
+{
+    WorldTickSnapshotView view = TankView(loose, looseX, kTwoTanks);
+    BotSnapshot second = view.bots[0];
+    second.guid = 13;
+    second.pos_x = secondX;
+    second.nearby_count = 0;
+    second.threat_target_guid = kMobOnTank;
+    second.party_member_index = 3;
+    view.bots.push_back(second);
+    view.nearby.resize(view.bots.size() * view.max_nearby_units);
+    AddNearby(view, 3, MobAt(kMobOnTank, secondX + 4.0f));
+    for (std::uint64_t ref : loose)
+        AddNearby(view, 3, MobAt(ref, looseX));
+    view.party_views[0].member_count = 4;
+    PartyMember member = view.party_members[0];
+    member.guid = PlayerOf(13);
+    member.victim_ref = kMobOnTank;
+    view.party_members.push_back(member);
+    return view;
+}
+
+PolicyOptions LooseOptions()
+{
+    PolicyOptions options = TankOptions(kTwoTanks);
+    options.PartySize = 4;
+    options.TankLoosePickup = true;
+    return options;
+}
+
+void LooseElectsTheNearestTankOnly()
+{
+    std::vector<std::string> events;
+    PolicyOptions options = LooseOptions();
+    options.OnEvent = [&](std::string const& line) { events.push_back(line); };
+    BotPolicy watched(options);
+    watched.SetRouteActive(true);
+    std::vector<BotAction> const actions = watched.Decide(TwoTankView({ kLooseOne }, 25.0f, 24.0f), 1000);
+    CHECK(CastsSpell(actions, 13, 355, kLooseOne));
+    CHECK(!CastsSpell(actions, 10, 355, kLooseOne));
+    bool logged = false;
+    for (std::string const& line : events)
+        logged = logged || (line.rfind("tank_loose: tank=13 target=1001 victim=", 0) == 0 && line.find("reason=newest") != std::string::npos);
+    CHECK(logged);
+    // The pick is not repeated inside the cooldown, by either tank.
+    std::vector<BotAction> const again = watched.Decide(TwoTankView({ kLooseOne }, 25.0f, 24.0f), 1500);
+    CHECK(!CastsSpell(again, 13, 355, kLooseOne) && !CastsSpell(again, 10, 355, kLooseOne));
+}
+
+void LooseKeepsTheOldWayWithoutTheKeyOrTheRoute()
+{
+    PolicyOptions off = LooseOptions();
+    off.TankLoosePickup = false;
+    BotPolicy keyOff(off);
+    keyOff.SetRouteActive(true);
+    std::vector<BotAction> const both = keyOff.Decide(TwoTankView({ kLooseOne }, 25.0f, 24.0f), 1000);
+    CHECK(CastsSpell(both, 10, 355, kLooseOne) && CastsSpell(both, 13, 355, kLooseOne));
+    BotPolicy noRoute(LooseOptions());   // a party that is not on a route: the gate is off
+    std::vector<BotAction> const plain = noRoute.Decide(TwoTankView({ kLooseOne }, 25.0f, 24.0f), 1000);
+    CHECK(CastsSpell(plain, 10, 355, kLooseOne) && CastsSpell(plain, 13, 355, kLooseOne));
+}
+
+void LooseTakesTheMobOnTheHealerFirst()
+{
+    PolicyOptions options = LooseOptions();
+    std::vector<std::string> events;
+    options.OnEvent = [&](std::string const& line) { events.push_back(line); };
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    WorldTickSnapshotView view = TwoTankView({ kLooseOne, kLooseTwo }, 6.0f, 60.0f);
+    view.nearby[2 + 1].pos_x = 20.0f;                       // bot 10's slot 3 is the second loose mob: out of the area taunt's ten yards
+    view.party_views[0].loose_mobs[1].victim_ref = PlayerOf(12);   // the priest
+    CHECK(view.party_views[0].loose_mobs[0].unit_ref == kLooseOne);
+    std::vector<BotAction> const actions = policy.Decide(view, 1000);
+    CHECK(CastsSpell(actions, 10, 355, kLooseTwo));
+    CHECK(!CastsSpell(actions, 10, 355, kLooseOne));
+    bool healer = false;
+    for (std::string const& line : events)
+        healer = healer || line.find("reason=healer act=taunt") != std::string::npos;
+    CHECK(healer);
+}
+
+bool MovesAhead(std::vector<BotAction> const& actions, std::uint64_t bot)
+{
+    for (BotAction const& action : actions)
+        if (action.type == ActionType::kMoveTo && action.bot_guid == bot && action.dest_x > 0.5f)
+            return true;
+    return false;
+}
+
+void LooseWalksTowardAMobOutOfReachAndNeverWithoutTheChaseYards()
+{
+    BotPolicy policy(LooseOptions());
+    policy.SetRouteActive(true);
+    std::vector<BotAction> const actions = policy.Decide(TwoTankView({ kLooseOne }, 36.0f, -60.0f), 1000);
+    CHECK(MovesAhead(actions, 10) && !CastsSpell(actions, 10, 355, kLooseOne));
+    PolicyOptions still = LooseOptions();
+    still.TankLooseChaseYards = 0;
+    BotPolicy stays(still);
+    stays.SetRouteActive(true);
+    CHECK(!MovesAhead(stays.Decide(TwoTankView({ kLooseOne }, 36.0f, -60.0f), 1000), 10));
+    PolicyOptions far = LooseOptions();
+    far.TankLooseRangeYards = 30;   // beyond the range setting the mob is left alone
+    BotPolicy leaves(far);
+    leaves.SetRouteActive(true);
+    CHECK(!MovesAhead(leaves.Decide(TwoTankView({ kLooseOne }, 36.0f, -60.0f), 1000), 10));
+}
+
+void LooseNeedsLineOfSight()
+{
+    BotPolicy policy(LooseOptions());
+    policy.SetRouteActive(true);
+    WorldTickSnapshotView view = TwoTankView({ kLooseOne }, 10.0f, 60.0f);
+    view.nearby[1].state_flags = forever_module::kNearbyLosKnown;   // bot 10's second slot: the loose mob, line of sight known and blocked
+    std::vector<BotAction> const blocked = policy.Decide(view, 1000);
+    CHECK(!CastsSpell(blocked, 10, 355, kLooseOne));
+    BotPolicy seen(LooseOptions());
+    seen.SetRouteActive(true);
+    view.nearby[1].state_flags = forever_module::kNearbyLosKnown | forever_module::kNearbyInLosOfBot;
+    CHECK(CastsSpell(seen.Decide(view, 1000), 10, 355, kLooseOne));
+}
+
 // Healer combat mana floor. Bot 12 is a priest in the party, in combat on a hostile in reach; Smite (585) is its attack row.
 WorldTickSnapshotView HealerView(std::uint32_t power)
 {
@@ -381,6 +506,11 @@ void RunPolicyTestsPart9()
     TankLeavesAMobOutOfReachAndAMobThatIsItsOwn();
     TankUsesChallengingShoutForTwoLooseMobs();
     TankPickupNotBelowTheTaunt();
+    LooseElectsTheNearestTankOnly();
+    LooseKeepsTheOldWayWithoutTheKeyOrTheRoute();
+    LooseTakesTheMobOnTheHealerFirst();
+    LooseWalksTowardAMobOutOfReachAndNeverWithoutTheChaseYards();
+    LooseNeedsLineOfSight();
     HealerKeepsAManaFloorInCombat();
     MemberHoldsWhileTheTankIsNotInCombat();
     MemberEngagesOnceTheTankIsInCombat();

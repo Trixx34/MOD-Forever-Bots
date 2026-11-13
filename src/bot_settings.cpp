@@ -818,6 +818,13 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadKey(config, "HealerDpsManaPct", 10, 80, settings.HealerDpsManaPct, warnings);
     ReadKey(config, "HealerCombatManaPct", 0, 80, settings.HealerCombatManaPct, warnings);
     ReadBool(config, "TankPickup", settings.TankPickup, warnings);
+    ReadBool(config, "TankLoosePickup", settings.TankLoosePickup, warnings);
+    ReadKey(config, "TankLooseCooldownMs", 500, 60000, settings.TankLooseCooldownMs, warnings);
+    ReadKey(config, "TankLooseRangeYards", 10, 60, settings.TankLooseRangeYards, warnings);
+    if (auto const chase = config.find("TankLooseChaseYards"); chase != config.end() && chase->second == "0")
+        settings.TankLooseChaseYards = 0; // explicitly never walk
+    else
+        ReadKey(config, "TankLooseChaseYards", 2, 20, settings.TankLooseChaseYards, warnings);
     ReadBool(config, "DamageEvents", settings.DamageEvents, warnings);
     ReadKey(config, "DamageEventMinPct", 1, 100, settings.DamageEventMinPct, warnings);
     ReadBool(config, "PullTankFirst", settings.PullTankFirst, warnings);

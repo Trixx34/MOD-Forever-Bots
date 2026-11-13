@@ -366,6 +366,11 @@ Module.forever-bots.TelemetrySummarySec = 60
 # HealerCombatManaPct = 25   (a healer in a party fight keeps this share of its mana for heals: its attack rows such as Smite stop below it; 0 = no floor, 0 to 80; bug 11)
 # TankPickup = 1   (a tank taunts the mobs that are on party members, and uses Challenging Shout or Roar for two or more; needs PartyViewPlanner = 1 and the core's
 #                   Bot.Snapshot.PartyView and PartyThreat; 0 = off)
+# TankLoosePickup = 1   (a dungeon, raid or tank-led party: when a hostile attacks a non-tank, the tanks elect ONE tank for it (the nearest with a ready taunt; mobs on healers
+#                        and casters first; in line of sight) and that tank taunts it; events tank_loose:; needs TankPickup and PartyViewPlanner; 0 = every tank taunts on its own)
+# TankLooseCooldownMs = 2500   (the least time between two picks of one tank; 500 to 60000)
+# TankLooseRangeYards = 40   (a loose mob farther than this from the tank is left; 10 to 60; the taunt itself reaches 30)
+# TankLooseChaseYards = 8   (a tank out of the taunt's reach walks at most this far toward the mob, never off the chase leash; 0 = never walk, else 2 to 20)
 # HealerLosMoveYards = 6
 # DamageEvents = 1   (take in the core's damage events, protocol 29: a bot's killing blows and hits of the core's Modules.DamageEvent.MinPct (20) percent of its max health or more, with the
 #                     real attacker and spell: the died: line names the real killer, the run telemetry gets dmg_by_spell and dmg_by_attacker; 0 = ignore them)
