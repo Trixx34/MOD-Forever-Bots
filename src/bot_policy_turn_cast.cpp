@@ -1183,7 +1183,7 @@ BotPolicy::TurnFlow BotPolicy::TurnTankPickup(DecideTick& tick, BotTurn& turn)
             }
             // Out of reach or out of sight: a short walk toward it, last resort, never off the chase leash.
             if (_options.TankLooseChaseYards != 0 && dist > 0.5f &&
-                !OffPartyLeash(tick, turn.partyLeader, bot.map_id, unit.pos_x, unit.pos_y, _options.DungeonChaseLeashYards, true))
+                !OffPartyLeash(tick, turn.partyLeader, bot.map_id, unit.pos_x, unit.pos_y, _options.DungeonChaseLeashYards, true, false))
             {
                 float const step = std::min(float(_options.TankLooseChaseYards), losBlocked ? dist : std::max(dist - (kOnyxiaTauntYards - 5.0f), 2.0f));
                 Point const dest{ bot.pos_x + (unit.pos_x - bot.pos_x) / dist * step, bot.pos_y + (unit.pos_y - bot.pos_y) / dist * step, bot.pos_z };
