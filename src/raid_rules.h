@@ -55,6 +55,19 @@ struct TankSwap
 constexpr std::uint8_t kWhoMelee = 1, kWhoRanged = 2, kWhoHealers = 4, kWhoAll = 7;
 
 struct SpreadRule
+{
+    std::uint32_t Entry = 0;        // the hostile's creature entry, 0 = any engaged hostile of the map
+    float Yards = 0.0f;
+    std::uint8_t Who = kWhoAll;
+};
+
+struct EnemyZone
+{
+    std::uint32_t Entry = 0;
+    float Yards = 0.0f;
+    std::uint8_t Who = kWhoAll;
+};
+
 struct PullPosition
 {
     float X = 0.0f;
