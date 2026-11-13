@@ -65,8 +65,8 @@ Module.forever-bots.TelemetrySummarySec = 60
 #   Module.forever-bots.Hub1_3 = 6475.8 481.2 9.9
 
 # Quests (M5). The starter quest data file (see data/starter_quests.txt and src/quest_data.h). A bot near one of its starts accepts
-# the quests of that start in order, hunts their targets, and hands them in; a bot with no start nearby grinds as before. Empty
-# turns quests off.
+# the quests of that start in order, hunts their targets, and hands them in; a bot with no start nearby grinds as before. Quests run when this or any of the four per-side keys is set;
+# with none of the five set, quests are off.
 # QuestFile = data/starter_quests.txt
 # A whole-world quest file (levels 1 to 60, made by tools/make_world_quests.py, doc/world-quests.md) works the same way: the bot takes quests that suit its
 # level, race and class from the nearest area that has some, and moves on to the next area when one is used up.
