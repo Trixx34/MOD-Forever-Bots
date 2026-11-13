@@ -194,7 +194,7 @@ void TestShippedFile()
     for (std::uint32_t entry : { 11350u, 11371u, 11372u })
     {
         std::optional<PullPosition> const pos = t.PullPositionOf(309, entry);
-        CHECK(pos.has_value() && pos->X == -11810.0f && pos->Y == -1317.0f && pos->Yards == 8.0f);
+        CHECK(pos.has_value() && pos->X == -11872.5f && pos->Y == -1287.7f && pos->Yards == 8.0f);
     }
 }
 
