@@ -373,6 +373,8 @@ Module.forever-bots.TelemetrySummarySec = 60
 # PullTankFirst = 1   (a dungeon, raid or tank-led party: the members wait on the route while the leader/tank has a target but is not in combat with it, and engage once
 #                      it is; solo bots and leveling parties are never held; 0 = every member pulls on its own, as before)
 # PullTankHoldMs = 12000   (the longest a member waits, so a dead or stuck tank cannot freeze the party; 1000 to 120000)
+# WarderPartyHold = 1   (a member with no target of its own holds outside an Onyxian Warder's Fire Nova instead of following the tank into it; 0 = follow as before)
+# PullMinHpPct = 60   (a member of a route/raid party below this health percent that nothing attacks rests instead of engaging or joining the tank's fight, at most 2 minutes; 0 = off)
 # PullMemberRangeYards = 12   (a target within this many yards of a member is engaged at once, no walk; 0 to 40)
 # Combat drift of dungeon parties (0.45.0; a scenario or "tank lead" party with a route; the 2026-11-07 sim's fights pulled leaders 60-250 yards off the route):
 # DungeonPullLeashYards = 30   (the route leader, out of a fight, pulls only a hostile within this many yards of the leg of the route it walks; 0 = off, else 10..80)

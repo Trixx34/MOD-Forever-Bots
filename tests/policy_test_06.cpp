@@ -482,6 +482,40 @@ void TheLeaderLogsADeadWarderOnce()
     CHECK(lines == 1);
 }
 
+// WarderPartyHold: a member with no target of its own does not follow the tank into a Warder's Fire Nova; it holds outside the nova, and follows again once the Warder is dead.
+bool MemberFollowsTankAtWarder(bool hold, bool warderAlive)
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 3;
+    options.PartyCount = 1;
+    options.WanderWhenIdle = false;
+    options.WarderPartyHold = hold;
+    options.ClassOf = [](std::uint64_t guid) { return guid == 10 ? 1u : 8u; };   // 10 the warrior tank, 11 and 12 mages
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);   // the raid runs the route rules
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12 });
+    view.bots[0].pos_x = 20.0f;   // the tank, 10 yards from the Warder at x = 30; the mages stand at x = 0, 30 yards from it
+    NearbyUnit warder = Hostile(2, 30.0f, warderAlive ? 100 : 0);
+    warder.guid = MakeUnitRef(8, 12129, 2);
+    for (std::size_t i = 0; i < 3; ++i)
+        AddNearby(view, i, warder);
+    bool follows = false;
+    for (std::uint64_t at = 1000; at < 3000; at += 100)
+    {
+        view.tick_number = at / 100;
+        for (BotAction const& action : policy.Decide(view, at))
+            follows = follows || (action.bot_guid == 11 && (action.type == ActionType::kFollow || action.type == ActionType::kMoveTo));
+    }
+    return follows;
+}
+
+void MemberHoldsOutsideTheNovaWhileTheTankPullsTheWarder()
+{
+    CHECK(MemberFollowsTankAtWarder(false, true));    // off: follows the tank, as before
+    CHECK(!MemberFollowsTankAtWarder(true, true));    // on: holds
+    CHECK(MemberFollowsTankAtWarder(true, false));    // a dead Warder: follows
+}
+
 // The kite point must be somewhere the core can path to. The module has no path query, so the first point is the retreat along the entry route (the line from the Warder
 // toward the dungeon entry, 26 yards out); when the core refuses it, the next point is the circle round the Warder, a different place and not the refused one again.
 void KiteRetreatsAlongTheEntryRouteAndFallsBackToTheCircle()
@@ -968,6 +1002,7 @@ void RunPolicyTestsPart6()
     RaidMemberSeesTheWarderInItsLeadersView();
     TheLeaderLogsADeadWarderOnce();
     KiteRetreatsAlongTheEntryRouteAndFallsBackToTheCircle();
+    MemberHoldsOutsideTheNovaWhileTheTankPullsTheWarder();
     PartyMemberDoesNotFleeOnLowHealth();
     PartyMemberDoesNotChaseAFleeingTarget();
     RangedBotAttacksWhenBackAtRange();

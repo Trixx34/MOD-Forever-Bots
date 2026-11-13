@@ -482,6 +482,50 @@ void BotPolicy::TurnTargeting(DecideTick& tick, BotTurn& turn)
             }
         }
     }
+    // The gaps of the tank-first pull (2026-11-13 sim, 4424 pulls against 9 holds): every other way a member of a route party gets a target on its own (its own threat
+    // target, the focus, the nearby-hostile scan, below in TurnTarget) is held the same way while the tank is not fighting; and a member that is hurt starts no fight at all
+    // (PullMinHpPct: revived at 49% after a wipe, walking back into the pack that killed it, 1312 of 1953 ZG deaths came from one ranged thrower). A bot that is in combat
+    // defends itself; the leader's own target (the assist above) keeps its own hold; a chat pull order (ForcedTarget) is the owner's and is never held.
+    turn.pullRest = false;
+    if (routeOn && partyMember && leaderSnap && bot.in_combat == 0 && bot.life_state == 0 && !returningToDungeon && state.Role_ != BotState::Role::Tank)
+    {
+        NearbyUnit const* mine = targetRef != 0 ? FindLiveMob(nearby, targetRef) : nullptr;
+        bool const attacked = mine && mine->victim_ref != 0;   // it fights somebody already: the party defends
+        if (_options.PullMinHpPct != 0 && bot.max_health > 0 && BelowPct(bot.health, bot.max_health, _options.PullMinHpPct) && !attacked)
+        {
+            if (state.PullRestSinceMs == 0)
+                state.PullRestSinceMs = nowMs;
+            if (nowMs - state.PullRestSinceMs < _options.PullRestMaxMs)
+            {
+                turn.pullRest = true;
+                if (_options.OnEvent && (state.PullRestLogMs == 0 || nowMs - state.PullRestLogMs >= 10000))
+                {
+                    state.PullRestLogMs = nowMs;
+                    _options.OnEvent("pull_hold: bot=" + std::to_string(bot.guid) + " reason=low_hp hp_pct=" + std::to_string(HealthPct(bot, 0)) + " rest_ms=" +
+                                     std::to_string(nowMs - state.PullRestSinceMs));
+                }
+                targetRef = 0;
+                targetUnit = nullptr;
+            }
+        }
+        else
+            state.PullRestSinceMs = 0;
+        if (!turn.pullRest && _options.PullTankFirst && targetRef != 0 && leaderSnap->life_state == 0 && leaderSnap->in_combat == 0 && targetRef != leaderSnap->threat_target_guid &&
+            targetRef != state.ForcedTarget && !attacked &&
+            !(mine && std::hypot(mine->pos_x - bot.pos_x, mine->pos_y - bot.pos_y) <= float(_options.PullMemberRangeYards)))
+        {
+            if (_options.OnEvent && (state.PullHoldLogMs == 0 || nowMs - state.PullHoldLogMs >= 10000))
+            {
+                state.PullHoldLogMs = nowMs;
+                _options.OnEvent("pull_hold: bot=" + std::to_string(bot.guid) + " reason=own_target tank=" + std::to_string(leaderSnap->guid) + " target=" +
+                                 std::to_string(forever_module::UnitRefEntry(targetRef)));
+            }
+            targetRef = 0;
+            targetUnit = nullptr;
+        }
+    }
+    else
+        state.PullRestSinceMs = 0;
 }
 
 BotPolicy::TurnFlow BotPolicy::TurnCrowdControl(DecideTick& tick, BotTurn& turn)
