@@ -284,9 +284,27 @@ or without a route), `resting` (a member below the ready health or mana for 40 %
 
 The scenario's result line gets `stalled=<n> last_stall=<cause>@<t_s>` after `time_s=` when the party stalled at least once; it is left out otherwise.
 
+**Damage by spell (protocol 29).** With a core that sends the damage event (`PlayerScript.OnDamaged`) and `DamageEvents = 1`, a `party_tl:` line gets these fields at its end when a bot of the party
+took a killing blow or a big hit in the 30 s it stands for, and the `boss_attempt:` end line gets them for the whole attempt (never on the start line, never when empty):
+
+    dmg_by_spell=<spell>:<damage>:<hits>:<deaths>,...   dmg_by_attacker=<creature entry>:<damage>:<hits>:<deaths>,...   (the top 5 by damage; spell 0 = melee or auto-attack; entry 0 = a player or no creature)
+    death_by_spell=<spell>:<deaths>:<overkill>,...      death_by_attacker=<entry>:<deaths>:<overkill>,...              (the top 5 by deaths; only when there was a death)
+
+The core sends only killing blows and hits of at least `Modules.DamageEvent.MinPct` (default 20 %) of the bot's maximum health (the module's `DamageEventMinPct` can raise that floor), and at most
+`Modules.DamageEvent.MaxPerSecond` (200) a second, so these totals are the big hits and the deaths, not a damage meter; small damage over time does not show. The `party_tl:` window restarts every
+line (30 s, not cumulative); the attempt total runs from the start line to the end line.
+
+The `died:` line gets, after its old fields (`bot life map pos last_decision killer_entry in_combat`), `killer_spell=<id|none> killer_src=<event|guess> overkill=<n|none> hit_amount=<n|none> hit_hp_pct=<n|none>
+last_hits=<spell:amount,...>`. With `killer_src=event` the `killer_entry` is the real attacker (`none` for a hit with no creature: a player, fall damage), `killer_spell` its spell (0 = melee), `hit_amount` the killing
+blow, `hit_hp_pct` the bot's health before it, and `last_hits` its last five big hits, newest first. With `killer_src=guess` (an older core, `DamageEvents = 0`, or no event for this death within 15 s) `killer_entry` is
+the old guess (the bot's threat target, else the closest live hostile) and the other fields are `none`.
+
 Read a run with `tools/run_telemetry.py run-telemetry.log` (or a journal file, or `-` for standard input; `--party dm#2` for one party): per party the time per step, the route
 point reached in 5 minute buckets, the stalls with their cause and the boss attempts. Or by hand:
 
     grep -h 'party_stalled:' run-telemetry.log                                   # every stall
     grep -h 'party_tl: scenario=sfk party=3 ' run-telemetry.log | awk '{print $6, $10, $11}'   # t_s, step, route of one party (field 1 is the ISO time)
     awk '/boss_attempt:/ && /stage=end/ {print $7, $9, $10, $11}' run-telemetry.log   # boss, duration, deaths, outcome
+
+`python3 tools/run_telemetry.py deaths <journal|-> [--spells spells.txt] [--top 30]` reads the `died:` lines and prints a table: one row per (attacker entry, spell id) with the deaths, the damage and overkill of the killing blows,
+and the average health percent before the blow; guesses are one row per guessed entry, marked. Spell names come from the optional `--spells` file (`<id> <name>` per line); the world DB is not read.

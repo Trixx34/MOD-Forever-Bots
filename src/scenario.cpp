@@ -78,6 +78,8 @@ void ScenarioDirector::MarkBossKilled(std::uint32_t entry, std::string const& na
                 end.DurS = nowMs >= _attemptStartMs ? (nowMs - _attemptStartMs) / 1000 : 0;
                 end.Deaths = _deathEvents - _attemptDeaths0;
                 end.Outcome = _attemptEntry == entry ? "killed" : "aborted";
+                end.Damage = _attemptDmg.Format();
+                _attemptDmg.Clear();
                 _telemetry.push_back(run_telemetry::FormatBossAttempt({ _plan.Name, "" }, end));
                 _attemptOpen = false;
             }
@@ -95,6 +97,15 @@ void ScenarioDirector::NoteProgress(std::uint64_t nowMs, bool boss, std::string 
     _lastProgress.AtS = _runStartMs != 0 && nowMs >= _runStartMs ? (nowMs - _runStartMs) / 1000 : 0;
     _window = {};
     _windowSinceMs = nowMs;
+}
+
+void ScenarioDirector::NoteDamage(damage_events::Hit const& hit)
+{
+    if (_runStartMs == 0)
+        return;
+    _windowDmg.Add(hit);
+    if (_attemptOpen)
+        _attemptDmg.Add(hit);
 }
 
 std::vector<std::string> ScenarioDirector::TakeTelemetry()
@@ -161,6 +172,7 @@ void ScenarioDirector::TrackRun(forever_module::WorldTickSnapshotView const& vie
                     _attemptStartMs = nowMs;
                     _attemptLastFightMs = nowMs;
                     _attemptDeaths0 = _deathEvents;
+                    _attemptDmg.Clear();
                     run_telemetry::BossAttempt start;
                     start.TS = tS;
                     start.Boss = _attemptBoss;
@@ -182,6 +194,8 @@ void ScenarioDirector::TrackRun(forever_module::WorldTickSnapshotView const& vie
                 end.DurS = (_attemptLastFightMs - _attemptStartMs) / 1000;
                 end.Deaths = _deathEvents - _attemptDeaths0;
                 end.Outcome = "aborted";
+                end.Damage = _attemptDmg.Format();
+                _attemptDmg.Clear();
                 _telemetry.push_back(run_telemetry::FormatBossAttempt(id, end));
                 _attemptOpen = false;
             }
@@ -228,6 +242,8 @@ void ScenarioDirector::TrackRun(forever_module::WorldTickSnapshotView const& vie
         line.Total = std::uint32_t(bots.size());
         line.InFight = inFight;
         line.Last = _lastProgress;
+        line.Damage = _windowDmg.Format();
+        _windowDmg.Clear();
         _telemetry.push_back(run_telemetry::FormatTimeline(id, line));
     }
     if (_telemetry.size() > kTelemetryQueueMax)

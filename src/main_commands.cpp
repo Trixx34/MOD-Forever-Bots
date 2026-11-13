@@ -375,6 +375,18 @@ void SetUpTrade(forever_module::ModuleClient& client, std::shared_ptr<trade::Tra
 void SetUpChat(forever_module::ModuleClient& client, std::shared_ptr<CommandQueue> const& commands, BotSettings& settings, std::shared_ptr<trade::TradeBook> const& trades,
                std::shared_ptr<std::function<void(std::vector<trade::Step> const&)>> const& runTrade)
 {
+    client.OnNotify("PlayerScript.OnDamaged", [commands, &settings](forever_module::EventNotify const& notify)
+    {
+        if (!settings.DamageEvents)
+            return;
+        damage_events::Hit hit;
+        if (!advisor::Decode(notify, hit) || !damage_events::PassesMinPct(hit, settings.DamageEventMinPct))
+            return;
+        hit.AtMs = nowMs();
+        std::lock_guard<std::mutex> lock(commands->Lock);
+        if (commands->DamageHits.size() < 512)
+            commands->DamageHits.push_back(hit);
+    });
     // Chat commands (chat_commands.h): a group leader's party or raid line, or a whisper to a bot. Parsed here, applied on the pump thread.
     client.OnNotify("PlayerScript.OnChat", [commands, &settings, trades, runTrade](forever_module::EventNotify const& notify)
     {

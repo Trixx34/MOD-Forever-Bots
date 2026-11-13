@@ -369,6 +369,22 @@ void main_detail::PumpTier2(forever_module::Tier2Session& session, std::atomic<b
                         return at == partyOf.end() ? nullptr : &extras.Scenarios[dungeonOf[at->second]].Route;
                     });
             }
+            if (extras.Commands)
+            {
+                // Damage events (protocol 29): the bot's ring for the died: line, and the party's totals for the run telemetry.
+                std::vector<damage_events::Hit> damageHits;
+                {
+                    std::lock_guard<std::mutex> lock(extras.Commands->Lock);
+                    damageHits.swap(extras.Commands->DamageHits);
+                }
+                for (damage_events::Hit const& hit : damageHits)
+                {
+                    policy.NoteDamage(hit);
+                    auto const at = partyOf.find(hit.Victim);
+                    if (at != partyOf.end() && at->second < directors.size())
+                        directors[at->second].NoteDamage(hit);
+                }
+            }
             std::vector<forever_module::BotAction> actions = policy.Decide(view, nowMs());
             // Talent respecs (TalentRespec): one kRespecTalents per bot, spec in spell_id and role in dest_x; the core does the reset and the spend.
             for (BotPolicy::TalentOrder const& order : policy.TakeRespecOrders())

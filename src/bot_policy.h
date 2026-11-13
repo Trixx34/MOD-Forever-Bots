@@ -28,6 +28,7 @@
 // when it has none of its own. Party actions are sent only out of combat.
 #pragma once
 
+#include "damage_events.h"
 #include "party_planner.h"
 #include "party_view_adapter.h"
 #include "transport_ride.h"
@@ -502,6 +503,8 @@ public:
     // says a line in guild chat. Pump thread.
     void OnGuildMemberLevel(forever_module::WorldTickSnapshotView const& view, std::uint64_t guild, std::uint64_t member, std::uint32_t level, std::uint64_t nowMs);
     // A player declined (or left) the group a bot invited it to for a shared quest objective (QuestInvite): no new invite for 2 hours. `playerRef` is a unit reference.
+    // Protocol 29: a damage event for a bot (PlayerScript.OnDamaged). Kept in the bot's ring of the last 16 hits; the died: line takes the real killer from it.
+    void NoteDamage(damage_events::Hit const& hit) { _damage.Add(hit); }
     void NoteQuestInviteDeclined(std::uint64_t playerRef, std::uint64_t nowMs) { _questInvite.NoteDeclined(playerRef, nowMs); }
     void OnLfgQueue(forever_module::WorldTickSnapshotView const& view, lfg_queue_fill::Queue const& queue, std::uint64_t nowMs);
     void NoteSocialOutcome(social::Outcome const& outcome, std::uint64_t nowMs);
@@ -1017,6 +1020,7 @@ private:
     bool _whisperTemplatesLoaded = false;
     city_greet::Greeter _cityGreet;                             // limits of the capital greetings
     city_inspect::Inspector _cityInspect;                       // limits of the capital emotes
+    damage_events::HitLog _damage;                              // the last hits each bot took, from the core's damage events (protocol 29)
     quest_invite::Memory _questInvite;                          // who was invited and who declined
     guild_milestone::Speaker _guildSpeaker;                     // one bot answers one level event
     lfg_queue_fill::Limiter _lfgQueueLimiter;           // one bot per queue per cooldown

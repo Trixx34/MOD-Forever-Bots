@@ -3,6 +3,7 @@
 // boss_attempt:, the stalled= fields of the result line). No core needed.
 #include "scenario_test_support.h"
 
+#include <algorithm>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -253,6 +254,64 @@ void DirectorBossAttempt()
     }
 }
 
+void DirectorDamageAggregates()
+{
+    std::uint64_t t, tick;
+    std::vector<BotSnapshot> bots;
+    ScenarioDirector director = RunningDirector(t, tick, bots, LongPlan());
+    std::vector<BotAction> actions;
+    std::vector<std::string> all;
+    auto const hit = [](std::uint32_t entry, std::uint32_t spell, std::uint32_t amount, bool killing)
+    {
+        damage_events::Hit h;
+        h.Entry = entry;
+        h.Spell = spell;
+        h.Amount = amount;
+        h.Killing = killing;
+        h.Overkill = killing ? 50 : 0;
+        return h;
+    };
+    // quiet 30 s windows carry no damage fields
+    for (int i = 0; i < 7; ++i)
+        director.Decide(View(++tick, bots), t += 5000, actions);
+    for (std::string const& line : Lines(director, "party_tl", all))
+        CHECK(!Has(line, "dmg_by_"));
+    all.clear();
+    // hits before the attempt are in the party window only; the attempt opens, takes two more, ends with the boss dead
+    director.NoteDamage(hit(100, 7, 400, false));
+    auto const fight = [&](std::uint32_t bossHealth, bool combat)
+    {
+        bots[1].in_combat = combat;
+        WorldTickSnapshotView view = View(++tick, bots);
+        view.bots[1].nearby_count = 1;
+        view.nearby[1].guid = forever_module::MakeUnitRef(8, 644, 5);
+        view.nearby[1].health = bossHealth;
+        view.nearby[1].max_health = 1000;
+        director.Decide(view, t += 5000, actions);
+    };
+    fight(900, true);
+    director.NoteDamage(hit(644, 20566, 3000, false));
+    director.NoteDamage(hit(644, 20566, 1500, true));
+    fight(500, true);
+    fight(0, false);
+    auto const attempts = Lines(director, "boss_attempt", all);
+    CHECK(attempts.size() == 2);
+    if (attempts.size() == 2)
+    {
+        CHECK(!Has(attempts[0], "dmg_by_"));
+        CHECK(Has(attempts[1], " dmg_by_spell=20566:4500:2:1 dmg_by_attacker=644:4500:2:1 death_by_spell=20566:1:50 death_by_attacker=644:1:50"));
+    }
+    // the party window has all three hits, once
+    for (int i = 0; i < 6; ++i)
+        director.Decide(View(++tick, bots), t += 5000, actions);
+    std::string withDamage;
+    for (std::string const& line : Lines(director, "party_tl", all))
+        if (Has(line, "dmg_by_spell="))
+            withDamage += line + "\n";
+    CHECK(Has(withDamage, "dmg_by_spell=20566:4500:2:1,7:400:1:0 dmg_by_attacker=644:4500:2:1,100:400:1:0"));
+    CHECK(std::count(withDamage.begin(), withDamage.end(), '\n') == 1);
+}
+
 void DirectorBossAbort()
 {
     std::uint64_t t, tick;
@@ -286,6 +345,7 @@ int main()
     DirectorProgressResetsTheClock();
     DirectorBossAttempt();
     DirectorBossAbort();
+    DirectorDamageAggregates();
     if (failures == 0)
         std::printf("run_telemetry_test: all checks passed\n");
     return failures == 0 ? 0 : 1;

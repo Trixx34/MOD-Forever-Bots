@@ -77,6 +77,25 @@ bool Decode(forever_module::EventNotify const& notify, BossKill& out)
     return true;
 }
 
+bool Decode(forever_module::EventNotify const& notify, damage_events::Hit& out)
+{
+    if (!notify.has_player_damaged())
+        return false;
+    forever_module::PlayerDamagedEvent const& event = notify.player_damaged();
+    out = {};
+    out.Victim = event.victim_guid();
+    out.Attacker = event.attacker_guid();
+    out.Entry = event.attacker_entry();
+    out.Spell = event.spell_id();
+    out.School = event.school();
+    out.Amount = event.amount();
+    out.Overkill = event.overkill();
+    out.Killing = event.killing_blow();
+    out.HealthAfter = event.victim_health_after();
+    out.MaxHealth = event.victim_max_health();
+    return true;
+}
+
 bool Decode(forever_module::EventNotify const& notify, GuildLevel& out)
 {
     if (!notify.has_guild_member_level())

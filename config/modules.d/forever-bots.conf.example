@@ -367,6 +367,9 @@ Module.forever-bots.TelemetrySummarySec = 60
 # TankPickup = 1   (a tank taunts the mobs that are on party members, and uses Challenging Shout or Roar for two or more; needs PartyViewPlanner = 1 and the core's
 #                   Bot.Snapshot.PartyView and PartyThreat; 0 = off)
 # HealerLosMoveYards = 6
+# DamageEvents = 1   (take in the core's damage events, protocol 29: a bot's killing blows and hits of the core's Modules.DamageEvent.MinPct (20) percent of its max health or more, with the
+#                     real attacker and spell: the died: line names the real killer, the run telemetry gets dmg_by_spell and dmg_by_attacker; 0 = ignore them)
+# DamageEventMinPct = 20   (the module also drops a non-lethal hit below this percent of the bot's max health; 1 to 100; raise it above the core's MinPct to hear less)
 # PullTankFirst = 1   (a dungeon, raid or tank-led party: the members wait on the route while the leader/tank has a target but is not in combat with it, and engage once
 #                      it is; solo bots and leveling parties are never held; 0 = every member pulls on its own, as before)
 # PullTankHoldMs = 12000   (the longest a member waits, so a dead or stuck tank cannot freeze the party; 1000 to 120000)

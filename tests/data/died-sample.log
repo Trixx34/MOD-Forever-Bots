@@ -1,0 +1,7 @@
+2026-11-12T10:00:01Z forever-bots: event died: bot=10 life=1 map=36 pos=5,6 last_decision=3 killer_entry=644 in_combat=1 killer_spell=20566 killer_src=event overkill=250 hit_amount=3100 hit_hp_pct=60 last_hits=20566:3100,0:900
+Nov 12 10:01:00 sim forever-bots[1]: forever-bots: event died: bot=11 life=1 map=36 pos=5,6 last_decision=3 killer_entry=644 in_combat=1 killer_spell=20566 killer_src=event overkill=50 hit_amount=2900 hit_hp_pct=40 last_hits=20566:2900
+forever-bots: event died: bot=12 life=1 map=36 pos=5,6 last_decision=none killer_entry=644 in_combat=1 killer_spell=0 killer_src=event overkill=10 hit_amount=800 hit_hp_pct=20 last_hits=0:800
+forever-bots: event died: bot=13 life=1 map=36 pos=5,6 last_decision=none killer_entry=none in_combat=0 killer_spell=3355 killer_src=event overkill=0 hit_amount=500 hit_hp_pct=100 last_hits=3355:500
+forever-bots: event died: bot=14 life=1 map=36 pos=5,6 last_decision=none killer_entry=1196 in_combat=1 killer_spell=none killer_src=guess overkill=none hit_amount=none hit_hp_pct=none last_hits=none
+forever-bots: event died: bot=15 life=1 map=36 pos=5,6 last_decision=none killer_entry=none in_combat=1
+forever-bots: event ghost: bot=10 map=0

@@ -326,6 +326,12 @@ void DungeonLearningKnobsAreBounded()
     CHECK(defaults.DungeonHealBelowPct == 55 && defaults.DungeonTankHealBelowPct == 75);
     CHECK(defaults.HealerCombatManaPct == 25 && defaults.TankPickup && !defaults.PartyViewPlanner);
     CHECK(defaults.HealerDpsManaPct == 40 && defaults.HealerLosMoveYards == 6 && warnings.empty());
+    CHECK(defaults.DamageEvents && defaults.DamageEventMinPct == 20);
+    BotSettings const damageSet = ParseBotSettings({ { "DamageEvents", "0" }, { "DamageEventMinPct", "35" } }, warnings);
+    CHECK(!damageSet.DamageEvents && damageSet.DamageEventMinPct == 35 && warnings.empty());
+    BotSettings const damageBad = ParseBotSettings({ { "DamageEventMinPct", "500" } }, warnings);
+    CHECK(damageBad.DamageEventMinPct == 20 && !warnings.empty());
+    warnings.clear();
     CHECK(defaults.PullTankFirst && defaults.PullTankHoldMs == 12000 && defaults.PullMemberRangeYards == 12);
     BotSettings const pullSet = ParseBotSettings({ { "PullTankFirst", "0" }, { "PullTankHoldMs", "5000" }, { "PullMemberRangeYards", "8" } }, warnings);
     CHECK(!pullSet.PullTankFirst && pullSet.PullTankHoldMs == 5000 && pullSet.PullMemberRangeYards == 8 && warnings.empty());

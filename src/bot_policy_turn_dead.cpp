@@ -136,14 +136,18 @@ void BotPolicy::DeadRecord(DecideTick& tick, BotTurn& turn)
                 killer = &unit;
         if (!killer)
             killer = Closest(bot, nearby, IsLiveMob);
-        std::uint32_t const killerEntry = killer ? forever_module::UnitRefEntry(killer->guid) : 0u;
+        // Protocol 29: the core's damage event names the real killer; without one (an older core, DamageEvents = 0, an event still on its way) the guess above stays and the
+        // line says so (killer_src=guess).
+        std::optional<damage_events::Hit> const blow = _damage.TakeKillingBlow(bot.guid, nowMs);
+        std::uint32_t const guessEntry = killer ? forever_module::UnitRefEntry(killer->guid) : 0u;
+        std::uint32_t const killerEntry = blow ? blow->Entry : guessEntry;
         state.KillerRepeat = killerEntry != 0 && killerEntry == state.LastKillerEntry;
         state.LastKillerEntry = killerEntry;
         LogEvent("died: bot=" + std::to_string(bot.guid) + " life=" + std::to_string(bot.life_state) + " map=" + std::to_string(bot.map_id) +
               " pos=" + std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) +
               " last_decision=" + (state.Last ? std::to_string(int(state.Last->Type)) : std::string("none")) +
-              " killer_entry=" + (killer ? std::to_string(forever_module::UnitRefEntry(killer->guid)) : std::string("none")) +
-              " in_combat=" + std::to_string(bot.in_combat));
+              " killer_entry=" + (blow ? (blow->Entry != 0 ? std::to_string(blow->Entry) : std::string("none")) : (killer ? std::to_string(guessEntry) : std::string("none"))) +
+              " in_combat=" + std::to_string(bot.in_combat) + damage_events::DiedFields(blow, _damage.Recent(bot.guid)));
     }
     if (bot.life_state == 2 && was != 2)
     {

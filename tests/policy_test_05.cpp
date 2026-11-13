@@ -310,6 +310,57 @@ void CorpseReleasesAtOnceWithoutARezzer()
     CHECK(Logged(events, "died:") && Logged(events, "release:"));
 }
 
+// Protocol 29: the died: line names the killer the core's damage event gives (entry, spell, overkill, the last hits) and marks the old guess as a guess when no event came.
+void DiedLineTakesTheRealKillerFromTheDamageEvent()
+{
+    auto const hit = [](std::uint64_t victim, std::uint32_t entry, std::uint32_t spell, std::uint32_t amount, bool killing, std::uint64_t atMs)
+    {
+        damage_events::Hit h;
+        h.AtMs = atMs;
+        h.Victim = victim;
+        h.Entry = entry;
+        h.Spell = spell;
+        h.Amount = amount;
+        h.Killing = killing;
+        h.Overkill = killing ? 200 : 0;
+        h.MaxHealth = 5000;
+        h.HealthAfter = killing ? 0 : 3000;
+        return h;
+    };
+    {
+        std::vector<std::string> events;
+        BotPolicy policy(DeadOptions(&events, AllWarriors));
+        policy.NoteDamage(hit(13, 11502, 0, 1500, false, 400));
+        policy.NoteDamage(hit(13, 11502, 20566, 1200, true, 900)); // 1000 of health left, 1200 dealt: overkill 200 (set above)
+        WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 });
+        Corpse(v.bots[3], 10.0f);
+        policy.Decide(v, 1000);
+        CHECK(LoggedWith(events, "died: bot=13"));
+        CHECK(LoggedWith(events, " killer_entry=11502 "));
+        CHECK(LoggedWith(events, " killer_spell=20566 killer_src=event overkill=200 hit_amount=1200 hit_hp_pct=20 last_hits=20566:1200,0:1500"));
+    }
+    {
+        std::vector<std::string> events;
+        BotPolicy policy(DeadOptions(&events, AllWarriors));
+        WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 });
+        Corpse(v.bots[3], 10.0f);
+        policy.Decide(v, 1000);
+        CHECK(LoggedWith(events, "died: bot=13"));
+        CHECK(LoggedWith(events, " killer_spell=none killer_src=guess overkill=none hit_amount=none hit_hp_pct=none last_hits=none"));
+        CHECK(LoggedWith(events, " killer_entry=")); // the old field is still there
+    }
+    {
+        // a killing blow older than 15 s is not the cause of this death, and a blow is used for one death only
+        std::vector<std::string> events;
+        BotPolicy policy(DeadOptions(&events, AllWarriors));
+        policy.NoteDamage(hit(13, 11502, 20566, 1200, true, 100));
+        WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 });
+        Corpse(v.bots[3], 10.0f);
+        policy.Decide(v, 30000);
+        CHECK(LoggedWith(events, "killer_src=guess"));
+    }
+}
+
 void CorpseReleasesWhenTheWholePartyIsDown()
 {
     BotPolicy policy(DeadOptions(nullptr));
@@ -1238,6 +1289,7 @@ void RunPolicyTestsPart5()
     ASecondDeathToTheSameCreatureMovesTheBot(3099);
     AHurtSoloBotRestsBeforeItPulls();
     CorpseReleasesAtOnceWithoutARezzer();
+    DiedLineTakesTheRealKillerFromTheDamageEvent();
     CorpseReleasesWhenTheWholePartyIsDown();
     ReleaseIsHeldInCombatUpToTheCap();
     GhostWalksToItsCorpseAndIgnoresCombat();

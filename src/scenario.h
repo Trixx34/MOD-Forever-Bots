@@ -14,6 +14,7 @@
 #pragma once
 
 #include "forever_module/tier2_session.h"
+#include "damage_events.h"
 #include "run_telemetry.h"
 
 #include <array>
@@ -236,6 +237,9 @@ public:
     // (the same entries, names and times); false for an entry the plan does not list. Repeats are harmless.
     bool NoteBossKill(std::uint32_t entry, std::uint64_t nowMs);
 
+    // Protocol 29: a damage event for a bot of this party. Added to the open boss attempt's total and to the 30 s window of the timeline (only while the run is on).
+    void NoteDamage(damage_events::Hit const& hit);
+
     // The telemetry lines made since the last call (party_tl:, party_stalled:, boss_attempt:; run_telemetry.h), oldest first.
     std::vector<std::string> TakeTelemetry();
 
@@ -336,6 +340,8 @@ private:
     std::uint64_t _lastStallS = 0;
     std::map<std::uint64_t, bool> _inCombat;            // bot -> in combat at the last tick (a fight start is a change from false to true)
     std::map<std::uint64_t, std::uint32_t> _moveSeq;    // leader guid -> last action sequence looked at
+    damage_events::Aggregate _attemptDmg;                  // damage events since the boss attempt opened
+    damage_events::Aggregate _windowDmg;                   // damage events since the last party_tl: line
     bool _attemptOpen = false;
     std::uint32_t _attemptEntry = 0;
     std::string _attemptBoss;

@@ -5,6 +5,7 @@
 
 #include "advisor_orders.h"
 
+#include "damage_events.h"
 #include "lfg_queue_fill.h"
 
 #include <cstdint>
@@ -43,6 +44,9 @@ struct BossKill
     bool DungeonBoss = false;       // the creature carries the dungeon boss flag
 };
 bool Decode(forever_module::EventNotify const& notify, BossKill& out);
+
+// The payload of EventNotify::player_damaged() (hook PlayerScript.OnDamaged, protocol 29); false when the notify carries none. AtMs is left 0 for the caller.
+bool Decode(forever_module::EventNotify const& notify, damage_events::Hit& out);
 
 // The payload of EventNotify::lfg_queue() (hook LfgScript.OnQueueUpdate); false when the notify carries none.
 bool Decode(forever_module::EventNotify const& notify, lfg_queue_fill::Queue& out);

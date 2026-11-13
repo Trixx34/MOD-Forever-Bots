@@ -105,7 +105,7 @@ std::string FormatTimeline(PartyId const& id, Timeline const& l)
 {
     return Head("party_tl", id, l.TS) + " leader=" + std::to_string(l.Leader) + " map=" + std::to_string(l.Map) + " pos=" + Fixed1(l.X) + "," + Fixed1(l.Y) + "," +
            Fixed1(l.Z) + " step=" + l.Step + " route=" + std::to_string(l.Point) + "/" + std::to_string(l.Points) + " target=" + std::to_string(l.Target) +
-           " alive=" + std::to_string(l.Alive) + "/" + std::to_string(l.Total) + " fight=" + std::to_string(l.InFight) + " last=" + Last(l.Last);
+           " alive=" + std::to_string(l.Alive) + "/" + std::to_string(l.Total) + " fight=" + std::to_string(l.InFight) + " last=" + Last(l.Last) + l.Damage;
 }
 
 std::string FormatStall(PartyId const& id, Stall const& s)
@@ -119,7 +119,7 @@ std::string FormatStall(PartyId const& id, Stall const& s)
 std::string FormatBossAttempt(PartyId const& id, BossAttempt const& b)
 {
     return Head("boss_attempt", id, b.TS) + " boss=" + Word(b.Boss) + " stage=" + (b.End ? "end" : "start") + " dur_s=" + std::to_string(b.DurS) +
-           " deaths=" + std::to_string(b.Deaths) + " outcome=" + b.Outcome;
+           " deaths=" + std::to_string(b.Deaths) + " outcome=" + b.Outcome + b.Damage;
 }
 
 std::string FormatResultFields(std::uint32_t stalls, std::string const& lastCause, std::uint64_t lastTS)

@@ -78,6 +78,7 @@ struct Timeline
     std::uint32_t Target = 0;
     std::uint32_t Alive = 0, Total = 0, InFight = 0;
     Progress Last;
+    std::string Damage;      // damage_events::Aggregate::Format() of the last 30 s (leading space), empty when no damage event came
 };
 
 struct Stall
@@ -99,13 +100,15 @@ struct BossAttempt
     std::uint64_t DurS = 0;
     std::uint32_t Deaths = 0;
     std::string Outcome;     // "open" at the start, "killed" or "aborted" at the end
+    std::string Damage;      // damage_events::Aggregate::Format() of the attempt (leading space), at the end only, empty when no damage event came
 };
 
 // "party_tl: scenario=dm party=2 variant= t_s=120 leader=5 map=36 pos=-14.5,-380.2,62.0 step=walk route=3/40 target=0 alive=5/5 fight=0 last=boss:Rhahk'Zor@100"
+// and, only when a damage event came in the 30 s before: " dmg_by_spell=20566:3100:4:1 dmg_by_attacker=11502:5200:6:1 death_by_spell=20566:1:250 death_by_attacker=11502:1:250" (damage_events.h)
 std::string FormatTimeline(PartyId const& id, Timeline const& line);
 // "party_stalled: scenario=dm party=2 variant= t_s=900 cause=resting no_progress_s=300 pulls=2 route_refusals=0 rest_s=210 dead_s=0 fight_s=40 stalls=1 route=3/40 last=route:3@600"
 std::string FormatStall(PartyId const& id, Stall const& line);
-// "boss_attempt: scenario=dm party=2 variant= t_s=640 boss=Mr._Smite stage=end dur_s=80 deaths=1 outcome=killed"
+// "boss_attempt: scenario=dm party=2 variant= t_s=640 boss=Mr._Smite stage=end dur_s=80 deaths=1 outcome=killed" plus the same dmg_by_ fields for the attempt on the end line when any came in
 std::string FormatBossAttempt(PartyId const& id, BossAttempt const& line);
 // "scenario=dm party=2" from "dm#2" (party=1 for a name without a number): the fields every line starts with.
 void SplitName(std::string const& name, std::string& scenario, std::uint32_t& party);

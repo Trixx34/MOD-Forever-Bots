@@ -312,6 +312,11 @@ struct BotSettings
     bool PullTankFirst = true;
     std::uint32_t PullTankHoldMs = 12000;
     std::uint32_t PullMemberRangeYards = 12;
+    // DamageEvents = 1 (default): take in the core's damage events (PlayerScript.OnDamaged, protocol 29: a bot's killing blows and big hits with the real attacker and spell) for the
+    // died: line and the run telemetry. DamageEventMinPct = 20: the module drops a non-lethal hit below this share of the bot's max health (the core's Modules.DamageEvent.MinPct is
+    // the floor under it; killing blows are never dropped).
+    bool DamageEvents = true;
+    std::uint32_t DamageEventMinPct = 20;
     // ActionStats = 1: every minute the module logs the ten (bot, action, spell) combinations it sent most often in that minute ("actions_top"), to find a bot that
     // repeats an action every tick. Off by default.
     bool ActionStats = false;
