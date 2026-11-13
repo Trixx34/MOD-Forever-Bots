@@ -160,7 +160,7 @@ struct BotSettings
     // Hubs (M7): where an idle bot walks when it has seen nothing for a while, per map, in the order given by n. Config keys
     // Hub<map>_<n> = "x y z" (n counts from 1).
     std::map<std::uint32_t, std::vector<std::array<float, 3>>> Hubs;
-    // Quests (M5): the starter quest data file (config key QuestFile, see quest_data.h). Empty turns quests off.
+    // Quests (M5): the starter quest data file (config key QuestFile, see quest_data.h). Quests run when this or any of the four per-side keys below is set; with none of the five set, quests are off.
     std::string QuestFile;
     // Per faction and band (config keys QuestFileAlliance, QuestFileHorde, QuestFileAlliance60, QuestFileHorde60): a bot of that side uses the list; from level 60 the
     // "60" list. Empty keys fall back (level 60 -> the side's leveling list -> QuestFile).
