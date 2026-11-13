@@ -323,8 +323,8 @@ struct BotSettings
     // PullTankFirst = 1 (default): in a dungeon, raid or tank-led party the members wait for the tank to be in combat before they engage its target (PullTankHoldMs: at most
     // this long, default 12000; PullMemberRangeYards: a target this near a member needs no walk, default 12).
     bool PullTankFirst = true;
-    // HealWaitTankHold = 1 (default): a healer casts no heal (Renew) on the party's tank at full health until the tank holds its target (heal_hold event).
-    bool HealWaitTankHold = true;
+    // HealWaitTankHold = 0 (default, 1 = on): a healer casts no heal (Renew) on the party's tank at full health until the tank holds its target (heal_hold event).
+    bool HealWaitTankHold = false;
     std::uint32_t PullTankHoldMs = 12000;
     std::uint32_t PullMemberRangeYards = 12;
     // PullMinHpPct = 60 (default): a member of a dungeon, raid or tank-led party below this health percent that nothing attacks stands and rests instead of engaging or walking into the
@@ -406,9 +406,9 @@ struct BotSettings
     // make the bot wait DeathLockoutHoldMs (default 90000, 0..3600000) more before the teleport.
     bool GhostTeleportHold = true;
     std::uint32_t GhostTeleportHoldMaxMs = 120000;
-    // GhostHoldAvoidEnemyMaxMs (default 300000, 0 = off, else up to 3600000): a dungeon ghost's teleport (entrance, party, leader rejoin, corpse) waits while a fighting hostile of
+    // GhostHoldAvoidEnemyMaxMs (default 0 = off, else up to 3600000; 300000 is a good value): a dungeon ghost's teleport (entrance, party, leader rejoin, corpse) waits while a fighting hostile of
     // an avoid_enemy row stands within max(30, the row's yards) of the destination, at most this long per death (ghost_teleport_hold reason=avoid_enemy).
-    std::uint32_t GhostHoldAvoidEnemyMaxMs = 300000;
+    std::uint32_t GhostHoldAvoidEnemyMaxMs = 0;
     std::uint32_t DeathLockoutCount = 4;
     std::uint32_t DeathLockoutWindowMs = 600000;
     std::uint32_t DeathLockoutHoldMs = 90000;

@@ -364,9 +364,9 @@ void DungeonLearningKnobsAreBounded()
     warnings.clear();
     BotSettings const pullSet = ParseBotSettings({ { "PullTankFirst", "0" }, { "PullTankHoldMs", "5000" }, { "PullMemberRangeYards", "8" } }, warnings);
     CHECK(!pullSet.PullTankFirst && pullSet.PullTankHoldMs == 5000 && pullSet.PullMemberRangeYards == 8 && warnings.empty());
-    CHECK(defaults.HealWaitTankHold);
-    BotSettings const healWait = ParseBotSettings({ { "HealWaitTankHold", "0" } }, warnings);
-    CHECK(!healWait.HealWaitTankHold && warnings.empty());
+    CHECK(!defaults.HealWaitTankHold);
+    BotSettings const healWait = ParseBotSettings({ { "HealWaitTankHold", "1" } }, warnings);
+    CHECK(healWait.HealWaitTankHold && warnings.empty());
 
     BotSettings const candidate = ParseBotSettings({ { "DungeonHealBelowPct", "60" }, { "DungeonTankHealBelowPct", "80" },
                                                      { "HealerDpsManaPct", "50" }, { "HealerLosMoveYards", "8" } }, warnings);
@@ -576,9 +576,9 @@ void GhostTeleportHoldSettings()
 {
     {
         std::vector<std::string> w;
-        CHECK(ParseBotSettings({}, w).GhostHoldAvoidEnemyMaxMs == 300000);
-        CHECK(ParseBotSettings({ { "GhostHoldAvoidEnemyMaxMs", "0" } }, w).GhostHoldAvoidEnemyMaxMs == 0 && w.empty());
-        CHECK(ParseBotSettings({ { "GhostHoldAvoidEnemyMaxMs", "9999999" } }, w).GhostHoldAvoidEnemyMaxMs == 300000 && !w.empty());
+        CHECK(ParseBotSettings({}, w).GhostHoldAvoidEnemyMaxMs == 0);
+        CHECK(ParseBotSettings({ { "GhostHoldAvoidEnemyMaxMs", "300000" } }, w).GhostHoldAvoidEnemyMaxMs == 300000 && w.empty());
+        CHECK(ParseBotSettings({ { "GhostHoldAvoidEnemyMaxMs", "9999999" } }, w).GhostHoldAvoidEnemyMaxMs == 0 && !w.empty());
     }
     std::vector<std::string> warnings;
     BotSettings const defaults = ParseBotSettings({}, warnings);

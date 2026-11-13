@@ -66,7 +66,7 @@ line to the module's stderr. A config reload updates the ramp, the random picks 
 | `TankLooseRangeYards` | 40 | A loose mob farther than this from the tank is left (10 to 60) |
 | `TankLooseChaseYards` | 8 | A tank out of the taunt's reach walks at most this far toward the mob, inside the chase leash (0 = never walk, else 2 to 20) |
 | `PullTankFirst` | 1 | In a dungeon, raid or tank-led party the members wait on the route while the leader (tank) has a target but is not in combat with it, and assist once it is; never for solo bots or leveling parties (0 = every member pulls on its own) |
-| `HealWaitTankHold` | 1 | A healer casts no heal (Renew included) on the party's tank at full health until the tank holds its target (the target's threat top, else its victim, is the tank; a target out of view counts as held); event `heal_hold`. 0 = as before |
+| `HealWaitTankHold` | 0 | A healer casts no heal (Renew included) on the party's tank at full health until the tank holds its target (the target's threat top, else its victim, is the tank; a target out of view counts as held); event `heal_hold`. 0 = as before |
 | `PullTankHoldMs` | 12000 | The longest a member waits for the tank, so a dead or stuck tank cannot freeze the party (1000 to 120000) |
 | `WarderPartyHold` | 1 | A raid member with no target of its own does not follow the tank into an Onyxian Warder's Fire Nova: it holds outside the nova while the tank pulls the Warder alone (0 = follow as before) |
 | `PullMinHpPct` | 60 | A member of a dungeon, raid or tank-led party below this health percent that nothing attacks stands and rests (at most 2 minutes) instead of engaging or joining the tank's fight; 0 = off (0 to 100) |
@@ -79,7 +79,7 @@ line to the module's stderr. A config reload updates the ramp, the random picks 
 | `PullMemberRangeYards` | 12 | A target this near a member is engaged at once, without a walk (0 to 40) |
 | `GhostTeleportHold` | 1 | A dungeon ghost's entrance or party teleport waits while a live hostile is within 30 yards of the destination (event `ghost_teleport_hold: ... reason=hostile`, at most one per 10 s per bot); 0 teleports at once as before |
 | `GhostTeleportHoldMaxMs` | 120000 | The longest a ghost is held for a hostile, per death (1000 to 3600000) |
-| `GhostHoldAvoidEnemyMaxMs` | 300000 | A dungeon ghost's teleport (entrance, party, leader rejoin, corpse) also waits while a fighting hostile of an `avoid_enemy` row stands within max(30, the row's yards) of the destination, this long at most per death (`ghost_teleport_hold: ... reason=avoid_enemy`); 0 = off |
+| `GhostHoldAvoidEnemyMaxMs` | 0 (off; 300000 is a good value) | A dungeon ghost's teleport (entrance, party, leader rejoin, corpse) also waits while a fighting hostile of an `avoid_enemy` row stands within max(30, the row's yards) of the destination, this long at most per death (`ghost_teleport_hold: ... reason=avoid_enemy`); 0 = off |
 | `DeathLockoutCount` | 4 | A bot that died this many times within `DeathLockoutWindowMs` waits `DeathLockoutHoldMs` more before its ghost teleport (`reason=lockout`); 0 is off (2 to 50) |
 | `DeathLockoutWindowMs` | 600000 | The lockout window (10000 to 86400000) |
 | `DeathLockoutHoldMs` | 90000 | The extra wait of a locked-out bot (0 to 3600000) |

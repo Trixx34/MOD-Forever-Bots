@@ -374,7 +374,7 @@ struct PolicyOptions
     // DeathLockoutWindowMs waits DeathLockoutHoldMs more. The 2026-11-12 zulgurub run: 2815 deaths in 60 min, each ghost put back at the pack that killed it.
     bool GhostTeleportHold = true;
     std::uint64_t GhostTeleportHoldMaxMs = 120000;
-    // GhostHoldAvoidEnemyMaxMs (0 = off here, the tests; the module's settings default to 300000): a ghost teleport of a dungeon party (entrance, party, leader rejoin and the
+    // GhostHoldAvoidEnemyMaxMs (0 = off here, the tests; the module settings default to 0 too, 300000 is the value to set): a ghost teleport of a dungeon party (entrance, party, leader rejoin and the
     // corpse run's teleport to the corpse) also waits while a live hostile of an `avoid_enemy`/`avoid_enemy_aura` entry of the raid rules is in a fight (it has a victim)
     // within max(30, the row's yards) of the destination, at most this long per death (ZG 2026-11-13 r4: 111 of 297 re-deaths within 30 s of the revive, Axe Flurry).
     std::uint64_t GhostHoldAvoidEnemyMaxMs = 0;
