@@ -849,6 +849,7 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
         ReadKey(config, "GhostTeleportPerSecond", 1, 100, settings.GhostTeleportPerSecond, warnings);
     ReadBool(config, "GhostTeleportHold", settings.GhostTeleportHold, warnings);
     ReadKey(config, "GhostTeleportHoldMaxMs", 1000, 3600000, settings.GhostTeleportHoldMaxMs, warnings);
+    ReadKey(config, "GhostHoldAvoidEnemyMaxMs", 0, 3600000, settings.GhostHoldAvoidEnemyMaxMs, warnings);
     if (auto const lockout = config.find("DeathLockoutCount"); lockout != config.end() && lockout->second == "0")
         settings.DeathLockoutCount = 0; // explicitly off
     else

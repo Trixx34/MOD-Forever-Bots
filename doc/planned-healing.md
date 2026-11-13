@@ -34,6 +34,8 @@ the mana rules are unchanged.
 
 `HealPlan` (1), `HealPlanPreHealMs` (4000, 0 = no pre-heal), `HealPlanPreHealPct` (96).
 
+`HealWaitTankHold` (1), outside the plan: a priest's Renew on the party's tank at full health waits until the tank holds its target (the target's `threat_top_ref`, else its `victim_ref`, is the tank; read in the healer's or the leader's view; a target out of view counts as held). The heal only put the healer on the pack's threat list (ZG 2026-11-13: `tank_loose reason=healer` 5 s after the pull). Event `heal_hold: healer= tank= reason=tank_not_holding`. Every other heal already needs the member below a mark under 100 %.
+
 ## What only the sim shows
 
 Whether the split lowers deaths in ZG and Onyxia against `HealPlan = 0`, that the pre-heal costs no mana trouble, healers out of line of sight of their assigned members (the switch covers range, not sight), and the event rate. Compare with the heal-related counts (`heal:` lines, deaths, `healer_fetch`) of a run with the plan off.

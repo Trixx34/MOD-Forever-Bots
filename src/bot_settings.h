@@ -406,6 +406,9 @@ struct BotSettings
     // make the bot wait DeathLockoutHoldMs (default 90000, 0..3600000) more before the teleport.
     bool GhostTeleportHold = true;
     std::uint32_t GhostTeleportHoldMaxMs = 120000;
+    // GhostHoldAvoidEnemyMaxMs (default 300000, 0 = off, else up to 3600000): a dungeon ghost's teleport (entrance, party, leader rejoin, corpse) waits while a fighting hostile of
+    // an avoid_enemy row stands within max(30, the row's yards) of the destination, at most this long per death (ghost_teleport_hold reason=avoid_enemy).
+    std::uint32_t GhostHoldAvoidEnemyMaxMs = 300000;
     std::uint32_t DeathLockoutCount = 4;
     std::uint32_t DeathLockoutWindowMs = 600000;
     std::uint32_t DeathLockoutHoldMs = 90000;

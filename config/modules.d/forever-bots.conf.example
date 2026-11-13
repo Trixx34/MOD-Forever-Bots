@@ -355,6 +355,8 @@ Module.forever-bots.TelemetrySummarySec = 60
 # CorpseRunTeleportSec = 60   (a corpse run longer than this puts the ghost at its corpse, the four-minute teleport brought forward; 0 = off, 10 to 3600)
 # GhostTeleportHold = 1   (a dungeon ghost's entrance or party teleport waits while a live hostile is within 30 yards of the destination; log: ghost_teleport_hold: ... reason=hostile; 0 = teleport at once as before)
 # GhostTeleportHoldMaxMs = 120000   (the longest a ghost is held for a hostile, per death; 1000 to 3600000)
+# GhostHoldAvoidEnemyMaxMs = 300000   (a dungeon ghost's teleport, to the entrance, the leader, a member (leader rejoin) or its corpse, waits while a hostile of an avoid_enemy row of
+#                                      the raid rules is fighting within max(30, the row's yards) of the destination, this long at most per death; ghost_teleport_hold reason=avoid_enemy; 0 = off)
 # DeathLockoutCount = 4   (a bot that died this many times within DeathLockoutWindowMs waits DeathLockoutHoldMs more before its ghost teleport, reason=lockout; 0 = off, else 2 to 50)
 # DeathLockoutWindowMs = 600000   (10000 to 86400000)
 # DeathLockoutHoldMs = 90000   (0 to 3600000)

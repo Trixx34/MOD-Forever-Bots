@@ -221,8 +221,54 @@ bool BotPolicy::ReviveGuardHolds(DecideTick& tick, BotTurn& turn, BotSnapshot co
 // Ghost teleport hold: a dungeon ghost is not put back beside the pack that killed it (the 2026-11-12 zulgurub run: 2815 deaths in 60 min). Held while (hostile) a live
 // hostile stands within kReviveHostileYards of the destination, seen by any living bot of the map, for GhostTeleportHoldMaxMs from the first decision of this death at most,
 // and (lockout) for DeathLockoutHoldMs after the first decision when the bot died DeathLockoutCount times within DeathLockoutWindowMs. True: hold back.
+bool BotPolicy::GhostAvoidEnemyHeld(DecideTick& tick, BotTurn& turn, std::uint32_t map, Point const& dest, char const* what)
+{
+    if (_options.GhostHoldAvoidEnemyMaxMs == 0 || !_options.RaidRules || !_options.RaidRules->HasAvoidEnemy(map))
+        return false;
+    std::uint64_t const nowMs = tick.nowMs;
+    BotState& state = turn.state;
+    if (state.GhostHoldSinceMs == 0)
+        state.GhostHoldSinceMs = nowMs;
+    std::uint64_t const heldMs = nowMs - state.GhostHoldSinceMs;
+    if (heldMs >= _options.GhostHoldAvoidEnemyMaxMs)
+        return false;
+    WorldTickSnapshotView const& view = tick.view;
+    std::uint32_t entry = 0;
+    for (std::size_t i = 0; i < view.bots.size() && entry == 0; ++i)
+    {
+        BotSnapshot const& watcher = view.bots[i];
+        if (watcher.map_id != map || watcher.life_state != 0 || std::hypot(watcher.pos_x - dest.X, watcher.pos_y - dest.Y) > kReviveHostileYards + 60.0f)
+            continue;
+        for (NearbyUnit const& unit : view.NearbyOf(i))
+        {
+            if (!IsLiveMob(unit) || unit.victim_ref == 0)
+                continue;   // only a hostile that is in a fight
+            float yards = 0.0f;
+            for (raid_rules::EnemyZone const& zone : _options.RaidRules->AvoidEnemyFor(map, forever_module::UnitRefEntry(unit.guid)))
+                yards = std::max(yards, std::max(kReviveHostileYards, zone.Yards));
+            if (yards > 0.0f && std::hypot(unit.pos_x - dest.X, unit.pos_y - dest.Y) <= yards)
+            {
+                entry = forever_module::UnitRefEntry(unit.guid);
+                break;
+            }
+        }
+    }
+    if (entry == 0)
+        return false;
+    if (_options.OnEvent && (state.GhostHoldLoggedMs == 0 || nowMs - state.GhostHoldLoggedMs >= kGhostHoldLogMs))
+    {
+        state.GhostHoldLoggedMs = nowMs;
+        _options.OnEvent(std::string("ghost_teleport_hold: bot=") + std::to_string(turn.bot.guid) + " reason=avoid_enemy entry=" + std::to_string(entry) + " dest=" + what +
+                         " map=" + std::to_string(map) + " deaths=" + std::to_string(state.DeathHistoryMs.size()) + " held_ms=" + std::to_string(heldMs) +
+                         " waited_ms=" + std::to_string(nowMs - state.DeathMs));
+    }
+    return true;
+}
+
 bool BotPolicy::GhostTeleportHeld(DecideTick& tick, BotTurn& turn, std::uint32_t map, Point const& dest, char const* what)
 {
+    if (GhostAvoidEnemyHeld(tick, turn, map, dest, what))
+        return true;
     if (!_options.GhostTeleportHold)
         return false;
     std::uint64_t const nowMs = tick.nowMs;
@@ -589,7 +635,8 @@ void BotPolicy::DeadGhostRun(DecideTick& tick, BotTurn& turn)
         if (!fighting && member)
         {
             bool const withMember = bot.map_id == member->map_id && DistanceTo(bot, Point{ member->pos_x, member->pos_y, member->pos_z }) <= kEntryYards;
-            if (!withMember && nowMs >= state.CorpseTeleportRetryMs && GhostTeleportSlot(nowMs))
+            if (!withMember && nowMs >= state.CorpseTeleportRetryMs &&
+                !GhostAvoidEnemyHeld(tick, turn, member->map_id, Point{ member->pos_x, member->pos_y, member->pos_z }, "member") && GhostTeleportSlot(nowMs))
             {
                 state.CorpseTeleportRetryMs = nowMs + kEntryTeleportRetryMs;
                 BotAction toMember;
@@ -651,7 +698,10 @@ void BotPolicy::DeadGhostRun(DecideTick& tick, BotTurn& turn)
     // Sentinel Hill graveyard, its walk to the door refused for "no route"): the ghost is put at its corpse now, the same teleport as the four-minute timeout
     // below, brought forward. A ghost already at its corpse (waiting out the core's reclaim delay, or a hostile beside it) is not on a run any more: left alone.
     bool const atCorpse = bot.map_id == bot.corpse_map && DistanceTo(bot, Point{ bot.corpse_x, bot.corpse_y, bot.corpse_z }) <= kReclaimYards;
-    if (_options.CorpseRunTeleportMs != 0 && !state.RunTimeoutTeleported && !atCorpse && nowMs - state.RunStartMs > _options.CorpseRunTeleportMs && GhostTeleportSlot(nowMs))
+    // GhostHoldAvoidEnemyMaxMs: not while a fighting hostile of an avoid_enemy row stands at the corpse (the ghost walks on meanwhile).
+    auto const corpseHeld = [&] { return GhostAvoidEnemyHeld(tick, turn, bot.corpse_map, Point{ bot.corpse_x, bot.corpse_y, bot.corpse_z }, "corpse"); };
+    if (_options.CorpseRunTeleportMs != 0 && !state.RunTimeoutTeleported && !atCorpse && nowMs - state.RunStartMs > _options.CorpseRunTeleportMs && !corpseHeld() &&
+        GhostTeleportSlot(nowMs))
     {
         state.RunTimeoutTeleported = true;
         state.RunStartMs = nowMs;
@@ -671,9 +721,9 @@ void BotPolicy::DeadGhostRun(DecideTick& tick, BotTurn& turn)
     {
         // Four minutes of walking and the corpse is not reached: the ghost is put at the corpse once (the core does not refuse a teleport for a ghost),
         // and the run starts over. A ghost that gave up here stayed a ghost for good (34 bots in 55 minutes on the sim).
-        if (!state.RunTimeoutTeleported && !GhostTeleportSlot(nowMs))
+        if (!state.RunTimeoutTeleported && (corpseHeld() || !GhostTeleportSlot(nowMs)))
         {
-            // over this second's ghost teleports (GhostTeleportPerSecond): the next tick tries again
+            // over this second's ghost teleports (GhostTeleportPerSecond), or held for an avoid_enemy hostile at the corpse: the next tick tries again
         }
         else if (!state.RunTimeoutTeleported)
         {

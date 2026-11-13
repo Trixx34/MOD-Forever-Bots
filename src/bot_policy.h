@@ -374,6 +374,10 @@ struct PolicyOptions
     // DeathLockoutWindowMs waits DeathLockoutHoldMs more. The 2026-11-12 zulgurub run: 2815 deaths in 60 min, each ghost put back at the pack that killed it.
     bool GhostTeleportHold = true;
     std::uint64_t GhostTeleportHoldMaxMs = 120000;
+    // GhostHoldAvoidEnemyMaxMs (0 = off here, the tests; the module's settings default to 300000): a ghost teleport of a dungeon party (entrance, party, leader rejoin and the
+    // corpse run's teleport to the corpse) also waits while a live hostile of an `avoid_enemy`/`avoid_enemy_aura` entry of the raid rules is in a fight (it has a victim)
+    // within max(30, the row's yards) of the destination, at most this long per death (ZG 2026-11-13 r4: 111 of 297 re-deaths within 30 s of the revive, Axe Flurry).
+    std::uint64_t GhostHoldAvoidEnemyMaxMs = 0;
     std::uint32_t DeathLockoutCount = 4;                // 0 = no lockout
     std::uint64_t DeathLockoutWindowMs = 600000;
     std::uint64_t DeathLockoutHoldMs = 90000;
@@ -981,6 +985,9 @@ private:
     TurnFlow DeadHeldByWarder(DecideTick& tick, BotTurn& turn);
     bool ReviveGuardHolds(DecideTick& tick, BotTurn& turn, forever_module::BotSnapshot const& member);
     bool GhostTeleportHeld(DecideTick& tick, BotTurn& turn, std::uint32_t map, Point const& dest, char const* what);
+    // GhostHoldAvoidEnemyMaxMs: a fighting hostile of an avoid_enemy row stands near the destination (reason avoid_enemy). Also called on its own before the leader rejoin
+    // and the corpse teleports, which GhostTeleportHeld does not hold.
+    bool GhostAvoidEnemyHeld(DecideTick& tick, BotTurn& turn, std::uint32_t map, Point const& dest, char const* what);
     TurnFlow DeadReviveByLeader(DecideTick& tick, BotTurn& turn);
     void DeadGhostRun(DecideTick& tick, BotTurn& turn);
     void DeadEmit(DecideTick& tick, BotTurn& turn, Decision const& wantedDead);

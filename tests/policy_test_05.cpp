@@ -1270,8 +1270,56 @@ void AGhostTeleportWaitsForAHostileAndALockout()
     }
 }
 
+// GhostHoldAvoidEnemyMaxMs: the party teleport also waits for a fighting hostile of an avoid_enemy row near the destination, at the row's yards (33, past the 30 of
+// the plain hold), at most GhostHoldAvoidEnemyMaxMs per death; a thrower nobody fights, another entry or the key at 0 does not hold.
+void AGhostTeleportWaitsForAFightingAvoidEnemyHostile()
+{
+    auto const build = [](bool fighting, std::uint32_t entry)
+    {
+        WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 });
+        for (BotSnapshot& bot : v.bots)
+            bot.map_id = 36;
+        Ghost(v.bots[3], 0.0f, 36, 50.0f);
+        v.bots[3].map_id = 0;                                                  // the ghost is outside, at the graveyard
+        NearbyUnit thrower = HostileAt(7, 32.0f, 0.0f);                        // 32 yards from the leader, the destination
+        thrower.guid = MakeUnitRef(8, entry, 7);
+        thrower.victim_ref = fighting ? PlayerOf(99) : 0;                      // it fights somebody (another party)
+        AddNearby(v, 2, thrower);
+        return v;
+    };
+    auto const optionsOf = [](std::vector<std::string>* events, std::uint64_t maxMs)
+    {
+        PolicyOptions options = DeadOptions(events, AllWarriors);
+        options.GhostHoldAvoidEnemyMaxMs = maxMs;
+        std::vector<std::string> errors;
+        options.RaidRules = std::make_shared<raid_rules::Table>(raid_rules::Parse("avoid_enemy|36|11350|33|healers|Axe Flurry\n", errors));
+        CHECK(errors.empty());
+        return options;
+    };
+    std::vector<std::string> events;
+    BotPolicy policy(optionsOf(&events, 300000));
+    policy.SetRouteActive(true);
+    CHECK(!TeleportOf(policy.Decide(build(true, 11350), 1000), 13).has_value());
+    CHECK(Logged(events, "ghost_teleport_hold: bot=13 reason=avoid_enemy entry=11350 dest=leader"));
+    CHECK(!TeleportOf(policy.Decide(build(true, 11350), 200000), 13).has_value());   // past the plain hold's 120 s
+    CHECK(TeleportOf(policy.Decide(build(false, 11350), 201000), 13).has_value());  // the fight is over
+    // the maximum: 300 s after the first decision the ghost goes anyway
+    BotPolicy expiring(optionsOf(nullptr, 300000));
+    expiring.SetRouteActive(true);
+    CHECK(!TeleportOf(expiring.Decide(build(true, 11350), 1000), 13).has_value());
+    CHECK(TeleportOf(expiring.Decide(build(true, 11350), 302000), 13).has_value());
+    // another entry (no row), or the key at 0: no hold at 32 yards
+    BotPolicy other(optionsOf(nullptr, 300000));
+    other.SetRouteActive(true);
+    CHECK(TeleportOf(other.Decide(build(true, 11351), 1000), 13).has_value());
+    BotPolicy off(optionsOf(nullptr, 0));
+    off.SetRouteActive(true);
+    CHECK(TeleportOf(off.Decide(build(true, 11350), 1000), 13).has_value());
+}
+
 void RunPolicyTestsPart5()
 {
+    AGhostTeleportWaitsForAFightingAvoidEnemyHostile();
     AutoShotIsNotReissuedWhileActive();
     AutoShotIsReissuedAfterTheFightAndWhenRefused();
     AutoShotIsReissuedAfterMoving();

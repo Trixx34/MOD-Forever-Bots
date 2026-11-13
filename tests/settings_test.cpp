@@ -574,6 +574,12 @@ void CorpseRunTeleportSettings()
 // GhostTeleportHold and the death lockout: defaults, overrides, bad values keep the default with a warning.
 void GhostTeleportHoldSettings()
 {
+    {
+        std::vector<std::string> w;
+        CHECK(ParseBotSettings({}, w).GhostHoldAvoidEnemyMaxMs == 300000);
+        CHECK(ParseBotSettings({ { "GhostHoldAvoidEnemyMaxMs", "0" } }, w).GhostHoldAvoidEnemyMaxMs == 0 && w.empty());
+        CHECK(ParseBotSettings({ { "GhostHoldAvoidEnemyMaxMs", "9999999" } }, w).GhostHoldAvoidEnemyMaxMs == 300000 && !w.empty());
+    }
     std::vector<std::string> warnings;
     BotSettings const defaults = ParseBotSettings({}, warnings);
     CHECK(defaults.GhostTeleportHold && defaults.GhostTeleportHoldMaxMs == 120000 && defaults.DeathLockoutCount == 4 && defaults.DeathLockoutWindowMs == 600000 &&

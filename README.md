@@ -79,6 +79,7 @@ line to the module's stderr. A config reload updates the ramp, the random picks 
 | `PullMemberRangeYards` | 12 | A target this near a member is engaged at once, without a walk (0 to 40) |
 | `GhostTeleportHold` | 1 | A dungeon ghost's entrance or party teleport waits while a live hostile is within 30 yards of the destination (event `ghost_teleport_hold: ... reason=hostile`, at most one per 10 s per bot); 0 teleports at once as before |
 | `GhostTeleportHoldMaxMs` | 120000 | The longest a ghost is held for a hostile, per death (1000 to 3600000) |
+| `GhostHoldAvoidEnemyMaxMs` | 300000 | A dungeon ghost's teleport (entrance, party, leader rejoin, corpse) also waits while a fighting hostile of an `avoid_enemy` row stands within max(30, the row's yards) of the destination, this long at most per death (`ghost_teleport_hold: ... reason=avoid_enemy`); 0 = off |
 | `DeathLockoutCount` | 4 | A bot that died this many times within `DeathLockoutWindowMs` waits `DeathLockoutHoldMs` more before its ghost teleport (`reason=lockout`); 0 is off (2 to 50) |
 | `DeathLockoutWindowMs` | 600000 | The lockout window (10000 to 86400000) |
 | `DeathLockoutHoldMs` | 90000 | The extra wait of a locked-out bot (0 to 3600000) |
