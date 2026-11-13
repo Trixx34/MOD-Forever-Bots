@@ -356,6 +356,8 @@ if(Python3_Interpreter_FOUND)
     add_test(NAME world_data COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/world_data_test.py ${CMAKE_CURRENT_SOURCE_DIR})
     # The pre-raid quest lists and attunement chains made by tools/gen_prebis_quests.py (doc/pre-raid-progression.md).
     add_test(NAME gen_prebis_quests COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/gen_prebis_quests_test.py ${CMAKE_CURRENT_SOURCE_DIR})
+    # The PvP gear wishlist generator (tools/gen_pvp.py, which builds on tools/gen_prebis.py) on a made-up fixture.
+    add_test(NAME gen_pvp COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/gen_pvp_test.py ${CMAKE_CURRENT_SOURCE_DIR})
 endif()
 
 add_executable(sell_test tests/sell_test.cpp)
