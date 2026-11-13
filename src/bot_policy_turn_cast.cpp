@@ -1017,6 +1017,165 @@ BotPolicy::TurnFlow BotPolicy::TurnTankPickup(DecideTick& tick, BotTurn& turn)
                 return unit.health != 0 && std::hypot(unit.pos_x - bot.pos_x, unit.pos_y - bot.pos_y) <= yards;
         return false;
     };
+    // TankLoosePickup (route, raid and tank-led parties): one elected tank per loose mob instead of every tank taunting the same one (the 2026-11-13 sim: bots 222 and 224 both
+    // taunted the same mob in the same second while the casters died). Mobs on healers come first, then on casters, then the ones that are casting, then the newest; a mob
+    // whose elected tank is another one is left to it and the next is tried. The elected tank is the nearest with a ready taunt (a claim keeps it for the cooldown).
+    bool electedForTop = true;
+    if (_options.TankLoosePickup && turn.routeOn)
+    {
+        auto const unitOf = [&](std::uint64_t ref) -> NearbyUnit const*
+        {
+            for (NearbyUnit const& unit : turn.nearby)
+                if (unit.guid == ref)
+                    return &unit;
+            for (NearbyUnit const& unit : tick.LeaderNearby(turn.partyLeader, bot.map_id))
+                if (unit.guid == ref)
+                    return &unit;
+            return nullptr;
+        };
+        struct Candidate
+        {
+            party_view::LooseMob Mob;
+            NearbyUnit Unit;
+            int Rank = 3;
+        };
+        std::vector<Candidate> candidates;
+        for (party_view::LooseMob const& mob : loose)
+        {
+            NearbyUnit const* unit = unitOf(mob.Unit);
+            if (unit == nullptr || unit->health == 0 || !unit->is_hostile ||
+                (unit->state_flags & (forever_module::kNearbyTauntImmune | forever_module::kNearbyCcLocked | forever_module::kNearbyEvading)) != 0 ||
+                std::hypot(unit->pos_x - bot.pos_x, unit->pos_y - bot.pos_y) > float(_options.TankLooseRangeYards))
+                continue;
+            Candidate candidate{ mob, *unit, 3 };
+            std::uint32_t victimClass = 0;
+            for (BotSnapshot const& other : tick.view.bots)
+                if (PlayerRef(other.guid) == mob.Victim)
+                {
+                    victimClass = ClassFor(_options, other.guid);
+                    break;
+                }
+            if (mob.VictimIsHealer)
+                candidate.Rank = 0;
+            else if (victimClass == 5 || victimClass == 8 || victimClass == 9)   // priest, mage, warlock: casters die first
+                candidate.Rank = 1;
+            else if (unit->casting != 0)
+                candidate.Rank = 2;
+            candidates.push_back(candidate);
+        }
+        std::stable_sort(candidates.begin(), candidates.end(), [](Candidate const& a, Candidate const& b) { return a.Rank < b.Rank; });
+        if (_looseClaims.size() > 256)
+            for (auto it = _looseClaims.begin(); it != _looseClaims.end();)
+                it = nowMs >= it->second.UntilMs ? _looseClaims.erase(it) : std::next(it);
+        // The tanks of the party that could take a mob: this bot, and the members with the tank role that are bots in this fight with their taunt ready.
+        struct Tank
+        {
+            std::uint64_t Guid = 0;
+            float X = 0, Y = 0;
+        };
+        std::vector<Tank> tanks;
+        bool const iAmReady = nowMs >= state.PickupAtMs && usable(single);
+        if (iAmReady)
+            tanks.push_back(Tank{ bot.guid, bot.pos_x, bot.pos_y });
+        for (forever_module::PartyMember const& member : tick.view.MembersOf(*party))
+        {
+            if (member.is_bot == 0 || member.online == 0 || (member.role & forever_module::kPartyRoleTank) == 0 || member.guid == PlayerRef(bot.guid))
+                continue;
+            for (BotSnapshot const& other : tick.view.bots)
+            {
+                if (PlayerRef(other.guid) != member.guid)
+                    continue;
+                std::uint32_t const otherClass = ClassFor(_options, other.guid);
+                std::uint32_t const otherSpell = otherClass == kWarriorClass ? kTauntSpell : otherClass == kDruidClass_ ? kGrowlSpell : 0;
+                bool ready = otherSpell != 0 && other.life_state == 0 && other.in_combat != 0 && other.map_id == bot.map_id &&
+                             (other.level == 0 || rotation::LearnLevel(otherSpell) <= other.level) && CanPay(_options.SpellCosts.get(), otherSpell, other);
+                for (forever_module::SpellCooldown const& cooldown : other.spell_cooldowns)
+                    if (cooldown.spell_id == otherSpell && cooldown.remaining_ms != 0)
+                        ready = false;
+                if (ready)
+                    tanks.push_back(Tank{ other.guid, other.pos_x, other.pos_y });
+                break;
+            }
+        }
+        bool first = true;
+        for (Candidate const& candidate : candidates)
+        {
+            std::uint64_t elected = 0;
+            auto const claim = _looseClaims.find(candidate.Mob.Unit);
+            if (claim != _looseClaims.end() && nowMs < claim->second.UntilMs)
+                elected = claim->second.Tank;   // a tank that took it a moment ago keeps it, even if its taunt is cooling now
+            else
+            {
+                float bestKey = 1e9f;
+                for (Tank const& tank : tanks)
+                {
+                    float const dist = std::hypot(tank.X - candidate.Unit.pos_x, tank.Y - candidate.Unit.pos_y);
+                    float const key = (dist <= kOnyxiaTauntYards ? 0.0f : 1000.0f) + dist;
+                    if (key < bestKey || (key == bestKey && tank.Guid < elected))
+                    {
+                        bestKey = key;
+                        elected = tank.Guid;
+                    }
+                }
+            }
+            if (first)
+                electedForTop = elected == bot.guid;
+            first = false;
+            if (elected != bot.guid || !iAmReady)
+                continue;
+            NearbyUnit const& unit = candidate.Unit;
+            float const dist = std::hypot(unit.pos_x - bot.pos_x, unit.pos_y - bot.pos_y);
+            bool const losBlocked = (unit.state_flags & forever_module::kNearbyLosKnown) != 0 && (unit.state_flags & forever_module::kNearbyInLosOfBot) == 0;
+            char const* const why = candidate.Rank == 0 ? "healer" : candidate.Rank == 1 ? "caster" : candidate.Rank == 2 ? "casting" : "newest";
+            auto const describe = [&](char const* action)
+            {
+                return std::string("tank_loose: tank=") + std::to_string(bot.guid) + " target=" + std::to_string(forever_module::UnitRefEntry(candidate.Mob.Unit)) +
+                       " victim=" + std::to_string(candidate.Mob.Victim) + " reason=" + why + " act=" + action + " dist=" + std::to_string(int(dist)) +
+                       " loose=" + std::to_string(loose.size());
+            };
+            std::uint64_t const holdMs = std::max<std::uint64_t>(_options.TankLooseCooldownMs, 500);
+            if (dist <= kOnyxiaTauntYards && !losBlocked)
+            {
+                BotAction cast;
+                cast.bot_guid = bot.guid;
+                cast.type = ActionType::kCastSpell;
+                cast.spell_id = single;
+                cast.target_guid = candidate.Mob.Unit;
+                tick.actions.push_back(cast);
+                state.CastTarget[single] = candidate.Mob.Unit;
+                state.PickupAtMs = nowMs + holdMs;
+                state.NextCastMs = nowMs + kGlobalCooldownMs;
+                _looseClaims[candidate.Mob.Unit] = LooseClaim{ bot.guid, nowMs + holdMs };
+                if (_options.OnEvent)
+                    _options.OnEvent(describe("taunt"));
+                return TurnFlow::kSkip;
+            }
+            // Out of reach or out of sight: a short walk toward it, last resort, never off the chase leash.
+            if (_options.TankLooseChaseYards != 0 && dist > 0.5f &&
+                !OffPartyLeash(tick, turn.partyLeader, bot.map_id, unit.pos_x, unit.pos_y, _options.DungeonChaseLeashYards, true))
+            {
+                float const step = std::min(float(_options.TankLooseChaseYards), losBlocked ? dist : std::max(dist - (kOnyxiaTauntYards - 5.0f), 2.0f));
+                Point const dest{ bot.pos_x + (unit.pos_x - bot.pos_x) / dist * step, bot.pos_y + (unit.pos_y - bot.pos_y) / dist * step, bot.pos_z };
+                BotAction move;
+                move.bot_guid = bot.guid;
+                move.type = ActionType::kMoveTo;
+                move.dest_x = dest.X;
+                move.dest_y = dest.Y;
+                move.dest_z = dest.Z;
+                tick.actions.push_back(move);
+                state.Last = Decision{ ActionType::kMoveTo, candidate.Mob.Unit, dest };
+                state.LastMove = state.Last;
+                state.PickupAtMs = nowMs + holdMs;
+                _looseClaims[candidate.Mob.Unit] = LooseClaim{ bot.guid, nowMs + holdMs };
+                if (_options.OnEvent)
+                    _options.OnEvent(describe(losBlocked ? "approach_los" : "approach"));
+                return TurnFlow::kSkip;
+            }
+        }
+        // The single taunt is decided here; the area taunt below only runs for the tank elected for the top mob.
+        if (!electedForTop || candidates.empty())
+            return TurnFlow::kNext;
+    }
     // The area taunt: two or more loose mobs, most of them around the tank.
     if (loose.size() >= 2 && nowMs >= state.PickupAoeAtMs && usable(area))
     {
@@ -1039,7 +1198,7 @@ BotPolicy::TurnFlow BotPolicy::TurnTankPickup(DecideTick& tick, BotTurn& turn)
             return TurnFlow::kSkip;
         }
     }
-    if (nowMs >= state.PickupAtMs && usable(single))
+    if (!(_options.TankLoosePickup && turn.routeOn) && nowMs >= state.PickupAtMs && usable(single))
     {
         std::uint64_t const target = party_view::TauntTargetFor(tick.view, *party, PlayerRef(bot.guid));
         if (target != 0 && near(target, kOnyxiaTauntYards))

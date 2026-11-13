@@ -306,6 +306,13 @@ struct BotSettings
     std::uint32_t HealerDpsManaPct = 40;
     std::uint32_t HealerCombatManaPct = 25; // HealerCombatManaPct: a healer in a party fight keeps this share of its mana for heals (0 = no floor; 0..80)
     bool TankPickup = true;       // TankPickup: a tank taunts the mobs that are on party members (needs PartyViewPlanner and the core's party view)
+    // TankLoosePickup = 1 (default): in a dungeon, raid or tank-led party (the routeOn gate, as PullTankFirst) the tanks elect ONE tank per loose mob (the nearest with a ready taunt),
+    // healers' and casters' attackers first, within TankLooseRangeYards of the tank, in line of sight; TankLooseCooldownMs between two picks of one tank; TankLooseChaseYards (0 = never
+    // walk): a tank out of the taunt's reach walks at most this far toward the mob, only inside the chase leash. Needs TankPickup and PartyViewPlanner.
+    bool TankLoosePickup = true;
+    std::uint32_t TankLooseCooldownMs = 2500;
+    std::uint32_t TankLooseRangeYards = 40;
+    std::uint32_t TankLooseChaseYards = 8;
     std::uint32_t HealerLosMoveYards = 6;
     // PullTankFirst = 1 (default): in a dungeon, raid or tank-led party the members wait for the tank to be in combat before they engage its target (PullTankHoldMs: at most
     // this long, default 12000; PullMemberRangeYards: a target this near a member needs no walk, default 12).

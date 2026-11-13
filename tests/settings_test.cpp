@@ -335,6 +335,12 @@ void DungeonLearningKnobsAreBounded()
     CHECK(defaults.PullTankFirst && defaults.PullTankHoldMs == 12000 && defaults.PullMemberRangeYards == 12 && defaults.PullMinHpPct == 60);
     CHECK(ParseBotSettings({ { "PullMinHpPct", "0" } }, warnings).PullMinHpPct == 0 && warnings.empty());
     CHECK(defaults.WarderPartyHold && !ParseBotSettings({ { "WarderPartyHold", "0" } }, warnings).WarderPartyHold && warnings.empty());
+    CHECK(defaults.TankLoosePickup && defaults.TankLooseCooldownMs == 2500 && defaults.TankLooseRangeYards == 40 && defaults.TankLooseChaseYards == 8);
+    BotSettings const looseSet = ParseBotSettings({ { "TankLoosePickup", "0" }, { "TankLooseCooldownMs", "4000" }, { "TankLooseRangeYards", "30" }, { "TankLooseChaseYards", "0" } }, warnings);
+    CHECK(!looseSet.TankLoosePickup && looseSet.TankLooseCooldownMs == 4000 && looseSet.TankLooseRangeYards == 30 && looseSet.TankLooseChaseYards == 0 && warnings.empty());
+    BotSettings const looseBad = ParseBotSettings({ { "TankLooseRangeYards", "5" }, { "TankLooseChaseYards", "1" } }, warnings);
+    CHECK(looseBad.TankLooseRangeYards == 40 && looseBad.TankLooseChaseYards == 8 && warnings.size() == 2);
+    warnings.clear();
     BotSettings const pullSet = ParseBotSettings({ { "PullTankFirst", "0" }, { "PullTankHoldMs", "5000" }, { "PullMemberRangeYards", "8" } }, warnings);
     CHECK(!pullSet.PullTankFirst && pullSet.PullTankHoldMs == 5000 && pullSet.PullMemberRangeYards == 8 && warnings.empty());
 

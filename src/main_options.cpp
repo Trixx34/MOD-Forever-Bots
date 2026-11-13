@@ -58,6 +58,10 @@ void PolicyFromSettings(PolicyOptions& policyOptions, BotSettings& settings)
     policyOptions.HealerDpsManaPct = settings.HealerDpsManaPct;
     policyOptions.HealerCombatManaPct = settings.HealerCombatManaPct;
     policyOptions.TankPickup = settings.TankPickup;
+    policyOptions.TankLoosePickup = settings.TankLoosePickup;
+    policyOptions.TankLooseCooldownMs = settings.TankLooseCooldownMs;
+    policyOptions.TankLooseRangeYards = settings.TankLooseRangeYards;
+    policyOptions.TankLooseChaseYards = settings.TankLooseChaseYards;
     policyOptions.PullTankFirst = settings.PullTankFirst;
     policyOptions.PullTankHoldMs = settings.PullTankHoldMs;
     policyOptions.PullMemberRangeYards = settings.PullMemberRangeYards;
