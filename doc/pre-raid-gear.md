@@ -31,7 +31,7 @@ All of it is read from the item columns and the loot tables:
 - not quest-bound (`bonding` 4), no `requiredSkill` (profession-gated pieces: the bot may lack the profession);
 - not a test item: a placeholder name (the core's own rule: deprecated, unused, [ph], zz..., test..., plus monster - and qa), or a name that begins with its own item
   level ("90 Green Warrior Axe", "63 Epic Rogue Tunic"). Items with no source at all (below) are dropped too, so a test item with a normal name is still out;
-- not dropped by any creature or chest on the raid maps (`--raid-maps`, default 409 469 509 531 533 249 309 230): `creature_template_difficulty.LootID` of every creature
+- not dropped by any creature or chest on the raid maps (`--raid-maps`, default 409 469 509 531 533 249 309): `creature_template_difficulty.LootID` of every creature
   spawned there and chest loot (`gameobject_template.Data1` of type 3), references followed recursively;
 - has a source: dungeon drop (`--dungeon-maps`), world drop (a creature or reference drop elsewhere), quest reward, vendor, crafted (`spell_effect` create-item), or PvP
   (`item_sparse.RequiredPVPRank` / `RequiredPVPMedal`, or a rank title in the name: Knight-Captain's, Blood Guard's, General's, ...). Tag order when several apply:
@@ -74,7 +74,7 @@ reading. What the code shows for certain: epics never reach auto gear on the sim
 - PvP rank pieces: included, tagged `source=pvp`; `--no-pvp` leaves them out. Counts per class are in the table below. High rank pieces (General's, Warlord's) may be more than
   "pre-raid" intends; decide whether to keep them.
 - Test items ("N Green/Epic <class> ..."): excluded.
-- Raid map list includes 230 (Blackrock Depths, a dungeon, as listed in the task): its loot is excluded from the lists. Remove 230 from `--raid-maps` if BRD loot is wanted.
+- Raid maps are 409 469 509 531 533 249 309 (Molten Core, Blackwing Lair, AQ20, AQ40, Naxxramas, Onyxia, Zul'Gurub). Blackrock Depths (230) is a five-man dungeon: its loot is allowed and tagged dungeon.
 - Raid-tier quest rewards that sit in no raid zone (Ahn'Qiraj gate quest rewards such as the Bronze Dragonflight rings, quest sort Tanaris) are still in the lists;
   no database column marks them.
 - Vendor is a wide source in this database (13,544 vendor items); reputation vendors of raid factions are in.

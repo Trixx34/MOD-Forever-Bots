@@ -333,7 +333,7 @@ def parse_args(argv):
     p.add_argument("--max-ilvl", type=int, default=70)
     p.add_argument("--min-quality", type=int, default=3, help="3 rare (default)")
     p.add_argument("--max-quality", type=int, default=4, help="4 epic (default: epics are allowed, owner decision)")
-    p.add_argument("--raid-maps", default="409,469,509,531,533,249,309,230", help="maps whose creature and chest loot is excluded")
+    p.add_argument("--raid-maps", default="409,469,509,531,533,249,309", help="maps whose creature and chest loot is excluded")
     p.add_argument("--dungeon-maps", default="33,34,36,43,47,48,70,90,109,129,189,229,289,329,349,389,429,230", help="maps tagged as dungeon sources")
     p.add_argument("--raid-quest-sorts", default="19,2717,2677,2159,3429,3428,3456,1977",
                    help="QuestSortID (AreaTable id) of raid zones: Zul'Gurub, Molten Core, Blackwing Lair, Onyxia, AQ20, AQ40, Naxxramas; their quest rewards are excluded")
