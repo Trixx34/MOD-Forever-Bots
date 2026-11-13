@@ -52,6 +52,9 @@ void PolicyFromSettings(PolicyOptions& policyOptions, BotSettings& settings)
     policyOptions.TacticRecover = settings.TacticRecover;
     policyOptions.TacticCc = settings.TacticCc;
     policyOptions.PartyPlanner.Enabled = settings.PartyPlanner;
+    policyOptions.HealPlan.Enabled = settings.HealPlan;
+    policyOptions.HealPlan.PreHealMs = settings.HealPlanPreHealMs;
+    policyOptions.HealPlan.PreHealBelowPct = settings.HealPlanPreHealPct;
     policyOptions.PartyViewPlanner = settings.PartyViewPlanner;
     policyOptions.DungeonHealBelowPct = settings.DungeonHealBelowPct;
     policyOptions.DungeonTankHealBelowPct = settings.DungeonTankHealBelowPct;

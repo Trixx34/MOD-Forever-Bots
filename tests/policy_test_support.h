@@ -35,6 +35,7 @@ inline PolicyOptions AggressiveOptions()
 {
     PolicyOptions options;
     options.AggressiveStart = true;
+    options.HealPlan.Enabled = false;   // the older heal tests assume every healer picks for itself; the planned-healing tests turn it on
     return options;
 }
 

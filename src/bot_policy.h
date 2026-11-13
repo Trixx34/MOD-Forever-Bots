@@ -32,6 +32,7 @@
 #include "wipe_hold.h"
 #include "damage_events.h"
 #include "party_planner.h"
+#include "heal_plan.h"
 #include "party_view_adapter.h"
 #include "transport_ride.h"
 #include "role_profile.h"
@@ -251,6 +252,8 @@ struct PolicyOptions
     bool TacticCc = true;
     // The party planner (party_planner.h): on by default (Module.forever-bots.PartyPlanner = 0 turns it off).
     party_planner::Settings PartyPlanner{ true };
+    // Planned healing (heal_plan.h, doc/planned-healing.md): healers split the group, the main healer pre-heals the tank. On by default (HealPlan = 0 turns it off); needs the party planner.
+    heal_plan::Settings HealPlan;
     // PartyViewPlanner: the planner also reads the core's shared party view (layout 25: humans, tank roles, loose mobs); off = the bots-only merge.
     bool PartyViewPlanner = false;
     // Bounded knobs for offline dungeon-policy experiments; defaults preserve current behavior.
@@ -1131,6 +1134,12 @@ private:
         std::uint64_t UntilMs = 0;
     };
     std::unordered_map<std::uint64_t, LooseClaim> _looseClaims;          // loose mob unit reference -> the tank elected for it (TankLoosePickup)
+    std::unordered_map<std::uint64_t, heal_plan::Plan> _healPlans;        // party leader guid -> its standing heal assignment (bot_policy_heal_plan.cpp)
+    heal_plan::Plan const* HealPlanOf(std::uint64_t leaderGuid) const;
+    std::uint32_t HealPlanTankThreshold(heal_plan::Plan const* plan, std::uint64_t healer, std::uint64_t tank, std::uint32_t base, std::uint64_t nowMs) const;
+    bool OwnerCanHeal(DecideTick const& tick, heal_plan::Plan const& plan, forever_module::BotSnapshot const& member) const;
+    void UpdateHealPlan(std::uint64_t leaderGuid, std::vector<party_planner::Member> const& members);
+    void PruneHealPlans(std::unordered_map<std::uint64_t, std::vector<std::uint64_t>> const& membersOf);
     std::unordered_map<std::uint64_t, party_planner::Order> _partyOrders; // party leader guid -> its plan (Phase 2)
     PolicyOptions _options;
     // One planner per (side, band): index side * 2 + band.

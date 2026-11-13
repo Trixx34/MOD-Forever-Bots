@@ -54,6 +54,9 @@ void ChatSettings()
     BotSettings const spiritDefault = ParseBotSettings({}, warnings);
     CHECK(spiritDefault.SpiritHealerAfterMs == 45000 && spiritDefault.SpiritHealerOnRepeat && !spiritDefault.HealDownrank);
     BotSettings const spiritSet = ParseBotSettings({ { "SpiritHealerAfterMs", "0" }, { "SpiritHealerOnRepeat", "0" }, { "HealDownrank", "1" } }, warnings);
+    CHECK(spiritDefault.HealPlan && spiritDefault.HealPlanPreHealMs == 4000 && spiritDefault.HealPlanPreHealPct == 96);
+    BotSettings const healPlanSet = ParseBotSettings({ { "HealPlan", "0" }, { "HealPlanPreHealMs", "0" }, { "HealPlanPreHealPct", "90" } }, warnings);
+    CHECK(!healPlanSet.HealPlan && healPlanSet.HealPlanPreHealMs == 0 && healPlanSet.HealPlanPreHealPct == 90);
     CHECK(spiritSet.SpiritHealerAfterMs == 0 && !spiritSet.SpiritHealerOnRepeat && spiritSet.HealDownrank);
     BotSettings const threatDefault = ParseBotSettings({}, warnings);
     CHECK(threatDefault.ThreatHold && threatDefault.ThreatHoldPct == 90 && threatDefault.ThreatReleasePct == 70 && threatDefault.ThreatHoldMaxSec == 8 &&

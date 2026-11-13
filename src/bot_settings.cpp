@@ -870,6 +870,9 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
         }
     }
     ReadBool(config, "PartyPlanner", settings.PartyPlanner, warnings);
+    ReadBool(config, "HealPlan", settings.HealPlan, warnings);
+    ReadKey(config, "HealPlanPreHealMs", 0, 60000, settings.HealPlanPreHealMs, warnings);
+    ReadKey(config, "HealPlanPreHealPct", 1, 100, settings.HealPlanPreHealPct, warnings);
     ReadBool(config, "PartyViewPlanner", settings.PartyViewPlanner, warnings);
     ReadBool(config, "Crafting", settings.Crafting, warnings);
     ReadBool(config, "ActionStats", settings.ActionStats, warnings);

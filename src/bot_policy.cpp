@@ -673,6 +673,7 @@ void BotPolicy::PlanParties(WorldTickSnapshotView const& view, std::unordered_ma
         settings.TankHealBelowPct = _options.DungeonTankHealBelowPct;
         settings.HealRangeYards = kHealRangeYards;
         party_planner::Plan(settings, members, enemies, nowMs, _partyOrders[entry.first]);
+        UpdateHealPlan(entry.first, members);   // planned healing (bot_policy_heal_plan.cpp)
     }
 }
 
@@ -750,6 +751,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
         PlanParties(view, indexOf, membersOf, nowMs);
     for (auto it = _partyOrders.begin(); it != _partyOrders.end();)
         it = membersOf.count(it->first) ? std::next(it) : _partyOrders.erase(it);
+    PruneHealPlans(membersOf);
 
     DecideTick tick{ view, nowMs, actions, present, indexOf, leaderOf, membersOf, tankLed, _options.PartyPlanner.Enabled ? &_partyOrders : nullptr };
 
