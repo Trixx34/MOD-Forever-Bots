@@ -45,35 +45,54 @@ All of it is read from the item columns and the loot tables:
 
 Ranking inside a slot, in this order:
 
-1. PvE first: a candidate that is not PvP and has a positive score beats every PvP piece (PvP rank pieces only fill a slot with no PvE option);
-2. profile score (below), higher first;
+1. tier 0 is a PvE piece that fits the profile: not PvP, a positive profile score and a positive fit (the sum of the profile's positive weights times the item's stats, plus an
+   effect bonus). An item whose stats the profile does not want (fit 0), or whose junk stats pull the score to zero or below, is tier 1 together with PvP rank pieces. So
+   a tier 1 item is only picked when no tier 0 item exists for the slot (minimum-fit rule, PvE first). For a weapon, tier 0 also needs a core stat of the profile (`CORE`);
+2. profile score, higher first;
 3. item level, then quality, then name (deterministic; the item entry is only the last tie-break and never a filter).
 
-The profile score is a weighted sum of the item's stats, plus `armor` and weapon damage per second where the profile has those keys. This replaces the earlier
-"item level first" order, so a dungeon, crafted, quest, vendor or world piece with the right stats beats a PvP piece of a higher level.
-Weights live in `PROFILES` in `tools/gen_prebis.py` (`--profile CLASS=NAME` overrides a class). Ranged weapons (bow, gun, crossbow, thrown, wand) use their own
-`ranged_dps` weight when the profile has one; the hunter weights ranged dps 8 and melee dps 1.
+The profile score is a weighted sum of the item's stats, plus the profile's weight of the item's `armor` and of the weapon damage per second where the profile has those keys.
+Weights live in `PROFILES` in `tools/gen_prebis.py` (`--profile CLASS=NAME` overrides a class). `--audit` prints every pick that is not tier 0: none exists in the committed lists, so no slot is
+filled by an item that does not fit.
 
 Roles: the lists are keyed by class, so one profile per class. The ZG roster (and the other sim rosters) sends warrior as the tank, priest as the healer,
 mage and warlock as caster damage, rogue as melee damage and hunter as ranged damage. Paladin, shaman and druid are in no roster, so they get the healer profile.
 
-| class | profile | main weights |
+Weights (per point; "junk" stats carry a negative weight so an item with only those cannot win a slot):
+
+| profile (classes) | wanted | junk |
 |---|---|---|
-| warrior | tank | Sta, Def, Dodge, Parry, Block, block value, armour, Str/Agi small, hit/crit small |
-| paladin, shaman, druid, priest | healer | Int, spell healing, spell power, MP5, Sta small; Str, Agi, AP negative |
-| mage, warlock | caster | spell power/damage, Int, Crit, Hit, Sta small; Spi, Str, Agi, AP negative |
-| rogue | rogue | Agi, AP, Hit, Crit, Sta; weapon dps |
-| hunter | hunter | Agi, RAP/AP, Hit, Crit, Int, Sta; ranged dps heavy |
+| tank (warrior) | Sta 2, Def 4, Dodge 3, Parry 3, Block 2, block value 0.5, Str 1.2, Agi 0.8, AP 0.4, Hit 1, Crit 0.5, armour 0.05, weapon dps 3 | Int, Spi, spell power/damage/healing -1, MP5 -0.5 |
+| rogue | Agi 2.2, Str 1, AP 1, Crit 2, Hit 2, Sta 0.4, weapon dps 3 | same as tank |
+| hunter | Agi 2.2, Str 1, AP 1, RAP 1, Crit 2, Hit 2, Sta 0.4, ranged dps 3, melee dps 1; core stats Agi/Str/AP/RAP | Int, Spi, spell power, healing, MP5 weigh 0 |
+| caster (mage, warlock) | spell power/damage 1.2, Int 1, Crit 1, Hit 1, Sta 0.4, MP5 0.3, Spi 0.1, wand dps 0.5, melee dps 0 | Str, Agi -1, AP, RAP -2 |
+| healer (priest, paladin, shaman, druid) | healing and spell power 1.2, Int 1.5, MP5 2.5, Spi 0.8, Crit 0.5, Sta 0.4, wand dps 0.5, melee dps 0 | Str, Agi -1, AP, RAP -2 |
+
+Core stats (a weapon needs one of them to be tier 0): tank Str/Agi/AP/Sta/Def/Parry/Dodge/Block, rogue and hunter Agi/Str/AP (hunter also RAP), caster spell
+power/damage and Int, healer healing, spell power, Int and MP5. This is why the hunter no longer gets a staff with Int and Crit only, and the rogue no longer gets a mace
+with Crit only.
 
 Stat codes used (core `ItemModType`, read from the item `stats` column): 3 Agi, 4 Str, 5 Int, 6 Spi, 7 Sta, 12 Def, 13 Dodge, 14 Parry, 15 Block, 31 Hit,
-32 Crit, 38 AP, 39 RAP, 41 spell healing, 42 spell damage, 43 MP5, 45 spell power, 48 block value, 50 extra armour, 51-56 resistances.
+32 Crit, 38 AP, 39 RAP, 41 spell healing, 42 spell damage, 43 MP5, 45 spell power, 48 block value, 50 extra armour, 51-56 resistances. Stats with no weight (resistances,
+vs-undead attack power, extra armour as a stat) count nothing.
 
-Weapons: the generator picks one consistent weapon set per class (`WEAPON_MODE`): warrior, paladin and shaman take main hand plus shield,
-rogue main hand plus off hand, hunter a two-hander plus ranged, priest, casters and druid the best of two-hander or one-hander plus holdable (`auto`). The equip service wears bag
+Effects (trinkets): the database holds no spell text. `armory_item.effects` is `trigger:spellId:Name|...`, the hotfix `spell_effect` has no row for these spells, and the world
+database has no spell description table. So effects are scored by NAME only (`EFFECT_FIT`, never by item entry): a name that matches the profile adds a flat bonus of 40 to
+the stat score and to the fit. Names matched: physical profiles (tank, rogue, hunter) Earthstrike, Heroism, Lightning Strike, Blood Fury; casters Ephemeral Power, Massive
+Destruction, Arcane Potency, Blue Dragon; healers Blue Dragon, Rapid Healing, Nimble Healing Touch (plus the caster names). Only names whose effect is known are listed; any other
+effect scores nothing, so a trinket with useful stats beats it. Raid-boss trinkets (the Zul'Gurub charms, most of which carry these names) are not in the pool anyway. The warrior
+keeps the Alterac Valley insignias, whose 24 Dodge is a real tank stat; Defiler's Talisman (Sta 12, damage absorb) fills the second trinket slot of the caster and healer lists.
+
+Weapons: the generator picks one consistent weapon set per class (`WEAPON_MODE`): warrior, paladin and shaman take main hand plus shield, rogue and hunter main hand plus
+off hand (hunter: `melee`, which also compares a two-hander against the pair and takes the better set; a set whose pieces all carry a core stat beats one that does not),
+priest, casters and druid the better of the one-hand or two-hand options. The equip service wears bag
 items best gear score first into the first slot that fits, and a shield or off-hand cannot follow a two-hander, so a mixed list could end up with a two-hander
 blocking the shield. One set avoids that. Gear score of the core is not the profile score, so the core may still pick another list item over the intended one of the same slot.
 
 Per slot one item is kept; rings, trinkets and a dual wielder's one-handers keep two (`--per-slot` changes the rest).
+
+Slots with no entry because the class has no such item (not because nothing fits): paladin, shaman and druid have no ranged slot or relic in the pre-raid pool (no libram, totem
+or idol passes the filters); a shield class has no off-hand; a two-hander or dual-wield list has no shield. Every slot that has an entry holds a tier 0 item.
 
 ## Quest chains of raids and the AQ gate
 
@@ -113,6 +132,7 @@ reading. What the code shows for certain: epics never reach auto gear on the sim
 ## Owner decisions
 
 - Epics (quality 3-4): allowed; `--max-quality 3` for blues only.
+- Round 4 ("fix the weak picks"): stat weights retuned per profile, junk stats negative, minimum-fit rule, core stat for weapons, effect names for trinkets (above).
 - PvE first: PvE, crafted, quest, vendor, dungeon and world pieces are used whenever one exists for the slot and fits the profile; PvP rank pieces only where no PvE option
   exists. `data/prebis-nopvp/` stays as the variant without PvP.
 - AQ gate quest rewards (Scarab Lord line, AQ opening event) excluded by the quest rule above, not by item ID.
@@ -130,61 +150,62 @@ Counts of the committed lists (identical in both variants; no slot is empty exce
 no off hand or held item for classes that use a two-hander):
 
     warrior  17 items pvp=0 epic=12  chest=1 cloak=1 feet=1 finger=2 hands=1 head=1 legs=1 mainhand=1 neck=1 ranged=1 shield=1 shoulder=1 trinket=2 waist=1 wrist=1
-    paladin  16 items pvp=0 epic=6  chest=1 cloak=1 feet=1 finger=2 hands=1 head=1 legs=1 mainhand=1 neck=1 shield=1 shoulder=1 trinket=2 waist=1 wrist=1
-    hunter   16 items pvp=0 epic=8  chest=1 cloak=1 feet=1 finger=2 hands=1 head=1 legs=1 neck=1 ranged=1 shoulder=1 trinket=2 waist=1 weapon2h=1 wrist=1
-    rogue    17 items pvp=0 epic=9  chest=1 cloak=1 feet=1 finger=2 hands=1 head=1 legs=1 mainhand=1 neck=1 offhand=1 ranged=1 shoulder=1 trinket=2 waist=1 wrist=1
-    priest   16 items pvp=0 epic=8  chest=1 cloak=1 feet=1 finger=2 hands=1 head=1 legs=1 neck=1 ranged=1 shoulder=1 trinket=2 waist=1 weapon2h=1 wrist=1
-    shaman   16 items pvp=0 epic=7  chest=1 cloak=1 feet=1 finger=2 hands=1 head=1 legs=1 mainhand=1 neck=1 shield=1 shoulder=1 trinket=2 waist=1 wrist=1
+    paladin  16 items pvp=0 epic=7  chest=1 cloak=1 feet=1 finger=2 hands=1 head=1 legs=1 mainhand=1 neck=1 shield=1 shoulder=1 trinket=2 waist=1 wrist=1
+    hunter   17 items pvp=0 epic=10  chest=1 cloak=1 feet=1 finger=2 hands=1 head=1 legs=1 mainhand=1 neck=1 offhand=1 ranged=1 shoulder=1 trinket=2 waist=1 wrist=1
+    rogue    17 items pvp=0 epic=10  chest=1 cloak=1 feet=1 finger=2 hands=1 head=1 legs=1 mainhand=1 neck=1 offhand=1 ranged=1 shoulder=1 trinket=2 waist=1 wrist=1
+    priest   17 items pvp=0 epic=11  chest=1 cloak=1 feet=1 finger=2 hands=1 head=1 holdable=1 legs=1 mainhand=1 neck=1 ranged=1 shoulder=1 trinket=2 waist=1 wrist=1
+    shaman   16 items pvp=0 epic=6  chest=1 cloak=1 feet=1 finger=2 hands=1 head=1 legs=1 mainhand=1 neck=1 shield=1 shoulder=1 trinket=2 waist=1 wrist=1
     mage     16 items pvp=0 epic=9  chest=1 cloak=1 feet=1 finger=2 hands=1 head=1 legs=1 neck=1 ranged=1 shoulder=1 trinket=2 waist=1 weapon2h=1 wrist=1
     warlock  16 items pvp=0 epic=9  chest=1 cloak=1 feet=1 finger=2 hands=1 head=1 legs=1 neck=1 ranged=1 shoulder=1 trinket=2 waist=1 weapon2h=1 wrist=1
-    druid    15 items pvp=0 epic=4  chest=1 cloak=1 feet=1 finger=2 hands=1 head=1 legs=1 neck=1 shoulder=1 trinket=2 waist=1 weapon2h=1 wrist=1
+    druid    16 items pvp=0 epic=5  chest=1 cloak=1 feet=1 finger=2 hands=1 head=1 holdable=1 legs=1 mainhand=1 neck=1 shoulder=1 trinket=2 waist=1 wrist=1
 
-## Lists for hunter, mage and warrior
+## Lists for hunter, mage, warrior, rogue and priest
 
 
-#### hunter
+### hunter
 
 | slot | item | id | ilvl | q | source | main stats |
 |---|---|---|---|---|---|---|
-| head | Beastmaster's Cap | 22013 | 60 | 4 | quest | Agi 22, Sta 21, Int 12, Hit 10, arm 314 |
-| neck | Onyxia Tooth Pendant | 18404 | 65 | 4 | quest | Agi 7, Sta 8, Hit 10, Crit 14 |
+| head | Beastmaster's Cap | 22013 | 60 | 4 | quest | Agi 22, Sta 21, Int 12, Hit 10, arm 314, fx Increased Pet Health +3% |
+| neck | Onyxia Tooth Pendant | 18404 | 65 | 4 | quest | Agi 7, Sta 8, res 10, Hit 10, Crit 14 |
 | shoulder | Defiler's Chain Pauldrons | 20158 | 65 | 4 | vendor | Agi 20, Sta 18, Int 17, arm 312 |
 | cloak | Earthweave Cloak | 21187 | 62 | 3 | quest | Agi 15, Hit 10, arm 44 |
-| chest | Beastmaster's Tunic | 22060 | 60 | 4 | quest | Agi 25, Sta 16, Int 13, Crit 14, arm 387 |
-| wrist | Beastmaster's Bindings | 22011 | 65 | 3 | quest | Agi 16, Sta 7, Int 5, arm 167 |
-| hands | Beaststalker's Gloves | 16676 | 59 | 3 | dungeon | Agi 14, Spi 10, Sta 10, Int 10, arm 218 |
+| chest | Beastmaster's Tunic | 22060 | 60 | 4 | quest | Agi 25, Sta 16, Int 13, Crit 14, arm 387, fx Increased Pet Armor +10% |
+| wrist | Windtalker's Wristguards | 19582 | 65 | 4 | vendor | Int 8, Spi 7, Sta 8, AP 38, arm 182 |
+| hands | Handguards of Undead Slaying | 23082 | 63 | 3 | quest | Sta 15, s128 30, AP 30, arm 231 |
 | waist | Defiler's Chain Girdle | 20150 | 63 | 3 | vendor | Sta 10, Crit 14, AP 34, arm 208 |
 | legs | Outrider's Chain Leggings | 22673 | 65 | 4 | vendor | Agi 35, Sta 15, Crit 14, Hit 10, arm 364 |
-| feet | Beastmaster's Boots | 22061 | 60 | 4 | quest | Agi 24, Sta 9, arm 266 |
+| feet | Beastmaster's Boots | 22061 | 60 | 4 | quest | Agi 24, Sta 9, arm 266, fx Increased Pet Damage +3% |
 | finger | Don Julio's Band | 19325 | 65 | 4 | vendor | Sta 11, Crit 14, Hit 10, AP 16 |
 | finger | Band of Earthen Might | 21182 | 66 | 3 | quest | Str 6, Crit 14, Hit 10 |
-| trinket | Defiler's Talisman | 20072 | 63 | 3 | vendor | Sta 12 |
-| trinket | Talisman of Arathor | 20071 | 63 | 3 | vendor | Sta 12 |
-| weapon2h | Ironbark Staff | 20069 | 65 | 4 | vendor | Int 10, Sta 19, Crit 28, dps 61.5 |
+| trinket | Darkmoon Card: Heroism | 19287 | 66 | 4 | quest | fx Heroism |
+| trinket | Darkmoon Card: Maelstrom | 19289 | 66 | 4 | quest | fx Lightning Strike |
+| mainhand | Sentinel's Blade | 19546 | 63 | 3 | vendor | Agi 13, Sta 5, dps 41.6 |
+| offhand | Electrified Dagger | 19100 | 65 | 3 | vendor | Agi 10, dps 42.8, fx Lightning Bolt |
 | ranged | Bloodseeker | 19107 | 63 | 3 | quest | Agi 23, Str 26, dps 54.0 |
 
-#### mage
+### mage
 
 | slot | item | id | ilvl | q | source | main stats |
 |---|---|---|---|---|---|---|
-| head | Sorcerer's Crown | 22065 | 60 | 4 | quest | Int 25, Spi 14, Sta 16, SP 11, Crit 14, arm 75 |
-| neck | Onyxia Tooth Pendant | 18404 | 65 | 4 | quest | Agi 7, Sta 8, Hit 10, Crit 14 |
-| shoulder | Defiler's Epaulets | 20176 | 65 | 4 | vendor | Sta 18, Int 17, SP 12, MP5 4, arm 75 |
-| cloak | Frostwolf Advisor's Cloak | 19085 | 60 | 3 | vendor | Sta 11, SP 14, arm 43 |
+| head | Deathmist Mask | 22074 | 60 | 4 | quest | Int 24, Sta 24, SP 16, Hit 10, arm 75 |
+| neck | Orb of the Darkmoon | 19426 | 65 | 4 | quest | Sta 11, Spi 8, SP 22 |
+| shoulder | Defiler's Epaulets | 20176 | 65 | 4 | vendor | Sta 18, Int 17, s50 110, SP 12, MP5 4, arm 75 |
+| cloak | Frostwolf Advisor's Cloak | 19085 | 60 | 3 | vendor | Sta 11, res 5, SP 14, arm 43 |
 | chest | Earthpower Vest | 21183 | 66 | 3 | quest | Int 22, Crit 14, SP 25, arm 93 |
 | wrist | Rockfury Bracers | 21186 | 62 | 4 | quest | Sta 7, SP 27, Hit 10, arm 42 |
-| hands | Dreadmist Wraps | 16705 | 59 | 3 | dungeon | Spi 14, Int 9, Sta 13, Hit 10, arm 52 |
-| waist | Defiler's Cloth Girdle | 20163 | 63 | 3 | vendor | Sta 7, Int 6, Crit 14, SP 14, arm 50 |
-| legs | Outrider's Silk Leggings | 22747 | 65 | 4 | vendor | Sta 23, Int 19, Spi 10, SP 28, arm 88 |
+| hands | Gloves of Undead Cleansing | 23084 | 63 | 3 | quest | Sta 10, Int 10, s136 18, SP 18, arm 56 |
+| waist | Defiler's Cloth Girdle | 20163 | 63 | 3 | vendor | Sta 7, Int 6, s50 100, Crit 14, SP 14, arm 50 |
+| legs | Outrider's Silk Leggings | 22747 | 65 | 4 | vendor | Sta 23, Int 19, Spi 10, s50 100, SP 28, arm 88 |
 | feet | Sorcerer's Boots | 22064 | 60 | 4 | quest | Spi 10, Int 16, Sta 14, SP 21, arm 64 |
-| finger | Don Julio's Band | 19325 | 65 | 4 | vendor | Sta 11, Crit 14, Hit 10, AP 16 |
-| finger | Dragonslayer's Signet | 18403 | 65 | 4 | quest | Int 11, SP 7, Sta 11, Crit 14 |
-| trinket | Defiler's Talisman | 20072 | 63 | 3 | vendor | Sta 12 |
-| trinket | Talisman of Arathor | 20071 | 63 | 3 | vendor | Sta 12 |
-| weapon2h | Ironbark Staff | 20069 | 65 | 4 | vendor | Int 10, Sta 19, Crit 28, dps 61.5 |
+| finger | Elemental Focus Band | 20682 | 65 | 4 | world | Int 11, Sta 8, SP 22 |
+| finger | Dragonslayer's Signet | 18403 | 65 | 4 | quest | Int 11, SP 7, Sta 11, res 6, Crit 14 |
+| trinket | Darkmoon Card: Blue Dragon | 19288 | 66 | 4 | quest | fx Aura of the Blue Dragon |
+| trinket | Defiler's Talisman | 20072 | 63 | 3 | vendor | Sta 12, fx Damage Absorb |
+| weapon2h | Crackling Staff | 19102 | 65 | 3 | vendor | Int 25, SP 25, dps 55.7 |
 | ranged | Stormrager | 16997 | 62 | 3 | quest | Sta 11, Int 7, dps 40.8 |
 
-#### warrior
+### warrior
 
 | slot | item | id | ilvl | q | source | main stats |
 |---|---|---|---|---|---|---|
@@ -198,13 +219,57 @@ no off hand or held item for classes that use a two-hander):
 | waist | Belt of Heroism | 21994 | 65 | 3 | quest | Str 15, Sta 12, Agi 9, Def 7, arm 380 |
 | legs | Outrider's Plate Legguards | 22651 | 65 | 4 | vendor | Str 28, Sta 27, Crit 14, Hit 10, arm 646 |
 | feet | Boots of Heroism | 21995 | 60 | 4 | quest | Sta 20, Str 20, Hit 10, arm 470 |
-| finger | Protector's Band | 19514 | 63 | 3 | vendor | Str 12, Agi 11, Sta 8 |
 | finger | Don Julio's Band | 19325 | 65 | 4 | vendor | Sta 11, Crit 14, Hit 10, AP 16 |
-| trinket | Frostwolf Insignia Rank 6 | 17909 | 60 | 4 | quest | Dodge 24 |
-| trinket | Stormpike Insignia Rank 6 | 17904 | 60 | 4 | quest | Dodge 24 |
-| mainhand | Mindfang | 20214 | 65 | 4 | vendor | Sta 8, Crit 14, dps 47.4 |
+| finger | Protector's Band | 19514 | 63 | 3 | vendor | Str 12, Agi 11, Sta 8 |
+| trinket | Frostwolf Insignia Rank 6 | 17909 | 60 | 4 | quest | res 10, s46 30, Dodge 24, fx Recall |
+| trinket | Stormpike Insignia Rank 6 | 17904 | 60 | 4 | quest | res 10, s46 30, Dodge 24, fx Recall |
+| mainhand | Mindfang | 20214 | 65 | 4 | vendor | Sta 8, Crit 14, s50 40, dps 47.4 |
 | shield | The Immovable Object | 19321 | 65 | 4 | vendor | Sta 15, BlkVal 27, arm 2468 |
 | ranged | Outrider's Bow | 19558 | 63 | 3 | vendor | Sta 33, Agi 13, dps 53.9 |
+
+### rogue
+
+| slot | item | id | ilvl | q | source | main stats |
+|---|---|---|---|---|---|---|
+| head | Darkmantle Cap | 22005 | 60 | 4 | quest | Agi 26, Sta 18, Str 13, Crit 14, arm 150 |
+| neck | Onyxia Tooth Pendant | 18404 | 65 | 4 | quest | Agi 7, Sta 8, res 10, Hit 10, Crit 14 |
+| shoulder | Defiler's Leather Shoulders | 20194 | 65 | 4 | vendor | Sta 17, Agi 18, s50 110, AP 30, arm 148 |
+| cloak | Earthweave Cloak | 21187 | 62 | 3 | quest | Agi 15, Hit 10, arm 44 |
+| chest | Darkmantle Tunic | 22009 | 60 | 4 | quest | Agi 31, Sta 15, Hit 20, arm 185 |
+| wrist | Forest Stalker's Bracers | 19587 | 65 | 4 | vendor | Agi 19, Str 11, Sta 8, arm 86 |
+| hands | Handwraps of Undead Slaying | 23081 | 63 | 3 | quest | Sta 15, s128 30, AP 30, arm 110 |
+| waist | Defiler's Leather Girdle | 20190 | 63 | 3 | vendor | Sta 7, s50 60, Crit 14, AP 34, arm 99 |
+| legs | Outrider's Leather Pants | 22740 | 65 | 4 | vendor | Agi 28, Sta 27, s50 60, Crit 14, arm 173 |
+| feet | Darkmantle Boots | 22003 | 60 | 4 | quest | Agi 24, Sta 10, arm 127, fx Stealth 08 |
+| finger | Don Julio's Band | 19325 | 65 | 4 | vendor | Sta 11, Crit 14, Hit 10, AP 16 |
+| finger | Band of Earthen Might | 21182 | 66 | 3 | quest | Str 6, Crit 14, Hit 10 |
+| trinket | Darkmoon Card: Heroism | 19287 | 66 | 4 | quest | fx Heroism |
+| trinket | Darkmoon Card: Maelstrom | 19289 | 66 | 4 | quest | fx Lightning Strike |
+| mainhand | Sentinel's Blade | 19546 | 63 | 3 | vendor | Agi 13, Sta 5, dps 41.6 |
+| offhand | Electrified Dagger | 19100 | 65 | 3 | vendor | Agi 10, dps 42.8, fx Lightning Bolt |
+| ranged | Bloodseeker | 19107 | 63 | 3 | quest | Agi 23, Str 26, dps 54.0 |
+
+### priest
+
+| slot | item | id | ilvl | q | source | main stats |
+|---|---|---|---|---|---|---|
+| head | Virtuous Crown | 22080 | 60 | 4 | quest | Int 17, Sta 16, Spi 16, SP 11, MP5 6, Crit 14, arm 75 |
+| neck | Wavefront Necklace | 20685 | 65 | 4 | world | Int 6, Sta 5, MP5 8, Heal 24, SpDmg 8 |
+| shoulder | Defiler's Epaulets | 20176 | 65 | 4 | vendor | Sta 18, Int 17, s50 110, SP 12, MP5 4, arm 75 |
+| cloak | Battle Healer's Cloak | 19526 | 63 | 3 | vendor | Sta 11, Spi 8, Heal 26, SpDmg 9, arm 45 |
+| chest | Virtuous Robe | 22083 | 60 | 4 | quest | Int 22, Spi 12, Sta 21, SP 14, MP5 6, arm 93 |
+| wrist | Dryad's Wrist Bindings | 19595 | 65 | 4 | vendor | Int 8, Spi 7, Sta 8, SP 22, arm 44 |
+| hands | Devout Gloves | 16692 | 59 | 3 | dungeon | Spi 17, Int 10, Sta 8, Heal 15, SpDmg 5, arm 52 |
+| waist | Devout Belt | 16696 | 58 | 3 | dungeon | Int 20, Spi 9, Sta 4, Heal 11, SpDmg 4, arm 46 |
+| legs | Outrider's Silk Leggings | 22747 | 65 | 4 | vendor | Sta 23, Int 19, Spi 10, s50 100, SP 28, arm 88 |
+| feet | Virtuous Sandals | 22084 | 60 | 4 | quest | Spi 12, Int 13, Sta 12, SP 12, MP5 7, arm 64 |
+| finger | Elemental Focus Band | 20682 | 65 | 4 | world | Int 11, Sta 8, SP 22 |
+| finger | Ring of Entropy | 18543 | 66 | 4 | world | Int 13, Sta 11, Spi 8, Crit 14 |
+| trinket | Darkmoon Card: Blue Dragon | 19288 | 66 | 4 | quest | fx Aura of the Blue Dragon |
+| trinket | Defiler's Talisman | 20072 | 63 | 3 | vendor | Sta 12, fx Damage Absorb |
+| mainhand | Cold Forged Hammer | 20648 | 63 | 3 | quest | Sta 5, Int 9, MP5 3, dps 41.5 |
+| holdable | Lei of the Lifegiver | 19312 | 65 | 4 | vendor | Heal 40, MP5 5, SpDmg 13, Sta 12 |
+| ranged | Stormrager | 16997 | 62 | 3 | quest | Sta 11, Int 7, dps 40.8 |
 
 ## What to verify on the sim
 

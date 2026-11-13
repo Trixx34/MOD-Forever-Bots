@@ -14,25 +14,25 @@
 22009
 # slot=wrist ilvl=65 quality=4 source=vendor Forest Stalker's Bracers
 19587
-# slot=hands ilvl=59 quality=3 source=dungeon Shadowcraft Gloves
-16712
+# slot=hands ilvl=63 quality=3 source=quest Handwraps of Undead Slaying
+23081
 # slot=waist ilvl=63 quality=3 source=vendor Defiler's Leather Girdle
 20190
 # slot=legs ilvl=65 quality=4 source=vendor Outrider's Leather Pants
 22740
-# slot=feet ilvl=59 quality=3 source=dungeon Shadowcraft Boots
-16711
+# slot=feet ilvl=60 quality=4 source=quest Darkmantle Boots
+22003
 # slot=finger ilvl=65 quality=4 source=vendor Don Julio's Band
 19325
 # slot=finger ilvl=66 quality=3 source=quest Band of Earthen Might
 21182
-# slot=trinket ilvl=63 quality=3 source=vendor Defiler's Talisman
-20072
-# slot=trinket ilvl=63 quality=3 source=vendor Talisman of Arathor
-20071
-# slot=mainhand ilvl=65 quality=4 source=vendor Mindfang
-20214
-# slot=offhand ilvl=65 quality=4 source=vendor The Lobotomizer
-19324
+# slot=trinket ilvl=66 quality=4 source=quest Darkmoon Card: Heroism
+19287
+# slot=trinket ilvl=66 quality=4 source=quest Darkmoon Card: Maelstrom
+19289
+# slot=mainhand ilvl=63 quality=3 source=vendor Sentinel's Blade
+19546
+# slot=offhand ilvl=65 quality=3 source=vendor Electrified Dagger
+19100
 # slot=ranged ilvl=63 quality=3 source=quest Bloodseeker
 19107

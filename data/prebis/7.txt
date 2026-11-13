@@ -10,8 +10,8 @@
 22101
 # slot=cloak ilvl=63 quality=3 source=vendor Battle Healer's Cloak
 19526
-# slot=chest ilvl=60 quality=4 source=quest Vest of The Five Thunders
-22102
+# slot=chest ilvl=63 quality=3 source=world Vest of Elements
+16666
 # slot=wrist ilvl=65 quality=3 source=quest Bindings of The Five Thunders
 22095
 # slot=hands ilvl=59 quality=3 source=dungeon Gauntlets of Elements
@@ -26,11 +26,11 @@
 20682
 # slot=finger ilvl=66 quality=4 source=world Ring of Entropy
 18543
+# slot=trinket ilvl=66 quality=4 source=quest Darkmoon Card: Blue Dragon
+19288
 # slot=trinket ilvl=63 quality=3 source=vendor Defiler's Talisman
 20072
-# slot=trinket ilvl=63 quality=3 source=vendor Talisman of Arathor
-20071
-# slot=mainhand ilvl=65 quality=4 source=vendor Mindfang
-20214
+# slot=mainhand ilvl=63 quality=3 source=quest Cold Forged Hammer
+20648
 # slot=shield ilvl=62 quality=3 source=quest Sacred Protector
 16998

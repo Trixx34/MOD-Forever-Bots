@@ -22,10 +22,10 @@
 22651
 # slot=feet ilvl=60 quality=4 source=quest Boots of Heroism
 21995
-# slot=finger ilvl=63 quality=3 source=vendor Protector's Band
-19514
 # slot=finger ilvl=65 quality=4 source=vendor Don Julio's Band
 19325
+# slot=finger ilvl=63 quality=3 source=vendor Protector's Band
+19514
 # slot=trinket ilvl=60 quality=4 source=quest Frostwolf Insignia Rank 6
 17909
 # slot=trinket ilvl=60 quality=4 source=quest Stormpike Insignia Rank 6

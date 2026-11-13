@@ -12,10 +12,10 @@
 21187
 # slot=chest ilvl=60 quality=4 source=quest Beastmaster's Tunic
 22060
-# slot=wrist ilvl=65 quality=3 source=quest Beastmaster's Bindings
-22011
-# slot=hands ilvl=59 quality=3 source=dungeon Beaststalker's Gloves
-16676
+# slot=wrist ilvl=65 quality=4 source=vendor Windtalker's Wristguards
+19582
+# slot=hands ilvl=63 quality=3 source=quest Handguards of Undead Slaying
+23082
 # slot=waist ilvl=63 quality=3 source=vendor Defiler's Chain Girdle
 20150
 # slot=legs ilvl=65 quality=4 source=vendor Outrider's Chain Leggings
@@ -26,11 +26,13 @@
 19325
 # slot=finger ilvl=66 quality=3 source=quest Band of Earthen Might
 21182
-# slot=trinket ilvl=63 quality=3 source=vendor Defiler's Talisman
-20072
-# slot=trinket ilvl=63 quality=3 source=vendor Talisman of Arathor
-20071
-# slot=weapon2h ilvl=65 quality=4 source=vendor Ironbark Staff
-20069
+# slot=trinket ilvl=66 quality=4 source=quest Darkmoon Card: Heroism
+19287
+# slot=trinket ilvl=66 quality=4 source=quest Darkmoon Card: Maelstrom
+19289
+# slot=mainhand ilvl=63 quality=3 source=vendor Sentinel's Blade
+19546
+# slot=offhand ilvl=65 quality=3 source=vendor Electrified Dagger
+19100
 # slot=ranged ilvl=63 quality=3 source=quest Bloodseeker
 19107

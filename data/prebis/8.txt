@@ -2,10 +2,10 @@
 # Rules: quality 3-4, item level 58-70, required level <= 60, no quest-bound items, no test items, none dropped by raid creatures or chests (maps 409,469,509,531,533,249,309),
 # usable by the class (armour type, weapon skill, class mask), best by stat profile 'caster' score, then item level (tools/gen_prebis.py PROFILES).
 # One item entry per line; the comment line above an entry gives: slot, item level, quality, source, name.
-# slot=head ilvl=60 quality=4 source=quest Sorcerer's Crown
-22065
-# slot=neck ilvl=65 quality=4 source=quest Onyxia Tooth Pendant
-18404
+# slot=head ilvl=60 quality=4 source=quest Deathmist Mask
+22074
+# slot=neck ilvl=65 quality=4 source=quest Orb of the Darkmoon
+19426
 # slot=shoulder ilvl=65 quality=4 source=vendor Defiler's Epaulets
 20176
 # slot=cloak ilvl=60 quality=3 source=vendor Frostwolf Advisor's Cloak
@@ -14,23 +14,23 @@
 21183
 # slot=wrist ilvl=62 quality=4 source=quest Rockfury Bracers
 21186
-# slot=hands ilvl=59 quality=3 source=dungeon Dreadmist Wraps
-16705
+# slot=hands ilvl=63 quality=3 source=quest Gloves of Undead Cleansing
+23084
 # slot=waist ilvl=63 quality=3 source=vendor Defiler's Cloth Girdle
 20163
 # slot=legs ilvl=65 quality=4 source=vendor Outrider's Silk Leggings
 22747
 # slot=feet ilvl=60 quality=4 source=quest Sorcerer's Boots
 22064
-# slot=finger ilvl=65 quality=4 source=vendor Don Julio's Band
-19325
+# slot=finger ilvl=65 quality=4 source=world Elemental Focus Band
+20682
 # slot=finger ilvl=65 quality=4 source=quest Dragonslayer's Signet
 18403
+# slot=trinket ilvl=66 quality=4 source=quest Darkmoon Card: Blue Dragon
+19288
 # slot=trinket ilvl=63 quality=3 source=vendor Defiler's Talisman
 20072
-# slot=trinket ilvl=63 quality=3 source=vendor Talisman of Arathor
-20071
-# slot=weapon2h ilvl=65 quality=4 source=vendor Ironbark Staff
-20069
+# slot=weapon2h ilvl=65 quality=3 source=vendor Crackling Staff
+19102
 # slot=ranged ilvl=62 quality=3 source=quest Stormrager
 16997

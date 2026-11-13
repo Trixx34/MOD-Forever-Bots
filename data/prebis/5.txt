@@ -6,8 +6,8 @@
 22080
 # slot=neck ilvl=65 quality=4 source=world Wavefront Necklace
 20685
-# slot=shoulder ilvl=60 quality=3 source=world Devout Mantle
-16695
+# slot=shoulder ilvl=65 quality=4 source=vendor Defiler's Epaulets
+20176
 # slot=cloak ilvl=63 quality=3 source=vendor Battle Healer's Cloak
 19526
 # slot=chest ilvl=60 quality=4 source=quest Virtuous Robe
@@ -20,17 +20,19 @@
 16696
 # slot=legs ilvl=65 quality=4 source=vendor Outrider's Silk Leggings
 22747
-# slot=feet ilvl=60 quality=4 source=quest Sorcerer's Boots
-22064
+# slot=feet ilvl=60 quality=4 source=quest Virtuous Sandals
+22084
 # slot=finger ilvl=65 quality=4 source=world Elemental Focus Band
 20682
 # slot=finger ilvl=66 quality=4 source=world Ring of Entropy
 18543
+# slot=trinket ilvl=66 quality=4 source=quest Darkmoon Card: Blue Dragon
+19288
 # slot=trinket ilvl=63 quality=3 source=vendor Defiler's Talisman
 20072
-# slot=trinket ilvl=63 quality=3 source=vendor Talisman of Arathor
-20071
-# slot=weapon2h ilvl=65 quality=3 source=vendor Crackling Staff
-19102
+# slot=mainhand ilvl=63 quality=3 source=quest Cold Forged Hammer
+20648
+# slot=holdable ilvl=65 quality=4 source=vendor Lei of the Lifegiver
+19312
 # slot=ranged ilvl=62 quality=3 source=quest Stormrager
 16997

@@ -61,7 +61,7 @@ with tempfile.TemporaryDirectory() as out:
     check(1009 in rogue and 1010 in rogue and 1015 not in rogue, "two rings, epic included, third ring cut")
     check(1027 in rogue and 1025 in rogue and 1002 in rogue, "a PvP piece where it is the only fit, crafted and dungeon sources kept")
     check(1026 in rogue and 1016 not in rogue, "PvE first: the lower level dungeon gloves beat the PvP gloves")
-    check(1033 in rogue and 1019 in rogue and 1023 not in rogue and 1020 not in rogue and 1030 not in rogue, "rogue: two one-handers (weapon damage counts), no two-hander")
+    check(1019 in rogue and 1033 not in rogue and 1020 not in rogue and 1030 not in rogue and 1036 not in rogue, "rogue: one-handers that carry agility (the slow mace has no core stat), no two-hander")
     check(1022 not in rogue, "no shield for a rogue")
     # a cloth class: the robe with the intellect, not the agility one; a cloth class takes the caster stat robe
     check(1017 in mage and 1018 not in mage and 1003 not in mage, "mage robe picked by spell power and Intellect, not by item level or agility")
@@ -85,8 +85,8 @@ with tempfile.TemporaryDirectory() as out:
 check(g.DEFAULT_PROFILE[1] == "tank" and g.DEFAULT_PROFILE[5] == "healer" and g.DEFAULT_PROFILE[8] == "caster" and g.DEFAULT_PROFILE[9] == "caster"
       and g.DEFAULT_PROFILE[4] == "rogue" and g.DEFAULT_PROFILE[3] == "hunter", "profile per class")
 item = {"itemLevel": "60", "stats": "3:10,5:4,7:5,38:6", "armor": "100", "dmgMin": "10", "dmgMax": "30", "delay": "2000", "inventoryType": "15"}
-check(abs(g.stat_score(item, g.PROFILES["hunter"]) - (2.5 * 10 + 0.8 * 4 + 0.4 * 5 + 6 + 8 * 10)) < 0.01, "stat score is the weighted sum plus weapon dps")
-check(g.stat_score({"stats": "7:10", "armor": "200", "itemLevel": "60"}, g.PROFILES["tank"]) == 25 + 10, "tank counts stamina and armour")
+check(abs(g.stat_score(item, g.PROFILES["hunter"]) - (2.2 * 10 + 0 * 4 + 0.4 * 5 + 6 + 3 * 10)) < 0.01, "stat score is the weighted sum plus weapon dps")
+check(g.stat_score({"stats": "7:10", "armor": "200", "itemLevel": "60"}, g.PROFILES["tank"]) == 20 + 10, "tank counts stamina and armour")
 # hunter takes the attack power helm over the stamina helm of a higher level; the tank warrior takes the stamina one
 text_h = open(os.path.join(out_dir, "3.txt")).read()
 check("1029" in ids_text(text_h) and "1028" not in ids_text(text_h), "hunter profile: agility, attack power and hit over stamina")
@@ -94,6 +94,17 @@ check("1028" in ids_text(open(os.path.join(out_dir, "1.txt")).read()), "tank pro
 check(1032 in ids_of(os.path.join(out_dir, "3.txt")) and 1033 not in ids_of(os.path.join(out_dir, "3.txt")), "hunter: one two-hander, no one-hander next to it")
 check(1033 in ids_of(os.path.join(out_dir, "1.txt")) and 1022 in ids_of(os.path.join(out_dir, "1.txt")) and 1020 not in ids_of(os.path.join(out_dir, "1.txt")),
       "tank warrior: one-hander and shield, no two-hander")
+# fit rules: a hunter two-hander with no agility or attack power loses to one with agility, whatever its damage or crit; AP/Agi are junk on casters; effects are scored by name
+check(1032 in ids_of(os.path.join(out_dir, "3.txt")) and 1036 not in ids_of(os.path.join(out_dir, "3.txt")), "hunter weapon carries agility (core stat rule)")
+check(g.fit_of({"stats": "6:10,7:19,32:28"}, "hunter")[1] == 0 and g.fit_of({"stats": "3:5"}, "hunter")[1] == 5, "core amount counts agility for the hunter, not intellect")
+check(g.stat_score({"stats": "38:16,32:14,31:10,7:11"}, g.PROFILES["caster"]) < 0 < g.stat_score({"stats": "38:16,32:14,31:10,7:11"}, g.PROFILES["rogue"]),
+      "attack power on a ring: negative for the caster, positive for the rogue")
+check(g.stat_score({"stats": "5:10,45:20"}, g.PROFILES["hunter"]) <= 0 and g.stat_score({"stats": "5:10,6:5,45:20"}, g.PROFILES["tank"]) < 0, "spell stats count nothing for hunter and tank")
+mage_out = ids_of(os.path.join(out_dir, "8.txt"))
+check(1038 in mage_out and (1037 not in mage_out or mage_out.index(1038) < mage_out.index(1037)), "mage ranks the spell ring over the attack power ring")
+check(1034 in ids_of(os.path.join(out_dir, "4.txt")) and 1034 not in mage_out and 1039 in mage_out and 1039 not in ids_of(os.path.join(out_dir, "4.txt")),
+      "trinkets by effect name: Earthstrike for the rogue, Ephemeral Power for the mage")
+check(1035 in ids_of(os.path.join(out_dir, "4.txt")), "a trinket with stats fills the second trinket slot")
 # loot references are followed, nested and cyclic
 refs = {10: [(0, 100), (1, 11)], 11: [(0, 101), (1, 10)]}
 check(g.resolve_loot([{"ItemType": "1", "Item": "10"}, {"ItemType": "0", "Item": "5"}], refs) == {100, 101, 5}, "reference loot resolved recursively")
