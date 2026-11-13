@@ -23,28 +23,45 @@ import sys
 ITEM_CLASS_WEAPON, ITEM_CLASS_ARMOR = 2, 4
 CLASS_NAMES = {1: "warrior", 2: "paladin", 3: "hunter", 4: "rogue", 5: "priest", 7: "shaman", 8: "mage", 9: "warlock", 11: "druid"}
 
-# ITEM_MOD_* numbers as they appear in armory_item.stats ("type:amount,...").
+# ITEM_MOD_* numbers as they appear in armory_item.stats ("type:amount,..."), checked against ItemModType in the core (ItemTemplate.h) and the stats strings of
+# the 2,000-odd weapons and armour of ilvl 58-70 (doc/pre-raid-gear.md has the table).
 AGILITY, STRENGTH, INTELLECT, SPIRIT, STAMINA = 3, 4, 5, 6, 7
-DEFENSE, DODGE, PARRY, BLOCK, CRIT, HASTE = 12, 13, 14, 15, 32, 36
+DEFENSE, DODGE, PARRY, BLOCK = 12, 13, 14, 15
+HIT_MELEE, HIT_RANGED, HIT_SPELL, CRIT_MELEE, CRIT_RANGED, CRIT_SPELL = 16, 17, 18, 19, 20, 21
+HIT, CRIT, ATTACK_POWER, RANGED_ATTACK_POWER = 31, 32, 38, 39
+SPELL_HEALING, SPELL_DAMAGE, MANA_REGEN, SPELL_POWER, BLOCK_VALUE, EXTRA_ARMOR = 41, 42, 43, 45, 48, 50
 PRIMARY = (AGILITY, STRENGTH, INTELLECT, SPIRIT)
 
-# The core's gear profiles (ModuleBotActions.cpp PreferredStats): the stats a role wants. Profile 0 doubles as the class default.
+# A stat profile: a weight per point of each item stat, plus ARMOR (per point of the item's own armour value) and DPS (per point of weapon damage per second;
+# a wand counts as a weapon). A stat a profile does not name counts nothing; a negative weight counts against it. Ranking inside a slot is the weighted sum first,
+# then item level, quality (see select_for_class). The weights follow the classic stat values: a point of Agility or Strength is about one attack power (and
+# Agility adds crit), +healing and +spell damage are worth one point each to the class that uses them, Intellect gives mana and spell crit.
+ARMOR, DPS, RANGED_DPS = "armor", "dps", "ranged_dps"   # RANGED_DPS: weapon damage per second of a bow, gun, crossbow, thrown weapon or wand (default: DPS)
 PROFILES = {
-    0: None,                                    # the class default, below
-    1: (AGILITY, STAMINA),
-    2: (INTELLECT, SPIRIT, STAMINA),
-    3: (INTELLECT, CRIT, STAMINA),
-    4: (INTELLECT, SPIRIT, HASTE, STAMINA),
-    5: (STRENGTH, STAMINA, DODGE, PARRY, DEFENSE, BLOCK),   # shield tank
-    6: (AGILITY, STAMINA, DODGE, DEFENSE),                  # feral tank
+    # shield tank (the sim's warriors): stamina, armour, defence, avoidance and block first; strength for threat and block value
+    "tank": {STAMINA: 2.5, DEFENSE: 4, DODGE: 3, PARRY: 3, BLOCK: 2, BLOCK_VALUE: 0.5, STRENGTH: 1.2, AGILITY: 0.8, ATTACK_POWER: 0.3, HIT: 1, HIT_MELEE: 1,
+             EXTRA_ARMOR: 0.05, ARMOR: 0.05, DPS: 4, INTELLECT: -1, SPIRIT: -1},
+    "warrior-dps": {STRENGTH: 2.5, AGILITY: 1.2, ATTACK_POWER: 1, CRIT: 3, CRIT_MELEE: 3, HIT: 3, HIT_MELEE: 3, STAMINA: 0.4, DPS: 8, INTELLECT: -1, SPIRIT: -1},
+    "rogue": {AGILITY: 2.5, STRENGTH: 1.2, ATTACK_POWER: 1, CRIT: 3, CRIT_MELEE: 3, HIT: 3, HIT_MELEE: 3, STAMINA: 0.4, DPS: 8, INTELLECT: -1, SPIRIT: -1},
+    "hunter": {AGILITY: 2.5, ATTACK_POWER: 1, RANGED_ATTACK_POWER: 1, CRIT: 3, CRIT_RANGED: 3, CRIT_MELEE: 2, HIT: 3, HIT_RANGED: 3, HIT_MELEE: 2, INTELLECT: 0.8,
+               STRENGTH: 0.5, STAMINA: 0.4, MANA_REGEN: 1, DPS: 1, RANGED_DPS: 8, SPIRIT: -0.5},   # melee weapon damage hardly counts for a hunter
+    "ret-paladin": {STRENGTH: 2.5, AGILITY: 0.8, ATTACK_POWER: 1, CRIT: 3, CRIT_MELEE: 3, HIT: 3, HIT_MELEE: 3, STAMINA: 0.4, INTELLECT: 0.5, DPS: 8, SPIRIT: -0.5},
+    # healers (holy priest, holy paladin, restoration shaman and druid): +healing, Intellect, mana per five seconds and spell crit; Stamina last
+    "healer": {SPELL_HEALING: 1.5, SPELL_POWER: 1.5, INTELLECT: 2, SPIRIT: 1.2, MANA_REGEN: 2.5, CRIT: 1, CRIT_SPELL: 1, STAMINA: 0.4, DPS: 2,
+               STRENGTH: -1, AGILITY: -1, ATTACK_POWER: -3, RANGED_ATTACK_POWER: -3, SPELL_DAMAGE: 0},
+    # damage casters (mage, warlock): spell damage, hit, crit and Intellect; Stamina second-rate (the warlock's Life Tap is not scored)
+    "caster": {SPELL_DAMAGE: 1.5, SPELL_POWER: 1.5, INTELLECT: 1.5, CRIT: 3, CRIT_SPELL: 3, HIT: 3, HIT_SPELL: 3, STAMINA: 0.6, SPIRIT: 0.2, MANA_REGEN: 0.5, DPS: 2,
+               STRENGTH: -1, AGILITY: -1, ATTACK_POWER: -3, RANGED_ATTACK_POWER: -3, SPELL_HEALING: 0},
 }
-CLASS_DEFAULT_STATS = {
-    1: (STRENGTH, STAMINA), 2: (STRENGTH, STAMINA), 3: (AGILITY, STAMINA), 4: (AGILITY, STRENGTH, STAMINA),
-}
-CASTER_STATS = (INTELLECT, SPIRIT, STAMINA)   # priest, shaman, mage, warlock, druid
-# The one list per class that ScenarioGear<classId> can carry has no role: the roster profile of a class is picked here. The sim's raid and dungeon
-# rosters send the warrior as the tank (kAutoGear spell_id 1), so the warrior list is the shield tank's. Override with --profile CLASS=N.
-DEFAULT_ROLE_PROFILE = {1: 5}
+# The profile each class's list is built for. ScenarioGear<classId> is keyed by class, so one profile per class. The roster of the sim's ZG, MC and Onyxia runs
+# (tools/sim-overnight ZG_ROSTER, and the dungeon file roster 2:1,5:5,8:8,2:9,5:4) is warrior, priest, mage, warlock and rogue, four of each, the warrior as tank, the
+# priest as healer, mage, warlock and rogue as damage. Hunter, paladin, shaman and druid are in no sim roster yet: hunter is damage, paladin, shaman and druid are
+# healers (the raid planner's default for them). --profile CLASS=NAME changes any of these.
+DEFAULT_PROFILE = {1: "tank", 2: "healer", 3: "hunter", 4: "rogue", 5: "healer", 7: "healer", 8: "caster", 9: "caster", 11: "healer"}
+# How a class's weapons are chosen: "shield" one-hander and shield, "dual" two one-handers, "twohand" a two-hander, "auto" the better of a two-hander and a
+# one-hander with a held item. The equip service (EquipBagUpgrades) wears bag items best gear score first into the first slot that takes them and a shield or off-hand
+# cannot follow a two-hander, so a list carries ONE consistent set, never both a two-hander and a one-hander.
+WEAPON_MODE = {1: "shield", 2: "shield", 3: "twohand", 4: "dual", 5: "auto", 7: "shield", 8: "auto", 9: "auto", 11: "auto"}
 
 # Armour: the heaviest subclass a class wears at level 60 (BotGearRules::MaxArmorSubclass). 1 cloth, 2 leather, 3 mail, 4 plate.
 MAX_ARMOR = {1: 4, 2: 4, 3: 3, 4: 2, 5: 1, 7: 3, 8: 1, 9: 1, 11: 2}
@@ -70,6 +87,7 @@ HOLDABLE_CLASSES = (2, 5, 7, 8, 9, 11)
 SLOT_OF = {1: "head", 2: "neck", 3: "shoulder", 5: "chest", 20: "chest", 6: "waist", 7: "legs", 8: "feet", 9: "wrist", 10: "hands",
            11: "finger", 12: "trinket", 16: "cloak", 14: "shield", 23: "holdable",
            13: "weapon1h", 21: "weapon1h", 22: "offhand", 17: "weapon2h", 15: "ranged", 25: "ranged", 26: "ranged", 28: "relic"}
+WEAPON_SLOTS = ("weapon1h", "weapon2h", "offhand", "shield", "holdable", "ranged", "relic")
 BODY_SLOTS = ("head", "shoulder", "chest", "waist", "legs", "feet", "wrist", "hands")
 # How many items a slot keeps. Pairs (rings, trinkets) keep two; one-handers two for a dual wielder; everything else one.
 PAIR_SLOTS = ("finger", "trinket")
@@ -124,11 +142,37 @@ def resolve_loot(rows, references):
     return items
 
 
+def quest_reward_items(quests, raid_sorts, raid_infos, reward_cols):
+    """The items rewarded by quests that are not raid-tier (see load_from_db). `quests` are rows with ID, QuestSortID, QuestInfoID, SuggestedGroupNum, Flags, Prev,
+    Grp and the reward columns."""
+    by_id = {int(q["ID"]): q for q in quests}
+    raid = {i for i, q in by_id.items() if int(q["QuestSortID"]) in raid_sorts or int(q["QuestInfoID"]) in raid_infos
+            or int(q["SuggestedGroupNum"]) >= 10 or (int(q["Flags"]) & 64)}
+    groups = {}
+    for i, q in by_id.items():
+        if int(q["Grp"]) > 0:
+            groups.setdefault(int(q["Grp"]), set()).add(i)
+    queue = list(raid)
+    while queue:
+        i = queue.pop()
+        q = by_id[i]
+        linked = {abs(int(q["Prev"]))} | (groups.get(int(q["Grp"]), set()) if int(q["Grp"]) > 0 else set())
+        for j in linked:
+            if j in by_id and j not in raid:
+                raid.add(j)
+                queue.append(j)
+    items = set()
+    for i, q in by_id.items():
+        if i not in raid:
+            items |= {int(q[c]) for c in reward_cols if int(q[c]) > 0}
+    return items
+
+
 def load_from_db(args):
     db = Db(args.mysql)
     quality_list = idlist(range(args.min_quality, args.max_quality + 1))
     items = db.rows(
-        "SELECT id, name, quality, itemLevel, requiredLevel, class, subclass, inventoryType, bonding, stats, allowableClass, requiredSkill, requiredSkillRank "
+        "SELECT id, name, quality, itemLevel, requiredLevel, class, subclass, inventoryType, bonding, armor, dmgMin, dmgMax, delay, stats, allowableClass, requiredSkill, requiredSkillRank "
         "FROM armory_item WHERE class IN (2, 4) AND quality IN (%s) AND itemLevel BETWEEN %d AND %d AND requiredLevel <= %d AND inventoryType <> 0"
         % (quality_list, args.min_ilvl, args.max_ilvl, args.level))
 
@@ -160,12 +204,14 @@ def load_from_db(args):
     anywhere = {int(r["Item"]) for r in db.rows("SELECT DISTINCT Item FROM creature_loot_template WHERE ItemType = 0")}
     for entries in references.values():
         anywhere |= {v for k, v in entries if k == 0}
-    # Quest rewards, except those of raid quests: a quest of a raid zone (QuestSortID is an AreaTable id), of the raid quest kinds (QuestInfoID) or
-    # suggested for ten or more players is raid-tier content (attunements, Zandalar and Ahn'Qiraj chains).
-    quest = set()
-    not_raid = ("QuestSortID NOT IN (%s) AND QuestInfoID NOT IN (%s) AND SuggestedGroupNum < 10" % (idlist(args.raid_quest_sorts), idlist(args.raid_quest_infos)))
-    for column in ["RewardItem%d" % i for i in range(1, 5)] + ["RewardChoiceItemID%d" % i for i in range(1, 7)]:
-        quest |= {int(r["i"]) for r in db.rows("SELECT DISTINCT %s AS i FROM quest_template WHERE %s > 0 AND %s" % (column, column, not_raid))}
+    # Quest rewards, except those of raid quests. A raid quest is one in a raid zone (QuestSortID is an AreaTable id, --raid-quest-sorts), of a raid kind (QuestInfoID,
+    # --raid-quest-infos), suggested for ten or more players, or with the raid-eligible flag (QuestFlags 0x40, QUEST_FLAGS_RAID: the Ahn'Qiraj gate event, the Scarab
+    # Lord line and the other world-event chains carry it). The chain counts as a whole: a quest that leads on to a raid quest (PrevQuestID, walked backward) or shares its
+    # positive ExclusiveGroup with one is raid-tier too, so the first steps of the AQ chains, which carry no flag, go with it. A rule on the quest, never on an item.
+    reward_cols = ["RewardItem%d" % i for i in range(1, 5)] + ["RewardChoiceItemID%d" % i for i in range(1, 7)]
+    quests = db.rows("SELECT q.ID, q.QuestSortID, q.QuestInfoID, q.SuggestedGroupNum, q.Flags, IFNULL(a.PrevQuestID, 0) AS Prev, IFNULL(a.ExclusiveGroup, 0) AS Grp, " +
+                     ", ".join("q." + c for c in reward_cols) + " FROM quest_template q LEFT JOIN quest_template_addon a ON a.ID = q.ID")
+    quest = quest_reward_items(quests, args.raid_quest_sorts, args.raid_quest_infos, reward_cols)
     vendor = {int(r["item"]) for r in db.rows("SELECT DISTINCT item FROM npc_vendor WHERE item > 0")}
     crafted = {int(r["i"]) for r in db.rows(
         "SELECT DISTINCT EffectItemType AS i FROM %s.spell_effect WHERE Effect = 24 AND EffectItemType > 0" % args.hotfix_db)}
@@ -193,24 +239,23 @@ def parse_stats(text):
     return out
 
 
-def preferred_stats(class_id, profile):
-    if profile:
-        return PROFILES[profile]
-    return CLASS_DEFAULT_STATS.get(class_id, CASTER_STATS)
+def weapon_dps(item):
+    try:
+        low, high, delay = float(item.get("dmgMin") or 0), float(item.get("dmgMax") or 0), float(item.get("delay") or 0)
+    except ValueError:
+        return 0.0
+    return (low + high) / 2.0 / (delay / 1000.0) if delay > 0 else 0.0
 
 
-def stat_score(item, wanted):
-    """The core's GearScore: item level * 10 plus 3x a wanted primary, 1x another wanted stat, minus 3x an unwanted primary (ModuleBotSupplyRules)."""
-    total = 0
+def stat_score(item, weights):
+    """The profile score of an item: the sum of weight * amount over its stats, plus the profile's weight of the item's armour value and weapon damage per second."""
+    total = 0.0
     for kind, amount in parse_stats(item["stats"]):
-        if amount <= 0:
-            continue
-        primary = kind in PRIMARY
-        if kind in wanted:
-            total += 3 * amount if primary else amount
-        elif primary:
-            total -= 3 * amount
-    return int(item["itemLevel"]) * 10 + total
+        total += weights.get(kind, 0) * amount
+    total += weights.get(ARMOR, 0) * int(float(item.get("armor") or 0))
+    ranged = str(item.get("inventoryType")) in ("15", "25", "26")
+    total += weights.get(RANGED_DPS if ranged else DPS, weights.get(DPS, 0)) * weapon_dps(item)
+    return round(total, 3)
 
 
 def is_test_item(item):
@@ -254,7 +299,7 @@ def class_usable(item, class_id):
 
 
 def select_for_class(class_id, items, sources, raid_loot, args, profile):
-    wanted = preferred_stats(class_id, profile)
+    weights = PROFILES[profile]
     by_slot = {}
     for item in items:
         name = item["name"]
@@ -272,22 +317,59 @@ def select_for_class(class_id, items, sources, raid_loot, args, profile):
             continue
         if not class_usable(item, class_id):
             continue
-        slot = SLOT_OF[int(item["inventoryType"])]
-        by_slot.setdefault(slot, []).append((stat_score(item, wanted), int(item["quality"]), item, tag))
+        inv = int(item["inventoryType"])
+        slot = SLOT_OF[inv]
+        by_slot.setdefault(slot, []).append((stat_score(item, weights), int(item["quality"]), item, tag, inv))
+
+    def ranked(cands):
+        # Best first: the profile score, then item level, then quality; the name and entry only make the order stable.
+        # PvE first (owner decision): a PvP rank piece is only used where no PvE piece that fits the profile (a positive score) exists for the slot, or to fill the
+        # second place of a ring or trinket pair.
+        return sorted(cands, key=lambda c: (0 if (c[3] != "pvp" and c[0] > 0) else 1, -c[0], -int(c[2]["itemLevel"]), -c[1], c[2]["name"], int(c[2]["id"])))
 
     chosen = []
     for slot, cands in by_slot.items():
+        if slot in WEAPON_SLOTS:
+            continue
         if slot in BODY_SLOTS:
             # The core drops armour lighter than the class maximum when a maximum-type piece exists for the slot (BotGearRules::ChooseForSlot).
             top = [c for c in cands if int(c[2]["subclass"]) == MAX_ARMOR[class_id]]
             cands = top or cands
-        # Best first: score (item level first, then stat fit), quality, then name and entry only to make the order stable.
-        cands.sort(key=lambda c: (-c[0], -c[1], c[2]["name"], int(c[2]["id"])))
-        keep = 2 if slot in PAIR_SLOTS or (slot in ("weapon1h",) and class_id in DUAL_WIELD) else args.per_slot
-        for c in cands[:keep]:
-            chosen.append((slot, c))
+        for c in ranked(cands)[:2 if slot in PAIR_SLOTS else args.per_slot]:
+            chosen.append((slot, c[:4]))
+
+    # One consistent weapon set (see WEAPON_MODE): a main hand and what goes with it, a ranged weapon or relic.
+    def best(slot, invs=None, exclude=None):
+        pool = [c for c in by_slot.get(slot, []) if (invs is None or c[4] in invs) and (exclude is None or c[2]["id"] != exclude)]
+        r = ranked(pool)
+        return r[0] if r else None
+
+    mode = WEAPON_MODE[class_id]
+    main = off = None
+    two = best("weapon2h")
+    one = best("weapon1h", (13, 21))
+    if mode == "shield":
+        main, off = one, best("shield") or best("holdable")
+    elif mode == "dual":
+        main = one
+        off = best("weapon1h", (13,), main[2]["id"] if main else None) or best("offhand")
+        if off and best("offhand") and best("offhand")[0] > off[0]:
+            off = best("offhand")
+    elif mode == "twohand":
+        main = two or one
+    else:   # auto: the better of a two-hander and a one-hander with a held item
+        held = best("holdable")
+        one_total = (one[0] if one else 0) + (held[0] if held and one else 0)
+        if two and (not one or two[0] >= one_total):
+            main = two
+        else:
+            main, off = one, (held if one else None)
+    for slot, c in ((("weapon2h" if main and main[4] == 17 else "mainhand"), main), (("shield" if off and off[4] == 14 else "holdable" if off and off[4] == 23 else "offhand"), off),
+                    ("ranged", best("ranged")), ("relic", best("relic"))):
+        if c:
+            chosen.append((slot, c[:4]))
     order = {s: i for i, s in enumerate(("head", "neck", "shoulder", "cloak", "chest", "wrist", "hands", "waist", "legs", "feet", "finger", "trinket",
-                                         "weapon2h", "weapon1h", "offhand", "shield", "holdable", "ranged", "relic"))}
+                                         "weapon2h", "mainhand", "offhand", "shield", "holdable", "ranged", "relic"))}
     chosen.sort(key=lambda sc: (order.get(sc[0], 99), -sc[1][0]))
     return chosen
 
@@ -301,12 +383,13 @@ def write_lists(data, args):
     os.makedirs(args.out, exist_ok=True)
     report = {}
     for class_id, class_name in sorted(CLASS_NAMES.items()):
-        profile = args.profiles.get(class_id, DEFAULT_ROLE_PROFILE.get(class_id, 0))
+        profile = args.profiles.get(class_id, DEFAULT_PROFILE[class_id])
         chosen = select_for_class(class_id, items, sources, raid_loot, args, profile)
         lines = ["# Pre-raid gear for %s (class %d), generated by tools/gen_prebis.py; do not edit by hand." % (class_name, class_id),
                  "# Rules: quality %d-%d, item level %d-%d, required level <= %d, no quest-bound items, no test items, none dropped by raid creatures or chests (maps %s),"
-                 % (args.min_quality, args.max_quality, args.min_ilvl, args.max_ilvl, args.level, ",".join(str(m) for m in args.raid_maps)),
-                 "# usable by the class (armour type, weapon skill, class mask), best by item level then stat fit (stat profile %d)." % profile,
+                 % (args.min_quality, args.max_quality, args.min_ilvl, args.max_ilvl, args.level, ",".join(str(m) for m in args.raid_maps)) +
+                 (" no PvP rank items," if args.no_pvp else ""),
+                 "# usable by the class (armour type, weapon skill, class mask), best by stat profile '%s' score, then item level (tools/gen_prebis.py PROFILES)." % profile,
                  "# One item entry per line; the comment line above an entry gives: slot, item level, quality, source, name."]
         for slot, (score, quality, item, tag) in chosen:
             lines.append("# slot=%s ilvl=%s quality=%s source=%s %s" % (slot, item["itemLevel"], quality, tag or "none", item["name"]))
@@ -339,8 +422,9 @@ def parse_args(argv):
                    help="QuestSortID (AreaTable id) of raid zones: Zul'Gurub, Molten Core, Blackwing Lair, Onyxia, AQ20, AQ40, Naxxramas; their quest rewards are excluded")
     p.add_argument("--raid-quest-infos", default="62,83", help="QuestInfoID of raid quests; their rewards are excluded")
     p.add_argument("--per-slot", type=int, default=1, help="items kept per slot (rings, trinkets and a dual wielder's one-handers keep 2)")
-    p.add_argument("--profile", action="append", default=[], metavar="CLASS=N", help="stat profile 0-6 of a class list (default: warrior 5, shield tank)")
+    p.add_argument("--profile", action="append", default=[], metavar="CLASS=NAME", help="stat profile of a class list, one of %s (defaults: DEFAULT_PROFILE)" % ", ".join(sorted(PROFILES)))
     p.add_argument("--no-pvp", action="store_true", help="leave out PvP rank items")
+    p.add_argument("--also-nopvp", metavar="DIR", help="after the main run, write a second set of lists without PvP rank items to DIR (data/prebis-nopvp)")
     p.add_argument("--keep-unsourced", action="store_true", help="keep items with no known source (default: dropped, they cannot be obtained)")
     args = p.parse_args(argv)
     args.raid_maps = [int(x) for x in args.raid_maps.split(",") if x]
@@ -350,7 +434,9 @@ def parse_args(argv):
     args.profiles = {}
     for spec in args.profile:
         c, n = spec.split("=")
-        args.profiles[int(c)] = int(n)
+        if n not in PROFILES:
+            raise SystemExit("unknown profile " + n)
+        args.profiles[int(c)] = n
     return args
 
 
@@ -362,10 +448,20 @@ def main(argv):
     else:
         data = load_from_db(args)
     report = write_lists(data, args)
+    if args.also_nopvp:
+        print("-- without PvP rank items: " + args.also_nopvp)
+        args.out, args.no_pvp = args.also_nopvp, True
+        report_nopvp = write_lists(data, args)
+        print_report(report_nopvp)
+        print("-- with PvP rank items")
+    print_report(report)
+    return 0
+
+
+def print_report(report):
     for class_id, r in sorted(report.items()):
         print("%-8s %3d items  pvp=%d epic=%d  %s" % (CLASS_NAMES[class_id], r["items"], r["pvp"], r["epic"],
                                                       " ".join("%s=%d" % kv for kv in sorted(r["slots"].items()))))
-    return 0
 
 
 if __name__ == "__main__":

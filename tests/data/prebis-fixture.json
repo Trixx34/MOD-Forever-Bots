@@ -13,7 +13,11 @@
    "stats": "3:20,7:15",
    "allowableClass": "-1",
    "requiredSkill": "0",
-   "requiredSkillRank": "0"
+   "requiredSkillRank": "0",
+   "armor": "0",
+   "dmgMin": "0",
+   "dmgMax": "0",
+   "delay": "0"
   },
   {
    "id": "1002",
@@ -28,7 +32,11 @@
    "stats": "3:30,7:15",
    "allowableClass": "-1",
    "requiredSkill": "0",
-   "requiredSkillRank": "0"
+   "requiredSkillRank": "0",
+   "armor": "0",
+   "dmgMin": "0",
+   "dmgMax": "0",
+   "delay": "0"
   },
   {
    "id": "1003",
@@ -43,7 +51,11 @@
    "stats": "5:30,7:10",
    "allowableClass": "-1",
    "requiredSkill": "0",
-   "requiredSkillRank": "0"
+   "requiredSkillRank": "0",
+   "armor": "0",
+   "dmgMin": "0",
+   "dmgMax": "0",
+   "delay": "0"
   },
   {
    "id": "1004",
@@ -58,7 +70,11 @@
    "stats": "4:30,7:30",
    "allowableClass": "-1",
    "requiredSkill": "0",
-   "requiredSkillRank": "0"
+   "requiredSkillRank": "0",
+   "armor": "0",
+   "dmgMin": "0",
+   "dmgMax": "0",
+   "delay": "0"
   },
   {
    "id": "1005",
@@ -73,7 +89,11 @@
    "stats": "3:99,7:99",
    "allowableClass": "-1",
    "requiredSkill": "0",
-   "requiredSkillRank": "0"
+   "requiredSkillRank": "0",
+   "armor": "0",
+   "dmgMin": "0",
+   "dmgMax": "0",
+   "delay": "0"
   },
   {
    "id": "1006",
@@ -88,7 +108,11 @@
    "stats": "3:40,7:30",
    "allowableClass": "-1",
    "requiredSkill": "0",
-   "requiredSkillRank": "0"
+   "requiredSkillRank": "0",
+   "armor": "0",
+   "dmgMin": "0",
+   "dmgMax": "0",
+   "delay": "0"
   },
   {
    "id": "1007",
@@ -103,7 +127,11 @@
    "stats": "3:40,7:30",
    "allowableClass": "-1",
    "requiredSkill": "0",
-   "requiredSkillRank": "0"
+   "requiredSkillRank": "0",
+   "armor": "0",
+   "dmgMin": "0",
+   "dmgMax": "0",
+   "delay": "0"
   },
   {
    "id": "1008",
@@ -118,7 +146,11 @@
    "stats": "7:5",
    "allowableClass": "-1",
    "requiredSkill": "0",
-   "requiredSkillRank": "0"
+   "requiredSkillRank": "0",
+   "armor": "0",
+   "dmgMin": "0",
+   "dmgMax": "0",
+   "delay": "0"
   },
   {
    "id": "1009",
@@ -133,7 +165,11 @@
    "stats": "3:10,7:10",
    "allowableClass": "-1",
    "requiredSkill": "0",
-   "requiredSkillRank": "0"
+   "requiredSkillRank": "0",
+   "armor": "0",
+   "dmgMin": "0",
+   "dmgMax": "0",
+   "delay": "0"
   },
   {
    "id": "1010",
@@ -148,7 +184,11 @@
    "stats": "3:12",
    "allowableClass": "-1",
    "requiredSkill": "0",
-   "requiredSkillRank": "0"
+   "requiredSkillRank": "0",
+   "armor": "0",
+   "dmgMin": "0",
+   "dmgMax": "0",
+   "delay": "0"
   },
   {
    "id": "1011",
@@ -163,7 +203,11 @@
    "stats": "3:50",
    "allowableClass": "-1",
    "requiredSkill": "0",
-   "requiredSkillRank": "0"
+   "requiredSkillRank": "0",
+   "armor": "0",
+   "dmgMin": "0",
+   "dmgMax": "0",
+   "delay": "0"
   },
   {
    "id": "1012",
@@ -178,7 +222,11 @@
    "stats": "3:50",
    "allowableClass": "-1",
    "requiredSkill": "0",
-   "requiredSkillRank": "0"
+   "requiredSkillRank": "0",
+   "armor": "0",
+   "dmgMin": "0",
+   "dmgMax": "0",
+   "delay": "0"
   },
   {
    "id": "1013",
@@ -193,7 +241,11 @@
    "stats": "3:50",
    "allowableClass": "-1",
    "requiredSkill": "0",
-   "requiredSkillRank": "0"
+   "requiredSkillRank": "0",
+   "armor": "0",
+   "dmgMin": "0",
+   "dmgMax": "0",
+   "delay": "0"
   },
   {
    "id": "1014",
@@ -208,7 +260,11 @@
    "stats": "5:50",
    "allowableClass": "16",
    "requiredSkill": "0",
-   "requiredSkillRank": "0"
+   "requiredSkillRank": "0",
+   "armor": "0",
+   "dmgMin": "0",
+   "dmgMax": "0",
+   "delay": "0"
   },
   {
    "id": "1015",
@@ -223,7 +279,11 @@
    "stats": "3:5",
    "allowableClass": "-1",
    "requiredSkill": "0",
-   "requiredSkillRank": "0"
+   "requiredSkillRank": "0",
+   "armor": "0",
+   "dmgMin": "0",
+   "dmgMax": "0",
+   "delay": "0"
   },
   {
    "id": "1016",
@@ -238,7 +298,11 @@
    "stats": "3:20,7:10",
    "allowableClass": "-1",
    "requiredSkill": "0",
-   "requiredSkillRank": "0"
+   "requiredSkillRank": "0",
+   "armor": "0",
+   "dmgMin": "0",
+   "dmgMax": "0",
+   "delay": "0"
   },
   {
    "id": "1017",
@@ -250,10 +314,14 @@
    "subclass": "1",
    "inventoryType": "20",
    "bonding": "1",
-   "stats": "5:25,6:10,7:10",
+   "stats": "5:25,45:30,7:10",
    "allowableClass": "-1",
    "requiredSkill": "0",
-   "requiredSkillRank": "0"
+   "requiredSkillRank": "0",
+   "armor": "0",
+   "dmgMin": "0",
+   "dmgMax": "0",
+   "delay": "0"
   },
   {
    "id": "1018",
@@ -268,7 +336,11 @@
    "stats": "3:40,7:10",
    "allowableClass": "-1",
    "requiredSkill": "0",
-   "requiredSkillRank": "0"
+   "requiredSkillRank": "0",
+   "armor": "0",
+   "dmgMin": "0",
+   "dmgMax": "0",
+   "delay": "0"
   },
   {
    "id": "1019",
@@ -283,7 +355,11 @@
    "stats": "3:10,7:5",
    "allowableClass": "-1",
    "requiredSkill": "0",
-   "requiredSkillRank": "0"
+   "requiredSkillRank": "0",
+   "armor": "0",
+   "dmgMin": "0",
+   "dmgMax": "0",
+   "delay": "0"
   },
   {
    "id": "1020",
@@ -298,7 +374,11 @@
    "stats": "4:30,7:20",
    "allowableClass": "-1",
    "requiredSkill": "0",
-   "requiredSkillRank": "0"
+   "requiredSkillRank": "0",
+   "armor": "0",
+   "dmgMin": "0",
+   "dmgMax": "0",
+   "delay": "0"
   },
   {
    "id": "1021",
@@ -313,7 +393,11 @@
    "stats": "3:20",
    "allowableClass": "-1",
    "requiredSkill": "165",
-   "requiredSkillRank": "0"
+   "requiredSkillRank": "0",
+   "armor": "0",
+   "dmgMin": "0",
+   "dmgMax": "0",
+   "delay": "0"
   },
   {
    "id": "1022",
@@ -328,7 +412,11 @@
    "stats": "7:20,15:10",
    "allowableClass": "-1",
    "requiredSkill": "0",
-   "requiredSkillRank": "0"
+   "requiredSkillRank": "0",
+   "armor": "0",
+   "dmgMin": "0",
+   "dmgMax": "0",
+   "delay": "0"
   },
   {
    "id": "1023",
@@ -343,7 +431,11 @@
    "stats": "3:8",
    "allowableClass": "-1",
    "requiredSkill": "0",
-   "requiredSkillRank": "0"
+   "requiredSkillRank": "0",
+   "armor": "0",
+   "dmgMin": "0",
+   "dmgMax": "0",
+   "delay": "0"
   },
   {
    "id": "1024",
@@ -358,7 +450,11 @@
    "stats": "3:6",
    "allowableClass": "-1",
    "requiredSkill": "0",
-   "requiredSkillRank": "0"
+   "requiredSkillRank": "0",
+   "armor": "0",
+   "dmgMin": "0",
+   "dmgMax": "0",
+   "delay": "0"
   },
   {
    "id": "1025",
@@ -373,7 +469,163 @@
    "stats": "3:10",
    "allowableClass": "-1",
    "requiredSkill": "0",
-   "requiredSkillRank": "0"
+   "requiredSkillRank": "0",
+   "armor": "0",
+   "dmgMin": "0",
+   "dmgMax": "0",
+   "delay": "0"
+  },
+  {
+   "id": "1026",
+   "name": "Dungeon Gloves",
+   "quality": "3",
+   "itemLevel": "58",
+   "requiredLevel": "56",
+   "class": "4",
+   "subclass": "2",
+   "inventoryType": "10",
+   "bonding": "1",
+   "stats": "3:12",
+   "allowableClass": "-1",
+   "requiredSkill": "0",
+   "requiredSkillRank": "0",
+   "armor": "0",
+   "dmgMin": "0",
+   "dmgMax": "0",
+   "delay": "0"
+  },
+  {
+   "id": "1027",
+   "name": "Rank Shoulders",
+   "quality": "3",
+   "itemLevel": "66",
+   "requiredLevel": "60",
+   "class": "4",
+   "subclass": "2",
+   "inventoryType": "3",
+   "bonding": "1",
+   "stats": "3:20,7:10",
+   "allowableClass": "-1",
+   "requiredSkill": "0",
+   "requiredSkillRank": "0",
+   "armor": "0",
+   "dmgMin": "0",
+   "dmgMax": "0",
+   "delay": "0"
+  },
+  {
+   "id": "1028",
+   "name": "Stamina Mail Helm",
+   "quality": "3",
+   "itemLevel": "69",
+   "requiredLevel": "60",
+   "class": "4",
+   "subclass": "3",
+   "inventoryType": "1",
+   "bonding": "1",
+   "stats": "7:40",
+   "allowableClass": "-1",
+   "requiredSkill": "0",
+   "requiredSkillRank": "0",
+   "armor": "300",
+   "dmgMin": "0",
+   "dmgMax": "0",
+   "delay": "0"
+  },
+  {
+   "id": "1029",
+   "name": "Hunter Mail Helm",
+   "quality": "3",
+   "itemLevel": "60",
+   "requiredLevel": "58",
+   "class": "4",
+   "subclass": "3",
+   "inventoryType": "1",
+   "bonding": "1",
+   "stats": "3:20,38:30,31:10",
+   "allowableClass": "-1",
+   "requiredSkill": "0",
+   "requiredSkillRank": "0",
+   "armor": "300",
+   "dmgMin": "0",
+   "dmgMax": "0",
+   "delay": "0"
+  },
+  {
+   "id": "1030",
+   "name": "Staff of Intellect",
+   "quality": "3",
+   "itemLevel": "65",
+   "requiredLevel": "58",
+   "class": "2",
+   "subclass": "10",
+   "inventoryType": "17",
+   "bonding": "1",
+   "stats": "5:30,7:10",
+   "allowableClass": "-1",
+   "requiredSkill": "0",
+   "requiredSkillRank": "0",
+   "armor": "0",
+   "dmgMin": "100",
+   "dmgMax": "150",
+   "delay": "3000"
+  },
+  {
+   "id": "1031",
+   "name": "Tome of Power",
+   "quality": "3",
+   "itemLevel": "64",
+   "requiredLevel": "58",
+   "class": "4",
+   "subclass": "0",
+   "inventoryType": "23",
+   "bonding": "1",
+   "stats": "5:10",
+   "allowableClass": "-1",
+   "requiredSkill": "0",
+   "requiredSkillRank": "0",
+   "armor": "0",
+   "dmgMin": "0",
+   "dmgMax": "0",
+   "delay": "0"
+  },
+  {
+   "id": "1032",
+   "name": "Hunter Polearm",
+   "quality": "3",
+   "itemLevel": "66",
+   "requiredLevel": "58",
+   "class": "2",
+   "subclass": "6",
+   "inventoryType": "17",
+   "bonding": "1",
+   "stats": "3:25,7:10",
+   "allowableClass": "-1",
+   "requiredSkill": "0",
+   "requiredSkillRank": "0",
+   "armor": "0",
+   "dmgMin": "200",
+   "dmgMax": "300",
+   "delay": "3500"
+  },
+  {
+   "id": "1033",
+   "name": "Slow Mace",
+   "quality": "3",
+   "itemLevel": "66",
+   "requiredLevel": "58",
+   "class": "2",
+   "subclass": "4",
+   "inventoryType": "13",
+   "bonding": "1",
+   "stats": "7:5",
+   "allowableClass": "-1",
+   "requiredSkill": "0",
+   "requiredSkillRank": "0",
+   "armor": "0",
+   "dmgMin": "50",
+   "dmgMax": "60",
+   "delay": "2600"
   }
  ],
  "raid_loot": [
@@ -395,7 +647,14 @@
    1024,
    1021,
    1017,
-   1018
+   1018,
+   1026,
+   1028,
+   1029,
+   1030,
+   1031,
+   1032,
+   1033
   ],
   "quest": [
    1007,
@@ -414,7 +673,8 @@
    1025
   ],
   "pvp": [
-   1016
+   1016,
+   1027
   ]
  }
 }
