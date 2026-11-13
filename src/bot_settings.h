@@ -44,6 +44,8 @@
 //   ScenarioEntry = "36 -14.57 -385.48 62.46"  (map x y z: where the party is teleported to)
 //   ScenarioDurationSec = 1200        ScenarioRoute<n> = "x y z" (n counts from 1)
 //   ScenarioGear<classId> = "item,item,..."  (optional: items granted instead of auto gear for that class)
+//   ScenarioGearFile = /path/data/prebis  (optional: a folder with <classId>.txt, one item entry per line, # comments; used for each class without its own
+//                                         ScenarioGear<classId>; see doc/pre-raid-gear.md)
 //   ScenarioBosses = "644:Rhahk'Zor,643:Sneed,..."  (creature entry[:name] of each boss; the result counts the ones seen dead)
 //   ScenarioResultFile = "scenario-results.log"
 // Dead-bot recovery (a dead bot releases its spirit, walks back to its corpse and reclaims it; a living priest, paladin or shaman may
@@ -457,6 +459,9 @@ bool IsScenarioList(std::string const& value);
 // The entries of a Scenario list, in order. A bad entry or a repeated name is dropped with a warning; the parties are cut at kMaxScenarioParties in all (the
 // entry that crosses it is shortened, the ones after it dropped).
 std::vector<ScenarioListItem> ParseScenarioList(std::string const& value, std::vector<std::string>& warnings);
+
+// The item entries of one gear list file (ScenarioGearFile, <classId>.txt): an entry at the start of a line, '#' comments, blank lines skipped, a repeated entry kept once.
+std::vector<std::uint32_t> ParseGearList(std::string const& text);
 
 // The config one dungeon of a Scenario list reads its scenario from: `config` without the plain dungeon keys and without every "<key>.<id>" override, then
 // the overrides of `name` as plain keys, and Scenario = name, ScenarioParties = parties, Dungeon = name. The dungeon file merge (dungeon_data.h) and the
