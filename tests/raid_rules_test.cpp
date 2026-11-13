@@ -76,6 +76,33 @@ void TestLeash()
     CHECK(t.PullLeash(309) == 15 && t.PullLeash(249) == 0 && t.PullLeash(1) == 0);
 }
 
+void TestSpacingAndAuraRows()
+{
+    std::vector<std::string> errors;
+    Table t = Parse("spread|309|14507|10|ranged|Holy Wrath\n"
+                    "spread|309|0|8|all|any fight\n"
+                    "avoid_enemy|309|14507|15|healers|Holy Nova\n"
+                    "avoid_enemy|309|14507|15|ranged\n"
+                    "purge|309|23895|Renew\n"
+                    "mindcontrol|309|24327|Cause Insanity\n",
+                    errors);
+    CHECK(errors.empty());
+    auto const boss = t.SpreadFor(309, 14507);
+    CHECK(boss.size() == 2 && boss[0].Yards == 10.0f && boss[0].Who == kWhoRanged && boss[1].Entry == 0 && boss[1].Who == kWhoAll);
+    CHECK(t.SpreadFor(309, 1).size() == 1 && t.SpreadFor(249, 14507).empty());
+    auto const nova = t.AvoidEnemyFor(309, 14507);
+    CHECK(nova.size() == 2 && nova[0].Yards == 15.0f && nova[0].Who == kWhoHealers && nova[1].Who == kWhoRanged);
+    CHECK(t.AvoidEnemyFor(309, 1).empty() && t.HasAvoidEnemy(309) && !t.HasAvoidEnemy(249));
+    CHECK(t.IsPurgeAura(309, 23895) && !t.IsPurgeAura(309, 1) && !t.IsPurgeAura(249, 23895));
+    CHECK(t.IsMindControlAura(309, 24327) && !t.IsMindControlAura(309, 23895));
+    // bad rows: yards out of range, unknown who, entry 0 for avoid_enemy, missing fields, aura 0
+    std::vector<std::string> bad;
+    Table b = Parse("spread|309|1|1|all|x\nspread|309|1|70|all|x\nspread|309|1|10|everyone|x\nspread|309|1|10\n"
+                    "avoid_enemy|309|0|10|all|x\navoid_enemy|309|5|10|none|x\npurge|309|0|x\nmindcontrol|309|abc|x\n", bad);
+    CHECK(bad.size() == 8);
+    CHECK(b.SpreadFor(309, 1).empty() && !b.HasAvoidEnemy(309) && !b.IsPurgeAura(309, 0));
+}
+
 void TestErrors()
 {
     std::vector<std::string> errors;
@@ -143,6 +170,10 @@ void TestShippedFile()
     }
     CHECK(t.SwapStacks(309, 12097).has_value());
     CHECK(t.IsBoss(309, 14517));
+    // Venoxis (14507): Holy Nova radius 15 (SpellRadius), Renew 23895 (his own cast, a periodic heal), Hakkar's Cause Insanity 24327 (charm aura)
+    CHECK(t.IsPurgeAura(309, 23895) && t.IsMindControlAura(309, 24327));
+    CHECK(!t.AvoidEnemyFor(309, 14507).empty() && t.AvoidEnemyFor(309, 14507)[0].Yards == 15.0f);
+    CHECK(!t.SpreadFor(309, 14507).empty());
 }
 
 } // namespace
@@ -152,6 +183,7 @@ int main()
     TestRows();
     TestWildcardNoAoe();
     TestLeash();
+    TestSpacingAndAuraRows();
     TestErrors();
     TestMerge();
     TestShippedFile();

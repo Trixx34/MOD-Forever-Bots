@@ -511,6 +511,24 @@ void BotPolicy::PlanParties(WorldTickSnapshotView const& view, std::unordered_ma
                         member.Debuffs.push_back({ spell, static_cast<std::uint8_t>(*kind) });
                     if (rules->SwapStacks(mapId, spell))
                         member.SwapStacks = std::max(member.SwapStacks, snap.auras[a].stacks);
+                    if (_options.RaidMindControl && rules->IsMindControlAura(mapId, spell))
+                        member.Controlled = true;
+                }
+                // spacing groups and the purge and hold spells of the raid rules (bot_policy_raidrules.cpp)
+                BotState::Role const role = known != _bots.end() ? known->second.Role_ : BotState::Role::Auto;
+                bool const tankRole = role == BotState::Role::Tank || (role == BotState::Role::Auto && classId == kWarriorClass && _options.PartySize != 0);
+                if (_options.RaidSpread && !tankRole)
+                    member.SpreadKind = SpreadKindOf(classId, member.CanHeal);
+                if (_options.RaidPurge)
+                    member.PurgeSpell = PurgeSpellFor(classId, snap.level);
+                if (_options.RaidMindControl)
+                {
+                    member.ControlCcSpell = ControlCcSpellFor(classId, snap.level);
+                    if (known != _bots.end())
+                    {
+                        auto const retry = known->second.RetryAtMs.find(member.ControlCcSpell);
+                        member.ControlReady = nowMs >= known->second.NextCastMs && (retry == known->second.RetryAtMs.end() || nowMs >= retry->second);
+                    }
                 }
             }
             if (member.Alive)
@@ -539,10 +557,30 @@ void BotPolicy::PlanParties(WorldTickSnapshotView const& view, std::unordered_ma
                 {
                     enemy.InterruptFirst = unit.casting != 0 && rules->InterruptFirst(mapId, unit.cast_spell_id);
                     enemy.NoAoe = rules->NoAoe(mapId, forever_module::UnitRefEntry(unit.guid));
+                    if (_options.RaidSpread && enemy.Engaged)
+                        for (raid_rules::SpreadRule const& rule : rules->SpreadFor(mapId, forever_module::UnitRefEntry(unit.guid)))
+                            enemy.Spread.push_back({ rule.Yards, rule.Who });
                 }
                 enemies.push_back(enemy);
             }
         }
+        // The raid rules' purge rows: an aura of a row that a member's target_auras (layout 24: the auras on its current target) shows on an enemy of the list.
+        if (rules != nullptr && _options.RaidPurge)
+            for (std::uint64_t guid : guids)
+            {
+                auto const at = indexOf.find(guid);
+                if (at == indexOf.end())
+                    continue;
+                BotSnapshot const& snap = view.bots[at->second];
+                if (snap.life_state != 0 || snap.threat_target_guid == 0 || snap.target_aura_count == 0)
+                    continue;
+                auto const enemy = std::find_if(enemies.begin(), enemies.end(), [&](party_planner::Enemy const& e) { return e.Ref == snap.threat_target_guid; });
+                if (enemy == enemies.end())
+                    continue;
+                for (std::size_t a = 0; a < snap.target_aura_count && a < forever_module::kMaxTargetAuras; ++a)
+                    if (snap.target_auras[a].spell_id != 0 && rules->IsPurgeAura(mapId, snap.target_auras[a].spell_id))
+                        enemy->PurgeAura = snap.target_auras[a].spell_id;
+            }
         // The raid rules' tank swap: while the boss of a swap row is in view every member carries the row's stack count as its threshold.
         if (rules != nullptr)
             if (raid_rules::MapRules const* mapRules = rules->Find(mapId))
@@ -609,7 +647,11 @@ void BotPolicy::PlanParties(WorldTickSnapshotView const& view, std::unordered_ma
                 {
                     auto const mine = std::find_if(members.begin(), members.end(), [&](party_planner::Member const& m) { return m.Guid == fromView.Guid || PlayerRef(m.Guid) == fromView.Guid; });   // the view names a member by unit ref, the bots-only list by counter
                     if (mine == members.end())
-                        members.push_back(fromView); // a human: no interrupt row, no crowd control, never assigned a job
+                    {
+                        members.push_back(fromView);
+                        members.back().Movable = false;                                 // a human: no interrupt row, no crowd control, never assigned a job or moved
+                        members.back().SpreadKind = _options.RaidSpread && !fromView.Tank ? raid_rules::kWhoAll : 0;
+                    }
                     else if (fromView.Tank)
                         mine->Tank = true;
                 }
@@ -757,6 +799,8 @@ void BotPolicy::DecideBot(DecideTick& tick, std::size_t i)
         return;
     if (TurnTelegraphEscape(tick, turn) == TurnFlow::kSkip)
         return;
+    if (TurnRaidSpacing(tick, turn) == TurnFlow::kSkip)
+        return;
     TurnTargetMemory(tick, turn);
     if (TurnDead(tick, turn) == TurnFlow::kSkip)
         return;
@@ -768,6 +812,8 @@ void BotPolicy::DecideBot(DecideTick& tick, std::size_t i)
     if (TurnCrowdControl(tick, turn) == TurnFlow::kSkip)
         return;
     if (TurnOnyxiaCasts(tick, turn) == TurnFlow::kSkip)
+        return;
+    if (TurnRaidAuras(tick, turn) == TurnFlow::kSkip)
         return;
     if (TurnRaidRules(tick, turn) == TurnFlow::kSkip)
         return;

@@ -367,6 +367,13 @@ struct BotSettings
     // A tank holds unless the rule table marks the spell lethal (`avoid|spell`) or frontal; a bot mid-cast holds unless the spell is lethal or TelegraphEscapeCasters = 1.
     bool TelegraphEscape = true;
     bool TelegraphEscapeCasters = false;
+    // RaidSpread, RaidAvoidEnemy, RaidPurge, RaidMindControl (default ON each; they act only through rows of the raid rule table, so with no RaidRulesFile or no such row nothing changes):
+    // `spread` rows keep the members of a group apart while the row's boss is engaged, `avoid_enemy` rows keep non-tank members a distance from a hostile of an entry,
+    // `purge` rows let a priest or shaman remove a listed enemy buff, `mindcontrol` rows make nobody attack a member carrying the aura and let a mage polymorph it. doc/raid-rules.md.
+    bool RaidSpread = true;
+    bool RaidAvoidEnemy = true;
+    bool RaidPurge = true;
+    bool RaidMindControl = true;
     // RaidRulesFile (absolute path, data/raid_rules.txt; empty = none): the raid rule table, see raid_rules.h and the README.
     std::string RaidRulesFile;
     // CorpseRunTeleportSec (0 = off, else 10..3600): a ghost whose corpse run takes longer is put at its corpse (needs Bot.Actions.Teleport).

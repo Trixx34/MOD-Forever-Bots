@@ -27,6 +27,17 @@ void DefaultsWhenEmpty()
     CHECK(ParseBotSettings({ { "MountMinLevel", "0" } }, more).MountMinLevel == 0);
 }
 
+void RaidRuleRowSwitches()
+{
+    std::vector<std::string> warnings;
+    BotSettings const s = ParseBotSettings({}, warnings);
+    CHECK(s.RaidSpread && s.RaidAvoidEnemy && s.RaidPurge && s.RaidMindControl);   // on by default: they act only through rows of RaidRulesFile
+    BotSettings const off = ParseBotSettings({ { "RaidSpread", "0" }, { "RaidAvoidEnemy", "0" }, { "RaidPurge", "0" }, { "RaidMindControl", "0" } }, warnings);
+    CHECK(!off.RaidSpread && !off.RaidAvoidEnemy && !off.RaidPurge && !off.RaidMindControl);
+    CHECK(ParseBotSettings({ { "RaidPurge", "0" } }, warnings).RaidSpread);
+    CHECK(warnings.empty());
+}
+
 void ReadsValidValues()
 {
     std::vector<std::string> warnings;
@@ -604,6 +615,7 @@ int main()
     SayAndSupplySettings();
     RunTelemetryDirSetting();
     DefaultsWhenEmpty();
+    RaidRuleRowSwitches();
     TelemetrySettings();
     ReadsValidValues();
     MaxBotsIsCapped();

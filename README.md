@@ -46,6 +46,7 @@ line to the module's stderr. A config reload updates the ramp, the random picks 
 | `Race`, `Class` | 1, 1 | A race and class id, or `random` (a seeded pick over the Forever valid combinations, including the Skyborne races 95 and 96) |
 | `RandomSeed` | 1 | Seed for the random picks |
 | `RaidRulesFile` | empty | Absolute path of `data/raid_rules.txt`, the raid rule table (adds first, interrupt-first casts, dispel kinds, avoid zones, tank swap, no-AoE); needs `PartyPlanner` on. `doc/raid-rules.md` |
+| `RaidSpread`, `RaidAvoidEnemy`, `RaidPurge`, `RaidMindControl` | 1, 1, 1, 1 | Switches for the raid rule rows `spread`, `avoid_enemy`, `purge`, `mindcontrol` (keep members apart, keep non-tanks out of a hostile's radius, remove a listed enemy buff, hold a mind controlled member). On by default, but each acts only through a row of its kind in `RaidRulesFile`; without rows nothing changes. `doc/raid-rules.md` |
 | `BotsInitial`, `BotsStep`, `BotsStepMinutes`, `BotsCap`, `BotsStopTime` | 300, 100, 15, 1500, 06:00 | The ramp: start count, bots added per step, minutes per step, the cap, and the local time it stops adding |
 | `ServiceEverySec` | 600 | Seconds between vendor visits for an idle bot (60 to 86400) |
 | `ChatSay`, `ChatSayMax` | 0 (off), 3 | A bot that takes a chat order answers with a short /say line (0 to 50 bots speak for one order; a whispered bot always answers) |
@@ -210,7 +211,7 @@ Without `FOREVER_MODULE_SDK_SOURCE`, CMake fetches `Trixx34/forever-module-sdk` 
 - `src/bot_ramp.{h,cpp}`: the ramp schedule. `src/bot_store.{h,cpp}`: the store row keys.
 - `src/bot_telemetry.{h,cpp}`, `src/rotating_file.{h,cpp}`: the telemetry CSV and its rotating file.
 - `src/dungeon_data.{h,cpp}`: the dungeon structures, the old text file (routes, bosses, entry) and its merge into the scenario config. `data/dungeons.txt`, `tools/make_dungeon.py`, `doc/dungeons.md`.
-- `src/raid_rules.{h,cpp}`, `data/raid_rules.txt`: the raid rule table (adds, interrupt-first casts, dispel kinds, avoid zones, tank swap, no-AoE) read from `Module.forever-bots.RaidRulesFile` and fed into the party planner; `doc/raid-rules.md`.
+- `src/raid_rules.{h,cpp}`, `data/raid_rules.txt`: the raid rule table (adds, interrupt-first casts, dispel kinds, avoid zones, tank swap, no-AoE, spread, avoid_enemy, purge, mindcontrol) read from `Module.forever-bots.RaidRulesFile` and fed into the party planner; `doc/raid-rules.md`.
 - `src/dungeon_files.{h,cpp}`, `src/mini_json.{h,cpp}`: the per-dungeon JSON files (`data/dungeons/<map id>-<name>.json`: entrance, route, events, a block per boss), the override folder `DungeonDir` and the reload. `tools/convert_dungeons.py`, `doc/dungeon-strategy.md`.
 - `src/main.cpp`: handshake, config, control requests, revocations, the ramp timer and the Tier 2 pump thread.
 - `tests/*_test.cpp`: unit tests for each library.

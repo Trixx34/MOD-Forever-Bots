@@ -562,6 +562,13 @@ CreatureType CreatureTypeOf(std::uint32_t entry);
 std::uint32_t CcSpellForClass(std::uint32_t classId);
 // The class's dispel spell for a kind (1 magic, 2 curse, 3 disease, 4 poison; the SDK's dispel_type), 0 when the class has none at that level (level 0 = unknown: any).
 std::uint32_t DispelSpellFor(std::uint32_t classId, std::uint32_t level, std::uint8_t kind);
+// Raid rules (raid_rules.h rows spread, purge, mindcontrol): the spread group of a class (raid_rules::kWhoMelee, kWhoRanged, kWhoHealers; canHeal = a healer by role), the spell
+// that removes a magic buff from an enemy (priest Dispel Magic 527 from level 18, shaman Purge 370 from level 12; 0 for the other classes), and the spell that holds a
+// mind controlled member (a mage's Polymorph, from its learn level; 0 for the other classes). level 0 = unknown: any.
+std::uint8_t SpreadKindOf(std::uint32_t classId, bool canHeal);
+std::uint32_t PurgeSpellFor(std::uint32_t classId, std::uint32_t level);
+std::uint32_t ControlCcSpellFor(std::uint32_t classId, std::uint32_t level);
+
 // The class's threat-drop spell (priest Fade, hunter Feign Death, rogue Feint, druid Cower), 0 when the class has none at this level. onTarget is set when the cast goes at the target.
 std::uint32_t ThreatDropSpellFor(std::uint32_t classId, std::uint32_t level, bool& onTarget);
 
