@@ -342,6 +342,78 @@ void GuildCreatesRotateAmongMasters()
     CHECK(seen.size() == 10);
 }
 
+// The core refuses every create (outcomes come back): a refused master is skipped at once (no 60 s pending wait), the later masters get the slots, one
+// event line per block, and with RefusalBackoff off every master is retried.
+void GuildRefusedCreatesAreSkipped()
+{
+    auto run = [](bool backoff, std::vector<std::string>& events, std::vector<std::vector<std::uint64_t>>& perPlan)
+    {
+        PolicyOptions on = Quiet();
+        on.Guilds.Enabled = true;
+        on.Guilds.RefusalBackoff = backoff;
+        on.Guilds.LevelingShare = 0;
+        on.Guilds.UtilityShare = 0;
+        on.Guilds.RaidingShare = 100;
+        on.Guilds.RaidSize = 2;
+        on.Guilds.RaidMinLevel = 1;
+        on.OnEvent = [&](std::string const& line) { events.push_back(line); };
+        BotPolicy policy(on);
+        WorldTickSnapshotView v = View(20, 0, {}, 1);
+        for (std::uint64_t guid = 2; guid <= 20; ++guid)
+        {
+            BotSnapshot b = v.bots[0];
+            b.guid = guid;
+            v.bots.push_back(b);
+        }
+        std::uint64_t now = kNow;
+        for (int plan = 0; plan < 4; ++plan, now += 30000)
+        {
+            policy.Decide(v, now);
+            std::vector<std::uint64_t> masters;
+            for (social::Order const& order : policy.TakeSocialOrders())
+            {
+                if (order.What != social::Kind::Guild || order.Op != 3)
+                    continue;
+                masters.push_back(order.Bot);
+                social::Outcome refused;
+                refused.What = social::Kind::Guild;
+                refused.Op = 3;
+                refused.Bot = order.Bot;
+                refused.Reason = "Bot.Social.Enabled is off";
+                policy.NoteSocialOutcome(refused, now + 500);
+            }
+            perPlan.push_back(masters);
+        }
+    };
+    std::vector<std::string> events;
+    std::vector<std::vector<std::uint64_t>> plans;
+    run(true, events, plans);
+    std::set<std::uint64_t> seen;
+    for (auto const& masters : plans)
+    {
+        CHECK(masters.size() <= 3);
+        for (std::uint64_t const master : masters)
+            CHECK(seen.insert(master).second);   // a refused master is not asked again inside its window
+    }
+    CHECK(seen.size() == 10);
+    // The skipped masters are logged once each, not once per plan.
+    int skipped = 0;
+    for (std::string const& line : events)
+        if (line.find("guild_create_skipped: master=") == 0)
+            ++skipped;
+    CHECK(skipped > 0 && skipped <= 10);
+
+    std::vector<std::string> offEvents;
+    std::vector<std::vector<std::uint64_t>> offPlans;
+    run(false, offEvents, offPlans);
+    std::size_t offSent = 0;
+    for (auto const& masters : offPlans)
+        offSent += masters.size();
+    for (std::string const& line : offEvents)
+        CHECK(line.find("guild_create_skipped") != 0);
+    CHECK(offSent > 10);   // no window: masters are asked again within the four plans
+}
+
 void GuildAnswersAreSentWhenOnAndNotWhenOff()
 {
     PolicyOptions on = Quiet();
@@ -470,6 +542,7 @@ int main()
     BattlegroundsAreSentWhenOnAndNotWhenOff();
     GuildCreateCooldown();
     GuildCreatesRotateAmongMasters();
+    GuildRefusedCreatesAreSkipped();
     GuildAnswersAreSentWhenOnAndNotWhenOff();
     GiftsAreSentWhenOnAndNotWhenOff();
     PickGiftChoosesSmallStacksOnly();

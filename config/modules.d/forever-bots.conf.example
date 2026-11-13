@@ -143,6 +143,7 @@ Module.forever-bots.TelemetrySummarySec = 60
 # GuildsLevelCap = 60
 # GuildsRaidMinLevel = 60
 # GuildsRaidSize = 40
+# GuildsRefusalBackoff = 1
 # GuildsLevelingShare = 60
 # GuildsRaidingShare = 20
 # GuildsUtilityShare = 20
@@ -470,6 +471,9 @@ Module.forever-bots.TelemetrySummarySec = 60
 # Bot.Guilds.RaidingShare = 20
 # Bot.Guilds.UtilityShare = 20
 # Bot.Guilds.RaidSize = 40
+# A master whose create the core refused (or that was never confirmed) is skipped for 120 s, doubled per failure up to 16 min, so later creates are not starved
+# (event line guild_create_skipped, once per window). 1 = on (default), 0 = every master is retried every plan.
+# Bot.Guilds.RefusalBackoff = 1
 
 # ---- Keys that were only described in the code (src/bot_settings.h) before. Every key shows its default; the value here is the default unless said.
 

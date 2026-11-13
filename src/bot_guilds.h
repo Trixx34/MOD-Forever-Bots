@@ -40,6 +40,7 @@ struct Settings
     std::uint32_t RaidingShare = 20;    // GuildsRaidingShare
     std::uint32_t UtilityShare = 20;    // GuildsUtilityShare
     std::uint32_t RaidSize = 40;        // GuildsRaidSize: bots per raiding guild (2 to 40)
+    bool RefusalBackoff = true;         // GuildsRefusalBackoff: a master whose create was refused (or never confirmed) is skipped for a growing window (120 s doubled, 16 min at most), so the creates behind it get the slots
     // The raiding check beyond the level (attunement, gear). Empty: the level alone qualifies.
     std::function<bool(Bot const&)> RaidQualified;
 };

@@ -302,6 +302,9 @@ void ConfigLoadsAndClamps()
     CHECK(settings.Enabled);
     CHECK(settings.LevelingShare == 50 && settings.RaidingShare == 30 && settings.UtilityShare == 20);
     CHECK(settings.RaidSize == 25);
+    CHECK(settings.RefusalBackoff);   // on by default
+    std::vector<std::string> w2;
+    CHECK(!LoadSettings({ { "GuildsRefusalBackoff", "0" } }, w2).RefusalBackoff);
     CHECK(settings.LevelCap == 60 && settings.RaidMinLevel == 60);
     CHECK(warnings.empty());
 
