@@ -73,6 +73,9 @@ Settings LoadSettings(std::unordered_map<std::string, std::string> const& config
     auto const enabled = config.find("GuildsEnabled");
     if (enabled != config.end())
         settings.Enabled = enabled->second == "1" || enabled->second == "true";
+    auto const backoff = config.find("GuildsRefusalBackoff");
+    if (backoff != config.end())
+        settings.RefusalBackoff = backoff->second == "1" || backoff->second == "true";
     ReadKey(config, "GuildsLevelCap", 1, 255, settings.LevelCap, warnings);
     ReadKey(config, "GuildsRaidMinLevel", 1, 255, settings.RaidMinLevel, warnings);
     ReadKey(config, "GuildsLevelingShare", 0, 100, settings.LevelingShare, warnings);

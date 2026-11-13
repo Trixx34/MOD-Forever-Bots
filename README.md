@@ -121,6 +121,7 @@ Each tick the policy (`src/bot_policy.cpp`) reads the bot's snapshot and sends a
   points by its profile for the (class, role), when `Bot.Talents.Profiles` names a profile file; otherwise, or for a class with no profile,
   its greedy allocator. A refusal (in combat) is asked again after 5 s. Points already spent are not taken back, so a role change affects
   only new points (no respec yet). Protocol 17.
+- **Guild create backoff (`GuildsRefusalBackoff`, default on).** A guild master whose create the core refused (or that was never confirmed) is skipped for 120 s, doubled per failure up to 16 min, so the 3 create slots per plan rotate through the other masters instead of retrying the same ones every 30 s. The event line `guild_create_skipped: master=... failures=... wait_s=...` is written once per window. `0` retries every master every plan.
 - **Duels, battlegrounds, guild join, mail gifts (all off by default).** `Duels`, `Battlegrounds`, `GuildJoin` and `MailGifts` now send real actions
   through the SDK (`BotDuel`, `BotBattleground`, `BotGuild`, `BotGiftMail`; ActionRequest fields 23 to 26, protocol stays 20). The core needs
   `Bot.Social.Enabled = 1` (gifts also need `Bot.Trade.Enabled = 1`); a core without the actions refuses them and the module logs a `*_gap` event.

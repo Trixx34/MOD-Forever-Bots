@@ -19,6 +19,16 @@ constexpr std::uint64_t kGuildCreateBlockMs = 120000;   // a master whose create
 constexpr std::uint32_t kGuildCreateBlockDoublings = 3; // ...up to 8 times that: 120, 240, 480, then 960 s (16 minutes) at most
 }  // namespace
 
+void BotPolicy::NoteGuildCreateFailed(std::uint64_t master, std::uint64_t nowMs)
+{
+    if (!_options.Guilds.RefusalBackoff)
+        return;
+    CreateBlock& block = _guildCreateBlocks[master];
+    block.Failures = std::min(block.Failures + 1, kGuildCreateBlockDoublings + 1);
+    block.UntilMs = nowMs + (kGuildCreateBlockMs << (block.Failures - 1));
+    block.Logged = false;
+}
+
 void BotPolicy::DriveGuilds(forever_module::WorldTickSnapshotView const& view, std::uint64_t nowMs)
 {
     if (!_options.Guilds.Enabled)
@@ -85,9 +95,7 @@ void BotPolicy::DriveGuilds(forever_module::WorldTickSnapshotView const& view, s
             ++it;
             continue;
         }
-        CreateBlock& block = _guildCreateBlocks[it->first];
-        block.Failures = std::min(block.Failures + 1, kGuildCreateBlockDoublings + 1);
-        block.UntilMs = nowMs + (kGuildCreateBlockMs << (block.Failures - 1));
+        NoteGuildCreateFailed(it->first, nowMs);
         it = _pendingGuilds.erase(it);
     }
 
@@ -133,7 +141,14 @@ void BotPolicy::DriveGuilds(forever_module::WorldTickSnapshotView const& view, s
         if (busy(master) || _pendingGuilds.count(master))   // a create in flight is not sent again (it would restart the pending clock and no block would ever be set)
             continue;
         if (auto const blocked = _guildCreateBlocks.find(master); blocked != _guildCreateBlocks.end() && blocked->second.UntilMs > nowMs)
+        {
+            // One line per block, not per plan: the window is long and the plan runs every 30 s.
+            if (!blocked->second.Logged && _options.OnEvent)
+                _options.OnEvent("guild_create_skipped: master=" + std::to_string(master) + " failures=" + std::to_string(blocked->second.Failures) +
+                                 " wait_s=" + std::to_string((blocked->second.UntilMs - nowMs) / 1000));
+            blocked->second.Logged = true;
             continue;
+        }
         social::Order order;
         order.What = social::Kind::Guild;
         order.Op = 3;

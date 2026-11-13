@@ -974,6 +974,8 @@ private:
     void TurnSocial(DecideTick& tick, BotTurn& turn);
     // Bot guilds (GuildsEnabled): plans the pool of online bots every kGuildPlanMs and queues the create, invite and leave orders the plan asks for.
     void DriveGuilds(forever_module::WorldTickSnapshotView const& view, std::uint64_t nowMs);
+    // A guild create of this master was refused by the core or never confirmed: the master is skipped for a growing window (GuildsRefusalBackoff).
+    void NoteGuildCreateFailed(std::uint64_t master, std::uint64_t nowMs);
     void TurnAdvisor(DecideTick& tick, BotTurn& turn);   // the advisor features (bot_policy_advisor.cpp); out of combat only
     void TurnLootTaxiMount(DecideTick& tick, BotTurn& turn);
     void TurnSendMove(DecideTick& tick, BotTurn& turn);
@@ -1043,7 +1045,7 @@ private:
     std::unordered_map<std::uint64_t, bot_guilds::Guild> _botGuilds;     // guild guid -> purpose and faction
     std::unordered_map<std::uint64_t, PendingGuild> _pendingGuilds;      // master guid -> the guild it is creating
     std::unordered_map<std::uint64_t, std::uint64_t> _guildAcceptDueMs;  // invitee guid -> when it accepts
-    struct CreateBlock { std::uint32_t Failures = 0; std::uint64_t UntilMs = 0; };
+    struct CreateBlock { std::uint32_t Failures = 0; std::uint64_t UntilMs = 0; bool Logged = false; };
     std::unordered_map<std::uint64_t, CreateBlock> _guildCreateBlocks;   // master guid -> its unconfirmed creates and when it may try again
     std::uint64_t _guildPlanAtMs = 0;
     std::size_t _guildCreateCursor = 0;   // where the next plan starts walking its creates and moves (round robin)

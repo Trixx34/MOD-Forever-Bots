@@ -215,6 +215,12 @@ void BotPolicy::NoteSocialOutcome(social::Outcome const& outcome, std::uint64_t 
         battlegrounds::NoteLeft(state.BgState, _options.Battlegrounds, nowMs);
     if (outcome.What == social::Kind::Gift && state.GiftState.SentToday > 0)
         --state.GiftState.SentToday;
+    // A refused guild create: the master waits (and the creates behind it get the slots) without waiting for the pending entry to expire.
+    if (outcome.What == social::Kind::Guild && outcome.Op == 3 && _options.Guilds.Enabled)
+    {
+        if (_pendingGuilds.erase(outcome.Bot) != 0)
+            NoteGuildCreateFailed(outcome.Bot, nowMs);
+    }
     // The guild poll is expected to be refused nearly always ("no pending guild invitation"): not worth a line.
     if (outcome.What == social::Kind::Guild && outcome.Op == 0 && !social::IsUnknownActionReason(outcome.Reason))
         return;
