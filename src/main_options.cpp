@@ -58,6 +58,9 @@ void PolicyFromSettings(PolicyOptions& policyOptions, BotSettings& settings)
     policyOptions.HealerDpsManaPct = settings.HealerDpsManaPct;
     policyOptions.HealerCombatManaPct = settings.HealerCombatManaPct;
     policyOptions.TankPickup = settings.TankPickup;
+    policyOptions.PullTankFirst = settings.PullTankFirst;
+    policyOptions.PullTankHoldMs = settings.PullTankHoldMs;
+    policyOptions.PullMemberRangeYards = settings.PullMemberRangeYards;
     policyOptions.HealerLosMoveYards = settings.HealerLosMoveYards;
     policyOptions.Gathering = settings.Gathering;
     if (!settings.CraftingFociFile.empty())

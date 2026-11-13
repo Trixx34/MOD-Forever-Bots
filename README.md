@@ -56,6 +56,9 @@ line to the module's stderr. A config reload updates the ramp, the random picks 
 | `CorpseRunTeleportSec` | 60 | A ghost whose corpse run takes longer is put at its corpse (the teleport needs `Bot.Actions.Teleport`); the four-minute teleport is brought forward to this. 0 is off (10 to 3600); a ghost already at its corpse is left alone |
 | `DungeonPullLeashYards` | 30 | A dungeon party's route leader, out of a fight, pulls only a hostile within this many yards of the leg of the route it walks (0 is off, 10 to 80) |
 | `DungeonChaseLeashYards` | 40 | A dungeon party's bot does not walk after, or pick in a fight, a hostile farther than this from both that leg and its leader (a fled creature, the next pack); a member goes back to its leader instead (0 is off, 10 to 80) |
+| `PullTankFirst` | 1 | In a dungeon, raid or tank-led party the members wait on the route while the leader (tank) has a target but is not in combat with it, and assist once it is; never for solo bots or leveling parties (0 = every member pulls on its own) |
+| `PullTankHoldMs` | 12000 | The longest a member waits for the tank, so a dead or stuck tank cannot freeze the party (1000 to 120000) |
+| `PullMemberRangeYards` | 12 | A target this near a member is engaged at once, without a walk (0 to 40) |
 | `GhostTeleportHold` | 1 | A dungeon ghost's entrance or party teleport waits while a live hostile is within 30 yards of the destination (event `ghost_teleport_hold: ... reason=hostile`, at most one per 10 s per bot); 0 teleports at once as before |
 | `GhostTeleportHoldMaxMs` | 120000 | The longest a ghost is held for a hostile, per death (1000 to 3600000) |
 | `DeathLockoutCount` | 4 | A bot that died this many times within `DeathLockoutWindowMs` waits `DeathLockoutHoldMs` more before its ghost teleport (`reason=lockout`); 0 is off (2 to 50) |

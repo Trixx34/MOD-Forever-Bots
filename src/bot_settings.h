@@ -307,6 +307,11 @@ struct BotSettings
     std::uint32_t HealerCombatManaPct = 25; // HealerCombatManaPct: a healer in a party fight keeps this share of its mana for heals (0 = no floor; 0..80)
     bool TankPickup = true;       // TankPickup: a tank taunts the mobs that are on party members (needs PartyViewPlanner and the core's party view)
     std::uint32_t HealerLosMoveYards = 6;
+    // PullTankFirst = 1 (default): in a dungeon, raid or tank-led party the members wait for the tank to be in combat before they engage its target (PullTankHoldMs: at most
+    // this long, default 12000; PullMemberRangeYards: a target this near a member needs no walk, default 12).
+    bool PullTankFirst = true;
+    std::uint32_t PullTankHoldMs = 12000;
+    std::uint32_t PullMemberRangeYards = 12;
     // ActionStats = 1: every minute the module logs the ten (bot, action, spell) combinations it sent most often in that minute ("actions_top"), to find a bot that
     // repeats an action every tick. Off by default.
     bool ActionStats = false;

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // BotPolicy::Decide, a bot's turn: quests, the pull hold, targets, crowd control, taming, the fight watchdog and the movement set-up (the steps DecideBot runs in order; bot_policy.cpp).
 #include <algorithm>
+#include <cmath>
 #include "bot_policy_internal.h"
 
 void BotPolicy::TurnQuestsAndHold(DecideTick& tick, BotTurn& turn)
@@ -333,7 +334,33 @@ void BotPolicy::TurnTargeting(DecideTick& tick, BotTurn& turn)
         else if (targetRef == 0 && !turn.Avoided(state.ForcedTarget))
             targetRef = state.ForcedTarget;
     }
-    if (targetRef == 0 && partyMember && leaderSnap && leaderSnap->threat_target_guid != 0 && !tankHeadStart && !noSelfPull &&
+    // Tank first (PullTankFirst; dungeon, raid and tank-led parties only, the routeOn gate): while the leader (the tank) has a target but is not in combat with it yet, a
+    // member out of combat waits on the route instead of walking to the target (the 2026-11-12 ZG run: bots 2-13 left the route 5 s after the tank's pull and the pack
+    // killed them). It ends when the tank is in combat, the leader is dead or has no target, or PullTankHoldMs have passed since the hold began on that target. A target
+    // within PullMemberRangeYards of the member needs no walk and is not held.
+    bool pullHeld = false;
+    if (_options.PullTankFirst && routeOn && partyMember && leaderSnap && leaderSnap->life_state == 0 && leaderSnap->threat_target_guid != 0 &&
+        leaderSnap->in_combat == 0 && bot.in_combat == 0)
+    {
+        std::uint64_t const leaderTarget = leaderSnap->threat_target_guid;
+        if (state.PullHoldRef != leaderTarget)
+        {
+            state.PullHoldRef = leaderTarget;
+            state.PullHoldSinceMs = nowMs;
+        }
+        NearbyUnit const* near = FindLiveMob(nearby, leaderTarget);
+        bool const noWalk = near && std::hypot(near->pos_x - bot.pos_x, near->pos_y - bot.pos_y) <= float(_options.PullMemberRangeYards);
+        pullHeld = nowMs - state.PullHoldSinceMs < _options.PullTankHoldMs && !noWalk;
+        if (pullHeld && _options.OnEvent && (state.PullHoldLogMs == 0 || nowMs - state.PullHoldLogMs >= 10000))
+        {
+            state.PullHoldLogMs = nowMs;
+            _options.OnEvent("pull_hold: bot=" + std::to_string(bot.guid) + " reason=tank_first tank=" + std::to_string(leaderSnap->guid) + " target=" +
+                             std::to_string(forever_module::UnitRefEntry(leaderTarget)) + " held_ms=" + std::to_string(nowMs - state.PullHoldSinceMs));
+        }
+    }
+    else
+        state.PullHoldRef = 0;
+    if (targetRef == 0 && partyMember && leaderSnap && leaderSnap->threat_target_guid != 0 && !tankHeadStart && !noSelfPull && !pullHeld &&
         !turn.Avoided(leaderSnap->threat_target_guid))
     {
         // A leader that has not engaged the target (not in combat: it is still walking to it) and that stands on another level from the bot is not assisted: the

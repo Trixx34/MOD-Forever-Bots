@@ -160,6 +160,122 @@ void HealerKeepsAManaFloorInCombat()
     CHECK(!HealerAttacks(options, 4000));           // a higher floor holds the 80 % healer too
 }
 
+// PullTankFirst: a party of five on the route, bot 12 the warrior leader with a target 20 yards from the mage (bot 11), which is not in combat with it.
+struct TankFirstSetup
+{
+    PolicyOptions options;
+    WorldTickSnapshotView view;
+    std::uint64_t mob = 0;
+};
+
+TankFirstSetup TankFirstParty(bool tankFirst, std::uint32_t tankInCombat, std::uint32_t tankLife = 0)
+{
+    TankFirstSetup setup;
+    setup.options = AggressiveOptions();
+    setup.options.PartySize = 5;
+    setup.options.PartyCount = 1;
+    setup.options.ClassOf = [](std::uint64_t guid) { return guid == 12 ? 1u : guid == 11 ? 8u : 5u; };
+    setup.options.PullTankFirst = tankFirst;
+    setup.view = PartyView({ 10, 11, 12, 13, 14 });
+    NearbyUnit target = Hostile(7, 20.0f, 100);
+    target.guid = MakeUnitRef(8, 598, 7);
+    setup.mob = target.guid;
+    setup.view.bots[2].threat_target_guid = target.guid;
+    setup.view.bots[2].in_combat = tankInCombat;
+    setup.view.bots[2].life_state = tankLife;
+    AddNearby(setup.view, 1, target);
+    return setup;
+}
+
+// The first time (ms) bot 11 acts on the mob, or 0 if it never does inside 20 s.
+std::uint64_t MageEngagesAt(TankFirstSetup const& setup)
+{
+    BotPolicy policy(setup.options);
+    policy.SetRouteActive(true);
+    for (std::uint64_t at = 0; at <= 20000; at += 500)
+        for (BotAction const& action : policy.Decide(setup.view, at))
+            if (action.bot_guid == 11 && action.target_guid == setup.mob)
+                return at == 0 ? 1 : at;
+    return 0;
+}
+
+void MemberHoldsWhileTheTankIsNotInCombat()
+{
+    TankFirstSetup setup = TankFirstParty(true, 0);
+    std::uint64_t const at = MageEngagesAt(setup);
+    CHECK(at >= 12000);   // not before the hold ran out (the next test): the member stands on the route meanwhile
+}
+
+void MemberEngagesOnceTheTankIsInCombat()
+{
+    TankFirstSetup setup = TankFirstParty(true, 1);
+    std::uint64_t const at = MageEngagesAt(setup);
+    CHECK(at != 0 && at < 6000);
+}
+
+void PullHoldExpiresAfterTheHoldTime()
+{
+    TankFirstSetup setup = TankFirstParty(true, 0);
+    std::uint64_t const at = MageEngagesAt(setup);
+    CHECK(at >= 12000 && at <= 14000);
+    setup.options.PullTankHoldMs = 4000;
+    std::uint64_t const shorter = MageEngagesAt(setup);
+    CHECK(shorter >= 4000 && shorter < at);
+}
+
+void DeadTankDoesNotFreezeTheParty()
+{
+    TankFirstSetup setup = TankFirstParty(true, 0, 1);   // the tank is dead: no tank to wait for
+    std::uint64_t const at = MageEngagesAt(setup);
+    CHECK(at < 6000);
+}
+
+void PullTankFirstOffKeepsTheOldBehaviour()
+{
+    TankFirstSetup setup = TankFirstParty(false, 0);
+    std::uint64_t const at = MageEngagesAt(setup);
+    CHECK(at != 0 && at < 6000);
+}
+
+void PullHoldLeavesATargetWithinReachAlone()
+{
+    TankFirstSetup setup = TankFirstParty(true, 0);
+    setup.view.nearby[4].pos_x = 8.0f;   // the mage's slot: the mob is 8 yards away, inside PullMemberRangeYards
+    std::uint64_t const at = MageEngagesAt(setup);
+    CHECK(at != 0 && at < 6000);
+}
+
+void PullHoldNeverTouchesASoloBot()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PullTankFirst = true;
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = PartyView({ 10 });
+    NearbyUnit mob = Hostile(7, 5.0f, 100);
+    AddNearby(view, 0, mob);
+    bool acted = false;
+    for (std::uint64_t at = 0; at < 4000; at += 500)
+        for (BotAction const& action : policy.Decide(view, at))
+            acted = acted || (action.bot_guid == 10 && action.target_guid == mob.guid);
+    CHECK(acted);
+}
+
+void PullHoldLogsOncePerTenSeconds()
+{
+    TankFirstSetup setup = TankFirstParty(true, 0);
+    std::vector<std::string> events;
+    setup.options.OnEvent = [&events](std::string const& line) { events.push_back(line); };
+    BotPolicy policy(setup.options);
+    policy.SetRouteActive(true);
+    for (std::uint64_t at = 1000; at < 10000; at += 500)   // not 0: the log stamp's 0 means never
+        policy.Decide(setup.view, at);
+    std::size_t holds = 0;
+    for (std::string const& line : events)
+        if (line.find("pull_hold: bot=11 reason=tank_first tank=12 target=598 held_ms=") == 0)
+            ++holds;
+    CHECK(holds == 1);
+}
+
 } // namespace
 
 void RunPolicyTestsPart9()
@@ -170,4 +286,12 @@ void RunPolicyTestsPart9()
     TankUsesChallengingShoutForTwoLooseMobs();
     TankPickupNotBelowTheTaunt();
     HealerKeepsAManaFloorInCombat();
+    MemberHoldsWhileTheTankIsNotInCombat();
+    MemberEngagesOnceTheTankIsInCombat();
+    PullHoldExpiresAfterTheHoldTime();
+    DeadTankDoesNotFreezeTheParty();
+    PullTankFirstOffKeepsTheOldBehaviour();
+    PullHoldLeavesATargetWithinReachAlone();
+    PullHoldNeverTouchesASoloBot();
+    PullHoldLogsOncePerTenSeconds();
 }

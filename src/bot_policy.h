@@ -253,6 +253,12 @@ struct PolicyOptions
     std::uint32_t HealerCombatManaPct = 25;
     // TankPickup: the tank turn taunts a mob that is on a non-tank (the party view's loose mobs), and uses the area taunt for two or more. Acts only with PartyViewPlanner.
     bool TankPickup = true;
+    // PullTankFirst (dungeon, raid and tank-led parties only: the route rules, never a solo bot or a leveling party): a member waits on the route while the party leader (the
+    // tank) has a target but is not yet in combat with it, and assists once the tank is in combat or PullTankHoldMs has passed. A member whose target is already within
+    // PullMemberRangeYards of it need not walk and is not held. 0 = off here (the tests); the module's settings turn it on.
+    bool PullTankFirst = false;
+    std::uint64_t PullTankHoldMs = 12000;
+    std::uint32_t PullMemberRangeYards = 12;
     std::uint32_t HealerLosMoveYards = 6;
     // Combat drift (0.45.0; the 2026-11-07 sim: fights took 1000-1600 s of each 1800 s run and pulled the leaders 60-250 yards off their route). 0 = off here (the
     // tests); the module's settings turn them on by default. DungeonPullLeashYards: the route leader, out of a fight, pulls only a hostile within this many yards of
@@ -532,6 +538,9 @@ private:
         std::uint64_t FightStartMs = 0;
         std::uint64_t ThreatHoldRef = 0;                 // the target a threat hold is on (0 = not holding)
         std::uint64_t ThreatHoldSinceMs = 0;
+        std::uint64_t PullHoldRef = 0;                   // the leader target a tank-first pull hold started on (0 = none), PullHoldSinceMs when
+        std::uint64_t PullHoldSinceMs = 0;
+        std::uint64_t PullHoldLogMs = 0;                 // last pull_hold event (at most one per 10 s)
         std::uint64_t ThreatGraceUntilMs = 0;            // a hold that ran out its maximum: no new hold until then
         std::uint64_t ThreatDropAtMs = 0;                // a threat-drop ability may be tried again at this time
         std::uint64_t NextCastMs = 0;                    // global cooldown: no rotation cast before this
