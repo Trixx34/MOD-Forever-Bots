@@ -60,6 +60,8 @@ line to the module's stderr. A config reload updates the ramp, the random picks 
 | `DamageEventMinPct` | 20 | A non-lethal hit smaller than this percent of the bot's max health is dropped by the module (1 to 100); the core sends hits from its own `Modules.DamageEvent.MinPct` (default 20) up, and every killing blow |
 | `PullTankFirst` | 1 | In a dungeon, raid or tank-led party the members wait on the route while the leader (tank) has a target but is not in combat with it, and assist once it is; never for solo bots or leveling parties (0 = every member pulls on its own) |
 | `PullTankHoldMs` | 12000 | The longest a member waits for the tank, so a dead or stuck tank cannot freeze the party (1000 to 120000) |
+| `WarderPartyHold` | 1 | A raid member with no target of its own does not follow the tank into an Onyxian Warder's Fire Nova: it holds outside the nova while the tank pulls the Warder alone (0 = follow as before) |
+| `PullMinHpPct` | 60 | A member of a dungeon, raid or tank-led party below this health percent that nothing attacks stands and rests (at most 2 minutes) instead of engaging or joining the tank's fight; 0 = off (0 to 100) |
 | `PullMemberRangeYards` | 12 | A target this near a member is engaged at once, without a walk (0 to 40) |
 | `GhostTeleportHold` | 1 | A dungeon ghost's entrance or party teleport waits while a live hostile is within 30 yards of the destination (event `ghost_teleport_hold: ... reason=hostile`, at most one per 10 s per bot); 0 teleports at once as before |
 | `GhostTeleportHoldMaxMs` | 120000 | The longest a ghost is held for a hostile, per death (1000 to 3600000) |

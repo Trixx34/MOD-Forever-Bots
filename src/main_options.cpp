@@ -61,6 +61,8 @@ void PolicyFromSettings(PolicyOptions& policyOptions, BotSettings& settings)
     policyOptions.PullTankFirst = settings.PullTankFirst;
     policyOptions.PullTankHoldMs = settings.PullTankHoldMs;
     policyOptions.PullMemberRangeYards = settings.PullMemberRangeYards;
+    policyOptions.PullMinHpPct = settings.PullMinHpPct;
+    policyOptions.WarderPartyHold = settings.WarderPartyHold;
     policyOptions.HealerLosMoveYards = settings.HealerLosMoveYards;
     policyOptions.Gathering = settings.Gathering;
     if (!settings.CraftingFociFile.empty())

@@ -276,6 +276,102 @@ void PullHoldLogsOncePerTenSeconds()
     CHECK(holds == 1);
 }
 
+// The gaps of the tank-first pull: the member's own threat target while the tank is not fighting, and PullMinHpPct.
+TankFirstSetup OwnTargetParty(bool tankFirst)
+{
+    TankFirstSetup setup = TankFirstParty(tankFirst, 0);
+    setup.view.bots[2].threat_target_guid = 0;                 // the tank has no target ...
+    setup.view.bots[1].threat_target_guid = setup.mob;         // ... but the mage already has its own
+    return setup;
+}
+
+void MemberOwnTargetIsHeldWhileTheTankIsQuiet()
+{
+    CHECK(MageEngagesAt(OwnTargetParty(false)) != 0);          // off: as before
+    CHECK(MageEngagesAt(OwnTargetParty(true)) == 0);           // on: the member waits for the tank, however long
+}
+
+void MemberOwnTargetWithinReachOrAttackingIsNotHeld()
+{
+    TankFirstSetup near = OwnTargetParty(true);
+    near.view.nearby[4].pos_x = 8.0f;
+    CHECK(MageEngagesAt(near) != 0);
+    TankFirstSetup fighting = OwnTargetParty(true);
+    fighting.view.nearby[4].victim_ref = PlayerOf(13);        // the mob is on a party member: the party defends
+    CHECK(MageEngagesAt(fighting) != 0);
+}
+
+void MemberOwnTargetIsHeldInTheLogToo()
+{
+    TankFirstSetup setup = OwnTargetParty(true);
+    std::vector<std::string> events;
+    setup.options.OnEvent = [&events](std::string const& line) { events.push_back(line); };
+    BotPolicy policy(setup.options);
+    policy.SetRouteActive(true);
+    for (std::uint64_t at = 1000; at < 4000; at += 500)
+        policy.Decide(setup.view, at);
+    bool logged = false;
+    for (std::string const& line : events)
+        logged = logged || line.find("pull_hold: bot=11 reason=own_target") == 0;
+    CHECK(logged);
+}
+
+TankFirstSetup HurtMemberParty(std::uint32_t pct, std::uint32_t mageInCombat = 0)
+{
+    TankFirstSetup setup = TankFirstParty(true, 1);            // the tank is fighting: the mage would assist at once
+    setup.options.PullMinHpPct = 60;
+    setup.view.bots[1].max_health = 1800;
+    setup.view.bots[1].health = 1800 * pct / 100;
+    setup.view.bots[1].in_combat = mageInCombat;
+    return setup;
+}
+
+void HurtMemberDoesNotJoinTheTanksFight()
+{
+    CHECK(MageEngagesAt(HurtMemberParty(100)) != 0);           // healthy: assists
+    CHECK(MageEngagesAt(HurtMemberParty(49)) == 0);            // revived at 49%: rests
+    CHECK(MageEngagesAt(HurtMemberParty(61)) != 0);
+    TankFirstSetup off = HurtMemberParty(49);
+    off.options.PullMinHpPct = 0;
+    CHECK(MageEngagesAt(off) != 0);                            // setting off
+    CHECK(MageEngagesAt(HurtMemberParty(49, 1)) != 0);         // attacked (in combat): defends itself
+}
+
+void HurtMemberRestEndsAfterTheCap()
+{
+    TankFirstSetup setup = HurtMemberParty(49);
+    setup.options.PullRestMaxMs = 20000;
+    BotPolicy policy(setup.options);
+    policy.SetRouteActive(true);
+    std::uint64_t first = 0;
+    for (std::uint64_t at = 1000; at <= 60000 && first == 0; at += 1000)
+    {
+        setup.view.tick_number = at / 100;
+        for (BotAction const& action : policy.Decide(setup.view, at))
+            if (action.bot_guid == 11 && action.target_guid == setup.mob)
+                first = at;
+    }
+    CHECK(first >= 21000 && first <= 25000);
+}
+
+void HurtMemberLogsAndStandsStill()
+{
+    TankFirstSetup setup = HurtMemberParty(49);
+    std::vector<std::string> events;
+    setup.options.OnEvent = [&events](std::string const& line) { events.push_back(line); };
+    BotPolicy policy(setup.options);
+    policy.SetRouteActive(true);
+    bool moved = false;
+    for (std::uint64_t at = 1000; at < 6000; at += 500)
+        for (BotAction const& action : policy.Decide(setup.view, at))
+            moved = moved || (action.bot_guid == 11 && (action.type == ActionType::kMoveTo || action.type == ActionType::kFollow));
+    bool logged = false;
+    for (std::string const& line : events)
+        logged = logged || line.find("pull_hold: bot=11 reason=low_hp hp_pct=49") == 0;
+    CHECK(logged);
+    CHECK(!moved);
+}
+
 } // namespace
 
 void RunPolicyTestsPart9()
@@ -294,4 +390,10 @@ void RunPolicyTestsPart9()
     PullHoldLeavesATargetWithinReachAlone();
     PullHoldNeverTouchesASoloBot();
     PullHoldLogsOncePerTenSeconds();
+    MemberOwnTargetIsHeldWhileTheTankIsQuiet();
+    MemberOwnTargetWithinReachOrAttackingIsNotHeld();
+    MemberOwnTargetIsHeldInTheLogToo();
+    HurtMemberDoesNotJoinTheTanksFight();
+    HurtMemberRestEndsAfterTheCap();
+    HurtMemberLogsAndStandsStill();
 }

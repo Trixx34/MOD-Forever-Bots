@@ -312,6 +312,12 @@ struct BotSettings
     bool PullTankFirst = true;
     std::uint32_t PullTankHoldMs = 12000;
     std::uint32_t PullMemberRangeYards = 12;
+    // PullMinHpPct = 60 (default): a member of a dungeon, raid or tank-led party below this health percent that nothing attacks stands and rests instead of engaging or walking into the
+    // tank's fight (0 = off; at most 2 minutes, then it may engage again). Revived-at-49% members walked back into the pack that killed them (ZG, 2026-11-13).
+    std::uint32_t PullMinHpPct = 60;
+    // WarderPartyHold = 1 (default): in the Onyxia raid a member with no target of its own does not follow the tank into an Onyxian Warder's Fire Nova; it holds outside the nova
+    // while the tank pulls the Warder alone (2026-11-13 sim: 40 members followed the tank to 0-6 yards of the Warder and died to Fire Nova, 700 of 798 deaths).
+    bool WarderPartyHold = true;
     // DamageEvents = 1 (default): take in the core's damage events (PlayerScript.OnDamaged, protocol 29: a bot's killing blows and big hits with the real attacker and spell) for the
     // died: line and the run telemetry. DamageEventMinPct = 20: the module drops a non-lethal hit below this share of the bot's max health (the core's Modules.DamageEvent.MinPct is
     // the floor under it; killing blows are never dropped).

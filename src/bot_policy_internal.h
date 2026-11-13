@@ -789,6 +789,7 @@ struct BotPolicy::BotTurn
     bool stagingHold = false;                             // TurnBegin
     std::span<NearbyUnit const> nearby{};                 // TurnTargetMemory
     std::uint64_t deadParty = 0;
+    bool pullRest = false;                              // TurnTargeting: a hurt member of a route party (PullMinHpPct) that rests instead of fighting or following
     bool hurtRest = false;                              // TurnRevivedAndRoles: hurt and solo, out of combat: rests before it fights (kRecoverPullPct)
     bool lowHealth = false;                               // TurnRevivedAndRoles
     std::uint32_t classId = 0;

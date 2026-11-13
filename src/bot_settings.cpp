@@ -823,6 +823,8 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadBool(config, "PullTankFirst", settings.PullTankFirst, warnings);
     ReadKey(config, "PullTankHoldMs", 1000, 120000, settings.PullTankHoldMs, warnings);
     ReadKey(config, "PullMemberRangeYards", 0, 40, settings.PullMemberRangeYards, warnings);
+    ReadKey(config, "PullMinHpPct", 0, 100, settings.PullMinHpPct, warnings);
+    ReadBool(config, "WarderPartyHold", settings.WarderPartyHold, warnings);
     ReadKey(config, "HealerLosMoveYards", 3, 12, settings.HealerLosMoveYards, warnings);
     ReadBool(config, "AggressiveStart", settings.AggressiveStart, warnings);
     if (auto const it = config.find("DungeonTactics"); it != config.end())

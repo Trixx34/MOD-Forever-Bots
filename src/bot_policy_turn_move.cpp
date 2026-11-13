@@ -110,6 +110,13 @@ void BotPolicy::TurnMoveChoice(DecideTick& tick, BotTurn& turn)
         wanted = Decision{ ActionType::kMoveTo, 0, *healLosPoint };
         moveWhy = "heal_los";
     }
+    else if (turn.pullRest && targetRef == 0)
+    {
+        // A hurt member of a route party (PullMinHpPct) stands where it is and rests: it neither follows the leader into the fight nor pulls.
+        state.InFight = false;
+        wanted = Decision{ ActionType::kStop, 0 };
+        moveWhy = "pull_rest";
+    }
     else if (targetRef != 0)
         MoveToTarget(tick, turn);
     else
@@ -381,6 +388,21 @@ void BotPolicy::MoveWithoutTarget(DecideTick& tick, BotTurn& turn)
     }
     state.InFight = false;
     wanted = followRef ? Decision{ ActionType::kFollow, followRef } : Decision{ ActionType::kStop, 0 };
+    // WarderPartyHold: a member that follows the tank does not walk into an Onyxian Warder's Fire Nova with it (2026-11-13: members followed the tank to 0-6 yards of a Warder,
+    // every kite point was then refused, and the nova killed them). While a live Warder stands within the stand distance of the leader the member stays outside it; a member
+    // already inside is the kite branch's (TurnMoveChoice).
+    if (_options.WarderPartyHold && partyMember && turn.aoeWarder != nullptr && leaderSnap && leaderSnap->life_state == 0 && leaderSnap->map_id == bot.map_id && wanted.Type == ActionType::kFollow &&
+        std::hypot(leaderSnap->pos_x - turn.aoeWarder->pos_x, leaderSnap->pos_y - turn.aoeWarder->pos_y) < kAoeStandYards)
+    {
+        wanted = Decision{ ActionType::kStop, 0 };
+        turn.moveWhy = "warder_hold";
+        if (_options.OnEvent && (state.WarderHoldLogMs == 0 || nowMs - state.WarderHoldLogMs >= 10000))
+        {
+            state.WarderHoldLogMs = nowMs;
+            _options.OnEvent("warder_hold: bot=" + std::to_string(bot.guid) + " leader=" + std::to_string(leaderSnap->guid) + " dist=" +
+                             std::to_string(int(std::hypot(bot.pos_x - turn.aoeWarder->pos_x, bot.pos_y - turn.aoeWarder->pos_y))));
+        }
+    }
     // A member that has lost its leader in a dungeon (far away, or on another level of the instance, so that it has no way to follow) is put next to it after a while
     // (DungeonTeleport; the core's Bot.Actions.Teleport). Not in a fight, and not again for 30 seconds.
     // A leader just revived at the instance entrance is not followed there: it comes back to the party (leader_recover, in the route below).

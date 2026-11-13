@@ -260,6 +260,14 @@ struct PolicyOptions
     bool PullTankFirst = false;
     std::uint64_t PullTankHoldMs = 12000;
     std::uint32_t PullMemberRangeYards = 12;
+    // PullMinHpPct: a member of a route party below this health percent, not in combat, starts no fight and does not walk to the leader's fight; it stands and rests (at most
+    // 2 minutes). 0 = off here (the tests); the module's settings default to 60.
+    std::uint32_t PullMinHpPct = 0;
+    std::uint64_t PullRestMaxMs = 120000;   // a hurt member rests at most this long before it may engage again, so a party with no healer is not frozen
+    // WarderPartyHold: a party member with no target of its own does not follow its leader (the tank) into an Onyxian Warder's Fire Nova: while a live Warder stands within
+    // the nova stand distance of the leader, the member holds where it is (outside it) and the tank pulls the Warder alone; the members then fight it from range as before.
+    // 0 = off here (the tests); the module's settings default to on.
+    bool WarderPartyHold = false;
     std::uint32_t HealerLosMoveYards = 6;
     // Combat drift (0.45.0; the 2026-11-07 sim: fights took 1000-1600 s of each 1800 s run and pulled the leaders 60-250 yards off their route). 0 = off here (the
     // tests); the module's settings turn them on by default. DungeonPullLeashYards: the route leader, out of a fight, pulls only a hostile within this many yards of
@@ -543,6 +551,9 @@ private:
         std::uint64_t ThreatHoldSinceMs = 0;
         std::uint64_t PullHoldRef = 0;                   // the leader target a tank-first pull hold started on (0 = none), PullHoldSinceMs when
         std::uint64_t PullHoldSinceMs = 0;
+        std::uint64_t PullRestSinceMs = 0;               // a hurt member (PullMinHpPct) started resting at this time (0 = not resting)
+        std::uint64_t PullRestLogMs = 0;
+        std::uint64_t WarderHoldLogMs = 0;                // last warder_hold event (at most one per 10 s)
         std::uint64_t PullHoldLogMs = 0;                 // last pull_hold event (at most one per 10 s)
         std::uint64_t ThreatGraceUntilMs = 0;            // a hold that ran out its maximum: no new hold until then
         std::uint64_t ThreatDropAtMs = 0;                // a threat-drop ability may be tried again at this time
