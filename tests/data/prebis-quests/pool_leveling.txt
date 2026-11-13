@@ -1,0 +1,17 @@
+# fixture pool, leveling list
+start W0_0_0   # 3 quests, levels 52-58
+anchor 0 10.0 10.0 1.0
+quest 100 giver 10.0 10.0 1.0 ender 10.0 10.0 1.0
+req 100 level 52
+hunt 100 0 3 1111
+area 100 20.0 20.0 1.0
+quest 101 giver 12.0 10.0 1.0 ender 12.0 10.0 1.0
+req 101 level 53 prev 100
+quest 102 giver 14.0 10.0 1.0 ender 14.0 10.0 1.0
+req 102 level 58
+reward 102
+
+start W0_5_5   # 1 quests
+anchor 0 500.0 500.0 1.0
+quest 105 giver 500.0 500.0 1.0 ender 500.0 500.0 1.0
+req 105 level 60

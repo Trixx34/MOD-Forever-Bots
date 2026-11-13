@@ -1,0 +1,9 @@
+# fixture pool, level 60 list
+start W0_0_0   # 3 quests
+anchor 0 11.0 10.0 1.0
+quest 200 giver 30.0 10.0 1.0 ender 30.0 10.0 1.0
+req 200 level 60
+quest 201 giver 30.0 10.0 1.0 ender 30.0 10.0 1.0
+req 201 level 60 prev 200
+quest 202 giver 32.0 10.0 1.0 ender 32.0 10.0 1.0
+req 202 level 60 prev 201 classes 5

@@ -354,6 +354,8 @@ if(Python3_Interpreter_FOUND)
     add_test(NAME make_rotations COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/make_rotations_test.py ${CMAKE_CURRENT_SOURCE_DIR})
     # The world database tools: dump_to_sqlite.py and export_world_quests.py on a tiny made-up dump.
     add_test(NAME world_data COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/world_data_test.py ${CMAKE_CURRENT_SOURCE_DIR})
+    # The pre-raid quest lists and attunement chains made by tools/gen_prebis_quests.py (doc/pre-raid-progression.md).
+    add_test(NAME gen_prebis_quests COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/gen_prebis_quests_test.py ${CMAKE_CURRENT_SOURCE_DIR})
 endif()
 
 add_executable(sell_test tests/sell_test.cpp)

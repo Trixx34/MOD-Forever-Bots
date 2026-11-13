@@ -1,0 +1,13 @@
+# Attunement rules for tools/gen_prebis_quests.py (doc/pre-raid-progression.md). Format: attunement <name> <alliance|horde|both> <final quest id>
+# The chain is the final quest and the quests that lead to it (PrevQuestID, RewardNextQuest) in the world database. Ids are quest ids, checked against
+# quest_template of forever_test_world; no item entry is named here.
+# Onyxia: Drakefire Amulet (Alliance: The Dragon's Eye leads to 6502, Horde: Blood of the Black Dragon Champion).
+attunement onyxia alliance 6502
+attunement onyxia horde 6602
+# Molten Core: Attunement to the Core (Lothos Riftwaker, both sides).
+attunement mc both 7848
+# Blackwing Lair: Blackhand's Command (the Mark of Drakkisath; the Orb of Command in Lower Blackrock Spire).
+attunement bwl both 7761
+# Upper Blackrock Spire key: Seal of Ascension.
+attunement ubrs_key both 4743
+# Zul'Gurub, Ruins of Ahn'Qiraj, Temple of Ahn'Qiraj and Naxxramas need none (no entry here).
