@@ -54,6 +54,13 @@ add|309|14965|0|Bloodseeker Bat
 # within 15 yards of the route leg (the lone thrower and priest at the next turn are 9 yards off it and are still pulled). Gurubashi Axe Throwers are killed before the rest.
 leash|309|15|ZG shelf pack: no pulls farther than 15 yards off the route
 add|309|11350|1|Gurubashi Axe Thrower
+# The leash above did not stop the pack: the lone thrower beside the route (route_yards 5-9, inside the leash) was pulled, and the leader, now in a fight, took the next target by the chase
+# leash of 40 (11371/11372 stand 23-33 yards off the leg: 393 pulls, 1069 deaths to Axe Flurry in the 2026-11-13 run; the leash now holds for that pick too). The tank pulls the pack
+# from the route's point 9 (-11810,-1317,62), 72 yards from the four shelf throwers (-11882..-11911,-1316..-1327, z 77.5; sim creature table 2026-11-13) and 20 from the lone one
+# (-11830.6,-1317, z 66.7), and goes back there once the pull has landed; the other members wait. Positions are from the creature table, not tested for line of sight.
+pullpos|309|11350|-11810|-1317|62|8|ZG shelf pack: pull from route point 9
+pullpos|309|11371|-11810|-1317|62|8|ZG shelf pack: pull from route point 9
+pullpos|309|11372|-11810|-1317|62|8|ZG shelf pack: pull from route point 9
 # Great Heal (Gurubashi priests, Jeklik), Drain Life, Mind Flay
 interrupt|309|23954|Great Heal
 interrupt|309|24208|Great Heal

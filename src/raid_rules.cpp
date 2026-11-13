@@ -34,6 +34,11 @@ bool Radius(std::string const& text, float& out)
     return text_number::ParseDecimal(text, out) && std::isfinite(out) && out > 0.0f && out <= 200.0f;
 }
 
+bool Coordinate(std::string const& text, float& out)
+{
+    return text_number::ParseDecimal(text, out) && std::isfinite(out) && std::fabs(out) <= 100000.0f;
+}
+
 std::optional<DispelKind> KindOf(std::string const& text)
 {
     if (text == "magic")
@@ -144,6 +149,14 @@ Table Parse(std::string_view text, std::vector<std::string>& errors)
             else
                 table.Edit(map).PullLeash = a;
         }
+        else if (kind == "pullpos")
+        {
+            float x = 0.0f, y = 0.0f, z = 0.0f, yards = 0.0f;
+            if (f.size() < 7 || !Id(f[2], a) || !Coordinate(f[3], x) || !Coordinate(f[4], y) || !Coordinate(f[5], z) || !Radius(f[6], yards) || yards < 2.0f || yards > 40.0f)
+                bad("pullpos: expected 'pullpos|map|entry|x|y|z|yards|name' (yards 2..40)");
+            else if (!table.Edit(map).PullPositions.emplace(a, PullPosition{ x, y, z, yards }).second)
+                bad("pullpos: entry " + std::to_string(a) + " is listed twice; the first position is kept");
+        }
         else if (kind == "noaoe")
         {
             if (!Id(f[2], a, true))
@@ -252,6 +265,14 @@ std::uint32_t Table::PullLeash(std::uint32_t map) const
 {
     MapRules const* r = Find(map);
     return r ? r->PullLeash : 0u;
+}
+
+std::optional<PullPosition> Table::PullPositionOf(std::uint32_t map, std::uint32_t entry) const
+{
+    if (MapRules const* r = Find(map))
+        if (auto const it = r->PullPositions.find(entry); it != r->PullPositions.end())
+            return it->second;
+    return std::nullopt;
 }
 
 bool Table::NoAoe(std::uint32_t map, std::uint32_t bossEntry) const

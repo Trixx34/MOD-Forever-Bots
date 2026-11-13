@@ -19,7 +19,9 @@
 //   avoid_enemy|map|entry|yards|who|name       a non-tank member of group `who` keeps at least `yards` from a live hostile of this entry (Holy Nova, a charging add, melee reach)
 //   purge|map|aura_id|name                     an aura on an enemy that a priest (Dispel Magic), shaman (Purge) or hunter (Tranquilizing Shot) removes, seen in the target_auras of a member's current target
 //   mindcontrol|map|aura_id|name               a member carrying this aura is mind controlled: nobody attacks it and a mage polymorphs it
-//   leash|map|yards|name                       the route leader of a dungeon party pulls only hostiles within `yards` (10..80) of the route leg on this map (narrows DungeonPullLeashYards, never widens it)
+//   leash|map|yards|name                       the route leader of a dungeon party pulls only hostiles within `yards` (10..80) of the route leg on this map (narrows DungeonPullLeashYards, never widens it); it also narrows the pick of a new target by a party in a fight (the chase leash), not the defence against what attacks
+//   pullpos|map|entry|x|y|z|yards[|name]       the tank pulls a creature of this entry from this position (outside its throw range, or behind a corner): it walks to within `yards` (2..40) of the point
+//                                              before it pulls, goes back to it once the pull has landed, and the other members stay where they are until the tank is in the fight
 #pragma once
 
 #include <cstdint>
@@ -53,17 +55,12 @@ struct TankSwap
 constexpr std::uint8_t kWhoMelee = 1, kWhoRanged = 2, kWhoHealers = 4, kWhoAll = 7;
 
 struct SpreadRule
+struct PullPosition
 {
-    std::uint32_t Entry = 0;        // the hostile's creature entry, 0 = any engaged hostile of the map
+    float X = 0.0f;
+    float Y = 0.0f;
+    float Z = 0.0f;
     float Yards = 0.0f;
-    std::uint8_t Who = kWhoAll;
-};
-
-struct EnemyZone
-{
-    std::uint32_t Entry = 0;
-    float Yards = 0.0f;
-    std::uint8_t Who = kWhoAll;
 };
 
 struct MapRules
@@ -81,6 +78,7 @@ struct MapRules
     std::vector<EnemyZone> AvoidEnemy;
     std::map<std::uint32_t, std::string> Purge;             // enemy aura id -> name
     std::map<std::uint32_t, std::string> MindControl;       // aura id on a member -> name
+    std::map<std::uint32_t, PullPosition> PullPositions;    // creature entry -> where the tank pulls it from
 };
 
 class Table
@@ -110,6 +108,8 @@ public:
     bool HasAvoidEnemy(std::uint32_t map) const;
     bool IsPurgeAura(std::uint32_t map, std::uint32_t aura) const;
     bool IsMindControlAura(std::uint32_t map, std::uint32_t aura) const;
+    // Where the tank pulls a creature of this entry from, nullopt when the map has no `pullpos` row for it.
+    std::optional<PullPosition> PullPositionOf(std::uint32_t map, std::uint32_t entry) const;
     bool IsFrontal(std::uint32_t map, std::uint32_t bossEntry, std::uint32_t spell) const;
     // A frontal row of any boss of the map names the spell (a telegraph carries a caster ref, not a boss entry).
     bool IsFrontalAny(std::uint32_t map, std::uint32_t spell) const;
