@@ -865,6 +865,10 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadBool(config, "AvoidGroundEffects", settings.AvoidGroundEffects, warnings);
     ReadBool(config, "TelegraphEscape", settings.TelegraphEscape, warnings);
     ReadBool(config, "TelegraphEscapeCasters", settings.TelegraphEscapeCasters, warnings);
+    ReadBool(config, "RaidSpread", settings.RaidSpread, warnings);
+    ReadBool(config, "RaidAvoidEnemy", settings.RaidAvoidEnemy, warnings);
+    ReadBool(config, "RaidPurge", settings.RaidPurge, warnings);
+    ReadBool(config, "RaidMindControl", settings.RaidMindControl, warnings);
     if (auto const it = config.find("AvoidSpellsFile"); it != config.end())
         settings.AvoidSpellsFile = it->second;
     if (auto const it = config.find("RaidRulesFile"); it != config.end())

@@ -421,6 +421,14 @@ Module.forever-bots.TelemetrySummarySec = 60
 # first, the dispel kind of an aura (curse, magic, poison, disease), ground effects to step out of (needs AvoidGroundEffects = 1 and the core's Bot.Snapshot.GroundEffects = 1),
 # the debuff that swaps the tanks and the no-area-damage fights. The party planner reads it, so it needs PartyPlanner on (the default). Empty = no rules. doc/raid-rules.md.
 # Module.forever-bots.RaidRulesFile = /srv/forever/sim/modules_runtime/forever-bots/data/raid_rules.txt
+# Four switches for the raid rule rows that act on positions and auras (each default ON, and each acts only through a row of its kind in RaidRulesFile for the map, so without rows
+# nothing changes): RaidSpread (`spread` rows: members of a group keep N yards apart while the boss is engaged; the planner names a clear point for the higher guid, one nudge per 5 s),
+# RaidAvoidEnemy (`avoid_enemy` rows: non-tank members of a group keep N yards from a hostile of an entry, Holy Nova style), RaidPurge (`purge` rows: a priest or shaman removes a listed
+# enemy buff; needs the enemy to be the current target of a bot, layout 24 target_auras), RaidMindControl (`mindcontrol` rows: nobody attacks a member with the aura, a mage polymorphs it).
+# Module.forever-bots.RaidSpread = 1
+# Module.forever-bots.RaidAvoidEnemy = 1
+# Module.forever-bots.RaidPurge = 1
+# Module.forever-bots.RaidMindControl = 1
 
 # Mounts: a bot asks to mount up for a long walk only from MountMinLevel (default 40: classic riding is learned at 40; 0 = any level).
 # Module.forever-bots.MountMinLevel = 40

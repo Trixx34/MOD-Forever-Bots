@@ -1,5 +1,7 @@
 #include "party_planner.h"
 
+#include "ground_avoid.h"
+
 #include <algorithm>
 #include <cmath>
 #include <utility>
@@ -210,6 +212,89 @@ bool Plan(Settings const& settings, std::vector<Member> const& members, std::vec
             break;      // one job per afflicted member per plan
         }
 
+    // Purge: one enemy aura of a purge row at a time (the lowest unit reference): the nearest ready purger in reach, then the next nearest as backup. A member
+    // that already has a dispel job, or is on an emergency heal, is left out.
+    order.Purges.clear();
+    {
+        Enemy const* target = nullptr;
+        for (Enemy const& e : enemies)
+            if (e.PurgeAura != 0 && e.Health != 0 && (!target || e.Ref < target->Ref))
+                target = &e;
+        std::unordered_map<std::uint64_t, std::uint64_t> purgeSeen;
+        if (target)
+        {
+            auto const at = order.PurgeSeenMs.find(target->Ref);
+            purgeSeen[target->Ref] = at != order.PurgeSeenMs.end() ? at->second : nowMs;
+            std::unordered_set<std::uint64_t> taken;
+            for (std::uint8_t rank = 0; rank < 2; ++rank)
+            {
+                Member const* best = nullptr;
+                float bestD = 0.0f;
+                for (Member const& m : members)
+                {
+                    if (!m.Alive || m.PurgeSpell == 0 || !m.DispelReady || dispellers.count(m.Guid) || emergencyHealers.count(m.Guid) || taken.count(m.Guid))
+                        continue;
+                    float const d = Dist(m, *target);
+                    if (d > settings.PurgeRangeYards)
+                        continue;
+                    if (!best || d < bestD || (d == bestD && m.Guid < best->Guid))
+                    {
+                        best = &m;
+                        bestD = d;
+                    }
+                }
+                if (!best)
+                    break;
+                taken.insert(best->Guid);
+                order.Purges.push_back({ best->Guid, target->Ref, target->PurgeAura, best->PurgeSpell, rank });
+            }
+        }
+        order.PurgeSeenMs = std::move(purgeSeen);
+    }
+
+    // Mind control: a member that carries a mindcontrol aura is listed (nobody attacks it) and held by the nearest ready member with a hold spell (rank 0), the next
+    // nearest as backup (rank 1). A caster holds one controlled member.
+    order.Controlled.clear();
+    order.Control.clear();
+    {
+        std::vector<Member const*> controlled;
+        for (Member const& m : members)
+            if (m.Alive && m.Controlled)
+                controlled.push_back(&m);
+        std::sort(controlled.begin(), controlled.end(), [](Member const* a, Member const* b) { return a->Guid < b->Guid; });
+        std::unordered_map<std::uint64_t, std::uint64_t> controlSeen;
+        std::unordered_set<std::uint64_t> taken;
+        for (Member const* victim : controlled)
+        {
+            order.Controlled.push_back(victim->Guid);
+            auto const at = order.ControlSeenMs.find(victim->Guid);
+            controlSeen[victim->Guid] = at != order.ControlSeenMs.end() ? at->second : nowMs;
+            for (std::uint8_t rank = 0; rank < 2; ++rank)
+            {
+                Member const* best = nullptr;
+                float bestD = 0.0f;
+                for (Member const& m : members)
+                {
+                    if (!m.Alive || m.Controlled || m.ControlCcSpell == 0 || !m.ControlReady || taken.count(m.Guid))
+                        continue;
+                    float const d = std::hypot(m.X - victim->X, m.Y - victim->Y);
+                    if (d > settings.PurgeRangeYards)
+                        continue;
+                    if (!best || d < bestD || (d == bestD && m.Guid < best->Guid))
+                    {
+                        best = &m;
+                        bestD = d;
+                    }
+                }
+                if (!best)
+                    break;
+                taken.insert(best->Guid);
+                order.Control.push_back({ best->Guid, victim->Guid, best->ControlCcSpell, rank });
+            }
+        }
+        order.ControlSeenMs = std::move(controlSeen);
+    }
+
     // Buffs: for each party buff spell some member offers, each living member gets it from a living member that offers it and is within reach, the one with the fewest members so far, then the nearest (a member's own cast on itself is not planned).
     order.Buffs.clear();
     std::vector<std::uint32_t> buffSpells;
@@ -253,6 +338,50 @@ bool Plan(Settings const& settings, std::vector<Member> const& members, std::vec
     for (Enemy const& e : enemies)
         if (e.NoAoe && e.Health != 0)
             order.NoAoe = true;
+
+    // Spread: for each rule an engaged enemy puts in force, the members of the rule's groups are settled one by one (a member that cannot move first, then by guid); one
+    // that stands closer than the rule's yards to a settled member is given the nearest point that is clear of all of them, within SpreadMaxMoveYards of where it is.
+    order.Spread.clear();
+    {
+        std::vector<SpreadRule> rules;
+        for (Enemy const& e : enemies)
+            if (e.Health != 0)
+                for (SpreadRule const& rule : e.Spread)
+                {
+                    bool known = false;
+                    for (SpreadRule const& have : rules)
+                        known = known || (have.Yards == rule.Yards && have.Who == rule.Who);
+                    if (!known)
+                        rules.push_back(rule);
+                }
+        std::unordered_set<std::uint64_t> nudged;
+        for (SpreadRule const& rule : rules)
+        {
+            std::vector<Member const*> group;
+            for (Member const& m : members)
+                if (m.Alive && (m.SpreadKind & rule.Who) != 0)
+                    group.push_back(&m);
+            std::sort(group.begin(), group.end(), [](Member const* a, Member const* b)
+            { return std::make_tuple(a->Movable ? 1 : 0, a->Guid) < std::make_tuple(b->Movable ? 1 : 0, b->Guid); });
+            std::vector<ground_avoid::Circle> settled;
+            for (Member const* m : group)
+            {
+                float x = m->X, y = m->Y;
+                if (m->Movable && !nudged.count(m->Guid) && ground_avoid::InsideAny(x, y, settled))
+                {
+                    if (auto const out = ground_avoid::EscapePoint(x, y, settled);
+                        out && std::hypot(out->X - x, out->Y - y) <= settings.SpreadMaxMoveYards)
+                    {
+                        order.Spread.push_back({ m->Guid, out->X, out->Y });
+                        nudged.insert(m->Guid);
+                        x = out->X;
+                        y = out->Y;
+                    }
+                }
+                settled.push_back({ x, y, std::max(0.0f, rule.Yards - 1.0f) });   // inside = closer than radius + 1 yard
+            }
+        }
+    }
 
     // Kill target: of the pack's units that nobody holds, the best kill rank, then a caster, then the weakest (lowest ref on a tie).
     order.KillTarget = 0;
@@ -344,6 +473,52 @@ DispelAssignment const* DispelFor(Order const* order, std::uint64_t bot)
 bool NoAoeNow(Order const* order)
 {
     return order && order->NoAoe;
+}
+
+SpreadAssignment const* SpreadFor(Order const* order, std::uint64_t bot)
+{
+    if (order)
+        for (SpreadAssignment const& a : order->Spread)
+            if (a.Bot == bot)
+                return &a;
+    return nullptr;
+}
+
+PurgeAssignment const* PurgeFor(Settings const& settings, Order const* order, std::uint64_t bot, std::uint64_t nowMs)
+{
+    if (!order)
+        return nullptr;
+    for (PurgeAssignment const& a : order->Purges)
+    {
+        if (a.Bot != bot)
+            continue;
+        if (a.Rank == 0)
+            return &a;
+        auto const seen = order->PurgeSeenMs.find(a.Target);
+        return seen != order->PurgeSeenMs.end() && nowMs >= seen->second + settings.BackupDelayMs ? &a : nullptr;
+    }
+    return nullptr;
+}
+
+bool IsControlled(Order const* order, std::uint64_t member)
+{
+    return order && std::find(order->Controlled.begin(), order->Controlled.end(), member) != order->Controlled.end();
+}
+
+ControlAssignment const* ControlFor(Settings const& settings, Order const* order, std::uint64_t bot, std::uint64_t nowMs)
+{
+    if (!order)
+        return nullptr;
+    for (ControlAssignment const& a : order->Control)
+    {
+        if (a.Bot != bot)
+            continue;
+        if (a.Rank == 0)
+            return &a;
+        auto const seen = order->ControlSeenMs.find(a.Target);
+        return seen != order->ControlSeenMs.end() && nowMs >= seen->second + settings.BackupDelayMs ? &a : nullptr;
+    }
+    return nullptr;
 }
 
 std::uint64_t CcTargetFor(Order const* order, std::uint64_t bot)

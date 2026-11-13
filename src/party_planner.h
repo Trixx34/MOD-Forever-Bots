@@ -22,6 +22,8 @@ struct Settings
     std::uint32_t TankHealBelowPct = 55;    // the tank (or leader) in combat is healed below this share
     float HealRangeYards = 30.0f;
     float BuffRangeYards = 30.0f;           // a party buff reaches members this close
+    float PurgeRangeYards = 30.0f;          // a purge, and the polymorph of a mind controlled member, reach this far
+    float SpreadMaxMoveYards = 15.0f;       // a spread nudge moves a member at most this far from where it stands
 };
 
 // One party member as the planner sees it.
@@ -52,6 +54,20 @@ struct Member
     std::vector<std::uint32_t> BuffSpells;  // the party buff spells (upkeep rows) the member can cast at its level
     std::uint32_t SwapStacks = 0;           // stacks of the rule table's tank swap aura on the member
     std::uint32_t SwapAt = 0;               // the stack count at which a tank holding it is swapped, 0 for no swap rule in this fight
+    // Raid rules, spacing and aura jobs (raid_rules.h rows spread, purge, mindcontrol).
+    std::uint8_t SpreadKind = 0;            // the spread group of the member (raid_rules::kWhoMelee, kWhoRanged, kWhoHealers), 0 for one that is never spread (a tank, an unknown role)
+    bool Movable = true;                    // false for a human (the plan cannot move it; its position still counts as taken)
+    std::uint32_t PurgeSpell = 0;           // the spell that removes a magic buff from an enemy (priest Dispel Magic, shaman Purge), 0 for none
+    std::uint32_t ControlCcSpell = 0;       // the spell that holds a mind controlled member (a mage's Polymorph), 0 for none
+    bool ControlReady = true;               // ControlCcSpell is not on cooldown or retry
+    bool Controlled = false;                // carries an aura of a mindcontrol row
+};
+
+// One spread rule in force: members of the groups in `Who` keep `Yards` apart.
+struct SpreadRule
+{
+    float Yards = 0.0f;
+    std::uint8_t Who = 7;
 };
 
 // One hostile unit in the party's merged view.
@@ -67,6 +83,8 @@ struct Enemy
     bool InterruptFirst = false;            // its cast is one the raid rules list to interrupt before any other cast
     bool NoAoe = false;                     // the raid rules say nobody uses area damage while it fights
     std::uint64_t Health = 0;
+    std::vector<SpreadRule> Spread;         // the spread rules of the raid rules that this engaged enemy puts in force
+    std::uint32_t PurgeAura = 0;            // an aura of a purge row that a member's target_auras shows on this enemy, 0 for none
     std::vector<std::uint32_t> CcSpells;    // the crowd control spells that may hold it (creature type, not a boss, not the kill priority, in the tank's pack)
 };
 
@@ -104,6 +122,29 @@ struct CcAssignment
     std::uint64_t Target = 0;
 };
 
+struct SpreadAssignment
+{
+    std::uint64_t Bot = 0;
+    float X = 0.0f, Y = 0.0f;               // where the member goes so that it stands clear of the others
+};
+
+struct PurgeAssignment
+{
+    std::uint64_t Bot = 0;
+    std::uint64_t Target = 0;               // the enemy unit reference
+    std::uint32_t Aura = 0;
+    std::uint32_t Spell = 0;
+    std::uint8_t Rank = 0;                  // 0 first choice, 1 backup (fires once the aura has been seen for BackupDelayMs)
+};
+
+struct ControlAssignment
+{
+    std::uint64_t Bot = 0;
+    std::uint64_t Target = 0;               // the mind controlled member's guid (the module's bot counter)
+    std::uint32_t Spell = 0;
+    std::uint8_t Rank = 0;
+};
+
 // One party's plan, kept across ticks under its leader.
 struct Order
 {
@@ -115,6 +156,12 @@ struct Order
     std::vector<InterruptAssignment> Interrupts;
     std::vector<CcAssignment> CrowdControl;
     std::vector<HealAssignment> Heals;      // one member per healer, the neediest first; a member nobody needs to heal is not listed
+    std::vector<SpreadAssignment> Spread;   // members too close to a lower-guid (or immovable) member of a spread group, each with its clear point
+    std::vector<PurgeAssignment> Purges;    // one enemy aura per plan: the nearest ready purger (rank 0) and the next nearest (rank 1)
+    std::vector<std::uint64_t> Controlled;  // the members that carry a mindcontrol aura: nobody attacks them
+    std::vector<ControlAssignment> Control; // per controlled member: the nearest ready polymorph caster (rank 0) and a backup (rank 1)
+    std::unordered_map<std::uint64_t, std::uint64_t> PurgeSeenMs;      // purge target -> when the plan first saw the aura
+    std::unordered_map<std::uint64_t, std::uint64_t> ControlSeenMs;    // controlled member -> when the plan first saw it controlled
     std::uint64_t KillTarget = 0;           // the unit the damage dealers share: best kill rank, then a caster, then the weakest; never one that is held
     std::unordered_map<std::uint64_t, std::uint64_t> CastSeenMs;   // casting target -> when the plan first saw it casting
     std::uint64_t LastPlannedMs = 0;
@@ -144,6 +191,18 @@ DispelAssignment const* DispelFor(Order const* order, std::uint64_t bot);
 
 // Whether the plan says nobody uses area damage now (the raid rules' noaoe row); false with no plan.
 bool NoAoeNow(Order const* order);
+
+// The point the plan moves `bot` to for spacing, nullptr for none.
+SpreadAssignment const* SpreadFor(Order const* order, std::uint64_t bot);
+
+// The purge the plan gives `bot` now: its rank 0 job, or its rank 1 job once the aura has been in view for settings.BackupDelayMs; nullptr for none.
+PurgeAssignment const* PurgeFor(Settings const& settings, Order const* order, std::uint64_t bot, std::uint64_t nowMs);
+
+// Whether `member` is mind controlled by the plan's reading (nobody attacks it).
+bool IsControlled(Order const* order, std::uint64_t member);
+
+// The polymorph the plan gives `bot` now (rank 0, or rank 1 after the backup delay), nullptr for none.
+ControlAssignment const* ControlFor(Settings const& settings, Order const* order, std::uint64_t bot, std::uint64_t nowMs);
 
 // The unit a bot is to hold, 0 if the plan holds none for it.
 std::uint64_t CcTargetFor(Order const* order, std::uint64_t bot);

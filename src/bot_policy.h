@@ -142,6 +142,11 @@ struct PolicyOptions
     bool AvoidGroundEffects = false;
     bool TelegraphEscape = true;          // raid maps only (a map with raid rules): step out of an enemy cast's area (TurnTelegraphEscape)
     bool TelegraphEscapeCasters = false;  // also a bot that is mid-cast, for a telegraph that is not lethal-class
+    // Raid rule rows that act on positions and auras (raid_rules.h: spread, avoid_enemy, purge, mindcontrol); each is on by default and does nothing without such a row.
+    bool RaidSpread = true;
+    bool RaidAvoidEnemy = true;
+    bool RaidPurge = true;
+    bool RaidMindControl = true;
     std::shared_ptr<ground_avoid::AvoidTable const> AvoidSpells;
     // The raid rule table (RaidRulesFile, raid_rules.h): the planner reads the interrupt-first casts, the dispel kinds, the tank swap aura and the no-AoE rule from it; the add
     // ranks are merged into each scenario's KillPriority at start; the ground-effect spells of its avoid rows join the hazard circles. Null = none.
@@ -657,6 +662,11 @@ private:
         ground_avoid::Point2 TelegraphDest{};            // where the bot walks to leave an enemy cast's area (kept like AvoidDest)
         std::uint64_t TelegraphSetMs = 0;
         std::uint64_t TelegraphLoggedMs = 0;
+        ground_avoid::Point2 SpacingDest{};              // where the bot walks for a spread nudge or out of an avoid_enemy zone (raid_rules.h)
+        std::uint64_t SpacingSetMs = 0;                  // when SpacingDest was chosen (0 = none)
+        std::uint64_t SpacingNextMs = 0;                 // a spread nudge is not started before this
+        std::uint64_t SpacingLoggedMs = 0;
+        std::uint64_t RaidCastLoggedMs = 0;              // the last raid_purge / raid_mindcontrol line
         std::uint64_t AvoidSetMs = 0;                    // when AvoidDest was chosen (0 = none)
         std::uint64_t AvoidLoggedMs = 0;                 // the last avoid_effect line for this bot (at most one per 10 s)
         std::uint64_t WalkBlockedAtMs = 0;               // when a move got the answer "no route": the walk (grind spot, hub, exploring) that began before it is over, and the bot picks another later
@@ -951,6 +961,8 @@ private:
     TurnFlow TurnCrowdControl(DecideTick& tick, BotTurn& turn);
     TurnFlow TurnOnyxiaCasts(DecideTick& tick, BotTurn& turn);
     TurnFlow TurnRaidRules(DecideTick& tick, BotTurn& turn);
+    TurnFlow TurnRaidSpacing(DecideTick& tick, BotTurn& turn);    // spread and avoid_enemy rows (bot_policy_raidrules.cpp)
+    TurnFlow TurnRaidAuras(DecideTick& tick, BotTurn& turn);      // purge and mindcontrol rows (bot_policy_raidrules.cpp)
     TurnFlow TurnTankPickup(DecideTick& tick, BotTurn& turn);   // taunts the mobs that are on party members (bot_policy_turn_cast.cpp)
     TurnFlow TurnTaming(DecideTick& tick, BotTurn& turn);
     void TurnFightWatch(DecideTick& tick, BotTurn& turn);

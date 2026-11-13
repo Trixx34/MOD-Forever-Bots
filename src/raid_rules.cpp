@@ -47,6 +47,24 @@ std::optional<DispelKind> KindOf(std::string const& text)
     return std::nullopt;
 }
 
+bool Yards(std::string const& text, float& out)
+{
+    return text_number::ParseDecimal(text, out) && std::isfinite(out) && out >= 2.0f && out <= 60.0f;
+}
+
+std::optional<std::uint8_t> WhoOf(std::string const& text)
+{
+    if (text == "all")
+        return kWhoAll;
+    if (text == "ranged")
+        return kWhoRanged;
+    if (text == "healers")
+        return kWhoHealers;
+    if (text == "melee")
+        return kWhoMelee;
+    return std::nullopt;
+}
+
 } // namespace
 
 Table Parse(std::string_view text, std::vector<std::string>& errors)
@@ -139,6 +157,24 @@ Table Parse(std::string_view text, std::vector<std::string>& errors)
                 bad("frontal: expected 'frontal|map|boss_entry|spell_id|name'");
             else
                 table.Edit(map).Frontal[a].insert(b);
+        }
+        else if (kind == "spread" || kind == "avoid_enemy")
+        {
+            auto const who = f.size() > 4 ? WhoOf(f[4]) : std::nullopt;
+            bool const any = kind == "spread";
+            if (f.size() < 5 || !Id(f[2], a, any) || !Yards(f[3], radius) || !who)
+                bad(kind + ": expected '" + kind + "|map|" + (any ? "boss_entry (0 = any)" : "entry") + "|yards (2..60)|all/ranged/healers/melee|name'");
+            else if (any)
+                table.Edit(map).Spread.push_back({ a, radius, *who });
+            else
+                table.Edit(map).AvoidEnemy.push_back({ a, radius, *who });
+        }
+        else if (kind == "purge" || kind == "mindcontrol")
+        {
+            if (!Id(f[2], a))
+                bad(kind + ": expected '" + kind + "|map|aura_spell_id|name'");
+            else
+                (kind == "purge" ? table.Edit(map).Purge : table.Edit(map).MindControl)[a] = f.size() > 3 ? f[3] : std::string();
         }
         else
             bad("unknown row kind '" + kind + "'");
@@ -244,6 +280,44 @@ bool Table::IsLethalSpell(std::uint32_t map, std::uint32_t spell) const
         if (!zone.Object && zone.Id == spell)
             return true;
     return false;
+}
+
+std::vector<SpreadRule> Table::SpreadFor(std::uint32_t map, std::uint32_t entry) const
+{
+    std::vector<SpreadRule> out;
+    if (MapRules const* r = Find(map))
+        for (SpreadRule const& rule : r->Spread)
+            if (rule.Entry == 0 || rule.Entry == entry)
+                out.push_back(rule);
+    return out;
+}
+
+std::vector<EnemyZone> Table::AvoidEnemyFor(std::uint32_t map, std::uint32_t entry) const
+{
+    std::vector<EnemyZone> out;
+    if (MapRules const* r = Find(map))
+        for (EnemyZone const& zone : r->AvoidEnemy)
+            if (zone.Entry == entry)
+                out.push_back(zone);
+    return out;
+}
+
+bool Table::HasAvoidEnemy(std::uint32_t map) const
+{
+    MapRules const* r = Find(map);
+    return r && !r->AvoidEnemy.empty();
+}
+
+bool Table::IsPurgeAura(std::uint32_t map, std::uint32_t aura) const
+{
+    MapRules const* r = Find(map);
+    return r && r->Purge.count(aura) != 0;
+}
+
+bool Table::IsMindControlAura(std::uint32_t map, std::uint32_t aura) const
+{
+    MapRules const* r = Find(map);
+    return r && r->MindControl.count(aura) != 0;
 }
 
 bool Table::IsFrontal(std::uint32_t map, std::uint32_t bossEntry, std::uint32_t spell) const

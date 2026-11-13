@@ -8,6 +8,10 @@
 #   swap|map|boss_entry|aura_id|stacks|name
 #   noaoe|map|boss_entry|name                    boss_entry 0 = every fight on the map
 #   frontal|map|boss_entry|spell_id|name
+#   spread|map|boss_entry|yards|who|name         who: all/ranged/healers/melee; boss_entry 0 = any engaged hostile of the map
+#   avoid_enemy|map|entry|yards|who|name
+#   purge|map|aura_spell_id|name
+#   mindcontrol|map|aura_spell_id|name
 # A spell id marked (check) was written from memory and is not yet confirmed against the spell data (none left: see doc/raid-rules.md).
 
 # ---- Onyxia's Lair (map 249, 40-man) ----
@@ -68,3 +72,18 @@ swap|309|14517|12097|3|Pierce Armor
 # radius is an estimate (not yet read from the spell data); a rule's radius overrides the snapshot's
 avoid|409|spell|19428|2.5|Lava Bomb (GO 177704)
 avoid|409|spell|21158|4|Lava Burst (GO 178088)
+
+# ---- Zul'Gurub: spacing, purge and mind control rows (added 2026-11-13) ----
+# Evidence (Trinity-Forever-Modules classic_boss_venoxis.cpp / classic_boss_hakkar.cpp, sim world DB creature_template_spell, SpellName/SpellEffect/SpellRadius.db2):
+#  - Venoxis (14507) casts Holy Nova 23858 on himself (SpellRadius 15 yards: verified), Renew 23895 on himself (periodic heal, aura type 8: verified) and Holy Wrath 23979 on his victim.
+#  - Hakkar (14834) casts Cause Insanity 24327 (aura type 6 = charm, plus 319 and 31: verified); the script skips a target that already carries it.
+# Venoxis' Holy Nova: the ranged damage dealers and the healers stay 15 yards from him (the tank and the melee do not move). Verified radius.
+avoid_enemy|309|14507|15|ranged|Venoxis Holy Nova (radius 15, SpellRadius)
+avoid_enemy|309|14507|15|healers|Venoxis Holy Nova (radius 15, SpellRadius)
+# Holy Wrath 23979 hits his victim (damage effect, verified); that it jumps to nearby members and how far is NOT in the data we read: the 10 yards are an estimate.
+spread|309|14507|10|ranged|Venoxis Holy Wrath (jump radius is an estimate)
+spread|309|14507|10|healers|Venoxis Holy Wrath (jump radius is an estimate)
+# Venoxis heals himself with Renew: a priest, shaman or hunter removes it
+purge|309|23895|Venoxis Renew
+# Hakkar's Cause Insanity (charm): the member is not attacked and a mage polymorphs it
+mindcontrol|309|24327|Hakkar Cause Insanity

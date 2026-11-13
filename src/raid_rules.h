@@ -15,6 +15,10 @@
 //   swap|map|boss_entry|aura_id|stacks|name    the tank holding `stacks` of this aura on it is swapped for another tank
 //   noaoe|map|boss_entry|name                  no area damage in this fight (boss_entry 0 = every fight on the map)
 //   frontal|map|boss_entry|spell_id|name       a frontal cast of the boss: the tank keeps the boss turned away from the raid (data only, see the README)
+//   spread|map|boss_entry|yards|who|name      while an engaged hostile of this entry is in view (0 = any), the planner's raid members of group `who` stay at least `yards` apart (chain lightning, bombs, Holy Wrath); who: all, ranged, healers or melee; tanks never move
+//   avoid_enemy|map|entry|yards|who|name       a non-tank member of group `who` keeps at least `yards` from a live hostile of this entry (Holy Nova, a charging add, melee reach)
+//   purge|map|aura_id|name                     an aura on an enemy that a priest (Dispel Magic), shaman (Purge) or hunter (Tranquilizing Shot) removes, seen in the target_auras of a member's current target
+//   mindcontrol|map|aura_id|name               a member carrying this aura is mind controlled: nobody attacks it and a mage polymorphs it
 //   leash|map|yards|name                       the route leader of a dungeon party pulls only hostiles within `yards` (10..80) of the route leg on this map (narrows DungeonPullLeashYards, never widens it)
 #pragma once
 
@@ -45,6 +49,23 @@ struct TankSwap
     std::uint32_t Stacks = 0;
 };
 
+// Who a spread or avoid_enemy row applies to (a bit mask): melee damage dealers, ranged damage dealers, healers. Tanks are never moved by either row.
+constexpr std::uint8_t kWhoMelee = 1, kWhoRanged = 2, kWhoHealers = 4, kWhoAll = 7;
+
+struct SpreadRule
+{
+    std::uint32_t Entry = 0;        // the hostile's creature entry, 0 = any engaged hostile of the map
+    float Yards = 0.0f;
+    std::uint8_t Who = kWhoAll;
+};
+
+struct EnemyZone
+{
+    std::uint32_t Entry = 0;
+    float Yards = 0.0f;
+    std::uint8_t Who = kWhoAll;
+};
+
 struct MapRules
 {
     std::map<std::uint32_t, std::string> Bosses;            // entry -> name
@@ -56,6 +77,10 @@ struct MapRules
     std::set<std::uint32_t> NoAoe;                          // boss entries, 0 = the whole map
     std::map<std::uint32_t, std::set<std::uint32_t>> Frontal; // boss entry -> frontal spell ids
     std::uint32_t PullLeash = 0;                            // yards, 0 = none
+    std::vector<SpreadRule> Spread;
+    std::vector<EnemyZone> AvoidEnemy;
+    std::map<std::uint32_t, std::string> Purge;             // enemy aura id -> name
+    std::map<std::uint32_t, std::string> MindControl;       // aura id on a member -> name
 };
 
 class Table
@@ -78,6 +103,13 @@ public:
     bool NoAoe(std::uint32_t map, std::uint32_t bossEntry) const;
     // The map's own pull leash in yards (0 = the map has none): the policy uses the smaller of this and DungeonPullLeashYards.
     std::uint32_t PullLeash(std::uint32_t map) const;
+    // The spread rows that apply to an engaged hostile of `entry` (rows of entry 0 apply to every one).
+    std::vector<SpreadRule> SpreadFor(std::uint32_t map, std::uint32_t entry) const;
+    // The avoid_enemy rows of a hostile of `entry`.
+    std::vector<EnemyZone> AvoidEnemyFor(std::uint32_t map, std::uint32_t entry) const;
+    bool HasAvoidEnemy(std::uint32_t map) const;
+    bool IsPurgeAura(std::uint32_t map, std::uint32_t aura) const;
+    bool IsMindControlAura(std::uint32_t map, std::uint32_t aura) const;
     bool IsFrontal(std::uint32_t map, std::uint32_t bossEntry, std::uint32_t spell) const;
     // A frontal row of any boss of the map names the spell (a telegraph carries a caster ref, not a boss entry).
     bool IsFrontalAny(std::uint32_t map, std::uint32_t spell) const;

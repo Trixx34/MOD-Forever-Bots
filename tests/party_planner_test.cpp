@@ -2,6 +2,7 @@
 // Unit tests for the party planner (party_planner.h). No core needed.
 #include "party_planner.h"
 
+#include <cmath>
 #include <cstdio>
 
 using namespace party_planner;
@@ -422,6 +423,237 @@ void BuffsIgnoreTheDeadAndTheFar()
     CHECK(far.Buffs.empty());
 }
 
+Member Spreadable(std::uint64_t guid, float x, float y, std::uint8_t kind)
+{
+    Member m;
+    m.Guid = guid;
+    m.X = x;
+    m.Y = y;
+    m.SpreadKind = kind;
+    return m;
+}
+
+Enemy SpreadBoss(float yards, std::uint8_t who)
+{
+    Enemy e;
+    e.Ref = 900;
+    e.Health = 1000;
+    e.Engaged = true;
+    e.Spread.push_back({ yards, who });
+    return e;
+}
+
+float Apart(Member const& a, SpreadAssignment const& n)
+{
+    return std::hypot(a.X - n.X, a.Y - n.Y);
+}
+
+void SpreadMovesTheHigherGuidAwayFromTheLower()
+{
+    Settings s = On();
+    Order o;
+    std::vector<Member> members{ Spreadable(1, 0, 0, 2), Spreadable(2, 3, 0, 2), Spreadable(3, 50, 0, 2) };
+    Plan(s, members, { SpreadBoss(10, 2) }, 1000, o);
+    CHECK(o.Spread.size() == 1);
+    SpreadAssignment const* nudge = SpreadFor(&o, 2);
+    CHECK(nudge != nullptr && SpreadFor(&o, 1) == nullptr && SpreadFor(&o, 3) == nullptr);
+    if (nudge)
+    {
+        CHECK(std::hypot(nudge->X - 0, nudge->Y - 0) >= 10.0f);     // at least `yards` from the member that stays
+        CHECK(Apart(members[1], *nudge) <= s.SpreadMaxMoveYards);
+    }
+}
+
+void SpreadClumpEndsUpClear()
+{
+    Settings s = On();
+    Order o;
+    std::vector<Member> members;
+    for (std::uint64_t g = 1; g <= 6; ++g)
+        members.push_back(Spreadable(g, float(g) * 0.5f, 0, 2));       // six ranged within 3 yards
+    Plan(s, members, { SpreadBoss(8, 2) }, 1000, o);
+    std::vector<std::pair<float, float>> at;
+    for (Member const& m : members)
+    {
+        SpreadAssignment const* n = SpreadFor(&o, m.Guid);
+        at.push_back(n ? std::make_pair(n->X, n->Y) : std::make_pair(m.X, m.Y));
+    }
+    for (std::size_t i = 0; i < at.size(); ++i)
+        for (std::size_t j = i + 1; j < at.size(); ++j)
+            CHECK(std::hypot(at[i].first - at[j].first, at[i].second - at[j].second) >= 8.0f - 0.01f);
+    CHECK(SpreadFor(&o, 1) == nullptr);                                 // the lowest guid stays
+}
+
+void SpreadOnlyTheNamedGroupsAndNeverTanksOrDeadOrWithoutAnEnemy()
+{
+    Settings s = On();
+    std::vector<Member> members{ Spreadable(1, 0, 0, 2), Spreadable(2, 2, 0, 1), Spreadable(3, 1, 1, 0), Spreadable(4, 1, 0, 2) };
+    members[3].Alive = false;
+    Order healersOnly;
+    Plan(s, members, { SpreadBoss(10, 4) }, 1000, healersOnly);
+    CHECK(healersOnly.Spread.empty());                                  // nobody is a healer
+    Order ranged;
+    Plan(s, members, { SpreadBoss(10, 2) }, 1000, ranged);
+    CHECK(ranged.Spread.empty());                                       // one ranged alive, the melee and the tank (kind 0) are not in the group
+    Order none;
+    Plan(s, members, {}, 1000, none);
+    CHECK(none.Spread.empty());                                         // no enemy puts a rule in force
+    Enemy dead = SpreadBoss(10, 7);
+    dead.Health = 0;
+    Order gone;
+    Plan(s, { Spreadable(1, 0, 0, 2), Spreadable(2, 1, 0, 2) }, { dead }, 1000, gone);
+    CHECK(gone.Spread.empty());
+}
+
+void SpreadKeepsAHumanInPlaceAndMovesTheBotAroundIt()
+{
+    Settings s = On();
+    Order o;
+    Member human = Spreadable(9, 0, 0, 7);
+    human.Movable = false;                                              // a higher guid, but it cannot be moved: it is settled first
+    Plan(s, { Spreadable(1, 2, 0, 2), human }, { SpreadBoss(10, 7) }, 1000, o);
+    CHECK(SpreadFor(&o, 9) == nullptr && SpreadFor(&o, 1) != nullptr);
+}
+
+void SpreadIsRecomputedEachPlanAndGoneWhenClear()
+{
+    Settings s = On();
+    Order o;
+    std::vector<Member> members{ Spreadable(1, 0, 0, 2), Spreadable(2, 3, 0, 2) };
+    Plan(s, members, { SpreadBoss(10, 2) }, 1000, o);
+    CHECK(o.Spread.size() == 1);
+    members[1].X = 30;
+    Plan(s, members, { SpreadBoss(10, 2) }, 2000, o);
+    CHECK(o.Spread.empty());
+}
+
+Member Purger(std::uint64_t guid, float x, std::uint32_t spell)
+{
+    Member m;
+    m.Guid = guid;
+    m.X = x;
+    m.PurgeSpell = spell;
+    return m;
+}
+
+Enemy Buffed(std::uint64_t ref, float x, std::uint32_t aura)
+{
+    Enemy e;
+    e.Ref = ref;
+    e.X = x;
+    e.Health = 1000;
+    e.PurgeAura = aura;
+    return e;
+}
+
+void PurgeGoesToTheNearestWithABackup()
+{
+    Settings s = On();
+    Order o;
+    Plan(s, { Purger(1, 20, 527), Purger(2, 5, 370), Purger(3, 8, 527), Member{} }, { Buffed(77, 0, 23895) }, 1000, o);
+    CHECK(o.Purges.size() == 2);
+    CHECK(o.Purges[0].Bot == 2 && o.Purges[0].Rank == 0 && o.Purges[0].Spell == 370 && o.Purges[0].Target == 77 && o.Purges[0].Aura == 23895);
+    CHECK(o.Purges[1].Bot == 3 && o.Purges[1].Rank == 1);
+    CHECK(PurgeFor(s, &o, 2, 1000) != nullptr);
+    CHECK(PurgeFor(s, &o, 3, 1000) == nullptr);                          // the backup waits
+    CHECK(PurgeFor(s, &o, 3, 1000 + s.BackupDelayMs) != nullptr);
+    CHECK(PurgeFor(s, &o, 4, 1000) == nullptr && PurgeFor(s, nullptr, 2, 1000) == nullptr);
+}
+
+void PurgeNeedsAnAuraReachAndAFreeCaster()
+{
+    Settings s = On();
+    Order none;
+    Plan(s, { Purger(1, 5, 527) }, { Buffed(77, 0, 0) }, 1000, none);
+    CHECK(none.Purges.empty());                                          // no listed aura on the enemy
+    Order far;
+    Plan(s, { Purger(1, 100, 527) }, { Buffed(77, 0, 23895) }, 1000, far);
+    CHECK(far.Purges.empty());                                           // out of reach
+    Order busy;
+    Member dispeller = Purger(1, 5, 527);
+    dispeller.DispelKinds = 1u << 1;
+    Member patient;
+    patient.Guid = 2;
+    patient.Debuffs.push_back({ 23952, 1 });
+    Plan(s, { dispeller, patient, Purger(3, 6, 370) }, { Buffed(77, 0, 23895) }, 1000, busy);
+    CHECK(DispelFor(&busy, 1) != nullptr);                               // the nearer priest cleans the member
+    CHECK(busy.Purges.size() == 1 && busy.Purges[0].Bot == 3);           // the shaman takes the enemy buff
+    Order notReady;
+    Member cooling = Purger(1, 5, 527);
+    cooling.DispelReady = false;
+    Plan(s, { cooling }, { Buffed(77, 0, 23895) }, 1000, notReady);
+    CHECK(notReady.Purges.empty());
+}
+
+void PurgeKeepsOnlyOneEnemyAndTheSeenTime()
+{
+    Settings s = On();
+    Order o;
+    Plan(s, { Purger(1, 5, 527), Purger(2, 6, 527) }, { Buffed(90, 1, 23895), Buffed(70, 2, 23895) }, 1000, o);
+    CHECK(!o.Purges.empty() && o.Purges[0].Target == 70);
+    Plan(s, { Purger(1, 5, 527), Purger(2, 6, 527) }, { Buffed(70, 2, 23895) }, 2000, o);
+    CHECK(o.PurgeSeenMs[70] == 1000);                                    // kept across plans
+    Plan(s, { Purger(1, 5, 527) }, {}, 3000, o);
+    CHECK(o.Purges.empty() && o.PurgeSeenMs.empty());
+}
+
+Member Sheeper(std::uint64_t guid, float x)
+{
+    Member m;
+    m.Guid = guid;
+    m.X = x;
+    m.ControlCcSpell = 118;
+    return m;
+}
+
+Member Charmed(std::uint64_t guid, float x)
+{
+    Member m;
+    m.Guid = guid;
+    m.X = x;
+    m.Controlled = true;
+    return m;
+}
+
+void MindControlIsHeldByTheNearestCasterWithABackup()
+{
+    Settings s = On();
+    Order o;
+    Plan(s, { Charmed(5, 0), Sheeper(1, 25), Sheeper(2, 10), Sheeper(3, 100) }, {}, 1000, o);
+    CHECK(IsControlled(&o, 5) && !IsControlled(&o, 1) && !IsControlled(nullptr, 5));
+    CHECK(o.Control.size() == 2);                                        // the third is out of reach
+    CHECK(o.Control[0].Bot == 2 && o.Control[0].Target == 5 && o.Control[0].Rank == 0 && o.Control[0].Spell == 118);
+    CHECK(o.Control[1].Bot == 1 && o.Control[1].Rank == 1);
+    CHECK(ControlFor(s, &o, 2, 1000) != nullptr && ControlFor(s, &o, 1, 1000) == nullptr);
+    CHECK(ControlFor(s, &o, 1, 1000 + s.BackupDelayMs) != nullptr && ControlFor(s, &o, 3, 5000) == nullptr);
+}
+
+void MindControlCasterRulesAndRelease()
+{
+    Settings s = On();
+    Order o;
+    Member cooling = Sheeper(1, 5);
+    cooling.ControlReady = false;
+    Member alsoCharmed = Sheeper(2, 6);
+    alsoCharmed.Controlled = true;                                       // a controlled caster does not cast at its fellow
+    Plan(s, { Charmed(5, 0), cooling, alsoCharmed }, {}, 1000, o);
+    CHECK(o.Controlled.size() == 2 && o.Control.empty());                // both carry the aura; nobody can hold them
+    Member dead = Charmed(5, 0);
+    dead.Alive = false;
+    Plan(s, { dead, Sheeper(1, 5) }, {}, 2000, o);
+    CHECK(o.Controlled.empty() && o.Control.empty());                    // a dead member is not held
+    Plan(s, { Sheeper(1, 5), Sheeper(2, 6) }, {}, 3000, o);
+    CHECK(o.Controlled.empty() && o.ControlSeenMs.empty());              // the aura ended
+}
+
+void NoRulesNothingChanges()
+{
+    Settings s = On();
+    Order o;
+    Plan(s, { Spreadable(1, 0, 0, 2), Spreadable(2, 1, 0, 2), Sheeper(3, 0), Purger(4, 0, 527) }, { Buffed(1, 0, 0) }, 1000, o);
+    CHECK(o.Spread.empty() && o.Purges.empty() && o.Controlled.empty() && o.Control.empty());
+}
+
 int main()
 {
     Disabled();
@@ -443,6 +675,17 @@ int main()
     BuffsGoToTheNearestOffer();
     BuffsSpreadOverTheCasters();
     BuffsIgnoreTheDeadAndTheFar();
+    SpreadMovesTheHigherGuidAwayFromTheLower();
+    SpreadClumpEndsUpClear();
+    SpreadOnlyTheNamedGroupsAndNeverTanksOrDeadOrWithoutAnEnemy();
+    SpreadKeepsAHumanInPlaceAndMovesTheBotAroundIt();
+    SpreadIsRecomputedEachPlanAndGoneWhenClear();
+    PurgeGoesToTheNearestWithABackup();
+    PurgeNeedsAnAuraReachAndAFreeCaster();
+    PurgeKeepsOnlyOneEnemyAndTheSeenTime();
+    MindControlIsHeldByTheNearestCasterWithABackup();
+    MindControlCasterRulesAndRelease();
+    NoRulesNothingChanges();
     if (failures)
     {
         std::printf("%d failure(s)\n", failures);

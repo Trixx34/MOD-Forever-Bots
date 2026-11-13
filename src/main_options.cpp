@@ -118,6 +118,10 @@ void PolicyFromSettings(PolicyOptions& policyOptions, BotSettings& settings)
     policyOptions.AvoidGroundEffects = settings.AvoidGroundEffects;
     policyOptions.TelegraphEscape = settings.TelegraphEscape;
     policyOptions.TelegraphEscapeCasters = settings.TelegraphEscapeCasters;
+    policyOptions.RaidSpread = settings.RaidSpread;
+    policyOptions.RaidAvoidEnemy = settings.RaidAvoidEnemy;
+    policyOptions.RaidPurge = settings.RaidPurge;
+    policyOptions.RaidMindControl = settings.RaidMindControl;
     if (settings.AvoidGroundEffects)
     {
         auto avoidTable = std::make_shared<ground_avoid::AvoidTable>();
