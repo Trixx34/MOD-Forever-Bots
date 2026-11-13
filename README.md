@@ -45,6 +45,7 @@ line to the module's stderr. A config reload updates the ramp, the random picks 
 | `MaxBots` | 1 | Bots controlled at once, 1 to 1500 (capped by the core's Tier 2 grant) |
 | `Race`, `Class` | 1, 1 | A race and class id, or `random` (a seeded pick over the Forever valid combinations, including the Skyborne races 95 and 96) |
 | `RandomSeed` | 1 | Seed for the random picks |
+| `ScenarioGearFile` | empty | Folder with one gear list per class (`<classId>.txt`, an item entry per line, `#` comments): the items a scenario grants a class instead of auto gear, for each class without its own `ScenarioGear<classId>`. `data/prebis/` holds the pre-raid lists made by `tools/gen_prebis.py`; needs `Bot.Actions.Grant` in the core. `doc/pre-raid-gear.md` |
 | `RaidRulesFile` | empty | Absolute path of `data/raid_rules.txt`, the raid rule table (adds first, interrupt-first casts, dispel kinds, avoid zones, tank swap, no-AoE); needs `PartyPlanner` on. `doc/raid-rules.md` |
 | `BotsInitial`, `BotsStep`, `BotsStepMinutes`, `BotsCap`, `BotsStopTime` | 300, 100, 15, 1500, 06:00 | The ramp: start count, bots added per step, minutes per step, the cap, and the local time it stops adding |
 | `ServiceEverySec` | 600 | Seconds between vendor visits for an idle bot (60 to 86400) |

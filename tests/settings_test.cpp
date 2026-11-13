@@ -3,6 +3,8 @@
 #include "bot_settings.h"
 
 #include <cstdio>
+#include <filesystem>
+#include <fstream>
 
 namespace {
 
@@ -585,8 +587,40 @@ void RunTelemetryDirSetting()
     CHECK(ParseBotSettings({}, warnings).TelemetryFile == "forever-bots-telemetry.csv");
 }
 
+
+// ScenarioGearFile: a folder of <classId>.txt lists feeds ScenarioGear<classId> for the classes that have no key of their own.
+void ScenarioGearFileSetting()
+{
+    CHECK((ParseGearList("# header\n\n  20309 # tunic\n20309\nnot a number\n13096\r\n 0\n") == std::vector<std::uint32_t>{ 20309, 13096 }));
+
+    std::filesystem::path const dir = std::filesystem::temp_directory_path() / ("forever-gear-" + std::to_string(std::rand()));
+    std::filesystem::create_directories(dir);
+    { std::ofstream(dir / "4.txt") << "# rogue\n100\n# slot=ring\n101\n"; }
+    { std::ofstream(dir / "8.txt") << "# mage\n200\n"; }
+    { std::ofstream(dir / "9.txt") << "# only comments\n"; }
+    std::unordered_map<std::string, std::string> config = {
+        { "Scenario", "dm" }, { "ScenarioRoster", "1:4,1:8,1:9" }, { "ScenarioLevel", "18" }, { "ScenarioEntry", "36 1 2 3" },
+        { "ScenarioGearFile", dir.string() }, { "ScenarioGear8", "7,8" },
+    };
+    std::vector<std::string> warnings;
+    BotSettings const settings = ParseBotSettings(config, warnings);
+    ScenarioSettings const& s = settings.Scenario;
+    CHECK(s.Gear.count(4) == 1 && s.Gear.at(4) == (std::vector<std::uint32_t>{ 100, 101 }));
+    CHECK(s.Gear.count(8) == 1 && s.Gear.at(8) == (std::vector<std::uint32_t>{ 7, 8 }));   // the explicit key wins over the file
+    CHECK(s.Gear.count(9) == 0);                                                            // a file with no entry leaves the class on auto gear
+    CHECK(warnings.empty());
+
+    config["ScenarioGearFile"] = (dir / "nowhere").string();
+    config.erase("ScenarioGear8");
+    std::vector<std::string> again;
+    BotSettings const empty = ParseBotSettings(config, again);
+    CHECK(empty.Scenario.Gear.empty() && !again.empty());
+    std::filesystem::remove_all(dir);
+}
+
 int main()
 {
+    ScenarioGearFileSetting();
     RealismSettings();
     CorpseRunTeleportSettings();
     GhostTeleportHoldSettings();

@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <algorithm>
 #include <charconv>
+#include <fstream>
 #include <limits>
 #include <sstream>
 #include <system_error>
@@ -312,7 +313,7 @@ void ReadOneScenario(std::unordered_map<std::string, std::string> const& config,
             else
                 warnings.push_back("Module.forever-bots.ScenarioAmmo: not a count from 0 to 2000; ignored.");
         }
-        else if (key.rfind("ScenarioGear", 0) == 0)
+        else if (key.rfind("ScenarioGear", 0) == 0 && key != "ScenarioGearFile")
         {
             std::uint32_t classId = 0;
             if (std::from_chars(key.data() + 12, key.data() + key.size(), classId).ec != std::errc{} || classId == 0)
@@ -333,6 +334,31 @@ void ReadOneScenario(std::unordered_map<std::string, std::string> const& config,
     std::sort(route.begin(), route.end(), [](auto const& a, auto const& b) { return a.first < b.first; });
     for (auto const& [n, point] : route)
         scenario.Route.push_back(point);
+
+    // ScenarioGearFile: a folder with one list per class, <classId>.txt (tools/gen_prebis.py writes data/prebis/). A class that has its own ScenarioGear<classId> key
+    // keeps that list; the other classes read their file. A missing file leaves the class on auto gear (no warning for a class with no list).
+    if (auto const dir = config.find("ScenarioGearFile"); dir != config.end() && !dir->second.empty())
+    {
+        bool any = false;
+        for (std::uint32_t classId = 1; classId <= 11; ++classId)
+        {
+            if (scenario.Gear.count(classId))
+                continue;
+            std::ifstream file(dir->second + "/" + std::to_string(classId) + ".txt");
+            if (!file)
+                continue;
+            std::stringstream text;
+            text << file.rdbuf();
+            std::vector<std::uint32_t> items = ParseGearList(text.str());
+            if (!items.empty())
+            {
+                scenario.Gear[classId] = std::move(items);
+                any = true;
+            }
+        }
+        if (!any)
+            warnings.push_back("Module.forever-bots.ScenarioGearFile: no <classId>.txt with an item in '" + dir->second + "'; the classes stay on auto gear.");
+    }
 }
 
 // A party is one faction: the server refuses an invite across the sides, so a roster with races of both could never form its party.
@@ -443,6 +469,26 @@ void ReadStopTime(std::unordered_map<std::string, std::string> const& config, st
 }
 
 } // namespace
+
+// One gear list file: an item entry at the start of a line, '#' starts a comment (to the end of the line), blank lines are skipped. Anything else on a
+// line after the number is ignored; a line that does not start with a number is ignored. The same entry twice is kept once (the first place).
+std::vector<std::uint32_t> ParseGearList(std::string const& text)
+{
+    std::vector<std::uint32_t> items;
+    std::istringstream lines(text);
+    std::string line;
+    while (std::getline(lines, line))
+    {
+        std::size_t const start = line.find_first_not_of(" \t\r");
+        if (start == std::string::npos || line[start] == '#')
+            continue;
+        std::uint32_t entry = 0;
+        if (std::from_chars(line.data() + start, line.data() + line.size(), entry).ec == std::errc{} && entry > 0 &&
+            std::find(items.begin(), items.end(), entry) == items.end())
+            items.push_back(entry);
+    }
+    return items;
+}
 
 bool IsScenarioList(std::string const& value)
 {
