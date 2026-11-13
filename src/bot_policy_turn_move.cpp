@@ -576,6 +576,57 @@ void BotPolicy::RouteReadiness(DecideTick& tick, BotTurn& turn, RouteLeg& route)
         if (auto const mana = _partyMana.find(bot.guid); mana != _partyMana.end() && mana->second.Holding(_options.PartyMana, bot.in_combat != 0, nowMs))
             route.manaReady = false;
     bool const& manaReady = route.manaReady;
+    // The ready gate before the next pull, and the wipe recovery's hold and rewind (scenario.cpp).
+    route.pullReady = true;
+    {
+        PolicyOptions const& o = _options;
+        WipeHold const wipe = WipeHoldOf(bot.guid);
+        if (wipe.RewindTo && wipe.Epoch != state.WipeEpochSeen)
+        {
+            state.WipeEpochSeen = wipe.Epoch;
+            if (*wipe.RewindTo < state.RouteIndex)
+            {
+                if (o.OnEvent)
+                    o.OnEvent("wipe_recovery: bot=" + std::to_string(bot.guid) + " reason=rewind from=" + std::to_string(state.RouteIndex) + " to=" + std::to_string(*wipe.RewindTo));
+                state.RouteIndex = *wipe.RewindTo;
+            }
+            state.RouteNoRoute = 0;
+            state.RouteStallSinceMs = 0;
+            state.Last.reset();
+        }
+        bool wipeWait = wipe.Hold && !wipe.LeaderFree;
+        bool tired = false;
+        char const* tiredWhy = "low_hp";
+        if (bot.in_combat == 0)
+        {
+            auto const check = [&](BotSnapshot const& member)
+            {
+                if (member.life_state != 0)
+                    return;
+                if (o.PullMinHpPct != 0 && &member != &bot && member.max_health > 0 && BelowPct(member.health, member.max_health, o.PullMinHpPct))
+                    tired = true, tiredWhy = "low_hp";
+                else if (o.PullReadyManaPct != 0 && member.power_type == 0 && member.max_power > 0 && BelowPct(member.power, member.max_power, o.PullReadyManaPct))
+                    tired = true, tiredWhy = "low_mana";
+            };
+            check(bot);
+            tick.ForEachPartyMember(bot.guid, check);
+        }
+        if (!tired)
+            state.PullReadyStartMs = 0;
+        else if (state.PullReadyStartMs == 0)
+            state.PullReadyStartMs = nowMs;
+        bool const gated = tired && nowMs - state.PullReadyStartMs < o.PullReadyMaxMs;
+        if (gated || wipeWait)
+        {
+            route.pullReady = false;
+            if (o.OnEvent && (state.PullReadyLogMs == 0 || nowMs - state.PullReadyLogMs >= 10000))
+            {
+                state.PullReadyLogMs = nowMs;
+                o.OnEvent("pull_hold: bot=" + std::to_string(bot.guid) + " reason=" + (wipeWait ? "wipe_hold" : tiredWhy) + " point=" + std::to_string(state.RouteIndex) +
+                          " wait_ms=" + std::to_string(state.PullReadyStartMs != 0 ? nowMs - state.PullReadyStartMs : 0));
+            }
+        }
+    }
     // A waypoint the core finds no route to (a spawn on a ledge or off the navmesh, a generated point inside a wall) would hold the whole run for
     // good: after kRouteNoRouteSkip refusals in a row the leader gives that point up and goes on to the next one.
     // A boss point is never skipped: the boss stands between the party and the rest of the dungeon (a locked door opens when it dies, or it guards
@@ -886,6 +937,7 @@ void BotPolicy::RouteWalkOn(DecideTick& tick, BotTurn& turn, RouteLeg& route)
     bool& together = route.together;
     bool const& strong = route.strong;
     bool const& manaReady = route.manaReady;
+    bool const& pullReady = route.pullReady;
     bool& recovering = route.recovering;
     bool& eventBusy = route.eventBusy;
     // A boss point is passed the same way once its boss is dead: the party pulled it and killed it away from its point (Targorr the Dread, the Stockade's point 0,
@@ -945,7 +997,7 @@ void BotPolicy::RouteWalkOn(DecideTick& tick, BotTurn& turn, RouteLeg& route)
             }
         }
     }
-    if (waypoint && together && strong && manaReady)
+    if (waypoint && together && strong && manaReady && pullReady)
     {
         state.RouteHealthHoldSinceMs = 0;
         wanted = Decision{ ActionType::kMoveTo, 0, *waypoint };
@@ -1047,7 +1099,7 @@ void BotPolicy::RouteWalkOn(DecideTick& tick, BotTurn& turn, RouteLeg& route)
                         farthest = member.guid;
                     }
             });
-            char const* why = !strong ? "health" : !manaReady ? "mana" : deadWaitKind != 0 ? "dead_member" : farthestYards > kRouteWaitYards ? "member_far" : "player_far";
+            char const* why = !strong ? "health" : !manaReady ? "mana" : !pullReady ? "pull_ready" : deadWaitKind != 0 ? "dead_member" : farthestYards > kRouteWaitYards ? "member_far" : "player_far";
             _options.OnEvent(std::string("route_hold: bot=") + std::to_string(bot.guid) + " point=" + std::to_string(state.RouteIndex) + "/" +
                              std::to_string(routePoints->size()) + " why=" + why + " hp_pct=" +
                              std::to_string(HealthPct(bot, 100)) + " farthest=" + std::to_string(farthest) +

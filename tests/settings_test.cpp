@@ -345,6 +345,11 @@ void DungeonLearningKnobsAreBounded()
     warnings.clear();
     CHECK(defaults.PullTankFirst && defaults.PullTankHoldMs == 12000 && defaults.PullMemberRangeYards == 12 && defaults.PullMinHpPct == 60);
     CHECK(ParseBotSettings({ { "PullMinHpPct", "0" } }, warnings).PullMinHpPct == 0 && warnings.empty());
+    CHECK(defaults.PullReadyManaPct == 60 && defaults.PullReadyMaxMs == 90000);
+    CHECK(defaults.WipeReadyPct == 80 && defaults.WipeReadyMaxMs == 240000 && defaults.WipeBackoffCount == 3 && defaults.WipeBackoffMs == 90000);
+    CHECK(ParseBotSettings({ { "PullReadyManaPct", "0" }, { "WipeBackoffCount", "0" }, { "WipeReadyPct", "0" } }, warnings).PullReadyManaPct == 0 && warnings.empty());
+    CHECK(ParseBotSettings({ { "WipeReadyMaxMs", "5" } }, warnings).WipeReadyMaxMs == 240000 && !warnings.empty());
+    warnings.clear();
     CHECK(defaults.WarderPartyHold && !ParseBotSettings({ { "WarderPartyHold", "0" } }, warnings).WarderPartyHold && warnings.empty());
     CHECK(defaults.TankLoosePickup && defaults.TankLooseCooldownMs == 2500 && defaults.TankLooseRangeYards == 40 && defaults.TankLooseChaseYards == 8);
     BotSettings const looseSet = ParseBotSettings({ { "TankLoosePickup", "0" }, { "TankLooseCooldownMs", "4000" }, { "TankLooseRangeYards", "30" }, { "TankLooseChaseYards", "0" } }, warnings);

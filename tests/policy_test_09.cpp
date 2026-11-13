@@ -497,6 +497,165 @@ void HurtMemberLogsAndStandsStill()
     CHECK(!moved);
 }
 
+// The ready gate before a pull: a mana user short of mana rests (pull_hold reason=low_mana) while the tank is quiet, at most PullReadyMaxMs.
+TankFirstSetup DryMageParty(std::uint32_t manaPct, std::uint32_t tankInCombat)
+{
+    TankFirstSetup setup = TankFirstParty(false, tankInCombat);   // tank-first off: only the ready gate holds the mage
+    setup.options.PullReadyManaPct = 60;
+    setup.options.PullReadyMaxMs = 8000;
+    setup.view.bots[1].power_type = 0;
+    setup.view.bots[1].max_power = 1000;
+    setup.view.bots[1].power = 10 * manaPct;
+    return setup;
+}
+
+void DryMemberRestsBeforeAPullAndNotLongerThanTheCap()
+{
+    CHECK(MageEngagesAt(DryMageParty(100, 0)) != 0 && MageEngagesAt(DryMageParty(100, 0)) < 6000);   // full mana: pulls as before
+    std::uint64_t const at = MageEngagesAt(DryMageParty(30, 0));
+    CHECK(at >= 8000 && at <= 11000);                                                                // dry: waits for the cap
+    CHECK(MageEngagesAt(DryMageParty(61, 0)) < 6000);
+    TankFirstSetup off = DryMageParty(30, 0);
+    off.options.PullReadyManaPct = 0;
+    CHECK(MageEngagesAt(off) < 6000);                                                                // setting off
+    CHECK(MageEngagesAt(DryMageParty(30, 1)) < 6000);                                                // the tank is already fighting: the mage helps
+}
+
+void DryMemberLogsLowMana()
+{
+    TankFirstSetup setup = DryMageParty(30, 0);
+    std::vector<std::string> events;
+    setup.options.OnEvent = [&events](std::string const& line) { events.push_back(line); };
+    BotPolicy policy(setup.options);
+    policy.SetRouteActive(true);
+    for (std::uint64_t at = 1000; at < 6000; at += 500)
+        policy.Decide(setup.view, at);
+    bool logged = false;
+    for (std::string const& line : events)
+        logged = logged || line.find("pull_hold: bot=11 reason=low_mana hp_pct=100 mana_pct=30") == 0;
+    CHECK(logged);
+}
+
+// The route leader does not walk on while a member is below PullMinHpPct or PullReadyManaPct; after PullReadyMaxMs it does.
+void LeaderHoldsTheNextPullForAWeakMember(bool mana)
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.ClassOf = WarriorLeads;
+    options.Route = { Point{ 100.0f, 0.0f, 0.0f }, Point{ 140.0f, 0.0f, 0.0f } };
+    options.PullMinHpPct = 60;
+    options.PullReadyManaPct = 60;
+    options.PullReadyMaxMs = 30000;
+    std::vector<std::string> events;
+    options.OnEvent = [&events](std::string const& line) { events.push_back(line); };
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    for (BotSnapshot& bot : view.bots)
+        bot.pos_x = 50.0f;
+    if (mana)
+    {
+        view.bots[3].power_type = 0;
+        view.bots[3].max_power = 1000;
+        view.bots[3].power = 200;
+    }
+    else
+        view.bots[3].health = 400;
+    std::uint32_t early = 0, late = 0;
+    for (std::uint64_t now = 0; now <= 20000; now += 1000)
+        early += LeaderWalk(policy.Decide(view, now)) == 100.0f;
+    for (std::uint64_t now = 40000; now <= 60000; now += 1000)
+        late += LeaderWalk(policy.Decide(view, now)) == 100.0f;
+    CHECK(early == 0);                                                // held while the member is weak
+    CHECK(late >= 1);                                                 // PullReadyMaxMs passed: it goes on
+    bool logged = false;
+    for (std::string const& line : events)
+        logged = logged || line.find(std::string("pull_hold: bot=12 reason=") + (mana ? "low_mana" : "low_hp")) == 0;
+    CHECK(logged);
+    view.bots[3].health = 1000;
+    view.bots[3].power = 1000;
+    BotPolicy fit(options);
+    fit.SetRouteActive(true);
+    std::uint32_t walks = 0;
+    for (std::uint64_t now = 0; now <= 5000; now += 1000)
+        walks += LeaderWalk(fit.Decide(view, now)) == 100.0f;
+    CHECK(walks >= 1);                                                // everybody fit: no hold
+}
+
+void LeaderHoldsForAHurtMember() { LeaderHoldsTheNextPullForAWeakMember(false); }
+void LeaderHoldsForADryMember() { LeaderHoldsTheNextPullForAWeakMember(true); }
+
+// The wipe hold from the director: members rest and the leader waits until it is free; a rewind sets the leader's route index back once.
+void WipeHoldHoldsMembersAndLeaderUntilFreed()
+{
+    auto const make = [](WipeHold& hold, std::vector<std::string>& events)
+    {
+        PolicyOptions options = AggressiveOptions();
+        options.PartySize = 5;
+        options.ClassOf = WarriorLeads;
+        options.Route = { Point{ 100.0f, 0.0f, 0.0f }, Point{ 140.0f, 0.0f, 0.0f } };
+        options.OnEvent = [&events](std::string const& line) { events.push_back(line); };
+        auto policy = std::make_unique<BotPolicy>(options);
+        policy->SetRouteActive(true);
+        policy->SetWipeHoldFor([&hold](std::uint64_t) { return hold; });
+        return policy;
+    };
+    WipeHold hold;
+    hold.Hold = true;
+    std::vector<std::string> events;
+    auto policy = make(hold, events);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    for (BotSnapshot& bot : view.bots)
+        bot.pos_x = 50.0f;
+    std::uint32_t walks = 0;
+    for (std::uint64_t now = 0; now <= 10000; now += 1000)
+        walks += LeaderWalk(policy->Decide(view, now)) == 100.0f;
+    CHECK(walks == 0);
+    bool logged = false;
+    for (std::string const& line : events)
+        logged = logged || line.find("pull_hold: bot=12 reason=wipe_hold") == 0;
+    CHECK(logged);
+    hold.LeaderFree = true;                                           // the tank goes first
+    for (std::uint64_t now = 11000; now <= 16000; now += 1000)
+        walks += LeaderWalk(policy->Decide(view, now)) == 100.0f;
+    CHECK(walks >= 1);
+}
+
+void WipeBackoffRewindsTheLeadersRouteIndexOnce()
+{
+    WipeHold hold;
+    std::vector<std::string> events;
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.ClassOf = WarriorLeads;
+    options.Route = { Point{ 100.0f, 0.0f, 0.0f }, Point{ 300.0f, 0.0f, 0.0f }, Point{ 500.0f, 0.0f, 0.0f } };
+    options.OnEvent = [&events](std::string const& line) { events.push_back(line); };
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    policy.SetWipeHoldFor([&hold](std::uint64_t) { return hold; });
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    for (BotSnapshot& bot : view.bots)
+        bot.pos_x = 295.0f;                                           // at point 1: the leader's index is there
+    float walk = -1.0f;
+    for (std::uint64_t now = 0; now <= 3000; now += 1000)
+        if (float const w = LeaderWalk(policy.Decide(view, now)); w >= 0.0f)
+            walk = w;
+    CHECK(walk == 500.0f);                                            // it walks to point 2 (point 1 is reached or passed)
+    for (BotSnapshot& bot : view.bots)
+        bot.pos_x = 250.0f;                                           // clear of every point
+    hold.Epoch = 1;
+    hold.RewindTo = 0;
+    walk = -1.0f;
+    for (std::uint64_t now = 5000; now <= 9000; now += 1000)
+        if (float const w = LeaderWalk(policy.Decide(view, now)); w >= 0.0f)
+            walk = w;
+    CHECK(walk == 100.0f);                                            // set back to point 0
+    bool logged = false;
+    for (std::string const& line : events)
+        logged = logged || line.find("wipe_recovery: bot=12 reason=rewind from=2 to=0") == 0;
+    CHECK(logged);
+}
+
 } // namespace
 
 void RunPolicyTestsPart9()
@@ -526,4 +685,10 @@ void RunPolicyTestsPart9()
     HurtMemberDoesNotJoinTheTanksFight();
     HurtMemberRestEndsAfterTheCap();
     HurtMemberLogsAndStandsStill();
+    DryMemberRestsBeforeAPullAndNotLongerThanTheCap();
+    DryMemberLogsLowMana();
+    LeaderHoldsForAHurtMember();
+    LeaderHoldsForADryMember();
+    WipeHoldHoldsMembersAndLeaderUntilFreed();
+    WipeBackoffRewindsTheLeadersRouteIndexOnce();
 }

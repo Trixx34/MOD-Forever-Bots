@@ -850,6 +850,7 @@ struct BotPolicy::RouteLeg
     bool together = true;                                 // RouteReadiness
     bool strong = false;
     bool manaReady = false;
+    bool pullReady = true;                                // RouteReadiness: the ready gate (members above PullMinHpPct and PullReadyManaPct, no wipe hold)
     bool recovering = false;                              // RouteReadiness, then RouteLeaderRecover
     bool eventBusy = false;                               // RouteEvents
 };

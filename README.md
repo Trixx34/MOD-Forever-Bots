@@ -67,6 +67,12 @@ line to the module's stderr. A config reload updates the ramp, the random picks 
 | `PullTankHoldMs` | 12000 | The longest a member waits for the tank, so a dead or stuck tank cannot freeze the party (1000 to 120000) |
 | `WarderPartyHold` | 1 | A raid member with no target of its own does not follow the tank into an Onyxian Warder's Fire Nova: it holds outside the nova while the tank pulls the Warder alone (0 = follow as before) |
 | `PullMinHpPct` | 60 | A member of a dungeon, raid or tank-led party below this health percent that nothing attacks stands and rests (at most 2 minutes) instead of engaging or joining the tank's fight; 0 = off (0 to 100) |
+| `PullReadyManaPct` | 60 | Ready gate before a pull in a route party: a mana user below this mana percent rests (event `pull_hold: ... reason=low_mana`) instead of pulling or joining a pull while the leader is out of combat, and the route leader does not walk on to the next pack while a member is below `PullMinHpPct` health or this mana; 0 = off (0 to 100) |
+| `PullReadyMaxMs` | 90000 | The longest the ready gate holds (leader and members), so a party with no drink is not frozen (1000 to 600000) |
+| `WipeReadyPct` | 80 | Wipe recovery (scenario runs with `ScenarioWipeRecovery = 1`): after a wipe nobody pulls until every bot has revived, stands on the entry map and has this health and mana percent; the tank is freed 6 s before the members; 0 = off (0 to 100). Events `wipe_recovery: ...` |
+| `WipeReadyMaxMs` | 240000 | The longest the wipe hold lasts, so a ghost that never comes back does not stop the run (10000 to 1800000) |
+| `WipeBackoffCount` | 3 | After this many wipes at the same route segment the run backs off: it holds `WipeBackoffMs` longer, puts the party at a safe route point two points before the pack and sets the leader back to it; 0 = off (0 to 20) |
+| `WipeBackoffMs` | 90000 | The extra wait of a backoff (0 to 900000) |
 | `PullMemberRangeYards` | 12 | A target this near a member is engaged at once, without a walk (0 to 40) |
 | `GhostTeleportHold` | 1 | A dungeon ghost's entrance or party teleport waits while a live hostile is within 30 yards of the destination (event `ghost_teleport_hold: ... reason=hostile`, at most one per 10 s per bot); 0 teleports at once as before |
 | `GhostTeleportHoldMaxMs` | 120000 | The longest a ghost is held for a hostile, per death (1000 to 3600000) |
