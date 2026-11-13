@@ -103,6 +103,24 @@ void TestSpacingAndAuraRows()
     CHECK(b.SpreadFor(309, 1).empty() && !b.HasAvoidEnemy(309) && !b.IsPurgeAura(309, 0));
 }
 
+void TestAvoidEnemyAuraRows()
+{
+    std::vector<std::string> errors;
+    Table t = Parse("avoid_enemy|309|11350|33|healers|always\n"
+                    "avoid_enemy_aura|309|11350|33|ranged|24018|Axe Flurry\n",
+                    errors);
+    CHECK(errors.empty());
+    auto const zones = t.AvoidEnemyFor(309, 11350);
+    CHECK(zones.size() == 2 && zones[0].Aura == 0 && zones[1].Aura == 24018 && zones[1].Who == kWhoRanged && zones[1].Yards == 33.0f);
+    CHECK(t.HasAvoidEnemy(309));
+    // bad rows: aura missing or 0, entry 0, yards out of range, unknown who
+    std::vector<std::string> bad;
+    Table b = Parse("avoid_enemy_aura|309|11350|33|ranged\navoid_enemy_aura|309|11350|33|ranged|0|x\navoid_enemy_aura|309|0|33|ranged|24018|x\n"
+                    "avoid_enemy_aura|309|11350|90|ranged|24018|x\navoid_enemy_aura|309|11350|33|nobody|24018|x\n", bad);
+    CHECK(bad.size() == 5);
+    CHECK(!b.HasAvoidEnemy(309));
+}
+
 void TestPullPosition()
 {
     std::vector<std::string> errors;
@@ -208,6 +226,7 @@ int main()
     TestWildcardNoAoe();
     TestLeash();
     TestSpacingAndAuraRows();
+    TestAvoidEnemyAuraRows();
     TestPullPosition();
     TestErrors();
     TestMerge();

@@ -182,6 +182,14 @@ Table Parse(std::string_view text, std::vector<std::string>& errors)
             else
                 table.Edit(map).AvoidEnemy.push_back({ a, radius, *who });
         }
+        else if (kind == "avoid_enemy_aura")
+        {
+            auto const who = f.size() > 4 ? WhoOf(f[4]) : std::nullopt;
+            if (f.size() < 6 || !Id(f[2], a) || !Yards(f[3], radius) || !who || !Id(f[5], b))
+                bad("avoid_enemy_aura: expected 'avoid_enemy_aura|map|entry|yards (2..60)|all/ranged/healers/melee|aura_id|name'");
+            else
+                table.Edit(map).AvoidEnemy.push_back({ a, radius, *who, b });
+        }
         else if (kind == "purge" || kind == "mindcontrol")
         {
             if (!Id(f[2], a))

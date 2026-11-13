@@ -755,6 +755,13 @@ struct BotPolicy::DecideTick
     // A leader or inviter reference that is one of this module's bots, as against a human player (both are players to the core).
     bool IsOurBot(std::uint64_t ref) const;
 
+    // Whether a hostile unit carries an aura, as far as the bots can tell: the snapshot lists auras only for a bot's current target (target_auras, at most
+    // kMaxTargetAuras). kSeen when a bot that has the unit as its target lists the aura; kAbsent when such a bot lists fewer than kMaxTargetAuras auras and not
+    // this one; kUnknown when no bot has it as its target (or every list is full). One scan of the view per unit and aura per tick (avoid_enemy_aura rows).
+    enum class AuraSeen : std::uint8_t { kUnknown, kAbsent, kSeen };
+    AuraSeen UnitAuraSeen(std::uint64_t unitRef, std::uint32_t aura) const;
+    mutable std::map<std::pair<std::uint64_t, std::uint32_t>, AuraSeen> unitAuraSeen;
+
     // The members of a leader's party that are online (not the leader).
     template <typename Fn>
     void ForEachPartyMember(std::uint64_t leaderGuid, Fn&& fn) const

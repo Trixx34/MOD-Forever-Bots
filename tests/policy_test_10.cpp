@@ -184,6 +184,47 @@ void AvoidEnemyMeleeStaysWhenOnlyRangedAreListed()
     CHECK(MovesOf(melee.Decide(RaidView(f), 1000), 11).size() == 1);
 }
 
+// ---- avoid_enemy_aura ----
+void AvoidEnemyAuraHoldsOnlyWhileTheAuraIsOnOrUnknown()
+{
+    RaidFixture f{ Classes, { { 40, 0 }, { 5, 0 }, { 1, 0 }, { -40, 0 }, { 0, 40 } }, false, 0.0f };     // mage 11 five yards from the unit; every bot targets it
+    char const* rule = "avoid_enemy_aura|309|14507|15|ranged|24018|Axe Flurry\n";
+    // the bots' target lists show the aura: the mage steps out
+    WorldTickSnapshotView seen = RaidView(f);
+    seen.bots[2].target_aura_count = 1;
+    seen.bots[2].target_auras[0].spell_id = 24018;
+    BotPolicy withAura(RaidOptions(Classes, rule));
+    CHECK(MovesOf(withAura.Decide(seen, 1000), 11).size() == 1);
+    // complete lists without the aura: no circle
+    WorldTickSnapshotView absent = RaidView(f);
+    absent.bots[2].target_aura_count = 1;
+    absent.bots[2].target_auras[0].spell_id = 772;
+    BotPolicy noAura(RaidOptions(Classes, rule));
+    CHECK(MovesOf(noAura.Decide(absent, 1000), 11).empty());
+    // one list without it, one with it: the aura wins
+    WorldTickSnapshotView mixed = absent;
+    mixed.bots[4].target_aura_count = 1;
+    mixed.bots[4].target_auras[0].spell_id = 24018;
+    BotPolicy both(RaidOptions(Classes, rule));
+    CHECK(MovesOf(both.Decide(mixed, 1000), 11).size() == 1);
+    // nobody targets the unit: unknown keeps the circle
+    WorldTickSnapshotView unknown = RaidView(f);
+    for (BotSnapshot& bot : unknown.bots)
+        bot.threat_target_guid = 0;
+    BotPolicy noWatcher(RaidOptions(Classes, rule));
+    CHECK(MovesOf(noWatcher.Decide(unknown, 1000), 11).size() == 1);
+    // only full lists (8 auras, none of them the row's): unknown, the circle stays
+    WorldTickSnapshotView full = RaidView(f);
+    for (BotSnapshot& bot : full.bots)
+    {
+        bot.target_aura_count = forever_module::kMaxTargetAuras;
+        for (std::size_t a = 0; a < forever_module::kMaxTargetAuras; ++a)
+            bot.target_auras[a].spell_id = 1000 + std::uint32_t(a);
+    }
+    BotPolicy fullLists(RaidOptions(Classes, rule));
+    CHECK(MovesOf(fullLists.Decide(full, 1000), 11).size() == 1);
+}
+
 // ---- purge ----
 void PurgeCastsDispelMagicOnTheBuffedBoss()
 {
@@ -277,6 +318,7 @@ void RunPolicyTestsPart10()
     AvoidEnemyMovesARangedMemberOutOfTheCircle();
     AvoidEnemyHonoursGroupSwitchAndCasting();
     AvoidEnemyMeleeStaysWhenOnlyRangedAreListed();
+    AvoidEnemyAuraHoldsOnlyWhileTheAuraIsOnOrUnknown();
     PurgeCastsDispelMagicOnTheBuffedBoss();
     PurgeShamanUsesPurgeAndNoOtherClassPurges();
     MindControlMageHoldsTheControlledMember();

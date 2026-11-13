@@ -17,6 +17,9 @@
 //   frontal|map|boss_entry|spell_id|name       a frontal cast of the boss: the tank keeps the boss turned away from the raid (data only, see the README)
 //   spread|map|boss_entry|yards|who|name      while an engaged hostile of this entry is in view (0 = any), the planner's raid members of group `who` stay at least `yards` apart (chain lightning, bombs, Holy Wrath); who: all, ranged, healers or melee; tanks never move
 //   avoid_enemy|map|entry|yards|who|name       a non-tank member of group `who` keeps at least `yards` from a live hostile of this entry (Holy Nova, a charging add, melee reach)
+//   avoid_enemy_aura|map|entry|yards|who|aura_id|name   the same, but only while the hostile carries the aura (Axe Flurry 24018). The snapshot has no aura list for
+//                                              nearby units, only target_auras of a bot's current target: the circle is dropped only when a bot that has the unit as its
+//                                              target sees a complete aura list without the aura; with no such bot (or a full list) the circle stays, as avoid_enemy
 //   purge|map|aura_id|name                     an aura on an enemy that a priest (Dispel Magic), shaman (Purge) or hunter (Tranquilizing Shot) removes, seen in the target_auras of a member's current target
 //   mindcontrol|map|aura_id|name               a member carrying this aura is mind controlled: nobody attacks it and a mage polymorphs it
 //   leash|map|yards|name                       the route leader of a dungeon party pulls only hostiles within `yards` (10..80) of the route leg on this map (narrows DungeonPullLeashYards, never widens it); it also narrows the pick of a new target by a party in a fight (the chase leash), not the defence against what attacks
@@ -66,6 +69,7 @@ struct EnemyZone
     std::uint32_t Entry = 0;
     float Yards = 0.0f;
     std::uint8_t Who = kWhoAll;
+    std::uint32_t Aura = 0;     // avoid_enemy_aura: the circle holds only while the unit carries this aura; 0 = always (avoid_enemy)
 };
 
 struct PullPosition

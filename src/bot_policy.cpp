@@ -852,6 +852,32 @@ bool BotPolicy::DecideTick::IsOurBot(std::uint64_t ref) const
     return ref != 0 && indexOf.count(ref & forever_module::kUnitRefCounterMask) != 0;
 }
 
+BotPolicy::DecideTick::AuraSeen BotPolicy::DecideTick::UnitAuraSeen(std::uint64_t unitRef, std::uint32_t aura) const
+{
+    auto const key = std::make_pair(unitRef, aura);
+    if (auto const at = unitAuraSeen.find(key); at != unitAuraSeen.end())
+        return at->second;
+    AuraSeen seen = AuraSeen::kUnknown;
+    for (BotSnapshot const& other : view.bots)
+    {
+        if (other.threat_target_guid != unitRef || other.life_state != 0)
+            continue;
+        std::size_t const count = std::min<std::size_t>(other.target_aura_count, forever_module::kMaxTargetAuras);
+        bool listed = false;
+        for (std::size_t a = 0; a < count && !listed; ++a)
+            listed = other.target_auras[a].spell_id == aura;
+        if (listed)
+        {
+            seen = AuraSeen::kSeen;
+            break;
+        }
+        if (count < forever_module::kMaxTargetAuras)
+            seen = AuraSeen::kAbsent;   // a complete list without the aura; a later bot that lists it still wins
+    }
+    unitAuraSeen.emplace(key, seen);
+    return seen;
+}
+
 bool BotPolicy::BotTurn::Avoided(std::uint64_t ref) const
 {
     auto const until = state.AvoidUntilMs.find(ref);

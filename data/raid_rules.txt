@@ -10,6 +10,7 @@
 #   frontal|map|boss_entry|spell_id|name
 #   spread|map|boss_entry|yards|who|name         who: all/ranged/healers/melee; boss_entry 0 = any engaged hostile of the map
 #   avoid_enemy|map|entry|yards|who|name
+#   avoid_enemy_aura|map|entry|yards|who|aura_id|name   as avoid_enemy, only while the hostile carries the aura (seen in a member's target_auras; unknown keeps the circle)
 #   purge|map|aura_spell_id|name
 #   mindcontrol|map|aura_spell_id|name
 # A spell id marked (check) was written from memory and is not yet confirmed against the spell data (none left: see doc/raid-rules.md).
@@ -60,6 +61,7 @@ add|309|11350|1|Gurubashi Axe Thrower
 # (-11830.6,-1317, z 66.7), and goes back there once the pull has landed; the other members wait. Positions are from the creature table, not tested for line of sight.
 # 11350 has no pullpos row: the entry also matches the lone thrower at the stairs bottom, where the tank never got within the yards and waited out the 30 s walk (2026-11-13 night r4).
 # Axe Flurry (24018 -> 24019, 30 yard radius around the thrower, 24020: 1250 flat damage and a 2 s stun to everyone hit) is avoided instead: non-tanks keep out of 33 yards.
+# Not avoid_enemy_aura|..|24018: the first Flurry tick comes 1 s after the aura and stuns for 2 s, so a member that came in during a gap could not get out again.
 avoid_enemy|309|11350|33|healers|Axe Flurry 24019 radius 30
 avoid_enemy|309|11350|33|ranged|Axe Flurry 24019 radius 30
 pullpos|309|11371|-11872.5|-1287.7|82.3|8|ZG shelf pack: pull from route point 7, before the stairs (route point 9 is in throw range of the lone thrower at the stairs bottom)

@@ -81,6 +81,7 @@ BotPolicy::TurnFlow BotPolicy::TurnRaidSpacing(DecideTick& tick, BotTurn& turn)
                    DistanceTo(bot, Point{ state.SpacingDest.X, state.SpacingDest.Y, bot.pos_z }) > kArrivedYards;
 
     // avoid_enemy: a non-tank member of the row's group stays out of a circle of `yards` around a live hostile of the entry. A bot mid-cast holds unless that unit is casting.
+    // avoid_enemy_aura rows: the same circle, only while the unit carries the row's aura (DecideTick::UnitAuraSeen; unknown counts as carrying it).
     if (_options.RaidAvoidEnemy && !tank && rules.HasAvoidEnemy(bot.map_id))
     {
         bool const healer = state.Role_ != BotState::Role::Dps && state.Role_ != BotState::Role::Tank && HealSpellFor(classId, bot.level) != 0;
@@ -93,7 +94,8 @@ BotPolicy::TurnFlow BotPolicy::TurnRaidSpacing(DecideTick& tick, BotTurn& turn)
             if (!unit.is_hostile || unit.health == 0 || !IsLiveMob(unit))
                 continue;
             for (raid_rules::EnemyZone const& zone : rules.AvoidEnemyFor(bot.map_id, forever_module::UnitRefEntry(unit.guid)))
-                if ((zone.Who & kind) != 0)
+                // avoid_enemy_aura: no circle once a bot targeting the unit sees a complete aura list without the aura (unknown keeps the circle)
+                if ((zone.Who & kind) != 0 && (zone.Aura == 0 || tick.UnitAuraSeen(unit.guid, zone.Aura) != DecideTick::AuraSeen::kAbsent))
                 {
                     circles.push_back({ unit.pos_x, unit.pos_y, zone.Yards - ground_avoid::kInsideMarginYards });   // inside = closer than radius + 1 yard = closer than `yards`
                     anyCasting = anyCasting || unit.casting != 0;
