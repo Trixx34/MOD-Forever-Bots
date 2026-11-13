@@ -344,6 +344,8 @@ if(Python3_Interpreter_FOUND)
     add_test(NAME soak_report COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/soak_report_test.py)
     # The replay of a telemetry run, one section per open finding of the sim handoff.
     add_test(NAME run_telemetry_py COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_telemetry_test.py ${CMAKE_CURRENT_SOURCE_DIR})
+    # The pre-raid gear list generator on a small fixture and a fake mysql command.
+    add_test(NAME gen_prebis COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/gen_prebis_test.py ${CMAKE_CURRENT_SOURCE_DIR})
     add_test(NAME snapshot_replay COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/snapshot_replay_test.py)
     # The spec of rotations made into a rotation file by tools/make_rotations.py.
     add_test(NAME make_rotations COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/make_rotations_test.py ${CMAKE_CURRENT_SOURCE_DIR})
