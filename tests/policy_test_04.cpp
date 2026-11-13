@@ -444,6 +444,82 @@ void AFlippingPartyDoesNotHoldTheLeaderForever()
     CHECK(pulled);                                                    // the wait ends after kPullHoldMaxMs (45 s) of flipping
 }
 
+// Planned healing (heal_plan.h): 10 and 11 are priests, 12 the warrior leader (the tank), 13 and 14 warriors. The plan gives the tank and 11 to 10, and 10, 13, 14 to 11.
+PolicyOptions HealPlanOptions(bool enabled, std::vector<std::string>* events)
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.PartyCount = 1;
+    options.ClassOf = [](std::uint64_t guid) -> std::uint32_t { return guid == 10 || guid == 11 ? 5u : 1u; };
+    options.HealPlan.Enabled = enabled;
+    if (events)
+        options.OnEvent = [events](std::string const& event) { events->push_back(event); };
+    return options;
+}
+
+bool CastsAnyHeal(std::vector<BotAction> const& actions, std::uint64_t bot, std::uint64_t target)
+{
+    for (BotAction const& action : actions)
+        if (action.type == ActionType::kCastSpell && action.bot_guid == bot && action.target_guid == target)
+            return true;
+    return false;
+}
+
+void HealPlanSplitsTheHealDuty()
+{
+    std::vector<std::string> events;
+    BotPolicy policy(HealPlanOptions(true, &events));
+    policy.SetRouteActive(true);
+    WorldTickSnapshotView view = DungeonView({ 10, 11, 12, 13, 14 }, [](std::uint64_t guid) -> std::uint32_t { return guid == 12 ? 1u : guid == 10 || guid == 11 ? 5u : 1u; });
+    view.bots[3].health = 300;                                       // bot 13, assigned to healer 11
+    auto const actions = policy.Decide(view, 1000);
+    CHECK(CastsAnyHeal(actions, 11, PlayerOf(13)));
+    CHECK(!CastsAnyHeal(actions, 10, PlayerOf(13)));                 // 10's own members are fine, but 11 is free to take it
+    CHECK(Logged(events, "heal_plan: leader=12 healers=2 main=10"));
+    CHECK(!Logged(events, "heal_assign_switch:"));
+    std::size_t plans = 0;
+    for (std::string const& event : events)
+        plans += event.rfind("heal_plan:", 0) == 0 ? 1 : 0;
+    policy.Decide(view, 3000);
+    policy.Decide(view, 5000);
+    std::size_t after = 0;
+    for (std::string const& event : events)
+        after += event.rfind("heal_plan:", 0) == 0 ? 1 : 0;
+    CHECK(plans == 1 && after == 1);                                 // on change only
+}
+
+void HealPlanSwitchesWhenTheOwnerCannotHeal()
+{
+    std::vector<std::string> events;
+    BotPolicy policy(HealPlanOptions(true, &events));
+    policy.SetRouteActive(true);
+    WorldTickSnapshotView view = DungeonView({ 10, 11, 12, 13, 14 }, [](std::uint64_t guid) -> std::uint32_t { return guid == 12 ? 1u : guid == 10 || guid == 11 ? 5u : 1u; });
+    view.bots[3].health = 300;                                       // bot 13, assigned to healer 11
+    view.bots[1].pos_x = 120.0f;                                     // healer 11 is out of reach of it
+    auto const actions = policy.Decide(view, 1000);
+    CHECK(CastsAnyHeal(actions, 10, PlayerOf(13)));                  // 10's own members are fine: it takes the neediest of the others
+    CHECK(Logged(events, "heal_assign_switch: healer=10 target=13 assigned_healer=11"));
+}
+
+void HealPlanPreHealsTheTankAtTheStartOfAFight()
+{
+    auto const run = [](bool enabled, std::uint64_t nowMs)
+    {
+        BotPolicy policy(HealPlanOptions(enabled, nullptr));
+        policy.SetRouteActive(true);
+        WorldTickSnapshotView view = DungeonView({ 10, 11, 12, 13, 14 }, [](std::uint64_t guid) -> std::uint32_t { return guid == 12 ? 1u : guid == 10 || guid == 11 ? 5u : 1u; });
+        view.bots[2].in_combat = 1;
+        view.bots[2].threat_target_guid = MakeUnitRef(8, 1, 7);
+        AddNearby(view, 2, Unit(8, 7, 5.0f, true));                  // the pack the tank holds, so its fight is not dropped as empty
+        policy.Decide(view, 1000);                                   // the fight starts, the tank at full health
+        view.bots[2].health = view.bots[2].max_health * 9 / 10;      // the tank at 90 %: above the 75 % tank mark
+        return policy.Decide(view, nowMs);
+    };
+    CHECK(CastsAnyHeal(run(true, 2000), 10, PlayerOf(12)));          // the main healer tops the tank up in the first seconds of the fight
+    CHECK(!CastsAnyHeal(run(true, 9000), 10, PlayerOf(12)));         // not after the window
+    CHECK(!CastsAnyHeal(run(false, 2000), 10, PlayerOf(12)));        // HealPlan = 0: as before
+}
+
 void HealerHealsTheHurtMember()
 {
     WorldTickSnapshotView view = DungeonView({ 10, 11, 12, 13, 14 });
@@ -1054,6 +1130,9 @@ void RunPolicyTestsPart4()
     ALeaderThatDoesNotMoveIsNoticed();
     ALeaderWalksBackToAFarHealer();
     HealerHealsTheHurtMember();
+    HealPlanSplitsTheHealDuty();
+    HealPlanSwitchesWhenTheOwnerCannotHeal();
+    HealPlanPreHealsTheTankAtTheStartOfAFight();
     HealDownrankCastsTheRankThatCoversTheDeficit();
     HealDownrankPausesAfterAnUnknownRank();
     HealerHealsItselfWithoutATarget();

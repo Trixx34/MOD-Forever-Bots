@@ -46,6 +46,7 @@ line to the module's stderr. A config reload updates the ramp, the random picks 
 | `Race`, `Class` | 1, 1 | A race and class id, or `random` (a seeded pick over the Forever valid combinations, including the Skyborne races 95 and 96) |
 | `RandomSeed` | 1 | Seed for the random picks |
 | `RaidRulesFile` | empty | Absolute path of `data/raid_rules.txt`, the raid rule table (adds first, interrupt-first casts, dispel kinds, avoid zones, tank swap, no-AoE); needs `PartyPlanner` on. `doc/raid-rules.md` |
+| `HealPlan`, `HealPlanPreHealMs`, `HealPlanPreHealPct` | 1, 4000, 96 | Planned healing: healers split the party or raid (the main healer takes the tanks, the others the rest), a healer whose own members are fine takes the neediest of the others, and the main healer tops the tank up below `HealPlanPreHealPct` percent for `HealPlanPreHealMs` ms after the fight starts (0 = no pre-heal). Needs `PartyPlanner` on. Events `heal_plan:` and `heal_assign_switch:`. `doc/planned-healing.md` |
 | `BotsInitial`, `BotsStep`, `BotsStepMinutes`, `BotsCap`, `BotsStopTime` | 300, 100, 15, 1500, 06:00 | The ramp: start count, bots added per step, minutes per step, the cap, and the local time it stops adding |
 | `ServiceEverySec` | 600 | Seconds between vendor visits for an idle bot (60 to 86400) |
 | `ChatSay`, `ChatSayMax` | 0 (off), 3 | A bot that takes a chat order answers with a short /say line (0 to 50 bots speak for one order; a whispered bot always answers) |

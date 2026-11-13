@@ -413,6 +413,13 @@ Module.forever-bots.TelemetrySummarySec = 60
 # the interrupt and cc tactics (DungeonTactics), so with those off it changes nothing. 0 = off, every bot picks its own jobs as before. doc/dungeon-strategy.md.
 # Module.forever-bots.PartyPlanner = 0
 #
+# Planned healing (heal_plan.h, doc/planned-healing.md), on by default, needs PartyPlanner: the healers of a party or raid split the group (the main healer, the lowest guid, takes the
+# tanks; the others the rest), a healer whose own members are fine takes the neediest of the others, the main healer pre-heals the tank for HealPlanPreHealMs ms after the pull starts
+# (below HealPlanPreHealPct percent health; 0 ms = no pre-heal). HealPlan = 0 = every healer scans the whole group as before. Events heal_plan: and heal_assign_switch:.
+# Module.forever-bots.HealPlan = 0
+# Module.forever-bots.HealPlanPreHealMs = 4000
+# Module.forever-bots.HealPlanPreHealPct = 96
+#
 # PartyViewPlanner = 1: the planner also reads the core's shared party view (layout 25; needs Bot.Snapshot.PartyView = 1 in the core): human
 # members, tank roles known by role, and the loose mobs on non-tanks. Default 0 (the bots-only merge); without a view it changes nothing.
 # Module.forever-bots.PartyViewPlanner = 1

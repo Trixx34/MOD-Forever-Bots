@@ -298,6 +298,10 @@ struct BotSettings
     // runs (docs/99-deadmines-runs.md) all of them on did slightly worse than none (2.0 bosses and 36 deaths against 2.25 and 14), and no single tactic is proven yet, so they
     // are off until each has a run of its own that shows a gain.
     bool TacticFocus = false, TacticInterrupt = false, TacticHeal = false, TacticRest = false, TacticRecover = false, TacticCc = false;
+    // Planned healing (heal_plan.h, doc/planned-healing.md): HealPlan (default on; needs PartyPlanner), HealPlanPreHealMs (default 4000, 0 = no pre-heal), HealPlanPreHealPct (default 96).
+    bool HealPlan = true;
+    std::uint32_t HealPlanPreHealMs = 4000;
+    std::uint32_t HealPlanPreHealPct = 96;
     bool PartyPlanner = true;     // the party planner (party_planner.h): its own key, PartyPlanner = 0 turns it off
     bool PartyViewPlanner = false; // PartyViewPlanner = 1: the planner also reads the core's shared party view (needs the core's Bot.Snapshot.PartyView); default off
     // Bounded policy-lab knobs; defaults match the built-in dungeon policy.

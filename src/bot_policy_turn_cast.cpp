@@ -90,7 +90,8 @@ BotPolicy::TurnFlow BotPolicy::PartyHeal(DecideTick& tick, BotTurn& turn)
         BotSnapshot const* hurt = nullptr;
         std::uint64_t hurtPct = (IsRouteActive(bot.guid) && _options.TacticHeal) ? _options.DungeonHealBelowPct : kHealBelowPct;
         BotSnapshot const* leaderHurt = nullptr;   // the tank with a target: healed first, whatever its share
-        std::uint64_t leaderHurtPct = _options.DungeonTankHealBelowPct;
+        heal_plan::Plan const* const healPlan = HealPlanOf(partyLeader);
+        std::uint64_t leaderHurtPct = HealPlanTankThreshold(healPlan, bot.guid, partyLeader, _options.DungeonTankHealBelowPct, nowMs);   // pre-heal window: topped up higher
         BotSnapshot const* leaderTopUp = nullptr;  // the route leader out of a fight, below kRouteTopUpPct
         // Emergency target: anyone under kEmergencyHealBelowPct gets Flash Heal first.
         BotSnapshot const* emergencyHurt = nullptr;
@@ -104,6 +105,28 @@ BotPolicy::TurnFlow BotPolicy::PartyHeal(DecideTick& tick, BotTurn& turn)
             auto const at = state.RetryAtMs.find(spell);
             return at == state.RetryAtMs.end() || nowMs >= at->second;
         };
+        // Planned healing: do this healer's own members need a heal now (then it leaves the others alone, emergencies aside)?
+        bool assignedNeed = false;
+        if (healPlan && heal_plan::Covers(healPlan, bot.guid))
+        {
+            auto const needs = [&](BotSnapshot const& member)
+            {
+                if (member.life_state != 0 || member.max_health == 0 || !heal_plan::IsAssigned(healPlan, bot.guid, member.guid) || Distance2d(bot, member) > kHealRangeYards)
+                    return;
+                std::uint64_t const pct = std::uint64_t(member.health) * 100 / member.max_health;
+                if (pct < (member.guid == partyLeader ? std::max<std::uint64_t>(leaderHurtPct, hurtPct) : hurtPct))
+                    assignedNeed = true;
+            };
+            needs(bot);
+            auto const lead = leaderOf.find(bot.guid);
+            std::uint64_t const leadGuid = lead != leaderOf.end() ? lead->second : bot.guid;
+            for (BotSnapshot const& other : view.bots)
+            {
+                auto const otherLead = leaderOf.find(other.guid);
+                if (other.guid != bot.guid && otherLead != leaderOf.end() && otherLead->second == leadGuid)
+                    needs(other);
+            }
+        }
         auto const consider = [&](BotSnapshot const& member)
         {
             if (member.life_state != 0 || member.max_health == 0 || Distance2d(bot, member) > kHealRangeYards)
@@ -116,7 +139,11 @@ BotPolicy::TurnFlow BotPolicy::PartyHeal(DecideTick& tick, BotTurn& turn)
             if (pct < kPrayerBelowPct)
                 ++lowCount;   // counted before the assignment check: Prayer of Healing looks at the whole party, whoever else heals a member
             // The party planner gave this member to another healer (party_planner.h): leave it, the same as a claim.
-            if (party_planner::HealAssignedElsewhere(tick.PlanOf(partyLeader), bot.guid, member.guid))
+            // With a standing heal plan (heal_plan.h) the plan decides whose member this is and the reactive planner's nearest-healer pick is not used.
+            if (!healPlan && party_planner::HealAssignedElsewhere(tick.PlanOf(partyLeader), bot.guid, member.guid))
+                return;
+            // Another healer's member waits while this healer's own need heals, or while its healer is free to take it.
+            if (healPlan && heal_plan::Judge(healPlan, bot.guid, member.guid, assignedNeed, OwnerCanHeal(tick, *healPlan, member), static_cast<std::uint32_t>(pct), kEmergencyHealBelowPct) == heal_plan::Verdict::Skip)
                 return;
             if (member.guid == partyLeader)
             {
@@ -301,6 +328,10 @@ BotPolicy::TurnFlow BotPolicy::PartyHeal(DecideTick& tick, BotTurn& turn)
                     if (spellToCast == kPowerWordShield)
                         state.BuffUntilMs[{ kPowerWordShield, heal.target_guid }] = nowMs + kShieldLockMs;
                     _healClaims[target->guid] = HealClaim{ healGroup, nowMs + kHealClaimMs };
+                    if (healPlan && heal_plan::Covers(healPlan, bot.guid) && !heal_plan::IsAssigned(healPlan, bot.guid, target->guid) && !assignedNeed && hurtPct >= kEmergencyHealBelowPct &&
+                        healPlan->HealerOf.count(target->guid) && _options.OnEvent)
+                        _options.OnEvent("heal_assign_switch: healer=" + std::to_string(bot.guid) + " target=" + std::to_string(target->guid) +
+                                         " assigned_healer=" + std::to_string(healPlan->HealerOf.at(target->guid)) + " target_hp_pct=" + std::to_string(hurtPct));
                     if (_options.OnEvent)
                         _options.OnEvent("heal: healer=" + std::to_string(bot.guid) + " spell=" + std::to_string(spellToCast) +
                                          " target=" + std::to_string(target->guid) + " target_hp_pct=" + std::to_string(hurtPct) +
