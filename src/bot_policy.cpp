@@ -882,13 +882,15 @@ float BotPolicy::PartyRouteLegDistance(std::uint64_t leaderGuid, std::uint32_t m
     return std::numeric_limits<float>::infinity();
 }
 
-bool BotPolicy::OffPartyLeash(DecideTick const& tick, std::uint64_t leaderGuid, std::uint32_t mapId, float x, float y, std::uint32_t yards, bool orLeader) const
+bool BotPolicy::OffPartyLeash(DecideTick const& tick, std::uint64_t leaderGuid, std::uint32_t mapId, float x, float y, std::uint32_t yards, bool orLeader, bool mapLeash) const
 {
     if (yards == 0 || leaderGuid == 0)
         return false;
-    // A map's own pull leash (raid rules row `leash`): the leader's pull only (orLeader false), narrower than the setting, never wider. Zul'Gurub's first pack stands 20-30
-    // yards below the ramp; the default 30 let the leader pull it and the raid died 18 times on that shelf (2026-11-13).
-    if (!orLeader && _options.RaidRules)
+    // A map's own pull leash (raid rules row `leash`): narrower than the setting, never wider. Zul'Gurub's first pack stands 20-30 yards below the ramp; the default 30 let
+    // the leader pull it and the raid died 18 times on that shelf (2026-11-13). It applies to the pick of a new target (the leader's pull, and the next target of a party
+    // already in a fight, whose chase leash of 40 let the 2026-11-13 run walk from the lone thrower on into the pack: 393 pulls on 11371/11372 at 23-33 yards off the leg),
+    // not to the walk after a target the bot already has (MoveToTarget's chase leash).
+    if (mapLeash && _options.RaidRules)
         if (std::uint32_t const mapLeash = _options.RaidRules->PullLeash(mapId); mapLeash != 0 && mapLeash < yards)
             yards = mapLeash;
     float const leg = PartyRouteLegDistance(leaderGuid, mapId, x, y);

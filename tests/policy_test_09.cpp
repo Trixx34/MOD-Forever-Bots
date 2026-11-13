@@ -245,6 +245,23 @@ void PullHoldLeavesATargetWithinReachAlone()
     CHECK(at != 0 && at < 6000);
 }
 
+// A target with a `pullpos` row is not excused from the hold for standing within reach of a member: the tank pulls it from its position, the members wait.
+void PullPositionHoldsEvenAMemberNearTheTarget()
+{
+    for (bool row : { false, true })
+    {
+        TankFirstSetup setup = TankFirstParty(true, 0);
+        std::vector<std::string> errors;
+        if (row)
+            setup.options.RaidRules = std::make_shared<raid_rules::Table>(raid_rules::Parse("pullpos|36|598|0|-10|0|4|shelf\n", errors));
+        for (BotSnapshot& bot : setup.view.bots)
+            bot.map_id = 36;
+        setup.view.nearby[4].pos_x = 8.0f;   // inside PullMemberRangeYards
+        std::uint64_t const at = MageEngagesAt(setup);
+        CHECK(row ? at >= 12000 : (at != 0 && at < 6000));
+    }
+}
+
 void PullHoldNeverTouchesASoloBot()
 {
     PolicyOptions options = AggressiveOptions();
@@ -388,6 +405,7 @@ void RunPolicyTestsPart9()
     DeadTankDoesNotFreezeTheParty();
     PullTankFirstOffKeepsTheOldBehaviour();
     PullHoldLeavesATargetWithinReachAlone();
+    PullPositionHoldsEvenAMemberNearTheTarget();
     PullHoldNeverTouchesASoloBot();
     PullHoldLogsOncePerTenSeconds();
     MemberOwnTargetIsHeldWhileTheTankIsQuiet();

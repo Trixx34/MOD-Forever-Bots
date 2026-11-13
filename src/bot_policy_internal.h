@@ -341,6 +341,8 @@ constexpr std::uint64_t kPullHoldClearMs = 10000;  // the party must be ready th
 constexpr std::uint32_t kRecoveryRisePct = 8;        // a rise counts as recovery when it is this much of the summed maximum within kRecoveryWindowMs (drinking gives about 14 % in 10 s, plain regeneration about 3 %)
 constexpr std::uint64_t kRecoveryWindowMs = 10000;
 constexpr std::uint64_t kPullHoldAbsMaxMs = 180000;  // 0.44.14: the hold is cut off here even while the party still recovers (the 45 s cap below counts from the last rise)
+constexpr std::uint64_t kPullPosWalkMs = 30000;     // the tank gives up walking to a raid rules pull position after this long and pulls from where it is
+constexpr std::uint64_t kPullPosHoldMs = 15000;     // after the pull landed the tank holds at the pull position this long for the pack to come to it
 constexpr std::uint64_t kPullHoldMaxMs = 45000;     // the party never waits longer than this for itself
 constexpr std::uint32_t kTankRestPct = 80;          // a dungeon party leader (the tank) below this health pulls nothing until it is back above, up to kPullHoldAbsMaxMs
 

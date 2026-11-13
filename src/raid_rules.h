@@ -15,7 +15,9 @@
 //   swap|map|boss_entry|aura_id|stacks|name    the tank holding `stacks` of this aura on it is swapped for another tank
 //   noaoe|map|boss_entry|name                  no area damage in this fight (boss_entry 0 = every fight on the map)
 //   frontal|map|boss_entry|spell_id|name       a frontal cast of the boss: the tank keeps the boss turned away from the raid (data only, see the README)
-//   leash|map|yards|name                       the route leader of a dungeon party pulls only hostiles within `yards` (10..80) of the route leg on this map (narrows DungeonPullLeashYards, never widens it)
+//   leash|map|yards|name                       the route leader of a dungeon party pulls only hostiles within `yards` (10..80) of the route leg on this map (narrows DungeonPullLeashYards, never widens it); it also narrows the pick of a new target by a party in a fight (the chase leash), not the defence against what attacks
+//   pullpos|map|entry|x|y|z|yards[|name]       the tank pulls a creature of this entry from this position (outside its throw range, or behind a corner): it walks to within `yards` (2..40) of the point
+//                                              before it pulls, goes back to it once the pull has landed, and the other members stay where they are until the tank is in the fight
 #pragma once
 
 #include <cstdint>
@@ -45,6 +47,14 @@ struct TankSwap
     std::uint32_t Stacks = 0;
 };
 
+struct PullPosition
+{
+    float X = 0.0f;
+    float Y = 0.0f;
+    float Z = 0.0f;
+    float Yards = 0.0f;
+};
+
 struct MapRules
 {
     std::map<std::uint32_t, std::string> Bosses;            // entry -> name
@@ -56,6 +66,7 @@ struct MapRules
     std::set<std::uint32_t> NoAoe;                          // boss entries, 0 = the whole map
     std::map<std::uint32_t, std::set<std::uint32_t>> Frontal; // boss entry -> frontal spell ids
     std::uint32_t PullLeash = 0;                            // yards, 0 = none
+    std::map<std::uint32_t, PullPosition> PullPositions;    // creature entry -> where the tank pulls it from
 };
 
 class Table
@@ -78,6 +89,8 @@ public:
     bool NoAoe(std::uint32_t map, std::uint32_t bossEntry) const;
     // The map's own pull leash in yards (0 = the map has none): the policy uses the smaller of this and DungeonPullLeashYards.
     std::uint32_t PullLeash(std::uint32_t map) const;
+    // Where the tank pulls a creature of this entry from, nullopt when the map has no `pullpos` row for it.
+    std::optional<PullPosition> PullPositionOf(std::uint32_t map, std::uint32_t entry) const;
     bool IsFrontal(std::uint32_t map, std::uint32_t bossEntry, std::uint32_t spell) const;
     // A frontal row of any boss of the map names the spell (a telegraph carries a caster ref, not a boss entry).
     bool IsFrontalAny(std::uint32_t map, std::uint32_t spell) const;

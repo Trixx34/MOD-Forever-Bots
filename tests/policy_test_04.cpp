@@ -875,7 +875,7 @@ void TheLeaderPullsOnlyAlongItsRouteLeg()
 }
 
 // A raid rules `leash` row narrows the leader's pull leash on its map (never widens it): a hostile 20 yards off the leg is pulled with the setting's 30, not with the
-// map's 15; a hostile 9 yards off still is; a row for another map changes nothing; the chase leash is not touched.
+// map's 15; a hostile 9 yards off still is; a row for another map changes nothing; the chase leash of a target already held is not touched.
 void ARaidRulesLeashNarrowsTheLeadersPull()
 {
     auto const pulls = [](char const* rows, float y)
@@ -895,6 +895,91 @@ void ARaidRulesLeashNarrowsTheLeadersPull()
     CHECK(pulls("leash|36|15|shelf\n", 9.0f));
     CHECK(pulls("leash|309|15|shelf\n", 20.0f));                           // another map
     CHECK(pulls("leash|36|40|wide\n", 35.0f) == false);                    // never wider than the setting
+}
+
+// The map's leash also narrows the pick of a new target by a leader already in a fight (the 2026-11-13 ZG run: the chase leash of 40 let the leader walk from the lone thrower
+// on into the pack 23-33 yards off the leg, 393 pulls). A hostile 28 yards off the leg: picked with the chase leash 40 and no row, not with `leash|36|15`; one 9 yards off still is.
+// The defence is not touched: a hostile that is the leader's threat target is fought wherever it stands.
+void ARaidRulesLeashNarrowsTheNextTargetInAFight()
+{
+    auto const picks = [](char const* rows, float y, bool threat)
+    {
+        std::vector<std::string> errors;
+        PolicyOptions options = DriftOptions(30, 40);
+        options.RaidRules = std::make_shared<raid_rules::Table>(raid_rules::Parse(rows, errors));
+        BotPolicy policy(options);
+        policy.SetRouteActive(true);
+        policy.Decide(DriftView(), 1000);
+        WorldTickSnapshotView view = DriftView();
+        NearbyUnit const mob = HostileAt(8, 30.0f, y);
+        view.bots[2].in_combat = 1;                                         // the leader (bot 12) is in a fight already
+        if (threat)
+            view.bots[2].threat_target_guid = mob.guid;
+        AddNearby(view, 2, mob);
+        return HasAction(policy.Decide(view, 1500), 12, ActionType::kFollow, mob.guid);
+    };
+    CHECK(picks("", 28.0f, false));
+    CHECK(!picks("leash|36|15|shelf\n", 28.0f, false));
+    CHECK(picks("leash|36|15|shelf\n", 9.0f, false));
+    CHECK(picks("leash|309|15|shelf\n", 28.0f, false));                    // another map
+    CHECK(picks("leash|36|15|shelf\n", 28.0f, true));                      // already its threat target: fought
+}
+
+// A raid rules `pullpos` row: the tank (bot 12, the leader) out of combat walks to the position before it pulls an entry with a row (the hostile is entry 1, 30 yards east,
+// the position is 10 yards south of the origin), pulls normally once it is there; no row, or a row for another entry, and it pulls at once.
+void TheTankWalksToThePullPositionFirst()
+{
+    auto const first = [](char const* rows, float atX, float atY)
+    {
+        std::vector<std::string> errors;
+        PolicyOptions options = DriftOptions(30, 40);
+        options.RaidRules = std::make_shared<raid_rules::Table>(raid_rules::Parse(rows, errors));
+        BotPolicy policy(options);
+        policy.SetRouteActive(true);
+        policy.Decide(DriftView(), 1000);
+        WorldTickSnapshotView view = DriftView();
+        view.bots[2].pos_x = atX;
+        view.bots[2].pos_y = atY;
+        AddNearby(view, 2, HostileAt(8, 30.0f, 3.0f));
+        std::vector<BotAction> const actions = policy.Decide(view, 1500);
+        for (BotAction const& action : actions)
+            if (action.bot_guid == 12 && action.type == ActionType::kMoveTo)
+                return std::string("move:") + std::to_string(int(action.dest_x)) + "," + std::to_string(int(action.dest_y));
+        return std::string(HasAction(actions, 12, ActionType::kFollow, MakeUnitRef(8, 1, 8)) ? "pull" : "none");
+    };
+    CHECK(first("pullpos|36|1|0|-10|0|4|shelf\n", 0.0f, 0.0f) == "move:0,-10");
+    CHECK(first("pullpos|36|1|0|-10|0|4|shelf\n", 0.0f, -8.0f) == "pull");           // within the yards of the position: pulls
+    CHECK(first("", 0.0f, 0.0f) == "pull");
+    CHECK(first("pullpos|36|9|0|-10|0|4|other\n", 0.0f, 0.0f) == "pull");            // another entry
+    CHECK(first("pullpos|309|1|0|-10|0|4|other\n", 0.0f, 0.0f) == "pull");           // another map
+}
+
+// Once the pull has landed (the tank is in combat with the target, still 30 yards off) the tank goes back to the position, holds there while the pack comes, and fights on
+// after kPullPosHoldMs.
+void TheTankGoesBackToThePullPositionAndHolds()
+{
+    std::vector<std::string> errors;
+    PolicyOptions options = DriftOptions(30, 40);
+    options.RaidRules = std::make_shared<raid_rules::Table>(raid_rules::Parse("pullpos|36|1|0|-10|0|4|shelf\n", errors));
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    policy.Decide(DriftView(), 1000);
+    auto const tick = [&](float x, float y, std::uint64_t at)
+    {
+        WorldTickSnapshotView view = DriftView();
+        view.bots[2].pos_x = x;
+        view.bots[2].pos_y = y;
+        view.bots[2].in_combat = 1;
+        NearbyUnit const mob = HostileAt(8, 30.0f, 3.0f);
+        view.bots[2].threat_target_guid = mob.guid;
+        AddNearby(view, 2, mob);
+        return policy.Decide(view, at);
+    };
+    std::vector<BotAction> const back = tick(10.0f, 0.0f, 2000);
+    CHECK(HasAction(back, 12, ActionType::kMoveTo) && !HasAction(back, 12, ActionType::kFollow));
+    std::vector<BotAction> const hold = tick(0.0f, -10.0f, 3000);
+    CHECK(!HasAction(hold, 12, ActionType::kMoveTo) && !HasAction(hold, 12, ActionType::kFollow));
+    CHECK(HasAction(tick(0.0f, -10.0f, 2000 + 15000 + 1000), 12, ActionType::kFollow, MakeUnitRef(8, 1, 8)));
 }
 
 // DungeonChaseLeashYards: a member does not walk after its threat target once that is farther than the leash from both the route leg and the leader (it fled, or it
@@ -1080,6 +1165,9 @@ void RunPolicyTestsPart4()
     DefaultBotsDoNotPullWhatIsInRange();
     TheLeaderPullsOnlyAlongItsRouteLeg();
     ARaidRulesLeashNarrowsTheLeadersPull();
+    ARaidRulesLeashNarrowsTheNextTargetInAFight();
+    TheTankWalksToThePullPositionFirst();
+    TheTankGoesBackToThePullPositionAndHolds();
     AMemberDoesNotChaseOffThePartysLeash();
     AFightingMemberPicksNothingOffTheLeash();
     ADeadLeadersCorpseIsRevivedNextToAQuietMember();

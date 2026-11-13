@@ -76,6 +76,23 @@ void TestLeash()
     CHECK(t.PullLeash(309) == 15 && t.PullLeash(249) == 0 && t.PullLeash(1) == 0);
 }
 
+void TestPullPosition()
+{
+    std::vector<std::string> errors;
+    Table t = Parse("pullpos|309|11350|-11810.5|-1317|62|8|shelf\n"
+                    "pullpos|309|11350|1|2|3|9|second\n"           // the same entry twice: the first is kept
+                    "pullpos|309|11371|-11810|-1317|62|1|too small\n"
+                    "pullpos|309|11372|-11810|-1317|62|41|too big\n"
+                    "pullpos|309|11372|x|-1317|62|8\n"
+                    "pullpos|309|0|1|2|3|8\n"
+                    "pullpos|309|11372|1|2|3\n",                    // too short
+                    errors);
+    CHECK(errors.size() == 6);
+    std::optional<PullPosition> const p = t.PullPositionOf(309, 11350);
+    CHECK(p.has_value() && p->X == -11810.5f && p->Y == -1317.0f && p->Z == 62.0f && p->Yards == 8.0f);
+    CHECK(!t.PullPositionOf(309, 11371) && !t.PullPositionOf(309, 11372) && !t.PullPositionOf(249, 11350));
+}
+
 void TestErrors()
 {
     std::vector<std::string> errors;
@@ -143,6 +160,11 @@ void TestShippedFile()
     }
     CHECK(t.SwapStacks(309, 12097).has_value());
     CHECK(t.IsBoss(309, 14517));
+    for (std::uint32_t entry : { 11350u, 11371u, 11372u })
+    {
+        std::optional<PullPosition> const pos = t.PullPositionOf(309, entry);
+        CHECK(pos.has_value() && pos->X == -11810.0f && pos->Y == -1317.0f && pos->Yards == 8.0f);
+    }
 }
 
 } // namespace
@@ -152,6 +174,7 @@ int main()
     TestRows();
     TestWildcardNoAoe();
     TestLeash();
+    TestPullPosition();
     TestErrors();
     TestMerge();
     TestShippedFile();

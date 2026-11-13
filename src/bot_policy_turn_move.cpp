@@ -141,6 +141,62 @@ void BotPolicy::MoveToTarget(DecideTick& tick, BotTurn& turn)
     auto& moveWhy = turn.moveWhy;
     auto& kiteRetry = turn.kiteRetry;
     auto& kiteEntry = turn.kiteEntry;
+    // Raid rules `pullpos`: the tank (the route leader) pulls a creature of a listed entry from the stated position. Out of combat it walks there first (at most
+    // kPullPosWalkMs); once the pull has landed it goes back to the position and holds there kPullPosHoldMs while the pack is still on its way, so the pack comes to
+    // the tank instead of the tank walking into the pack's throw range. The other members wait (TurnTargeting's tank-first hold).
+    if (turn.partyLeaderBot && turn.routeOn && targetUnit && _options.RaidRules)
+    {
+        if (std::optional<raid_rules::PullPosition> const pos = _options.RaidRules->PullPositionOf(bot.map_id, forever_module::UnitRefEntry(targetRef)))
+        {
+            if (state.PullPosRef != targetRef)
+            {
+                state.PullPosRef = targetRef;
+                state.PullPosSinceMs = nowMs;
+                state.PullPosFightMs = 0;
+                state.PullPosArmed = false;
+            }
+            float const atPos = std::hypot(bot.pos_x - pos->X, bot.pos_y - pos->Y);
+            auto const goTo = [&](char const* why)
+            {
+                wanted = Decision{ ActionType::kMoveTo, 0, Point{ pos->X, pos->Y, pos->Z } };
+                moveWhy = why;
+                if (_options.OnEvent && (state.PullPosLogMs == 0 || nowMs - state.PullPosLogMs >= 5000))
+                {
+                    state.PullPosLogMs = nowMs;
+                    _options.OnEvent(std::string("pull_position: bot=") + std::to_string(bot.guid) + " why=" + why + " target_entry=" + std::to_string(forever_module::UnitRefEntry(targetRef)) +
+                                     " at=" + std::to_string(int(pos->X)) + "," + std::to_string(int(pos->Y)) + " yards=" + std::to_string(int(atPos)));
+                }
+            };
+            if (bot.in_combat == 0 && !state.PullPosArmed)
+            {
+                if (atPos > pos->Yards && nowMs - state.PullPosSinceMs < kPullPosWalkMs)
+                {
+                    goTo("pull_position");
+                    return;
+                }
+                state.PullPosArmed = true;
+            }
+            else if (bot.in_combat != 0)
+            {
+                state.PullPosArmed = true;
+                if (state.PullPosFightMs == 0)
+                    state.PullPosFightMs = nowMs;
+                if (nowMs - state.PullPosFightMs < kPullPosHoldMs && distance > kMeleeApproachYards + 1.0f)
+                {
+                    if (atPos > pos->Yards)
+                        goTo("pull_back");
+                    else
+                    {
+                        wanted = Decision{ ActionType::kStop, 0 };
+                        moveWhy = "pull_hold";
+                    }
+                    return;
+                }
+            }
+        }
+        else
+            state.PullPosRef = 0;
+    }
     if (!state.InFight)
     {
         state.InFight = true;
@@ -302,7 +358,7 @@ void BotPolicy::MoveToTarget(DecideTick& tick, BotTurn& turn)
     {
         // Walking to a target that never gets in range (behind a wall, or unreachable) is given up after a while:
         // the target is avoided, and the bot picks another one next tick.
-        if (targetUnit && turn.routeOn && OffPartyLeash(tick, partyLeader, bot.map_id, targetUnit->pos_x, targetUnit->pos_y, _options.DungeonChaseLeashYards, true))
+        if (targetUnit && turn.routeOn && OffPartyLeash(tick, partyLeader, bot.map_id, targetUnit->pos_x, targetUnit->pos_y, _options.DungeonChaseLeashYards, true, false))
         {
             // DungeonChaseLeashYards: the target is off the party's leash (far from the leg of the route and from the leader: it fled, or it is the next pack). The bot
             // does not walk after it: a member goes back to its leader, the leader stands, and either fights it when it comes back. It is avoided (the bot turns to another
@@ -311,7 +367,7 @@ void BotPolicy::MoveToTarget(DecideTick& tick, BotTurn& turn)
             bool otherInLeash = false;
             for (NearbyUnit const& unit : turn.nearby)
                 otherInLeash = otherInLeash || (unit.guid != targetRef && IsLiveMob(unit) && !turn.Avoided(unit.guid) &&
-                                                !OffPartyLeash(tick, partyLeader, bot.map_id, unit.pos_x, unit.pos_y, _options.DungeonChaseLeashYards, true));
+                                                !OffPartyLeash(tick, partyLeader, bot.map_id, unit.pos_x, unit.pos_y, _options.DungeonChaseLeashYards, true, false));
             if (otherInLeash)
                 AvoidUnit(state.AvoidUntilMs, state.AvoidCount, targetRef, nowMs);
             wanted = partyMember && turn.leaderSnap && turn.leaderSnap->life_state == 0 && Distance2d(bot, *turn.leaderSnap) > kFollowLeaderYards

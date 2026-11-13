@@ -349,7 +349,9 @@ void BotPolicy::TurnTargeting(DecideTick& tick, BotTurn& turn)
             state.PullHoldSinceMs = nowMs;
         }
         NearbyUnit const* near = FindLiveMob(nearby, leaderTarget);
-        bool const noWalk = near && std::hypot(near->pos_x - bot.pos_x, near->pos_y - bot.pos_y) <= float(_options.PullMemberRangeYards);
+        // A target with a raid rules `pullpos` row is pulled by the tank from its position: no member is excused from the hold for standing near it.
+        bool const positioned = _options.RaidRules && _options.RaidRules->PullPositionOf(bot.map_id, forever_module::UnitRefEntry(leaderTarget)).has_value();
+        bool const noWalk = !positioned && near && std::hypot(near->pos_x - bot.pos_x, near->pos_y - bot.pos_y) <= float(_options.PullMemberRangeYards);
         pullHeld = nowMs - state.PullHoldSinceMs < _options.PullTankHoldMs && !noWalk;
         if (pullHeld && _options.OnEvent && (state.PullHoldLogMs == 0 || nowMs - state.PullHoldLogMs >= 10000))
         {
@@ -461,8 +463,13 @@ void BotPolicy::TurnTargeting(DecideTick& tick, BotTurn& turn)
                     bool const specialTier = interruptable(unit) || isSummonerToKill(unit) || rankOf(unit) != 1000;
                     return specialTier || engaged.count(unit.guid) != 0 || !atEngagementCap;
                 };
+                // The map's leash (raid rules `leash`) also holds for the focus pick: a unit nobody fights yet and that stands off the party's route is not reached for
+                // (the 2026-11-13 ZG run: the pack beside the ramp was taken up one unit at a time as the "best" of the tank's pack).
+                std::uint32_t const mapLeash = _options.RaidRules ? _options.RaidRules->PullLeash(bot.map_id) : 0u;
+                auto const unengagedOffLeash = [&](NearbyUnit const& unit)
+                { return mapLeash != 0 && engaged.count(unit.guid) == 0 && OffPartyLeash(tick, partyLeader, bot.map_id, unit.pos_x, unit.pos_y, mapLeash, true, false); };
                 for (NearbyUnit const& unit : nearby)
-                    if (unit.is_hostile && unit.health != 0 && IsLiveMob(unit) && !turn.Avoided(unit.guid) && unit.guid != assist->guid &&
+                    if (unit.is_hostile && unit.health != 0 && IsLiveMob(unit) && !turn.Avoided(unit.guid) && unit.guid != assist->guid && !unengagedOffLeash(unit) &&
                         std::hypot(unit.pos_x - assist->pos_x, unit.pos_y - assist->pos_y) <=
                             (voidwalkerNearby && forever_module::UnitRefEntry(unit.guid) == kSearingBladeWarlockEntry ? kSummonerReachYards : kFocusPackYards) &&
                         reachable(unit) &&
@@ -757,7 +764,7 @@ BotPolicy::TurnFlow BotPolicy::TurnTaming(DecideTick& tick, BotTurn& turn)
     std::uint32_t const leashYards = !routeOn || leashParty == 0 ? 0u : leaderPull ? _options.DungeonPullLeashYards : _options.DungeonChaseLeashYards;
     if (leashYards != 0)
         leashed = [this, &tick, leashParty, leashYards, leaderPull, mapId = bot.map_id](NearbyUnit const& unit)
-        { return OffPartyLeash(tick, leashParty, mapId, unit.pos_x, unit.pos_y, leashYards, !leaderPull); };
+        { return OffPartyLeash(tick, leashParty, mapId, unit.pos_x, unit.pos_y, leashYards, !leaderPull, true); };
     if (targetRef != 0)
     {
         for (NearbyUnit const& unit : nearby)

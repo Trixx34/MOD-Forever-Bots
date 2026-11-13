@@ -551,7 +551,12 @@ private:
         std::uint64_t ThreatHoldSinceMs = 0;
         std::uint64_t PullHoldRef = 0;                   // the leader target a tank-first pull hold started on (0 = none), PullHoldSinceMs when
         std::uint64_t PullHoldSinceMs = 0;
+        std::uint64_t PullPosRef = 0;                    // the tank's target that has a raid rules `pullpos` row (0 = none): the walk to the pull position started at PullPosSinceMs
+        std::uint64_t PullPosSinceMs = 0;
+        std::uint64_t PullPosFightMs = 0;                // when the pull on PullPosRef landed (the tank was in combat), 0 = not yet
+        bool PullPosArmed = false;                       // the tank has been at the pull position (or gave up reaching it): the pull itself may start
         std::uint64_t PullRestSinceMs = 0;               // a hurt member (PullMinHpPct) started resting at this time (0 = not resting)
+        std::uint64_t PullPosLogMs = 0;
         std::uint64_t PullRestLogMs = 0;
         std::uint64_t WarderHoldLogMs = 0;                // last warder_hold event (at most one per 10 s)
         std::uint64_t PullHoldLogMs = 0;                 // last pull_hold event (at most one per 10 s)
@@ -999,9 +1004,9 @@ private:
     bool InterruptTaken(std::uint64_t targetRef, std::uint64_t nowMs) const;
     std::uint8_t DeadWait(DecideTick const& tick, std::uint64_t leaderGuid) const;
     // The combat-drift leash (DungeonPullLeashYards, DungeonChaseLeashYards): how far (x, y) is from the leg of the route this party's leader walks (infinity: no
-    // route known, or past its end), and whether a hostile there is off the leash (farther than `yards` from that leg and, with `orLeader`, from the living leader).
+    // route known, or past its end), and whether a hostile there is off the leash (farther than `yards` from that leg and, with `orLeader`, from the living leader). `mapLeash`: the map's raid rules `leash` row narrows `yards`.
     float PartyRouteLegDistance(std::uint64_t leaderGuid, std::uint32_t mapId, float x, float y) const;
-    bool OffPartyLeash(DecideTick const& tick, std::uint64_t leaderGuid, std::uint32_t mapId, float x, float y, std::uint32_t yards, bool orLeader) const;
+    bool OffPartyLeash(DecideTick const& tick, std::uint64_t leaderGuid, std::uint32_t mapId, float x, float y, std::uint32_t yards, bool orLeader, bool mapLeash) const;
     // " route_yards=N" for a log line: how far the turn's target is from its party's route leg (empty off a route, or with no target or route).
     std::string RouteYardsField(BotTurn const& turn) const;
     // DungeonLeaderRejoin: the living, quiet member of a dead leader's party on the given map that it comes back next to (nearest to (x, y)), or nullptr.
