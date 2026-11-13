@@ -119,6 +119,13 @@ Table Parse(std::string_view text, std::vector<std::string>& errors)
             else
                 table.Edit(map).Swaps.push_back({ a, b, c });
         }
+        else if (kind == "leash")
+        {
+            if (!Id(f[2], a) || a < 10 || a > 80)
+                bad("leash: expected 'leash|map|yards|name' (yards 10..80)");
+            else
+                table.Edit(map).PullLeash = a;
+        }
         else if (kind == "noaoe")
         {
             if (!Id(f[2], a, true))
@@ -203,6 +210,12 @@ std::optional<std::uint32_t> Table::SwapStacks(std::uint32_t map, std::uint32_t 
             if (swap.Aura == aura)
                 return swap.Stacks;
     return std::nullopt;
+}
+
+std::uint32_t Table::PullLeash(std::uint32_t map) const
+{
+    MapRules const* r = Find(map);
+    return r ? r->PullLeash : 0u;
 }
 
 bool Table::NoAoe(std::uint32_t map, std::uint32_t bossEntry) const

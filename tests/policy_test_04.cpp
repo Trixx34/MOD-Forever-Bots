@@ -874,6 +874,29 @@ void TheLeaderPullsOnlyAlongItsRouteLeg()
     CHECK(pulls(0, 7));
 }
 
+// A raid rules `leash` row narrows the leader's pull leash on its map (never widens it): a hostile 20 yards off the leg is pulled with the setting's 30, not with the
+// map's 15; a hostile 9 yards off still is; a row for another map changes nothing; the chase leash is not touched.
+void ARaidRulesLeashNarrowsTheLeadersPull()
+{
+    auto const pulls = [](char const* rows, float y)
+    {
+        std::vector<std::string> errors;
+        PolicyOptions options = DriftOptions(30, 0);
+        options.RaidRules = std::make_shared<raid_rules::Table>(raid_rules::Parse(rows, errors));
+        BotPolicy policy(options);
+        policy.SetRouteActive(true);
+        policy.Decide(DriftView(), 1000);
+        WorldTickSnapshotView view = DriftView();
+        AddNearby(view, 2, HostileAt(8, 30.0f, y));
+        return HasAction(policy.Decide(view, 1500), 12, ActionType::kFollow, MakeUnitRef(8, 1, 8));
+    };
+    CHECK(pulls("", 20.0f));                                               // no row: the setting's 30
+    CHECK(!pulls("leash|36|15|shelf\n", 20.0f));
+    CHECK(pulls("leash|36|15|shelf\n", 9.0f));
+    CHECK(pulls("leash|309|15|shelf\n", 20.0f));                           // another map
+    CHECK(pulls("leash|36|40|wide\n", 35.0f) == false);                    // never wider than the setting
+}
+
 // DungeonChaseLeashYards: a member does not walk after its threat target once that is farther than the leash from both the route leg and the leader (it fled, or it
 // is the next pack); inside the leash, and with the leash off, it does (kPartyChaseYards, 45, is the old limit).
 void AMemberDoesNotChaseOffThePartysLeash()
@@ -1056,6 +1079,7 @@ void RunPolicyTestsPart4()
     ACorpseIsNotRevivedBesideAHostileAndRevivesAreCapped();
     DefaultBotsDoNotPullWhatIsInRange();
     TheLeaderPullsOnlyAlongItsRouteLeg();
+    ARaidRulesLeashNarrowsTheLeadersPull();
     AMemberDoesNotChaseOffThePartysLeash();
     AFightingMemberPicksNothingOffTheLeash();
     ADeadLeadersCorpseIsRevivedNextToAQuietMember();

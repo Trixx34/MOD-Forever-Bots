@@ -45,6 +45,11 @@ boss|309|14834|Hakkar
 # Bloodseeker bats of Jeklik first
 add|309|11368|0|Bloodseeker Bat
 add|309|14965|0|Bloodseeker Bat
+# The first pack ("shelf": 5 Gurubashi Axe Throwers 11350 and Razzashi serpents on a ledge 20-30 yards off the ramp) killed 1312+214+195+60 bots of 1953 on the 2026-11-13 sim
+# (Axe Flurry 24020 / 24071 hits of 800-1700, 2400-hp casters); the leader pulled the serpent 20 yards off the route leg and the whole pack came. The leader now pulls only
+# within 15 yards of the route leg (the lone thrower and priest at the next turn are 9 yards off it and are still pulled). Gurubashi Axe Throwers are killed before the rest.
+leash|309|15|ZG shelf pack: no pulls farther than 15 yards off the route
+add|309|11350|1|Gurubashi Axe Thrower
 # Great Heal (Gurubashi priests, Jeklik), Drain Life, Mind Flay
 interrupt|309|23954|Great Heal
 interrupt|309|24208|Great Heal

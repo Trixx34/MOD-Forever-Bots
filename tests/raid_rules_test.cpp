@@ -68,6 +68,14 @@ void TestWildcardNoAoe()
     CHECK(!t.NoAoe(249, 14517));
 }
 
+void TestLeash()
+{
+    std::vector<std::string> errors;
+    Table t = Parse("leash|309|15|shelf\nleash|249|5|too small\nleash|36|x|bad\n", errors);
+    CHECK(errors.size() == 2);
+    CHECK(t.PullLeash(309) == 15 && t.PullLeash(249) == 0 && t.PullLeash(1) == 0);
+}
+
 void TestErrors()
 {
     std::vector<std::string> errors;
@@ -143,6 +151,7 @@ int main()
 {
     TestRows();
     TestWildcardNoAoe();
+    TestLeash();
     TestErrors();
     TestMerge();
     TestShippedFile();

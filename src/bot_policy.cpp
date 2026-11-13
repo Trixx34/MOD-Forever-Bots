@@ -886,6 +886,11 @@ bool BotPolicy::OffPartyLeash(DecideTick const& tick, std::uint64_t leaderGuid, 
 {
     if (yards == 0 || leaderGuid == 0)
         return false;
+    // A map's own pull leash (raid rules row `leash`): the leader's pull only (orLeader false), narrower than the setting, never wider. Zul'Gurub's first pack stands 20-30
+    // yards below the ramp; the default 30 let the leader pull it and the raid died 18 times on that shelf (2026-11-13).
+    if (!orLeader && _options.RaidRules)
+        if (std::uint32_t const mapLeash = _options.RaidRules->PullLeash(mapId); mapLeash != 0 && mapLeash < yards)
+            yards = mapLeash;
     float const leg = PartyRouteLegDistance(leaderGuid, mapId, x, y);
     if (std::isinf(leg) || leg <= float(yards))
         return false;

@@ -15,6 +15,7 @@
 //   swap|map|boss_entry|aura_id|stacks|name    the tank holding `stacks` of this aura on it is swapped for another tank
 //   noaoe|map|boss_entry|name                  no area damage in this fight (boss_entry 0 = every fight on the map)
 //   frontal|map|boss_entry|spell_id|name       a frontal cast of the boss: the tank keeps the boss turned away from the raid (data only, see the README)
+//   leash|map|yards|name                       the route leader of a dungeon party pulls only hostiles within `yards` (10..80) of the route leg on this map (narrows DungeonPullLeashYards, never widens it)
 #pragma once
 
 #include <cstdint>
@@ -54,6 +55,7 @@ struct MapRules
     std::vector<TankSwap> Swaps;
     std::set<std::uint32_t> NoAoe;                          // boss entries, 0 = the whole map
     std::map<std::uint32_t, std::set<std::uint32_t>> Frontal; // boss entry -> frontal spell ids
+    std::uint32_t PullLeash = 0;                            // yards, 0 = none
 };
 
 class Table
@@ -74,6 +76,8 @@ public:
     // The stack count at which a tank holding `aura` is swapped, nullopt when the aura is not a swap aura of the map.
     std::optional<std::uint32_t> SwapStacks(std::uint32_t map, std::uint32_t aura) const;
     bool NoAoe(std::uint32_t map, std::uint32_t bossEntry) const;
+    // The map's own pull leash in yards (0 = the map has none): the policy uses the smaller of this and DungeonPullLeashYards.
+    std::uint32_t PullLeash(std::uint32_t map) const;
     bool IsFrontal(std::uint32_t map, std::uint32_t bossEntry, std::uint32_t spell) const;
     // A frontal row of any boss of the map names the spell (a telegraph carries a caster ref, not a boss entry).
     bool IsFrontalAny(std::uint32_t map, std::uint32_t spell) const;
