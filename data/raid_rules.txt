@@ -58,7 +58,10 @@ add|309|11350|1|Gurubashi Axe Thrower
 # leash of 40 (11371/11372 stand 23-33 yards off the leg: 393 pulls, 1069 deaths to Axe Flurry in the 2026-11-13 run; the leash now holds for that pick too). The tank pulls the pack
 # from the route's point 9 (-11810,-1317,62), 72 yards from the four shelf throwers (-11882..-11911,-1316..-1327, z 77.5; sim creature table 2026-11-13) and 20 from the lone one
 # (-11830.6,-1317, z 66.7), and goes back there once the pull has landed; the other members wait. Positions are from the creature table, not tested for line of sight.
-pullpos|309|11350|-11872.5|-1287.7|82.3|8|ZG shelf pack: pull from route point 7, before the stairs (route point 9 is in throw range of the lone thrower at the stairs bottom)
+# 11350 has no pullpos row: the entry also matches the lone thrower at the stairs bottom, where the tank never got within the yards and waited out the 30 s walk (2026-11-13 night r4).
+# Axe Flurry (24018 -> 24019, 30 yard radius around the thrower, 24020: 1250 flat damage and a 2 s stun to everyone hit) is avoided instead: non-tanks keep out of 33 yards.
+avoid_enemy|309|11350|33|healers|Axe Flurry 24019 radius 30
+avoid_enemy|309|11350|33|ranged|Axe Flurry 24019 radius 30
 pullpos|309|11371|-11872.5|-1287.7|82.3|8|ZG shelf pack: pull from route point 7, before the stairs (route point 9 is in throw range of the lone thrower at the stairs bottom)
 pullpos|309|11372|-11872.5|-1287.7|82.3|8|ZG shelf pack: pull from route point 7, before the stairs (route point 9 is in throw range of the lone thrower at the stairs bottom)
 # Great Heal (Gurubashi priests, Jeklik), Drain Life, Mind Flay

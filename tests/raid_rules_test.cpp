@@ -191,7 +191,9 @@ void TestShippedFile()
     CHECK(t.IsPurgeAura(309, 23895) && t.IsMindControlAura(309, 24327));
     CHECK(!t.AvoidEnemyFor(309, 14507).empty() && t.AvoidEnemyFor(309, 14507)[0].Yards == 15.0f);
     CHECK(!t.SpreadFor(309, 14507).empty());
-    for (std::uint32_t entry : { 11350u, 11371u, 11372u })
+    CHECK(!t.PullPositionOf(309, 11350));    // the lone thrower shares the entry: no pullpos row, Axe Flurry is avoided (avoid_enemy)
+    CHECK(t.AvoidEnemyFor(309, 11350).size() == 2);
+    for (std::uint32_t entry : { 11371u, 11372u })
     {
         std::optional<PullPosition> const pos = t.PullPositionOf(309, entry);
         CHECK(pos.has_value() && pos->X == -11872.5f && pos->Y == -1287.7f && pos->Yards == 8.0f);
