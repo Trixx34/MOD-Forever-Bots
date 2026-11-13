@@ -198,6 +198,145 @@ void WipeRecoveryTimesOutToWipe()
     CHECK(result && result->Outcome == "wipe" && result->Wipes == 0);
 }
 
+ScenarioPlan WipeHoldPlan()
+{
+    ScenarioPlan plan = RecoveryPlan();
+    plan.WipeRecoveryMs = 600000;
+    plan.DurationMs = 100000000;
+    plan.WipeReadyPct = 80;
+    plan.WipeReadyMaxMs = 120000;
+    plan.WipeBackoffCount = 2;
+    plan.WipeBackoffMs = 30000;
+    plan.Route = { { 0.0f, 100.0f, 0.0f }, { 0.0f, 200.0f, 0.0f }, { 0.0f, 300.0f, 0.0f }, { 0.0f, 400.0f, 0.0f }, { 0.0f, 500.0f, 0.0f } };
+    return plan;
+}
+
+bool Logged(std::vector<std::string> const& lines, std::string const& what)
+{
+    for (std::string const& line : lines)
+        if (line.find(what) != std::string::npos)
+            return true;
+    return false;
+}
+
+void AllDown(std::vector<BotSnapshot>& bots)
+{
+    for (BotSnapshot& bot : bots)
+        Down(bot, 2);
+}
+
+void AllUp(std::vector<BotSnapshot>& bots, std::uint32_t health, std::uint32_t mana)
+{
+    for (BotSnapshot& bot : bots)
+    {
+        Up(bot);
+        bot.health = health;
+        bot.power_type = 0;
+        bot.max_power = 1000;
+        bot.power = mana;
+    }
+}
+
+// After a wipe the party holds until everybody is up with WipeReadyPct health and mana; the leader is freed first, the members kWipeTankLeadMs later.
+void WipeHoldWaitsForEveryoneToReviveAndRest()
+{
+    std::uint64_t t, tick;
+    std::vector<BotSnapshot> bots;
+    ScenarioDirector director = RunningDirector(t, tick, bots, WipeHoldPlan());
+    std::vector<BotAction> actions;
+    CHECK(!director.WipeHoldState().Hold);
+    AllDown(bots);
+    director.Decide(View(++tick, bots), t += 1000, actions);
+    CHECK(director.WipeHoldState().Hold && !director.WipeHoldState().LeaderFree);
+    AllUp(bots, 500, 300);                                             // revived at half health and mana
+    bots[2].map_id = 0;                                                // one member is still outside
+    director.Decide(View(++tick, bots), t += 5000, actions);
+    director.Decide(View(++tick, bots), t += 30000, actions);
+    CHECK(director.WipeHoldState().Hold && !director.WipeHoldState().LeaderFree);   // not ready: low, and one outside
+    bots[2].map_id = 36;
+    AllUp(bots, 700, 900);
+    director.Decide(View(++tick, bots), t += 1000, actions);
+    CHECK(director.WipeHoldState().Hold && !director.WipeHoldState().LeaderFree);   // health 70 % is below 80 %
+    AllUp(bots, 900, 900);
+    director.Decide(View(++tick, bots), t += 1000, actions);
+    CHECK(director.WipeHoldState().Hold && director.WipeHoldState().LeaderFree);    // the tank first
+    director.Decide(View(++tick, bots), t += kWipeTankLeadMs - 1000, actions);
+    CHECK(director.WipeHoldState().Hold);
+    director.Decide(View(++tick, bots), t += 2000, actions);
+    CHECK(!director.WipeHoldState().Hold);                             // the members follow
+    std::vector<std::string> const lines = director.TakeTelemetry();
+    CHECK(Logged(lines, "wipe_recovery: party=t reason=start wipes=1 segment=0"));
+    CHECK(Logged(lines, "reason=ready wipes=1 segment=0"));
+    CHECK(Logged(lines, "reason=released"));
+    CHECK(Logged(lines, "waited_ms="));
+}
+
+void WipeHoldIsCappedAndOffWithoutTheSetting()
+{
+    std::uint64_t t, tick;
+    std::vector<BotSnapshot> bots;
+    ScenarioDirector director = RunningDirector(t, tick, bots, WipeHoldPlan());
+    std::vector<BotAction> actions;
+    AllDown(bots);
+    director.Decide(View(++tick, bots), t += 1000, actions);
+    AllUp(bots, 300, 100);                                             // never rests up
+    director.Decide(View(++tick, bots), t += 1000, actions);
+    director.Decide(View(++tick, bots), t += 100000, actions);
+    CHECK(!director.WipeHoldState().LeaderFree);
+    director.Decide(View(++tick, bots), t += 21000, actions);
+    CHECK(director.WipeHoldState().LeaderFree);                        // WipeReadyMaxMs
+    CHECK(Logged(director.TakeTelemetry(), "reason=timeout"));
+    ScenarioPlan off = WipeHoldPlan();
+    off.WipeReadyPct = 0;
+    ScenarioDirector plain = RunningDirector(t, tick, bots, off);
+    AllUp(bots, 1000, 1000);
+    AllDown(bots);
+    plain.Decide(View(++tick, bots), t += 1000, actions);
+    CHECK(!plain.WipeHoldState().Hold);
+}
+
+// The second wipe at the same segment backs off: it waits WipeBackoffMs at least, then the living are put at a safe point two before the furthest and the leader is rewound.
+void WipeBackoffAfterRepeatedWipesAtOneSegment()
+{
+    std::uint64_t t, tick;
+    std::vector<BotSnapshot> bots;
+    ScenarioDirector director = RunningDirector(t, tick, bots, WipeHoldPlan());
+    std::vector<BotAction> actions;
+    bots[0].pos_y = 100.0f;                                            // the leader walks: furthest = 1 ... 3
+    director.Decide(View(++tick, bots), t += 1000, actions);
+    bots[0].pos_y = 200.0f;
+    director.Decide(View(++tick, bots), t += 1000, actions);
+    bots[0].pos_y = 300.0f;
+    director.Decide(View(++tick, bots), t += 1000, actions);
+    bots[0].pos_y = 0.0f;
+    for (int wipe = 1; wipe <= 2; ++wipe)
+    {
+        AllDown(bots);
+        director.Decide(View(++tick, bots), t += 1000, actions);
+        AllUp(bots, 1000, 1000);
+        actions.clear();
+        director.Decide(View(++tick, bots), t += 1000, actions);       // everybody is fit at once ...
+        if (wipe == 1)
+        {
+            CHECK(director.WipeHoldState().LeaderFree && !director.WipeHoldState().RewindTo);   // first wipe here: no backoff, no rewind
+            CHECK(Count(actions, ActionType::kTeleport) == 0);
+            director.Decide(View(++tick, bots), t += 7000, actions);
+            CHECK(!director.WipeHoldState().Hold);
+        }
+    }
+    CHECK(director.WipeHoldState().Hold && !director.WipeHoldState().LeaderFree);       // ... but the backoff waits WipeBackoffMs
+    director.Decide(View(++tick, bots), t += 31000, actions);
+    CHECK(director.WipeHoldState().LeaderFree && director.WipeHoldState().RewindTo && *director.WipeHoldState().RewindTo == 1 && director.WipeHoldState().Epoch == 1);
+    CHECK(Count(actions, ActionType::kTeleport) == 3);
+    for (BotAction const& action : actions)
+        if (action.type == ActionType::kTeleport)
+            CHECK(action.spell_id == 36 && action.dest_y == 200.0f);                   // route point 1, two before furthest = 3
+    std::vector<std::string> const lines = director.TakeTelemetry();
+    CHECK(Logged(lines, "reason=start_backoff wipes=2 segment=3"));
+    CHECK(Logged(lines, "reason=backoff wipes=2 segment=3"));
+    CHECK(Logged(lines, "safe_point=1"));
+}
+
 void UnderstrengthEndsTheRun()
 {
     std::uint64_t t, tick;
@@ -678,6 +817,9 @@ void RunScenarioTestsPart4()
     RevivedBotIsCountedOnceInDeaths();
     WipeRecoveredByAReclaimingGhost();
     WipeRecoveryTimesOutToWipe();
+    WipeHoldWaitsForEveryoneToReviveAndRest();
+    WipeHoldIsCappedAndOffWithoutTheSetting();
+    WipeBackoffAfterRepeatedWipesAtOneSegment();
     UnderstrengthEndsTheRun();
     DeadLeaderAbandonsAfterTheCap();
     EnteringSkipsGhostsAndCorpses();

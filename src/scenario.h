@@ -16,6 +16,7 @@
 #include "forever_module/tier2_session.h"
 #include "damage_events.h"
 #include "run_telemetry.h"
+#include "wipe_hold.h"
 
 #include <array>
 #include <cstdint>
@@ -73,6 +74,12 @@ struct ScenarioPlan
     // the wipe is cancelled and counted in Wipes; else the run ends as "wipe". Off (default): all down ends the run at once.
     bool WipeRecovery = false;
     std::uint64_t WipeRecoveryMs = 300000;
+    // Wipe hold and backoff (UpdateWipeRecovery; 0 = off): after a wipe the party holds until all are up with WipeReadyPct health and mana, at most WipeReadyMaxMs. After
+    // WipeBackoffCount wipes at the same route segment it waits WipeBackoffMs longer and is put back at a safe point (two points before the furthest one) with the leader rewound.
+    std::uint32_t WipeReadyPct = 0;
+    std::uint64_t WipeReadyMaxMs = 240000;
+    std::uint32_t WipeBackoffCount = 0;
+    std::uint64_t WipeBackoffMs = 90000;
     // The run ends as "understrength" when fewer than MinAlive bots (but at least one) are alive for kUnderstrengthGraceMs (0 = off).
     std::uint32_t MinAlive = 0;
     // The run ends as "abandoned_dead_leader" when the party leader has been down this long (0 = off).
@@ -180,6 +187,8 @@ constexpr std::uint64_t kRecoverMaxMs = 240000;
 // After a wipe the revived party stands outside at the graveyard: this long after the leader is up there, the living members are put back at the entry (a corpse run
 // through the portal does the same on foot), and again every kEnterRetryMs while some are still outside.
 constexpr std::uint64_t kReenterDelayMs = 20000;
+// After a wipe the leader (the tank) is freed this long before the members, so it is at the pack first.
+constexpr std::uint64_t kWipeTankLeadMs = 6000;
 constexpr std::uint64_t kUnderstrengthGraceMs = 180000; // fewer than MinAlive alive this long: the run is given up
 constexpr std::uint64_t kBossGraceMs = 360000;          // RequireBosses: time allowed after the last waypoint for the remaining bosses to die
 constexpr float kRoutePointReachYards = 15.0f; // the leader counts as having reached a waypoint this close to it
@@ -246,8 +255,13 @@ public:
     // The creature entries of the bosses seen dead so far.
     std::set<std::uint32_t> const& KilledBossEntries() const { return _bossKilledEntries; }
 
+    // The wipe hold for the policy (SetWipeHoldFor): see BotPolicy::WipeHold.
+    WipeHold WipeHoldState() const;
+
 private:
     void Finish(std::string outcome, std::uint64_t nowMs);
+    // Wipe recovery (WipeReadyPct): the hold after a wipe, its release (leader first) and the backoff at a segment that wiped the party WipeBackoffCount times.
+    void UpdateWipeRecovery(std::vector<forever_module::BotSnapshot> const& bots, forever_module::BotSnapshot const* leader, std::uint32_t alive, std::uint64_t nowMs, std::vector<forever_module::BotAction>& actions);
     void MarkBossKilled(std::uint32_t entry, std::string const& name, std::uint64_t nowMs);
     // Run telemetry, once per Running tick: the timeline, the stall verdict and the boss attempts. step is the tick's time state name.
     void TrackRun(forever_module::WorldTickSnapshotView const& view, forever_module::BotSnapshot const* leader, char const* step, std::uint64_t nowMs);
@@ -315,6 +329,18 @@ private:
     std::uint32_t _deathEvents = 0;
     std::uint32_t _revived = 0;
     std::uint32_t _wipes = 0;
+    bool _wipeHold = false;                            // UpdateWipeRecovery: the party holds
+    bool _wipeArmed = true;                            // a new wipe counts only after the party was up again once
+    bool _wipeLeaderFree = false;
+    bool _wipeBackoff = false;
+    std::uint64_t _wipeStartMs = 0;
+    std::uint64_t _wipeFreeMs = 0;
+    std::uint64_t _wipeNeedMs = 0;                     // the longest the hold lasts
+    std::uint32_t _wipeSegment = 0;
+    std::uint32_t _wipeCount = 0;                      // wipe episodes of this run (UpdateWipeRecovery)
+    std::uint32_t _wipeEpoch = 0;
+    std::optional<std::size_t> _wipeRewindTo;
+    std::map<std::uint32_t, std::uint32_t> _segmentWipes; // route segment (the furthest point) -> wipes there
     bool _allDown = false;                             // the whole party is down and the wipe recovery timer runs
     std::uint64_t _allDownSinceMs = 0;
     std::uint64_t _fewAliveSinceMs = 0;

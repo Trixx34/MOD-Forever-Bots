@@ -315,6 +315,19 @@ struct BotSettings
     // PullMinHpPct = 60 (default): a member of a dungeon, raid or tank-led party below this health percent that nothing attacks stands and rests instead of engaging or walking into the
     // tank's fight (0 = off; at most 2 minutes, then it may engage again). Revived-at-49% members walked back into the pack that killed them (ZG, 2026-11-13).
     std::uint32_t PullMinHpPct = 60;
+    // PullReadyManaPct = 60 (default): the ready gate before a pull in a route party: a mana user below this mana percent rests instead of pulling or joining a pull while the leader
+    // is out of combat (pull_hold reason=low_mana), and the route leader does not walk on to the next pack while a member is below PullMinHpPct health or this mana. At most
+    // PullReadyMaxMs (default 90000, 1000 to 600000), so a party with no drink is not frozen. 0 = off (the health gate PullMinHpPct stays).
+    std::uint32_t PullReadyManaPct = 60;
+    std::uint32_t PullReadyMaxMs = 90000;
+    // Wipe recovery (a scenario run with ScenarioWipeRecovery = 1; Karrz1's raid logic): after a wipe (everybody down, or nearly) the party holds, nobody pulls, until all have revived
+    // and have WipeReadyPct health and mana (0 = off, 1 to 100, default 80) or WipeReadyMaxMs has passed (default 240000, 10000 to 1800000); the leader (tank) is freed first. After
+    // WipeBackoffCount wipes at the same route segment (default 3, 0 = off) the run backs off: it waits WipeBackoffMs longer (default 90000, 0 to 900000) and the party is put back at a
+    // safe route point two points before the pack (and the leader set back to it) instead of pulling the same pack again.
+    std::uint32_t WipeReadyPct = 80;
+    std::uint32_t WipeReadyMaxMs = 240000;
+    std::uint32_t WipeBackoffCount = 3;
+    std::uint32_t WipeBackoffMs = 90000;
     // WarderPartyHold = 1 (default): in the Onyxia raid a member with no target of its own does not follow the tank into an Onyxian Warder's Fire Nova; it holds outside the nova
     // while the tank pulls the Warder alone (2026-11-13 sim: 40 members followed the tank to 0-6 yards of the Warder and died to Fire Nova, 700 of 798 deaths).
     bool WarderPartyHold = true;

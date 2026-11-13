@@ -108,6 +108,106 @@ void ScenarioDirector::NoteDamage(damage_events::Hit const& hit)
         _attemptDmg.Add(hit);
 }
 
+WipeHold ScenarioDirector::WipeHoldState() const
+{
+    WipeHold hold;
+    hold.Hold = _wipeHold;
+    hold.LeaderFree = _wipeHold && _wipeLeaderFree;
+    hold.Epoch = _wipeEpoch;
+    hold.RewindTo = _wipeRewindTo;
+    return hold;
+}
+
+// Wipe recovery (Karrz1's raid logic: after a wipe nobody pulls until everybody has revived and rested). Today after a wipe the survivors are put at the entry and the route
+// resumes at once, so the same pack was pulled again with half-dead bots (ZG runs 29 and 31: about 2100 of 3600 s dead). Does not touch the ghost flow (the policy's corpse
+// run and the entry re-teleport above): it only holds the living.
+//   - a wipe starts when every bot is down, or nearly (the leader is down and at most a tenth of a roster of ten or more is up); counted per route segment (the furthest point)
+//   - the hold ends when every bot is up on the entry map with WipeReadyPct health and mana, or after WipeReadyMaxMs (+ WipeBackoffMs on a backoff; a backoff also waits at
+//     least WipeBackoffMs)
+//   - the leader (the tank) is freed first and the members kWipeTankLeadMs later: the tank gets to the pack first
+//   - the WipeBackoffCount-th wipe at one segment: the party is put at a safe route point two points before the furthest and the leader is set back to it
+void ScenarioDirector::UpdateWipeRecovery(std::vector<BotSnapshot> const& bots, BotSnapshot const* leader, std::uint32_t alive, std::uint64_t nowMs, std::vector<BotAction>& actions)
+{
+    if (_plan.WipeReadyPct == 0)
+        return;
+    std::size_t const n = bots.size();
+    bool const nearly = alive == 0 || (leader && leader->life_state != 0 && n >= 10 && std::uint64_t(alive) * 10 <= n);
+    auto const log = [&](char const* reason, std::uint64_t waited, char const* extra = "")
+    {
+        _telemetry.push_back("wipe_recovery: party=" + _plan.Name + " reason=" + reason + " wipes=" + std::to_string(_segmentWipes[_wipeSegment]) + " segment=" +
+                             std::to_string(_wipeSegment) + " total_wipes=" + std::to_string(_wipeCount) + " waited_ms=" + std::to_string(waited) + " alive=" + std::to_string(alive) +
+                             "/" + std::to_string(n) + extra);
+    };
+    if (!_wipeHold)
+    {
+        if (!nearly)
+            _wipeArmed = true;
+        else if (_wipeArmed)
+        {
+            _wipeArmed = false;
+            _wipeHold = true;
+            _wipeLeaderFree = false;
+            _wipeStartMs = nowMs;
+            _wipeSegment = _furthest;
+            ++_wipeCount;
+            std::uint32_t const here = ++_segmentWipes[_wipeSegment];
+            _wipeBackoff = _plan.WipeBackoffCount != 0 && here >= _plan.WipeBackoffCount;
+            _wipeNeedMs = _plan.WipeReadyMaxMs + (_wipeBackoff ? _plan.WipeBackoffMs : 0);
+            _wipeRewindTo.reset();
+            log(_wipeBackoff ? "start_backoff" : "start", 0);
+        }
+        return;
+    }
+    if (!nearly)
+        _wipeArmed = true;
+    std::uint64_t const waited = nowMs - _wipeStartMs;
+    if (!_wipeLeaderFree)
+    {
+        bool ready = waited >= (_wipeBackoff ? _plan.WipeBackoffMs : 0);
+        for (BotSnapshot const& bot : bots)
+        {
+            if (bot.life_state != 0 || bot.map_id != _plan.EntryMap)
+                ready = false;
+            else if (bot.max_health != 0 && std::uint64_t(bot.health) * 100 < std::uint64_t(bot.max_health) * _plan.WipeReadyPct)
+                ready = false;
+            else if (bot.power_type == 0 && bot.max_power != 0 && std::uint64_t(bot.power) * 100 < std::uint64_t(bot.max_power) * _plan.WipeReadyPct)
+                ready = false;
+        }
+        if (!ready && waited < _wipeNeedMs)
+            return;
+        _wipeLeaderFree = true;
+        _wipeFreeMs = nowMs;
+        log(ready ? "ready" : "timeout", waited);
+        if (_wipeBackoff && !_plan.Route.empty())
+        {
+            std::size_t const safe = _wipeSegment >= 2 ? std::size_t(_wipeSegment) - 2 : 0;
+            ScenarioPoint const& point = _plan.Route[std::min(safe, _plan.Route.size() - 1)];
+            _wipeRewindTo = std::min(safe, _plan.Route.size() - 1);
+            ++_wipeEpoch;
+            for (BotSnapshot const& bot : bots)
+                if (bot.life_state == 0 && bot.map_id == _plan.EntryMap)
+                {
+                    BotAction action;
+                    action.bot_guid = bot.guid;
+                    action.type = ActionType::kTeleport;
+                    action.spell_id = _plan.EntryMap;
+                    action.dest_x = point.X;
+                    action.dest_y = point.Y;
+                    action.dest_z = point.Z;
+                    actions.push_back(action);
+                }
+            log("backoff", waited, (" safe_point=" + std::to_string(*_wipeRewindTo)).c_str());
+        }
+        return;
+    }
+    if (nowMs - _wipeFreeMs >= kWipeTankLeadMs)
+    {
+        _wipeHold = false;
+        _wipeRewindTo.reset();
+        log("released", nowMs - _wipeStartMs);
+    }
+}
+
 std::vector<std::string> ScenarioDirector::TakeTelemetry()
 {
     std::vector<std::string> lines;
@@ -1044,6 +1144,7 @@ void ScenarioDirector::Decide(forever_module::WorldTickSnapshotView const& view,
                 _allDown = false; // somebody came back: the wipe is cancelled
                 ++_wipes;
             }
+            UpdateWipeRecovery(bots, leader, alive, nowMs, actions);
             bool const leaderDown = leader && leader->life_state != 0;
             if (leaderDown && !_leaderDown)
                 _leaderDownSinceMs = nowMs;

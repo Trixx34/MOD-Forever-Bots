@@ -334,6 +334,11 @@ void DungeonLearningKnobsAreBounded()
     warnings.clear();
     CHECK(defaults.PullTankFirst && defaults.PullTankHoldMs == 12000 && defaults.PullMemberRangeYards == 12 && defaults.PullMinHpPct == 60);
     CHECK(ParseBotSettings({ { "PullMinHpPct", "0" } }, warnings).PullMinHpPct == 0 && warnings.empty());
+    CHECK(defaults.PullReadyManaPct == 60 && defaults.PullReadyMaxMs == 90000);
+    CHECK(defaults.WipeReadyPct == 80 && defaults.WipeReadyMaxMs == 240000 && defaults.WipeBackoffCount == 3 && defaults.WipeBackoffMs == 90000);
+    CHECK(ParseBotSettings({ { "PullReadyManaPct", "0" }, { "WipeBackoffCount", "0" }, { "WipeReadyPct", "0" } }, warnings).PullReadyManaPct == 0 && warnings.empty());
+    CHECK(ParseBotSettings({ { "WipeReadyMaxMs", "5" } }, warnings).WipeReadyMaxMs == 240000 && !warnings.empty());
+    warnings.clear();
     CHECK(defaults.WarderPartyHold && !ParseBotSettings({ { "WarderPartyHold", "0" } }, warnings).WarderPartyHold && warnings.empty());
     BotSettings const pullSet = ParseBotSettings({ { "PullTankFirst", "0" }, { "PullTankHoldMs", "5000" }, { "PullMemberRangeYards", "8" } }, warnings);
     CHECK(!pullSet.PullTankFirst && pullSet.PullTankHoldMs == 5000 && pullSet.PullMemberRangeYards == 8 && warnings.empty());

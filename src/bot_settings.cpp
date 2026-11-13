@@ -824,6 +824,12 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadKey(config, "PullTankHoldMs", 1000, 120000, settings.PullTankHoldMs, warnings);
     ReadKey(config, "PullMemberRangeYards", 0, 40, settings.PullMemberRangeYards, warnings);
     ReadKey(config, "PullMinHpPct", 0, 100, settings.PullMinHpPct, warnings);
+    ReadKey(config, "PullReadyManaPct", 0, 100, settings.PullReadyManaPct, warnings);
+    ReadKey(config, "PullReadyMaxMs", 1000, 600000, settings.PullReadyMaxMs, warnings);
+    ReadKey(config, "WipeReadyPct", 0, 100, settings.WipeReadyPct, warnings);
+    ReadKey(config, "WipeReadyMaxMs", 10000, 1800000, settings.WipeReadyMaxMs, warnings);
+    ReadKey(config, "WipeBackoffCount", 0, 20, settings.WipeBackoffCount, warnings);
+    ReadKey(config, "WipeBackoffMs", 0, 900000, settings.WipeBackoffMs, warnings);
     ReadBool(config, "WarderPartyHold", settings.WarderPartyHold, warnings);
     ReadKey(config, "HealerLosMoveYards", 3, 12, settings.HealerLosMoveYards, warnings);
     ReadBool(config, "AggressiveStart", settings.AggressiveStart, warnings);

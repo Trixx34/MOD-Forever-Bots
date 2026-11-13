@@ -354,6 +354,11 @@ void main_detail::PumpTier2(forever_module::Tier2Session& session, std::atomic<b
                     auto const at = partyOf.find(guid);
                     return at != partyOf.end() && directors[at->second].Staging();
                 });
+                policy.SetWipeHoldFor([&directors, &partyOf](std::uint64_t guid)
+                {
+                    auto const at = partyOf.find(guid);
+                    return at != partyOf.end() ? directors[at->second].WipeHoldState() : WipeHold{};
+                });
                 policy.SetKilledBossesFor([&directors, &partyOf](std::uint64_t guid) -> std::set<std::uint32_t> const&
                 {
                     static std::set<std::uint32_t> const none;

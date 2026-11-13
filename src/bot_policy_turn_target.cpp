@@ -491,18 +491,26 @@ void BotPolicy::TurnTargeting(DecideTick& tick, BotTurn& turn)
     {
         NearbyUnit const* mine = targetRef != 0 ? FindLiveMob(nearby, targetRef) : nullptr;
         bool const attacked = mine && mine->victim_ref != 0;   // it fights somebody already: the party defends
-        if (_options.PullMinHpPct != 0 && bot.max_health > 0 && BelowPct(bot.health, bot.max_health, _options.PullMinHpPct) && !attacked)
+        // The ready gate before a pull: hurt (PullMinHpPct), or a mana user short of mana (PullReadyManaPct) while the leader is not fighting, or the director's wipe hold (after a
+        // wipe nobody pulls until the party has revived and rested; the director ends it).
+        bool const hpLow = _options.PullMinHpPct != 0 && bot.max_health > 0 && BelowPct(bot.health, bot.max_health, _options.PullMinHpPct) && !attacked;
+        bool const manaLow = _options.PullReadyManaPct != 0 && bot.power_type == 0 && bot.max_power > 0 && BelowPct(bot.power, bot.max_power, _options.PullReadyManaPct) &&
+                             !attacked && leaderSnap->in_combat == 0;
+        bool const wipeHold = !attacked && WipeHoldOf(bot.guid).Hold;
+        if (hpLow || manaLow || wipeHold)
         {
             if (state.PullRestSinceMs == 0)
                 state.PullRestSinceMs = nowMs;
-            if (nowMs - state.PullRestSinceMs < _options.PullRestMaxMs)
+            std::uint64_t const cap = wipeHold ? ~0ull : hpLow ? _options.PullRestMaxMs : _options.PullReadyMaxMs;
+            if (nowMs - state.PullRestSinceMs < cap)
             {
                 turn.pullRest = true;
                 if (_options.OnEvent && (state.PullRestLogMs == 0 || nowMs - state.PullRestLogMs >= 10000))
                 {
                     state.PullRestLogMs = nowMs;
-                    _options.OnEvent("pull_hold: bot=" + std::to_string(bot.guid) + " reason=low_hp hp_pct=" + std::to_string(HealthPct(bot, 0)) + " rest_ms=" +
-                                     std::to_string(nowMs - state.PullRestSinceMs));
+                    char const* const reason = wipeHold ? "wipe_hold" : hpLow ? "low_hp" : "low_mana";
+                    _options.OnEvent("pull_hold: bot=" + std::to_string(bot.guid) + " reason=" + reason + " hp_pct=" + std::to_string(HealthPct(bot, 0)) + " mana_pct=" +
+                                     std::to_string(bot.max_power > 0 ? bot.power * 100 / bot.max_power : 100) + " rest_ms=" + std::to_string(nowMs - state.PullRestSinceMs));
                 }
                 targetRef = 0;
                 targetUnit = nullptr;

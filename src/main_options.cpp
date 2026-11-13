@@ -62,6 +62,8 @@ void PolicyFromSettings(PolicyOptions& policyOptions, BotSettings& settings)
     policyOptions.PullTankHoldMs = settings.PullTankHoldMs;
     policyOptions.PullMemberRangeYards = settings.PullMemberRangeYards;
     policyOptions.PullMinHpPct = settings.PullMinHpPct;
+    policyOptions.PullReadyManaPct = settings.PullReadyManaPct;
+    policyOptions.PullReadyMaxMs = settings.PullReadyMaxMs;
     policyOptions.WarderPartyHold = settings.WarderPartyHold;
     policyOptions.HealerLosMoveYards = settings.HealerLosMoveYards;
     policyOptions.Gathering = settings.Gathering;
@@ -382,6 +384,10 @@ void SetUpScenario(PolicyOptions& policyOptions, PumpExtras& extras, BotSettings
         plan.TameSpot = { scenario.TameSpot[1], scenario.TameSpot[2], scenario.TameSpot[3] };
         plan.WipeRecovery = scenario.WipeRecovery;
         plan.WipeRecoveryMs = std::uint64_t(scenario.WipeRecoverySec) * 1000;
+        plan.WipeReadyPct = settings.WipeReadyPct;
+        plan.WipeReadyMaxMs = settings.WipeReadyMaxMs;
+        plan.WipeBackoffCount = settings.WipeBackoffCount;
+        plan.WipeBackoffMs = settings.WipeBackoffMs;
         plan.RequireBosses = scenario.RequireBosses;
         plan.VerifyConfig = settings.ScenarioConfigGuard;
         plan.MinAlive = scenario.MinAlive;

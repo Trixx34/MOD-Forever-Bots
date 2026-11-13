@@ -28,6 +28,8 @@
 // when it has none of its own. Party actions are sent only out of combat.
 #pragma once
 
+#include <optional>
+#include "wipe_hold.h"
 #include "damage_events.h"
 #include "party_planner.h"
 #include "party_view_adapter.h"
@@ -264,6 +266,11 @@ struct PolicyOptions
     // 2 minutes). 0 = off here (the tests); the module's settings default to 60.
     std::uint32_t PullMinHpPct = 0;
     std::uint64_t PullRestMaxMs = 120000;   // a hurt member rests at most this long before it may engage again, so a party with no healer is not frozen
+    // PullReadyManaPct: the ready gate before a pull in a route party. A mana user below this mana percent does not start or join a pull while the leader is out of combat (it rests,
+    // pull_hold reason=low_mana), and the route leader does not walk on to the next pack while a member is dead-tired (health below PullMinHpPct or mana below this) -- both at most
+    // PullReadyMaxMs, so a party without a drink is not frozen. 0 = off here (the tests); the module's settings default to 60.
+    std::uint32_t PullReadyManaPct = 0;
+    std::uint64_t PullReadyMaxMs = 90000;
     // WarderPartyHold: a party member with no target of its own does not follow its leader (the tank) into an Onyxian Warder's Fire Nova: while a live Warder stands within
     // the nova stand distance of the leader, the member holds where it is (outside it) and the tank pulls the Warder alone; the members then fight it from range as before.
     // 0 = off here (the tests); the module's settings default to on.
@@ -421,6 +428,9 @@ public:
     void SetTamingFor(std::function<bool(std::uint64_t)> fn) { _tamingFn = std::move(fn); }
     // The bot's scenario party is not inside yet (Waiting to Entering): it holds at the staging place, with no quest, grind walk or pull of its own.
     void SetStagingHoldFor(std::function<bool(std::uint64_t)> fn) { _stagingHoldFn = std::move(fn); }
+    // Wipe recovery (the scenario director, scenario.cpp): after a wipe the members hold (rest, no pull) while Hold; the route leader holds until LeaderFree (it goes first,
+    // the tank gets to the pack before the members); after a backoff RewindTo is the route point the leader is set back to once per Epoch.
+    void SetWipeHoldFor(std::function<WipeHold(std::uint64_t)> fn) { _wipeHoldFn = std::move(fn); }
     void SetKilledBossesFor(std::function<std::set<std::uint32_t> const&(std::uint64_t)> fn) { _killedBossesFn = std::move(fn); }
     // Several dungeons: the route, events, kill priority and portal of the bot's own party's dungeon. A bot it returns nullptr for (or without it) uses the
     // options' own Route, Events, KillPriority and portal, as a single-dungeon scenario does.
@@ -554,6 +564,9 @@ private:
         std::uint64_t PullRestSinceMs = 0;               // a hurt member (PullMinHpPct) started resting at this time (0 = not resting)
         std::uint64_t PullRestLogMs = 0;
         std::uint64_t WarderHoldLogMs = 0;                // last warder_hold event (at most one per 10 s)
+        std::uint64_t PullReadyStartMs = 0;              // the route leader's ready gate (a member short of health or mana) began at this time (0 = not holding)
+        std::uint64_t PullReadyLogMs = 0;
+        std::uint32_t WipeEpochSeen = 0;                 // the last wipe-recovery rewind this leader applied
         std::uint64_t PullHoldLogMs = 0;                 // last pull_hold event (at most one per 10 s)
         std::uint64_t ThreatGraceUntilMs = 0;            // a hold that ran out its maximum: no new hold until then
         std::uint64_t ThreatDropAtMs = 0;                // a threat-drop ability may be tried again at this time
@@ -1108,6 +1121,8 @@ private:
     std::function<bool(std::uint64_t)> _routeActiveFn;
     std::function<bool(std::uint64_t)> _tamingFn;
     std::function<bool(std::uint64_t)> _stagingHoldFn;
+    std::function<WipeHold(std::uint64_t)> _wipeHoldFn;
+    WipeHold WipeHoldOf(std::uint64_t guid) const { return _wipeHoldFn ? _wipeHoldFn(guid) : WipeHold{}; }
     std::function<std::set<std::uint32_t> const&(std::uint64_t)> _killedBossesFn;
     std::map<std::uint32_t, std::set<std::uint32_t>> _tankKilled;   // map -> bosses seen dead during a "tank lead" run
 

@@ -375,6 +375,13 @@ Module.forever-bots.TelemetrySummarySec = 60
 # PullTankHoldMs = 12000   (the longest a member waits, so a dead or stuck tank cannot freeze the party; 1000 to 120000)
 # WarderPartyHold = 1   (a member with no target of its own holds outside an Onyxian Warder's Fire Nova instead of following the tank into it; 0 = follow as before)
 # PullMinHpPct = 60   (a member of a route/raid party below this health percent that nothing attacks rests instead of engaging or joining the tank's fight, at most 2 minutes; 0 = off)
+# PullReadyManaPct = 60   (ready gate before a pull: a mana user below this mana percent rests, pull_hold reason=low_mana, and the route leader does not walk on to the next pack while a
+#                          member is below PullMinHpPct health or this mana; 0 = off)
+# PullReadyMaxMs = 90000   (the longest the ready gate holds; 1000 to 600000)
+# WipeReadyPct = 80   (after a wipe nobody pulls until all have revived and have this health and mana percent; the tank goes first; wipe_recovery: events; needs ScenarioWipeRecovery = 1; 0 = off)
+# WipeReadyMaxMs = 240000   (the longest the wipe hold lasts; 10000 to 1800000)
+# WipeBackoffCount = 3   (this many wipes at one route segment: the party waits WipeBackoffMs longer and is put back two route points before the pack; 0 = off)
+# WipeBackoffMs = 90000   (the extra wait of a backoff; 0 to 900000)
 # PullMemberRangeYards = 12   (a target within this many yards of a member is engaged at once, no walk; 0 to 40)
 # Combat drift of dungeon parties (0.45.0; a scenario or "tank lead" party with a route; the 2026-11-07 sim's fights pulled leaders 60-250 yards off the route):
 # DungeonPullLeashYards = 30   (the route leader, out of a fight, pulls only a hostile within this many yards of the leg of the route it walks; 0 = off, else 10..80)
