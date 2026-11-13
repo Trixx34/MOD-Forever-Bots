@@ -275,6 +275,10 @@ struct PolicyOptions
     // tank) has a target but is not yet in combat with it, and assists once the tank is in combat or PullTankHoldMs has passed. A member whose target is already within
     // PullMemberRangeYards of it need not walk and is not held. 0 = off here (the tests); the module's settings turn it on.
     bool PullTankFirst = false;
+    // HealWaitTankHold: a healer casts no heal (Renew) on the party's tank while the tank is at full health and does not hold its target yet (the target's
+    // threat_top_ref, else its victim_ref, is not the tank). A heal then only puts the healer on the pack's threat list (ZG 2026-11-13: tank_loose reason=healer
+    // 5 s after the pull). A target that is not in view counts as held. 0 = off here (the tests); the module's settings turn it on.
+    bool HealWaitTankHold = false;
     std::uint64_t PullTankHoldMs = 12000;
     std::uint32_t PullMemberRangeYards = 12;
     // PullMinHpPct: a member of a route party below this health percent, not in combat, starts no fight and does not walk to the leader's fight; it stands and rests (at most
@@ -588,6 +592,7 @@ private:
         std::uint64_t PullReadyLogMs = 0;
         std::uint32_t WipeEpochSeen = 0;                 // the last wipe-recovery rewind this leader applied
         std::uint64_t PullHoldLogMs = 0;                 // last pull_hold event (at most one per 10 s)
+        std::uint64_t HealHoldLogMs = 0;                 // last heal_hold event (HealWaitTankHold, at most one per 10 s)
         std::uint64_t ThreatGraceUntilMs = 0;            // a hold that ran out its maximum: no new hold until then
         std::uint64_t ThreatDropAtMs = 0;                // a threat-drop ability may be tried again at this time
         std::uint64_t NextCastMs = 0;                    // global cooldown: no rotation cast before this
@@ -1023,6 +1028,8 @@ private:
     TurnFlow TurnPartySupport(DecideTick& tick, BotTurn& turn);
     // TurnPartySupport's parts (bot_policy_turn_cast.cpp).
     TurnFlow PartyHeal(DecideTick& tick, BotTurn& turn);
+    // HealWaitTankHold: the tank's target (in the healer's or the leader's view) has the tank on top of its threat (threat_top_ref, else victim_ref); true when it is not in view.
+    bool TankHoldsTarget(DecideTick const& tick, BotTurn const& turn, forever_module::BotSnapshot const& tank) const;
     TurnFlow PartyHealerDps(DecideTick& tick, BotTurn& turn);
     TurnFlow PartyResurrect(DecideTick& tick, BotTurn& turn);
     TurnFlow TurnHunterPet(DecideTick& tick, BotTurn& turn);

@@ -890,6 +890,50 @@ void RenewKeepsUpOnTheFightingTankEveryFifteenSeconds()
     CHECK(!CastsSpell(calm.Decide(LeveledDungeonView(40), 1000), 10, 139, PlayerOf(12)));
 }
 
+// HealWaitTankHold: no Renew on a full-health tank whose target is on someone else (ZG 2026-11-13: tank_loose reason=healer 5 s after the pull).
+void RenewWaitsUntilTheTankHoldsItsTarget()
+{
+    auto const policyWith = [](bool wait)
+    {
+        PolicyOptions options = AggressiveOptions();
+        options.PartySize = 5;
+        options.PartyCount = 1;
+        options.ClassOf = WarriorLeads;
+        options.HealWaitTankHold = wait;
+        BotPolicy policy(options);
+        policy.SetRouteActive(true);
+        return policy;
+    };
+    std::uint64_t const mob = MakeUnitRef(8, 1, 7);
+    auto const viewWith = [mob](std::uint64_t victim, std::uint64_t top, bool inView)
+    {
+        WorldTickSnapshotView view = LeveledDungeonView(40);
+        view.bots[2].in_combat = 1;                      // the tank (bot 12) fights, at full health
+        view.bots[2].threat_target_guid = mob;
+        if (inView)
+        {
+            NearbyUnit unit = Hostile(7, 20, 100);
+            unit.guid = mob;
+            unit.victim_ref = victim;
+            unit.threat_top_ref = top;
+            AddNearby(view, 0, unit);                    // in the priest's (bot 10) view
+        }
+        return view;
+    };
+    BotPolicy onPriest = policyWith(true);
+    CHECK(!CastsSpell(onPriest.Decide(viewWith(PlayerOf(10), 0, true), 1000), 10, 139, PlayerOf(12)));   // the mob hits the priest: no Renew
+    BotPolicy held = policyWith(true);
+    CHECK(CastsSpell(held.Decide(viewWith(PlayerOf(12), 0, true), 1000), 10, 139, PlayerOf(12)));        // the mob hits the tank: Renew
+    BotPolicy topTank = policyWith(true);
+    CHECK(CastsSpell(topTank.Decide(viewWith(PlayerOf(10), PlayerOf(12), true), 1000), 10, 139, PlayerOf(12)));   // threat top wins over the victim
+    BotPolicy topOther = policyWith(true);
+    CHECK(!CastsSpell(topOther.Decide(viewWith(PlayerOf(12), PlayerOf(11), true), 1000), 10, 139, PlayerOf(12)));
+    BotPolicy unseen = policyWith(true);
+    CHECK(CastsSpell(unseen.Decide(viewWith(0, 0, false), 1000), 10, 139, PlayerOf(12)));                 // not in view: as before
+    BotPolicy off = policyWith(false);
+    CHECK(CastsSpell(off.Decide(viewWith(PlayerOf(10), 0, true), 1000), 10, 139, PlayerOf(12)));         // switch off: as before
+}
+
 void BindingHealWhenThePriestAndTheTankAreBothHurt()
 {
     BotPolicy policy = DungeonPolicy();
@@ -941,6 +985,7 @@ void PrayerOfHealingOnlyWhenMostOfThePartyIsLow()
 void RunPolicyTestsPart7()
 {
     RenewKeepsUpOnTheFightingTankEveryFifteenSeconds();
+    RenewWaitsUntilTheTankHoldsItsTarget();
     BindingHealWhenThePriestAndTheTankAreBothHurt();
     PrayerOfHealingOnlyWhenMostOfThePartyIsLow();
     ShortOfAmmoWalksToTheAmmoVendor();

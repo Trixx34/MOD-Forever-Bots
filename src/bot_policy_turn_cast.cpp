@@ -64,6 +64,19 @@ BotPolicy::TurnFlow BotPolicy::TurnPartySupport(DecideTick& tick, BotTurn& turn)
     return TurnFlow::kNext;
 }
 
+bool BotPolicy::TankHoldsTarget(DecideTick const& tick, BotTurn const& turn, BotSnapshot const& tank) const
+{
+    if (tank.threat_target_guid == 0)
+        return false;   // in combat with nothing aimed at: nothing is held
+    NearbyUnit const* unit = FindLiveMob(tick.view.NearbyOf(turn.i), tank.threat_target_guid);
+    if (!unit)
+        unit = FindLiveMob(tick.LeaderNearby(tank.guid, tank.map_id), tank.threat_target_guid);
+    if (!unit)
+        return true;    // not in view: nothing to judge by, heal as before
+    std::uint64_t const tankRef = PlayerRef(tank.guid);
+    return unit->threat_top_ref != 0 ? unit->threat_top_ref == tankRef : unit->victim_ref == tankRef;
+}
+
 // TurnPartySupport: the heal of the party member that needs it most (an emergency, the tank, a shield, Renew, Prayer of Healing, a top-up).
 BotPolicy::TurnFlow BotPolicy::PartyHeal(DecideTick& tick, BotTurn& turn)
 {
@@ -222,8 +235,20 @@ BotPolicy::TurnFlow BotPolicy::PartyHeal(DecideTick& tick, BotTurn& turn)
         bool const priest = classId == 5;
         bool const prayer = priest && lowCount >= kPrayerMinLow && bot.level >= kPrayerOfHealingLevel && ready(kPrayerOfHealing);
         // Renew on the tank: while it fights and the last Renew has run out. The priest sees only its own auras, so the timer is the module's.
-        bool const renewDue = priest && tankMember && tankMember->in_combat != 0 && bot.level >= kRenewLevel && ready(kRenew) &&
+        bool renewDue = priest && tankMember && tankMember->in_combat != 0 && bot.level >= kRenewLevel && ready(kRenew) &&
                               !(state.BuffUntilMs.count({ kRenew, PlayerRef(tankMember->guid) }) && nowMs < state.BuffUntilMs[{ kRenew, PlayerRef(tankMember->guid) }]);
+        // HealWaitTankHold: no Renew on a tank at full health that does not hold its target yet (the heal only puts the healer on the pack's threat list).
+        // Renew is the one heal here that goes on a full-health tank; every other branch needs the member below a threshold under 100 %.
+        if (renewDue && _options.HealWaitTankHold && tankMember->health >= tankMember->max_health && !TankHoldsTarget(tick, turn, *tankMember))
+        {
+            renewDue = false;
+            if (_options.OnEvent && (state.HealHoldLogMs == 0 || nowMs - state.HealHoldLogMs >= 10000))
+            {
+                state.HealHoldLogMs = nowMs;
+                _options.OnEvent("heal_hold: healer=" + std::to_string(bot.guid) + " tank=" + std::to_string(tankMember->guid) + " reason=tank_not_holding target=" +
+                                 std::to_string(forever_module::UnitRefEntry(tankMember->threat_target_guid)));
+            }
+        }
         if (prayer)
         {
             spellToCast = kPrayerOfHealing; // a party heal around the priest: most of the party is low

@@ -378,6 +378,8 @@ Module.forever-bots.TelemetrySummarySec = 60
 # DamageEventMinPct = 20   (the module also drops a non-lethal hit below this percent of the bot's max health; 1 to 100; raise it above the core's MinPct to hear less)
 # PullTankFirst = 1   (a dungeon, raid or tank-led party: the members wait on the route while the leader/tank has a target but is not in combat with it, and engage once
 #                      it is; solo bots and leveling parties are never held; 0 = every member pulls on its own, as before)
+# HealWaitTankHold = 1   (a healer casts no heal, Renew included, on the party's tank at full health until the tank holds its target: the target's threat top, else its
+#                         victim, is the tank; a target out of view counts as held; event heal_hold; 0 = Renew on the fighting tank as before)
 # PullTankHoldMs = 12000   (the longest a member waits, so a dead or stuck tank cannot freeze the party; 1000 to 120000)
 # WarderPartyHold = 1   (a member with no target of its own holds outside an Onyxian Warder's Fire Nova instead of following the tank into it; 0 = follow as before)
 # PullMinHpPct = 60   (a member of a route/raid party below this health percent that nothing attacks rests instead of engaging or joining the tank's fight, at most 2 minutes; 0 = off)
