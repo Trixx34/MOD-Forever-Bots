@@ -1,0 +1,97 @@
+# Level-60 pre-raid quests for the alliance: rewards on the class gear lists (source=quest) and the attunement chains.
+# Made by tools/gen_prebis_quests.py (doc/pre-raid-progression.md); do not edit by hand. Format: src/quest_data.h.
+# Use as QuestFileAlliance60 (the `level` of a block is dropped, `classes` limits a quest to the classes that want its reward).
+
+start W0_-19_-5   # 1 quests
+anchor 0 -9218.6 -2221.8 67.6
+quest 4223 giver -9218.6 -2221.8 67.6 ender -8378.5 -2748.9 186.7
+req 4223 prev 4186
+
+start W0_-17_-6   # 2 quests
+anchor 0 -8377.9 -2764.7 190.2
+quest 4182 giver -8377.2 -2780.5 193.7 ender -8377.2 -2780.5 193.7
+hunt 4182 0 15 7047
+hunt 4182 1 10 7040
+hunt 4182 2 1 7044
+hunt 4182 3 4 7041
+area 4182 -8243.4 -2744.5 136.3
+area 4182 -8238.0 -2679.0 135.3
+area 4182 -8246.0 -2547.5 138.5
+quest 4224 giver -8378.5 -2748.9 186.7 ender -8378.5 -2748.9 186.7
+req 4224 prev 4223
+
+start W0_-17_0   # 2 quests
+anchor 0 -8440.0 329.4 122.6
+quest 4185 giver -8440.0 329.4 122.6 ender -8440.0 329.4 122.6
+req 4185 prev 4184
+quest 7496 giver -8440.0 329.4 122.6 ender -8986.3 556.0 93.9
+req 7496 prev 7495 classes 396
+
+start W0_-16_-3   # 1 quests
+anchor 0 -7535.8 -1211.1 285.6
+quest 8997 giver -7535.8 -1211.1 285.6 ender -4847.0 -1057.8 502.2
+req 8997 prev 8996 races 77 classes 415
+
+start W0_-10_-3   # 11 quests
+anchor 0 -4847.0 -1057.8 502.2
+quest 8905 giver -4847.0 -1057.8 502.2 ender -4847.0 -1057.8 502.2
+req 8905 races 255 classes 1024
+reward 8905
+quest 8908 giver -4847.0 -1057.8 502.2 ender -4847.0 -1057.8 502.2
+req 8908 classes 2
+reward 8908
+quest 8912 giver -4847.0 -1057.8 502.2 ender -4847.0 -1057.8 502.2
+req 8912 races 255 classes 1
+reward 8912
+quest 8933 giver -4847.0 -1057.8 502.2 ender -4847.0 -1057.8 502.2
+req 8933 prev 8977 races 255 classes 2
+reward 8933
+quest 8937 giver -4847.0 -1057.8 502.2 ender -4847.0 -1057.8 502.2
+req 8937 prev 8977 races 255 classes 1
+reward 8937
+quest 9000 giver -4847.0 -1057.8 502.2 ender -4847.0 -1057.8 502.2
+req 9000 prev 8997 races 255 classes 4
+reward 9000
+quest 9002 giver -4847.0 -1057.8 502.2 ender -4847.0 -1057.8 502.2
+req 9002 prev 8997 races 77 classes 2
+reward 9002
+quest 9003 giver -4847.0 -1057.8 502.2 ender -4847.0 -1057.8 502.2
+req 9003 prev 8997 races 77 classes 16
+reward 9003
+quest 9004 giver -4847.0 -1057.8 502.2 ender -4847.0 -1057.8 502.2
+req 9004 prev 8997 races 255 classes 8
+reward 9004
+quest 9005 giver -4847.0 -1057.8 502.2 ender -4847.0 -1057.8 502.2
+req 9005 prev 8997 races 77 classes 256
+reward 9005
+quest 9006 giver -4847.0 -1057.8 502.2 ender -4847.0 -1057.8 502.2
+req 9006 prev 8997 races 255 classes 1
+reward 9006
+
+start W0_0_-1   # 2 quests
+anchor 0 14.9 -355.0 131.1
+quest 7141 giver 14.9 -355.0 131.1 ender 14.9 -355.0 131.1
+req 7141 classes 1118
+quest 8271 giver 14.9 -355.0 131.1 ender 14.9 -355.0 131.1
+req 8271 prev 7141 classes 1118
+
+start W0_6_-7   # 6 quests
+anchor 0 3357.5 -3379.7 144.9
+quest 8952 giver 3357.5 -3379.7 144.9 ender -4847.0 -1057.8 502.2
+req 8952 prev 9015 races 77 classes 4
+reward 8952
+quest 8953 giver 3357.5 -3379.7 144.9 ender -4847.0 -1057.8 502.2
+req 8953 prev 9015 races 77 classes 128
+reward 8953
+quest 8954 giver 3357.5 -3379.7 144.9 ender -4847.0 -1057.8 502.2
+req 8954 prev 9015 races 77 classes 2
+reward 8954
+quest 8955 giver 3357.5 -3379.7 144.9 ender -4847.0 -1057.8 502.2
+req 8955 prev 9015 races 77 classes 16
+reward 8955
+quest 8956 giver 3357.5 -3379.7 144.9 ender -4847.0 -1057.8 502.2
+req 8956 prev 9015 races 77 classes 8
+reward 8956
+quest 8959 giver 3357.5 -3379.7 144.9 ender -4847.0 -1057.8 502.2
+req 8959 prev 9015 races 77 classes 1
+reward 8959

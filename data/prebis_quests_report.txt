@@ -1,0 +1,125 @@
+# Pre-raid quest report, made by tools/gen_prebis_quests.py; do not edit by hand.
+# Wishlist items by source tag (all classes): dungeon 7, quest 73, vendor 48, world 20
+# Wishlist items with source=quest but no quest found in the database: 0
+# alliance: 25 quests in the list (19 for gear, 6 attunement or chain), 58 wanted quests missing from the pool
+missing alliance 4183 The True Masters ender on another map or an objective the planner cannot do
+missing alliance 4184 The True Masters ender on another map or an objective the planner cannot do
+missing alliance 4186 The True Masters ender on another map or an objective the planner cannot do
+missing alliance 4241 Marshal Windsor ender on another map or an objective the planner cannot do
+missing alliance 4242 Abandoned Hope ender on another map or an objective the planner cannot do
+missing alliance 4264 A Crumpled Up Note no creature giver (starts from an item)
+missing alliance 4282 A Shred of Hope ender on another map or an objective the planner cannot do
+missing alliance 4322 Jail Break! ender on another map or an objective the planner cannot do
+missing alliance 4742 Seal of Ascension ender on another map or an objective the planner cannot do
+missing alliance 4743 Seal of Ascension ender on another map or an objective the planner cannot do
+missing alliance 6148 The Scarlet Oracle, Demetria ender on another map or an objective the planner cannot do
+missing alliance 6402 Stormwind Rendezvous flagged raid-eligible
+missing alliance 6403 The Great Masquerade flagged raid-eligible
+missing alliance 6501 The Dragon's Eye ender on another map or an objective the planner cannot do
+missing alliance 6502 Drakefire Amulet flagged raid-eligible
+missing alliance 7167 The Eye of Command ender on another map or an objective the planner cannot do
+missing alliance 7172 The Eye of Command ender on another map or an objective the planner cannot do
+missing alliance 7491 For All To See ender on another map or an objective the planner cannot do
+missing alliance 7495 Victory for the Alliance no creature giver (starts from an item) (needed first for 7496)
+missing alliance 7761 Blackhand's Command no creature giver (an object or a script gives it), no creature ender, flagged raid-eligible
+missing alliance 7848 Attunement to the Core flagged raid-eligible
+missing alliance 7907 Darkmoon Beast Deck no creature giver (starts from an item)
+missing alliance 7928 Darkmoon Warlords Deck no creature giver (starts from an item)
+missing alliance 7929 Darkmoon Elementals Deck no creature giver (starts from an item)
+missing alliance 7940 1200 Tickets - Orb of the Darkmoon ender on another map or an objective the planner cannot do
+missing alliance 7981 1200 Tickets - Amulet of the Darkmoon ender on another map or an objective the planner cannot do
+missing alliance 8272 Hero of the Frostwolf ender on another map or an objective the planner cannot do
+missing alliance 8548 Volunteer's Battlegear ender on another map or an objective the planner cannot do
+missing alliance 8572 Veteran's Battlegear ender on another map or an objective the planner cannot do
+missing alliance 8574 Stalwart's Battlegear ender on another map or an objective the planner cannot do
+missing alliance 8913 An Earnest Proposition ender on another map or an objective the planner cannot do
+missing alliance 8918 An Earnest Proposition ender on another map or an objective the planner cannot do
+missing alliance 8920 An Earnest Proposition ender on another map or an objective the planner cannot do
+missing alliance 8944 Just Compensation ender on another map or an objective the planner cannot do
+missing alliance 8957 Anthion's Parting Words ender on another map or an objective the planner cannot do
+missing alliance 8977 Return to Deliana ender on another map or an objective the planner cannot do (needed first for 8933)
+missing alliance 8996 Return to Bodley ender on another map or an objective the planner cannot do (needed first for 8997)
+missing alliance 9008 Saving the Best for Last ender on another map or an objective the planner cannot do
+missing alliance 9009 Saving the Best for Last ender on another map or an objective the planner cannot do
+missing alliance 9010 Saving the Best for Last ender on another map or an objective the planner cannot do
+missing alliance 9011 Saving the Best for Last ender on another map or an objective the planner cannot do
+missing alliance 9012 Saving the Best for Last ender on another map or an objective the planner cannot do
+missing alliance 9013 Saving the Best for Last ender on another map or an objective the planner cannot do
+missing alliance 9015 The Challenge ender on another map or an objective the planner cannot do (needed first for 8953)
+missing alliance 9017 Anthion's Parting Words ender on another map or an objective the planner cannot do
+missing alliance 9018 Anthion's Parting Words ender on another map or an objective the planner cannot do
+missing alliance 9019 Anthion's Parting Words ender on another map or an objective the planner cannot do
+missing alliance 9020 Anthion's Parting Words ender on another map or an objective the planner cannot do
+missing alliance 9022 Anthion's Parting Words ender on another map or an objective the planner cannot do
+missing alliance 9094 Argent Dawn Gloves ender on another map or an objective the planner cannot do
+missing alliance 9333 Argent Dawn Gloves ender on another map or an objective the planner cannot do
+missing alliance 10492 An Earnest Proposition no creature giver (an object or a script gives it), no creature ender, no row in quest_classic_level (the generator cannot place it)
+missing alliance 10493 An Earnest Proposition no creature giver (an object or a script gives it), no creature ender, no row in quest_classic_level (the generator cannot place it)
+missing alliance 10495 Just Compensation no creature giver (an object or a script gives it), no creature ender, no row in quest_classic_level (the generator cannot place it)
+missing alliance 10496 Anthion's Parting Words no creature giver (starts from an item), no creature ender, no row in quest_classic_level (the generator cannot place it)
+missing alliance 10497 Anthion's Parting Words no creature giver (starts from an item), no creature ender, no row in quest_classic_level (the generator cannot place it)
+missing alliance 10498 Saving the Best for Last no creature giver (an object or a script gives it), no creature ender, no row in quest_classic_level (the generator cannot place it)
+missing alliance 10499 Saving the Best for Last no creature giver (an object or a script gives it), no creature ender, no row in quest_classic_level (the generator cannot place it)
+# horde: 17 quests in the list (12 for gear, 5 attunement or chain), 62 wanted quests missing from the pool
+missing horde 4742 Seal of Ascension ender on another map or an objective the planner cannot do
+missing horde 4743 Seal of Ascension ender on another map or an objective the planner cannot do
+missing horde 4903 Warlord's Command ender on another map or an objective the planner cannot do
+missing horde 4941 Eitrigg's Wisdom ender on another map or an objective the planner cannot do
+missing horde 4974 For The Horde! flagged raid-eligible
+missing horde 6148 The Scarlet Oracle, Demetria ender on another map or an objective the planner cannot do
+missing horde 6568 The Testament of Rexxar ender on another map or an objective the planner cannot do
+missing horde 6569 Oculus Illusions flagged raid-eligible
+missing horde 6570 Emberstrife ender on another map or an objective the planner cannot do
+missing horde 6583 The Test of Skulls, Somnus flagged raid-eligible
+missing horde 6585 The Test of Skulls, Axtroz flagged raid-eligible
+missing horde 6601 Ascension... ender on another map or an objective the planner cannot do
+missing horde 6602 Blood of the Black Dragon Champion flagged raid-eligible
+missing horde 7167 The Eye of Command ender on another map or an objective the planner cannot do
+missing horde 7172 The Eye of Command ender on another map or an objective the planner cannot do
+missing horde 7490 Victory for the Horde no creature giver (starts from an item) (needed first for 7491)
+missing horde 7496 Celebrating Good Times ender on another map or an objective the planner cannot do
+missing horde 7761 Blackhand's Command no creature giver (an object or a script gives it), no creature ender, flagged raid-eligible
+missing horde 7848 Attunement to the Core flagged raid-eligible
+missing horde 7907 Darkmoon Beast Deck no creature giver (starts from an item)
+missing horde 7928 Darkmoon Warlords Deck no creature giver (starts from an item)
+missing horde 7929 Darkmoon Elementals Deck no creature giver (starts from an item)
+missing horde 7940 1200 Tickets - Orb of the Darkmoon ender on another map or an objective the planner cannot do
+missing horde 7981 1200 Tickets - Amulet of the Darkmoon ender on another map or an objective the planner cannot do
+missing horde 8271 Hero of the Stormpike ender on another map or an objective the planner cannot do
+missing horde 8548 Volunteer's Battlegear ender on another map or an objective the planner cannot do
+missing horde 8572 Veteran's Battlegear ender on another map or an objective the planner cannot do
+missing horde 8574 Stalwart's Battlegear ender on another map or an objective the planner cannot do
+missing horde 8905 An Earnest Proposition ender on another map or an objective the planner cannot do
+missing horde 8908 An Earnest Proposition ender on another map or an objective the planner cannot do
+missing horde 8912 An Earnest Proposition ender on another map or an objective the planner cannot do
+missing horde 8933 Just Compensation ender on another map or an objective the planner cannot do
+missing horde 8937 Just Compensation ender on another map or an objective the planner cannot do
+missing horde 8952 Anthion's Parting Words ender on another map or an objective the planner cannot do
+missing horde 8953 Anthion's Parting Words ender on another map or an objective the planner cannot do
+missing horde 8954 Anthion's Parting Words ender on another map or an objective the planner cannot do
+missing horde 8955 Anthion's Parting Words ender on another map or an objective the planner cannot do
+missing horde 8956 Anthion's Parting Words ender on another map or an objective the planner cannot do
+missing horde 8957 Anthion's Parting Words ender on another map or an objective the planner cannot do
+missing horde 8959 Anthion's Parting Words ender on another map or an objective the planner cannot do
+missing horde 8978 Return to Mokvar ender on another map or an objective the planner cannot do (needed first for 8944)
+missing horde 8998 Back to the Beginning ender on another map or an objective the planner cannot do (needed first for 9012)
+missing horde 9000 Saving the Best for Last ender on another map or an objective the planner cannot do
+missing horde 9002 Saving the Best for Last ender on another map or an objective the planner cannot do
+missing horde 9003 Saving the Best for Last ender on another map or an objective the planner cannot do
+missing horde 9004 Saving the Best for Last ender on another map or an objective the planner cannot do
+missing horde 9005 Saving the Best for Last ender on another map or an objective the planner cannot do
+missing horde 9006 Saving the Best for Last ender on another map or an objective the planner cannot do
+missing horde 9017 Anthion's Parting Words ender on another map or an objective the planner cannot do
+missing horde 9018 Anthion's Parting Words ender on another map or an objective the planner cannot do
+missing horde 9019 Anthion's Parting Words ender on another map or an objective the planner cannot do
+missing horde 9020 Anthion's Parting Words ender on another map or an objective the planner cannot do
+missing horde 9022 Anthion's Parting Words ender on another map or an objective the planner cannot do
+missing horde 9094 Argent Dawn Gloves ender on another map or an objective the planner cannot do
+missing horde 9333 Argent Dawn Gloves ender on another map or an objective the planner cannot do
+missing horde 10492 An Earnest Proposition no creature giver (an object or a script gives it), no creature ender, no row in quest_classic_level (the generator cannot place it)
+missing horde 10493 An Earnest Proposition no creature giver (an object or a script gives it), no creature ender, no row in quest_classic_level (the generator cannot place it)
+missing horde 10495 Just Compensation no creature giver (an object or a script gives it), no creature ender, no row in quest_classic_level (the generator cannot place it)
+missing horde 10496 Anthion's Parting Words no creature giver (starts from an item), no creature ender, no row in quest_classic_level (the generator cannot place it)
+missing horde 10497 Anthion's Parting Words no creature giver (starts from an item), no creature ender, no row in quest_classic_level (the generator cannot place it)
+missing horde 10498 Saving the Best for Last no creature giver (an object or a script gives it), no creature ender, no row in quest_classic_level (the generator cannot place it)
+missing horde 10499 Saving the Best for Last no creature giver (an object or a script gives it), no creature ender, no row in quest_classic_level (the generator cannot place it)

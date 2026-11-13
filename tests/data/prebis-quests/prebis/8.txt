@@ -1,0 +1,5 @@
+# Pre-raid gear for mage (class 8)
+# slot=head ilvl=60 quality=4 source=quest Mage hat
+9003
+# slot=chest ilvl=60 quality=4 source=quest Chest
+9002

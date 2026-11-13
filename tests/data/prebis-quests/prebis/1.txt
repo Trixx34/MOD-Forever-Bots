@@ -1,0 +1,9 @@
+# Pre-raid gear for warrior (class 1)
+# slot=head ilvl=60 quality=4 source=quest Helm
+9001
+# slot=chest ilvl=60 quality=4 source=quest Chest
+9002
+# slot=neck ilvl=60 quality=4 source=quest Raid chain neck
+9004
+# slot=legs ilvl=60 quality=4 source=vendor Vendor legs
+9005

@@ -1,0 +1,49 @@
+# Attunement chains, made by tools/gen_prebis_quests.py from data/attunements.txt; do not edit by hand.
+# chain <name> <side> <quest> <quest> ...   (do in this order; the last is the attunement quest)
+# status <name> <side> <quest> <placed | reason it is not in the quest list>
+chain onyxia alliance 4182 4183 4184 4185 4186 4223 4224 4241 4242 4264 4282 4322 6402 6403 6501 6502
+status onyxia alliance 4182 placed   # Dragonkin Menace
+status onyxia alliance 4183 ender on another map or an objective the planner cannot do   # The True Masters
+status onyxia alliance 4184 ender on another map or an objective the planner cannot do   # The True Masters
+status onyxia alliance 4185 placed   # The True Masters
+status onyxia alliance 4186 ender on another map or an objective the planner cannot do   # The True Masters
+status onyxia alliance 4223 placed   # The True Masters
+status onyxia alliance 4224 placed   # The True Masters
+status onyxia alliance 4241 ender on another map or an objective the planner cannot do   # Marshal Windsor
+status onyxia alliance 4242 ender on another map or an objective the planner cannot do   # Abandoned Hope
+status onyxia alliance 4264 no creature giver (starts from an item)   # A Crumpled Up Note
+status onyxia alliance 4282 ender on another map or an objective the planner cannot do   # A Shred of Hope
+status onyxia alliance 4322 ender on another map or an objective the planner cannot do   # Jail Break!
+status onyxia alliance 6402 flagged raid-eligible   # Stormwind Rendezvous
+status onyxia alliance 6403 flagged raid-eligible   # The Great Masquerade
+status onyxia alliance 6501 ender on another map or an objective the planner cannot do   # The Dragon's Eye
+status onyxia alliance 6502 flagged raid-eligible   # Drakefire Amulet
+chain mc alliance 7848
+status mc alliance 7848 flagged raid-eligible   # Attunement to the Core
+chain bwl alliance 7761
+status bwl alliance 7761 no creature giver (an object or a script gives it), no creature ender, flagged raid-eligible   # Blackhand's Command
+chain ubrs_key alliance 4742 4743
+status ubrs_key alliance 4742 ender on another map or an objective the planner cannot do   # Seal of Ascension
+status ubrs_key alliance 4743 ender on another map or an objective the planner cannot do   # Seal of Ascension
+chain onyxia horde 4903 4941 4974 6566 6567 6568 6569 6570 6582 6583 6584 6585 6601 6602
+status onyxia horde 4903 ender on another map or an objective the planner cannot do   # Warlord's Command
+status onyxia horde 4941 ender on another map or an objective the planner cannot do   # Eitrigg's Wisdom
+status onyxia horde 4974 flagged raid-eligible   # For The Horde!
+status onyxia horde 6566 placed   # What the Wind Carries
+status onyxia horde 6567 placed   # The Champion of the Horde
+status onyxia horde 6568 ender on another map or an objective the planner cannot do   # The Testament of Rexxar
+status onyxia horde 6569 flagged raid-eligible   # Oculus Illusions
+status onyxia horde 6570 ender on another map or an objective the planner cannot do   # Emberstrife
+status onyxia horde 6582 placed   # The Test of Skulls, Scryer
+status onyxia horde 6583 flagged raid-eligible   # The Test of Skulls, Somnus
+status onyxia horde 6584 placed   # The Test of Skulls, Chronalis
+status onyxia horde 6585 flagged raid-eligible   # The Test of Skulls, Axtroz
+status onyxia horde 6601 ender on another map or an objective the planner cannot do   # Ascension...
+status onyxia horde 6602 flagged raid-eligible   # Blood of the Black Dragon Champion
+chain mc horde 7848
+status mc horde 7848 flagged raid-eligible   # Attunement to the Core
+chain bwl horde 7761
+status bwl horde 7761 no creature giver (an object or a script gives it), no creature ender, flagged raid-eligible   # Blackhand's Command
+chain ubrs_key horde 4742 4743
+status ubrs_key horde 4742 ender on another map or an objective the planner cannot do   # Seal of Ascension
+status ubrs_key horde 4743 ender on another map or an objective the planner cannot do   # Seal of Ascension

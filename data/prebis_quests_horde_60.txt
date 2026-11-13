@@ -1,0 +1,60 @@
+# Level-60 pre-raid quests for the horde: rewards on the class gear lists (source=quest) and the attunement chains.
+# Made by tools/gen_prebis_quests.py (doc/pre-raid-progression.md); do not edit by hand. Format: src/quest_data.h.
+# Use as QuestFileHorde60 (the `level` of a block is dropped, `classes` limits a quest to the classes that want its reward).
+
+start W0_0_-3   # 2 quests
+anchor 0 371.2 -1004.1 109.3
+quest 7142 giver 371.2 -1004.1 109.3 ender 371.2 -1004.1 109.3
+req 7142 classes 1118
+quest 8272 giver 371.2 -1004.1 109.3 ender 371.2 -1004.1 109.3
+req 8272 prev 7142 classes 1118
+
+start W1_-11_-8   # 2 quests
+anchor 1 -5103.4 -3949.5 41.6
+quest 6582 giver -5103.4 -3949.5 41.6 ender -5103.4 -3949.5 41.6
+req 6582 prev 6570
+hunt 6582 0 1 10664
+area 6582 5887.8 -4058.8 594.7
+quest 6584 giver -5103.4 -3949.5 41.6 ender -5103.4 -3949.5 41.6
+req 6584 prev 6570
+hunt 6584 0 1 8197
+area 6584 -8185.2 -4695.1 16.2
+
+start W1_3_-9   # 13 quests
+anchor 1 1916.7 -4160.4 41.5
+quest 6566 giver 1920.1 -4125.7 43.0 ender 1920.1 -4125.7 43.0
+req 6566 prev 4974
+quest 7491 giver 1920.1 -4125.7 43.0 ender 1568.0 -4405.9 8.1
+req 7491 prev 7490 classes 396
+quest 8913 giver 1915.7 -4170.8 41.0 ender 1915.7 -4170.8 41.0
+req 8913 races 178 classes 1024
+reward 8913
+quest 8918 giver 1915.7 -4170.8 41.0 ender 1915.7 -4170.8 41.0
+req 8918 races 178 classes 64
+reward 8918
+quest 8920 giver 1915.7 -4170.8 41.0 ender 1915.7 -4170.8 41.0
+req 8920 races 178 classes 1
+reward 8920
+quest 8944 giver 1915.7 -4170.8 41.0 ender 1915.7 -4170.8 41.0
+req 8944 prev 8978 races 255 classes 1
+reward 8944
+quest 9008 giver 1915.7 -4170.8 41.0 ender 1915.7 -4170.8 41.0
+req 9008 prev 8998 races 255 classes 4
+reward 9008
+quest 9009 giver 1915.7 -4170.8 41.0 ender 1915.7 -4170.8 41.0
+req 9009 prev 8998 races 178 classes 16
+reward 9009
+quest 9010 giver 1915.7 -4170.8 41.0 ender 1915.7 -4170.8 41.0
+req 9010 prev 8998 races 255 classes 8
+reward 9010
+quest 9011 giver 1915.7 -4170.8 41.0 ender 1915.7 -4170.8 41.0
+req 9011 prev 8998 races 255 classes 64
+reward 9011
+quest 9012 giver 1915.7 -4170.8 41.0 ender 1915.7 -4170.8 41.0
+req 9012 prev 8998 races 255 classes 256
+reward 9012
+quest 9013 giver 1915.7 -4170.8 41.0 ender 1915.7 -4170.8 41.0
+req 9013 prev 8998 races 255 classes 1
+reward 9013
+quest 6567 giver 1920.1 -4125.7 43.0 ender 248.3 1834.8 86.2
+req 6567 prev 6566

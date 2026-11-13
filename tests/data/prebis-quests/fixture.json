@@ -1,0 +1,13 @@
+{"quests": [
+ {"id": 100, "title": "Gear quest", "sort": 10, "group": 0, "flags": 0, "prev": 0, "next": 0, "addonNext": 0, "startItem": 0, "creatureStart": true, "creatureEnd": true, "classicLevel": 52, "rewards": [9001]},
+ {"id": 101, "title": "Chain step", "sort": 10, "group": 0, "flags": 0, "prev": 100, "next": 0, "addonNext": 0, "startItem": 0, "creatureStart": true, "creatureEnd": true, "classicLevel": 53, "rewards": [9002]},
+ {"id": 102, "title": "Mage quest", "sort": 10, "group": 0, "flags": 0, "prev": 0, "next": 0, "addonNext": 0, "startItem": 0, "creatureStart": true, "creatureEnd": true, "classicLevel": 58, "rewards": [9003]},
+ {"id": 103, "title": "Raid chain quest", "sort": 10, "group": 0, "flags": 64, "prev": 0, "next": 0, "addonNext": 0, "startItem": 0, "creatureStart": true, "creatureEnd": true, "classicLevel": 60, "rewards": [9004]},
+ {"id": 104, "title": "Unplaceable", "sort": 10, "group": 0, "flags": 0, "prev": 0, "next": 0, "addonNext": 0, "startItem": 555, "creatureStart": false, "creatureEnd": true, "classicLevel": 60, "rewards": [9001]},
+ {"id": 105, "title": "Not wanted", "sort": 10, "group": 0, "flags": 0, "prev": 0, "next": 0, "addonNext": 0, "startItem": 0, "creatureStart": true, "creatureEnd": true, "classicLevel": 60, "rewards": [9005]},
+ {"id": 200, "title": "Chain first", "sort": 1, "group": 0, "flags": 0, "prev": 0, "next": 201, "addonNext": 0, "startItem": 0, "creatureStart": true, "creatureEnd": true, "classicLevel": 60, "rewards": []},
+ {"id": 201, "title": "Chain via reward next", "sort": 1, "group": 0, "flags": 0, "prev": 200, "next": 0, "addonNext": 205, "startItem": 0, "creatureStart": true, "creatureEnd": true, "classicLevel": 60, "rewards": []},
+ {"id": 202, "title": "Test of A", "sort": 1, "group": 0, "flags": 0, "prev": 201, "next": 0, "addonNext": 205, "startItem": 0, "creatureStart": true, "creatureEnd": true, "classicLevel": 60, "rewards": []},
+ {"id": 205, "title": "Attunement final", "sort": 1, "group": 0, "flags": 72, "prev": 0, "next": 0, "addonNext": 0, "startItem": 0, "creatureStart": true, "creatureEnd": true, "classicLevel": 60, "rewards": []},
+ {"id": 210, "title": "Horde only final", "sort": 1, "group": 0, "flags": 64, "prev": 0, "next": 0, "addonNext": 0, "startItem": 0, "creatureStart": true, "creatureEnd": true, "classicLevel": 60, "rewards": []}
+]}
