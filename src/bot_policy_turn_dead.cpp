@@ -66,9 +66,94 @@ void BotPolicy::DeadRunFailed(DecideTick& tick, BotTurn& turn, char const* why)
     BotSnapshot const& bot = turn.bot;
     BotState& state = turn.state;
     state.RunFailed = true;
+    state.RunFailedAtMs = nowMs;
+    state.RunFailedNoCorpse = std::string(why) == "no_corpse";
     DeadEmit(tick, turn, Decision{ ActionType::kStop, 0 });
     LogEvent(std::string("corpse_run_failed: bot=") + std::to_string(bot.guid) + " reason=" + why + " map=" + std::to_string(bot.map_id) +
           " corpse_map=" + std::to_string(bot.corpse_map) + " run_ms=" + std::to_string(state.RunStarted ? nowMs - state.RunStartMs : 0));
+}
+
+// The ghost fallback. A ghost whose corpse run failed (no corpse in the snapshot, or the run timed out after the teleport to the corpse) stood for good: prod 2026-11-14 had
+// 56 of 150 online bots as ghosts. GhostFallbackMs after the failure it takes the spirit healer (kResurrect spell_id 2, protocol 28). A ghost outside a dungeon party takes
+// it as well once it has been a ghost GhostMaxMs, whatever the run is doing, and at once when its corpse lies in the area it avoids (the death area). The core looks for a
+// spirit healer within about 40 yards, so a ghost that walked off is first put back where it appeared (the graveyard). A refusal (an older core, the key off, no
+// healer and no corpse) logs ghost_stuck, and the corpse run is tried again.
+bool BotPolicy::DeadGhostFallback(DecideTick& tick, BotTurn& turn)
+{
+    std::uint64_t const nowMs = tick.nowMs;
+    std::vector<BotAction>& actions = tick.actions;
+    BotSnapshot const& bot = turn.bot;
+    BotState& state = turn.state;
+    if (bot.life_state != 2)
+        return false;
+    bool const instanceParty = IsRouteActive(bot.guid) || (turn.deadParty != 0 && tick.tankLed.count(turn.deadParty) != 0);
+    char const* reason = nullptr;
+    if (state.GhostFallbackActive)
+        reason = "active";
+    else if (_options.GhostFallbackMs != 0 && state.RunFailed && nowMs - state.RunFailedAtMs >= _options.GhostFallbackMs)
+        reason = state.RunFailedNoCorpse ? "no_corpse" : "run_failed";
+    else if (!instanceParty && _options.GhostMaxMs != 0 && state.GhostSinceMs != 0 && nowMs - state.GhostSinceMs >= _options.GhostMaxMs)
+        reason = "ghost_max";
+    else if (!instanceParty && bot.corpse_valid != 0 && nowMs < state.AvoidAreaUntilMs && bot.corpse_map == state.AvoidAreaMap &&
+             std::hypot(bot.corpse_x - state.AvoidAreaX, bot.corpse_y - state.AvoidAreaY) <= float(_options.DeathAreaYards))
+        reason = "death_area";
+    if (!reason)
+        return false;
+    if (nowMs < state.SpiritHealerRefusedUntilMs)
+    {
+        // Refused: the corpse run again (it may have come back), and a line now and then so a stuck ghost is seen.
+        state.GhostFallbackActive = false;
+        if (state.RunFailed && bot.corpse_valid != 0)
+        {
+            state.RunFailed = false;
+            state.RunFailedNoCorpse = false;
+            state.RunStarted = false;
+            state.RunTimeoutTeleported = false;
+        }
+        if (state.GhostStuckLoggedMs == 0 || nowMs - state.GhostStuckLoggedMs >= 60000)
+        {
+            state.GhostStuckLoggedMs = nowMs;
+            LogEvent(std::string("ghost_stuck: bot=") + std::to_string(bot.guid) + " reason=spirit_healer_refused would=" + reason + " corpse_valid=" +
+                     std::to_string(bot.corpse_valid) + " ghost_s=" + std::to_string(state.GhostSinceMs != 0 ? (nowMs - state.GhostSinceMs) / 1000 : 0));
+        }
+        return false;
+    }
+    if (!state.GhostFallbackActive)
+    {
+        state.GhostFallbackActive = true;
+        LogEvent(std::string("ghost_fallback: bot=") + std::to_string(bot.guid) + " reason=" + reason + " map=" + std::to_string(bot.map_id) + " corpse_valid=" +
+                 std::to_string(bot.corpse_valid) + " ghost_s=" + std::to_string(state.GhostSinceMs != 0 ? (nowMs - state.GhostSinceMs) / 1000 : 0));
+    }
+    // Back to the graveyard first when the ghost walked (or was put) away from it.
+    if (state.GhostSinceMs != 0 && (bot.map_id != state.GhostSpawnMap || DistanceTo(bot, state.GhostSpawn) > kGhostFallbackHealerYards))
+    {
+        if (nowMs >= state.GhostFallbackTeleportMs && GhostTeleportSlot(nowMs))
+        {
+            state.GhostFallbackTeleportMs = nowMs + kCorpseTeleportRetryMs;
+            BotAction back;
+            back.bot_guid = bot.guid;
+            back.type = ActionType::kTeleport;
+            back.spell_id = state.GhostSpawnMap;
+            back.dest_x = state.GhostSpawn.X;
+            back.dest_y = state.GhostSpawn.Y;
+            back.dest_z = state.GhostSpawn.Z;
+            actions.push_back(back);
+            LogEvent("ghost_fallback_teleport: bot=" + std::to_string(bot.guid) + " map=" + std::to_string(state.GhostSpawnMap));
+            return true;
+        }
+        // The teleport is not due yet (or was refused): the spirit healer is asked from here, the core walks to one within its reach or falls back to the reclaim.
+    }
+    if (nowMs >= state.SpiritHealerRetryMs)
+    {
+        BotAction spirit;
+        spirit.bot_guid = bot.guid;
+        spirit.type = ActionType::kResurrect;
+        spirit.spell_id = kSpiritHealerSpell;
+        actions.push_back(spirit);
+        state.SpiritHealerRetryMs = nowMs + kSpiritHealerRetryMs;
+        state.Last.reset();
+    }
+    return true;
 }
 
 // Just died, or became a ghost: the living state is dropped and the change is logged.
@@ -105,7 +190,37 @@ void BotPolicy::DeadRecord(DecideTick& tick, BotTurn& turn)
         state.RunTimeoutTeleported = false;
         state.GhostHoldSinceMs = 0;
         state.GhostHoldLoggedMs = 0;
+        state.GhostSinceMs = 0;
+        state.RunFailedNoCorpse = false;
+        state.RunFailedAtMs = 0;
+        state.GhostFallbackActive = false;
+        state.GhostFallbackTeleportMs = 0;
         state.DeathHistoryMs.push_back(nowMs);
+        // The death area: DeathAreaCount deaths within DeathAreaWindowMs and DeathAreaYards of this one (this one counted) make the bot avoid the area. Not for a bot of a
+        // dungeon party: there the route is the content and the dungeon ghost rules apply.
+        if (_options.DeathAreaCount != 0)
+        {
+            std::size_t drop = 0;
+            while (drop < state.DeathSpots.size() && nowMs - state.DeathSpots[drop].AtMs > _options.DeathAreaWindowMs)
+                ++drop;
+            state.DeathSpots.erase(state.DeathSpots.begin(), state.DeathSpots.begin() + drop);
+            state.DeathSpots.push_back(BotDeathSpot{ bot.map_id, bot.pos_x, bot.pos_y, nowMs });
+            if (state.DeathSpots.size() > 32)
+                state.DeathSpots.erase(state.DeathSpots.begin());
+            bool const instanceParty = IsRouteActive(bot.guid) || (turn.deadParty != 0 && tick.tankLed.count(turn.deadParty) != 0);
+            std::uint32_t const here = DeathsNear(state.DeathSpots, bot.map_id, bot.pos_x, bot.pos_y, float(_options.DeathAreaYards), nowMs, _options.DeathAreaWindowMs);
+            if (!instanceParty && here >= _options.DeathAreaCount)
+            {
+                state.AvoidAreaMap = bot.map_id;
+                state.AvoidAreaX = bot.pos_x;
+                state.AvoidAreaY = bot.pos_y;
+                state.AvoidAreaUntilMs = nowMs + _options.DeathAreaAvoidMs;
+                state.AreaEscapeRetryMs = 0;
+                LogEvent("death_area: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id) + " pos=" +
+                         std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) + " deaths=" + std::to_string(here) + " avoid_s=" +
+                         std::to_string(_options.DeathAreaAvoidMs / 1000));
+            }
+        }
         {
             std::uint64_t const keepMs = std::max<std::uint64_t>(_options.DeathLockoutWindowMs, 1);
             std::size_t drop = 0;
@@ -151,6 +266,10 @@ void BotPolicy::DeadRecord(DecideTick& tick, BotTurn& turn)
     }
     if (bot.life_state == 2 && was != 2)
     {
+        // Where the ghost appears is the graveyard, where the spirit healer stands (the ghost fallback goes back there).
+        state.GhostSinceMs = nowMs;
+        state.GhostSpawnMap = bot.map_id;
+        state.GhostSpawn = Point{ bot.pos_x, bot.pos_y, bot.pos_z };
         state.RunStarted = false;
         state.Inside = false;
         state.Last.reset();
@@ -572,6 +691,16 @@ void BotPolicy::DeadGhostRun(DecideTick& tick, BotTurn& turn)
     auto& nearby = turn.nearby;
     auto const& deadParty = turn.deadParty;
     // A ghost: back to the corpse. A corpse on another map (an instance, a ghost is released outside) is reached through the portal.
+    if (DeadGhostFallback(tick, turn))
+        return;
+    if (state.RunFailed && state.RunFailedNoCorpse && bot.corpse_valid)
+    {
+        // The corpse is back in the snapshot (it was missing for a tick, or for longer): the run starts again.
+        state.RunFailed = false;
+        state.RunFailedNoCorpse = false;
+        state.RunStarted = false;
+        LogEvent("corpse_run_resume: bot=" + std::to_string(bot.guid) + " map=" + std::to_string(bot.map_id) + " corpse_map=" + std::to_string(bot.corpse_map));
+    }
     if (state.RunFailed)
         return;
     if (!bot.corpse_valid)

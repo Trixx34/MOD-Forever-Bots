@@ -268,6 +268,27 @@ Module.forever-bots.TelemetrySummarySec = 60
 # SpiritHealerOnRepeat: the second death to the same creature entry within five minutes takes the spirit healer at once, while a hostile is near the corpse.
 # SpiritHealerOnRepeat = 1
 
+# Leveling deaths (prod 2026-11-14: 7441 deaths against 25 level-ups; 56 of 150 online bots were ghosts).
+# IdleEnemyAttackersOnly: a bot that starts no fight of its own (defensive or passive stance, a stay order) is kept from walking on only by a creature that attacks it,
+# its pet or its party; 0 = the old rule (any live creature in view that is not grey kept it standing).
+# IdleEnemyAttackersOnly = 1
+# CasterMeleeWithoutSpell: a ranged bot with no damage spell it can cast at its level (a level 1 shaman or druid) closes to melee and auto-attacks.
+# CasterMeleeWithoutSpell = 1
+# EngageMaxLevelAbove: out of combat and outside a dungeon route, no fight is started with a creature more than this many levels above the bot (0 = off, 0 to 60).
+# EngageMaxLevelAbove = 5
+# EngageEliteSolo: a bot without a party may start a fight with an elite, rare elite or boss (0 = it does not).
+# EngageEliteSolo = 0
+# GhostFallbackSec: a ghost whose corpse run failed (no corpse, run timed out) takes the spirit healer this long after (0 = never; needs Bot.Actions.SpiritHealer).
+# GhostFallbackSec = 30
+# GhostMaxSec: a ghost outside a dungeon party takes the spirit healer after being a ghost this long (0 = no bound, else 60 to 86400).
+# GhostMaxSec = 600
+# DeathAreaCount: this many deaths within DeathAreaWindowSec and DeathAreaYards of each other make the bot avoid that area for DeathAreaAvoidSec: its ghost takes the
+# spirit healer, alive it is moved to a grind spot for its level away from it, and it walks no way back in (0 = off, else 2 to 50).
+# DeathAreaCount = 3
+# DeathAreaWindowSec = 900
+# DeathAreaYards = 60
+# DeathAreaAvoidSec = 1800
+
 # HealDownrank (protocol 28, off by default): a healer casts a lower rank of its heal for a small deficit (kCastSpell with dest_x = 1 names the exact rank; the core
 # answers kNotKnown for a rank the bot has not learned, and the healer then casts the highest rank as before). Saves mana, costs more casts.
 # HealDownrank = 0

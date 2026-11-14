@@ -60,6 +60,19 @@ void ChatSettings()
     BotSettings const healPlanSet = ParseBotSettings({ { "HealPlan", "0" }, { "HealPlanPreHealMs", "0" }, { "HealPlanPreHealPct", "90" } }, warnings);
     CHECK(!healPlanSet.HealPlan && healPlanSet.HealPlanPreHealMs == 0 && healPlanSet.HealPlanPreHealPct == 90);
     CHECK(spiritSet.SpiritHealerAfterMs == 0 && !spiritSet.SpiritHealerOnRepeat && spiritSet.HealDownrank);
+    // Leveling deaths: the idle rule, the caster melee and the level-gap guard are on; the ghost fallback after 30 s, a ghost at most 10 min; the death area at 3 deaths.
+    CHECK(spiritDefault.IdleEnemyAttackersOnly && spiritDefault.CasterMeleeWithoutSpell && spiritDefault.EngageMaxLevelAbove == 5 && !spiritDefault.EngageEliteSolo &&
+          spiritDefault.GhostFallbackSec == 30 && spiritDefault.GhostMaxSec == 600 && spiritDefault.DeathAreaCount == 3 && spiritDefault.DeathAreaWindowSec == 900 &&
+          spiritDefault.DeathAreaYards == 60 && spiritDefault.DeathAreaAvoidSec == 1800);
+    std::vector<std::string> deathWarnings;
+    BotSettings const deathSet = ParseBotSettings({ { "IdleEnemyAttackersOnly", "0" }, { "CasterMeleeWithoutSpell", "0" }, { "EngageMaxLevelAbove", "0" },
+                                                    { "EngageEliteSolo", "1" }, { "GhostFallbackSec", "0" }, { "GhostMaxSec", "0" }, { "DeathAreaCount", "0" },
+                                                    { "DeathAreaWindowSec", "600" }, { "DeathAreaYards", "40" }, { "DeathAreaAvoidSec", "3600" } }, deathWarnings);
+    CHECK(!deathSet.IdleEnemyAttackersOnly && !deathSet.CasterMeleeWithoutSpell && deathSet.EngageMaxLevelAbove == 0 && deathSet.EngageEliteSolo &&
+          deathSet.GhostFallbackSec == 0 && deathSet.GhostMaxSec == 0 && deathSet.DeathAreaCount == 0 && deathSet.DeathAreaWindowSec == 600 &&
+          deathSet.DeathAreaYards == 40 && deathSet.DeathAreaAvoidSec == 3600 && deathWarnings.empty());
+    BotSettings const deathBad = ParseBotSettings({ { "DeathAreaCount", "1" }, { "GhostMaxSec", "5" } }, deathWarnings);
+    CHECK(deathBad.DeathAreaCount == 3 && deathBad.GhostMaxSec == 600 && deathWarnings.size() == 2);   // out of range: the default stays, with a warning each
     BotSettings const threatDefault = ParseBotSettings({}, warnings);
     CHECK(threatDefault.ThreatHold && threatDefault.ThreatHoldPct == 90 && threatDefault.ThreatReleasePct == 70 && threatDefault.ThreatHoldMaxSec == 8 &&
           threatDefault.ThreatNearDeathPct == 15 && threatDefault.ThreatDropAbilities);

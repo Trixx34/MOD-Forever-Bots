@@ -17,6 +17,16 @@ void PolicyFromSettings(PolicyOptions& policyOptions, BotSettings& settings)
     policyOptions.SpiritHealerAfterMs = settings.SpiritHealerAfterMs;
     policyOptions.SpiritHealerOnRepeat = settings.SpiritHealerOnRepeat;
     policyOptions.HealDownrank = settings.HealDownrank;
+    policyOptions.IdleEnemyAttackersOnly = settings.IdleEnemyAttackersOnly;
+    policyOptions.CasterMeleeWithoutSpell = settings.CasterMeleeWithoutSpell;
+    policyOptions.EngageMaxLevelAbove = settings.EngageMaxLevelAbove;
+    policyOptions.EngageEliteSolo = settings.EngageEliteSolo;
+    policyOptions.GhostFallbackMs = std::uint64_t(settings.GhostFallbackSec) * 1000;
+    policyOptions.GhostMaxMs = std::uint64_t(settings.GhostMaxSec) * 1000;
+    policyOptions.DeathAreaCount = settings.DeathAreaCount;
+    policyOptions.DeathAreaWindowMs = std::uint64_t(settings.DeathAreaWindowSec) * 1000;
+    policyOptions.DeathAreaYards = settings.DeathAreaYards;
+    policyOptions.DeathAreaAvoidMs = std::uint64_t(settings.DeathAreaAvoidSec) * 1000;
     policyOptions.ThreatHold = settings.ThreatHold;
     policyOptions.ThreatHoldPct = settings.ThreatHoldPct;
     policyOptions.ThreatReleasePct = settings.ThreatReleasePct;

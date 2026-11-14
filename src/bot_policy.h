@@ -111,6 +111,15 @@ struct ErrandOrder
 
 enum class ErrandOutcome : std::uint8_t { kNone, kDone, kFailed };
 
+// Where and when a bot died (the death area guard, DeathAreaCount).
+struct BotDeathSpot
+{
+    std::uint32_t Map = 0;
+    float X = 0.0f;
+    float Y = 0.0f;
+    std::uint64_t AtMs = 0;
+};
+
 // Options for the policy. TestSpell (0 = off) replaces the rotation: it is cast at the target every CastEveryTicks
 // ticks, which exercises the cast path (milestone M1). ClassId selects the rotation (0 = none).
 struct PolicyOptions
@@ -401,6 +410,28 @@ struct PolicyOptions
     // (SpiritHealerOnRepeat). Needs Bot.Actions.SpiritHealer in the core (the core refuses it otherwise and the old hold and reclaim go on).
     std::uint64_t SpiritHealerAfterMs = 45000;
     bool SpiritHealerOnRepeat = true;
+    // Leveling deaths (prod 2026-11-14: 7441 deaths against 25 level-ups in 200k telemetry lines, 56 of 150 online bots ghosts).
+    // IdleEnemyAttackersOnly (default on): a bot that starts no fight of its own (noSelfPull) is kept from idling, walking to a grind spot or an errand only by a creature
+    // that attacks it, its pet or its party (victim_ref), not by any creature in view. Off: the old rule (any live creature that is not grey).
+    bool IdleEnemyAttackersOnly = true;
+    // CasterMeleeWithoutSpell (default on): a ranged bot with no unconditional damage spell castable at its level closes to melee and auto-attacks (see MoveToTarget).
+    bool CasterMeleeWithoutSpell = true;
+    // The level-gap guard: out of combat and off a dungeon route, no fight is started with a creature more than EngageMaxLevelAbove levels above the bot (0 = off), nor,
+    // for a bot without a party, with an elite, rare elite or boss unless EngageEliteSolo.
+    std::uint32_t EngageMaxLevelAbove = 5;
+    bool EngageEliteSolo = false;
+    // The ghost fallback: a ghost whose corpse run failed (no corpse in the snapshot, the run timed out) takes the spirit healer GhostFallbackMs later (0 = never), put back
+    // at the graveyard it appeared at first when it walked off; and a ghost outside a dungeon party is never a ghost longer than GhostMaxMs (0 = no bound): then it takes the
+    // spirit healer whatever it is doing. Needs protocol 28 in the core (Bot.Actions.SpiritHealer); a refusal logs ghost_stuck and the corpse run starts again.
+    std::uint64_t GhostFallbackMs = 30000;
+    std::uint64_t GhostMaxMs = 600000;
+    // The death area: DeathAreaCount deaths (0 = off) within DeathAreaWindowMs and DeathAreaYards of one another make the bot avoid that area for DeathAreaAvoidMs: its
+    // ghost takes the spirit healer instead of reclaiming there, alive it is moved to a grind spot for its level away from it (teleport, and a walk when the teleport is
+    // refused), and a solo bot walks no way into it.
+    std::uint32_t DeathAreaCount = 3;
+    std::uint64_t DeathAreaWindowMs = 900000;
+    std::uint32_t DeathAreaYards = 60;
+    std::uint64_t DeathAreaAvoidMs = 1800000;
     // Protocol 28 (config HealDownrank, default off): a healer casts a lower rank of its heal for a small deficit (kCastSpell with dest_x = 1 names the exact rank).
     bool HealDownrank = false;
     // DPS threat discipline (layout 24 threat fields; needs Bot.Snapshot.Threat in the core, else nothing is read): a damage dealer in a party whose threat on its target is at
@@ -955,7 +986,27 @@ private:
         bool KillerRepeat = false;                       // the last death was to the same creature entry as the one before: a death loop one death sooner
         std::uint64_t RecoverSinceMs = 0;                // since when a solo bot out of combat has been under kRecoverPullPct health (0 = not hurt); kRecoverHoldMs caps the hold
         std::uint64_t EscapeUntilMs = 0;                 // after a death loop the bot is put at a suitable grind spot; not again before this
-        float RunStartDist = 0.0f;                       // distance to the corpse at the start (same map), for progress lines
+        // The death area (DeathAreaCount, DeathAreaWindowMs, DeathAreaYards, DeathAreaAvoidMs): where the bot died lately, and the area it avoids after dying there
+        // DeathAreaCount times. A ghost whose corpse lies in it takes the spirit healer instead of the corpse run; alive, the bot is moved out and walks no way back in.
+        std::vector<BotDeathSpot> DeathSpots;            // newest last, trimmed to DeathAreaWindowMs
+        std::uint32_t AvoidAreaMap = 0;
+        float AvoidAreaX = 0.0f;
+        float AvoidAreaY = 0.0f;
+        std::uint64_t AvoidAreaUntilMs = 0;              // 0 or past: no area avoided
+        std::uint64_t AvoidAreaLoggedMs = 0;             // the last death_area_move_blocked line
+        std::uint64_t AreaEscapeRetryMs = 0;             // the next death area escape not before this
+        // The ghost fallback (GhostFallbackMs, GhostMaxMs): where the ghost appeared (the graveyard: a spirit healer is there), when, and why the corpse run failed.
+        std::uint64_t GhostSinceMs = 0;                  // when the bot became a ghost in this death (0 = not a ghost)
+        std::uint32_t GhostSpawnMap = 0;
+        Point GhostSpawn;
+        bool RunFailedNoCorpse = false;                  // the run failed only because the snapshot had no corpse: it starts again when the corpse shows up
+        std::uint64_t RunFailedAtMs = 0;
+        bool GhostFallbackActive = false;                // the ghost is on the spirit healer fallback
+        std::uint64_t GhostFallbackTeleportMs = 0;       // the last teleport back to the graveyard of the fallback
+        std::uint64_t GhostStuckLoggedMs = 0;            // the last ghost_stuck line
+        std::uint64_t LevelGapLoggedFor = 0;             // engage_skipped: the target last logged
+        std::uint64_t NoSpellLoggedFor = 0;              // caster_no_spell_melee: the target last logged
+        float RunStartDist = 0.0f;                      // distance to the corpse at the start (same map), for progress lines
         std::uint32_t RunProgress = 0;                   // 25, 50 or 75: the last progress line written
         std::unordered_map<std::uint64_t, std::uint64_t> RezRetryAtMs; // dead member -> no resurrect cast on it before this
         std::unordered_map<std::uint64_t, std::uint32_t> RezRefusals;  // dead member -> refusals in a row
@@ -1013,6 +1064,10 @@ private:
     void DeadGhostRun(DecideTick& tick, BotTurn& turn);
     void DeadEmit(DecideTick& tick, BotTurn& turn, Decision const& wantedDead);
     void DeadRunFailed(DecideTick& tick, BotTurn& turn, char const* why);
+    // The ghost fallback (GhostFallbackMs, GhostMaxMs, the death area): true when it took the ghost's turn (the spirit healer, or the teleport back to the graveyard).
+    bool DeadGhostFallback(DecideTick& tick, BotTurn& turn);
+    // The death area escape (DeathAreaCount): an alive bot out of combat inside the area it avoids is moved to a grind spot for its level away from it.
+    void DeathAreaEscape(DecideTick& tick, BotTurn& turn);
     void LogEvent(std::string const& text) const;
     void TurnRevivedAndRoles(DecideTick& tick, BotTurn& turn);
     void TurnTransport(DecideTick& tick, BotTurn& turn); // TransportRide (bot_policy_turn_life.cpp)

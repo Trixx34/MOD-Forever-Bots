@@ -264,6 +264,37 @@ void BotPolicy::MoveToTarget(DecideTick& tick, BotTurn& turn)
     bool const outOfPower = bot.max_power > 0 && BelowPct(bot.power, bot.max_power, kOutOfPowerPct);
     // A hunter with no ammunition cannot shoot (the core refuses every ranged attack): it closes to melee range as well.
     float approach = (outOfPower || NoAmmo(bot, classId)) && !healerSupport ? kMeleeApproachYards : rotation::ApproachYards(classId, spec);
+    // CasterMeleeWithoutSpell: a ranged bot with no damage spell it can cast at its level (no unconditional target row learned by now, or every one came back "not
+    // known" from the core) closes to melee and auto-attacks. It used to stand at its 25-yard stand-off casting nothing, the fight watchdog gave the target up
+    // (kStallAvoidMs, 5 to 40 minutes), and soon every creature around was avoided: the 2026-11-14 sim's level 1 shamans (Lightning Bolt's row starts at rank 2,
+    // level 8) and druids (Wrath's at rank 2, level 6; Starsurge and Sunfire are runes) stood idle beside live creatures for the whole run.
+    if (_options.CasterMeleeWithoutSpell && !healerSupport && approach > kMeleeApproachYards + 0.5f && classId != kHunterClass)
+    {
+        bool castable = false;
+        for (rotation::Row const& row : RowsFor(classId, spec))
+        {
+            if (row.Buff || !row.OnTarget || row.When.Condition != rotation::Cond::Always || row.When2.Condition != rotation::Cond::Always)
+                continue;
+            std::uint32_t const learn = row.MinLevel != 0 ? row.MinLevel : rotation::LearnLevel(row.Spell);
+            if (bot.level != 0 && (learn > bot.level || (row.MaxLevel != 0 && row.MaxLevel < bot.level)))
+                continue;
+            auto const retry = state.RetryAtMs.find(row.Spell);
+            if (retry != state.RetryAtMs.end() && retry->second > nowMs + kNoSpellRetryMs)
+                continue;   // the core said "not known" (or it failed again and again): not castable for now
+            castable = true;
+            break;
+        }
+        if (!castable)
+        {
+            approach = kMeleeApproachYards;
+            if (_options.OnEvent && targetRef != 0 && state.NoSpellLoggedFor != targetRef)
+            {
+                state.NoSpellLoggedFor = targetRef;
+                _options.OnEvent("caster_no_spell_melee: bot=" + std::to_string(bot.guid) + " class=" + std::to_string(classId) + " spec=" + spec + " level=" +
+                                 std::to_string(bot.level));
+            }
+        }
+    }
     if (nowMs < state.CloserUntilMs)
         approach = std::min(approach, kMeleeApproachYards + 1.0f);
     if (nowMs < state.RangeCloserUntilMs)
@@ -1373,16 +1404,49 @@ void BotPolicy::TurnIdle(DecideTick& tick, BotTurn& turn)
     // An enemy near keeps the bot from idling, which keeps it from walking to grind spots. Only one the bot would actually pull counts: a bot
     // whose start zone shows only elites, packs of four or more, or creatures well above its level used to stand there for the whole run
     // (all 73 Undead and many Night Elf and Tauren bots of the 8-hour soak), neither fighting nor leaving. A bot that holds position by
-    // order (a party waiting in a dungeon, no self pull) still counts any live creature.
+    // order (a party waiting in a dungeon) still counts any live creature.
     turn.enemyNear = false;
     auto& enemyNear = turn.enemyNear;
-    if (dungeonHold || noSelfPull)
+    if (dungeonHold || (noSelfPull && !_options.IdleEnemyAttackersOnly))
     {
         for (NearbyUnit const& unit : nearby)
             enemyNear = enemyNear || (IsLiveMob(unit) && (huntEntries.empty() ? !IsGrey(bot, unit) : true));
     }
+    else if (noSelfPull)
+    {
+        // IdleEnemyAttackersOnly: a bot that starts no fight of its own (defensive or passive stance, a stay order) counts only a creature that is attacking it, its
+        // pet or its party (NearbyUnit::victim_ref). Any live creature in view used to count, so a defensive bot beside a neutral or passive creature neither fought
+        // nor walked on (the sim's 'Galorogar'). The bot itself is out of combat here (noSelfPull needs that); an aggressive creature that comes for it puts it in
+        // combat, and noSelfPull is off then.
+        for (NearbyUnit const& unit : nearby)
+            if (IsLiveMob(unit) && AttacksOwnSide(tick.view, bot, unit.victim_ref))
+            {
+                enemyNear = true;
+                break;
+            }
+    }
     else
         enemyNear = PullTarget(bot, nearby, turn.AvoidedFn(), false, huntEntries, routeOn) != nullptr;
+    // The death area (DeathAreaCount): a solo bot out of combat does not walk back into the place where it keeps dying, whatever sends it there (a quest, a hub, a
+    // grind spot). The walk is dropped while the area is avoided; the death area escape (TurnRevivedAndRoles) moves a bot that is inside it away.
+    if (wanted.Type == ActionType::kMoveTo && bot.in_combat == 0 && turn.partyLeader == 0 && !routeOn && nowMs < state.AvoidAreaUntilMs &&
+        state.AvoidAreaMap == bot.map_id && std::hypot(wanted.Dest.X - state.AvoidAreaX, wanted.Dest.Y - state.AvoidAreaY) <= float(_options.DeathAreaYards) &&
+        std::hypot(bot.pos_x - state.AvoidAreaX, bot.pos_y - state.AvoidAreaY) > float(_options.DeathAreaYards))
+    {
+        if (_options.OnEvent && (state.AvoidAreaLoggedMs == 0 || nowMs - state.AvoidAreaLoggedMs >= 30000))
+        {
+            state.AvoidAreaLoggedMs = nowMs;
+            _options.OnEvent(std::string("death_area_move_blocked: bot=") + std::to_string(bot.guid) + " why=" + moveWhy + " dest=" + std::to_string(int(wanted.Dest.X)) + "," +
+                             std::to_string(int(wanted.Dest.Y)) + " left_s=" + std::to_string((state.AvoidAreaUntilMs - nowMs) / 1000));
+        }
+        wanted = Decision{ ActionType::kStop, 0 };
+        moveWhy = "death_area";
+        if (state.Wandering)
+        {
+            state.Wandering = false;   // a grind spot or hub inside the area: the next idle walk picks another one
+            state.IdleSinceMs = nowMs;
+        }
+    }
     turn.idle = !hasTarget && !enemyNear && wanted.Type == ActionType::kStop && questStep.Kind == QuestStepKind::None && !routeBusy;
     auto& idle = turn.idle;
 
