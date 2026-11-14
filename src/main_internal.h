@@ -289,7 +289,15 @@ struct AuctionBook
 // The loot event as a listing candidate. A weapon or a piece of armour is marked Equipment: the module does not know what a bot wears or keeps for
 // an upgrade, so it lists equipment only after auction::GearReady's hold (doc/economy-and-professions.md). It used to mark it Needed, which kept every
 // piece of equipment (the only thing the core's kList lists) off the house: no bot ever had anything to list.
-auction::Candidate CandidateOf(forever_module::PlayerItemLootedEvent const& event);
+// With `exact` (AuctionGearExact) and the core's item facts in the event, an upgrade the bot would wear now is Needed and the hold gives way to the item's
+// required level (auction::Settings::GearExact).
+auction::Candidate CandidateOf(forever_module::PlayerItemLootedEvent const& event, bool exact);
+
+// PlayerItemLootedEvent.source: 0 (or absent, an older core) a loot window; 1 crafted, 2 quest reward, 3 auction mail (the core's
+// Modules.ItemReceivedEvent.Enabled). Only loot-window items go to the vendor sale book: a crafted bandage or a bought item is not junk.
+constexpr std::uint32_t kItemSourceLoot = 0;
+constexpr std::uint32_t kItemSourceMail = 3;
+bool FromLootWindow(forever_module::PlayerItemLootedEvent const& event);
 
 // The vendor sales, used on the Run() thread only: what each bot has looted that it may sell, and the sales its visit still has to make.
 struct SellBook

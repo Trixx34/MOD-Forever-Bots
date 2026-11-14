@@ -4,7 +4,7 @@
 
 namespace main_detail {
 
-auction::Candidate CandidateOf(forever_module::PlayerItemLootedEvent const& event)
+auction::Candidate CandidateOf(forever_module::PlayerItemLootedEvent const& event, bool exact)
 {
     auction::Candidate item;
     item.ItemGuid = event.item_guid();
@@ -17,7 +17,22 @@ auction::Candidate CandidateOf(forever_module::PlayerItemLootedEvent const& even
     item.Equipment = event.item_class() == kItemClassWeapon || event.item_class() == kItemClassArmor;
     item.Stackable = item.Count != 1;   // the core lists single items only
     item.Goods = event.item_class() == kItemClassTradeGoods;
+    // The core's item facts (an older core sends none: has_upgrade_score() is false). Used only with AuctionGearExact: an upgrade the bot would wear now
+    // is Needed, a soulbound item Bound, and auction::GearReady judges the rest by its required level instead of the hold.
+    if (exact && event.has_upgrade_score())
+    {
+        item.HasFacts = true;
+        item.RequiredLevel = event.required_level();
+        item.Usable = event.usable();
+        item.Bound = event.bound();
+        item.Needed = item.Equipment && event.upgrade_score() > 0;
+    }
     return item;
+}
+
+bool FromLootWindow(forever_module::PlayerItemLootedEvent const& event)
+{
+    return !event.has_source() || event.source() == kItemSourceLoot;
 }
 
 sell::Item SellItemOf(forever_module::PlayerItemLootedEvent const& event)

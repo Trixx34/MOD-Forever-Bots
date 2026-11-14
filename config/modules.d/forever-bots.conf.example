@@ -350,6 +350,10 @@ Module.forever-bots.TelemetrySummarySec = 60
 #                                the module assumes 16 bag slots. A bot with something to list does not wait for full bags.)
 # AuctionGearSell = 1           (equipment is listed, after the hold below; 0 lists no weapon or armour)
 # AuctionGearHoldLevels = 2     (a looted piece of equipment is listed only once the bot is this many levels above the level it looted it at, 0..10)
+# AuctionGearExact = 0          (1: when the core sends the item facts in the loot event, an upgrade the bot would wear now is never listed, a piece it may
+#                                use at a required level at most AuctionGearHoldLevels above its loot level is kept until it is one level past that level,
+#                                anything else is listed at once; a core without the facts keeps the hold above. Crafted items, quest rewards and expired
+#                                listings back by mail join the book when the core's Modules.ItemReceivedEvent.Enabled is 1; they are never vendor sales.)
 # AuctionPerVisit = 5           (items listed per visit, 1..20)
 # AuctionListedMax = 10         (listings a bot has at once, 1..50)
 # AuctionGoodsSell = 1         (off by default: stacks of trade goods, white or better, that a bot does not need are listed as commodities at AuctionGoodsPct
