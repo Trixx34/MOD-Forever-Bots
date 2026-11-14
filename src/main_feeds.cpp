@@ -4,6 +4,26 @@
 
 namespace main_detail {
 
+namespace {
+
+// A bot's looted items as a list, after the bot's level is stamped on the ones that have no loot level yet (auction::StampLootLevel; the loot event
+// does not carry the level, the feed does).
+std::vector<auction::Candidate> StampedItems(std::unordered_map<std::uint64_t, auction::Candidate>& looted, std::uint32_t level)
+{
+    std::vector<auction::Candidate*> pointers;
+    pointers.reserve(looted.size());
+    for (auto& [guid, candidate] : looted)
+        pointers.push_back(&candidate);
+    auction::StampLootLevel(pointers, level);
+    std::vector<auction::Candidate> items;
+    items.reserve(looted.size());
+    for (auto const& [guid, candidate] : looted)
+        items.push_back(candidate);
+    return items;
+}
+
+} // namespace
+
 // Presence (bot_presence.h): the pump's feed, and a timer that logs bots off and back on.
 void SetUpPresence(forever_module::ModuleClient& client, RunContext& run, BotSettings& settings, PumpExtras& extras, std::shared_ptr<trade::TradeBook> const& trades)
 {
@@ -131,7 +151,8 @@ void SetUpAuction(forever_module::ModuleClient& client, RunContext& run, BotSett
         // buyout follows from the browse's reply, so it is not counted again in this tick's budget.
         auto const buyVisit = [&client, &settings, &budget, now](AuctionBot const& bot, auction::Standing& standing)
         {
-            if (!settings.Auction.BuyEnabled || !auction::BuyVisitDue(settings.Auction, standing, now))
+            // The core browses and buys only for a bot in reach of the auctioneer: a browse from farther spent the pace and the tick's budget for nothing.
+            if (!bot.InReach || !settings.Auction.BuyEnabled || !auction::BuyVisitDue(settings.Auction, standing, now))
                 return;
             std::uint64_t const spend = auction::BuyBudget(settings.Auction, bot.Copper, bot.Level);
             if (spend == 0 || !budget.Take())
@@ -189,16 +210,16 @@ void SetUpAuction(forever_module::ModuleClient& client, RunContext& run, BotSett
             for (auto const& [end, entry] : goodsEnds)
                 ++standing.GoodsListed[entry];
             auction::Bags const bags{ kBagSlotsAssumed, kBagSlotsAssumed - std::min(bot.FreeSlots, kBagSlotsAssumed) };
-            if (!auction::VisitDue(settings.Auction, bags, standing, false, now))
+            // What may be listed now: equipment waits out its hold (auction::GearReady).
+            std::vector<auction::Candidate> const items = auction::ReadyItems(settings.Auction, StampedItems(book->Items[bot.Guid], bot.Level), bot.Level);
+            bool const hasListable = auction::HasListable(settings.Auction, items, bot.Level);
+            if (!auction::ListingVisitDue(settings.Auction, bags, standing, bot.InReach, hasListable, now))
             {
                 buyVisit(bot, standing);
                 continue;
             }
             standing.LastVisitMs = now;
 
-            std::vector<auction::Candidate> items;
-            for (auto const& [itemGuid, candidate] : book->Items[bot.Guid])
-                items.push_back(candidate);
             for (auction::Listing const& listing : auction::PlanListings(settings.Auction, bags, standing, items))
             {
                 if (!budget.Take())
@@ -224,12 +245,7 @@ void SetUpAuction(forever_module::ModuleClient& client, RunContext& run, BotSett
             }
             if (settings.Auction.GoodsSell)
             {
-                auto& items = book->Items[bot.Guid];
-                std::vector<auction::Candidate> candidates;
-                candidates.reserve(items.size());
-                for (auto const& [guid, candidate] : items)
-                    candidates.push_back(candidate);
-                for (auction::GoodsListing const& goods : auction::PlanGoods(settings.Auction, standing, candidates))
+                for (auction::GoodsListing const& goods : auction::PlanGoods(settings.Auction, standing, items))
                 {
                     if (!budget.Take())
                         break;
@@ -330,8 +346,13 @@ void SetUpErrands(forever_module::ModuleClient& client, BotSettings& settings, s
                 }
                 // Looted items to list (the Auction House, when it is on): the walk goes to the faction's auctioneer on the bot's map, and the
                 // visit (the listing timer) lists the items once the bot is there. Off until both the errands and the auction are on.
-                auto const looted = book->Items.find(bot.Guid);
-                bool const auctionDue = settings.Auction.Enabled && bot.Side != 0 && bot.AuctioneerValid && looted != book->Items.end() && !looted->second.empty();
+                // Only items the bot may list now: equipment on its hold (auction::GearReady) is no reason for a trip.
+                bool auctionDue = false;
+                if (settings.Auction.Enabled && bot.Side != 0 && bot.AuctioneerValid)
+                {
+                    if (auto const looted = book->Items.find(bot.Guid); looted != book->Items.end() && !looted->second.empty())
+                        auctionDue = auction::HasListable(settings.Auction, StampedItems(looted->second, bot.Level), bot.Level);
+                }
                 if (!b.TrainDue && auctionDue)
                 {
                     b.AuctionDue = true;

@@ -121,6 +121,22 @@ void UnsellableItemsLeftOut()
     CHECK(PlanSales(On(), { grey, White(1, 1, 0) }).empty());
 }
 
+// 2026-11-14: a sale names the entry and sells every one the bot carries, so the cloth and meat of First Aid and Cooking and the stacks for the
+// auction house went to the vendor. Trade goods are kept unless SellVendorGoods.
+void TradeGoodsAreKeptUnlessSwitchedOn()
+{
+    Item cloth = White(2589, 6, 13);
+    cloth.Goods = true;
+    Item const junk = White(3, 1, 40);
+    std::vector<Sale> const kept = PlanSales(On(), { cloth, junk });
+    CHECK(kept.size() == 1 && kept[0].Entry == 3);
+    Settings sells = On();
+    sells.SellGoods = true;
+    std::vector<Sale> const sold = PlanSales(sells, { cloth, junk });
+    CHECK(sold.size() == 2 && sold[0].Entry == 2589);                     // 78 copper of cloth first
+    CHECK(PlanSales(On(), { cloth }).empty());
+}
+
 InFlight Sent(std::uint32_t sequence, std::uint64_t sentMs)
 {
     InFlight flight;
@@ -170,6 +186,7 @@ int main()
     MostMoneyFirst();
     CappedPerVisit();
     UnsellableItemsLeftOut();
+    TradeGoodsAreKeptUnlessSwitchedOn();
     ReplyDecidesTheSale();
     NoReplyInTimeIsRefused();
     VisitEndsAfterTheTimeout();

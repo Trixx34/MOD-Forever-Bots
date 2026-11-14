@@ -430,6 +430,9 @@ constexpr std::uint64_t kBagGearSpreadMs = 60000;
 constexpr std::uint64_t kTravelTimeoutMs = 180000; // a walk to the vendor longer than this is dropped for now
 constexpr float kTrainReachYards = 5.0f;          // a bot this close to its errand trainer sends the train order (the core allows about 5)
 constexpr std::uint64_t kErrandTrainRetryMs = 3000; // the next train order of an errand, while the core has not answered
+// An auction errand keeps the bot standing at the auctioneer this long before it ends: the listing visit runs on the module's own timer (every 10 s,
+// from a feed refreshed every 2 s), so a bot that walked on at once was gone before the visit saw it in reach.
+constexpr std::uint64_t kAuctionDwellMs = 25000;
 constexpr std::uint32_t kErrandTrainRefusalMax = 3; // train refusals in a row that end the errand as failed
 constexpr std::uint64_t kAvoidKeepMs = 3000;          // a walk out of a ground effect keeps its end point this long
 constexpr float kMountMinDistanceYards = 100.0f;   // a walk this long: mount up before it

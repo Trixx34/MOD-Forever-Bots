@@ -308,6 +308,33 @@ void MindControlBackupWaitsAndNoRogueCasts()
     CHECK(!CastsSpell(first, 13, 6770));                          // a rogue's Sap needs a target out of combat: not used
 }
 
+// 2026-11-14: an auction errand ended the moment the bot came in reach, and the bot walked on before the listing visit (its own 10 s timer) saw it
+// there. It stands kAuctionDwellMs (25 s) in reach now, then the errand is done.
+void AuctionErrandStandsAtTheAuctioneerBeforeItEnds()
+{
+    BotPolicy policy{ PolicyOptions{} };
+    ErrandOrder order;
+    order.Map = 0;
+    order.Dest = Point{ 2.0f, 0.0f, 0.0f };
+    order.Auction = true;
+    WorldTickSnapshotView const view = View(1, 0, {});
+    policy.Decide(view, 500);                                      // the bot is known to the policy
+    policy.StartErrand(kBot, order);
+    auto const movesOf = [](std::vector<BotAction> const& actions)
+    {
+        std::size_t moves = 0;
+        for (BotAction const& action : actions)
+            moves += action.bot_guid == kBot && action.type == ActionType::kMoveTo;
+        return moves;
+    };
+    CHECK(movesOf(policy.Decide(view, 1000)) == 0);                // in reach (2 yards): it stands
+    CHECK(policy.TakeErrandOutcome(kBot) == ErrandOutcome::kNone);
+    CHECK(movesOf(policy.Decide(view, 20000)) == 0);
+    CHECK(policy.TakeErrandOutcome(kBot) == ErrandOutcome::kNone); // 19 s in reach: still there for the listing visit
+    policy.Decide(view, 26000);
+    CHECK(policy.TakeErrandOutcome(kBot) == ErrandOutcome::kDone); // 25 s: done
+}
+
 } // namespace
 
 void RunPolicyTestsPart10()
@@ -323,4 +350,5 @@ void RunPolicyTestsPart10()
     PurgeShamanUsesPurgeAndNoOtherClassPurges();
     MindControlMageHoldsTheControlledMember();
     MindControlBackupWaitsAndNoRogueCasts();
+    AuctionErrandStandsAtTheAuctioneerBeforeItEnds();
 }

@@ -920,6 +920,7 @@ private:
         bool Reclaimed = false;                          // a reclaim was sent in this death
         std::optional<ErrandOrder> Errand;               // the town errand this bot is on (none = not on one)
         std::uint64_t ErrandTrainSentMs = 0;             // the next train order of the errand (0 = send now)
+        std::uint64_t ErrandArrivedMs = 0;               // an auction errand: when the bot came in reach of the auctioneer (0 = not yet)
         std::uint32_t ErrandRefusals = 0;                // train refusals in a row
         ErrandOutcome ErrandResult = ErrandOutcome::kNone; // the errand's end, until the module takes it
         std::uint64_t RunStartMs = 0;                    // the corpse run began (0 = not yet)

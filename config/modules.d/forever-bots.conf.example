@@ -277,11 +277,12 @@ Module.forever-bots.TelemetrySummarySec = 60
 # TaxiMasterMaxYards = 600  (a flight master farther than this is not walked to, 50..5000)
 # TaxiBlockedSec = 600      (after a refused flight the bot walks for this long, 10..86400)
 
-# Auction house (off by default; doc/economy.md). An idle bot whose bags are at least AuctionBagFullPct used lists up to AuctionPerVisit
-# green-or-better items it looted (never equipment, a quest item or a stack), at a price that is a percent of the vendor sell price.
-# The core runs every auction 2 hours, so AuctionRunHours takes only 2. Needs the core's AuctionHouseAction (kList). Players can buy the listings.
-# The module does not walk bots to an auctioneer yet: a visit happens only when a bot is already at one. Keys that the module does not
-# use yet (AuctionRelistPct, AuctionBuyMaxPct, AuctionBrowsePerVisit) are read and checked but have no effect.
+# Auction house (off by default; doc/economy.md, doc/economy-and-professions.md for the order to switch the chain on). A bot that looted something to
+# list walks to its faction's auctioneer (needs Errands = 1), and once it stands in reach lists up to AuctionPerVisit items: green-or-better pieces
+# of equipment it has held for AuctionGearHoldLevels levels (so the ones it can wear were worn first; a worn BoE item is bound and the core refuses
+# it), other green-or-better single items, and with AuctionGoodsSell stacks of trade goods. Never a quest item. The price is a percent of the vendor
+# sell price (never below it). The core runs every auction 2 hours, so AuctionRunHours takes only 2. Needs the core's AuctionHouseAction (kList).
+# Players can buy the listings. Keys that the module does not use yet (AuctionRelistPct, AuctionBrowsePerVisit) are read and checked but have no effect.
 # Auction = 0
 # AuctionSellPctGreen = 300     (green items: listed at this percent of the vendor price, 100..2000)
 # AuctionSellPctBlue = 400      (blue items, 100..2000)
@@ -290,7 +291,10 @@ Module.forever-bots.TelemetrySummarySec = 60
 # AuctionRelistPct = 90         (not used yet: the second listing of an expired item, 50..100)
 # AuctionRunHours = 2           (2 only: the core's run time)
 # AuctionMinVendorCopper = 100  (an item a vendor would pay less than this for is not listed, 0..1000000 copper)
-# AuctionBagFullPct = 60        (a visit happens when this share of the bag is used, 1..100; the module assumes 16 bag slots)
+# AuctionBagFullPct = 60        (a bot in reach of the auctioneer with nothing ready to list still visits when this share of the bag is used, 1..100;
+#                                the module assumes 16 bag slots. A bot with something to list does not wait for full bags.)
+# AuctionGearSell = 1           (equipment is listed, after the hold below; 0 lists no weapon or armour)
+# AuctionGearHoldLevels = 2     (a looted piece of equipment is listed only once the bot is this many levels above the level it looted it at, 0..10)
 # AuctionPerVisit = 5           (items listed per visit, 1..20)
 # AuctionListedMax = 10         (listings a bot has at once, 1..50)
 # AuctionGoodsSell = 1         (off by default: stacks of trade goods, white or better, that a bot does not need are listed as commodities at AuctionGoodsPct
@@ -566,6 +570,7 @@ Module.forever-bots.TelemetrySummarySec = 60
 # SellVendor = 0
 # SellEverySec = 1800                # (60..86400) a bot visits a vendor to sell at most this often
 # SellPerVisit = 8                   # (1..20) distinct items sold in one visit
+# SellVendorGoods = 0                # trade goods (cloth, meat, ore, herbs, leather) are kept for crafting and AuctionGoodsSell; 1 sells them too
 
 # Town errands (profession training trips to a capital trainer; Errands = 1 turns them on, off by default).
 # ErrandDailyMin = 60                # (1..1440) errand minutes a bot may spend in any rolling 24 hours

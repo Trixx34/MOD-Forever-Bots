@@ -1,5 +1,9 @@
 # Bot economy and the Auction House: design
 
+**2026-11-14:** why no bot ever listed (equipment marked Needed, the 16-slot bag rule, visits far from the auctioneer, the errand ending before the
+visit), the fixes, the order to switch the whole chain on in prod and the core change still needed: `doc/economy-and-professions.md`. Equipment is
+listed now, after a hold of `AuctionGearHoldLevels`.
+
 Status: **the decision logic is built and unit-tested** (`src/auction_policy.*`, `tests/auction_test.cpp`, settings `Auction*`, off by default). **The module drives
 the listings** (`main.cpp`, a visit timer every 10 s on the Run() thread, `AuctionHouseForBot` `kList`), from the bots' loot (`PlayerScript.OnLootItem`) and the pump's feed.
 A town errand (`errand_policy.*`, config key `Errands`, off by default) walks a bot with looted items to the faction's auctioneer on its map, using the snapshot's `auctioneer_x/y/z` (layout 20), and ends there; the listing visit then lists the items. The walk is not checked in game: the auctioneer's reach and the visit's range are unverified. Errands and listings both need their own switch on. It does not sell to vendors (that is `sell-visit-walk`, not merged), and does not relist expired items. Bots receive the pay

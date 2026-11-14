@@ -549,6 +549,7 @@ void main_detail::PumpTier2(forever_module::Tier2Session& session, std::atomic<b
                     entry.AuctioneerX = bot.auctioneer_x;
                     entry.AuctioneerY = bot.auctioneer_y;
                     entry.AuctioneerZ = bot.auctioneer_z;
+                    entry.Level = bot.level;
                     list.push_back(entry);
                 }
                 std::lock_guard<std::mutex> lock(extras.Errand->Lock);
@@ -567,7 +568,8 @@ void main_detail::PumpTier2(forever_module::Tier2Session& session, std::atomic<b
                 {
                     if ((extras.Alts && extras.Alts->Has(bot.guid)) || bot.group_role != 0)
                         continue;
-                    list.push_back({ bot.guid, bot.bag_free_slots, bot.auctioneer_guid, bot.life_state == 0 && bot.in_combat == 0, bot.copper, bot.level });
+                    list.push_back({ bot.guid, bot.bag_free_slots, bot.auctioneer_guid, bot.life_state == 0 && bot.in_combat == 0, bot.copper, bot.level,
+                                     auction::InReach(bot.auctioneer_valid != 0, bot.pos_x, bot.pos_y, bot.auctioneer_x, bot.auctioneer_y) });
                 }
                 std::lock_guard<std::mutex> lock(extras.Auction->Lock);
                 extras.Auction->Bots.swap(list);

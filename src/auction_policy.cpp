@@ -71,6 +71,65 @@ bool VisitDue(Settings const& settings, Bags const& bags, Standing const& standi
     return std::uint64_t(bags.UsedSlots) * 100 >= std::uint64_t(bags.TotalSlots) * settings.BagFullPct;
 }
 
+bool ListingVisitDue(Settings const& settings, Bags const& bags, Standing const& standing, bool inReach, bool hasListable, std::uint64_t nowMs)
+{
+    if (!settings.Enabled || !inReach)
+        return false;
+    if (!hasListable)
+        return VisitDue(settings, bags, standing, false, nowMs);
+    if (standing.LastVisitMs != 0 && nowMs - standing.LastVisitMs < ah_batch::VisitEveryMs(settings.BatchIntervalHours, settings.EveryMs))
+        return false;
+    return standing.ListedNow < settings.ListedMax;
+}
+
+void StampLootLevel(std::vector<Candidate*> const& items, std::uint32_t botLevel)
+{
+    if (botLevel == 0)
+        return;
+    for (Candidate* item : items)
+        if (item && item->LootLevel == 0)
+            item->LootLevel = botLevel;
+}
+
+bool GearReady(Settings const& settings, Candidate const& item, std::uint32_t botLevel)
+{
+    if (!item.Equipment)
+        return true;
+    if (!settings.GearSell || item.LootLevel == 0 || botLevel == 0)
+        return false;
+    return botLevel >= item.LootLevel + settings.GearHoldLevels;
+}
+
+std::vector<Candidate> ReadyItems(Settings const& settings, std::vector<Candidate> const& items, std::uint32_t botLevel)
+{
+    std::vector<Candidate> ready;
+    ready.reserve(items.size());
+    for (Candidate const& item : items)
+        if (GearReady(settings, item, botLevel))
+            ready.push_back(item);
+    return ready;
+}
+
+bool HasListable(Settings const& settings, std::vector<Candidate> const& items, std::uint32_t botLevel)
+{
+    if (!settings.Enabled)
+        return false;
+    std::vector<Candidate> const ready = ReadyItems(settings, items, botLevel);
+    for (Candidate const& item : ready)
+        if (Listable(settings, item))
+            return true;
+    return !PlanGoods(settings, Standing{}, ready).empty();
+}
+
+bool InReach(bool auctioneerValid, float botX, float botY, float auctioneerX, float auctioneerY)
+{
+    if (!auctioneerValid)
+        return false;
+    float const dx = botX - auctioneerX;
+    float const dy = botY - auctioneerY;
+    return dx * dx + dy * dy <= kReachYards * kReachYards;
+}
+
 std::vector<Listing> PlanListings(Settings const& settings, Bags const&, Standing const& standing, std::vector<Candidate> const& items)
 {
     std::vector<Listing> plan;
