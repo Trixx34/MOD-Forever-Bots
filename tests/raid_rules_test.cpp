@@ -149,6 +149,24 @@ void TestPullPosition()
     CHECK(!t.PullPositionOf(309, 11371) && !t.PullPositionOf(309, 11372) && !t.PullPositionOf(249, 11350));
 }
 
+// pull_single (Onyxia fix 3): yards 5..60, the first row of an entry is kept.
+void TestPullSingle()
+{
+    std::vector<std::string> errors;
+    Table t = Parse("pull_single|249|12129|30|Warder\n"
+                    "pull_single|249|12129|40|again\n"          // the same entry twice: the first is kept
+                    "pull_single|249|12130|4|too small\n"
+                    "pull_single|249|12131|61|too big\n"
+                    "pull_single|249|12132|x|bad\n"
+                    "pull_single|249|0|30|no entry\n"
+                    "pull_single|249|12133\n",                    // too short
+                    errors);
+    CHECK(errors.size() == 6);
+    CHECK(t.PullSingleYards(249, 12129) == 30.0f);
+    CHECK(t.PullSingleYards(249, 12130) == 0.0f && t.PullSingleYards(249, 12131) == 0.0f && t.PullSingleYards(309, 12129) == 0.0f);
+    CHECK(t.HasPullSingle(249) && !t.HasPullSingle(309));
+}
+
 void TestErrors()
 {
     std::vector<std::string> errors;
@@ -251,6 +269,7 @@ void TestShippedFile()
     CHECK(t.AddRank(249, 11262).has_value() && *t.AddRank(249, 11262) == 0);
     CHECK(t.IsFrontal(249, 10184, 18500) && t.IsFrontal(249, 10184, 18435));
     CHECK(t.TankSpotOf(249, 10184).has_value() && t.FlankOf(249, 10184).has_value());   // Onyxia's boss positions (RaidBossPositions)
+    CHECK(t.PullSingleYards(249, 12129) == 30.0f && !t.HasPullSingle(309));               // Warders one at a time (RaidPullSingle), Onyxia only
     CHECK(t.IsLethalSpell(249, 17086) && !t.IsLethalSpell(249, 18500) && !t.IsLethalSpell(309, 17086));
     // Zul'Gurub rows from the task
     for (std::uint32_t spell : { 23954u, 24208u, 24300u, 23953u })
@@ -302,6 +321,7 @@ int main()
     TestAvoidEnemyAuraRows();
     TestTanksGroup();
     TestPullPosition();
+    TestPullSingle();
     TestErrors();
     TestMerge();
     TestBossPositionRows();

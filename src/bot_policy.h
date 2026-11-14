@@ -172,6 +172,13 @@ struct PolicyOptions
     // RaidBossPositions (default off): `tank_spot` and `flank` rows of the raid rule table act (MoveBossPosition): the boss's victim, a tank, holds it from the tank spot,
     // everyone else that fights it stands on its flanks, out of its front and rear cones; a tank on a frontal telegraph holds.
     bool RaidBossPositions = false;
+    // RaidPullSingle (default off; Onyxia fix 3): `pull_single` rows of the raid rule table act (PullSingleSkips, PullSingleHoldOf): the route leader does not pull a creature
+    // of a listed entry while another live one of the entry stands within the row's yards of it and holds its walk while such a pair is near (kPullSingleHoldMaxMs at most);
+    // in a fight no bot of a route party picks one that fights nobody.
+    bool RaidPullSingle = false;
+    // RaidGhostFightHoldMaxMs (0 = off, the default; 300000 is a good value; Onyxia fix 3): on a map with a `pull_single` row a dungeon ghost's teleport into the instance
+    // (entrance, leader, corpse) waits while its party fights, at most this long per death: the Warders respawn in the tunnel when Onyxia is pulled.
+    std::uint64_t RaidGhostFightHoldMaxMs = 0;
     std::shared_ptr<ground_avoid::AvoidTable const> AvoidSpells;
     // The raid rule table (RaidRulesFile, raid_rules.h): the planner reads the interrupt-first casts, the dispel kinds, the tank swap aura and the no-AoE rule from it; the add
     // ranks are merged into each scenario's KillPriority at start; the ground-effect spells of its avoid rows join the hazard circles. Null = none.
@@ -762,6 +769,8 @@ private:
         std::uint64_t FlankBoss = 0;                     // the boss FlankDest was chosen around
         std::uint64_t FlankLogMs = 0;
         std::uint64_t TankSpotLogMs = 0;
+        std::uint64_t PullSingleSinceMs = 0;             // RaidPullSingle: when the leader first held its walk for the pair near it (0 = no pair near)
+        std::uint64_t PullSingleLogMs = 0;
         ground_avoid::Point2 SpacingDest{};              // where the bot walks for a spread nudge or out of an avoid_enemy zone (raid_rules.h)
         std::uint64_t SpacingSetMs = 0;                  // when SpacingDest was chosen (0 = none)
         std::uint64_t SpacingNextMs = 0;                 // a spread nudge is not started before this
@@ -1085,6 +1094,10 @@ private:
     // GhostHoldAvoidEnemyMaxMs: a fighting hostile of an avoid_enemy row stands near the destination (reason avoid_enemy). Also called on its own before the leader rejoin
     // and the corpse teleports, which GhostTeleportHeld does not hold.
     bool GhostAvoidEnemyHeld(DecideTick& tick, BotTurn& turn, std::uint32_t map, Point const& dest, char const* what);
+    // RaidGhostFightHoldMaxMs: on a map with a `pull_single` row the ghost's party is fighting (reason party_fight). Also called on its own for the corpse teleports.
+    bool GhostFightHeld(DecideTick& tick, BotTurn& turn, std::uint32_t map, char const* what);
+    // RaidPullSingle: the route leader's watch for a pair of a `pull_single` entry near it (sets the turn's pullSingleHold and pullSinglePairs).
+    void PullSingleWatch(DecideTick& tick, BotTurn& turn);
     TurnFlow DeadReviveByLeader(DecideTick& tick, BotTurn& turn);
     void DeadGhostRun(DecideTick& tick, BotTurn& turn);
     void DeadEmit(DecideTick& tick, BotTurn& turn, Decision const& wantedDead);

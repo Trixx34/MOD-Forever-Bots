@@ -384,8 +384,35 @@ bool BotPolicy::GhostAvoidEnemyHeld(DecideTick& tick, BotTurn& turn, std::uint32
     return true;
 }
 
+// RaidGhostFightHoldMaxMs (Onyxia fix 3): on a map with a `pull_single` row (Onyxia's Lair) a ghost of a dungeon party is not put into the instance while its party fights.
+// The entrance is the tunnel's mouth and the Warders patrol the tunnel; pulling Onyxia respawns every dead Warder within 200 yd. A ghost revived at the entrance (the core
+// resurrects it on entering) was taken to the fight through the Warders, or met one on its corpse run (2026-11-13/14: 85% of the map's deaths to Warders, 34-76 pulls per
+// stall). Held at most RaidGhostFightHoldMaxMs from the first held decision of this death (GhostHoldSinceMs, shared with the other ghost holds). True: hold back.
+bool BotPolicy::GhostFightHeld(DecideTick& tick, BotTurn& turn, std::uint32_t map, char const* what)
+{
+    if (_options.RaidGhostFightHoldMaxMs == 0 || !_options.RaidRules || !_options.RaidRules->HasPullSingle(map) || turn.deadParty == 0 ||
+        !PartyFighting(tick, turn.deadParty))
+        return false;
+    std::uint64_t const nowMs = tick.nowMs;
+    BotState& state = turn.state;
+    if (state.GhostHoldSinceMs == 0)
+        state.GhostHoldSinceMs = nowMs;
+    std::uint64_t const heldMs = nowMs - state.GhostHoldSinceMs;
+    if (heldMs >= _options.RaidGhostFightHoldMaxMs)
+        return false;
+    if (_options.OnEvent && (state.GhostHoldLoggedMs == 0 || nowMs - state.GhostHoldLoggedMs >= kGhostHoldLogMs))
+    {
+        state.GhostHoldLoggedMs = nowMs;
+        _options.OnEvent(std::string("ghost_teleport_hold: bot=") + std::to_string(turn.bot.guid) + " reason=party_fight dest=" + what + " map=" + std::to_string(map) +
+                         " party=" + std::to_string(turn.deadParty) + " held_ms=" + std::to_string(heldMs) + " waited_ms=" + std::to_string(nowMs - state.DeathMs));
+    }
+    return true;
+}
+
 bool BotPolicy::GhostTeleportHeld(DecideTick& tick, BotTurn& turn, std::uint32_t map, Point const& dest, char const* what)
 {
+    if (GhostFightHeld(tick, turn, map, what))
+        return true;
     if (GhostAvoidEnemyHeld(tick, turn, map, dest, what))
         return true;
     if (!_options.GhostTeleportHold)
@@ -828,7 +855,12 @@ void BotPolicy::DeadGhostRun(DecideTick& tick, BotTurn& turn)
     // below, brought forward. A ghost already at its corpse (waiting out the core's reclaim delay, or a hostile beside it) is not on a run any more: left alone.
     bool const atCorpse = bot.map_id == bot.corpse_map && DistanceTo(bot, Point{ bot.corpse_x, bot.corpse_y, bot.corpse_z }) <= kReclaimYards;
     // GhostHoldAvoidEnemyMaxMs: not while a fighting hostile of an avoid_enemy row stands at the corpse (the ghost walks on meanwhile).
-    auto const corpseHeld = [&] { return GhostAvoidEnemyHeld(tick, turn, bot.corpse_map, Point{ bot.corpse_x, bot.corpse_y, bot.corpse_z }, "corpse"); };
+    // RaidGhostFightHoldMaxMs: nor while the party fights on a map with a `pull_single` row (the corpse lies in the Warders' tunnel).
+    auto const corpseHeld = [&]
+    {
+        return GhostFightHeld(tick, turn, bot.corpse_map, "corpse") ||
+               GhostAvoidEnemyHeld(tick, turn, bot.corpse_map, Point{ bot.corpse_x, bot.corpse_y, bot.corpse_z }, "corpse");
+    };
     if (_options.CorpseRunTeleportMs != 0 && !state.RunTimeoutTeleported && !atCorpse && nowMs - state.RunStartMs > _options.CorpseRunTeleportMs && !corpseHeld() &&
         GhostTeleportSlot(nowMs))
     {

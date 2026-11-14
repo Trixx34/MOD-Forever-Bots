@@ -29,6 +29,9 @@
 //                                              sets which way its frontal casts go (Onyxia: north of her spawn, she faces the north wall). Module switch RaidBossPositions
 //   flank|map|boss_entry|front_deg|rear_deg|rear_yards|name   the members other than the boss's victim stand on its flanks: none in the front cone (front_deg wide, any
 //                                              distance) or in the rear cone (rear_deg wide, within rear_yards: a tail sweep). Module switch RaidBossPositions
+//   pull_single|map|entry|yards|name           creatures of this entry are pulled one at a time (Onyxian Warders, Fire Nova): the route leader does not pull one while another
+//                                              live one of the entry stands within `yards` (5..60) of it, and holds its walk while such a pair is near; in a fight nobody picks
+//                                              one that fights nobody. Module switch RaidPullSingle; the ghost hold RaidGhostFightHoldMaxMs acts on maps with such a row
 #pragma once
 
 #include <cstdint>
@@ -120,6 +123,7 @@ struct MapRules
     std::map<std::uint32_t, PullPosition> PullPositions;    // creature entry -> where the tank pulls it from
     std::map<std::uint32_t, TankSpot> TankSpots;            // boss entry -> where its tank holds it from
     std::map<std::uint32_t, FlankRule> Flanks;              // boss entry -> its front and rear cones
+    std::map<std::uint32_t, float> PullSingle;              // creature entry -> the yards within which a second one of the entry makes a pair (pull_single)
 };
 
 class Table
@@ -160,6 +164,9 @@ public:
     std::optional<TankSpot> TankSpotOf(std::uint32_t map, std::uint32_t bossEntry) const;
     std::optional<FlankRule> FlankOf(std::uint32_t map, std::uint32_t bossEntry) const;
     bool HasTankSpot(std::uint32_t map) const;
+    // The `pull_single` yards of a creature entry (0 = the map has no row for it), and whether the map has any such row.
+    float PullSingleYards(std::uint32_t map, std::uint32_t entry) const;
+    bool HasPullSingle(std::uint32_t map) const;
 
 private:
     std::map<std::uint32_t, MapRules> _maps;

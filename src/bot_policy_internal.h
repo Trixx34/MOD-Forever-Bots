@@ -358,6 +358,9 @@ constexpr std::uint64_t kRecoveryWindowMs = 10000;
 constexpr std::uint64_t kPullHoldAbsMaxMs = 180000;  // 0.44.14: the hold is cut off here even while the party still recovers (the 45 s cap below counts from the last rise)
 constexpr std::uint64_t kPullPosWalkMs = 30000;     // the tank gives up walking to a raid rules pull position after this long and pulls from where it is
 constexpr std::uint64_t kPullPosHoldMs = 15000;     // after the pull landed the tank holds at the pull position this long for the pack to come to it
+constexpr std::uint64_t kPullSingleHoldMaxMs = 60000;  // RaidPullSingle: the route leader holds its walk for a pair of a `pull_single` entry this long at most, then goes on as before
+constexpr float kPullSingleApproachYards = 20.0f;      // RaidPullSingle: a pair counts as near while one of the two is within the row's yards plus this of the leader
+constexpr std::uint64_t kPullSingleLogMs = 10000;
 constexpr std::uint64_t kPullHoldMaxMs = 45000;     // the party never waits longer than this for itself
 constexpr std::uint32_t kTankRestPct = 80;          // a dungeon party leader (the tank) below this health pulls nothing until it is back above, up to kPullHoldAbsMaxMs
 
@@ -648,6 +651,8 @@ float HealthShare(NearbyUnit const& unit);
 bool OnOtherLevel(BotSnapshot const& bot, NearbyUnit const& unit);
 
 // `leashed` (a dungeon party's leash, DungeonPullLeashYards / DungeonChaseLeashYards; empty = none): a candidate it says is outside is not chosen, defending or not.
+// RaidPullSingle: another live unit of `unit`'s entry within `yards` of it (bot_policy_turn_target.cpp), nullptr when none.
+NearbyUnit const* PullSinglePartner(std::span<NearbyUnit const> units, NearbyUnit const& unit, float yards);
 NearbyUnit const* PullTarget(BotSnapshot const& bot, std::span<NearbyUnit const> units,
                             std::function<bool(std::uint64_t)> const& avoided, bool defending,
                             std::vector<std::uint32_t> const& onlyEntries = {}, bool dungeon = false,
@@ -858,6 +863,8 @@ struct BotPolicy::BotTurn
     std::vector<std::uint32_t> const noEntries{};
     std::vector<std::uint32_t> const* huntEntries = nullptr;
     bool dungeonHold = false;
+    bool pullSingleHold = false;                          // RaidPullSingle: the route leader holds its walk (a pair of a pull_single entry is near; PullSingleWatch)
+    bool pullSinglePairs = false;                         // RaidPullSingle: the leader's pull skips a unit that has a second one of its entry near (the hold is not over its cap)
     bool tankHeadStart = false;
     NearbyUnit const* targetUnit = nullptr;               // TurnTargeting
     std::uint64_t targetRef = 0;

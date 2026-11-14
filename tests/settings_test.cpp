@@ -636,6 +636,20 @@ void RaidBossPositionsSetting()
     CHECK(!ParseBotSettings({ { "RaidBossPositions", "0" } }, w).RaidBossPositions && w.empty());
 }
 
+// RaidPullSingle and RaidGhostFightHoldMaxMs (Onyxia fix 3): off by default; the hold 10000..3600000 or 0.
+void RaidPullSingleSettings()
+{
+    std::vector<std::string> w;
+    BotSettings const defaults = ParseBotSettings({}, w);
+    CHECK(!defaults.RaidPullSingle && defaults.RaidGhostFightHoldMaxMs == 0 && w.empty());
+    BotSettings const on = ParseBotSettings({ { "RaidPullSingle", "1" }, { "RaidGhostFightHoldMaxMs", "300000" } }, w);
+    CHECK(on.RaidPullSingle && on.RaidGhostFightHoldMaxMs == 300000 && w.empty());
+    CHECK(ParseBotSettings({ { "RaidGhostFightHoldMaxMs", "0" } }, w).RaidGhostFightHoldMaxMs == 0 && w.empty());
+    CHECK(ParseBotSettings({ { "RaidGhostFightHoldMaxMs", "5000" } }, w).RaidGhostFightHoldMaxMs == 0 && !w.empty());
+    w.clear();
+    CHECK(ParseBotSettings({ { "RaidGhostFightHoldMaxMs", "9999999" } }, w).RaidGhostFightHoldMaxMs == 0 && !w.empty());
+}
+
 void GhostTeleportHoldSettings()
 {
     {
@@ -724,6 +738,7 @@ int main()
     GhostTeleportHoldSettings();
     ZgLeverSettings();
     RaidBossPositionsSetting();
+    RaidPullSingleSettings();
     CombatDriftSettings();
     ErrandSettings();
     ChatSettings();
