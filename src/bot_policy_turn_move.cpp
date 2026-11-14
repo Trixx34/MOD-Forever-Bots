@@ -1458,11 +1458,18 @@ void BotPolicy::TurnIdle(DecideTick& tick, BotTurn& turn)
         float const dist = bot.map_id == order.Map ? std::hypot(bot.pos_x - order.Dest.X, bot.pos_y - order.Dest.Y) : 1e9f;
         if (dist <= kTrainReachYards && order.Auction)
         {
-            // At the Auction House: the errand is done here. The listing visit (main.cpp) lists the items; the bot does not wait for it.
-            state.ErrandResult = ErrandOutcome::kDone;
-            state.Errand.reset();
-            if (_options.OnEvent)
-                _options.OnEvent("errand_done: bot=" + std::to_string(bot.guid) + " auction");
+            // At the Auction House: the bot stands in reach for kAuctionDwellMs, so the listing visit (main_feeds.cpp, its own 10 s timer) finds it
+            // there, then the errand is done.
+            if (state.ErrandArrivedMs == 0)
+                state.ErrandArrivedMs = nowMs;
+            if (nowMs - state.ErrandArrivedMs >= kAuctionDwellMs)
+            {
+                state.ErrandResult = ErrandOutcome::kDone;
+                state.Errand.reset();
+                state.ErrandArrivedMs = 0;
+                if (_options.OnEvent)
+                    _options.OnEvent("errand_done: bot=" + std::to_string(bot.guid) + " auction");
+            }
             wanted = Decision{};
         }
         else if (dist <= kTrainReachYards)

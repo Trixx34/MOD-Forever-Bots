@@ -57,6 +57,13 @@ struct Settings
     // Batched listing (config AhBatchIntervalHours, 0 = off, ah_batch.h): a bot visits the house at most once per this many hours (relisting and cancelling included),
     // and lists goods in stacks of 1, 5 or 20 chosen per item. With 0 the rules above are unchanged.
     std::uint32_t BatchIntervalHours = 0;
+    // Equipment (config keys AuctionGearSell, AuctionGearHoldLevels): a looted green-or-better weapon or piece of armour is listed once the bot has gained
+    // GearHoldLevels levels since it looted it. Until then it is kept: the core's bag equip pass (kVendor bit 4 on the service visits) wears it if it is an
+    // upgrade, and an equipped BoE item is soulbound, which the core's HandleAuctionSellItem refuses (CanBeTraded). The hold covers the items the bot
+    // could not wear yet when it looted them (a required level a little above its own). The loot event does not say the item's required level or
+    // upgrade score (doc/economy-and-professions.md, the core change), so the levels gained stand in for it.
+    bool GearSell = true;
+    std::uint32_t GearHoldLevels = 2;
 };
 
 // One item in a bot's bags as the core describes it for selling.
@@ -72,7 +79,28 @@ struct Candidate
     bool Needed = false;                        // the bot uses it: equipped, a better piece than what it wears, a reagent or supply it needs
     bool Stackable = false;                     // the core's kList takes single items only
     bool Goods = false;                         // trade goods: a stack for a commodity listing when Stackable (see PlanGoods)
+    bool Equipment = false;                     // a weapon or a piece of armour: listed only when GearReady
+    std::uint32_t LootLevel = 0;                // the bot's level when it looted the item (0: not known yet; StampLootLevel sets it)
 };
+
+// The bot's level as the loot level of the items that have none yet (the loot event does not carry the level; the first feed after the loot does).
+void StampLootLevel(std::vector<Candidate*> const& items, std::uint32_t botLevel);
+
+// Whether a piece of equipment may be listed now: gear selling is on, the loot level is known, and the bot has gained GearHoldLevels since.
+// Anything that is not equipment is ready (its own rules apply: Listable, PlanGoods).
+bool GearReady(Settings const& settings, Candidate const& item, std::uint32_t botLevel);
+
+// The items of `items` that may be listed now (GearReady), for PlanListings and PlanGoods.
+std::vector<Candidate> ReadyItems(Settings const& settings, std::vector<Candidate> const& items, std::uint32_t botLevel);
+
+// Whether the bot has anything to list now: a ready item that is Listable, or a goods stack PlanGoods would list. A town errand to the auctioneer is
+// only worth it then.
+bool HasListable(Settings const& settings, std::vector<Candidate> const& items, std::uint32_t botLevel);
+
+// Whether the bot stands in reach of its auctioneer: the snapshot gives the auctioneer of the bot's map, so only the 2D distance counts, at most
+// kReachYards. The core's handler (Player::GetNPCIfCanInteractWith) allows the auctioneer's combat reach plus 4 yards, about 5.5.
+constexpr float kReachYards = 5.0f;
+bool InReach(bool auctioneerValid, float botX, float botY, float auctioneerX, float auctioneerY);
 
 struct Listing
 {
@@ -113,6 +141,12 @@ struct Standing
 
 // Whether this bot may go to the house now: it is switched on, enough bag slots are used (or it has a relisting due), and the last visit is long enough ago.
 bool VisitDue(Settings const& settings, Bags const& bags, Standing const& standing, bool relistingDue, std::uint64_t nowMs);
+
+// The listing visit the module makes: only for a bot in reach of its auctioneer. (A visit made far away is refused by the core, and it used to spend the
+// pace, so a bot that then arrived on its errand waited EveryMs and had walked on.) A bot in reach with something to list visits as soon as the pace
+// and ListedMax allow, whatever its bags hold: the errand that brought it decided the trip was worth it, and the bag rule of VisitDue assumes a
+// 16-slot backpack while the snapshot's free slots cover every bag, so it never fired for a bot that carries bags. With nothing to list it is VisitDue.
+bool ListingVisitDue(Settings const& settings, Bags const& bags, Standing const& standing, bool inReach, bool hasListable, std::uint64_t nowMs);
 
 // The listings to make this visit, most valuable first: at most PerVisit, and ListedMax minus what is listed already. An item listed twice before is left
 // for a vendor (the caller sells it).

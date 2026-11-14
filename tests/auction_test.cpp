@@ -430,6 +430,73 @@ void RoundPricesAreOffByDefaultAndKeepThePlan()
     }
 }
 
+// 2026-11-14: no bot ever listed on the sim (Auction = 1, Errands = 1). A bot with bags has more free slots than the 16 the module assumes, so the
+// bag rule never fired; the visit now goes by the reach of the auctioneer and by having something to list.
+void ABotWithBagsVisitsWhenInReachWithSomethingToList()
+{
+    Settings s = On();
+    s.EveryMs = 600000;
+    Bags const withBags{ 16, 0 };        // 40 free slots in four bags: the module's view is 16 total, 0 used
+    Standing fresh;
+    CHECK(!VisitDue(s, withBags, fresh, false, 1000));                      // the old rule: never
+    CHECK(ListingVisitDue(s, withBags, fresh, true, true, 1000));          // in reach with an item: now
+    CHECK(!ListingVisitDue(s, withBags, fresh, false, true, 1000));        // far away: no visit (it spent the pace before)
+    CHECK(!ListingVisitDue(s, withBags, fresh, true, false, 1000));        // nothing to list and roomy bags: no visit
+    CHECK(ListingVisitDue(s, Bags{ 20, 12 }, fresh, true, false, 1000));   // nothing to list but full bags: the old rule still holds
+    Standing visited;
+    visited.LastVisitMs = 1000;
+    CHECK(!ListingVisitDue(s, withBags, visited, true, true, 1000 + 599000));
+    CHECK(ListingVisitDue(s, withBags, visited, true, true, 1000 + 600000));
+    Standing busy;
+    busy.ListedNow = s.ListedMax;
+    CHECK(!ListingVisitDue(s, withBags, busy, true, true, 1000));          // the listing cap
+    CHECK(!ListingVisitDue(Settings{}, withBags, fresh, true, true, 1000)); // off by default
+}
+
+void TheAuctioneerIsInReachWithinFiveYards()
+{
+    CHECK(InReach(true, 100.0f, 100.0f, 103.0f, 104.0f));                 // 5 yards
+    CHECK(!InReach(true, 100.0f, 100.0f, 104.0f, 104.0f));                // 5.7
+    CHECK(!InReach(false, 100.0f, 100.0f, 100.0f, 100.0f));               // no auctioneer on the map
+}
+
+// Equipment was marked Needed at loot and so never listed, and the core's kList lists single pieces only: nothing could be listed. It is listed now
+// after the hold, once the bag equip pass had its chance to wear it.
+void EquipmentIsListedAfterItsHold()
+{
+    Settings s = On();
+    Candidate sword = Gear(7, kUncommon, 500);
+    sword.Equipment = true;
+    CHECK(Listable(s, sword));                                             // equipment is not Needed by itself
+    CHECK(!GearReady(s, sword, 10));                                       // the loot level is not known yet
+    std::vector<Candidate> items{ sword, Gear(8, kCommon, 500) };
+    CHECK(!HasListable(s, items, 10));
+    StampLootLevel({ &items[0], &items[1] }, 10);
+    CHECK(items[0].LootLevel == 10);
+    StampLootLevel({ &items[0] }, 12);
+    CHECK(items[0].LootLevel == 10);                                       // stamped once
+    CHECK(!GearReady(s, items[0], 11));
+    CHECK(!HasListable(s, items, 11));
+    CHECK(ReadyItems(s, items, 11).size() == 1);                           // the white item passes the hold (and is not Listable)
+    CHECK(GearReady(s, items[0], 12));
+    CHECK(HasListable(s, items, 12));
+    std::vector<Listing> const plan = PlanListings(s, Bags{ 16, 0 }, Standing{}, ReadyItems(s, items, 12));
+    CHECK(plan.size() == 1 && plan[0].ItemGuid == 7 && plan[0].Bid == 1500 && plan[0].Buyout == 1800);
+    Settings noGear = s;
+    noGear.GearSell = false;
+    CHECK(!GearReady(noGear, items[0], 30));
+    CHECK(!HasListable(noGear, items, 30));
+    Settings noHold = s;
+    noHold.GearHoldLevels = 0;
+    CHECK(GearReady(noHold, items[0], 10));
+    Candidate needed = items[0];
+    needed.Needed = true;
+    CHECK(!HasListable(s, { needed }, 30));
+    Candidate bound = items[0];
+    bound.Bound = true;
+    CHECK(!HasListable(s, { bound }, 30));
+}
+
 int main()
 {
     RoundPricesAreRoundAndWithinTheCap();
@@ -453,6 +520,9 @@ int main()
     GoodsAreOffTillSwitchedOnAndPricedPerUnit();
     GoodsSkipNeededGreyAndSingleItems();
     GoodsRespectTheEntryCapAndTheVisitLimit();
+    ABotWithBagsVisitsWhenInReachWithSomethingToList();
+    TheAuctioneerIsInReachWithinFiveYards();
+    EquipmentIsListedAfterItsHold();
     if (failures == 0)
         std::printf("auction_test: all passed\n");
     return failures == 0 ? 0 : 1;

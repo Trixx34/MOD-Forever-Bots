@@ -1076,6 +1076,8 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
         ReadKey(config, "AuctionGoodsMinQuality", 1, 4, minQuality, warnings);
         settings.Auction.GoodsMinQuality = static_cast<std::uint8_t>(minQuality);
     }
+    ReadBool(config, "AuctionGearSell", settings.Auction.GearSell, warnings);
+    ReadKey(config, "AuctionGearHoldLevels", 0, 10, settings.Auction.GearHoldLevels, warnings);
     ReadKey(config, "AuctionRoundStep", 0, 1000000, settings.Auction.RoundStepCopper, warnings);
     ReadKey(config, "AuctionRoundMaxPct", 0, 10, settings.Auction.RoundMaxPct, warnings);
     ReadBool(config, "SellVendor", settings.Sell.Enabled, warnings);
@@ -1085,6 +1087,7 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
         settings.Sell.EveryMs = std::uint64_t(everySec) * 1000;
     }
     ReadKey(config, "SellPerVisit", 1, 20, settings.Sell.MaxSalesPerVisit, warnings);
+    ReadBool(config, "SellVendorGoods", settings.Sell.SellGoods, warnings);
     ReadBool(config, "Errands", settings.Errand.Enabled, warnings);
     ReadBool(config, "RidingTraining", settings.RidingTraining, warnings);
     if (auto const it = config.find("RidingRankFile"); it != config.end())

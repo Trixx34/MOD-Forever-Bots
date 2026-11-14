@@ -276,6 +276,7 @@ void BotPolicy::StartErrand(std::uint64_t botGuid, ErrandOrder const& order)
     BotState& state = StateOf(botGuid);
     state.Errand = order;
     state.ErrandTrainSentMs = 0;
+    state.ErrandArrivedMs = 0;
     state.ErrandRefusals = 0;
     state.ErrandResult = ErrandOutcome::kNone;
 }

@@ -13,7 +13,8 @@ auction::Candidate CandidateOf(forever_module::PlayerItemLootedEvent const& even
     item.Quality = static_cast<std::uint8_t>(event.quality());
     item.VendorSellCopper = event.sell_price();
     item.QuestItem = event.item_class() == kItemClassQuest;
-    item.Needed = event.item_class() == kItemClassWeapon || event.item_class() == kItemClassArmor;
+    // A weapon or a piece of armour is equipment: listed only after the hold (auction::GearReady), so the bag equip pass wears it first if the bot can.
+    item.Equipment = event.item_class() == kItemClassWeapon || event.item_class() == kItemClassArmor;
     item.Stackable = item.Count != 1;   // the core lists single items only
     item.Goods = event.item_class() == kItemClassTradeGoods;
     return item;
@@ -28,6 +29,7 @@ sell::Item SellItemOf(forever_module::PlayerItemLootedEvent const& event)
     item.VendorSellCopper = event.sell_price();
     item.QuestItem = event.item_class() == kItemClassQuest;
     item.Equipment = event.item_class() == kItemClassWeapon || event.item_class() == kItemClassArmor;
+    item.Goods = event.item_class() == kItemClassTradeGoods;
     return item;
 }
 

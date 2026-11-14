@@ -241,6 +241,7 @@ struct AuctionBot
     bool Idle = false;
     std::uint64_t Copper = 0;   // for the budget of a purchase (AuctionBuy)
     std::uint32_t Level = 0;
+    bool InReach = false;       // in reach of the auctioneer (auction::InReach): the core refuses a listing, a browse or a buyout from farther
 };
 
 struct AuctionFeed
@@ -265,6 +266,7 @@ struct ErrandBot
     float X = 0.0f, Y = 0.0f, Z = 0.0f;
     bool AuctioneerValid = false; // the snapshot found the bot's faction's auctioneer on its map
     float AuctioneerX = 0.0f, AuctioneerY = 0.0f, AuctioneerZ = 0.0f;
+    std::uint32_t Level = 0;  // for the hold of looted equipment (auction::GearReady)
 };
 
 struct ErrandFeed
@@ -284,8 +286,9 @@ struct AuctionBook
     std::unordered_map<std::uint64_t, std::vector<std::pair<std::uint64_t, std::uint32_t>>> GoodsEnds; // bot -> (when a goods listing runs out, its item entry)
 };
 
-// The loot event as a listing candidate. A weapon or a piece of armour is marked Needed: the module does not know what a bot wears or keeps
-// for an upgrade, so it never lists equipment (the core's bag description would decide that; doc/economy.md).
+// The loot event as a listing candidate. A weapon or a piece of armour is marked Equipment: the module does not know what a bot wears or keeps for
+// an upgrade, so it lists equipment only after auction::GearReady's hold (doc/economy-and-professions.md). It used to mark it Needed, which kept every
+// piece of equipment (the only thing the core's kList lists) off the house: no bot ever had anything to list.
 auction::Candidate CandidateOf(forever_module::PlayerItemLootedEvent const& event);
 
 // The vendor sales, used on the Run() thread only: what each bot has looted that it may sell, and the sales its visit still has to make.

@@ -18,6 +18,10 @@ struct Settings
     bool Enabled = false;                       // config key SellVendor (off by default)
     std::uint64_t EveryMs = 1800000;            // a bot visits a vendor to sell at most this often (config key SellEverySec)
     std::uint32_t MaxSalesPerVisit = 8;         // distinct items sold on one visit (config key SellPerVisit)
+    // Trade goods (cloth, meat, ore, herbs, leather: item class 7) are kept unless SellGoods (config key SellVendorGoods, off by default): a sale names
+    // the entry and sells every one the bot carries, which took the cloth and meat that First Aid and Cooking (Crafting) and the profession recipes use,
+    // and the stacks AuctionGoodsSell lists. Full bags still lose their surplus goods to the core's junk sale (kVendor bit 1024, 60 of a kind kept).
+    bool SellGoods = false;
 };
 
 // One item the bot may sell, as the module saw it looted.
@@ -29,6 +33,7 @@ struct Item
     std::uint64_t VendorSellCopper = 0;         // what a vendor pays for one of the item
     bool QuestItem = false;
     bool Equipment = false;                     // a weapon or a piece of armour
+    bool Goods = false;                         // trade goods (item class 7): kept unless Settings::SellGoods
 };
 
 // One kSellToVendor action: the item entry and how many to sell (0 = every one the bot carries of it).
@@ -46,7 +51,8 @@ bool Sellable(Item const& item);
 // (lastVisitMs 0 means it has never visited).
 bool VisitDue(Settings const& settings, bool hasSellable, std::uint64_t lastVisitMs, std::uint64_t nowMs);
 
-// The sales for one visit: one per distinct entry, most money first, at most MaxSalesPerVisit. Items that cannot be sold are left out.
+// The sales for one visit: one per distinct entry, most money first, at most MaxSalesPerVisit. Items that cannot be sold are left out, and trade
+// goods unless SellGoods.
 std::vector<Sale> PlanSales(Settings const& settings, std::vector<Item> const& items);
 
 // A visit that has not finished this long after it started is dropped: the bot could not reach the vendor, and the items stay for a later visit.

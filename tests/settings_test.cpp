@@ -174,6 +174,12 @@ void SayAndSupplySettings()
     CHECK(!ParseBotSettings({ { "Auction", "1" } }, warnings).Auction.BuyEnabled);
     BotSettings const buys = ParseBotSettings({ { "Auction", "1" }, { "AuctionBuy", "1" } }, warnings);
     CHECK(buys.Auction.Enabled && buys.Auction.BuyEnabled);
+    // Vendor sales keep trade goods by default.
+    CHECK(!off.Sell.SellGoods && ParseBotSettings({ { "SellVendorGoods", "1" } }, warnings).Sell.SellGoods);
+    // Equipment is listed after a two-level hold by default; both keys are read.
+    CHECK(off.Auction.GearSell && off.Auction.GearHoldLevels == 2);
+    BotSettings const gear = ParseBotSettings({ { "AuctionGearSell", "0" }, { "AuctionGearHoldLevels", "4" } }, warnings);
+    CHECK(!gear.Auction.GearSell && gear.Auction.GearHoldLevels == 4 && warnings.empty());
     CHECK(!off.Auction.Enabled && off.Auction.SellPctGreen == 300 && off.Auction.RunMinutes == 120 && off.Auction.EveryMs == 1800000);
     BotSettings const house = ParseBotSettings({ { "Auction", "1" }, { "AuctionSellPctGreen", "250" }, { "AuctionSellPctBlue", "350" }, { "AuctionSellPctEpic", "450" },
                                                  { "AuctionBuyoutPct", "130" }, { "AuctionRelistPct", "80" }, { "AuctionRunHours", "2" },

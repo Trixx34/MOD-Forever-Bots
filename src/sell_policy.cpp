@@ -30,7 +30,7 @@ std::vector<Sale> PlanSales(Settings const& settings, std::vector<Item> const& i
     std::map<std::uint32_t, Sale> byEntry;
     for (Item const& item : items)
     {
-        if (!Sellable(item))
+        if (!Sellable(item) || (item.Goods && !settings.SellGoods))
             continue;
         Sale& sale = byEntry[item.Entry];
         sale.Entry = item.Entry;
