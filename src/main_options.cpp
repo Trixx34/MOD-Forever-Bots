@@ -42,6 +42,7 @@ void PolicyFromSettings(PolicyOptions& policyOptions, BotSettings& settings)
     policyOptions.GuildJoin = settings.GuildJoin;
     policyOptions.Guilds = settings.Guilds;
     policyOptions.MailGifts = settings.MailGifts;
+    policyOptions.BotMail = settings.BotMail;
     policyOptions.DungeonReviveOutOfCombat = settings.DungeonReviveOutOfCombat;
     policyOptions.DungeonPullLeashYards = settings.DungeonPullLeashYards;
     policyOptions.DungeonChaseLeashYards = settings.DungeonChaseLeashYards;

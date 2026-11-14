@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "social_actions.h"
 
+#include "bot_mail.h"
 #include "mail_gifts.h"
 
 #include "forever_module/module_client.h"
@@ -92,6 +93,44 @@ bool Send(ModuleClient& client, Order const& order, Done done)
             });
             return true;
         }
+        case Kind::Mail:
+        {
+            if (order.Player == 0)
+                return false;
+            if (order.Op == 0)   // gold: no bags needed
+            {
+                if (order.Copper == 0)
+                    return false;
+                client.BotGiftMail(order.Bot, order.Player, 0, 0, order.Copper, botmail::GoldSubject(order.Copper), answer);
+                return true;
+            }
+            // Materials: the bags first, then the whole stack that fits (botmail::PickMaterial); the core checks the item again when the mail goes out.
+            client.BotTrade(order.Bot, ModuleClient::BotTradeOp::kListBags, 0, 0, 0, [&client, order, done, answer](ActionReply const& bags)
+            {
+                if (!bags.success())
+                {
+                    if (done)
+                        done(Answer(order, bags));
+                    return;
+                }
+                std::vector<botmail::Stack> stacks;
+                for (auto const& item : bags.bag_items())
+                    stacks.push_back({ item.item_guid(), item.entry(), item.count(), item.name() });
+                botmail::Settings limits;
+                limits.MaterialMinCount = order.MinCount;
+                limits.MaterialMaxCount = order.MaxCount;
+                int const pick = botmail::PickMaterial(limits, stacks, { order.Skill[0], order.Skill[1] }, { order.Skill[2], order.Skill[3] });
+                if (pick < 0)
+                {
+                    if (done)
+                        done(Failed(order, "no item fit to give"));
+                    return;
+                }
+                botmail::Stack const& stack = stacks[std::size_t(pick)];
+                client.BotGiftMail(order.Bot, order.Player, stack.ItemGuid, stack.Count, 0, botmail::MaterialSubject(stack.Name), answer);
+            });
+            return true;
+        }
     }
     return false;
 }
@@ -104,6 +143,7 @@ char const* GapEventName(Kind kind)
         case Kind::Battleground: return "battleground_gap";
         case Kind::Guild: return "guild_gap";
         case Kind::Gift: return "gift_gap";
+        case Kind::Mail: return "mail_gap";
     }
     return "social_gap";
 }

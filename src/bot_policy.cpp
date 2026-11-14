@@ -736,6 +736,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
 
     // Bot guilds (GuildsEnabled): the pool is planned into guilds and the create, invite and leave orders are queued.
     DriveGuilds(view, nowMs);
+    DriveMail(view, nowMs);
 
     // "tank lead" (chat): the tank bot walks its group through the dungeon. For the dungeon rules the group becomes a party with the tank as its leader: the
     // tank pulls when the party is ready, the others follow it and join the fight. A tank that left the dungeon (its map has no route) stops leading.

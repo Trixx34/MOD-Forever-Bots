@@ -15,7 +15,7 @@ class ModuleClient;
 
 namespace social {
 
-enum class Kind : std::uint8_t { Duel, Battleground, Guild, Gift };
+enum class Kind : std::uint8_t { Duel, Battleground, Guild, Gift, Mail };
 
 // Op values match the SDK enums: DuelOp (0 challenge, 1 accept, 2 decline), BattlegroundOp (0 queue, 1 leave queue, 2 leave), GuildOp (0 accept,
 // 1 decline, 2 leave). A gift has no op.
@@ -28,6 +28,12 @@ struct Order
     std::uint32_t Id = 0;           // Battleground: the BattlemasterList id
     std::uint64_t Seed = 0;         // Gift: spreads the choice of the stack
     std::string Text;               // Guild create (op 3): the new guild's name
+    // Mail (BotMail, bot_mail.h): Player is the recipient. Op 0 gold (Copper), op 1 a stack of materials the recipient's professions (Skill[0..1]) use and
+    // the sender's (Skill[2..3]) do not, between MinCount and MaxCount units.
+    std::uint64_t Copper = 0;
+    std::uint16_t Skill[4] = { 0, 0, 0, 0 };
+    std::uint32_t MinCount = 0;
+    std::uint32_t MaxCount = 0;
 };
 
 struct Outcome

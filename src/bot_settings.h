@@ -11,6 +11,7 @@
 #include "errand_policy.h"
 #include "guild_join.h"
 #include "inn_downtime.h"
+#include "bot_mail.h"
 #include "mail_gifts.h"
 #include "auction_policy.h"
 #include "bot_brackets.h"
@@ -227,6 +228,10 @@ struct BotSettings
     guild::Settings GuildJoin;
     bot_guilds::Settings Guilds;            // GuildsEnabled and the GuildsLevelCap, GuildsRaidMinLevel, GuildsLevelingShare, ... keys (bot_guilds.h)
     gifts::Settings MailGifts;
+    // BotMail (off by default, bot_mail.h, doc/bot-trade-mail.md): bots mail gold and materials to guildmates. BotMailGold, BotMailMaterials, BotMailDailyCap,
+    // BotMailCooldownSec, BotMailRecipientDailyCap, BotMailPlanEverySec, BotMailMaxPerPlan, BotMailGoldKeepCopper, BotMailGoldMinCopper, BotMailGoldMaxCopper,
+    // BotMailNeedyBelowCopper, BotMailMaterialMinCount, BotMailMaterialMaxCount.
+    botmail::Settings BotMail;
     // Realism features without combat (docs/bot-realism-backlog.md items 2 to 5; all off by default): IdleFidget*, ReadDelay*, PassingBuff*, TownAfk*; the
     // round-number auction price is in Auction (AuctionRoundStep, AuctionRoundMaxPct).
     realism::FidgetSettings Fidget;

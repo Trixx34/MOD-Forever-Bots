@@ -188,6 +188,19 @@ void BotPolicy::NoteSocialOutcome(social::Outcome const& outcome, std::uint64_t 
     BotState& state = known->second;
     state.SocialBusyUntilMs = 0;
 
+    if (outcome.What == social::Kind::Mail)
+    {
+        // BotMail: a refusal (or no stack fit to send) gives the day's slots back; the cooldown stays.
+        std::uint64_t to = 0;
+        if (auto const pending = _mailTo.find(outcome.Bot); pending != _mailTo.end())
+        {
+            to = pending->second;
+            _mailTo.erase(pending);
+        }
+        if (!outcome.Success)
+            botmail::NoteFailed(_mailState, outcome.Bot, to);
+    }
+
     if (outcome.Success)
     {
         switch (outcome.What)

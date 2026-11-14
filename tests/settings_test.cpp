@@ -716,8 +716,28 @@ void ScenarioGearFileSetting()
     std::filesystem::remove_all(dir);
 }
 
+// BotMail: off by default, every key read and bounded.
+void BotMailSettings()
+{
+    std::vector<std::string> warnings;
+    BotSettings const off = ParseBotSettings({}, warnings);
+    CHECK(!off.BotMail.Enabled && off.BotMail.Gold && off.BotMail.Materials && off.BotMail.DailyCap == 2 && off.BotMail.CooldownSec == 3600 &&
+          off.BotMail.GoldMaxCopper == 10000 && off.BotMail.GoldKeepCopper == 50000 && warnings.empty());
+    BotSettings const on = ParseBotSettings({ { "BotMail", "1" }, { "BotMailGold", "0" }, { "BotMailMaterials", "0" }, { "BotMailDailyCap", "5" },
+        { "BotMailCooldownSec", "600" }, { "BotMailRecipientDailyCap", "4" }, { "BotMailPlanEverySec", "60" }, { "BotMailMaxPerPlan", "3" },
+        { "BotMailGoldKeepCopper", "70000" }, { "BotMailGoldMinCopper", "5000" }, { "BotMailGoldMaxCopper", "20000" }, { "BotMailNeedyBelowCopper", "30000" },
+        { "BotMailMaterialMinCount", "10" }, { "BotMailMaterialMaxCount", "100" } }, warnings);
+    CHECK(on.BotMail.Enabled && !on.BotMail.Gold && !on.BotMail.Materials && on.BotMail.DailyCap == 5 && on.BotMail.CooldownSec == 600 &&
+          on.BotMail.RecipientDailyCap == 4 && on.BotMail.PlanEverySec == 60 && on.BotMail.MaxPerPlan == 3 && on.BotMail.GoldKeepCopper == 70000 &&
+          on.BotMail.GoldMinCopper == 5000 && on.BotMail.GoldMaxCopper == 20000 && on.BotMail.NeedyBelowCopper == 30000 &&
+          on.BotMail.MaterialMinCount == 10 && on.BotMail.MaterialMaxCount == 100 && warnings.empty());
+    BotSettings const bad = ParseBotSettings({ { "BotMailCooldownSec", "1" }, { "BotMailDailyCap", "99" } }, warnings);
+    CHECK(bad.BotMail.CooldownSec == 3600 && bad.BotMail.DailyCap == 2 && warnings.size() == 2);
+}
+
 int main()
 {
+    BotMailSettings();
     ScenarioGearFileSetting();
     RealismSettings();
     CorpseRunTeleportSettings();
