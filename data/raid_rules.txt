@@ -8,6 +8,8 @@
 #   swap|map|boss_entry|aura_id|stacks|name
 #   noaoe|map|boss_entry|name                    boss_entry 0 = every fight on the map
 #   frontal|map|boss_entry|spell_id|name
+#   tank_spot|map|boss_entry|x|y|z|yards|name    the boss's victim (a tank) holds it from here, within yards (1..15); RaidBossPositions
+#   flank|map|boss_entry|front_deg|rear_deg|rear_yards|name   the rest stand out of the front cone and the rear cone (within rear_yards); RaidBossPositions
 #   spread|map|boss_entry|yards|who|name         who: all/ranged/healers/melee; boss_entry 0 = any engaged hostile of the map
 #   avoid_enemy|map|entry|yards|who|name         who also tanks (only with RaidAvoidEnemyTank); melee rows act only with RaidAvoidEnemyMelee
 #   avoid_enemy_aura|map|entry|yards|who|aura_id|name   as avoid_enemy, only while the hostile carries the aura (seen in a member's target_auras; unknown keeps the circle)
@@ -36,6 +38,11 @@ avoid|249|spell|18617|35|Deep Breath
 # Wing Buffet and Flame Breath hit what stands in front of her: the tank holds her turned away from the raid (data only for now)
 frontal|249|10184|18500|Wing Buffet
 frontal|249|10184|18435|Flame Breath
+# Boss positions (module switch RaidBossPositions, default 0: these two rows do nothing then). Onyxia study 2026-11-07 (doc onyxia-study, route proposal): spawn -4.9 -217.2,
+# tank north of her at -0.9 -217.2 -86.0, so she faces north and Flame Breath (120 degrees, 45 yd) and Wing Buffet go at the north wall; Tail Sweep is the rear 120 degrees
+# within 30 yd. Flank points: the band middles (melee 5.5, healers 23, ranged 26 yd) at 74..106 degrees off her facing, by guid (the study's spots: 90 and 100 degrees).
+tank_spot|249|10184|-0.9|-217.2|-86.0|5|Onyxia: tank north of her spawn, she faces the north wall
+flank|249|10184|120|120|30|Onyxia: Flame Breath / Wing Buffet front 120, Tail Sweep rear 120 within 30 yd
 # Bellowing Roar (fear; the spell data has it as 22686, 18431 does not exist there): no tremor totem or fear ward is required of the party; nothing is listed on purpose.
 
 # ---- Zul'Gurub (map 309, 20-man) ----

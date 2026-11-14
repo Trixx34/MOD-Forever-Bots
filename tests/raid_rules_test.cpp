@@ -2,6 +2,7 @@
 // Unit tests for the raid rule table (raid_rules.h) and the shipped data/raid_rules.txt.
 #include "raid_rules.h"
 
+#include <cmath>
 #include <cstdio>
 #include <fstream>
 #include <sstream>
@@ -180,6 +181,61 @@ void TestMerge()
     CHECK(other.empty());
 }
 
+// tank_spot and flank rows (RaidBossPositions): parsed, bad values refused, a second row for the same boss refused.
+void TestBossPositionRows()
+{
+    std::vector<std::string> errors;
+    Table t = Parse("tank_spot|249|10184|-0.9|-217.2|-86.0|5|Onyxia\n"
+                    "flank|249|10184|120|120|30|Onyxia\n"
+                    "tank_spot|249|10184|9|9|9|5|second\n"     // line 3: twice
+                    "tank_spot|249|10185|1|2|3|20|far\n"      // line 4: yards above 15
+                    "flank|249|10186|200|60|30|wide\n"        // line 5: front above 180
+                    "flank|249|10187|170|170|30|no flank\n"   // line 6: together above 300
+                    "flank|249|10188|120|120|-1|neg\n",       // line 7: rear yards below 0
+                    errors);
+    CHECK(errors.size() == 5);
+    auto const spot = t.TankSpotOf(249, 10184);
+    CHECK(spot && std::fabs(spot->X + 0.9f) < 0.01f && std::fabs(spot->Y + 217.2f) < 0.01f && std::fabs(spot->Yards - 5.0f) < 0.01f);
+    auto const flank = t.FlankOf(249, 10184);
+    CHECK(flank && flank->FrontDeg == 120.0f && flank->RearDeg == 120.0f && flank->RearYards == 30.0f);
+    CHECK(!t.TankSpotOf(249, 10185) && !t.FlankOf(249, 10186) && !t.FlankOf(249, 10187) && !t.FlankOf(249, 10188));
+    CHECK(!t.TankSpotOf(309, 10184) && !t.FlankOf(309, 10184));
+    CHECK(t.HasTankSpot(249) && !t.HasTankSpot(309));
+}
+
+// The geometry: Onyxia at her spawn (-4.9, -217.2), the tank spot 4 yards north. She faces north (0) while held there, whatever her own orientation says.
+void TestBossPositionGeometry()
+{
+    TankSpot const spot{ -0.9f, -217.2f, -86.0f, 5.0f };
+    CHECK(std::fabs(PlannedFacing(spot, -4.9f, -217.2f, 2.0f)) < 0.01f);
+    CHECK(std::fabs(PlannedFacing(spot, -40.0f, -217.2f, 2.0f) - 2.0f) < 0.01f);   // far from the spot: her own orientation
+    CHECK(std::fabs(PlannedFacing(std::nullopt, -4.9f, -217.2f, 1.5f) - 1.5f) < 0.01f);
+    CHECK(std::fabs(PlannedFacing(spot, -0.9f, -217.2f, 1.5f) - 1.5f) < 0.01f);    // on the spot itself: no direction, her orientation
+    // Bearings relative to a north facing: ahead 0, +y (west) +90, behind 180, -y -90.
+    CHECK(std::fabs(RelativeBearingDeg(0, 0, 0, 10, 0)) < 0.01f);
+    CHECK(std::fabs(RelativeBearingDeg(0, 0, 0, 0, 10) - 90.0f) < 0.01f);
+    CHECK(std::fabs(std::fabs(RelativeBearingDeg(0, 0, 0, -10, 0)) - 180.0f) < 0.01f);
+    CHECK(std::fabs(RelativeBearingDeg(0, 0, 0, 0, -10) + 90.0f) < 0.01f);
+    CHECK(std::fabs(RelativeBearingDeg(0, 0, 3.14159265f, 10, 0) - 180.0f) < 0.01f);   // facing south: north is behind
+    FlankRule const rule{ 120.0f, 120.0f, 30.0f };
+    CHECK(InBossCone(rule, 0.0f, 40.0f, 5.0f));       // in front, far: the breath reaches 45
+    CHECK(InBossCone(rule, -62.0f, 10.0f, 5.0f));     // inside the front edge plus margin
+    CHECK(!InBossCone(rule, 90.0f, 26.0f, 5.0f));     // a flank
+    CHECK(InBossCone(rule, 170.0f, 20.0f, 5.0f));     // behind, within 30: tail sweep
+    CHECK(!InBossCone(rule, 170.0f, 35.0f, 5.0f));    // behind, beyond 30
+    // Flank bearings: the 70..110 sector (60 + 10, 180 - 60 - 10) in 5 slots, slot middles 74, 82, 90, 98, 106; the right side negative.
+    CHECK(std::fabs(FlankBearingDeg(rule, 1, 0, 5, 10.0f) - 74.0f) < 0.01f);
+    CHECK(std::fabs(FlankBearingDeg(rule, 1, 2, 5, 10.0f) - 90.0f) < 0.01f);
+    CHECK(std::fabs(FlankBearingDeg(rule, -1, 4, 5, 10.0f) + 106.0f) < 0.01f);
+    for (unsigned slot = 0; slot < 5; ++slot)
+        for (int side : { 1, -1 })
+            CHECK(!InBossCone(rule, FlankBearingDeg(rule, side, slot, 5, 10.0f), 5.5f, 5.0f));   // every flank point is out of both cones, melee distance too
+    // A narrow flank (front 170, rear 120: the sector is 85..120) still gives a bearing between the cones.
+    FlankRule const narrow{ 170.0f, 120.0f, 30.0f };
+    float const deg = FlankBearingDeg(narrow, 1, 0, 5, 20.0f);
+    CHECK(deg >= 85.0f && deg <= 120.0f);
+}
+
 void TestShippedFile()
 {
     std::ifstream file(FOREVER_RAID_RULES_FILE);
@@ -194,6 +250,7 @@ void TestShippedFile()
     // Onyxia: whelps first
     CHECK(t.AddRank(249, 11262).has_value() && *t.AddRank(249, 11262) == 0);
     CHECK(t.IsFrontal(249, 10184, 18500) && t.IsFrontal(249, 10184, 18435));
+    CHECK(t.TankSpotOf(249, 10184).has_value() && t.FlankOf(249, 10184).has_value());   // Onyxia's boss positions (RaidBossPositions)
     CHECK(t.IsLethalSpell(249, 17086) && !t.IsLethalSpell(249, 18500) && !t.IsLethalSpell(309, 17086));
     // Zul'Gurub rows from the task
     for (std::uint32_t spell : { 23954u, 24208u, 24300u, 23953u })
@@ -247,6 +304,8 @@ int main()
     TestPullPosition();
     TestErrors();
     TestMerge();
+    TestBossPositionRows();
+    TestBossPositionGeometry();
     TestShippedFile();
     if (failures == 0)
         std::printf("raid_rules_test: all passed\n");

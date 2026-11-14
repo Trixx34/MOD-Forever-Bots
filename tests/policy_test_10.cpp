@@ -520,6 +520,161 @@ void AuctionErrandStandsAtTheAuctioneerBeforeItEnds()
     CHECK(policy.TakeErrandOutcome(kBot) == ErrandOutcome::kDone); // 25 s: done
 }
 
+// ---- RaidBossPositions: tank_spot and flank rows (Onyxia fix 1) ----
+// Onyxia at the origin of map 249, facing north (+x); the tank spot 4 yards north of her. Bots 10..14 (12 the warrior tank, 14 a priest, the rest mages) at the given points.
+constexpr std::uint64_t kOnyRef = MakeUnitRef(8, 10184, 60);
+char const* const kOnyPositionRows = "tank_spot|249|10184|4|0|0|3|north\nflank|249|10184|120|120|30|cones\n";
+
+struct OnyFixture
+{
+    std::vector<std::pair<float, float>> at;
+    std::uint64_t victim = 0;     // the bot she attacks (0 = nobody known)
+    float bossZ = 0.0f;
+    std::uint32_t healthPct = 100;
+};
+
+WorldTickSnapshotView OnyView(OnyFixture const& f, std::uint32_t map = 249)
+{
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 }, Classes);
+    for (std::size_t i = 0; i < view.bots.size(); ++i)
+    {
+        BotSnapshot& bot = view.bots[i];
+        bot.map_id = map;
+        bot.pos_x = f.at[i].first;
+        bot.pos_y = f.at[i].second;
+        bot.in_combat = 1;
+        bot.threat_target_guid = kOnyRef;
+        NearbyUnit boss = Hostile(60, 0.0f, f.healthPct);
+        boss.guid = kOnyRef;
+        boss.pos_z = f.bossZ;
+        boss.orientation = 0.0f;
+        boss.victim_ref = f.victim != 0 ? PlayerRef(f.victim) : 0;
+        AddNearby(view, i, boss);
+    }
+    return view;
+}
+
+PolicyOptions OnyOptions(bool key, char const* rules = kOnyPositionRows)
+{
+    PolicyOptions options = RaidOptions(Classes, rules);
+    options.WanderWhenIdle = false;
+    options.RaidBossPositions = key;
+    return options;
+}
+
+// The kMoveTo destinations of every bot over 1..6 s (past the damage dealers' 3 s pull hold), from one run of a fresh policy (a repeated order is not sent again,
+// so each run starts with its own policy).
+std::map<std::uint64_t, std::vector<std::pair<float, float>>> OnyRun(PolicyOptions const& options, WorldTickSnapshotView view)
+{
+    BotPolicy policy(options);
+    std::map<std::uint64_t, std::vector<std::pair<float, float>>> out;
+    for (std::uint64_t at = 1000; at < 6000; at += 100)
+    {
+        view.tick_number = at / 100;
+        for (BotAction const& action : policy.Decide(view, at))
+            if (action.type == ActionType::kMoveTo && action.target_guid == 0)
+                out[action.bot_guid].emplace_back(action.dest_x, action.dest_y);
+    }
+    return out;
+}
+
+float BearingDeg(std::pair<float, float> const& p)
+{
+    return std::fabs(std::atan2(p.second, p.first) * 180.0f / 3.14159265f);
+}
+
+// The default layout: mage 11 in front of her (20 yards north), mage 13 behind her (20 south, inside the tail sweep), the tank 10 yards south of her and her victim,
+// mage 10 and priest 14 already on her flanks in their bands.
+OnyFixture OnyDefault()
+{
+    return OnyFixture{ { { 0.0f, 26.0f }, { 20.0f, 0.0f }, { -10.0f, 0.0f }, { -20.0f, 0.0f }, { 0.0f, -23.0f } }, 12 };
+}
+
+bool AtSpot(std::pair<float, float> const& m, float x)
+{
+    return std::fabs(m.first - x) < 0.01f && std::fabs(m.second) < 0.01f;
+}
+
+int FlankMoves(std::vector<std::pair<float, float>> const& moves)
+{
+    int n = 0;
+    for (auto const& m : moves)
+        n += BearingDeg(m) >= 60.0f && BearingDeg(m) <= 120.0f;
+    return n;
+}
+
+void BossPositionsKeyOnPutsTheRaidOnHerFlanks()
+{
+    auto moves = OnyRun(OnyOptions(true), OnyView(OnyDefault()));
+    for (std::uint64_t bot : { 11u, 13u })
+    {
+        CHECK(!moves[bot].empty());
+        for (auto const& m : moves[bot])
+        {
+            CHECK(BearingDeg(m) >= 70.0f - 0.5f && BearingDeg(m) <= 110.0f + 0.5f);              // out of both cones
+            CHECK(std::fabs(std::hypot(m.first, m.second) - 26.0f) < 0.5f);                    // the ranged band's middle
+        }
+    }
+    CHECK(moves[10].empty());   // already on a flank, in its band
+    CHECK(moves[14].empty());
+    // The tank she attacks walks to the tank spot (4, 0), north of her.
+    CHECK(!moves[12].empty());
+    for (auto const& m : moves[12])
+        CHECK(AtSpot(m, 4.0f));
+}
+
+void BossPositionsKeyOffChangesNothing()
+{
+    auto moves = OnyRun(OnyOptions(false), OnyView(OnyDefault()));
+    for (auto const& m : moves[11])
+        CHECK(BearingDeg(m) < 5.0f);              // only the old band kite, straight back along its bearing (north)
+    for (auto const& m : moves[13])
+        CHECK(BearingDeg(m) > 175.0f);            // and south
+    for (auto const& m : moves[12])
+        CHECK(!AtSpot(m, 4.0f));                  // no walk to the tank spot
+    CHECK(FlankMoves(moves[11]) == 0 && FlankMoves(moves[13]) == 0);
+}
+
+// Left alone: no rows for the boss (the key on), another map, a boss in the air (Onyxia's phase 2, by height and by health), the boss's victim when it is not a tank
+// (a mage in front of her with her aggro does not drag her round), and a tank she does not attack.
+void BossPositionsLeaveAloneCases()
+{
+    CHECK(FlankMoves(OnyRun(OnyOptions(true, "frontal|249|10184|18435|Flame Breath\n"), OnyView(OnyDefault()))[11]) == 0);
+    CHECK(FlankMoves(OnyRun(OnyOptions(true), OnyView(OnyDefault(), 309))[11]) == 0);
+    {
+        OnyFixture f = OnyDefault();
+        f.bossZ = 20.0f;
+        auto moves = OnyRun(OnyOptions(true), OnyView(f));
+        CHECK(FlankMoves(moves[11]) == 0);
+        for (auto const& m : moves[12])
+            CHECK(!AtSpot(m, 4.0f));
+    }
+    {
+        OnyFixture f = OnyDefault();
+        f.healthPct = 50;
+        CHECK(FlankMoves(OnyRun(OnyOptions(true), OnyView(f))[11]) == 0);
+    }
+    {
+        OnyFixture f = OnyDefault();
+        f.victim = 11;
+        auto moves = OnyRun(OnyOptions(true), OnyView(f));
+        CHECK(FlankMoves(moves[11]) == 0);
+        for (auto const& m : moves[12])
+            CHECK(!AtSpot(m, 4.0f));              // the tank is not her victim: no tank spot
+        CHECK(FlankMoves(moves[13]) > 0);         // the others still go to her flanks
+    }
+}
+
+// The tank at the spot does not walk out to her: with her 4 yards off it attacks from where it stands, and with the spot 20 yards from her it waits there for her.
+void BossPositionsTankHoldsAtTheSpot()
+{
+    OnyFixture f = OnyDefault();
+    f.at[2] = { 4.0f, 0.0f };
+    CHECK(OnyRun(OnyOptions(true), OnyView(f))[12].empty());
+    f.at[2] = { 20.0f, 0.0f };
+    CHECK(OnyRun(OnyOptions(true, "tank_spot|249|10184|20|0|0|3|far\nflank|249|10184|120|120|30|cones\n"), OnyView(f))[12].empty());
+}
+
 } // namespace
 
 void RunPolicyTestsPart10()
@@ -542,4 +697,8 @@ void RunPolicyTestsPart10()
     MemberRepairsWhileTheLeaderWaits();
     BrokenBotWithoutMoneyDoesNotLoop();
     AuctionErrandStandsAtTheAuctioneerBeforeItEnds();
+    BossPositionsKeyOnPutsTheRaidOnHerFlanks();
+    BossPositionsKeyOffChangesNothing();
+    BossPositionsLeaveAloneCases();
+    BossPositionsTankHoldsAtTheSpot();
 }

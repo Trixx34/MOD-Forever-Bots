@@ -150,6 +150,7 @@ void PolicyFromSettings(PolicyOptions& policyOptions, BotSettings& settings)
     policyOptions.PullOnePack = settings.PullOnePack;
     policyOptions.TankLooseSkipAvoidEnemy = settings.TankLooseSkipAvoidEnemy;
     policyOptions.RegroupRallyMs = settings.RegroupRallyMs;
+    policyOptions.RaidBossPositions = settings.RaidBossPositions;
     if (settings.AvoidGroundEffects)
     {
         auto avoidTable = std::make_shared<ground_avoid::AvoidTable>();

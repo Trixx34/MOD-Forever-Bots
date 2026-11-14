@@ -310,6 +310,11 @@ void BotPolicy::MoveToTarget(DecideTick& tick, BotTurn& turn)
     bool const bossBandKite = bossTarget && band.Min > kMeleeBand.Max;
     if (bossTarget)
         approach = std::min(approach, band.Max);
+    if (MoveBossPosition(tick, turn, band.Mid(), band.Max))
+    {
+        state.Approaching = false;
+        return;
+    }
     if (distance <= approach)
     {
         // A ranged bot that has walked into casting range stops there: the core's follow keeps running it into the target,
@@ -442,6 +447,104 @@ void BotPolicy::MoveToTarget(DecideTick& tick, BotTurn& turn)
             wanted = Decision{ ActionType::kFollow, targetRef };
         }
     }
+}
+
+// RaidBossPositions (Onyxia fix 1, doc/raid-rules.md "Boss positions"): the bot's target is a boss with a `tank_spot` or `flank` row on this map.
+// - The boss attacks this bot and the bot is a tank: it walks to the tank spot (the boss follows and turns to face it, so its frontal casts go the row's way), and at the
+//   spot it waits for the boss to come to it (beyond kTankSpotWaitYards) instead of walking out to meet it, then attacks from where it stands.
+// - Anyone else fighting it (the boss's victim excepted: a member that walks drags the boss round): a bot whose bearing from the boss, at the distance it will stand,
+//   is inside the front cone or the rear cone of the `flank` row walks to a flank point at its band's middle, on its own side, in a slot of the flank by guid. The point
+//   is kept kFlankKeepMs; one a hazard covers is passed over. A bot already on a flank is left to the band logic.
+// Not while the boss is in the air (kBossAirYards; Onyxia's phase 2 by health). The facing is planned (PlannedFacing): toward the tank spot while the boss is held there.
+bool BotPolicy::MoveBossPosition(DecideTick& tick, BotTurn& turn, float bandMid, float bandMax)
+{
+    std::uint64_t const nowMs = tick.nowMs;
+    BotSnapshot const& bot = turn.bot;
+    BotState& state = turn.state;
+    NearbyUnit const* boss = turn.targetUnit;
+    if (!_options.RaidBossPositions || !_options.RaidRules || boss == nullptr || turn.partyLeader == 0 || !boss->is_hostile || boss->health == 0)
+        return false;
+    std::uint32_t const entry = forever_module::UnitRefEntry(boss->guid);
+    std::optional<raid_rules::TankSpot> const spot = _options.RaidRules->TankSpotOf(bot.map_id, entry);
+    std::optional<raid_rules::FlankRule> const flank = _options.RaidRules->FlankOf(bot.map_id, entry);
+    if (!spot && !flank)
+        return false;
+    if (std::fabs(boss->pos_z - bot.pos_z) > kBossAirYards)
+        return false;
+    if (entry == kOnyxiaBossEntry && boss->max_health != 0 &&
+        OnyxiaPhaseOf(100.0f * static_cast<float>(boss->health) / static_cast<float>(boss->max_health)) == 2)
+        return false;
+    auto const log = [&](std::uint64_t& lastMs, std::string const& line)
+    {
+        if (_options.OnEvent && (lastMs == 0 || nowMs - lastMs >= 5000))
+        {
+            lastMs = nowMs;
+            _options.OnEvent(line);
+        }
+    };
+    std::uint32_t const classId = turn.classId;
+    bool const tank = state.Role_ == BotState::Role::Tank || (state.Role_ == BotState::Role::Auto && classId == kWarriorClass && _options.PartySize != 0);
+    bool const victim = boss->victim_ref != 0 && boss->victim_ref == PlayerRef(bot.guid);
+    if (victim)
+    {
+        if (!tank || !spot || bot.in_combat == 0)
+            return false;
+        float const atSpot = std::hypot(bot.pos_x - spot->X, bot.pos_y - spot->Y);
+        if (atSpot > spot->Yards)
+        {
+            turn.wanted = Decision{ ActionType::kMoveTo, 0, Point{ spot->X, spot->Y, spot->Z } };
+            turn.moveWhy = "tank_spot";
+            log(state.TankSpotLogMs, "tank_spot: bot=" + std::to_string(bot.guid) + " boss_entry=" + std::to_string(entry) + " yards=" + std::to_string(int(atSpot)) +
+                                     " boss_at=" + std::to_string(int(boss->pos_x)) + "," + std::to_string(int(boss->pos_y)));
+            return true;
+        }
+        // At the spot: while the boss is still on its way the tank waits for it; once it is near, the core's attack order closes the last yards with the boss's real
+        // reach (a big boss is in melee range well beyond kMeleeApproachYards centre to centre, so the band walk would pull the tank off the spot).
+        if (turn.distance > kTankSpotWaitYards)
+        {
+            turn.wanted = Decision{ ActionType::kStop, 0 };
+            turn.moveWhy = "tank_spot_hold";
+        }
+        else
+            turn.wanted = Decision{ ActionType::kAttackTarget, turn.targetRef };
+        return true;
+    }
+    if (!flank)
+        return false;
+    if (state.FlankSetMs != 0 && state.FlankBoss == boss->guid && nowMs < state.FlankSetMs + kFlankKeepMs &&
+        std::hypot(bot.pos_x - state.FlankDest.X, bot.pos_y - state.FlankDest.Y) > 1.5f)
+    {
+        turn.wanted = Decision{ ActionType::kMoveTo, 0, state.FlankDest };
+        turn.moveWhy = "boss_flank";
+        return true;
+    }
+    float const facing = raid_rules::PlannedFacing(spot, boss->pos_x, boss->pos_y, boss->orientation);
+    float const rel = raid_rules::RelativeBearingDeg(boss->pos_x, boss->pos_y, facing, bot.pos_x, bot.pos_y);
+    float const dist = std::hypot(bot.pos_x - boss->pos_x, bot.pos_y - boss->pos_y);
+    if (!raid_rules::InBossCone(*flank, rel, std::min(dist, bandMax), kFlankConeMarginDeg))
+        return false;
+    int const side = std::fabs(rel) < 1.0f || std::fabs(rel) > 179.0f ? ((bot.guid & 1) != 0 ? 1 : -1) : (rel > 0.0f ? 1 : -1);
+    std::vector<ground_avoid::Circle> const hazards = HazardCircles(_options, bot);
+    unsigned const first = static_cast<unsigned>(bot.guid % kFlankSlots);
+    for (int const s : { side, -side })
+        for (unsigned k = 0; k < kFlankSlots; ++k)
+        {
+            float const deg = raid_rules::FlankBearingDeg(*flank, s, first + k, kFlankSlots, kFlankEdgeMarginDeg);
+            float const angle = facing + deg * 3.14159265f / 180.0f;
+            Point const point{ boss->pos_x + std::cos(angle) * bandMid, boss->pos_y + std::sin(angle) * bandMid, bot.pos_z };
+            if (ground_avoid::InsideAny(point.X, point.Y, hazards))
+                continue;
+            state.FlankDest = point;
+            state.FlankSetMs = nowMs;
+            state.FlankBoss = boss->guid;
+            turn.wanted = Decision{ ActionType::kMoveTo, 0, point };
+            turn.moveWhy = "boss_flank";
+            log(state.FlankLogMs, "boss_flank: bot=" + std::to_string(bot.guid) + " boss_entry=" + std::to_string(entry) + " bearing=" + std::to_string(int(rel)) +
+                                  " yards=" + std::to_string(int(dist)) + " to_bearing=" + std::to_string(int(deg)) + " to=" + std::to_string(int(point.X)) + "," +
+                                  std::to_string(int(point.Y)));
+            return true;
+        }
+    return false;
 }
 
 // TurnMoveChoice with no target: the fight is over; the bot follows, is put back by its leader, walks the dungeon route, a quest step or a goto order.

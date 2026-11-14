@@ -101,6 +101,14 @@ constexpr StandBand kHealerBand{ 21.0f, 25.0f };
 constexpr StandBand kRangedBand{ 23.0f, 29.0f };
 constexpr StandBand kMeleeBand{ 2.0f, 9.0f };
 constexpr float kBandStepDegrees = 15.0f;     // a stand point that a hazard covers is tried this far round the bot's bearing, up to 4 steps either side
+// RaidBossPositions (tank_spot and flank rows, MoveBossPosition): a flank point is kept this long; a bot this many degrees inside a cone's edge counts as in it; the flank
+// sector's edges are kept this far off when a stand bearing is chosen, and the sector is split into this many slots (by guid) so the bots do not stack on one point.
+constexpr std::uint64_t kFlankKeepMs = 3000;
+constexpr float kFlankConeMarginDeg = 5.0f;
+constexpr float kFlankEdgeMarginDeg = 10.0f;
+constexpr unsigned kFlankSlots = 5;
+constexpr float kBossAirYards = 8.0f;
+constexpr float kTankSpotWaitYards = 15.0f;   // the tank at its spot waits while the boss is farther than this (centre to centre), and attacks once it is nearer   // a boss this far above or below the bot is in the air (Onyxia's phase 2): no positioning
 // Fire Nova reach from the Warder's centre (see kAoeKiteYards above): a ghost is held only while a live Warder is inside it. The 25-yard hold of 2026-11-08 kept 28 dead bots
 // on the floor 25 yards from a Warder that could not reach them (sim, 14:30-14:52).
 constexpr float kFireNovaYards = 23.5f;

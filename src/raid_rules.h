@@ -14,7 +14,7 @@
 //   avoid|map|object|entry|radius|name         a game object of this entry (kept, not acted on: write a trap game object as a spell row with its trap spell, kind 3 ground effects)
 //   swap|map|boss_entry|aura_id|stacks|name    the tank holding `stacks` of this aura on it is swapped for another tank
 //   noaoe|map|boss_entry|name                  no area damage in this fight (boss_entry 0 = every fight on the map)
-//   frontal|map|boss_entry|spell_id|name       a frontal cast of the boss: the tank keeps the boss turned away from the raid (data only, see the README)
+//   frontal|map|boss_entry|spell_id|name       a frontal cast of the boss (the telegraph escape; the positioning is tank_spot / flank)
 //   spread|map|boss_entry|yards|who|name      while an engaged hostile of this entry is in view (0 = any), the planner's raid members of group `who` stay at least `yards` apart (chain lightning, bombs, Holy Wrath); who: all, ranged, healers or melee; tanks never move
 //   avoid_enemy|map|entry|yards|who|name       (who also `tanks`, see kWhoTanks) a member of group `who` keeps at least `yards` from a live hostile of this entry (Holy Nova, a charging add, melee reach)
 //   avoid_enemy_aura|map|entry|yards|who|aura_id|name   the same, but only while the hostile carries the aura (Axe Flurry 24018). The snapshot has no aura list for
@@ -25,6 +25,10 @@
 //   leash|map|yards|name                       the route leader of a dungeon party pulls only hostiles within `yards` (10..80) of the route leg on this map (narrows DungeonPullLeashYards, never widens it); it also narrows the pick of a new target by a party in a fight (the chase leash), not the defence against what attacks
 //   pullpos|map|entry|x|y|z|yards[|name]       the tank pulls a creature of this entry from this position (outside its throw range, or behind a corner): it walks to within `yards` (2..40) of the point
 //                                              before it pulls, goes back to it once the pull has landed, and the other members stay where they are until the tank is in the fight
+//   tank_spot|map|boss_entry|x|y|z|yards|name  the tank the boss is attacking holds it from this point (within `yards`, 1..15): the boss turns to face the tank, so the point
+//                                              sets which way its frontal casts go (Onyxia: north of her spawn, she faces the north wall). Module switch RaidBossPositions
+//   flank|map|boss_entry|front_deg|rear_deg|rear_yards|name   the members other than the boss's victim stand on its flanks: none in the front cone (front_deg wide, any
+//                                              distance) or in the rear cone (rear_deg wide, within rear_yards: a tail sweep). Module switch RaidBossPositions
 #pragma once
 
 #include <cstdint>
@@ -81,6 +85,23 @@ struct PullPosition
     float Yards = 0.0f;
 };
 
+// tank_spot: where the tank holds the boss from (the boss faces the tank, so it faces from its own position toward this point).
+struct TankSpot
+{
+    float X = 0.0f;
+    float Y = 0.0f;
+    float Z = 0.0f;
+    float Yards = 0.0f;
+};
+
+// flank: the boss's cones nobody but its victim stands in. Widths in degrees (a 120 degree cone is 60 either side of the facing).
+struct FlankRule
+{
+    float FrontDeg = 0.0f;
+    float RearDeg = 0.0f;
+    float RearYards = 0.0f;
+};
+
 struct MapRules
 {
     std::map<std::uint32_t, std::string> Bosses;            // entry -> name
@@ -97,6 +118,8 @@ struct MapRules
     std::map<std::uint32_t, std::string> Purge;             // enemy aura id -> name
     std::map<std::uint32_t, std::string> MindControl;       // aura id on a member -> name
     std::map<std::uint32_t, PullPosition> PullPositions;    // creature entry -> where the tank pulls it from
+    std::map<std::uint32_t, TankSpot> TankSpots;            // boss entry -> where its tank holds it from
+    std::map<std::uint32_t, FlankRule> Flanks;              // boss entry -> its front and rear cones
 };
 
 class Table
@@ -133,6 +156,10 @@ public:
     bool IsFrontalAny(std::uint32_t map, std::uint32_t spell) const;
     // The map lists the spell as an `avoid|spell` row: a lethal-class cast the whole raid steps out of, casters mid-cast included.
     bool IsLethalSpell(std::uint32_t map, std::uint32_t spell) const;
+    // The boss's `tank_spot` / `flank` row, nullopt when the map has none for it.
+    std::optional<TankSpot> TankSpotOf(std::uint32_t map, std::uint32_t bossEntry) const;
+    std::optional<FlankRule> FlankOf(std::uint32_t map, std::uint32_t bossEntry) const;
+    bool HasTankSpot(std::uint32_t map) const;
 
 private:
     std::map<std::uint32_t, MapRules> _maps;
@@ -143,5 +170,18 @@ void MergeKillPriority(Table const& table, std::uint32_t map, std::map<std::uint
 
 // Reads the text. A bad row is reported in `errors` ("line N: ...") and skipped; the good rows are kept.
 Table Parse(std::string_view text, std::vector<std::string>& errors);
+
+// Boss positioning geometry (RaidBossPositions), pure. Angles: WoW orientation, radians, 0 = +x (north), counter-clockwise; the degree values are relative to the facing.
+// The facing to plan with: from the boss toward the tank spot while the boss stands within 1..kTankSpotFacingYards of it (the tank holds it there; robust to a snapshot
+// without orientation and to the boss turning for a moment), else the boss's own orientation.
+constexpr float kTankSpotFacingYards = 12.0f;
+float PlannedFacing(std::optional<TankSpot> const& spot, float bossX, float bossY, float orientation);
+// The bearing of (x, y) seen from the boss, relative to its facing, in degrees in (-180, 180]: 0 straight ahead, +90 its left (counter-clockwise), 180 behind.
+float RelativeBearingDeg(float bossX, float bossY, float facing, float x, float y);
+// A point at this relative bearing and distance is inside the front cone (any distance) or the rear cone (within RearYards), each widened by `marginDeg` per side.
+bool InBossCone(FlankRule const& rule, float relDeg, float yards, float marginDeg);
+// The stand bearing (degrees, relative to the facing) of slot `slot` of `slots` on one side (side > 0 the left, else the right): the flank sector between the cones,
+// each edge kept `marginDeg` off, split into `slots` equal parts and the middle of part `slot` taken.
+float FlankBearingDeg(FlankRule const& rule, int side, unsigned slot, unsigned slots, float marginDeg);
 
 } // namespace raid_rules

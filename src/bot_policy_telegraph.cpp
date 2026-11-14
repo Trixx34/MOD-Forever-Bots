@@ -26,6 +26,8 @@ BotPolicy::TurnFlow BotPolicy::TurnTelegraphEscape(DecideTick& tick, BotTurn& tu
         bool const frontal = rules.IsFrontalAny(bot.map_id, telegraph->spell_id);
         if (tank && !lethal && !frontal)
             continue;   // the tank holds the boss where it is
+        if (tank && !lethal && frontal && _options.RaidBossPositions && rules.HasTankSpot(bot.map_id))
+            continue;   // RaidBossPositions: the tank holds the boss facing away from the raid; stepping out would turn the next breath onto the flanks
         if (midCast && !lethal && !_options.TelegraphEscapeCasters)
             continue;   // a healer or caster finishes the cast unless the hit would kill
         chosen = telegraph;

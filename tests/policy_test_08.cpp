@@ -265,6 +265,29 @@ void TelegraphEscapeTankHoldsUnlessLethalOrFrontal()
     CHECK(GroundMoves(frontal.Decide(TelegraphView(249, 18500, 8.0f), 1000)).size() == 1);
 }
 
+// RaidBossPositions: with a tank_spot row on the map the tank also holds through a frontal telegraph (the boss stays turned away from the raid); a lethal one still moves it,
+// and without the key or without a tank_spot row the frontal one moves it as before.
+void TelegraphEscapeTankHoldsFrontalWithBossPositions()
+{
+    std::string const rules = std::string(kOnyRules) + "tank_spot|249|10184|4|0|0|3|spot\n";
+    PolicyOptions on = TelegraphOptions(1, rules.c_str());
+    on.RaidBossPositions = true;
+    BotPolicy frontal(on);
+    CHECK(GroundMoves(frontal.Decide(TelegraphView(249, 18500, 8.0f), 1000)).empty());
+    BotPolicy lethal(on);
+    CHECK(GroundMoves(lethal.Decide(TelegraphView(249, 17086, 8.0f), 1000)).size() == 1);
+    BotPolicy keyOff(TelegraphOptions(1, rules.c_str()));
+    CHECK(GroundMoves(keyOff.Decide(TelegraphView(249, 18500, 8.0f), 1000)).size() == 1);
+    PolicyOptions noSpot = TelegraphOptions(1, kOnyRules);
+    noSpot.RaidBossPositions = true;
+    BotPolicy withoutRow(noSpot);
+    CHECK(GroundMoves(withoutRow.Decide(TelegraphView(249, 18500, 8.0f), 1000)).size() == 1);
+    PolicyOptions rogue = TelegraphOptions(4, rules.c_str());
+    rogue.RaidBossPositions = true;
+    BotPolicy notATank(rogue);
+    CHECK(GroundMoves(notATank.Decide(TelegraphView(249, 18500, 8.0f), 1000)).size() == 1);   // a non-tank still steps out
+}
+
 void TelegraphEscapeCasterMidCastMovesOnlyForLethalOrByConfig()
 {
     auto castingView = [](std::uint32_t spell) {
@@ -435,6 +458,7 @@ void RunPolicyTestsPart8()
     TelegraphEscapeMovesAMeleeOutOnARaidMap();
     TelegraphEscapeIsOffOutsideRaidMapsOrWhenSwitchedOff();
     TelegraphEscapeTankHoldsUnlessLethalOrFrontal();
+    TelegraphEscapeTankHoldsFrontalWithBossPositions();
     TelegraphEscapeCasterMidCastMovesOnlyForLethalOrByConfig();
     ThreatHoldStopsADpsAtTheThreshold();
     ThreatHoldIsOffByTheSettingAndNeedsAParty();

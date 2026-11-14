@@ -433,6 +433,9 @@ struct BotSettings
     bool PullOnePack = false;
     bool TankLooseSkipAvoidEnemy = false;
     std::uint32_t RegroupRallyMs = 0;
+    // RaidBossPositions (default OFF; Onyxia fix 1, doc/raid-rules.md "Boss positions"): the `tank_spot` and `flank` rows act. The tank the boss attacks holds it from the
+    // tank spot (so the boss faces the way the row sets), the other members that fight it stand on its flanks, none in its front or rear cone. Without rows nothing changes.
+    bool RaidBossPositions = false;
     // RaidRulesFile (absolute path, data/raid_rules.txt; empty = none): the raid rule table, see raid_rules.h and the README.
     std::string RaidRulesFile;
     // CorpseRunTeleportSec (0 = off, else 10..3600): a ghost whose corpse run takes longer is put at its corpse (needs Bot.Actions.Teleport).

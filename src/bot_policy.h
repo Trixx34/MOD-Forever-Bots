@@ -169,6 +169,9 @@ struct PolicyOptions
     bool PullOnePack = false;
     bool TankLooseSkipAvoidEnemy = false;
     std::uint64_t RegroupRallyMs = 0;
+    // RaidBossPositions (default off): `tank_spot` and `flank` rows of the raid rule table act (MoveBossPosition): the boss's victim, a tank, holds it from the tank spot,
+    // everyone else that fights it stands on its flanks, out of its front and rear cones; a tank on a frontal telegraph holds.
+    bool RaidBossPositions = false;
     std::shared_ptr<ground_avoid::AvoidTable const> AvoidSpells;
     // The raid rule table (RaidRulesFile, raid_rules.h): the planner reads the interrupt-first casts, the dispel kinds, the tank swap aura and the no-AoE rule from it; the add
     // ranks are merged into each scenario's KillPriority at start; the ground-effect spells of its avoid rows join the hazard circles. Null = none.
@@ -754,6 +757,11 @@ private:
         ground_avoid::Point2 TelegraphDest{};            // where the bot walks to leave an enemy cast's area (kept like AvoidDest)
         std::uint64_t TelegraphSetMs = 0;
         std::uint64_t TelegraphLoggedMs = 0;
+        Point FlankDest{};                               // RaidBossPositions: the flank point the bot walks to, kept kFlankKeepMs so it does not shift with the boss's turns
+        std::uint64_t FlankSetMs = 0;                    // when FlankDest was chosen (0 = none)
+        std::uint64_t FlankBoss = 0;                     // the boss FlankDest was chosen around
+        std::uint64_t FlankLogMs = 0;
+        std::uint64_t TankSpotLogMs = 0;
         ground_avoid::Point2 SpacingDest{};              // where the bot walks for a spread nudge or out of an avoid_enemy zone (raid_rules.h)
         std::uint64_t SpacingSetMs = 0;                  // when SpacingDest was chosen (0 = none)
         std::uint64_t SpacingNextMs = 0;                 // a spread nudge is not started before this
@@ -1105,6 +1113,8 @@ private:
     // TurnMoveChoice's parts (bot_policy_turn_life.cpp). RouteLeg (bot_policy_internal.h) is what the parts of the route leader's walk share.
     struct RouteLeg;
     void MoveToTarget(DecideTick& tick, BotTurn& turn);
+    // RaidBossPositions: the tank spot and the flank points round a boss with `tank_spot` / `flank` rows. True when it set the turn's move.
+    bool MoveBossPosition(DecideTick& tick, BotTurn& turn, float bandMid, float bandMax);
     void MoveWithoutTarget(DecideTick& tick, BotTurn& turn);
     void RouteReadiness(DecideTick& tick, BotTurn& turn, RouteLeg& route);
     void RouteLeaderRecover(DecideTick& tick, BotTurn& turn, RouteLeg& route);

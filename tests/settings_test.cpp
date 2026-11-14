@@ -627,6 +627,15 @@ void ZgLeverSettings()
     CHECK(ParseBotSettings({ { "RegroupRallyMs", "1000" } }, w).RegroupRallyMs == 0 && !w.empty());
 }
 
+// RaidBossPositions (Onyxia fix 1): off by default, on with 1.
+void RaidBossPositionsSetting()
+{
+    std::vector<std::string> w;
+    CHECK(!ParseBotSettings({}, w).RaidBossPositions && w.empty());
+    CHECK(ParseBotSettings({ { "RaidBossPositions", "1" } }, w).RaidBossPositions && w.empty());
+    CHECK(!ParseBotSettings({ { "RaidBossPositions", "0" } }, w).RaidBossPositions && w.empty());
+}
+
 void GhostTeleportHoldSettings()
 {
     {
@@ -714,6 +723,7 @@ int main()
     CorpseRunTeleportSettings();
     GhostTeleportHoldSettings();
     ZgLeverSettings();
+    RaidBossPositionsSetting();
     CombatDriftSettings();
     ErrandSettings();
     ChatSettings();

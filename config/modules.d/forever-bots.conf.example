@@ -522,6 +522,10 @@ Module.forever-bots.TelemetrySummarySec = 60
 # Module.forever-bots.PullOnePack = 0
 # Module.forever-bots.TankLooseSkipAvoidEnemy = 0
 # Module.forever-bots.RegroupRallyMs = 0
+# RaidBossPositions (default 0 = off; doc/raid-rules.md "Boss positions"): the raid rule rows `tank_spot` (the tank the boss attacks holds it from this point, so the boss faces
+# that way: Onyxia north of her spawn, facing the north wall) and `flank` (every other member fighting the boss stands on its flanks, none in its front or rear cone) act;
+# a tank also holds through a frontal telegraph (Flame Breath). Without such rows nothing changes. Log lines tank_spot: and boss_flank:.
+# Module.forever-bots.RaidBossPositions = 0
 
 # Mounts: a bot asks to mount up for a long walk only from MountMinLevel (default 40: classic riding is learned at 40; 0 = any level).
 # Module.forever-bots.MountMinLevel = 40

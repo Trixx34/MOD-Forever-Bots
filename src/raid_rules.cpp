@@ -159,6 +159,25 @@ Table Parse(std::string_view text, std::vector<std::string>& errors)
             else if (!table.Edit(map).PullPositions.emplace(a, PullPosition{ x, y, z, yards }).second)
                 bad("pullpos: entry " + std::to_string(a) + " is listed twice; the first position is kept");
         }
+        else if (kind == "tank_spot")
+        {
+            float x = 0.0f, y = 0.0f, z = 0.0f, yards = 0.0f;
+            if (f.size() < 7 || !Id(f[2], a) || !Coordinate(f[3], x) || !Coordinate(f[4], y) || !Coordinate(f[5], z) || !Radius(f[6], yards) || yards < 1.0f || yards > 15.0f)
+                bad("tank_spot: expected 'tank_spot|map|boss_entry|x|y|z|yards|name' (yards 1..15)");
+            else if (!table.Edit(map).TankSpots.emplace(a, TankSpot{ x, y, z, yards }).second)
+                bad("tank_spot: boss " + std::to_string(a) + " is listed twice; the first spot is kept");
+        }
+        else if (kind == "flank")
+        {
+            float front = 0.0f, rear = 0.0f, rearYards = 0.0f;
+            bool const ok = f.size() >= 6 && Id(f[2], a) && text_number::ParseDecimal(f[3], front) && text_number::ParseDecimal(f[4], rear) &&
+                            text_number::ParseDecimal(f[5], rearYards) && std::isfinite(front) && std::isfinite(rear) && std::isfinite(rearYards) &&
+                            front >= 0.0f && front <= 180.0f && rear >= 0.0f && rear <= 180.0f && front + rear <= 300.0f && rearYards >= 0.0f && rearYards <= 60.0f;
+            if (!ok)
+                bad("flank: expected 'flank|map|boss_entry|front_deg|rear_deg|rear_yards|name' (degrees 0..180 each, together at most 300; rear_yards 0..60)");
+            else if (!table.Edit(map).Flanks.emplace(a, FlankRule{ front, rear, rearYards }).second)
+                bad("flank: boss " + std::to_string(a) + " is listed twice; the first row is kept");
+        }
         else if (kind == "noaoe")
         {
             if (!Id(f[2], a, true))
@@ -358,6 +377,78 @@ bool Table::IsFrontal(std::uint32_t map, std::uint32_t bossEntry, std::uint32_t 
         return false;
     auto const it = r->Frontal.find(bossEntry);
     return it != r->Frontal.end() && it->second.count(spell) != 0;
+}
+
+std::optional<TankSpot> Table::TankSpotOf(std::uint32_t map, std::uint32_t bossEntry) const
+{
+    if (MapRules const* r = Find(map))
+        if (auto const it = r->TankSpots.find(bossEntry); it != r->TankSpots.end())
+            return it->second;
+    return std::nullopt;
+}
+
+std::optional<FlankRule> Table::FlankOf(std::uint32_t map, std::uint32_t bossEntry) const
+{
+    if (MapRules const* r = Find(map))
+        if (auto const it = r->Flanks.find(bossEntry); it != r->Flanks.end())
+            return it->second;
+    return std::nullopt;
+}
+
+bool Table::HasTankSpot(std::uint32_t map) const
+{
+    MapRules const* r = Find(map);
+    return r && !r->TankSpots.empty();
+}
+
+namespace {
+constexpr float kPi = 3.14159265358979f;
+}
+
+float PlannedFacing(std::optional<TankSpot> const& spot, float bossX, float bossY, float orientation)
+{
+    if (spot)
+    {
+        float const dx = spot->X - bossX, dy = spot->Y - bossY;
+        float const yards = std::sqrt(dx * dx + dy * dy);
+        if (yards >= 1.0f && yards <= kTankSpotFacingYards)
+            return std::atan2(dy, dx);
+    }
+    return orientation;
+}
+
+float RelativeBearingDeg(float bossX, float bossY, float facing, float x, float y)
+{
+    float const dx = x - bossX, dy = y - bossY;
+    if (dx * dx + dy * dy < 1e-6f)
+        return 0.0f;
+    float deg = (std::atan2(dy, dx) - facing) * 180.0f / kPi;
+    deg = std::fmod(deg, 360.0f);
+    if (deg > 180.0f)
+        deg -= 360.0f;
+    else if (deg <= -180.0f)
+        deg += 360.0f;
+    return deg;
+}
+
+bool InBossCone(FlankRule const& rule, float relDeg, float yards, float marginDeg)
+{
+    float const off = std::fabs(relDeg);
+    if (rule.FrontDeg > 0.0f && off < rule.FrontDeg / 2.0f + marginDeg)
+        return true;
+    return rule.RearDeg > 0.0f && yards < rule.RearYards && off > 180.0f - rule.RearDeg / 2.0f - marginDeg;
+}
+
+float FlankBearingDeg(FlankRule const& rule, int side, unsigned slot, unsigned slots, float marginDeg)
+{
+    float lo = rule.FrontDeg / 2.0f + marginDeg;
+    float hi = 180.0f - rule.RearDeg / 2.0f - marginDeg;
+    if (hi < lo)
+        lo = hi = (rule.FrontDeg / 2.0f + 180.0f - rule.RearDeg / 2.0f) / 2.0f;   // a narrow flank: its middle
+    if (slots == 0)
+        slots = 1;
+    float const deg = lo + (hi - lo) * (float(slot % slots) + 0.5f) / float(slots);
+    return side > 0 ? deg : -deg;
 }
 
 } // namespace raid_rules

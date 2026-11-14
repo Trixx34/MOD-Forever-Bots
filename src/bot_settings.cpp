@@ -972,6 +972,7 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadBool(config, "RaidFocusAvoidEnemy", settings.RaidFocusAvoidEnemy, warnings);
     ReadBool(config, "PullOnePack", settings.PullOnePack, warnings);
     ReadBool(config, "TankLooseSkipAvoidEnemy", settings.TankLooseSkipAvoidEnemy, warnings);
+    ReadBool(config, "RaidBossPositions", settings.RaidBossPositions, warnings);
     if (config.count("RegroupRallyMs") != 0 && config.at("RegroupRallyMs") != "0")
         ReadKey(config, "RegroupRallyMs", 5000, 600000, settings.RegroupRallyMs, warnings);
     if (auto const it = config.find("AvoidSpellsFile"); it != config.end())
