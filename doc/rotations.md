@@ -162,6 +162,8 @@ Rows added to `data/rotation_spec.txt` (all read in the client data: class skill
 | Warlock | Conflagrate (destruction). Fel Armor (403619) is left out: no trainer teaches it, so bots never know it; Demon Armor stays the armor |
 | Druid | Starsurge, Sunfire (12 s dot) before Wrath |
 
+**Level 1 to 9 (2026-11-14 audit).** The rank 1 spells a class is given at creation (SkillLineAbility AcquireMethod 2: Lightning Bolt 403, Healing Wave 331, Wrath 5176, Healing Touch 5185, Raptor Strike 2973, Holy Light 635) are in no trainer's list, so `tools/abilities_from_db2.py` used to leave them out and the rows began with rank 2 at its learn level (Lightning Bolt 529 at 8). It now adds them at level 1. The paladin's Seal of Righteousness is 21084 up to level 9 and 20287 from 10. Auto Shot is `range 8 35` (the core refuses it inside 8 yards) and Raptor Strike covers `range 0 8`. Rows for spells no trainer teaches (Reckless Swings, Shockwave, Spearing Strike, Saber Slash, Oath of Light) are commented out in the spec, Blade Flurry starts at level 30, and a frost mage below 4 and a feral druid below 10 or 20 get a Fireball or Wrath row. `tests/rotation_data_test.cpp` pins a level 1 damage row for every block.
+
 Black Arrow, Chimera Shot, Divine Storm, Wrack and Chaos Bolt (earlier rows) are in no guide and are not rows now. The policy counts Saber Slash as a combo builder (one point, like Sinister Strike; `ComboPointsGained` in `src/bot_policy.cpp`). `tests/make_rotations_test.py`
 runs the tool on a made-up dump and checks these rows, their order, and that a dump without them gives no rows.
 

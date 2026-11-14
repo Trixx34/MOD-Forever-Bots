@@ -17,9 +17,9 @@ SPEC = os.path.join(ROOT, "data", "rotation_spec.txt")
 
 # class -> {name: id}; ids read from the Forever client data (rank 1 / the lowest id of the name in the class's skill lines)
 FOREVER = {
-    1: {"Shockwave": 440488, "Spearing Strike": 1310222},
+    1: {},   # Shockwave, Spearing Strike, Reckless Swings: no trainer teaches them, so no rows
     2: {"Rebuke": 425609, "Holy Strike": 678, "Hammer of the Righteous": 407632},
-    4: {"Saber Slash": 424785},
+    4: {},   # Saber Slash: no trainer teaches it, so no row
     5: {"Void Plague": 425204, "Vampiric Touch": 402668},
     7: {"Water Shield": 408510},   # Lava Burst is gone from the 70790 client
     8: {"Icy Veins": 425121, "Ice Lance": 400640},
@@ -91,15 +91,13 @@ for cls, spells in FOREVER.items():
         check(sid in got, f"class {cls}: {name} ({sid}) is in the rotation")
 order = lambda cls, a, b: ids(classes[cls]).index(a) < ids(classes[cls]).index(b)
 check(order(2, 678, 20271), "paladin: Holy Strike before Judgement")
-check(order(4, 424785, 1752), "rogue: Saber Slash before Sinister Strike")
 block_order = lambda cls, spec, a, b: ids(blocks[(cls, spec)]).index(a) < ids(blocks[(cls, spec)]).index(b)
-check(block_order(1, "prot", 1310222, 845), "warrior protection: Spearing Strike before Cleave")
 check(order(8, 400640, 116), "mage: Ice Lance before Frostbolt")
 check(block_order(5, "shadow", 402668, 8092), "priest shadow: Vampiric Touch before Mind Blast")
 check(order(11, 417157, 5176), "druid: Starsurge before Wrath")
 
 row = lambda cls, sid: next(r for r in classes[cls] if r.split()[1] == str(sid))
-check("duration 12" in row(4, 424785), "Saber Slash is a 12 s bleed")
+check(not any(r.split()[1] in ("424785", "1310222", "440488", "1329555", "1328548") for c in classes for r in classes[c]), "spells no trainer teaches are no rows")
 check("duration 18" in row(5, 425204) and "duration 15" in row(5, 402668), "priest damage over time lengths")
 check("range 0 5" in row(2, 678), "Holy Strike is a melee strike")
 check(row(7, 408510).startswith("buff") and "duration 600" in row(7, 408510), "Water Shield is a 10 minute upkeep buff")
