@@ -159,9 +159,9 @@ class 3
 # The default hunter is Beast Mastery.
 row "Hunter's Mark" duration 120 always target range 0 35
 row 1293241 level 25 duration 18 always target range 0 35       # Summon Hawk (no trainer teaches rank 1: the core refuses it until the bot has it)
-row "Multi-Shot" enemies 2 target range 0 35
-row "Aimed Shot" always target range 0 35
-row "Arcane Shot" always target range 0 35
+row "Multi-Shot" enemies 2 target range 8 35
+row "Aimed Shot" always target range 8 35
+row "Arcane Shot" always target range 8 35
 row "Raptor Strike" always target range 0 8     # rank 1 (2973) is known at level 1: a hunter in melee range has a strike, Auto Shot needs 8 yards
 row "Auto Shot" always target range 8 35        # the core refuses it inside 8 yards (minimum range); Raptor Strike covers that
 buff "Aspect of the Hawk" duration 3600 self
@@ -172,9 +172,9 @@ class 3 spec bm
 # Raptor Strike is what remains. The pet is the policy's own logic (Tame Beast, then Call Pet), not a row.
 row "Hunter's Mark" duration 120 always target range 0 35
 row 1293241 level 25 duration 18 always target range 0 35       # Summon Hawk (rank 1; no trainer teaches it: the core refuses it until the bot has it)
-row "Multi-Shot" enemies 2 target range 0 35
-row "Aimed Shot" always target range 0 35
-row "Arcane Shot" always target range 0 35
+row "Multi-Shot" enemies 2 target range 8 35
+row "Aimed Shot" always target range 8 35
+row "Arcane Shot" always target range 8 35
 row "Raptor Strike" always target range 0 8     # rank 1 (2973) is known at level 1: a hunter in melee range has a strike, Auto Shot needs 8 yards
 row "Auto Shot" always target range 8 35        # the core refuses it inside 8 yards (minimum range); Raptor Strike covers that
 buff "Aspect of the Hawk" duration 3600 self
@@ -183,9 +183,9 @@ class 3 spec mm
 # Marksmanship: Hunter's Mark, Aimed Shot and Arcane Shot on cooldown, Multi-Shot on cooldown for several targets, Trueshot Aura (Forever, level 32). Auto Shot has no cast time.
 row "Hunter's Mark" duration 120 always target range 0 35
 row "Rapid Fire" target_strong 1 self
-row "Multi-Shot" enemies 2 target range 0 35
-row "Aimed Shot" always target range 0 35
-row "Arcane Shot" always target range 0 35
+row "Multi-Shot" enemies 2 target range 8 35
+row "Aimed Shot" always target range 8 35
+row "Arcane Shot" always target range 8 35
 row "Raptor Strike" always target range 0 8     # rank 1 (2973) is known at level 1: a hunter in melee range has a strike, Auto Shot needs 8 yards
 row "Auto Shot" always target range 8 35        # the core refuses it inside 8 yards (minimum range); Raptor Strike covers that
 buff "Aspect of the Hawk" duration 3600 self
@@ -199,10 +199,10 @@ row "Strider Kick" target_casting target range 0 5     # Forever: melee interrup
 row "Counterattack" always target range 0 5
 row "Mongoose Bite" always target range 0 5
 row "Raptor Strike" always target range 0 8     # rank 1 (2973) is known at level 1: a hunter in melee range has a strike, Auto Shot needs 8 yards
-row "Serpent Sting" duration 15 always target range 0 35
-row "Multi-Shot" enemies 2 target range 0 35
-row "Aimed Shot" always target range 0 35
-row "Arcane Shot" always target range 0 35
+row "Serpent Sting" duration 15 always target range 8 35
+row "Multi-Shot" enemies 2 target range 8 35
+row "Aimed Shot" always target range 8 35
+row "Arcane Shot" always target range 8 35
 row "Auto Shot" always target range 8 35        # the core refuses it inside 8 yards (minimum range); Raptor Strike covers that
 buff "Aspect of the Hawk" duration 3600 self
 
@@ -504,20 +504,20 @@ class 11
 row "Healing Touch" self_hp_below 40 self
 row "Rejuvenation" self_hp_below 70 duration 12 self
 row "Moonfire" duration 12 always target range 0 30
-row "Starsurge" always target range 0 30            # Forever: instant, 6 s cooldown
-row "Sunfire" duration 12 always target range 0 30  # Forever: instant damage over time
+# row "Starsurge" always target range 0 30   # not a row: a Season of Discovery rune (SkillLineAbility AcquireMethod 3, never learned); no trainer, quest, item or learn spell gives it, so a bot never knows it
+# row "Sunfire" duration 12 always target range 0 30   # not a row: a Season of Discovery rune (SkillLineAbility AcquireMethod 3, never learned); no trainer, quest, item or learn spell gives it, so a bot never knows it
 row "Wrath" always target range 0 30
 buff "Mark of the Wild" duration 1800 party
 buff "Thorns" duration 600 party
 
 class 11 spec balance
-# Balance (damage): Entangling Roots on a pull, Moonfire and Insect Swarm on the target, Starfire and Wrath, Starsurge and Sunfire (Forever), Thorns and Rejuvenation on the druid.
+# Balance (damage): Entangling Roots on a pull, Moonfire and Insect Swarm on the target, Starfire and Wrath, Thorns and Rejuvenation on the druid.
 row "Healing Touch" self_hp_below 40 self
 row "Rejuvenation" self_hp_below 70 duration 12 self
 row "Moonfire" duration 12 always target range 0 30
 row "Insect Swarm" duration 12 always target range 0 30
-row "Starsurge" always target range 0 30            # Forever
-row "Sunfire" duration 12 always target range 0 30  # Forever
+# row "Starsurge" always target range 0 30   # not a row: a Season of Discovery rune (SkillLineAbility AcquireMethod 3, never learned); no trainer, quest, item or learn spell gives it, so a bot never knows it
+# row "Sunfire" duration 12 always target range 0 30   # not a row: a Season of Discovery rune (SkillLineAbility AcquireMethod 3, never learned); no trainer, quest, item or learn spell gives it, so a bot never knows it
 row "Starfire" always target range 0 30
 row "Wrath" always target range 0 30
 buff "Mark of the Wild" duration 1800 party

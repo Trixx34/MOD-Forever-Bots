@@ -272,6 +272,10 @@ void LoadPolicyTables(PolicyOptions& policyOptions, BotSettings& settings)
         }
     }
     policyOptions.QuestTeleport = settings.QuestTeleport;
+    policyOptions.OffMap.Enabled = settings.OffMapRecover;
+    policyOptions.OffMap.OffForMs = std::uint64_t(settings.OffMapSeconds) * 1000;
+    policyOptions.OffMap.CooldownMs = std::uint64_t(settings.OffMapCooldownSec) * 1000;
+    policyOptions.OffMap.MarginYards = float(settings.OffMapMarginYards);
     policyOptions.QuestGroups = settings.QuestGroups;
     if (!settings.TameBeastFile.empty())
     {

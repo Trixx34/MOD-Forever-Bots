@@ -170,6 +170,13 @@ struct BotSettings
     // QuestTeleport (0 or 1, off by default): a quest walk that has not moved for two minutes teleports to the giver. Needs
     // Bot.Actions.Teleport = 1 in the core. Off, that start is dropped and the bot grinds instead of retrying a refused teleport.
     bool QuestTeleport = false;
+    // Off-map recovery (off_map.h): OffMapRecover (0 or 1, default 1) teleports a living bot that stood more than OffMapMarginYards (default 500, 100..5000)
+    // outside the known places of its map (quest givers and anchors, grind spots, hubs) for OffMapSeconds (default 60, 10..3600) to the nearest known place of
+    // its faction, at most once per OffMapCooldownSec (default 600, 60..86400). Needs Bot.Actions.Teleport = 1 in the core (refused otherwise, and logged).
+    bool OffMapRecover = true;
+    std::uint32_t OffMapSeconds = 60;
+    std::uint32_t OffMapCooldownSec = 600;
+    std::uint32_t OffMapMarginYards = 500;
     // Grind spots (config key GrindFile, see grind_data.h): the places idle bots walk to for their level. Empty turns it off (hubs are used).
     std::string GrindFile;
     // Rotations (config key RotationFile, see combat_rotation.h): fight rows and upkeep buffs per class from a file. Empty = the built-in rotations.

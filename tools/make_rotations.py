@@ -15,9 +15,16 @@ Spec: the same records as the rotation file, with the spell written as a name in
     supersede "Frost Armor" by "Ice Armor"       # the better spell replaces the other from the level it is learned (maxlevel on the old one)
 A number in place of a name is used as it is.
 
-Usage: make_rotations.py --dump Server.log --spec data/rotation_spec.txt > data/rotations.txt
+Minimum range: the core refuses a cast at a target nearer than the spell's minimum range (SpellRange.db2 RangeMin, through SpellMisc.db2 RangeIndex), and the
+policy reads an out-of-range answer as "stand closer", which makes it worse (the sim's RFD runs: Aimed Shot 2739 and Multi-Shot 1011 out-of-range answers, almost no
+casts). With --dbc (the client's DB2 directory) or --ranges (a file of `spell min max` lines), a target row whose `range <min> <max>` is below the true minimum of
+any of its ranks is raised to it, and a target row with no range gets `range <min> <max>` when the spell has a minimum; each change is a warning, so the spec can
+say it itself.
+
+Usage: make_rotations.py --dump Server.log --spec data/rotation_spec.txt [--dbc /srv/forever/data/dbc/enUS] > data/rotations.txt
 """
 import argparse
+import os
 import re
 import shlex
 import sys
@@ -63,11 +70,68 @@ def resolve(cls_spells, token, warnings, where):
     return rank1, ids[rank1], sorted(ids)
 
 
+def read_ranges_dbc(dbc):
+    """{spell id: (hostile minimum range, hostile maximum range)} from SpellMisc.db2 (RangeIndex, difficulty 0) and SpellRange.db2."""
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import db2_reader
+    misc = db2_reader.read_table(os.path.join(dbc, "SpellMisc.db2"), skip_encrypted=True)
+    parents = dict(db2_reader.read_table.parents)
+    ranges = db2_reader.read_table(os.path.join(dbc, "SpellRange.db2"), strings=(0, 1), skip_encrypted=True)
+    # SpellMisc row: [Attributes[17], DifficultyID, CastingTimeIndex, DurationIndex, PvPDurationIndex, RangeIndex, ...]; SpellRange row: [DisplayName,
+    # DisplayNameShort, Flags, RangeMin[2], RangeMax[2]] (index 0 hostile, 1 friendly)
+    out = {}
+    for record, row in misc.items():
+        spell = parents.get(record)
+        if spell is None or row[1] != 0 or row[5] not in ranges:
+            continue
+        r = ranges[row[5]]
+        out[spell] = (db2_reader.as_float(r[3][0]), db2_reader.as_float(r[4][0]))
+    return out
+
+
+def read_ranges_file(path):
+    out = {}
+    with open(path, encoding="utf-8") as handle:
+        for line in handle:
+            parts = line.split("#")[0].split()
+            if len(parts) == 3 and parts[0].isdigit():
+                out[int(parts[0])] = (float(parts[1]), float(parts[2]))
+    return out
+
+
+def yards(value):
+    return str(int(value)) if float(value).is_integer() else str(value)
+
+
+def apply_min_range(tokens, ranks, ranges, where, warnings):
+    """The row's tokens (" level 1 always target range 0 35") with the true minimum range of its ranks. Self rows and buffs are left as they are."""
+    if not ranges or not ranks or " target" not in tokens + " ":
+        return tokens
+    known = [ranges[r] for r in ranks if r in ranges]
+    if not known:
+        return tokens
+    low = max(k[0] for k in known)
+    if low <= 0:
+        return tokens
+    m = re.search(r" range (\S+) (\S+)", tokens)
+    if m:
+        if float(m.group(1)) >= low:
+            return tokens
+        warnings.append(f"{where}: range {m.group(1)} {m.group(2)} raised to the minimum range {yards(low)} (DB2)")
+        return tokens[:m.start()] + f" range {yards(low)} {m.group(2)}" + tokens[m.end():]
+    high = min(k[1] for k in known)
+    warnings.append(f"{where}: no range, given range {yards(low)} {yards(high)} (DB2 minimum range)")
+    return tokens + f" range {yards(low)} {yards(high)}"
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dump", action="append", required=True, help="Server.log with BotAbilities lines (repeatable)")
     parser.add_argument("--spec", required=True)
+    parser.add_argument("--dbc", help="the client's DB2 directory: target rows get the spells' true minimum range")
+    parser.add_argument("--ranges", help="instead of --dbc: a file of `spell min max` lines")
     args = parser.parse_args()
+    ranges = read_ranges_dbc(args.dbc) if args.dbc else read_ranges_file(args.ranges) if args.ranges else {}
     spells = read_dump(args.dump)
     if not spells:
         sys.exit("no BotAbilities lines found in the dump (set Bot.Dump.Abilities = 1 and create a bot of each race and class)")
@@ -92,6 +156,8 @@ def main():
                 continue
             levels[name_token] = level
             extra = tokens
+            if kind == "row":
+                extra = apply_min_range(extra, ranks, ranges, f"class {cls}: {name_token}", warnings)
             if kind == "buff" and ranks and len(ranks) > 1:
                 extra += " ranks " + ",".join(str(r) for r in ranks)   # the aura shows the rank cast, not rank 1
             comment = f"   # {name_token}: ranks {ranks}" if ranks else ""

@@ -439,6 +439,7 @@ constexpr float kMountDismountDistanceYards = 15.0f; // arrived or close: dismou
 // stuck period, drops the start (kNoRouteBlockMs) so the bot grinds. With QuestTeleport off the start is dropped at once: the core
 // refuses the teleport while Bot.Actions.Teleport is 0, and retrying it never ends the walk.
 constexpr std::uint64_t kQuestWalkStuckMs = 120000;
+constexpr std::uint64_t kOffMapHoldMs = 4000;  // after an off-map teleport the bot takes no other order for this long (the snapshot still shows the old place)
 constexpr float kQuestWalkStuckYards = 5.0f;
 // Death and recovery. Spell ids and levels checked against the fork's SpellLevels.db2: Resurrection 2006 level 10,
 // Redemption 7328 level 12, Ancestral Spirit 2008 level 12, Rebirth 20484 level 20.

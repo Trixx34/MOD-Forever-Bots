@@ -146,6 +146,41 @@ std::array<QuestPlanner, 6> BotPolicy::MakeQuestSets(PolicyOptions const& option
     return { planner(0, 0), planner(0, 1), planner(1, 0), planner(1, 1), planner(2, 0), planner(2, 1) };
 }
 
+off_map::KnownWorld BotPolicy::MakeKnownWorld(PolicyOptions const& options)
+{
+    off_map::KnownWorld world;
+    if (!options.OffMap.Enabled)
+        return world;
+    // The same list can be shared by several (side, band) slots: each is added once.
+    std::set<QuestData const*> seen;
+    auto const addQuests = [&](std::shared_ptr<QuestData const> const& data, std::uint8_t side)
+    {
+        if (!data || !seen.insert(data.get()).second)
+            return;
+        for (QuestStartDef const& start : data->Starts)
+        {
+            if (start.HasAnchor)
+                world.Add({ start.Map, start.Anchor.X, start.Anchor.Y, start.Anchor.Z, side });
+            // A quest with no giver or ender point (an item start) has (0, 0) there: not a place.
+            for (QuestDef const& quest : start.Quests)
+                for (QuestPoint const& point : { quest.Giver, quest.Ender })
+                    if (point.X != 0.0f || point.Y != 0.0f)
+                        world.Add({ start.Map, point.X, point.Y, point.Z, side });
+        }
+    };
+    addQuests(options.Quests, 0);
+    for (std::size_t side = 0; side < 3; ++side)
+        for (std::size_t band = 0; band < 2; ++band)
+            addQuests(options.QuestLists[side][band], std::uint8_t(side));
+    if (options.Grind)
+        for (GrindSpot const& spot : options.Grind->Spots)
+            world.Add({ spot.Map, spot.X, spot.Y, spot.Z, spot.Side });
+    for (auto const& [map, hubs] : options.HubsByMap)
+        for (Point const& hub : hubs)
+            world.Add({ map, hub.X, hub.Y, hub.Z, 0 });
+    return world;
+}
+
 QuestPlanner const& BotPolicy::QuestsFor(BotSnapshot const& bot) const
 {
     std::size_t side = _options.PartySideOf ? _options.PartySideOf(bot.guid) : (_options.SideOf ? _options.SideOf(bot.guid) : 0);
@@ -805,6 +840,8 @@ void BotPolicy::DecideBot(DecideTick& tick, std::size_t i)
         return;
     TurnTargetMemory(tick, turn);
     if (TurnDead(tick, turn) == TurnFlow::kSkip)
+        return;
+    if (TurnOffMap(tick, turn) == TurnFlow::kSkip)
         return;
     TurnRevivedAndRoles(tick, turn);
     TurnTransport(tick, turn);

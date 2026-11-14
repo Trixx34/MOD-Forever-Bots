@@ -659,6 +659,49 @@ void EveryClassHasADamageRowAtLevelOne()
     CHECK(ranged(data.ByClass.at(7), 403) && ranged(data.ByClass.at(8), 133) && ranged(data.ByClass.at(9), 686) && ranged(data.ByClass.at(5), 585) && ranged(data.ByClass.at(11), 5176));
 }
 
+// 2026-11-14: the core refuses a hunter's shots inside 8 yards (SpellRange "Hunter Range" 8-35), and the policy reads that out-of-range answer as "stand
+// closer" (the sim's RFD runs: Aimed Shot 2739 and Multi-Shot 1011 out-of-range answers, almost no casts). Every shot row carries the DB2 minimum range,
+// so the rotation skips it at melee range and Raptor Strike plays. Starsurge and Sunfire are Season of Discovery runes no bot can learn: no rows.
+void RangedRowsCarryTheirMinimumRangeAndNoRuneRows()
+{
+    std::string const root = FOREVER_BOTS_SOURCE_DIR;
+    std::vector<std::string> warnings;
+    rotation::RotationData const data = rotation::LoadRotationData(root + "/data/rotations.txt", warnings);
+    CHECK(warnings.empty());
+    // Auto Shot, Serpent Sting, Arcane Shot, Aimed Shot, Multi-Shot: SpellMisc RangeIndex 114 (8 to 35 yards).
+    std::set<std::uint32_t> const shots = { 75, 1978, 3044, 19434, 2643 };
+    std::size_t seen = 0;
+    auto const check = [&](std::vector<rotation::Row> const& rows)
+    {
+        for (rotation::Row const& row : rows)
+        {
+            if (shots.count(row.Spell))
+            {
+                ++seen;
+                CHECK(row.OnTarget && row.MinRange >= 8.0f && row.MaxRange >= 30.0f);
+            }
+            CHECK(row.Spell != 417157 && row.Spell != 414684);   // Starsurge, Sunfire (AcquireMethod 3, never learned)
+        }
+    };
+    for (auto const& [cls, rows] : data.ByClass)
+        check(rows);
+    for (auto const& [key, rows] : data.BySpec)
+        check(rows);
+    CHECK(seen >= 16);   // four shots in each of the four hunter blocks, and Serpent Sting
+    // A balance druid still has its ranged damage: Moonfire and Wrath.
+    for (auto const& [key, rows] : data.BySpec)
+        if (key.first == 11 && key.second == "balance")
+        {
+            bool moonfire = false, wrath = false;
+            for (rotation::Row const& row : rows)
+            {
+                moonfire = moonfire || row.Spell == 8921;
+                wrath = wrath || row.Spell == 5176;
+            }
+            CHECK(moonfire && wrath);
+        }
+}
+
 // Bug #4 of the 2026-11-10 report: a row with two condition keywords keeps both (When and When2, ANDed); a third is a format error.
 void ARowKeepsTwoConditions()
 {
@@ -810,6 +853,7 @@ int main()
     AStanceIsHeldOnlyInAParty();
     TheShippedFilesLoadCleanly();
     EveryClassHasADamageRowAtLevelOne();
+    RangedRowsCarryTheirMinimumRangeAndNoRuneRows();
     ARowKeepsTwoConditions();
     ExecuteHasItsHealthConditionAndFeralBuildersGiveComboPoints();
     if (failures == 0)

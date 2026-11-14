@@ -75,6 +75,7 @@
 #include "quest_invite.h"
 #include "realism.h"
 #include "taxi_policy.h"
+#include "off_map.h"
 
 #include <array>
 #include <cstdint>
@@ -178,6 +179,9 @@ struct PolicyOptions
     // the teleport unless Bot.Actions.Teleport is on, and retrying it held level-1 bots in walk_to. With this off, that start is
     // dropped the same way a no-route move is, and the bot grinds. A refused teleport drops the start either way.
     bool QuestTeleport = false;
+    // Off-map recovery (off_map.h; config OffMapRecover, OffMapSeconds, OffMapCooldownSec, OffMapMarginYards): a living bot far outside the known places of
+    // its map (quest givers and anchors, grind spots, hubs) for OffForMs is teleported to the nearest one of its faction. Needs Bot.Actions.Teleport in the core.
+    off_map::Options OffMap;
     // Group quests (config QuestGroups, off by default; quest_group.h): quests marked 'group <n>' are taken, and the bot waits for a party of n.
     quest_group::Settings QuestGroups;
     // Dungeon recovery by teleport (config DungeonTeleport; needs Bot.Actions.Teleport in the core, so for tests and scenarios): a leader that has no route to a waypoint is put
@@ -436,7 +440,7 @@ char const* ActionStatusName(forever_module::BotActionStatus status);
 class BotPolicy
 {
 public:
-    explicit BotPolicy(PolicyOptions options = {}) : _options(options), _questSets(MakeQuestSets(options)), _scenarioRoute(ScenarioRouteOf(options)),
+    explicit BotPolicy(PolicyOptions options = {}) : _options(options), _questSets(MakeQuestSets(options)), _knownWorld(MakeKnownWorld(options)), _scenarioRoute(ScenarioRouteOf(options)),
                                                      _whispers(options.WhisperCooldownMs, options.WhisperMaxPerMin) {}
 
     // Actions for the bots in `view`. nowMs is a monotonic clock in milliseconds (cooldowns, retries, fight time).
@@ -770,6 +774,7 @@ private:
         std::uint64_t WalkStillSinceMs = 0;              // when it was at WalkAnchor; only read while WalkAnchored is set
         bool WalkAnchored = false;                       // a quest walk is being watched: WalkAnchor and WalkStillSinceMs are live.
                                                         // A flag, not WalkStillSinceMs == 0, because 0 is a legal timestamp.
+        off_map::Watch OffMap;                           // off-map recovery (TurnOffMap)
         bool QuestTeleportSent = false;                  // one teleport already sent for this stuck walk; a second stuck drops the start
         bool Traveling = false;                          // walking to the vendor for a visit
         // Supplies (supply_policy.h).
@@ -995,6 +1000,7 @@ private:
     void LogEvent(std::string const& text) const;
     void TurnRevivedAndRoles(DecideTick& tick, BotTurn& turn);
     void TurnTransport(DecideTick& tick, BotTurn& turn); // TransportRide (bot_policy_turn_life.cpp)
+    TurnFlow TurnOffMap(DecideTick& tick, BotTurn& turn);  // off-map recovery (off_map.h, bot_policy_turn_life.cpp)
     void TurnTalentsAndGear(DecideTick& tick, BotTurn& turn);
     void TurnQuestsAndHold(DecideTick& tick, BotTurn& turn);
     void TurnTargeting(DecideTick& tick, BotTurn& turn);
@@ -1164,6 +1170,9 @@ private:
     // One planner per (side, band): index side * 2 + band.
     static std::array<QuestPlanner, 6> MakeQuestSets(PolicyOptions const& options);
     std::array<QuestPlanner, 6> _questSets;
+    // The places of each map the module knows (quest anchors, givers and enders, grind spots, hubs), for the off-map check (TurnOffMap).
+    static off_map::KnownWorld MakeKnownWorld(PolicyOptions const& options);
+    off_map::KnownWorld _knownWorld;
     // The planner for this bot: its side (SideOf) and its band (level 60 or more is band 1).
     QuestPlanner const& QuestsFor(forever_module::BotSnapshot const& bot) const;
     GrindBlocklist _grindBlocks;                     // grind spots no bot can reach, shared by all bots

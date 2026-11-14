@@ -561,3 +561,51 @@ void BotPolicy::TurnTransport(DecideTick& tick, BotTurn& turn)
     if (order == transport_ride::Order::kJoin)
         turn.transportHold = true; // the snapshot still shows the old place: no walk this turn that the boarding would undo
 }
+
+// Off-map recovery (off_map.h): a living bot far outside the known places of its map for OffMap.OffForMs is teleported to the nearest one of its faction.
+// Not while the policy holds it (a scenario's staging, a dungeon route, tank lead, taming): those move it themselves. A refused teleport is logged by
+// ReadResult (teleport_refused) and tried again after OffMap.CooldownMs.
+BotPolicy::TurnFlow BotPolicy::TurnOffMap(DecideTick& tick, BotTurn& turn)
+{
+    if (!_options.OffMap.Enabled)
+        return TurnFlow::kNext;
+    BotSnapshot const& bot = turn.bot;
+    BotState& state = turn.state;
+    std::uint64_t const nowMs = tick.nowMs;
+    off_map::Facts facts;
+    facts.Map = bot.map_id;
+    facts.X = bot.pos_x;
+    facts.Y = bot.pos_y;
+    facts.Alive = bot.life_state == 0;
+    facts.InCombat = bot.in_combat != 0;
+    facts.Travelling = bot.in_flight != 0 || bot.transport_guid != 0 || (bot.movement_flags & 8u) != 0;
+    facts.Held = turn.stagingHold || IsRouteActive(bot.guid) || state.TankLead || tick.tankLed.count(bot.guid) != 0 || (_tamingFn && _tamingFn(bot.guid));
+    off_map::Verdict const verdict = off_map::Check(_options.OffMap, _knownWorld, state.OffMap, facts, nowMs);
+    if (verdict == off_map::Verdict::kWaiting && !state.OffMap.Logged)
+    {
+        state.OffMap.Logged = true;
+        LogEvent("off_map_seen: bot=" + std::to_string(bot.guid) + " map=" + std::to_string(bot.map_id) + " pos=" + std::to_string(int(bot.pos_x)) + "," +
+                 std::to_string(int(bot.pos_y)) + "," + std::to_string(int(bot.pos_z)));
+    }
+    if (verdict != off_map::Verdict::kSend)
+        return TurnFlow::kNext;
+    std::uint8_t const side = _options.PartySideOf ? _options.PartySideOf(bot.guid) : (_options.SideOf ? _options.SideOf(bot.guid) : 0);
+    off_map::Place const* home = _knownWorld.Home(bot.map_id, bot.pos_x, bot.pos_y, side);
+    if (!home)
+        return TurnFlow::kNext;
+    BotAction action;
+    action.bot_guid = bot.guid;
+    action.type = ActionType::kTeleport;
+    action.spell_id = home->Map;
+    action.dest_x = home->X;
+    action.dest_y = home->Y;
+    action.dest_z = home->Z;
+    tick.actions.push_back(action);
+    state.Last.reset();
+    state.GotoActive = false;
+    state.LevelHoldUntilMs = nowMs + kOffMapHoldMs;
+    LogEvent("off_map_home: bot=" + std::to_string(bot.guid) + " map=" + std::to_string(bot.map_id) + " pos=" + std::to_string(int(bot.pos_x)) + "," +
+             std::to_string(int(bot.pos_y)) + "," + std::to_string(int(bot.pos_z)) + " to=" + std::to_string(int(home->X)) + "," + std::to_string(int(home->Y)) + "," +
+             std::to_string(int(home->Z)) + " off_sec=" + std::to_string((nowMs - state.OffMap.OffSinceMs) / 1000) + " try=" + std::to_string(state.OffMap.Tries));
+    return TurnFlow::kSkip;
+}

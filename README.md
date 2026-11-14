@@ -85,6 +85,7 @@ line to the module's stderr. A config reload updates the ramp, the random picks 
 | `DeathLockoutHoldMs` | 90000 | The extra wait of a locked-out bot (0 to 3600000) |
 | `DungeonLeaderRejoin` | 1 | A dead route leader comes back next to its quiet party (its corpse is stood up beside a member with the recover tactic and `DungeonReviveOutOfCombat`; its ghost waits up to 60 s for the party's fight, then is teleported next to a living member), not alone at the entrance; 0 is the entrance as before |
 | `QuestTeleport` | 0 | A quest walk stuck for two minutes teleports to its giver (needs `Bot.Actions.Teleport = 1`); 0 drops the start and grinds instead |
+| `OffMapRecover`, `OffMapSeconds`, `OffMapCooldownSec`, `OffMapMarginYards` | 1, 60, 600, 500 | A living bot more than the margin outside the known places of its map (quest points, grind spots, hubs) for that many seconds is teleported to the nearest known place of its faction, once per cooldown (`off_map_seen`, `off_map_home`; needs `Bot.Actions.Teleport = 1`) |
 | `TrainEverySec` | 0 (off) | Seconds between trainer checks, also after a level-up (0, or 60 to 86400) |
 | `PartySize`, `PartyCount` | 0 (off), 1 | Bots per party (at most 5) and number of parties |
 | `Hub<map>_<n>` | none | Hub positions `"x y z"` per map, in order |
