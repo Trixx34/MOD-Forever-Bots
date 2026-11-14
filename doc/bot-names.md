@@ -29,3 +29,9 @@ One row per line, `|` separated, `#` comments, blank lines ignored.
 ## Adding names
 
 Append rows to the right section of the file. Keep one name per row, no duplicate (kind, name, races, sex) rows. Funny surnames go in the class section so that a rogue gets a rogue joke. Check with `python3 tools/check_bot_names.py` (rule check, duplicate check) before committing.
+
+## Guild names (`data/bot_guilds.txt`)
+
+One row per name: `guild|style|weight|name`. Styles: `lore`, `funny`, `normal`, `reallife`. Weight 1 to 100. There is no faction or race column: any bot guild may take any name.
+Name rule (guild name): letters, space, apostrophe, hyphen, 2 to 24 characters, unique ignoring case. Check with `python3 tools/check_bot_guilds.py`.
+The core does not read this file yet.
