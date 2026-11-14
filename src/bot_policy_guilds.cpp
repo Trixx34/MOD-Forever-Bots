@@ -254,12 +254,16 @@ void BotPolicy::DriveGuilds(forever_module::WorldTickSnapshotView const& view, s
         }
         if (inviter == 0 || busy(move.Bot))
             continue;
+        auto const backoff = _guildInviteBackoff.find(move.Bot);
+        if (backoff != _guildInviteBackoff.end() && nowMs < backoff->second.UntilMs)
+            continue; // refused before (the invitee is in a guild, already invited, or the faction rule): not asked again every plan
         social::Order invite;
         invite.What = social::Kind::Guild;
         invite.Op = 4;
         invite.Bot = inviter;
         invite.Player = move.Bot;
         queue(invite);
+        _guildInviteTarget[inviter] = move.Bot;
         _guildAcceptDueMs[move.Bot] = nowMs + kGuildAcceptDelayMs;
         ++queued;
         _guildMoveCursor = index + 1;

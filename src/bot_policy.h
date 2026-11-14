@@ -1202,6 +1202,13 @@ private:
     std::vector<StoreWrite> _guildStoreWrites;
     std::unordered_map<std::uint64_t, PendingGuild> _pendingGuilds;      // master guid -> the guild it is creating
     std::unordered_map<std::uint64_t, std::uint64_t> _guildAcceptDueMs;  // invitee guid -> when it accepts
+    struct GuildInviteBackoff
+    {
+        std::uint64_t UntilMs = 0; // no new guild invite for this bot before this time
+        std::uint32_t Fails = 0;   // refusals in a row (a join or a quiet hour resets it)
+    };
+    std::unordered_map<std::uint64_t, std::uint64_t> _guildInviteTarget;   // inviter guid -> the invitee of its last queued invite
+    std::unordered_map<std::uint64_t, GuildInviteBackoff> _guildInviteBackoff; // invitee guid -> refusal backoff
     struct CreateBlock { std::uint32_t Failures = 0; std::uint64_t UntilMs = 0; bool Logged = false; };
     std::unordered_map<std::uint64_t, CreateBlock> _guildCreateBlocks;   // master guid -> its unconfirmed creates and when it may try again
     std::uint64_t _guildPlanAtMs = 0;

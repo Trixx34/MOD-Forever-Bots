@@ -516,6 +516,56 @@ void RestoredGuildKeepsItsKind()
     CHECK(policy.TakeGuildStoreWrites().empty());
 }
 
+// 2026-11-14: the same refused guild invite was queued at every plan (19343 refusal lines in 2 hours). A refusal now holds the invitee for 60 s, doubled per
+// refusal in a row; a second refusal in a row is not logged again.
+void RefusedGuildInviteIsNotRepeatedEveryPlan()
+{
+    PolicyOptions on = Quiet();
+    on.Guilds.Enabled = true;
+    on.Guilds.PvpShare = 100;
+    on.Guilds.PvpMinLevel = 10;
+    std::vector<std::string> events;
+    on.OnEvent = [&](std::string const& line) { events.push_back(line); };
+    BotPolicy policy(on);
+    policy.RestoreBotGuild(500, bot_guilds::Purpose::Pvp, false, "Night Watch");
+    auto plan = [&](std::uint64_t now)
+    {
+        WorldTickSnapshotView v = View(20, 0, {}, 1);
+        v.bots[0].guild_guid = 500;
+        BotSnapshot joiner = v.bots[0];
+        joiner.guid = 2;
+        joiner.guild_guid = 0;
+        v.bots.push_back(joiner);
+        policy.Decide(v, now);
+        int invites = 0;
+        for (social::Order const& order : policy.TakeSocialOrders())
+            if (order.What == social::Kind::Guild && order.Op == 4 && order.Bot == 1 && order.Player == 2)
+                ++invites;
+        return invites;
+    };
+    auto refuse = [&](std::uint64_t now)
+    {
+        social::Outcome refused;
+        refused.What = social::Kind::Guild;
+        refused.Op = 4;
+        refused.Bot = 1;
+        refused.Reason = "the invite was refused";
+        policy.NoteSocialOutcome(refused, now);
+    };
+    CHECK(plan(kNow) == 1);
+    refuse(kNow + 100);
+    CHECK(plan(kNow + 30000) == 0);   // inside the 60 s wait
+    CHECK(plan(kNow + 61000) == 1);   // asked again after it
+    refuse(kNow + 61100);
+    CHECK(plan(kNow + 61000 + 90000) == 0);   // the second wait is 120 s
+    CHECK(plan(kNow + 61100 + 121000) == 1);
+    int refusedLines = 0;
+    for (std::string const& line : events)
+        if (line.find("social_refused: bot=1 op=4") == 0)
+            ++refusedLines;
+    CHECK(refusedLines == 1);
+}
+
 void GuildAnswersAreSentWhenOnAndNotWhenOff()
 {
     PolicyOptions on = Quiet();
@@ -646,6 +696,7 @@ int main()
     GuildCreatesRotateAmongMasters();
     GuildRefusedCreatesAreSkipped();
     GuildNamesFromTheList();
+    RefusedGuildInviteIsNotRepeatedEveryPlan();
     RestoredGuildKeepsItsKind();
     GuildAnswersAreSentWhenOnAndNotWhenOff();
     GiftsAreSentWhenOnAndNotWhenOff();

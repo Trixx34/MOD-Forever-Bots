@@ -231,6 +231,29 @@ void BotPolicy::NoteSocialOutcome(social::Outcome const& outcome, std::uint64_t 
             _pendingGuilds.erase(pending);
         }
     }
+    // A refused guild invite (op 4): the invitee is left alone for a while, longer after each refusal in a row. The same invite every plan made
+    // 19343 refusal lines in 2 hours on the sim (2026-11-14). A success clears the wait. The line is written for the first refusal only.
+    bool quietRefusal = false;
+    if (outcome.What == social::Kind::Guild && outcome.Op == 4)
+    {
+        auto const target = _guildInviteTarget.find(outcome.Bot);
+        if (target != _guildInviteTarget.end())
+        {
+            GuildInviteBackoff& backoff = _guildInviteBackoff[target->second];
+            if (outcome.Success)
+                backoff = GuildInviteBackoff{};
+            else
+            {
+                std::uint32_t const shift = backoff.Fails < 6 ? backoff.Fails : 6;
+                backoff.UntilMs = nowMs + std::min(kGuildInviteBackoffMaxMs, kGuildInviteBackoffBaseMs << shift);
+                quietRefusal = backoff.Fails != 0;
+                ++backoff.Fails;
+            }
+            _guildInviteTarget.erase(target);
+        }
+    }
+    if (quietRefusal)
+        return;
     // The guild poll is expected to be refused nearly always ("no pending guild invitation"): not worth a line.
     if (outcome.What == social::Kind::Guild && outcome.Op == 0 && !social::IsUnknownActionReason(outcome.Reason))
         return;
