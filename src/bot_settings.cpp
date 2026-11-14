@@ -1100,6 +1100,18 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadBool(config, "RidingTraining", settings.RidingTraining, warnings);
     if (auto const it = config.find("RidingRankFile"); it != config.end())
         settings.RidingRankFile = it->second;
+    ReadBool(config, "ReputationGrind", settings.Reputation.Enabled, warnings);
+    ReadKey(config, "ReputationMinLevel", 1, 60, settings.Reputation.MinLevel, warnings);
+    {
+        std::uint32_t tripSec = static_cast<std::uint32_t>(settings.Reputation.TripEveryMs / 1000);
+        ReadKey(config, "ReputationTripSec", 60, 86400, tripSec, warnings);
+        settings.Reputation.TripEveryMs = std::uint64_t(tripSec) * 1000;
+        std::uint32_t minCopper = static_cast<std::uint32_t>(settings.Reputation.MinCopper);
+        ReadKey(config, "ReputationMinCopper", 0, 100000000, minCopper, warnings);
+        settings.Reputation.MinCopper = minCopper;
+    }
+    if (auto const it = config.find("ReputationGoalFile"); it != config.end())
+        settings.ReputationGoalFile = it->second;
     ReadBool(config, "WeaponTraining", settings.WeaponTraining, warnings);
     ReadBool(config, "Fishing", settings.Fishing, warnings);
     if (auto const it = config.find("FishingSpotFile"); it != config.end())

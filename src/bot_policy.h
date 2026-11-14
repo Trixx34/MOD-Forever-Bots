@@ -61,6 +61,7 @@
 #include "dungeon_events.h"
 #include "errand_trainers.h"
 #include "supply_policy.h"
+#include "reputation.h"
 #include "repair_policy.h"
 #include "advisor_orders.h"
 #include "advisor_text.h"
@@ -411,6 +412,11 @@ struct PolicyOptions
     std::uint64_t WaitForGhostMs = 180000;      // and this long after the ghost entered the corpse's map
     // Supplies (layout 15): a bot short of ammunition, food or drink walks to a vendor that sells it and buys, and eats or drinks while resting.
     supply::Settings Supplies;
+    // Reputation goals (reputation.h, config ReputationGrind, off by default). Goals is the parsed data/reputation_goals.txt. ReputationFacts gives a bot's
+    // standings and the nearest vendor selling it a reputation-gated upgrade; the core sends neither yet (doc/reputation.md), so it stays empty and the feature idle.
+    reputation::Settings Reputation;
+    std::vector<reputation::Goal> ReputationGoals;
+    std::function<reputation::Facts(forever_module::BotSnapshot const&)> ReputationFacts;
     // Urgent repair trips (repair_policy.h; config keys RepairUrgent, RepairBrokenPct, RepairAfterDeathPct, RepairRetrySec, RepairLowCopperPerLevel): a bot with a
     // broken piece, or worn gear after a death, goes to its repairman at once, quest work or not; a party leader goes for a broken member.
     repair::Settings Repair;
@@ -836,6 +842,14 @@ private:
         off_map::Watch OffMap;                           // off-map recovery (TurnOffMap)
         bool QuestTeleportSent = false;                  // one teleport already sent for this stuck walk; a second stuck drops the start
         bool Traveling = false;                          // walking to the vendor for a visit
+        // Reputation goals (reputation.h).
+        reputation::Book RepBook;
+        std::uint32_t RepGoal = 0;                       // the faction the bot works on (0 = none)
+        bool RepTrip = false;                            // walking to the vendor of a reputation upgrade
+        std::uint64_t RepTripStartMs = 0;
+        std::uint64_t RepCheckAtMs = 0;                  // when the last buy is judged (0 = none pending)
+        std::uint64_t RepCopperBefore = 0;
+        std::uint32_t RepSlotsBefore = 0;
         // Supplies (supply_policy.h).
         std::uint64_t NextSupplyMs = 0;                  // no supply trip before this
         std::uint32_t SupplyFailures = 0;                // trips in a row that bought nothing
@@ -1124,6 +1138,7 @@ private:
     void MoveForQuestOrGoto(DecideTick& tick, BotTurn& turn);
     void TurnIdle(DecideTick& tick, BotTurn& turn);
     void TurnShopping(DecideTick& tick, BotTurn& turn);
+    void TurnReputation(DecideTick& tick, BotTurn& turn);
     void TurnWander(DecideTick& tick, BotTurn& turn);
     void TurnRestAndConsume(DecideTick& tick, BotTurn& turn);
     void TurnTrainAndParty(DecideTick& tick, BotTurn& turn);

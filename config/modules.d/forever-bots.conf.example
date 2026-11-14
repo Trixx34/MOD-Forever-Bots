@@ -552,6 +552,16 @@ Module.forever-bots.TelemetrySummarySec = 60
 # Module.forever-bots.RidingTraining = 0
 # Module.forever-bots.RidingRankFile = /srv/forever/sim/modules_runtime/forever-bots/data/riding_ranks.txt
 # Module.forever-bots.WeaponTraining = 0
+# Reputation goals (off by default; doc/reputation.md): a bot picks a faction whose reputation gates equipment (ReputationGoalFile, made by tools/gen_reputation_goals.py)
+# and buys the reward gear at the faction's vendor when the core reports one that sells it an upgrade it may buy now. Needs core changes that do not exist yet
+# (the reputation snapshot block and the vendor buy bit), so ReputationGrind = 1 changes nothing until they do.
+# ReputationMinLevel (1..60) is the level from which a bot makes a goal, ReputationTripSec (60..86400) the least time between two visits (a visit that bought
+# nothing waits 30 minutes, doubling, six hours at most), ReputationMinCopper the money a bot needs to go shopping.
+# Module.forever-bots.ReputationGrind = 0
+# Module.forever-bots.ReputationMinLevel = 10
+# Module.forever-bots.ReputationTripSec = 600
+# Module.forever-bots.ReputationMinCopper = 10000
+# Module.forever-bots.ReputationGoalFile = /srv/forever/sim/modules_runtime/forever-bots/data/reputation_goals.txt
 # Module.forever-bots.Fishing = 0
 # Module.forever-bots.FishingSpotFile = /srv/forever/sim/modules_runtime/forever-bots/data/fishing_spots.txt
 # Module.forever-bots.RareHunts = 0

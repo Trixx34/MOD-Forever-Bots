@@ -866,6 +866,7 @@ void BotPolicy::DecideBot(DecideTick& tick, std::size_t i)
     TurnMoveChoice(tick, turn);
     TurnIdle(tick, turn);
     TurnShopping(tick, turn);
+    TurnReputation(tick, turn);
     TurnWander(tick, turn);
     TurnRestAndConsume(tick, turn);
     TurnTrainAndParty(tick, turn);
