@@ -108,6 +108,8 @@ line to the module's stderr. A config reload updates the ramp, the random picks 
 | `SupplyPotions`, `SupplyBandages`, `SupplyReagents`, `SupplyHealthPotionLow`, `SupplyManaPotionLow`, `SupplyBandageLow`, `UseHealthPotionBelowPct`, `UseManaPotionBelowPct`, `UseBandageBelowPct` | 0, 0, 0, 1, 1, 3, 35, 25, 60 | Potions, bandages and reagents: on/off, the count that sends a bot shopping, and the health or mana percent at which they are used |
 | `SellVendor`, `SellEverySec`, `SellPerVisit` | 0, 1800, 8 | Selling white items to a vendor: on/off, seconds between visits, items per visit |
 | `ErrandDailyMin`, `ErrandGapMin`, `ErrandMaxMin`, `ErrandPerCity`, `ErrandStartsPerTick`, `ErrandTrainerFile` | 60, 120, 60, 2, 2, `data/errand_trainers.txt` | Town errands: minutes per day, gap, length, bots per capital, starts per tick, trainer table |
+| `RidingTraining`, `RidingRankFile` | 0, `data/riding_ranks.txt` | A bot refused a mount learns the riding ranks (Apprentice at 40, Journeyman at 60) from a riding trainer, as a town errand (needs `Errands`, `MountBuy`). `doc/mounts.md` |
+| `MountBuy`, `MountReserveCopperPerLevel`, `RidingTrainerFile`, `MountVendorFile` | 0, 5000, `data/riding_trainers.txt`, `data/mount_vendors.txt` | A bot refused a mount (after riding training) walks to a vendor of its race and buys a mount (Tier 1 `BuyItemForBot`), keeping copper per level in reserve. Needs `Errands`. `doc/mounts.md` |
 | `SpellCostFile` | empty | Spell cost table; empty = no cost check |
 
 The core has its own bot limits in `worldserver.conf`: `Bot.Login.MaxPerSecond`, `Bot.Limit.MaxBots`, `Bot.Limit.MaxWorldDiffMs`,

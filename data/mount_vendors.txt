@@ -1,0 +1,101 @@
+# Mount vendors for MountBuy (src/mount_plan.h). Two kinds of line:
+#   vendor|raceMask|map|entry|guid|x y z|name|subname
+#   item|vendorEntry|itemEntry|requiredLevel|ridingSkill|copper|name
+# raceMask: the race the vendor's mounts are for (1 Human, 2 Orc, 4 Dwarf, 8 Night Elf, 16 Undead, 32 Tauren, 64 Gnome, 128 Troll); a bot buys from a vendor of its own race.
+# ridingSkill: the riding skill the mount needs (75 Apprentice for a level 40 mount, 150 Journeyman for a level 60 mount).
+# Source (read only, forever-test, 2026-11-14): creature spawns of the vendors, npc_vendor rows (ExtendedCost 0) of mount items (item class 15, subclass 5) with
+# a buy price, item_sparse RequiredLevel/BuyPrice. The vendor race comes from the mount type (horse Human, ram Dwarf, mechanostrider Gnome, saber Night Elf,
+# wolf Orc, raptor Troll, undead horse Undead, kodo Tauren). Vendors with no creature spawn (43694, 216677) are left out. UNVERIFIED in game.
+vendor|1|0|384|20081393|-9455.4 -1385.3 47.2|Katie Hunter|Horse Breeder
+vendor|4|0|1261|20004152|-5537.0 -1323.7 399.2|Veron Amberstill|Ram Breeder
+vendor|1|0|1460|20009524|-3645.8 -744.1 9.9|Unger Statforth|Horse Breeder
+vendor|1|0|2357|20015662|-783.6 -603.3 15.2|Merideth Carlson|Horse Breeder
+vendor|2|1|3362|20007447|2159.4 -4653.7 49.7|Ogunaro Wolfrunner|Kennel Master
+vendor|32|1|3685|20024779|-2279.8 -392.1 -9.3|Harb Clawhoof|Kodo Mounts
+vendor|8|1|4730|20046473|10129.9 2533.2 1323.3|Lelanai|Saber Handler
+vendor|16|0|4731|20028472|2250.4 328.1 36.9|Zachariah Post|Undead Horse Merchant
+vendor|1|1|4885|20030506|-3835.7 -4397.7 11.0|Gregor MacVince|Horse Breeder
+vendor|128|1|7952|20006403|-858.2 -4882.7 22.1|Zjolnir|Raptor Handler
+vendor|64|0|7955|20000177|-5451.6 -617.3 394.5|Milli Featherwhistle|Mechanostrider Merchant
+item|384|2414|40|75|200000|Pinto Bridle
+item|384|5655|40|75|200000|Chestnut Mare Bridle
+item|384|5656|40|75|200000|Brown Horse Bridle
+item|384|12353|60|150|2000000|White Stallion Bridle
+item|384|12354|60|150|2000000|Palomino Bridle
+item|384|18777|60|150|2000000|Swift Brown Steed
+item|384|18778|60|150|2000000|Swift White Steed
+item|1261|5864|40|75|200000|Gray Ram
+item|1261|5872|40|75|200000|Brown Ram
+item|1261|5873|40|75|200000|White Ram
+item|1261|13328|60|150|2000000|Black Ram
+item|1261|13329|60|150|2000000|Frost Ram
+item|1261|18785|60|150|2000000|Swift White Ram
+item|1261|18786|60|150|2000000|Swift Brown Ram
+item|1261|18787|60|150|2000000|Swift Gray Ram
+item|1460|2411|40|75|200000|Black Stallion Bridle
+item|1460|2414|40|75|200000|Pinto Bridle
+item|1460|5655|40|75|200000|Chestnut Mare Bridle
+item|1460|5656|40|75|200000|Brown Horse Bridle
+item|1460|12353|60|150|2000000|White Stallion Bridle
+item|1460|12354|60|150|2000000|Palomino Bridle
+item|1460|18777|60|150|2000000|Swift Brown Steed
+item|1460|18778|60|150|2000000|Swift White Steed
+item|2357|2414|40|75|200000|Pinto Bridle
+item|2357|5655|40|75|200000|Chestnut Mare Bridle
+item|2357|5656|40|75|200000|Brown Horse Bridle
+item|2357|12353|60|150|2000000|White Stallion Bridle
+item|2357|12354|60|150|2000000|Palomino Bridle
+item|2357|18777|60|150|2000000|Swift Brown Steed
+item|2357|18778|60|150|2000000|Swift White Steed
+item|3362|1132|40|75|200000|Horn of the Timber Wolf
+item|3362|5665|40|75|200000|Horn of the Dire Wolf
+item|3362|5668|40|75|200000|Horn of the Brown Wolf
+item|3362|12330|60|150|2000000|Horn of the Red Wolf
+item|3362|12351|60|150|2000000|Horn of the Arctic Wolf
+item|3362|18796|60|150|2000000|Horn of the Swift Brown Wolf
+item|3362|18797|60|150|2000000|Horn of the Swift Timber Wolf
+item|3362|18798|60|150|2000000|Horn of the Swift Gray Wolf
+item|3685|15277|40|75|200000|Gray Kodo
+item|3685|15290|40|75|200000|Brown Kodo
+item|3685|15292|60|150|2000000|Green Kodo
+item|3685|15293|60|150|2000000|Teal Kodo
+item|3685|18793|60|150|2000000|Great White Kodo
+item|3685|18794|60|150|2000000|Great Brown Kodo
+item|3685|18795|60|150|2000000|Great Gray Kodo
+item|4730|8629|40|75|200000|Reins of the Striped Nightsaber
+item|4730|8631|40|75|200000|Reins of the Striped Frostsaber
+item|4730|8632|40|75|200000|Reins of the Spotted Frostsaber
+item|4730|12302|60|150|2000000|Reins of the Frostsaber
+item|4730|12303|60|150|2000000|Reins of the Nightsaber
+item|4730|18766|60|150|2000000|Reins of the Swift Frostsaber
+item|4730|18767|60|150|2000000|Reins of the Swift Mistsaber
+item|4730|18902|60|150|2000000|Reins of the Swift Stormsaber
+item|4731|13331|40|75|200000|Red Skeletal Horse
+item|4731|13332|40|75|200000|Blue Skeletal Horse
+item|4731|13333|40|75|200000|Brown Skeletal Horse
+item|4731|13334|60|150|2000000|Green Skeletal Warhorse
+item|4731|18791|60|150|2000000|Purple Skeletal Warhorse
+item|4885|2414|40|75|200000|Pinto Bridle
+item|4885|5655|40|75|200000|Chestnut Mare Bridle
+item|4885|5656|40|75|200000|Brown Horse Bridle
+item|4885|12353|60|150|2000000|White Stallion Bridle
+item|4885|12354|60|150|2000000|Palomino Bridle
+item|4885|18777|60|150|2000000|Swift Brown Steed
+item|4885|18778|60|150|2000000|Swift White Steed
+item|7952|8586|60|150|2000000|Whistle of the Mottled Red Raptor
+item|7952|8588|40|75|200000|Whistle of the Emerald Raptor
+item|7952|8591|40|75|200000|Whistle of the Turquoise Raptor
+item|7952|8592|40|75|200000|Whistle of the Violet Raptor
+item|7952|13317|60|150|2000000|Whistle of the Ivory Raptor
+item|7952|18788|60|150|2000000|Swift Blue Raptor
+item|7952|18789|60|150|2000000|Swift Olive Raptor
+item|7952|18790|60|150|2000000|Swift Orange Raptor
+item|7955|8563|40|75|200000|Red Mechanostrider
+item|7955|8595|40|75|200000|Blue Mechanostrider
+item|7955|13321|40|75|200000|Green Mechanostrider
+item|7955|13322|40|75|200000|Unpainted Mechanostrider
+item|7955|13326|60|150|2000000|White Mechanostrider Mod A
+item|7955|13327|60|150|2000000|Icy Blue Mechanostrider Mod A
+item|7955|18772|60|150|2000000|Swift Green Mechanostrider
+item|7955|18773|60|150|2000000|Swift White Mechanostrider
+item|7955|18774|60|150|2000000|Swift Yellow Mechanostrider

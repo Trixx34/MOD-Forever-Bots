@@ -107,6 +107,17 @@ struct ErrandOrder
     std::uint32_t Skill = 0;    // the profession skill line the bot trains
     std::uint32_t Entry = 0;    // the trainer's creature entry
     bool Auction = false;       // walk to the Auction House, not a trainer
+    // A mount purchase (MountBuy, mount_plan.h): walk to the vendor at Dest and ask for the mount item `Item` once the vendor is the bot's nearest one in reach.
+    // The purchase itself is a Tier 1 call made by the module's Run() thread (TakeBuyRequest / FinishBuy); the trip ends with its answer.
+    bool Vendor = false;
+    std::uint32_t Item = 0;     // the mount's item entry
+};
+
+// A purchase the policy wants made at the vendor the bot stands at (the vendor's unit reference is the snapshot's vendor_guid).
+struct BuyRequest
+{
+    std::uint64_t Vendor = 0;
+    std::uint32_t Item = 0;
 };
 
 enum class ErrandOutcome : std::uint8_t { kNone, kDone, kFailed };
@@ -524,6 +535,12 @@ public:
     void StartErrand(std::uint64_t botGuid, ErrandOrder const& order);
     void CancelErrand(std::uint64_t botGuid);
     ErrandOutcome TakeErrandOutcome(std::uint64_t botGuid);
+    // Mount purchases (MountBuy): the request of a bot on a vendor errand that stands at its vendor, taken once; FinishBuy gives the answer of the purchase
+    // (true: bought, the errand is done; false: refused, the errand failed).
+    std::optional<BuyRequest> TakeBuyRequest(std::uint64_t botGuid);
+    void FinishBuy(std::uint64_t botGuid, bool bought);
+    // Mount requests the core refused in a row for this bot (0 once it has mounted): the module's only sign that the bot has no riding skill or no mount.
+    std::uint32_t MountRefusals(std::uint64_t botGuid) const;
 
     // Who said a chat command and where, for ApplyChat. Issuer is the speaker's character guid counter (the group leader), Recipient the
     // whispered bot's guid counter (0 for party or raid chat). Pos and MapId are the speaker's; TargetRef is its selected unit (0 = none).
@@ -999,6 +1016,8 @@ private:
         std::uint64_t ErrandArrivedMs = 0;               // an auction errand: when the bot came in reach of the auctioneer (0 = not yet)
         std::uint32_t ErrandRefusals = 0;                // train refusals in a row
         ErrandOutcome ErrandResult = ErrandOutcome::kNone; // the errand's end, until the module takes it
+        std::optional<BuyRequest> ErrandBuy;             // a mount purchase waiting for the Run() thread
+        std::uint64_t ErrandBuySentMs = 0;               // when the purchase was handed over (0 = not yet); the answer is awaited kErrandBuyWaitMs
         std::uint64_t RunStartMs = 0;                    // the corpse run began (0 = not yet)
         std::uint64_t InsideSinceMs = 0;                 // the ghost is on the corpse's map since
         bool RunFailed = false;

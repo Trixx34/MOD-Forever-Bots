@@ -520,6 +520,72 @@ void AuctionErrandStandsAtTheAuctioneerBeforeItEnds()
     CHECK(policy.TakeErrandOutcome(kBot) == ErrandOutcome::kDone); // 25 s: done
 }
 
+// MountBuy: a vendor errand stands at the vendor, hands the purchase (the snapshot's vendor guid, the item) out once, and ends with the answer FinishBuy gives. Without a
+// vendor in reach it hands nothing out; with no answer in 30 s it fails.
+void MountVendorErrandHandsOutOnePurchaseAndEndsWithTheAnswer()
+{
+    auto const run = [](bool vendorInReach, int answer)
+    {
+        BotPolicy policy{ PolicyOptions{} };
+        ErrandOrder order;
+        order.Map = 0;
+        order.Dest = Point{ 2.0f, 0.0f, 0.0f };
+        order.Vendor = true;
+        order.Item = 2414;
+        order.Entry = 384;
+        WorldTickSnapshotView view = View(1, 0, {});
+        view.bots[0].vendor_valid = vendorInReach ? 1 : 0;
+        view.bots[0].vendor_guid = vendorInReach ? MakeUnitRef(8, 384, 99) : 0;
+        view.bots[0].vendor_x = 3.0f;
+        policy.Decide(view, 500);
+        policy.StartErrand(kBot, order);
+        int requests = 0;
+        std::uint64_t vendor = 0;
+        std::uint32_t item = 0;
+        for (std::uint64_t at = 1000; at < 20000; at += 1000)
+        {
+            for (BotAction const& action : policy.Decide(view, at))
+                CHECK(!(action.bot_guid == kBot && action.type == ActionType::kTrain)); // a vendor errand never trains
+            if (auto const request = policy.TakeBuyRequest(kBot))
+            {
+                ++requests;
+                vendor = request->Vendor;
+                item = request->Item;
+                if (answer >= 0)
+                    policy.FinishBuy(kBot, answer == 1);
+            }
+        }
+        return std::make_tuple(requests, vendor, item, policy.TakeErrandOutcome(kBot));
+    };
+    auto const bought = run(true, 1);
+    CHECK(std::get<0>(bought) == 1 && std::get<1>(bought) == MakeUnitRef(8, 384, 99) && std::get<2>(bought) == 2414 && std::get<3>(bought) == ErrandOutcome::kDone);
+    auto const refused = run(true, 0);
+    CHECK(std::get<0>(refused) == 1 && std::get<3>(refused) == ErrandOutcome::kFailed);
+    auto const noVendor = run(false, -1);
+    CHECK(std::get<0>(noVendor) == 0 && std::get<3>(noVendor) == ErrandOutcome::kNone);       // no vendor in reach: it waits there, nothing is bought
+    auto const silent = run(true, -1);
+    CHECK(std::get<0>(silent) == 1 && std::get<3>(silent) == ErrandOutcome::kNone);          // 19 s without an answer: still waiting
+    {
+        BotPolicy policy{ PolicyOptions{} };
+        ErrandOrder order;
+        order.Dest = Point{ 2.0f, 0.0f, 0.0f };
+        order.Vendor = true;
+        order.Item = 2414;
+        WorldTickSnapshotView view = View(1, 0, {});
+        view.bots[0].vendor_valid = 1;
+        view.bots[0].vendor_guid = MakeUnitRef(8, 384, 99);
+        view.bots[0].vendor_x = 3.0f;
+        policy.Decide(view, 500);
+        policy.StartErrand(kBot, order);
+        for (std::uint64_t at = 1000; at < 60000; at += 1000)
+        {
+            policy.Decide(view, at);
+            policy.TakeBuyRequest(kBot);
+        }
+        CHECK(policy.TakeErrandOutcome(kBot) == ErrandOutcome::kFailed);                     // no answer in 30 s
+    }
+}
+
 // ---- RaidBossPositions: tank_spot and flank rows (Onyxia fix 1) ----
 // Onyxia at the origin of map 249, facing north (+x); the tank spot 4 yards north of her. Bots 10..14 (12 the warrior tank, 14 a priest, the rest mages) at the given points.
 constexpr std::uint64_t kOnyRef = MakeUnitRef(8, 10184, 60);
@@ -697,6 +763,7 @@ void RunPolicyTestsPart10()
     MemberRepairsWhileTheLeaderWaits();
     BrokenBotWithoutMoneyDoesNotLoop();
     AuctionErrandStandsAtTheAuctioneerBeforeItEnds();
+    MountVendorErrandHandsOutOnePurchaseAndEndsWithTheAnswer();
     BossPositionsKeyOnPutsTheRaidOnHerFlanks();
     BossPositionsKeyOffChangesNothing();
     BossPositionsLeaveAloneCases();

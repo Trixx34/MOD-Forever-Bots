@@ -198,6 +198,10 @@ void SayAndSupplySettings()
     CHECK(!off.Taxi.Enabled && off.Taxi.MinWalkYards == 1500.0f && off.Taxi.MasterMaxYards == 600.0f && off.Taxi.BlockedMs == 600000);
     BotSettings const flights = ParseBotSettings({ { "Taxi", "1" }, { "TaxiMinWalkYards", "2000" }, { "TaxiMasterMaxYards", "800" }, { "TaxiBlockedSec", "120" } }, warnings);
     CHECK(flights.Taxi.Enabled && flights.Taxi.MinWalkYards == 2000.0f && flights.Taxi.MasterMaxYards == 800.0f && flights.Taxi.BlockedMs == 120000 && warnings.empty());
+    // Mounts: off by default; the reserve and the three files read.
+    CHECK(!off.MountBuy && !off.RidingTraining && off.MountReserveCopperPerLevel == 5000 && off.RidingTrainerFile == "data/riding_trainers.txt" && off.MountVendorFile == "data/mount_vendors.txt");
+    BotSettings const mountsOn = ParseBotSettings({ { "MountBuy", "1" }, { "RidingTraining", "1" }, { "MountReserveCopperPerLevel", "100" }, { "RidingTrainerFile", "/x/r.txt" }, { "MountVendorFile", "/x/m.txt" } }, warnings);
+    CHECK(mountsOn.MountBuy && mountsOn.RidingTraining && mountsOn.MountReserveCopperPerLevel == 100 && mountsOn.RidingTrainerFile == "/x/r.txt" && mountsOn.MountVendorFile == "/x/m.txt" && warnings.empty());
     BotSettings const bossAt = ParseBotSettings({ { "Scenario", "dm" }, { "ScenarioRoster", "2:1,5:5" }, { "ScenarioBossAt", "6:644,11:643,x" } }, warnings);
     CHECK(bossAt.Scenario.BossAt.size() == 2 && bossAt.Scenario.BossAt[0].first == 5 && bossAt.Scenario.BossAt[0].second == 644 &&
           bossAt.Scenario.BossAt[1].first == 10 && bossAt.Scenario.BossAt[1].second == 643);

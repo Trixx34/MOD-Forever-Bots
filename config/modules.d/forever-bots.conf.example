@@ -551,6 +551,14 @@ Module.forever-bots.TelemetrySummarySec = 60
 # RareHunts = 1 fights the rare creatures of RareHuntFile in range of their levels. Tradeskill training is the errand trainer walk (Errands = 1).
 # Module.forever-bots.RidingTraining = 0
 # Module.forever-bots.RidingRankFile = /srv/forever/sim/modules_runtime/forever-bots/data/riding_ranks.txt
+
+# Mounts (off by default; needs Errands = 1 and the mount refusal as its sign). MountBuy = 1: a bot that the core refused a mount (no riding skill or no mount yet)
+# walks to a riding trainer (RidingTraining = 1; RidingTrainerFile, RidingRankFile) and then to a mount vendor of its race (MountVendorFile) and buys a mount (a Tier 1
+# purchase). Each trip keeps MountReserveCopperPerLevel copper per level in the bot's purse (0..1000000). Flight points: Taxi = 1 (see above) already covers the long trips.
+# Module.forever-bots.MountBuy = 0
+# Module.forever-bots.MountReserveCopperPerLevel = 5000
+# Module.forever-bots.RidingTrainerFile = /srv/forever/sim/modules_runtime/forever-bots/data/riding_trainers.txt
+# Module.forever-bots.MountVendorFile = /srv/forever/sim/modules_runtime/forever-bots/data/mount_vendors.txt
 # Module.forever-bots.WeaponTraining = 0
 # Module.forever-bots.Fishing = 0
 # Module.forever-bots.FishingSpotFile = /srv/forever/sim/modules_runtime/forever-bots/data/fishing_spots.txt

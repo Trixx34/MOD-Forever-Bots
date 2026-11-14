@@ -747,6 +747,25 @@ void BotDismountsWhenClose()
     CHECK(dismounted);
 }
 
+// MountBuy reads the refusal count: a refused mount request counts once.
+void MountRefusalsAreCounted()
+{
+    WorldTickSnapshotView view = PartyView({ 10 });
+    SetVendor(view, 200.0f);
+    BotPolicy policy = VendorPolicy();
+    CHECK(policy.MountRefusals(10) == 0);
+    bool mounted = false;
+    for (BotAction const& action : policy.Decide(view, 0))
+        mounted = mounted || (action.type == ActionType::kMount && action.spell_id == 1);
+    CHECK(mounted);
+    view.bots[0].last_action_sequence = 5;
+    view.bots[0].last_action_type = uint8_t(ActionType::kMount);
+    view.bots[0].last_action_spell = 1;
+    view.bots[0].last_action_status = BotActionStatus::kRefused;
+    policy.Decide(view, 1000);
+    CHECK(policy.MountRefusals(10) == 1);
+}
+
 // In combat with a target: do not mount even if a vendor is far away.
 void BotDoesNotMountInCombat()
 {
@@ -1012,6 +1031,7 @@ void RunPolicyTestsPart6()
     BotBelowTheMountLevelNeverAsksToMount();
     BotDoesNotMountForAShortWalk();
     BotDismountsWhenClose();
+    MountRefusalsAreCounted();
     BotDoesNotMountInCombat();
     LowHealthFleesFromAHostileItIsNotFighting();
     WeakestTargetIsPulledFirst();
