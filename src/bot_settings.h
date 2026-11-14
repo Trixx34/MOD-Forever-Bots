@@ -28,6 +28,7 @@
 #include "city_inspect.h"
 #include "transport_ride.h"
 #include "city_greet.h"
+#include "meet_greet.h"
 #include "quest_invite.h"
 #include "realism.h"
 #include "taxi_policy.h"
@@ -253,6 +254,8 @@ struct BotSettings
     quest_invite::Settings QuestInvite;
     // Group quests (config QuestGroups, off by default; quest_group.h). WaitMs is QuestGroupWaitMinutes in minutes.
     quest_group::Settings QuestGroups;
+    meet_greet::Settings MeetGreet;
+    std::string MeetGreetFile = "data/meet_greetings.txt";
     // ADVISOR-MEMBERS
     // Supplies (layout 15, config keys Supplies, SupplyAmmoLow, SupplyAmmoTarget, SupplyFoodLow, SupplyFoodTarget, SupplyDrinkLow, SupplyDrinkTarget,
     // SupplyTripSec; off by default): bots buy ammunition, food and drink at vendors that sell what they can use, and eat and drink while resting.

@@ -1,0 +1,52 @@
+# One line per greeting a bot says (/say) when it passes a player or another bot in the field (MeetGreet). Short, neutral English, no mention of
+# what the speaker is. Lines over 255 bytes are skipped. Keep the pool large: a line is not repeated by the same character within 8 greetings.
+Hey!
+Hi there.
+Hello!
+Evening, friend.
+Morning!
+Well met.
+Hey, how's the road treating you?
+Hi! Doing alright out here?
+Hello, traveler.
+Greetings!
+Oh, hello. Didn't see you there.
+Good to see another face out here.
+Hey there, any luck today?
+Hi. Quiet around here, isn't it?
+Hail!
+Hello, hello.
+Howdy.
+Hey, safe travels.
+Hi! Mind the wildlife over there.
+Good day to you.
+Hey, nice to see company.
+Hello! Heading far?
+Well, hello.
+Hi, how's it going?
+Hey, watch out for that pack up the road.
+Greetings, adventurer.
+Oh, hi! Good luck out there.
+Hey, you look like you know the way.
+Hi. Long day?
+Hello there, stranger.
+Heya.
+Hey, good hunting.
+Hi! Lovely spot, this.
+Salutations.
+Hey, got a minute? Never mind, safe travels.
+Hello! Take care out there.
+Hey, fellow wanderer.
+Hi, don't mind me, just passing through.
+Hey! Nice gear.
+Hello, and good luck.
+Evenin'.
+Yo.
+Hi hi.
+Hey, how are the nerves holding up?
+Hello! Seen anything interesting lately?
+Hey, stay sharp out there.
+Good to meet you on the road.
+Hi! Have a good one.
+Hello again, the world is small.
+Hey, enjoy the scenery.

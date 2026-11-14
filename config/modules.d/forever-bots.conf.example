@@ -254,6 +254,16 @@ Module.forever-bots.TelemetrySummarySec = 60
 # CityGreetZoneMax = 2   (lines a minute over all bots of one map)
 # CityGreetFile = data/city_greetings.txt
 # AuctionTalkFile = data/auction_talk.txt
+# MeetGreet = 0          (a bot on its own, out of combat, that passes a player or another bot within 15 yards anywhere outside the capitals (inside them when CityGreet
+#                         is off) now and then waves or bows, says a short /say hello from MeetGreetFile, or both; one greeting per bot per MeetGreetBotCooldownSec,
+#                         one per pair of characters per MeetGreetPairCooldownSec, no line repeated by the same bot within 8 greetings)
+# MeetGreetChancePct = 3          (per look at a unit in range, 0 to 100)
+# MeetGreetZoneMax = 2            (greetings a minute over all bots of one map)
+# MeetGreetBotCooldownSec = 600   (0 to 86400)
+# MeetGreetPairCooldownSec = 1800 (0 to 86400)
+# MeetGreetWavePct = 40           (the share of greetings that is an emote alone, a wave or now and then a bow)
+# MeetGreetSayPct = 100           (of the other greetings, the share that is spoken; the rest becomes an emote alone)
+# MeetGreetFile = data/meet_greetings.txt
 # QuestInvite = 0        (an idle bot and a human on the same quest objective, the human within 30 yards: the bot invites the human to its group, once per
 #                         human per 30 minutes, never within 2 hours of a decline; the shared objective comes from the snapshot and a decline from the protocol 22
 #                         event GroupScript.OnInviteDeclined)
