@@ -81,6 +81,16 @@ Module.forever-bots.TelemetrySummarySec = 60
 # once; the core still refuses that unless Bot.Actions.Teleport = 1. A refused teleport drops the start either way.
 # QuestTeleport = 0
 
+# Off-map recovery. A living bot that stands more than OffMapMarginYards outside the known places of its map (quest givers and anchors, grind
+# spots, hubs; only maps with 10 or more of them, so never an instance) for OffMapSeconds is teleported to the nearest known place of its faction,
+# at most once per OffMapCooldownSec. For a bot left far off an island or a coast by a GM teleport or a follow. Not on a flight or transport, in
+# combat, dead, or while a dungeon route, tank lead, taming or a scenario holds it. Log: off_map_seen, off_map_home (teleport_refused when the core
+# says no). Needs Bot.Actions.Teleport = 1 in the core.
+# OffMapRecover = 1
+# OffMapSeconds = 60   (10 to 3600)
+# OffMapCooldownSec = 600   (60 to 86400)
+# OffMapMarginYards = 500   (100 to 5000)
+
 # Auto gear. 1 = the core dresses every bot for its class and level when it first appears and after it gains AutoGearEveryLevels levels
 # (best usable item per slot, uncommon quality at most; Bot.AutoGear.MaxQuality in the core's config). Off by default. With it off, a
 # player in a party can type .autogear to dress the bots that player leads.

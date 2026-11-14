@@ -668,6 +668,10 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadBool(config, "AutoGearing", settings.AutoGearing, warnings);
     ReadBool(config, "TalentRespec", settings.TalentRespec, warnings);
     ReadBool(config, "QuestTeleport", settings.QuestTeleport, warnings);
+    ReadBool(config, "OffMapRecover", settings.OffMapRecover, warnings);
+    ReadKey(config, "OffMapSeconds", 10, 3600, settings.OffMapSeconds, warnings);
+    ReadKey(config, "OffMapCooldownSec", 60, 86400, settings.OffMapCooldownSec, warnings);
+    ReadKey(config, "OffMapMarginYards", 100, 5000, settings.OffMapMarginYards, warnings);
     ReadBool(config, "ChatCommands", settings.ChatCommands, warnings);
     ReadBool(config, "ChatOrders", settings.ChatOrders, warnings);
     ReadBool(config, "ChatControl", settings.ChatControl, warnings);

@@ -74,6 +74,13 @@ void ChatSettings()
     CHECK(!off.ChatCommands && !off.ChatOrders && !off.ChatControl && !off.QuestTeleport); // all off by default
     BotSettings const on = ParseBotSettings({ { "ChatCommands", "1" }, { "ChatOrders", "1" }, { "ChatControl", "1" }, { "QuestTeleport", "1" } }, warnings);
     CHECK(on.ChatCommands && on.ChatOrders && on.ChatControl && on.QuestTeleport && warnings.empty());
+    // Off-map recovery: on by default; the times and the margin are read and bounded.
+    CHECK(off.OffMapRecover && off.OffMapSeconds == 60 && off.OffMapCooldownSec == 600 && off.OffMapMarginYards == 500);
+    BotSettings const offMap = ParseBotSettings({ { "OffMapRecover", "0" }, { "OffMapSeconds", "120" }, { "OffMapCooldownSec", "1800" }, { "OffMapMarginYards", "800" } }, warnings);
+    CHECK(!offMap.OffMapRecover && offMap.OffMapSeconds == 120 && offMap.OffMapCooldownSec == 1800 && offMap.OffMapMarginYards == 800 && warnings.empty());
+    std::vector<std::string> offMapWarnings;
+    BotSettings const offMapBad = ParseBotSettings({ { "OffMapSeconds", "5" } }, offMapWarnings);
+    CHECK(offMapBad.OffMapSeconds == 60 && offMapWarnings.size() == 1);
     CHECK(!off.QuestGroups.Enabled && off.QuestGroups.WaitMs == 600000 && off.QuestGroups.RangeYards == 150.0f); // group quests are off by default
     BotSettings const groups = ParseBotSettings({ { "QuestGroups", "1" }, { "QuestGroupWaitMinutes", "5" }, { "QuestGroupRangeYards", "80" }, { "QuestGroupGuildHelpers", "0" } }, warnings);
     CHECK(groups.QuestGroups.Enabled && groups.QuestGroups.WaitMs == 300000 && groups.QuestGroups.RangeYards == 80.0f && !groups.QuestGroups.GuildHelpers && warnings.empty());

@@ -24,7 +24,7 @@ FOREVER = {
     7: {"Water Shield": 408510},   # Lava Burst is gone from the 70790 client
     8: {"Icy Veins": 425121, "Ice Lance": 400640},
     9: {},  # no Forever row: Fel Armor is left out (no trainer teaches it)
-    11: {"Starsurge": 417157, "Sunfire": 414684},
+    11: {},  # Starsurge and Sunfire: Season of Discovery runes (AcquireMethod 3), nothing teaches them, so no rows
 }
 VANILLA = {
     1: {"Heroic Strike": 78, "Thunder Clap": 6343, "Cleave": 845},
@@ -94,12 +94,12 @@ check(order(2, 678, 20271), "paladin: Holy Strike before Judgement")
 block_order = lambda cls, spec, a, b: ids(blocks[(cls, spec)]).index(a) < ids(blocks[(cls, spec)]).index(b)
 check(order(8, 400640, 116), "mage: Ice Lance before Frostbolt")
 check(block_order(5, "shadow", 402668, 8092), "priest shadow: Vampiric Touch before Mind Blast")
-check(order(11, 417157, 5176), "druid: Starsurge before Wrath")
 
 row = lambda cls, sid: next(r for r in classes[cls] if r.split()[1] == str(sid))
 check(not any(r.split()[1] in ("424785", "1310222", "440488", "1329555", "1328548") for c in classes for r in classes[c]), "spells no trainer teaches are no rows")
 check("duration 18" in row(5, 425204) and "duration 15" in row(5, 402668), "priest damage over time lengths")
 check("range 0 5" in row(2, 678), "Holy Strike is a melee strike")
+check(not any(r.split()[1] in ("417157", "414684") for r in classes.get(11, [])), "no Starsurge or Sunfire row")
 check(row(7, 408510).startswith("buff") and "duration 600" in row(7, 408510), "Water Shield is a 10 minute upkeep buff")
 # Fel Armor (403619) is left out: no trainer teaches it, so a bot never knows it, and a supersede to it would stop Demon Armor for good
 check(not any(r.split()[1] == "403619" for r in classes[9]), "Fel Armor is not a warlock row")
@@ -131,6 +131,30 @@ for cls, spells in FOREVER.items():
         check(f"no spell named '{name}'" in err, f"a warning for {name}")
 for cls, spells in VANILLA.items():
     check(all(sid in ids(classes.get(cls, [])) for sid in spells.values()), f"class {cls}: vanilla rows are kept")
+
+# 3. the minimum range from a range file (as --dbc reads it from SpellMisc and SpellRange): a row below it is raised, a row with no range gets one,
+# a self row and a row already at the minimum are left alone, and each change is a warning.
+sys.path.insert(0, os.path.join(ROOT, "tools"))
+import make_rotations  # noqa: E402
+ranges = {2643: (8.0, 35.0), 20900: (8.0, 35.0), 585: (0.0, 30.0)}
+warnings = []
+check(make_rotations.apply_min_range(" level 18 enemies 2 target range 0 35", [2643], ranges, "a", warnings) == " level 18 enemies 2 target range 8 35", "range 0 raised to 8")
+check(make_rotations.apply_min_range(" level 20 always target range 0 35", [19434, 20900], ranges, "b", warnings) == " level 20 always target range 8 35", "any rank's minimum counts")
+check(make_rotations.apply_min_range(" level 18 always target", [2643], ranges, "c", warnings) == " level 18 always target range 8 35", "a row with no range gets one")
+check(make_rotations.apply_min_range(" level 18 always target range 8 35", [2643], ranges, "d", warnings) == " level 18 always target range 8 35", "already right")
+check(make_rotations.apply_min_range(" level 1 always target range 0 30", [585], ranges, "e", warnings) == " level 1 always target range 0 30", "no minimum range")
+check(make_rotations.apply_min_range(" level 1 self_hp_below 40 self", [2643], ranges, "f", warnings) == " level 1 self_hp_below 40 self", "a self row is left alone")
+check(len(warnings) == 3, "a warning for each change")
+with tempfile.TemporaryDirectory() as tmp:
+    log, spec, rng = (os.path.join(tmp, n) for n in ("Server.log", "spec.txt", "ranges.txt"))
+    with open(log, "w", encoding="utf-8") as handle:
+        handle.write(dump_line(3, {"Multi-Shot": 2643}) + "\n")
+    with open(spec, "w", encoding="utf-8") as handle:
+        handle.write('class 3\nrow "Multi-Shot" enemies 2 target range 0 35\n')
+    with open(rng, "w", encoding="utf-8") as handle:
+        handle.write("2643 8 35\n")
+    done = subprocess.run([sys.executable, "-I", TOOL, "--dump", log, "--spec", spec, "--ranges", rng], capture_output=True, text=True, check=True)
+    check("target range 8 35" in done.stdout and "raised to the minimum range 8" in done.stderr, "--ranges raises the row")
 
 if failures:
     print(f"{failures} failure(s)")
