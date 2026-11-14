@@ -362,6 +362,8 @@ if(Python3_Interpreter_FOUND)
     # The pre-raid gear list generator on a small fixture and a fake mysql command.
     add_test(NAME gen_prebis COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/gen_prebis_test.py ${CMAKE_CURRENT_SOURCE_DIR})
     add_test(NAME snapshot_replay COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/snapshot_replay_test.py)
+    # The grind spot data: well-formed, and map 2991 (Skyborne start) has spots for levels 3 to 14.
+    add_test(NAME grind_data COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/grind_data_test.py ${CMAKE_CURRENT_SOURCE_DIR})
     # The spec of rotations made into a rotation file by tools/make_rotations.py.
     add_test(NAME make_rotations COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/make_rotations_test.py ${CMAKE_CURRENT_SOURCE_DIR})
     # The world database tools: dump_to_sqlite.py and export_world_quests.py on a tiny made-up dump.
