@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Policy tests, part 1 of 8 (split out of policy_test.cpp; the helpers are in policy_test_support.h).
 #include "policy_test_support.h"
+#include "bot_policy_internal.h"   // StartAreaOfRace, kLeaderAwaySoloMs
 
 namespace {
 
@@ -937,6 +938,95 @@ void PartySideOfDecidesTheSides()
     CHECK(HasGroup(actions, 12, 1, PlayerOf(10)) && !HasGroup(actions, 12, 1, PlayerOf(11)));
 }
 
+// Within a side, the bots of one starting area party together (StartAreaOfRace): Orcs (race 2) with Orcs, Undead (race 5) with Undead. The cut used
+// to be by guid alone, and a member on another continent than its leader stood for the whole run (2026-11-14 sim).
+void PartiesAreCutPerStartingArea()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.PartyCount = 2;
+    options.ClassOf = WarriorLeads;
+    options.PartySideOf = [](std::uint64_t) { return std::uint8_t(2); };
+    options.RaceOf = [](std::uint64_t guid) { return guid % 2 == 0 ? 2u : 5u; };
+    BotPolicy policy(options);
+    auto const actions = policy.Decide(PartyView({ 10, 11, 12, 13, 14, 15, 16, 17, 18, 19 }), 0);
+    CHECK(HasGroup(actions, 12, 1, PlayerOf(10)) && HasGroup(actions, 12, 1, PlayerOf(18)));   // the Orc party: 10, 12 (leads), 14, 16, 18
+    CHECK(!HasGroup(actions, 12, 1, PlayerOf(11)) && !HasGroup(actions, 12, 1, PlayerOf(13)));
+    CHECK(HasGroup(actions, 11, 1, PlayerOf(13)) && HasGroup(actions, 11, 1, PlayerOf(19)));   // the Undead party: 11 (first guid leads) to 19
+    CHECK(!HasGroup(actions, 11, 1, PlayerOf(10)));
+
+    CHECK(StartAreaOfRace(2) == StartAreaOfRace(8));     // Orc, Troll
+    CHECK(StartAreaOfRace(3) == StartAreaOfRace(7));     // Dwarf, Gnome
+    CHECK(StartAreaOfRace(95) == StartAreaOfRace(96));   // Skyborne, both sides
+    CHECK(StartAreaOfRace(1) != StartAreaOfRace(3) && StartAreaOfRace(5) != StartAreaOfRace(2) && StartAreaOfRace(6) != StartAreaOfRace(2));
+    CHECK(StartAreaOfRace(0) == 0 && StartAreaOfRace(40) != StartAreaOfRace(41));
+}
+
+// A party member whose leader is alive on another map cannot follow it. It used to stand where it was for the whole run (no grind, no wander for a
+// party member); after kLeaderAwaySoloMs it walks on its own, and the stuck_idle line names the leader's map.
+void AMemberWhoseLeaderIsOnAnotherMapGoesSolo()
+{
+    std::vector<std::string> events;
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 2;
+    options.PartyCount = 1;
+    options.ClassOf = WarriorLeads;
+    options.OnEvent = [&events](std::string const& text) { events.push_back(text); };
+    WorldTickSnapshotView view = PartyView({ 10, 12 }, WarriorLeads);
+    for (BotSnapshot& bot : view.bots)
+    {
+        bot.group_role = bot.guid == 12 ? 2 : 1;
+        bot.group_leader_guid = PlayerOf(12);
+        bot.level = 5;
+    }
+    view.bots[0].map_id = 0;   // member 10: Tirisfal
+    view.bots[1].map_id = 1;   // leader 12: Durotar
+    auto const walks = [](std::vector<BotAction> const& actions)
+    {
+        for (BotAction const& action : actions)
+            if (action.bot_guid == 10 && (action.type == ActionType::kMoveTo || action.type == ActionType::kFollow))
+                return true;
+        return false;
+    };
+    BotPolicy policy(options);
+    bool early = false;
+    bool later = false;
+    for (std::uint64_t at = 0; at <= 400000; at += 1000)
+    {
+        view.tick_number = at / 100 + 1;
+        bool const moved = walks(policy.Decide(view, at));
+        if (at < kLeaderAwaySoloMs)
+            early = early || moved;
+        else
+            later = later || moved;
+    }
+    CHECK(!early);   // the first two minutes: it waits, the leader may come back
+    CHECK(later);    // then it walks on its own
+
+    // With nowhere to walk (WanderWhenIdle off) it stays, and the stuck_idle line says why: its leader is on map 1.
+    PolicyOptions still = options;
+    still.WanderWhenIdle = false;
+    BotPolicy stays(still);
+    for (std::uint64_t at = 1000; at <= 620000; at += 1000)   // the first check sets the mark, the second (two kStuckCheckMs later) reports
+    {
+        view.tick_number = at / 100 + 1;
+        stays.Decide(view, at);
+    }
+    CHECK(Logged(events, "stuck_idle: bot=10"));
+    CHECK(LoggedWith(events, "leader=12 leader_map=1 leader_away_solo=1"));
+
+    // The same party on one map: the member follows its leader, it does not go solo.
+    BotPolicy together(options);
+    WorldTickSnapshotView same = view;
+    same.bots[0].map_id = 1;
+    same.bots[0].pos_x = 200.0f;
+    bool followed = false;
+    for (std::uint64_t at = 0; at <= 5000; at += 1000)
+        for (BotAction const& action : together.Decide(same, at))
+            followed = followed || (action.bot_guid == 10 && action.type == ActionType::kFollow);
+    CHECK(followed);
+}
+
 void ABotLeadersInviteIsAnsweredOnce()
 {
     // With AcceptInvites on (a player's invite is accepted), an invite from a bot leader is still answered by the party code only: one accept,
@@ -1017,6 +1107,8 @@ void RunPolicyTestsPart1()
     OldPartiesAreLeftBeforeTheNewOnesForm();
     ALeaderWithItsOwnPendingPartyKeepsInviting();
     PartySideOfDecidesTheSides();
+    PartiesAreCutPerStartingArea();
+    AMemberWhoseLeaderIsOnAnotherMapGoesSolo();
     ABotLeadersInviteIsAnsweredOnce();
     OnlyAShareOfTheBotsFormParties();
     IdleBotsCraftTheirTwoSkillsInTurnAndWaitAfterARefusal();

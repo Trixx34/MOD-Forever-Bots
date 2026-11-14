@@ -243,6 +243,22 @@ std::uint32_t ClassFor(PolicyOptions const& options, std::uint64_t guid)
     return options.ClassId;
 }
 
+std::uint32_t StartAreaOfRace(std::uint32_t race)
+{
+    switch (race)
+    {
+        case 0: return 0;
+        case 1: return 1;            // Human: Northshire
+        case 3: case 7: return 2;    // Dwarf, Gnome: Coldridge Valley
+        case 4: return 3;            // Night Elf: Shadowglen
+        case 2: case 8: return 4;    // Orc, Troll: Valley of Trials
+        case 5: return 5;            // Undead: Deathknell
+        case 6: return 6;            // Tauren: Camp Narache
+        case 95: case 96: return 7;  // Skyborne (Alliance, Horde): map 2991
+        default: return 1000 + race;
+    }
+}
+
 bool NoAmmo(BotSnapshot const& bot, std::uint32_t classId)
 {
     return classId == kHunterClass && bot.ammo_entry != 0 && bot.ammo_count == 0;

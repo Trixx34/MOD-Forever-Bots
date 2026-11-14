@@ -398,7 +398,7 @@ void BotPolicy::TurnWander(DecideTick& tick, BotTurn& turn)
             idle = false;
         }
     }
-    else if (idle && healthy && _options.WanderWhenIdle && grindMode && nowMs >= state.GrindRetryAtMs && !partyMember && !stagingHold && !state.ChatStay && state.ChatFollow == 0)
+    else if (idle && healthy && _options.WanderWhenIdle && grindMode && nowMs >= state.GrindRetryAtMs && (!partyMember || turn.leaderAwaySolo) && !stagingHold && !state.ChatStay && state.ChatFollow == 0)
     {
         // Leveling: after a quiet spell the bot walks to a grind spot that suits its level (nearest first, not the ones it just left), and
         // stays to fight what lives there until it sees nothing for a while again.
@@ -463,7 +463,7 @@ void BotPolicy::TurnWander(DecideTick& tick, BotTurn& turn)
             }
         }
     }
-    else if (idle && healthy && _options.WanderWhenIdle && !partyMember && !state.ChatStay && state.ChatFollow == 0 && hubs != _options.HubsByMap.end() && !hubs->second.empty() &&
+    else if (idle && healthy && _options.WanderWhenIdle && (!partyMember || turn.leaderAwaySolo) && !state.ChatStay && state.ChatFollow == 0 && hubs != _options.HubsByMap.end() && !hubs->second.empty() &&
              state.HubFailures < kHubFailuresMax)
     {
         std::vector<Point> const& list = hubs->second;
@@ -518,7 +518,7 @@ void BotPolicy::TurnWander(DecideTick& tick, BotTurn& turn)
     // Exploring on foot: a bot with no grind spot and no hub it can reach (a map with neither, or hubs it never got to) would stand where it
     // began and never meet a creature, as 45 bots did for eight hours in the soak. After a short quiet it takes a walk of 50 to 100 yards in a
     // turning direction, and after a few walks tries its hubs again.
-    else if (idle && healthy && _options.WanderWhenIdle && (!grindMode || nowMs < state.GrindRetryAtMs) && !partyMember && !state.ChatStay && state.ChatFollow == 0)
+    else if (idle && healthy && _options.WanderWhenIdle && (!grindMode || nowMs < state.GrindRetryAtMs) && (!partyMember || turn.leaderAwaySolo) && !state.ChatStay && state.ChatFollow == 0)
     {
         // Starts a walk to a new random point; scale shortens it (a retry after a refused point). The point is at the bot's own height, so
         // the core often has no route to it (open ground the navmesh does not cover): a refused point is retried nearer, not after the idle pause.
@@ -614,7 +614,13 @@ void BotPolicy::TurnRestAndConsume(DecideTick& tick, BotTurn& turn)
                              " idleForS=" + std::to_string(state.Idling ? (nowMs - state.IdleSinceMs) / 1000 : 0) +
                              " pos=" + std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) + "," + std::to_string(int(bot.pos_z)) +
                              " in_combat=" + std::to_string(bot.in_combat) + " route_index=" + std::to_string(state.RouteIndex) +
-                             " tank_lead=" + std::to_string(state.TankLead) + " event_active=" + std::to_string(state.Events && state.Events->Active()));
+                             " tank_lead=" + std::to_string(state.TankLead) + " event_active=" + std::to_string(state.Events && state.Events->Active()) +
+                             // why it holds (the move reason of this turn) and where its party leader is: a leader on another map was the 2026-11-14 sim's main cause
+                             " why=" + (turn.moveWhy && *turn.moveWhy ? turn.moveWhy : "none") + " class=" + std::to_string(turn.classId) +
+                             (turn.partyMember ? " leader=" + std::to_string(turn.partyLeader) + " leader_map=" +
+                                                     (turn.leaderSnap ? std::to_string(turn.leaderSnap->map_id) : std::string("offline")) +
+                                                     " leader_away_solo=" + std::to_string(turn.leaderAwaySolo)
+                                               : std::string()));
         }
         state.DiagAtMs = nowMs;
         state.DiagX = bot.pos_x;

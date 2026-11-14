@@ -408,14 +408,18 @@ void BotPolicy::BuildParties(WorldTickSnapshotView const& view,
     // and the PartyCount parties with the lowest first guids are kept. When the module can tell the sides, a bot whose side is not known (its race is
     // not in the table) is left out: it could land in a party of the other side, and the server would refuse that invite for ever. Without a side
     // lookup (the tests) every bot has side 0 and they all party together.
+    // Within a side, the bots of one starting area party together (StartAreaOfRace): the cut used to be by guid alone, so an Undead in Tirisfal, an Orc
+    // in Durotar and a Skyborne on map 2991 made one party. A member only follows a leader on its own map and does not grind or wander while it is in a
+    // party, so the members on the other continents stood where they were for the whole run: 83 of 153 stuck_idle lines of the 2026-11-14 sim
+    // (party=1, wanted=stop, level 1 to 9, leader on another map). Without a race lookup (the tests) every bot is in area 0, the old cut.
     bool const sidesKnown = bool(_options.PartySideOf) || bool(_options.SideOf);
-    std::map<std::uint8_t, std::vector<std::uint64_t>> bySide;
+    std::map<std::pair<std::uint8_t, std::uint32_t>, std::vector<std::uint64_t>> bySide;
     for (std::uint64_t guid : guids)
     {
         std::uint8_t const side = _options.PartySideOf ? _options.PartySideOf(guid) : (_options.SideOf ? _options.SideOf(guid) : std::uint8_t(0));
         if (sidesKnown && side == 0)
             continue;
-        bySide[side].push_back(guid);
+        bySide[{ side, _options.RaceOf ? StartAreaOfRace(_options.RaceOf(guid)) : 0u }].push_back(guid);
     }
     // With PartyPercent or RandomPct set the parties are not all of the full size: each is 2 to PartySize bots, the size drawn from its first bot.
     bool const variedSizes = _options.PartySize > 2 && (_options.PartyPercent < 100 || _options.RandomPct > 0);
