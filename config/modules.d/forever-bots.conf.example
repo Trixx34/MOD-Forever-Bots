@@ -123,6 +123,11 @@ Module.forever-bots.TelemetrySummarySec = 60
 # (tools/make_grind_spots.py, doc/grind-spots.md).
 # GrindFile = "data/grind_spots.txt"
 #
+# Pre-raid gear for scenarios: a folder with one list per class (<classId>.txt, an item entry per line, # comments). The items a scenario grants a class
+# instead of auto gear, for each class without its own ScenarioGear<classId>. data/prebis/ holds the lists made by tools/gen_prebis.py. Needs Bot.Actions.Grant
+# in the core (doc/pre-raid-gear.md). Empty = off.
+# ScenarioGearFile = ""
+#
 # Chat commands (party chat, raid chat, or a whisper to one bot; or the .bots dot command). Both are off by default. Only the leader of a group
 # can command the bots in it. ChatCommands: follow [off], stay [off], goto here, release, status. ChatOrders adds: stop, pull, heal, passive,
 # aggressive. A selector may come first: all, tank, healer, dps, a class name (rogue, rogues), or a comma list: "healer follow", "rogue,mage stay".
