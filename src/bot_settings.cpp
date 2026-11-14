@@ -796,6 +796,22 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadKey(config, "SpiritHealerAfterMs", 0, 3600000, settings.SpiritHealerAfterMs, warnings);
     ReadBool(config, "SpiritHealerOnRepeat", settings.SpiritHealerOnRepeat, warnings);
     ReadBool(config, "HealDownrank", settings.HealDownrank, warnings);
+    ReadBool(config, "IdleEnemyAttackersOnly", settings.IdleEnemyAttackersOnly, warnings);
+    ReadBool(config, "CasterMeleeWithoutSpell", settings.CasterMeleeWithoutSpell, warnings);
+    ReadKey(config, "EngageMaxLevelAbove", 0, 60, settings.EngageMaxLevelAbove, warnings);
+    ReadBool(config, "EngageEliteSolo", settings.EngageEliteSolo, warnings);
+    ReadKey(config, "GhostFallbackSec", 0, 3600, settings.GhostFallbackSec, warnings);
+    if (auto const ghostMax = config.find("GhostMaxSec"); ghostMax != config.end() && ghostMax->second == "0")
+        settings.GhostMaxSec = 0; // explicitly no bound
+    else
+        ReadKey(config, "GhostMaxSec", 60, 86400, settings.GhostMaxSec, warnings);
+    if (auto const area = config.find("DeathAreaCount"); area != config.end() && area->second == "0")
+        settings.DeathAreaCount = 0; // explicitly off
+    else
+        ReadKey(config, "DeathAreaCount", 2, 50, settings.DeathAreaCount, warnings);
+    ReadKey(config, "DeathAreaWindowSec", 60, 86400, settings.DeathAreaWindowSec, warnings);
+    ReadKey(config, "DeathAreaYards", 10, 500, settings.DeathAreaYards, warnings);
+    ReadKey(config, "DeathAreaAvoidSec", 60, 86400, settings.DeathAreaAvoidSec, warnings);
     ReadBool(config, "ThreatHold", settings.ThreatHold, warnings);
     ReadKey(config, "ThreatHoldPct", 1, 100, settings.ThreatHoldPct, warnings);
     ReadKey(config, "ThreatReleasePct", 0, 99, settings.ThreatReleasePct, warnings);

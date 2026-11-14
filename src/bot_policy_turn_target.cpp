@@ -541,6 +541,30 @@ void BotPolicy::TurnTargeting(DecideTick& tick, BotTurn& turn)
     }
     else
         state.PullRestSinceMs = 0;
+
+    // The level-gap guard (EngageMaxLevelAbove, EngageEliteSolo): out of combat, outside a dungeon route, a bot does not start a fight with a creature far above its
+    // level, nor (solo) with an elite, rare elite or boss, whichever way the target came (its own last target, the focus, a party leader's target). PullTarget already
+    // leaves such creatures alone for the bot's own pulls; these paths did not (prod 2026-11-14: bot 641, level 5, died 590 times to a level 50 creature). A chat pull
+    // order (ForcedTarget) is the owner's and is kept, and so is the bot's own threat target (the core's: it is fighting it). In combat the bot defends itself as before.
+    if (targetRef != 0 && bot.in_combat == 0 && !routeOn && targetRef != state.ForcedTarget && targetRef != bot.threat_target_guid && (_options.EngageMaxLevelAbove != 0 || !_options.EngageEliteSolo))
+    {
+        NearbyUnit const* unit = FindLiveMob(nearby, targetRef);
+        if (!unit && partyMember)
+            unit = FindLiveMob(tick.LeaderNearby(partyLeader, bot.map_id), targetRef);
+        if (unit && unit->victim_ref == 0 && EngageTooStrong(bot, *unit, _options.EngageMaxLevelAbove, bot.group_leader_guid == 0 && partyLeader == 0, _options.EngageEliteSolo))
+        {
+            if (_options.OnEvent && state.LevelGapLoggedFor != targetRef)
+            {
+                state.LevelGapLoggedFor = targetRef;
+                _options.OnEvent("engage_skipped: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " target_entry=" +
+                                 std::to_string(forever_module::UnitRefEntry(targetRef)) + " target_level=" + std::to_string(unit->level) +
+                                 " elite=" + std::to_string(unit->elite != 0 || unit->creature_rank != 0 ? 1 : 0));
+            }
+            state.AvoidUntilMs[targetRef] = nowMs + kAvoidMs;
+            targetRef = 0;
+            targetUnit = nullptr;
+        }
+    }
 }
 
 BotPolicy::TurnFlow BotPolicy::TurnCrowdControl(DecideTick& tick, BotTurn& turn)

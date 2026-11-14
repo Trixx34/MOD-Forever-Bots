@@ -259,6 +259,19 @@ struct BotSettings
     std::uint32_t SpiritHealerAfterMs = 45000;
     bool SpiritHealerOnRepeat = true;
     bool HealDownrank = false;
+    // Leveling deaths (see PolicyOptions): IdleEnemyAttackersOnly (default on), CasterMeleeWithoutSpell (default on), EngageMaxLevelAbove (default 5, 0 = off, 0..60),
+    // EngageEliteSolo (default off), GhostFallbackSec (default 30, 0 = off, 0..3600), GhostMaxSec (default 600, 0 = no bound, else 60..86400), DeathAreaCount (default 3,
+    // 0 = off, else 2..50), DeathAreaWindowSec (default 900, 60..86400), DeathAreaYards (default 60, 10..500), DeathAreaAvoidSec (default 1800, 60..86400).
+    bool IdleEnemyAttackersOnly = true;
+    bool CasterMeleeWithoutSpell = true;
+    std::uint32_t EngageMaxLevelAbove = 5;
+    bool EngageEliteSolo = false;
+    std::uint32_t GhostFallbackSec = 30;
+    std::uint32_t GhostMaxSec = 600;
+    std::uint32_t DeathAreaCount = 3;
+    std::uint32_t DeathAreaWindowSec = 900;
+    std::uint32_t DeathAreaYards = 60;
+    std::uint32_t DeathAreaAvoidSec = 1800;
     // DPS threat discipline (config keys ThreatHold, ThreatHoldPct, ThreatReleasePct, ThreatHoldMaxSec, ThreatNearDeathPct, ThreatDropAbilities); see PolicyOptions.
     bool ThreatHold = true;
     std::uint32_t ThreatHoldPct = 90;

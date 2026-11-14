@@ -149,6 +149,39 @@ bool IsPlayer(NearbyUnit const& unit)
     return forever_module::UnitRefType(unit.guid) == 2 && unit.health > 0 && !unit.is_hostile;
 }
 
+bool AttacksOwnSide(WorldTickSnapshotView const& view, BotSnapshot const& bot, std::uint64_t victimRef)
+{
+    if (victimRef == 0)
+        return false;
+    if (victimRef == PlayerRef(bot.guid) || (bot.pet_guid != 0 && victimRef == bot.pet_guid))
+        return true;
+    if (bot.group_leader_guid == 0)
+        return false;
+    if (victimRef == bot.group_leader_guid)
+        return true;
+    for (BotSnapshot const& other : view.bots)
+        if (other.guid != bot.guid && other.group_leader_guid == bot.group_leader_guid &&
+            (victimRef == PlayerRef(other.guid) || (other.pet_guid != 0 && victimRef == other.pet_guid)))
+            return true;
+    return false;
+}
+
+bool EngageTooStrong(BotSnapshot const& bot, NearbyUnit const& unit, std::uint32_t maxAbove, bool solo, bool eliteSolo)
+{
+    if (maxAbove != 0 && bot.level != 0 && unit.level != 0 && unit.level > bot.level + maxAbove)
+        return true;
+    return solo && !eliteSolo && (unit.elite != 0 || unit.creature_rank == 1 || unit.creature_rank == 2 || unit.creature_rank == 3);
+}
+
+std::uint32_t DeathsNear(std::vector<BotDeathSpot> const& spots, std::uint32_t map, float x, float y, float yards, std::uint64_t nowMs, std::uint64_t windowMs)
+{
+    std::uint32_t count = 0;
+    for (BotDeathSpot const& spot : spots)
+        if (spot.Map == map && nowMs - spot.AtMs <= windowMs && std::hypot(spot.X - x, spot.Y - y) <= yards)
+            ++count;
+    return count;
+}
+
 void AvoidUnit(std::unordered_map<std::uint64_t, std::uint64_t>& avoidUntil, std::unordered_map<std::uint64_t, std::uint32_t>& count,
                std::uint64_t ref, std::uint64_t nowMs)
 {

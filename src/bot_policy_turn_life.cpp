@@ -326,6 +326,7 @@ void BotPolicy::TurnRevivedAndRoles(DecideTick& tick, BotTurn& turn)
     auto const& partyMember = turn.partyMember;
     turn.routeOn = IsRouteActive(bot.guid) || (partyLeader != 0 && tankLed.count(partyLeader) != 0);   // the dungeon party rules apply to this bot
     auto const& routeOn = turn.routeOn;
+    DeathAreaEscape(tick, turn);
     // A solo bot out of combat that is hurt (a reclaim brings it up at 50% health) rests before it fights or walks to a quest giver, up to kRecoverHoldMs: it is
     // treated as low on health (no target, no quest, away from a creature that is near, then sits). Prod 2026-11-12: revived at 49%, a bot pulled at once and died
     // to the same creature again, 812 deaths in 90 minutes.
@@ -560,4 +561,53 @@ void BotPolicy::TurnTransport(DecideTick& tick, BotTurn& turn)
     state.TransportNextMs = transport_ride::NextAfter(_options.TransportRide, nowMs, false);
     if (order == transport_ride::Order::kJoin)
         turn.transportHold = true; // the snapshot still shows the old place: no walk this turn that the boarding would undo
+}
+
+// The death area escape (DeathAreaCount): a solo bot, alive and out of combat, inside the area it avoids is put at a grind spot for its level at least kDeathLoopAwayYards
+// from it, and walks there as well (a goto) when the teleport is refused (Bot.Actions.Teleport off, a refusal in combat). The death loop escape above only ran at the
+// moment of a revive and only by teleport: prod 2026-11-14 bot 641, level 5, died 590 times in 18 hours at one spot of a level 50 zone.
+void BotPolicy::DeathAreaEscape(DecideTick& tick, BotTurn& turn)
+{
+    std::uint64_t const nowMs = tick.nowMs;
+    BotSnapshot const& bot = turn.bot;
+    BotState& state = turn.state;
+    if (_options.DeathAreaCount == 0 || nowMs >= state.AvoidAreaUntilMs || state.AvoidAreaMap != bot.map_id || bot.life_state != 0 || bot.in_combat != 0 ||
+        turn.partyLeader != 0 || turn.routeOn || turn.stagingHold || nowMs < state.AreaEscapeRetryMs)
+        return;
+    if (std::hypot(bot.pos_x - state.AvoidAreaX, bot.pos_y - state.AvoidAreaY) > float(_options.DeathAreaYards))
+        return;
+    state.AreaEscapeRetryMs = nowMs + kDeathAreaEscapeRetryMs;
+    if (!_options.Grind || _options.Grind->Spots.empty() || bot.level == 0)
+    {
+        LogEvent("death_area_escape: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id) + " result=no_grind_data");
+        return;
+    }
+    for (std::size_t const index : GrindSpotsForBot(state, bot, nowMs))
+    {
+        GrindSpot const& spot = _options.Grind->Spots[index];
+        if (std::hypot(spot.X - state.AvoidAreaX, spot.Y - state.AvoidAreaY) < kDeathLoopAwayYards)
+            continue;
+        BotAction away;
+        away.bot_guid = bot.guid;
+        away.type = ActionType::kTeleport;
+        away.spell_id = bot.map_id;
+        away.dest_x = spot.X;
+        away.dest_y = spot.Y;
+        away.dest_z = spot.Z;
+        tick.actions.push_back(away);
+        // The walk there, in case the teleport is refused; a teleport that lands ends it at once (the goto is done within 3 yards).
+        state.GotoActive = true;
+        state.GotoPoint = Point{ spot.X, spot.Y, spot.Z };
+        state.GotoUntilMs = nowMs + kDeathAreaWalkMs;
+        state.TrainAfterGoto = false;
+        state.Wandering = false;
+        state.EscapeUntilMs = nowMs + kDeathLoopCooldownMs;
+        state.GrindVisited.push_back(index);
+        if (state.GrindVisited.size() > kGrindMemory)
+            state.GrindVisited.erase(state.GrindVisited.begin());
+        LogEvent("death_area_escape: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id) + " from=" +
+                 std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) + " spot=" + std::to_string(index));
+        return;
+    }
+    LogEvent("death_area_escape: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id) + " result=no_spot_away");
 }

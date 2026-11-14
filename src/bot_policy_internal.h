@@ -122,6 +122,7 @@ constexpr float kMeleeCloserYards = 3.0f;        // and of a melee bot
 constexpr std::uint32_t kLosRefusalsAvoid = 3;   // this many line-of-sight refusals in a row and the target is avoided
 constexpr std::uint64_t kBusyRetryMs = 300;  // a cast refused because the bot was casting or moving: tried again very soon
 constexpr std::uint64_t kNotKnownRetryMs = 60000; // the spell may be learned later
+constexpr std::uint64_t kNoSpellRetryMs = 30000;  // CasterMeleeWithoutSpell: a spell whose retry lies further ahead than this is not counted as castable (a "not known", a long failure streak)
 constexpr float kOtherLevelHeight = 12.0f;  // yards: a hostile this far above or below the bot ...
 constexpr float kOtherLevelSlope = 0.5f;    // ... and steeper than this (height over flat distance, ~27 degrees) is on another level: a wall walk, a ledge, a floor above or below
 constexpr float kPullRadius = 10.0f;         // yards: hostiles this close to a candidate are pulled with it
@@ -486,6 +487,8 @@ constexpr std::uint32_t kVoidwalkerMinionEntry = 8996;
 constexpr float kSummonerReachYards = 35.0f; // how far from the tank's target the Warlock is still taken first (the snapshot's nearby range is 40)
 constexpr std::uint64_t kReclaimRetryMs = 3000;
 constexpr std::uint64_t kDeathLoopMs = 420000;         // three deaths within this time are a death loop: the bot is moved to a grind spot for its level (prod: a bot dying every ~62 s, so three deaths span ~125 s)
+constexpr std::uint64_t kDeathAreaEscapeRetryMs = 60000; // the death area escape: not again before this (a refused teleport, a walk under way)
+constexpr std::uint64_t kDeathAreaWalkMs = 600000;       // ... and its walk, when the teleport is refused, lasts at most this
 constexpr std::uint64_t kDeathLoopCooldownMs = 120000; // after an escape the bot is not moved again before this
 constexpr std::uint32_t kRecoverPullPct = 75;           // a solo bot out of combat below this health starts no fight and no quest walk: it backs off and rests first (prod 2026-11-12: bots revived at 49% pulled the creature that had killed them, 812 deaths in 90 minutes)
 constexpr std::uint64_t kRecoverHoldMs = 150000;       // ... for at most this long, so a bot that cannot regenerate does not stand for good
@@ -519,6 +522,7 @@ constexpr std::uint64_t kSpiritHealerRepeatWindowMs = 300000;
 constexpr std::uint64_t kSpiritHealerRetryMs = 3000;
 constexpr std::uint64_t kSpiritHealerRefusedMs = 120000;
 constexpr std::uint64_t kHealDownrankPauseMs = 600000;   // after a kNotKnown for an exact heal rank (the level said the bot has it, the core says it has not)
+constexpr float kGhostFallbackHealerYards = 30.0f;  // the ghost fallback: a ghost farther than this from where it appeared (the graveyard) is put back there first (the core looks for a spirit healer within 40)
 constexpr std::uint32_t kSpiritHealerSpell = 2;     // kResurrect spell_id: take the spirit healer
 // The pure rule: does a ghost at its corpse, with a live hostile near it since dangerSinceMs (0 = none), take the spirit healer now?
 inline bool SpiritHealerWanted(std::uint64_t afterMs, bool onRepeat, std::uint64_t nowMs, std::uint64_t dangerSinceMs, bool killerRepeat,
@@ -644,6 +648,17 @@ bool IsLiveMob(NearbyUnit const& unit);
 
 // A friendly player the bot may follow. A hostile player is not followed: it would lead the bot into a fight.
 bool IsPlayer(NearbyUnit const& unit);
+
+// IdleEnemyAttackersOnly: `victimRef` (a NearbyUnit::victim_ref) is the bot, its pet, its party leader, or a bot of its party or that bot's pet. A bot that starts no fight
+// of its own (noSelfPull) counts only such a creature as an enemy near: a neutral or passive creature beside it kept it standing for good (the sim's 'Galorogar').
+bool AttacksOwnSide(WorldTickSnapshotView const& view, BotSnapshot const& bot, std::uint64_t victimRef);
+
+// The level-gap guard (EngageMaxLevelAbove, EngageEliteSolo): a creature the bot does not start a fight with out of combat. More than maxAbove levels above the bot
+// (0 = no level rule; a level of 0 is unknown and not judged), or an elite, rare elite or boss for a bot without a party (solo) unless eliteSolo.
+bool EngageTooStrong(BotSnapshot const& bot, NearbyUnit const& unit, std::uint32_t maxAbove, bool solo, bool eliteSolo);
+
+// The death area (DeathAreaCount, DeathAreaYards): how many of the death spots lie on `map` within `yards` of (x, y) and are no older than windowMs.
+std::uint32_t DeathsNear(std::vector<BotDeathSpot> const& spots, std::uint32_t map, float x, float y, float yards, std::uint64_t nowMs, std::uint64_t windowMs);
 
 // Avoids a unit for kAvoidMs, doubled for each earlier time it was avoided, so a unit that keeps coming back (a trainer the
 // bot cannot attack) is left alone for longer each time.
