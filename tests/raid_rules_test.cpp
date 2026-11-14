@@ -121,6 +121,16 @@ void TestAvoidEnemyAuraRows()
     CHECK(!b.HasAvoidEnemy(309));
 }
 
+// `tanks` (ZG levers): its own group bit, not part of `all`.
+void TestTanksGroup()
+{
+    std::vector<std::string> errors;
+    Table t = Parse("avoid_enemy|309|11350|33|tanks|x\navoid_enemy|309|11350|33|all|x\n", errors);
+    CHECK(errors.empty());
+    auto const zones = t.AvoidEnemyFor(309, 11350);
+    CHECK(zones.size() == 2 && zones[0].Who == kWhoTanks && (zones[1].Who & kWhoTanks) == 0);
+}
+
 void TestPullPosition()
 {
     std::vector<std::string> errors;
@@ -210,7 +220,13 @@ void TestShippedFile()
     CHECK(!t.AvoidEnemyFor(309, 14507).empty() && t.AvoidEnemyFor(309, 14507)[0].Yards == 15.0f);
     CHECK(!t.SpreadFor(309, 14507).empty());
     CHECK(!t.PullPositionOf(309, 11350));    // the lone thrower shares the entry: no pullpos row, Axe Flurry is avoided (avoid_enemy)
-    CHECK(t.AvoidEnemyFor(309, 11350).size() == 2);
+    // healers, ranged, and (ZG levers, acted on only with RaidAvoidEnemyMelee / RaidAvoidEnemyTank) melee and tanks
+    auto const thrower = t.AvoidEnemyFor(309, 11350);
+    CHECK(thrower.size() == 4);
+    std::uint8_t groups = 0;
+    for (EnemyZone const& zone : thrower)
+        groups |= zone.Who;
+    CHECK(groups == (kWhoAll | kWhoTanks));
     for (std::uint32_t entry : { 11371u, 11372u })
     {
         std::optional<PullPosition> const pos = t.PullPositionOf(309, entry);
@@ -227,6 +243,7 @@ int main()
     TestLeash();
     TestSpacingAndAuraRows();
     TestAvoidEnemyAuraRows();
+    TestTanksGroup();
     TestPullPosition();
     TestErrors();
     TestMerge();

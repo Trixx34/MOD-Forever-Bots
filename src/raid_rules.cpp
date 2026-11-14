@@ -67,6 +67,8 @@ std::optional<std::uint8_t> WhoOf(std::string const& text)
         return kWhoHealers;
     if (text == "melee")
         return kWhoMelee;
+    if (text == "tanks")
+        return kWhoTanks;
     return std::nullopt;
 }
 
@@ -176,7 +178,7 @@ Table Parse(std::string_view text, std::vector<std::string>& errors)
             auto const who = f.size() > 4 ? WhoOf(f[4]) : std::nullopt;
             bool const any = kind == "spread";
             if (f.size() < 5 || !Id(f[2], a, any) || !Yards(f[3], radius) || !who)
-                bad(kind + ": expected '" + kind + "|map|" + (any ? "boss_entry (0 = any)" : "entry") + "|yards (2..60)|all/ranged/healers/melee|name'");
+                bad(kind + ": expected '" + kind + "|map|" + (any ? "boss_entry (0 = any)" : "entry") + "|yards (2..60)|all/ranged/healers/melee/tanks|name'");
             else if (any)
                 table.Edit(map).Spread.push_back({ a, radius, *who });
             else
@@ -186,7 +188,7 @@ Table Parse(std::string_view text, std::vector<std::string>& errors)
         {
             auto const who = f.size() > 4 ? WhoOf(f[4]) : std::nullopt;
             if (f.size() < 6 || !Id(f[2], a) || !Yards(f[3], radius) || !who || !Id(f[5], b))
-                bad("avoid_enemy_aura: expected 'avoid_enemy_aura|map|entry|yards (2..60)|all/ranged/healers/melee|aura_id|name'");
+                bad("avoid_enemy_aura: expected 'avoid_enemy_aura|map|entry|yards (2..60)|all/ranged/healers/melee/tanks|aura_id|name'");
             else
                 table.Edit(map).AvoidEnemy.push_back({ a, radius, *who, b });
         }

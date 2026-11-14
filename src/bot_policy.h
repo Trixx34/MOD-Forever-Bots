@@ -161,6 +161,14 @@ struct PolicyOptions
     bool RaidAvoidEnemy = true;
     bool RaidPurge = true;
     bool RaidMindControl = true;
+    // ZG levers (default off here and in the settings; bot_settings.h): avoid_enemy rows for melee and tanks, ranged focus on an avoid_enemy hostile, one pack at a time,
+    // no tank pickup of an avoid_enemy mob, and the bounded regroup rally (0 = off).
+    bool RaidAvoidEnemyMelee = false;
+    bool RaidAvoidEnemyTank = false;
+    bool RaidFocusAvoidEnemy = false;
+    bool PullOnePack = false;
+    bool TankLooseSkipAvoidEnemy = false;
+    std::uint64_t RegroupRallyMs = 0;
     std::shared_ptr<ground_avoid::AvoidTable const> AvoidSpells;
     // The raid rule table (RaidRulesFile, raid_rules.h): the planner reads the interrupt-first casts, the dispel kinds, the tank swap aura and the no-AoE rule from it; the add
     // ranks are merged into each scenario's KillPriority at start; the ground-effect spells of its avoid rows join the hazard circles. Null = none.
@@ -637,6 +645,8 @@ private:
         std::uint64_t PullPosLogMs = 0;
         std::uint64_t PullRestLogMs = 0;
         std::uint64_t WarderHoldLogMs = 0;                // last warder_hold event (at most one per 10 s)
+        std::uint64_t RallyLogMs = 0;                     // last regroup_rally event (RegroupRallyMs, at most one per 10 s)
+        std::uint64_t TankLooseSkipLogMs = 0;             // last tank_loose_skip event (TankLooseSkipAvoidEnemy, at most one per 10 s)
         std::uint64_t PullReadyStartMs = 0;              // the route leader's ready gate (a member short of health or mana) began at this time (0 = not holding)
         std::uint64_t PullReadyLogMs = 0;
         std::uint32_t WipeEpochSeen = 0;                 // the last wipe-recovery rewind this leader applied
@@ -1133,6 +1143,11 @@ private:
     std::set<std::uint32_t> const& KilledBossesOf(std::uint64_t guid) const;
     bool IsRezzer(forever_module::BotSnapshot const& member) const;
     bool PartyFighting(DecideTick const& tick, std::uint64_t leaderGuid) const;
+    // Regroup (0.35.0): a member the leader flagged stuck is not waited for, except (ZG levers) by the pull while PullOnePack is on (`forPull`; the pull hold's caps bound it)
+    // and by the pull and the route walk for RegroupRallyMs after it was flagged.
+    bool StuckExcused(BotState const& leader, std::uint64_t member, std::uint64_t nowMs, bool forPull) const;
+    // RegroupRallyMs: the leader waits for this stuck member right now (it is flagged and inside the rally time).
+    bool RallyWaitsFor(BotState const& leader, std::uint64_t member, std::uint64_t nowMs) const;
     std::set<std::uint64_t> PartyEngagedTargets(DecideTick const& tick, std::uint64_t leaderGuid) const;
     // Whether this hostile's interrupt is already claimed by a party member's rotation (set in TurnRotation the moment it sends
     // a row with Cond::TargetCasting, not inferred from another member's cast bar: see _interruptClaims).

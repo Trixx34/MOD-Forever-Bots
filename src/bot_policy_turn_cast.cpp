@@ -1051,7 +1051,29 @@ BotPolicy::TurnFlow BotPolicy::TurnTankPickup(DecideTick& tick, BotTurn& turn)
     forever_module::PartyView const* const party = at == tick.indexOf.end() ? nullptr : tick.view.PartyViewOf(at->second);
     if (party == nullptr)
         return TurnFlow::kNext;
-    std::vector<party_view::LooseMob> const loose = party_view::LooseMobsOf(tick.view, *party);
+    std::vector<party_view::LooseMob> loose = party_view::LooseMobsOf(tick.view, *party);
+    // TankLooseSkipAvoidEnemy (ZG lever, default off): a loose mob of an avoid_enemy entry (the Axe Thrower 11350 throwing at a healer from range) is not the tank's: a taunt
+    // turns the tank's fight toward it and the pack follows the tank into the thrower's Axe Flurry (2026-11-13/14: tank_loose reason=healer 129, mostly on 11350). The
+    // healers keep out of its circle and the ranged kill it (RaidFocusAvoidEnemy).
+    if (_options.TankLooseSkipAvoidEnemy && _options.RaidRules && _options.RaidRules->HasAvoidEnemy(bot.map_id))
+    {
+        std::size_t const before = loose.size();
+        std::uint32_t skippedEntry = 0;
+        std::erase_if(loose, [&](party_view::LooseMob const& mob)
+        {
+            std::uint32_t const entry = forever_module::UnitRefEntry(mob.Unit);
+            bool const skip = !_options.RaidRules->AvoidEnemyFor(bot.map_id, entry).empty();
+            if (skip)
+                skippedEntry = entry;
+            return skip;
+        });
+        if (loose.size() != before && _options.OnEvent && (state.TankLooseSkipLogMs == 0 || nowMs - state.TankLooseSkipLogMs >= 10000))
+        {
+            state.TankLooseSkipLogMs = nowMs;
+            _options.OnEvent("tank_loose_skip: tank=" + std::to_string(bot.guid) + " target=" + std::to_string(skippedEntry) + " reason=avoid_enemy skipped=" +
+                             std::to_string(before - loose.size()) + " left=" + std::to_string(loose.size()));
+        }
+    }
     if (loose.empty())
         return TurnFlow::kNext;
     auto const usable = [&](std::uint32_t spell)
@@ -1257,7 +1279,8 @@ BotPolicy::TurnFlow BotPolicy::TurnTankPickup(DecideTick& tick, BotTurn& turn)
     if (!(_options.TankLoosePickup && turn.routeOn) && nowMs >= state.PickupAtMs && usable(single))
     {
         std::uint64_t const target = party_view::TauntTargetFor(tick.view, *party, PlayerRef(bot.guid));
-        if (target != 0 && near(target, kOnyxiaTauntYards))
+        bool const skipTarget = _options.TankLooseSkipAvoidEnemy && _options.RaidRules && !_options.RaidRules->AvoidEnemyFor(bot.map_id, forever_module::UnitRefEntry(target)).empty();
+        if (target != 0 && !skipTarget && near(target, kOnyxiaTauntYards))
         {
             BotAction cast;
             cast.bot_guid = bot.guid;

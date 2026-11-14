@@ -9,7 +9,7 @@
 #   noaoe|map|boss_entry|name                    boss_entry 0 = every fight on the map
 #   frontal|map|boss_entry|spell_id|name
 #   spread|map|boss_entry|yards|who|name         who: all/ranged/healers/melee; boss_entry 0 = any engaged hostile of the map
-#   avoid_enemy|map|entry|yards|who|name
+#   avoid_enemy|map|entry|yards|who|name         who also tanks (only with RaidAvoidEnemyTank); melee rows act only with RaidAvoidEnemyMelee
 #   avoid_enemy_aura|map|entry|yards|who|aura_id|name   as avoid_enemy, only while the hostile carries the aura (seen in a member's target_auras; unknown keeps the circle)
 #   purge|map|aura_spell_id|name
 #   mindcontrol|map|aura_spell_id|name
@@ -64,6 +64,10 @@ add|309|11350|1|Gurubashi Axe Thrower
 # Not avoid_enemy_aura|..|24018: the first Flurry tick comes 1 s after the aura and stuns for 2 s, so a member that came in during a gap could not get out again.
 avoid_enemy|309|11350|33|healers|Axe Flurry 24019 radius 30
 avoid_enemy|309|11350|33|ranged|Axe Flurry 24019 radius 30
+# ZG levers 2026-11-14: the melee and the tank keep out of it too, but only with RaidAvoidEnemyMelee / RaidAvoidEnemyTank (module default 0: these two rows do nothing then).
+# 2026-11-13/14 night: 861 of 1539 ZG deaths to 11350 (Axe Flurry 24020 718) with only healers and ranged kept out. Pair with RaidFocusAvoidEnemy: the ranged kill it.
+avoid_enemy|309|11350|33|melee|Axe Flurry 24019 radius 30 (RaidAvoidEnemyMelee)
+avoid_enemy|309|11350|33|tanks|Axe Flurry 24019 radius 30 (RaidAvoidEnemyTank)
 pullpos|309|11371|-11872.5|-1287.7|82.3|8|ZG shelf pack: pull from route point 7, before the stairs (route point 9 is in throw range of the lone thrower at the stairs bottom)
 pullpos|309|11372|-11872.5|-1287.7|82.3|8|ZG shelf pack: pull from route point 7, before the stairs (route point 9 is in throw range of the lone thrower at the stairs bottom)
 # Great Heal (Gurubashi priests, Jeklik), Drain Life, Mind Flay

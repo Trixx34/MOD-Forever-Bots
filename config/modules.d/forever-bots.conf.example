@@ -512,6 +512,16 @@ Module.forever-bots.TelemetrySummarySec = 60
 # Module.forever-bots.RaidAvoidEnemy = 1
 # Module.forever-bots.RaidPurge = 1
 # Module.forever-bots.RaidMindControl = 1
+# ZG levers (2026-11-14; each default 0 = off; doc/raid-rules.md "ZG levers"): RaidAvoidEnemyMelee / RaidAvoidEnemyTank (avoid_enemy rows of group melee / tanks move the melee / the tank),
+# RaidFocusAvoidEnemy (ranged damage dealers take a fighting avoid_enemy hostile first and ignore its circle; focus_avoid_enemy), PullOnePack (nothing that fights nobody is picked
+# while the party fights; the leader does not pull while a member is stuck), TankLooseSkipAvoidEnemy (no taunt or walk to a loose avoid_enemy mob; tank_loose_skip),
+# RegroupRallyMs (0 = off, else 5000..600000: a stuck member is waited for this long and walks to the leader; regroup_rally).
+# Module.forever-bots.RaidAvoidEnemyMelee = 0
+# Module.forever-bots.RaidAvoidEnemyTank = 0
+# Module.forever-bots.RaidFocusAvoidEnemy = 0
+# Module.forever-bots.PullOnePack = 0
+# Module.forever-bots.TankLooseSkipAvoidEnemy = 0
+# Module.forever-bots.RegroupRallyMs = 0
 
 # Mounts: a bot asks to mount up for a long walk only from MountMinLevel (default 40: classic riding is learned at 40; 0 = any level).
 # Module.forever-bots.MountMinLevel = 40

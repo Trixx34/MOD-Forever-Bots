@@ -180,8 +180,99 @@ void AvoidEnemyMeleeStaysWhenOnlyRangedAreListed()
     RaidFixture f{ classes, { { 40, 0 }, { 5, 0 }, { 1, 0 }, { -40, 0 }, { 0, 40 } }, false, 0.0f };
     BotPolicy policy(RaidOptions(classes, "avoid_enemy|309|14507|15|ranged|Holy Nova\n"));
     CHECK(MovesOf(policy.Decide(RaidView(f), 1000), 11).empty());
-    BotPolicy melee(RaidOptions(classes, "avoid_enemy|309|14507|15|melee|Holy Nova\n"));
-    CHECK(MovesOf(melee.Decide(RaidView(f), 1000), 11).size() == 1);
+    BotPolicy meleeKeyOff(RaidOptions(classes, "avoid_enemy|309|14507|15|melee|Holy Nova\n"));
+    CHECK(MovesOf(meleeKeyOff.Decide(RaidView(f), 1000), 11).empty());          // melee rows act only with RaidAvoidEnemyMelee (default off)
+    PolicyOptions on = RaidOptions(classes, "avoid_enemy|309|14507|15|melee|Holy Nova\n");
+    on.RaidAvoidEnemyMelee = true;
+    BotPolicy melee(on);
+    std::vector<BotAction> const actions = melee.Decide(RaidView(f), 1000);
+    CHECK(MovesOf(actions, 11).size() == 1);
+    CHECK(MovesOf(actions, 12).empty());                                        // the tank is not melee
+}
+
+// RaidAvoidEnemyTank (ZG lever): a `tanks` row moves the tank (warrior 12, one yard from the unit) out of the circle, only with the key; `all` never includes the tank.
+void AvoidEnemyTanksRowMovesTheTankOnlyWithTheKey()
+{
+    RaidFixture f{ Classes, { { 40, 0 }, { 40, 5 }, { 1, 0 }, { -40, 0 }, { 0, 40 } }, false, 0.0f };
+    BotPolicy keyOff(RaidOptions(Classes, "avoid_enemy|309|14507|15|tanks|x\n"));
+    CHECK(MovesOf(keyOff.Decide(RaidView(f), 1000), 12).empty());
+    PolicyOptions on = RaidOptions(Classes, "avoid_enemy|309|14507|15|tanks|x\n");
+    on.RaidAvoidEnemyTank = true;
+    BotPolicy tank(on);
+    auto const moves = MovesOf(tank.Decide(RaidView(f), 1000), 12);
+    CHECK(moves.size() == 1);
+    if (moves.size() == 1)
+        CHECK(FromPoint(moves[0], 0, 0) >= 15.0f - 0.01f);
+    PolicyOptions all = RaidOptions(Classes, "avoid_enemy|309|14507|15|all|x\n");
+    all.RaidAvoidEnemyTank = true;
+    BotPolicy allRow(all);
+    CHECK(MovesOf(allRow.Decide(RaidView(f), 1000), 12).empty());
+}
+
+// RaidFocusAvoidEnemy (ZG lever): a ranged damage dealer turns from its target (the boss) to a fighting hostile of an avoid_enemy entry in reach; one that fights
+// nobody, the key off, or a healer, does not. The healers' row keeps the mage's own circle out of the picture.
+constexpr std::uint64_t kThrowerRef = MakeUnitRef(8, 11350, 60);
+
+bool ActsOn(std::vector<BotAction> const& actions, std::uint64_t bot, std::uint64_t target)
+{
+    for (BotAction const& action : actions)
+        if (action.bot_guid == bot && action.target_guid == target)
+            return true;
+    return false;
+}
+
+WorldTickSnapshotView ThrowerView(bool fighting, std::uint64_t mageTarget = kBossRef)
+{
+    RaidFixture f{ Classes, { { 40, 0 }, { 5, 0 }, { 1, 0 }, { -40, 0 }, { 0, 40 } }, false, 0.0f };
+    WorldTickSnapshotView view = RaidView(f);
+    for (std::size_t i = 0; i < view.bots.size(); ++i)
+    {
+        NearbyUnit thrower = Hostile(60, 25.0f, 100);
+        thrower.guid = kThrowerRef;
+        thrower.pos_y = 0.0f;
+        thrower.victim_ref = fighting ? PlayerOf(14) : 0;
+        AddNearby(view, i, thrower);
+    }
+    view.bots[1].threat_target_guid = mageTarget;
+    return view;
+}
+
+void RangedFocusFireOnAnAvoidEnemyHostile()
+{
+    auto const turns = [](bool key, bool fighting, std::uint64_t bot, std::vector<std::string>* events)
+    {
+        PolicyOptions options = RaidOptions(Classes, "avoid_enemy|309|11350|33|healers|Axe Flurry\n");
+        options.RaidFocusAvoidEnemy = key;
+        if (events)
+            options.OnEvent = [events](std::string const& line) { events->push_back(line); };
+        BotPolicy policy(options);
+        policy.SetRouteActive(true);
+        return ActsOn(policy.Decide(ThrowerView(fighting), 1000), bot, kThrowerRef);
+    };
+    std::vector<std::string> events;
+    CHECK(turns(true, true, 11, &events));
+    CHECK(Logged(events, "focus_avoid_enemy: bot=11 entry=11350"));
+    CHECK(!turns(false, true, 11, nullptr));                                    // key off: the mage stays on its target
+    CHECK(!turns(true, false, 11, nullptr));                                    // the thrower fights nobody yet: not pulled by the focus
+    CHECK(!turns(true, true, 14, nullptr));                                     // the priest is a healer
+}
+
+// RaidFocusAvoidEnemy: the mage that fights the thrower ignores that unit's circle (a ranged row), the other mage (13, also inside, on the boss) still steps out.
+void RangedFocusIgnoresTheCircleOfItsOwnTarget()
+{
+    auto const moves = [](bool key, std::uint64_t bot)
+    {
+        PolicyOptions options = RaidOptions(Classes, "avoid_enemy|309|11350|33|ranged|Axe Flurry\n");
+        options.RaidFocusAvoidEnemy = key;
+        BotPolicy policy(options);
+        policy.SetRouteActive(true);
+        WorldTickSnapshotView view = ThrowerView(true, kThrowerRef);
+        view.bots[3].pos_x = 10.0f;                                             // mage 13 fifteen yards from the thrower
+        return !MovesOf(policy.Decide(view, 1000), bot).empty();
+    };
+    CHECK(!moves(true, 11));
+    CHECK(moves(true, 13));
+    CHECK(moves(false, 11));
 }
 
 // ---- avoid_enemy_aura ----
@@ -439,6 +530,9 @@ void RunPolicyTestsPart10()
     AvoidEnemyMovesARangedMemberOutOfTheCircle();
     AvoidEnemyHonoursGroupSwitchAndCasting();
     AvoidEnemyMeleeStaysWhenOnlyRangedAreListed();
+    AvoidEnemyTanksRowMovesTheTankOnlyWithTheKey();
+    RangedFocusFireOnAnAvoidEnemyHostile();
+    RangedFocusIgnoresTheCircleOfItsOwnTarget();
     AvoidEnemyAuraHoldsOnlyWhileTheAuraIsOnOrUnknown();
     PurgeCastsDispelMagicOnTheBuffedBoss();
     PurgeShamanUsesPurgeAndNoOtherClassPurges();

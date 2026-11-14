@@ -421,6 +421,18 @@ struct BotSettings
     bool RaidAvoidEnemy = true;
     bool RaidPurge = true;
     bool RaidMindControl = true;
+    // ZG levers (2026-11-14, default OFF each; the sim turns them on in a drop-in; doc/raid-rules.md "ZG levers"):
+    // RaidAvoidEnemyMelee / RaidAvoidEnemyTank: `avoid_enemy` rows of group melee move melee damage dealers, rows of group tanks move the tank (otherwise neither moves).
+    // RaidFocusAvoidEnemy: a ranged damage dealer of a route party takes a fighting hostile of an avoid_enemy entry as its target first and ignores that one unit's circle.
+    // PullOnePack: while the party fights, nobody picks a hostile that fights nobody (a second pack); the leader does not pull while a member is stuck far away
+    // (within the pull hold's caps). TankLooseSkipAvoidEnemy: the tank neither taunts nor walks to a loose mob of an avoid_enemy entry (tank_loose_skip).
+    // RegroupRallyMs (0 = off, else 5000..600000): a stuck member is waited for this long after it was flagged (route walk and pull), and walks to the leader (regroup_rally).
+    bool RaidAvoidEnemyMelee = false;
+    bool RaidAvoidEnemyTank = false;
+    bool RaidFocusAvoidEnemy = false;
+    bool PullOnePack = false;
+    bool TankLooseSkipAvoidEnemy = false;
+    std::uint32_t RegroupRallyMs = 0;
     // RaidRulesFile (absolute path, data/raid_rules.txt; empty = none): the raid rule table, see raid_rules.h and the README.
     std::string RaidRulesFile;
     // CorpseRunTeleportSec (0 = off, else 10..3600): a ghost whose corpse run takes longer is put at its corpse (needs Bot.Actions.Teleport).

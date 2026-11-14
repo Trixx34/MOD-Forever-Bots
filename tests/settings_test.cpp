@@ -613,6 +613,20 @@ void CorpseRunTeleportSettings()
 }
 
 // GhostTeleportHold and the death lockout: defaults, overrides, bad values keep the default with a warning.
+// ZG levers (2026-11-14): all off by default; each turns on alone; RegroupRallyMs takes 0 or 5000..600000.
+void ZgLeverSettings()
+{
+    std::vector<std::string> w;
+    BotSettings const defaults = ParseBotSettings({}, w);
+    CHECK(!defaults.RaidAvoidEnemyMelee && !defaults.RaidAvoidEnemyTank && !defaults.RaidFocusAvoidEnemy && !defaults.PullOnePack &&
+          !defaults.TankLooseSkipAvoidEnemy && defaults.RegroupRallyMs == 0 && w.empty());
+    BotSettings const on = ParseBotSettings({ { "RaidAvoidEnemyMelee", "1" }, { "RaidAvoidEnemyTank", "1" }, { "RaidFocusAvoidEnemy", "1" }, { "PullOnePack", "1" },
+                                              { "TankLooseSkipAvoidEnemy", "1" }, { "RegroupRallyMs", "60000" } }, w);
+    CHECK(on.RaidAvoidEnemyMelee && on.RaidAvoidEnemyTank && on.RaidFocusAvoidEnemy && on.PullOnePack && on.TankLooseSkipAvoidEnemy && on.RegroupRallyMs == 60000 && w.empty());
+    CHECK(ParseBotSettings({ { "RegroupRallyMs", "0" } }, w).RegroupRallyMs == 0 && w.empty());
+    CHECK(ParseBotSettings({ { "RegroupRallyMs", "1000" } }, w).RegroupRallyMs == 0 && !w.empty());
+}
+
 void GhostTeleportHoldSettings()
 {
     {
@@ -699,6 +713,7 @@ int main()
     RealismSettings();
     CorpseRunTeleportSettings();
     GhostTeleportHoldSettings();
+    ZgLeverSettings();
     CombatDriftSettings();
     ErrandSettings();
     ChatSettings();

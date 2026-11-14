@@ -339,6 +339,85 @@ void ARegroupStopsWaitingForAStuckMember()
     CHECK(done);
 }
 
+// RegroupRallyMs (ZG lever): the leader waits for a stuck member (no walk) until the rally time after the flag is over, and the member walks to the leader (regroup_rally).
+// Off, the leader walks on once the member is stuck (ARegroupStopsWaitingForAStuckMember).
+void ARallyWaitsForAStuckMemberAndBringsItBack()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.ClassOf = WarriorLeads;
+    options.Route = { Point{ 100.0f, 0.0f, 0.0f }, Point{ 140.0f, 0.0f, 0.0f } };
+    options.RegroupRallyMs = 30000;
+    options.WanderWhenIdle = false;
+    std::vector<std::string> events;
+    options.OnEvent = [&events](std::string const& line) { events.push_back(line); };
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    WorldTickSnapshotView view = DungeonView({ 10, 11, 12, 13, 14 }, WarriorLeads);   // a formed party: bot 10 knows its leader
+    for (BotSnapshot& bot : view.bots)
+        bot.pos_x = 50.0f;
+    view.bots[0].pos_x = 0.0f;                                        // bot 10 stays 50 yards behind
+    CHECK(LeaderWalk(policy.Decide(view, 1000)) != 100.0f);
+    std::vector<BotAction> const stuck = policy.Decide(view, 22000);  // stuck since 11 s: the rally runs until 41 s
+    CHECK(LeaderWalk(stuck) != 100.0f);                                // the leader holds at the rally point
+    CHECK(WalkTo(policy.Decide(view, 23000), 10) == 50.0f);          // the stuck member walks to it (the flag is the leader's, read on the member's next turn)
+    CHECK(Logged(events, "regroup_rally: bot=10 leader=12"));
+    CHECK(LeaderWalk(policy.Decide(view, 35000)) != 100.0f);
+    CHECK(LeaderWalk(policy.Decide(view, 45000)) == 100.0f);          // the rally time is over: on without it, as before
+}
+
+// PullOnePack (ZG lever): the leader does not pull while a member is stuck far away (the pull hold's 45 s cap bounds it); off, it pulls once the member is stuck.
+void OnePackHoldsThePullForAStuckMember()
+{
+    auto const pullsAt = [](bool onePack, std::uint64_t at)
+    {
+        PolicyOptions options = DriftOptions(0, 0);
+        options.PullOnePack = onePack;
+        BotPolicy policy(options);
+        policy.SetRouteActive(true);
+        bool pulled = false;
+        for (std::uint64_t now = 1000; now <= at; now += 1000)
+        {
+            WorldTickSnapshotView view = DriftView();
+            view.bots[0].pos_x = -50.0f;                              // bot 10 is 50 yards behind
+            AddNearby(view, 2, HostileAt(8, 20.0f, 0.0f));
+            pulled = HasAction(policy.Decide(view, now), 12, ActionType::kFollow, MakeUnitRef(8, 1, 8)) || pulled;
+        }
+        return pulled;
+    };
+    CHECK(pullsAt(false, 25000));
+    CHECK(!pullsAt(true, 25000));
+    CHECK(pullsAt(true, 60000));                                      // past the pull hold's cap
+}
+
+// PullOnePack (ZG lever): a bot in a fight with no threat target of its own takes a hostile that already fights the party, not one that fights nobody (the next pack),
+// even when that one is the weaker; off, the weakest as before.
+void OnePackPicksOnlyWhatAlreadyFights()
+{
+    auto const picks = [](bool onePack, std::uint64_t counter)
+    {
+        PolicyOptions options = DriftOptions(0, 0);
+        options.PullOnePack = onePack;
+        BotPolicy policy(options);
+        policy.SetRouteActive(true);
+        policy.Decide(DriftView(), 1000);
+        WorldTickSnapshotView view = DriftView();
+        view.bots[0].in_combat = 1;
+        view.bots[2].in_combat = 1;
+        NearbyUnit idle = HostileAt(7, 6.0f, 0.0f);                    // the next pack: hurt, so the weakest pick, but it fights nobody
+        idle.health = 15;
+        NearbyUnit fighting = HostileAt(8, 3.0f, 0.0f);
+        fighting.victim_ref = PlayerOf(12);
+        AddNearby(view, 0, idle);
+        AddNearby(view, 0, fighting);
+        std::vector<BotAction> const actions = policy.Decide(view, 1500);
+        return HasAction(actions, 10, ActionType::kFollow, MakeUnitRef(8, 1, counter)) || HasAction(actions, 10, ActionType::kAttackTarget, MakeUnitRef(8, 1, counter));
+    };
+    CHECK(picks(false, 7));
+    CHECK(!picks(true, 7));
+    CHECK(picks(true, 8));
+}
+
 // Regroup (0.36.2): a member that trails the leader at the edge of the wait distance does not flip the stuck flag. It is logged once per regroup, stays stuck
 // until it is back inside kRegroupClearYards, and the leader keeps walking.
 void AStuckMemberAtTheBoundaryIsLoggedOnce()
@@ -1205,6 +1284,9 @@ void RunPolicyTestsPart4()
 {
     AFlippingPartyDoesNotHoldTheLeaderForever();
     ARegroupStopsWaitingForAStuckMember();
+    ARallyWaitsForAStuckMemberAndBringsItBack();
+    OnePackHoldsThePullForAStuckMember();
+    OnePackPicksOnlyWhatAlreadyFights();
     AStuckMemberAtTheBoundaryIsLoggedOnce();
     MemberRecoverDoesNotFireWithTheStuckEvent();
     ALeaderWithNoRouteIsPutBackOnTheRouteOnce();

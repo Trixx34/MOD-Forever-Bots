@@ -80,18 +80,24 @@ BotPolicy::TurnFlow BotPolicy::TurnRaidSpacing(DecideTick& tick, BotTurn& turn)
     bool walking = state.SpacingSetMs != 0 && nowMs < state.SpacingSetMs + kAvoidKeepMs &&
                    DistanceTo(bot, Point{ state.SpacingDest.X, state.SpacingDest.Y, bot.pos_z }) > kArrivedYards;
 
-    // avoid_enemy: a non-tank member of the row's group stays out of a circle of `yards` around a live hostile of the entry. A bot mid-cast holds unless that unit is casting.
+    // avoid_enemy: a member of the row's group stays out of a circle of `yards` around a live hostile of the entry. A bot mid-cast holds unless that unit is casting.
     // avoid_enemy_aura rows: the same circle, only while the unit carries the row's aura (DecideTick::UnitAuraSeen; unknown counts as carrying it).
-    if (_options.RaidAvoidEnemy && !tank && rules.HasAvoidEnemy(bot.map_id))
+    // ZG levers (default off): melee rows move melee only with RaidAvoidEnemyMelee, `tanks` rows move the tank only with RaidAvoidEnemyTank; with RaidFocusAvoidEnemy a ranged
+    // damage dealer ignores the circle of the one unit it fights (it is the one that kills it, TurnTargeting).
+    bool const healer = state.Role_ != BotState::Role::Dps && state.Role_ != BotState::Role::Tank && HealSpellFor(classId, bot.level) != 0;
+    std::uint8_t kind = tank ? raid_rules::kWhoTanks : SpreadKindOf(classId, healer);
+    if ((kind == raid_rules::kWhoMelee && !_options.RaidAvoidEnemyMelee) || (kind == raid_rules::kWhoTanks && !_options.RaidAvoidEnemyTank))
+        kind = 0;
+    if (_options.RaidAvoidEnemy && kind != 0 && rules.HasAvoidEnemy(bot.map_id))
     {
-        bool const healer = state.Role_ != BotState::Role::Dps && state.Role_ != BotState::Role::Tank && HealSpellFor(classId, bot.level) != 0;
-        std::uint8_t const kind = SpreadKindOf(classId, healer);
         std::vector<ground_avoid::Circle> circles;
         bool anyCasting = false;
         std::uint32_t entry = 0;
         for (NearbyUnit const& unit : tick.view.NearbyOf(turn.i))   // turn.nearby is filled by a later step
         {
             if (!unit.is_hostile || unit.health == 0 || !IsLiveMob(unit))
+                continue;
+            if (_options.RaidFocusAvoidEnemy && kind == raid_rules::kWhoRanged && unit.guid == bot.threat_target_guid)
                 continue;
             for (raid_rules::EnemyZone const& zone : rules.AvoidEnemyFor(bot.map_id, forever_module::UnitRefEntry(unit.guid)))
                 // avoid_enemy_aura: no circle once a bot targeting the unit sees a complete aura list without the aura (unknown keeps the circle)
