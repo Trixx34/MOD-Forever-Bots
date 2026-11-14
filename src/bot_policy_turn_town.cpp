@@ -39,13 +39,103 @@ void BotPolicy::TurnShopping(DecideTick& tick, BotTurn& turn)
                              " mpot=" + std::to_string(supplyFacts.ManaPotions) + " bandage=" + std::to_string(supplyFacts.Bandages) +
                              " failures=" + std::to_string(state.SupplyFailures));
     }
+    // Urgent repair trips (repair_policy.h). The routine visit above waits for an idle bot, and a bot with quest work is never idle: on prod half the
+    // equipped pieces were at durability 0. A bot with a broken piece (or worn gear after a death) goes to its repairman as soon as it is out of a fight,
+    // whatever it was doing; a party leader goes for a member's broken gear, and the member repairs once it has followed it into reach. Each trip is
+    // judged once the core has counted again, and one that repaired nothing (no money, nothing to sell, no way there) backs off, so it never loops.
+    auto const repairFactsOf = [&](BotSnapshot const& who, BotState const& whoState) {
+        repair::Facts facts;
+        facts.LowestPct = who.durability_pct;
+        facts.RepairmanKnown = who.repair_valid != 0;
+        facts.AfterDeath = whoState.RepairAfterDeath;
+        facts.Copper = who.copper;
+        facts.Level = who.level;
+        return facts;
+    };
+    auto const lowestOf = [&](std::uint64_t guid) -> std::uint32_t {
+        if (guid == 0)
+            return bot.durability_pct;
+        auto const at = tick.indexOf.find(guid);
+        return at != tick.indexOf.end() ? tick.view.bots[at->second].durability_pct : 0u;
+    };
+    if (state.RepairCheckAtMs != 0 && nowMs >= state.RepairCheckAtMs)
+    {
+        state.RepairCheckAtMs = 0;
+        std::uint32_t const after = lowestOf(state.RepairForGuid);
+        bool const improved = repair::Improved(state.RepairBeforePct, after);
+        state.RepairFailures = improved ? 0 : state.RepairFailures + 1;
+        state.NextRepairMs = nowMs + (improved ? _options.Repair.RetryMs : repair::BackoffMs(_options.Repair, state.RepairFailures));
+        if (_options.OnEvent)
+            _options.OnEvent(std::string(improved ? "repair_done" : "repair_failed") + ": bot=" + std::to_string(bot.guid) + " for=" +
+                             std::to_string(state.RepairForGuid) + " before=" + std::to_string(state.RepairBeforePct) + " after=" + std::to_string(after) +
+                             " copper=" + std::to_string(bot.copper) + " failures=" + std::to_string(state.RepairFailures));
+        state.RepairForGuid = 0;
+    }
+    if (state.RepairTrip && nowMs - state.RepairTripStartMs > _options.Repair.TripMaxMs)
+    {
+        // Fights, deaths or a long road kept it from the repairman: given up, and the next trip waits.
+        state.RepairTrip = false;
+        state.Traveling = false;
+        state.RepairForGuid = 0;
+        state.NextRepairMs = nowMs + repair::BackoffMs(_options.Repair, ++state.RepairFailures);
+        if (_options.OnEvent)
+            _options.OnEvent("repair_failed: bot=" + std::to_string(bot.guid) + " reason=trip_timeout failures=" + std::to_string(state.RepairFailures));
+    }
+    repair::Facts const ownRepair = repairFactsOf(bot, state);
+    repair::Why repairWhy = repair::Needed(_options.Repair, ownRepair);
+    if (repairWhy != repair::Why::AfterDeath && repairWhy != repair::Why::Broken)
+        state.RepairAfterDeath = false; // revived with gear good enough: nothing to do for that death
+    bool const repairFree = !hasTarget && bot.in_combat == 0 && !lowHealth && !state.InFight && !state.ChatStay && state.ChatFollow == 0 &&
+                            !turn.stagingHold && !turn.dungeonHold && !turn.returningToDungeon;
+    bool const repairReady = nowMs >= state.NextRepairMs && state.RepairCheckAtMs == 0;
+    std::uint64_t repairFor = 0;
+    if (repairWhy == repair::Why::None && turn.partyLeaderBot && _options.Repair.Enabled)
+    {
+        // A member's broken gear: the leader takes the party to the repairman (a member never walks off on its own).
+        auto const members = tick.membersOf.find(bot.guid);
+        if (members != tick.membersOf.end())
+            for (std::uint64_t const member : members->second)
+            {
+                auto const at = tick.indexOf.find(member);
+                auto const memberState = _bots.find(member);
+                if (at == tick.indexOf.end() || memberState == _bots.end())
+                    continue;
+                BotSnapshot const& other = tick.view.bots[at->second];
+                if (other.life_state != 0 || nowMs < memberState->second.NextRepairMs || memberState->second.RepairCheckAtMs != 0)
+                    continue;
+                repair::Why const why = repair::Needed(_options.Repair, repairFactsOf(other, memberState->second));
+                if (why != repair::Why::None && bot.repair_valid != 0)
+                {
+                    repairWhy = why;
+                    repairFor = member;
+                    break;
+                }
+            }
+    }
+    if (repairWhy != repair::Why::None && repairReady && repairFree && !partyMember && !state.RepairTrip)
+    {
+        state.RepairTrip = true;
+        state.RepairTripStartMs = nowMs;
+        state.RepairForGuid = repairFor;
+        if (auto const member = _bots.find(repairFor); repairFor != 0 && member != _bots.end())
+            state.RepairMemberVisitsAtStart = member->second.RepairVisits;
+        if (_options.OnEvent)
+            _options.OnEvent("repair_trip: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " why=" + repair::WhyName(repairWhy) +
+                             " for=" + std::to_string(repairFor) + " lowest=" + std::to_string(lowestOf(repairFor)) + " copper=" + std::to_string(bot.copper) +
+                             " dist=" + std::to_string(int(DistanceTo(bot, Point{ bot.repair_x, bot.repair_y, bot.repair_z }))));
+    }
+    // A member does not walk off to a far repairman; once its leader has brought it near one, it walks the last yards and repairs.
+    bool const memberRepair = partyMember && repairWhy != repair::Why::None && repairReady && repairFree &&
+                              DistanceTo(bot, Point{ bot.repair_x, bot.repair_y, bot.repair_z }) <= kRepairMemberWalkYards;
+    bool const repairShopping = (state.RepairTrip && repairFree) || memberRepair;
+
     // A party member follows its leader, and a bot held by a chat order stays where it was told: neither goes shopping.
     supply::Needs const supplyNeeds = (partyMember || state.ChatStay || state.ChatFollow != 0) ? supply::Needs{}
                                                                                                 : supply::Assess(_options.Supplies, supplyFacts);
     supply::Stop const supplyStop = supply::NextStop(supplyNeeds);
     bool const supplyDue = supplyStop != supply::Stop::None && nowMs >= state.NextSupplyMs && state.SupplyCheckAtMs == 0;
     bool const serviceDue = _options.ServiceEveryMs != 0 && nowMs >= state.NextServiceMs;
-    bool const shopping = (idle || urgentService) && !state.ChatStay && (serviceDue || supplyDue);
+    bool const shopping = ((idle || urgentService) && !state.ChatStay && (serviceDue || supplyDue)) || repairShopping;
     if (!shopping && state.Traveling)
         state.Traveling = false; // a walk to a vendor cut short (a fight, an order) starts its timer again next time
 
@@ -57,7 +147,7 @@ void BotPolicy::TurnShopping(DecideTick& tick, BotTurn& turn)
     {
         // The nearest vendor on the bot's map, found by the core (layout 6); the nearest repairman instead when the gear is worn
         // (layout 9). None on the map, or a party member: no walk.
-        bool const needRepair = bot.repair_valid != 0 && bot.durability_pct < kRepairBelowPct;
+        bool const needRepair = bot.repair_valid != 0 && (bot.durability_pct < kRepairBelowPct || repairShopping);
         // Worn gear first: the repairman is the stop then, and the supplies wait for the next trip (a few minutes).
         bool const supplyStopNow = supplyDue && !needRepair;
         bool const ammoStop = supplyStopNow && supplyStop == supply::Stop::Ammo;
@@ -70,8 +160,18 @@ void BotPolicy::TurnShopping(DecideTick& tick, BotTurn& turn)
                              : needRepair  ? Point{ bot.repair_x, bot.repair_y, bot.repair_z }
                                            : Point{ bot.vendor_x, bot.vendor_y, bot.vendor_z };
         bool const vendorExists = supplyStopNow || needRepair || bot.vendor_valid != 0;
-        bool const hasVendor = !partyMember && vendorExists;
+        bool const hasVendor = (!partyMember || memberRepair) && vendorExists;
         bool const inReach = vendorExists && DistanceTo(bot, vendor) <= kVendorReachYards;
+        // A leader that brought its party to the repairman for a member's broken gear waits there for that member's visit (kRepairMemberWaitMs at most).
+        bool leaderWaits = false;
+        if (repairShopping && state.RepairTrip && state.RepairForGuid != 0 && inReach)
+        {
+            if (state.RepairArrivedMs < state.RepairTripStartMs)
+                state.RepairArrivedMs = nowMs;
+            auto const member = _bots.find(state.RepairForGuid);
+            bool const memberVisited = member == _bots.end() || member->second.RepairVisits != state.RepairMemberVisitsAtStart;
+            leaderWaits = !memberVisited && nowMs - state.RepairArrivedMs < kRepairMemberWaitMs;
+        }
         if (hasVendor && !inReach)
         {
             if (!state.Traveling)
@@ -90,7 +190,17 @@ void BotPolicy::TurnShopping(DecideTick& tick, BotTurn& turn)
             {
                 state.Traveling = false;
                 state.ServiceUrgent = false;
-                if (state.SupplyTrip)
+                if (state.RepairTrip)
+                {
+                    // The repairman was not reached in time: a trip that repaired nothing.
+                    state.RepairTrip = false;
+                    state.SupplyTrip = false;
+                    state.RepairForGuid = 0;
+                    state.NextRepairMs = nowMs + repair::BackoffMs(_options.Repair, ++state.RepairFailures);
+                    if (_options.OnEvent)
+                        _options.OnEvent("repair_failed: bot=" + std::to_string(bot.guid) + " reason=walk_timeout failures=" + std::to_string(state.RepairFailures));
+                }
+                else if (state.SupplyTrip)
                 {
                     // The walk never got there: a trip that bought nothing.
                     state.SupplyTrip = false;
@@ -99,6 +209,12 @@ void BotPolicy::TurnShopping(DecideTick& tick, BotTurn& turn)
                 else
                     state.NextServiceMs = nowMs + _options.ServiceEveryMs;
             }
+        }
+        else if (leaderWaits)
+        {
+            wanted = Decision{};
+            moveWhy = "repair_wait";
+            idle = false;
         }
         else if (inReach || !vendorExists)
         {
@@ -128,6 +244,29 @@ void BotPolicy::TurnShopping(DecideTick& tick, BotTurn& turn)
             // Layout 13: the NPC's guid, not just its position. An older core leaves it 0 and the core resolves the
             // nearest vendor of the map instead.
             vendor.target_guid = needRepair ? bot.repair_guid : bot.vendor_guid;
+            if (repairShopping)
+            {
+                // An urgent repair visit: the core sells the grey items (and, short of money, the white junk) before it repairs, from what the sale
+                // brought in. The visit is judged a few seconds later (the lowest piece better than before), the bot's own gear or the member's.
+                if (repair::SellJunkFirst(_options.Repair, ownRepair))
+                    vendor.spell_id |= kServiceSellJunk;
+                std::uint64_t const judged = memberRepair ? 0 : state.RepairForGuid;
+                if (memberRepair || repair::Needed(_options.Repair, ownRepair) != repair::Why::None || judged != 0)
+                {
+                    state.RepairCheckAtMs = nowMs + kRepairJudgeAfterMs;
+                    state.RepairBeforePct = lowestOf(judged);
+                    state.RepairForGuid = judged;
+                }
+                else
+                    state.NextRepairMs = nowMs + _options.Repair.RetryMs;
+                state.RepairTrip = false;
+                state.RepairAfterDeath = false;
+                ++state.RepairVisits;
+                if (_options.OnEvent)
+                    _options.OnEvent("repair_visit: bot=" + std::to_string(bot.guid) + " for=" + std::to_string(judged) + " lowest=" +
+                                     std::to_string(lowestOf(judged)) + " copper=" + std::to_string(bot.copper) +
+                                     " sell_junk=" + std::to_string((vendor.spell_id & kServiceSellJunk) != 0 ? 1 : 0));
+            }
             if (supplyStopNow)
             {
                 // Layout 15: buy what is short. The core picks the items from this vendor's stock and buys up to the counts given here.

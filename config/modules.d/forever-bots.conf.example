@@ -42,6 +42,20 @@ Module.forever-bots.TelemetrySummarySec = 60
 # on: the bot checks the trainer every that many seconds, and at once after a level-up, when a trainer is in range.
 #   Module.forever-bots.TrainEverySec = 600
 
+# Urgent repair (on by default; independent of AutoGearing and of ServiceEverySec): the routine visit above is only made by an idle bot, and a bot with
+# quest work is never idle, so leveling bots wore broken gear (prod 2026-11-14: 232 of 463 equipped pieces at durability 0). A bot with an equipped piece
+# at or below RepairBrokenPct (0..99; 0 = a broken piece) goes to the nearest repairman on its map as soon as it is out of a fight, and quests wait until it
+# has been there. After a death (a death wears the gear), a piece below RepairAfterDeathPct (0..100, 0 = off) does the same. A party leader takes its party
+# for a member's broken gear; the member walks the last yards and repairs. The visit sells the grey items first, and the white junk too when the bot has less
+# than level x RepairLowCopperPerLevel copper, then repairs (the core repairs all or nothing: Player::DurabilityRepairAll pays the whole bill or repairs no piece). Each trip is judged a few seconds later; one that repaired nothing (no
+# money, no way there in 10 minutes) waits RepairRetrySec (60..86400), doubled each time in a row, at most an hour. The snapshot carries only the lowest
+# durability of the worn pieces, so the rule is on the worst piece (no average, no repair cost in the module).
+#   Module.forever-bots.RepairUrgent = 1
+#   Module.forever-bots.RepairBrokenPct = 0
+#   Module.forever-bots.RepairAfterDeathPct = 50
+#   Module.forever-bots.RepairRetrySec = 300
+#   Module.forever-bots.RepairLowCopperPerLevel = 100
+
 # Parties (M8): PartyCount parties of PartySize bots, cut from the lowest-guid bots in guid order. PartySize 0 turns
 # parties off (the default); at most 5. A party's leader is its first warrior, else its lowest-guid bot. The core applies
 # the invites and the group rules; the module only sends the actions. Needs the core with layout 5 (party state).

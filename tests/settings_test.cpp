@@ -107,6 +107,21 @@ void LevelDungeonSettings()
     CHECK(ParseBotSettings({ { "LevelDungeonRuns", "99" } }, warnings).LevelDungeonRuns == 5);
 }
 
+// Urgent repair (repair_policy.h): on by default, with or without AutoGearing; bounded keys.
+void RepairSettings()
+{
+    std::vector<std::string> warnings;
+    BotSettings const def = ParseBotSettings({}, warnings);
+    CHECK(def.Repair.Enabled && def.Repair.BrokenAtPct == 0 && def.Repair.AfterDeathBelowPct == 50 && def.Repair.RetryMs == 300000);
+    CHECK(def.Repair.LowCopperPerLevel == 100 && !def.AutoGearing && warnings.empty());
+    BotSettings const set = ParseBotSettings({ { "RepairUrgent", "0" }, { "RepairBrokenPct", "10" }, { "RepairAfterDeathPct", "0" }, { "RepairRetrySec", "7200" },
+                                               { "RepairLowCopperPerLevel", "250" } }, warnings);
+    CHECK(!set.Repair.Enabled && set.Repair.BrokenAtPct == 10 && set.Repair.AfterDeathBelowPct == 0 && set.Repair.RetryMs == 7200000);
+    CHECK(set.Repair.MaxBackoffMs == 7200000 && set.Repair.LowCopperPerLevel == 250 && warnings.empty());
+    BotSettings const bad = ParseBotSettings({ { "RepairBrokenPct", "100" }, { "RepairRetrySec", "5" } }, warnings);
+    CHECK(bad.Repair.BrokenAtPct == 0 && bad.Repair.RetryMs == 300000 && warnings.size() == 2);
+}
+
 void SayAndSupplySettings()
 {
     std::vector<std::string> warnings;
@@ -671,6 +686,7 @@ int main()
     QuestListSettings();
     LevelDungeonSettings();
     SayAndSupplySettings();
+    RepairSettings();
     RunTelemetryDirSetting();
     DefaultsWhenEmpty();
     RaidRuleRowSwitches();

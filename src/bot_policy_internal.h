@@ -186,6 +186,9 @@ constexpr std::uint32_t kBagsLowSlots = 4;         // a vendor visit of a bot wi
 constexpr std::uint32_t kServiceBuyAmmo = 8;     // layout 15: buy ammunition (dest_x = the count to carry), food (dest_y), drink (dest_z)
 constexpr std::uint32_t kServiceBuyFood = 16;
 constexpr std::uint32_t kServiceBuyDrink = 32;
+constexpr std::uint64_t kRepairJudgeAfterMs = 5000; // a repair visit is judged this long after it was sent (durability_pct is in every snapshot)
+constexpr std::uint64_t kRepairMemberWaitMs = 30000; // a leader that took its party to the repairman for a member waits this long for the member's visit
+constexpr float kRepairMemberWalkYards = 25.0f;      // a party member with broken gear this close to a repairman walks over and repairs (its leader stopped there)
 constexpr std::uint64_t kSupplyJudgeAfterMs = 7000; // a supply trip is judged this long after the buy: the core counts the bags every 2 seconds
 // Combo points: the rogue's Sinister Strike spell and the spend, and the points a finisher needs.
 constexpr std::uint32_t kSinisterStrike = 1752;

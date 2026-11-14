@@ -4,6 +4,7 @@
 #pragma once
 
 #include "battlegrounds.h"
+#include "repair_policy.h"
 #include "quest_group.h"
 #include "bot_guilds.h"
 #include "duels.h"
@@ -260,6 +261,11 @@ struct BotSettings
     // SupplyManaPotionLow and SupplyBandageLow (the counts under which a bot goes shopping; the core's settings decide how many it buys).
     // SupplyReagents (off by default): a bot whose cast was refused for lack of a reagent goes to a vendor that sells it; the core names the item.
     supply::Settings Supplies;
+    // Urgent repair trips (repair_policy.h; on by default, independent of AutoGearing and of the routine ServiceEverySec visit): RepairUrgent (0 or 1),
+    // RepairBrokenPct (0..99: a worn piece at or below this sends the bot to its repairman at once; 0 = only a broken piece), RepairAfterDeathPct (0..100:
+    // after a death, a piece below this does too; 0 = off), RepairRetrySec (60..86400: the cooldown between urgent trips; a trip that repaired nothing
+    // doubles it, up to an hour) and RepairLowCopperPerLevel (0..100000: a bot with less money than level x this also sells its white junk at the visit).
+    repair::Settings Repair;
     // VendorSellGear (default on; needs Bot.Vendor.SellGear in the core): a vendor visit also sells the bag gear the worn gear outclasses.
     bool VendorSellGear = true;
     // Protocol 28: SpiritHealerAfterMs (default 45000, 0 = off), SpiritHealerOnRepeat (default on), HealDownrank (default off); see PolicyOptions.

@@ -797,6 +797,20 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadKey(config, "MailGiftDailyCap", 0, 20, settings.MailGifts.DailyCap, warnings);
     ReadBool(config, "Supplies", settings.Supplies.Enabled, warnings);
     ReadBool(config, "VendorSellGear", settings.VendorSellGear, warnings);
+    ReadBool(config, "RepairUrgent", settings.Repair.Enabled, warnings);
+    ReadKey(config, "RepairBrokenPct", 0, 99, settings.Repair.BrokenAtPct, warnings);
+    ReadKey(config, "RepairAfterDeathPct", 0, 100, settings.Repair.AfterDeathBelowPct, warnings);
+    {
+        std::uint32_t retrySec = static_cast<std::uint32_t>(settings.Repair.RetryMs / 1000);
+        ReadKey(config, "RepairRetrySec", 60, 86400, retrySec, warnings);
+        settings.Repair.RetryMs = std::uint64_t(retrySec) * 1000;
+        settings.Repair.MaxBackoffMs = std::max<std::uint64_t>(settings.Repair.MaxBackoffMs, settings.Repair.RetryMs);
+    }
+    {
+        std::uint32_t lowCopper = static_cast<std::uint32_t>(settings.Repair.LowCopperPerLevel);
+        ReadKey(config, "RepairLowCopperPerLevel", 0, 100000, lowCopper, warnings);
+        settings.Repair.LowCopperPerLevel = lowCopper;
+    }
     ReadKey(config, "SpiritHealerAfterMs", 0, 3600000, settings.SpiritHealerAfterMs, warnings);
     ReadBool(config, "SpiritHealerOnRepeat", settings.SpiritHealerOnRepeat, warnings);
     ReadBool(config, "HealDownrank", settings.HealDownrank, warnings);
