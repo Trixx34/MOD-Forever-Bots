@@ -273,6 +273,20 @@ constexpr std::uint32_t kPlayerType = 2;     // unit reference type of a player 
 constexpr std::uint64_t kGuildInviteBackoffBaseMs = 60000;   // after a refused guild invite the same bot is not invited again for this long, doubled per refusal in a row
 constexpr std::uint64_t kGuildInviteBackoffMaxMs = 3600000;  // at most an hour
 constexpr std::uint64_t kInviteRetryMs = 15000; // a member is invited again this long after the last invite
+// Party invites that do not lead to a join (the invite refused by the core, declined, or left to expire): the first kInviteFreeTries invites of a member are
+// kInviteRetryMs apart, then the wait doubles per invite, up to kInviteRetryMaxMs. A join, or kInviteQuietResetMs without an invite, starts the count again.
+// (Neither the core's refusal of an invite nor a bot's decline names the member in what the module sees, so the count of invites without a join is the signal.)
+constexpr std::uint32_t kInviteFreeTries = 3;
+constexpr std::uint64_t kInviteRetryMaxMs = 600000;    // ten minutes
+constexpr std::uint64_t kInviteQuietResetMs = 3600000; // an hour
+// The wait after the `sent`-th invite in a row to a member that has not joined.
+inline std::uint64_t InviteRetryWaitMs(std::uint32_t sent)
+{
+    if (sent <= kInviteFreeTries)
+        return kInviteRetryMs;
+    std::uint32_t const shift = std::min<std::uint32_t>(sent - kInviteFreeTries, 10);
+    return std::min(kInviteRetryMaxMs, kInviteRetryMs << shift);
+}
 constexpr std::uint64_t kPartyRetryMs = 2000;   // a party action refused, or just sent, is not repeated before this
 constexpr float kFollowLeaderYards = 8.0f;      // a member this close to its leader stays where it is
 constexpr std::uint64_t kApproachTimeoutMs = 30000; // walking to a target this long without reaching it: avoid the target

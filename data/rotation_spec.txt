@@ -94,7 +94,7 @@ buff "Battle Shout" duration 120 self
 
 class 2
 # The default paladin (no spec): seals, judgement and strikes.
-row "Rebuke" target_casting target range 0 5          # Forever: melee interrupt, 15 s cooldown
+# row "Rebuke" target_casting target range 0 5   # not a row: a Season of Discovery rune (SkillLineAbility AcquireMethod 3, never learned); no trainer, quest, item, learn spell or talent gives it, so a bot never knows it
 row "Hammer of Justice" target_casting target range 0 10
 row "Holy Light" self_hp_below 50 self
 row "Consecration" enemies 3 self
@@ -110,7 +110,7 @@ supersede "Devotion Aura" by "Retribution Aura"
 class 2 spec prot
 # Protection (tank, S tier at level 30): Righteous Fury and Retribution Aura before the pull, Seal of Fury kept up, Consecration for packs (first rank 26573, level 20), Holy Strike and
 # Judgement as extra buttons, Exorcism is left out (it needs an undead or demon target).
-row "Rebuke" target_casting target range 0 5
+# row "Rebuke" target_casting target range 0 5   # not a row: a Season of Discovery rune (SkillLineAbility AcquireMethod 3, never learned); no trainer, quest, item, learn spell or talent gives it, so a bot never knows it
 row "Hammer of Justice" target_casting target range 0 10
 row "Holy Light" self_hp_below 50 self
 row "Consecration" enemies 3 self
@@ -140,7 +140,7 @@ supersede "Devotion Aura" by "Retribution Aura"
 
 class 2 spec ret
 # Retribution (damage): Judgement of the Crusader with the first Judgement, Seal of Righteousness, Holy Strike on cooldown, Consecration for three or more, Hammer of Wrath to finish.
-row "Rebuke" target_casting target range 0 5
+# row "Rebuke" target_casting target range 0 5   # not a row: a Season of Discovery rune (SkillLineAbility AcquireMethod 3, never learned); no trainer, quest, item, learn spell or talent gives it, so a bot never knows it
 row "Hammer of Justice" target_casting target range 0 10
 row "Holy Light" self_hp_below 50 self
 row "Hammer of Wrath" target_hp_below 20 target range 0 30
@@ -287,8 +287,8 @@ class 5 spec shadow
 # Smite as the filler (the wand is not cast), Vampiric Embrace. Shadowform is not before level 40 and is not cast.
 row "Power Word: Shield" self_hp_below 50 duration 30 self
 row "Shadow Word: Pain" duration 18 always target range 0 30
-row "Void Plague" duration 18 always target range 0 30   # Forever: 18 s damage over time
-row "Vampiric Touch" duration 15 always target range 0 30 # Forever: 15 s damage over time
+# row "Void Plague" duration 18 always target range 0 30   # not a row: a Season of Discovery rune (SkillLineAbility AcquireMethod 3, never learned); no trainer, quest, item, learn spell or talent gives it, so a bot never knows it
+# row "Vampiric Touch" duration 15 always target range 0 30   # not a row: a Season of Discovery rune (SkillLineAbility AcquireMethod 3, never learned); no trainer, quest, item, learn spell or talent gives it, so a bot never knows it
 row "Mind Blast" always target range 0 30
 row "Devouring Plague" duration 24 target_hp_above 50 target range 0 30
 row "Mind Flay" always target range 0 30
@@ -307,8 +307,8 @@ row "Flame Shock" duration 12 always target range 0 20
 # Lava Burst: removed from the client in 1.60.1.70790 (no spell of that name for shamans any more)
 row "Lightning Bolt" always target range 0 30
 buff "Lightning Shield" duration 600 self
-buff "Water Shield" duration 600 self               # Forever
-supersede "Lightning Shield" by "Water Shield"
+# buff "Water Shield" duration 600 self   # not a row here: a talent (trait node 104732, Restoration tree) that only the resto talent profile takes
+# supersede "Lightning Shield" by "Water Shield"   # Lightning Shield stays: this build has no Water Shield
 buff "Rockbiter Weapon" duration 300 self
 
 class 7 spec enh
@@ -327,7 +327,7 @@ buff "Windfury Weapon" duration 300 self
 supersede "Rockbiter Weapon" by "Windfury Weapon"
 
 class 7 spec ele
-# Elemental (damage): shocks, Fire Nova on cooldown, a fire totem (Searing, Magma against three), Chain Lightning for three or more, Lightning Bolt. Water Shield first (Forever, level 20).
+# Elemental (damage): shocks, Fire Nova on cooldown, a fire totem (Searing, Magma against three), Chain Lightning for three or more, Lightning Bolt. Lightning Shield (Water Shield is a Restoration talent).
 row "Earth Shock" target_casting target range 0 20
 row "Healing Wave" self_hp_below 40 self
 row "Searing Totem" duration 55 always self
@@ -337,11 +337,11 @@ row "Flame Shock" duration 12 always target range 0 20
 row "Chain Lightning" enemies 3 target range 0 30
 row "Lightning Bolt" always target range 0 30
 buff "Lightning Shield" duration 600 self
-buff "Water Shield" duration 600 self               # Forever
-supersede "Lightning Shield" by "Water Shield"
+# buff "Water Shield" duration 600 self   # not a row here: a talent (trait node 104732, Restoration tree) that only the resto talent profile takes
+# supersede "Lightning Shield" by "Water Shield"   # Lightning Shield stays: this build has no Water Shield
 
 class 7 spec resto
-# Restoration (healer): the heal block casts Healing Wave on the tank; Searing Totem and Flame Shock when damage is low, Lightning Bolt to pool mana by fighting. Water Shield first.
+# Restoration (healer): the heal block casts Healing Wave on the tank; Searing Totem and Flame Shock when damage is low, Lightning Bolt to pool mana by fighting. Water Shield first (talent node 104732, in the resto talent profile).
 row "Earth Shock" target_casting target range 0 20
 row "Healing Wave" self_hp_below 40 self
 row "Mana Tide Totem" self_power_below 25 duration 12 self   # level 38, restores mana to the party
@@ -416,12 +416,12 @@ supersede "Frost Armor" by "Ice Armor"
 supersede "Ice Armor" by "Mage Armor"
 
 class 8 spec frost
-# Frost: Frostbolt, Ice Lance on a Fingers of Frost proc (aura 400647), Frost Nova then run, Cone of Cold against several, Icy Veins on a strong target, Blizzard or Flamestrike and
+# Frost: Frostbolt, Ice Lance on a Fingers of Frost proc (aura 400647), Frost Nova then run, Cone of Cold against several, Blizzard or Flamestrike and
 # Arcane Explosion for packs, Counterspell.
 row "Counterspell" target_casting target range 0 30
 row "Frost Nova" enemies 2 self
 row "Evocation" self_power_below 15 self
-row "Icy Veins" target_strong 2 self               # Forever
+# row "Icy Veins" target_strong 2 self   # not a row: a Season of Discovery rune (SkillLineAbility AcquireMethod 3, never learned); no trainer, quest, item, learn spell or talent gives it, so a bot never knows it
 row "Flamestrike" enemies 4 duration 8 target range 0 30
 row "Blizzard" enemies 4 target range 0 30
 row "Arcane Explosion" enemies 3 self

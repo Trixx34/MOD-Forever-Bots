@@ -2,6 +2,25 @@
 // BotPolicy::Decide, a bot's turn: vendors and supplies, wandering, rest, training, parties, loot, flights, mounts and the move it sends (the steps DecideBot runs in order; bot_policy.cpp).
 #include "bot_policy_internal.h"
 
+bool BotPolicy::BotState::InviteDue(std::uint64_t member, std::uint64_t nowMs) const
+{
+    auto const at = InvitedAtMs.find(member);
+    if (at == InvitedAtMs.end())
+        return true;
+    auto const sent = InvitesSent.find(member);
+    return nowMs >= at->second + InviteRetryWaitMs(sent == InvitesSent.end() ? 1 : sent->second);
+}
+
+std::uint32_t BotPolicy::BotState::NoteInvite(std::uint64_t member, std::uint64_t nowMs)
+{
+    auto const at = InvitedAtMs.find(member);
+    std::uint32_t& sent = InvitesSent[member];
+    if (at != InvitedAtMs.end() && nowMs >= at->second + kInviteQuietResetMs)
+        sent = 0; // a quiet hour: the member is asked as if for the first time
+    InvitedAtMs[member] = nowMs;
+    return ++sent;
+}
+
 void BotPolicy::TurnShopping(DecideTick& tick, BotTurn& turn)
 {
     std::uint64_t nowMs = tick.nowMs;
@@ -774,8 +793,9 @@ void BotPolicy::TurnTrainAndParty(DecideTick& tick, BotTurn& turn)
     }
 
     // Party actions (M8), out of combat. The leader invites each member that is not in its party yet, and invites a
-    // member again only after kInviteRetryMs. A member accepts its leader's invite, and leaves a party that is not its
-    // leader's. Each is sent once; a refused one is retried after kPartyRetryMs.
+    // member again only after kInviteRetryMs, longer after kInviteFreeTries invites that did not lead to a join (InviteRetryWaitMs, up to
+    // kInviteRetryMaxMs). A member accepts its leader's invite, and leaves a party that is not its leader's. Each is sent once; a refused one
+    // is retried after kPartyRetryMs.
     if (_options.PartySize != 0 && bot.in_combat == 0 && nowMs >= state.PartyRetryAtMs)
     {
         if (partyLeaderBot)
@@ -801,13 +821,17 @@ void BotPolicy::TurnTrainAndParty(DecideTick& tick, BotTurn& turn)
                 if (at == indexOf.end())
                     continue; // not online
                 BotSnapshot const& other = view.bots[at->second];
-                if (other.group_leader_guid == leaderRef || other.group_invite_from == leaderRef)
-                    continue; // in this party already, or invited and waiting for the answer
+                if (other.group_leader_guid == leaderRef)
+                {
+                    state.NoteJoined(member); // in this party: a later invite (it left) starts at kInviteRetryMs again
+                    continue;
+                }
+                if (other.group_invite_from == leaderRef)
+                    continue; // invited and waiting for the answer
                 if ((other.group_role != 0 && other.group_leader_guid != leaderRef) ||
                     (other.group_role == 0 && other.group_invite_from != 0 && other.group_invite_from != leaderRef))
                     continue; // in another party, or invited to one: it leaves or declines on its own turn, then it is invited
-                auto const invited = state.InvitedAtMs.find(member);
-                if (invited != state.InvitedAtMs.end() && nowMs < invited->second + kInviteRetryMs)
+                if (!state.InviteDue(member, nowMs))
                     continue;
 
                 BotAction invite;
@@ -816,7 +840,10 @@ void BotPolicy::TurnTrainAndParty(DecideTick& tick, BotTurn& turn)
                 invite.spell_id = kGroupInvite;
                 invite.target_guid = PlayerRef(member);
                 actions.push_back(invite);
-                state.InvitedAtMs[member] = nowMs;
+                std::uint32_t const sent = state.NoteInvite(member, nowMs);
+                if (sent > kInviteFreeTries && _options.OnEvent)
+                    _options.OnEvent("party_invite_backoff: leader=" + std::to_string(bot.guid) + " bot=" + std::to_string(member) + " invites=" +
+                                     std::to_string(sent) + " next_ms=" + std::to_string(InviteRetryWaitMs(sent)));
             }
             // 40-man raid support (doc 108): this leader's roster is a raid (PolicyOptions::Raid). ConvertToRaid works at
             // any party size (Group.cpp), so it is asked for as soon as this bot leads one, well before the 6th member

@@ -67,7 +67,6 @@ row 78 level 1 self_power_above 70 target range 0 5   # Heroic Strike: ranks [78
 buff 6673 level 1 duration 120 self ranks 5242,6192,6673,11549,11550,11551   # Battle Shout: ranks [5242, 6192, 6673, 11549, 11550, 11551]
 
 class 2
-row 425609 level 1 target_casting target range 0 5   # Rebuke: ranks [425609]
 row 853 level 8 target_casting target range 0 10   # Hammer of Justice: ranks [853, 5588, 5589, 10308]
 row 635 level 1 self_hp_below 50 self   # Holy Light: ranks [635, 639, 647, 1026, 1042, 3472, 10328, 10329]
 row 26573 level 20 enemies 3 self   # Consecration: ranks [20116, 20922, 20923, 20924, 26573]
@@ -75,12 +74,11 @@ row 21084 level 1 maxlevel 9 duration 30 always self
 row 20287 level 10 duration 30 always self
 row 679 level 6 always target range 0 5   # Holy Strike: ranks [678, 679, 680, 1866, 2495, 5569, 10332, 10333]
 row 20271 level 4 always target range 0 10   # Judgement: ranks [20271]
-buff 465 level 1 duration 3600 self ranks 465,643,1032,10290,10291,10292,10293 maxlevel 15 maxlevel 15 maxlevel 15 maxlevel 15   # Devotion Aura: ranks [465, 643, 1032, 10290, 10291, 10292, 10293]
+buff 465 level 1 duration 3600 self ranks 465,643,1032,10290,10291,10292,10293 maxlevel 15   # Devotion Aura: ranks [465, 643, 1032, 10290, 10291, 10292, 10293]
 buff 7294 level 16 duration 3600 self ranks 7294,10298,10299,10300,10301   # Retribution Aura: ranks [7294, 10298, 10299, 10300, 10301]
 buff 19740 level 4 duration 300 party ranks 19740,19834,19835,19836,19837,19838   # Blessing of Might: ranks [19740, 19834, 19835, 19836, 19837, 19838]
 
 class 2 spec prot
-row 425609 level 1 target_casting target range 0 5   # Rebuke: ranks [425609]
 row 853 level 8 target_casting target range 0 10   # Hammer of Justice: ranks [853, 5588, 5589, 10308]
 row 635 level 1 self_hp_below 50 self   # Holy Light: ranks [635, 639, 647, 1026, 1042, 3472, 10328, 10329]
 row 26573 level 20 enemies 3 self   # Consecration: ranks [20116, 20922, 20923, 20924, 26573]
@@ -91,7 +89,7 @@ row 679 level 6 always target range 0 5   # Holy Strike: ranks [678, 679, 680, 1
 row 407632 level 40 always target range 0 5   # Hammer of the Righteous: ranks [407632]
 row 20271 level 4 always target range 0 10   # Judgement: ranks [20271]
 buff 25780 level 10 duration 1800 self in_party   # Righteous Fury: ranks [25780]
-buff 465 level 1 duration 3600 self ranks 465,643,1032,10290,10291,10292,10293 maxlevel 15 maxlevel 15 maxlevel 15   # Devotion Aura: ranks [465, 643, 1032, 10290, 10291, 10292, 10293]
+buff 465 level 1 duration 3600 self ranks 465,643,1032,10290,10291,10292,10293 maxlevel 15   # Devotion Aura: ranks [465, 643, 1032, 10290, 10291, 10292, 10293]
 buff 7294 level 16 duration 3600 self ranks 7294,10298,10299,10300,10301   # Retribution Aura: ranks [7294, 10298, 10299, 10300, 10301]
 buff 19740 level 4 duration 300 party ranks 19740,19834,19835,19836,19837,19838   # Blessing of Might: ranks [19740, 19834, 19835, 19836, 19837, 19838]
 
@@ -100,12 +98,11 @@ row 853 level 8 target_casting target range 0 10   # Hammer of Justice: ranks [8
 row 21084 level 1 maxlevel 9 duration 30 always self
 row 20287 level 10 duration 30 always self
 row 20271 level 4 always target range 0 10   # Judgement: ranks [20271]
-buff 465 level 1 duration 3600 self ranks 465,643,1032,10290,10291,10292,10293 maxlevel 15 maxlevel 15   # Devotion Aura: ranks [465, 643, 1032, 10290, 10291, 10292, 10293]
+buff 465 level 1 duration 3600 self ranks 465,643,1032,10290,10291,10292,10293 maxlevel 15   # Devotion Aura: ranks [465, 643, 1032, 10290, 10291, 10292, 10293]
 buff 7294 level 16 duration 3600 self ranks 7294,10298,10299,10300,10301   # Retribution Aura: ranks [7294, 10298, 10299, 10300, 10301]
 buff 19742 level 14 duration 300 party ranks 19742,19850,19852,19853,19854   # Blessing of Wisdom: ranks [19742, 19850, 19852, 19853, 19854]
 
 class 2 spec ret
-row 425609 level 1 target_casting target range 0 5   # Rebuke: ranks [425609]
 row 853 level 8 target_casting target range 0 10   # Hammer of Justice: ranks [853, 5588, 5589, 10308]
 row 635 level 1 self_hp_below 50 self   # Holy Light: ranks [635, 639, 647, 1026, 1042, 3472, 10328, 10329]
 row 24275 level 44 target_hp_below 20 target range 0 30   # Hammer of Wrath: ranks [24239, 24274, 24275]
@@ -232,8 +229,6 @@ buff 14752 level 30 duration 1800 party ranks 14752,14818,14819,27841   # Divine
 class 5 spec shadow
 row 17 level 6 self_hp_below 50 duration 30 self   # Power Word: Shield: ranks [17, 592, 600, 3747, 6065, 6066, 10898, 10899, 10900, 10901]
 row 589 level 4 duration 18 always target range 0 30   # Shadow Word: Pain: ranks [589, 594, 970, 992, 2767, 10892, 10893, 10894]
-row 425204 level 1 duration 18 always target range 0 30   # Void Plague: ranks [425204]
-row 402668 level 1 duration 15 always target range 0 30   # Vampiric Touch: ranks [402668]
 row 8092 level 10 always target range 0 30   # Mind Blast: ranks [8092, 8102, 8103, 8104, 8105, 8106, 10945, 10946, 10947]
 row 2944 level 20 duration 24 target_hp_above 50 target range 0 30   # Devouring Plague: ranks [2944, 19276, 19277, 19278, 19279, 19280]
 row 17311 level 28 always target range 0 30   # Mind Flay: ranks [17311, 17312, 17313, 17314, 18807]
@@ -249,9 +244,8 @@ row 17354 level 38 self_power_below 25 duration 12 self   # Mana Tide Totem: ran
 row 6363 level 20 duration 55 always self   # Searing Totem: ranks [6363, 6364, 6365, 10437, 10438]
 row 8050 level 10 duration 12 always target range 0 20   # Flame Shock: ranks [8050, 8052, 8053, 10447, 10448]
 row 403 level 1 always target range 0 30   # Lightning Bolt: ranks [403, 529, 548, 915, 943, 6041, 10391, 10392, 15207, 15208]
-buff 324 level 8 duration 600 self ranks 324,325,905,945,8134,10431,10432 maxlevel 19 maxlevel 19 maxlevel 19   # Lightning Shield: ranks [324, 325, 905, 945, 8134, 10431, 10432]
-buff 408510 level 20 duration 600 self   # Water Shield: ranks [408510]
-buff 8017 level 1 duration 300 self ranks 8017,8018,8019,10399,16314,16315,16316 maxlevel 29   # Rockbiter Weapon: ranks [8017, 8018, 8019, 10399, 16314, 16315, 16316]
+buff 324 level 8 duration 600 self ranks 324,325,905,945,8134,10431,10432   # Lightning Shield: ranks [324, 325, 905, 945, 8134, 10431, 10432]
+buff 8017 level 1 duration 300 self ranks 8017,8018,8019,10399,16314,16315,16316   # Rockbiter Weapon: ranks [8017, 8018, 8019, 10399, 16314, 16315, 16316]
 
 class 7 spec enh
 row 8042 level 4 target_casting target range 0 20   # Earth Shock: ranks [8042, 8044, 8045, 8046, 10412, 10413, 10414]
@@ -261,7 +255,7 @@ row 6363 level 20 duration 55 always self   # Searing Totem: ranks [6363, 6364, 
 row 408341 level 12 enemies 2 self   # Fire Nova: ranks [408341, 408342, 408343, 408344, 408345]
 row 8050 level 10 duration 12 always target range 0 20   # Flame Shock: ranks [8050, 8052, 8053, 10447, 10448]
 row 403 level 1 always target range 0 30   # Lightning Bolt: ranks [403, 529, 548, 915, 943, 6041, 10391, 10392, 15207, 15208]
-buff 324 level 8 duration 600 self ranks 324,325,905,945,8134,10431,10432 maxlevel 19 maxlevel 19   # Lightning Shield: ranks [324, 325, 905, 945, 8134, 10431, 10432]
+buff 324 level 8 duration 600 self ranks 324,325,905,945,8134,10431,10432   # Lightning Shield: ranks [324, 325, 905, 945, 8134, 10431, 10432]
 buff 8017 level 1 duration 300 self ranks 8017,8018,8019,10399,16314,16315,16316 maxlevel 29   # Rockbiter Weapon: ranks [8017, 8018, 8019, 10399, 16314, 16315, 16316]
 buff 8232 level 30 duration 300 self ranks 8232,8235,10486,16362   # Windfury Weapon: ranks [8232, 8235, 10486, 16362]
 
@@ -274,8 +268,7 @@ row 408341 level 12 enemies 2 self   # Fire Nova: ranks [408341, 408342, 408343,
 row 8050 level 10 duration 12 always target range 0 20   # Flame Shock: ranks [8050, 8052, 8053, 10447, 10448]
 row 421 level 32 enemies 3 target range 0 30   # Chain Lightning: ranks [421, 930, 2860, 10605]
 row 403 level 1 always target range 0 30   # Lightning Bolt: ranks [403, 529, 548, 915, 943, 6041, 10391, 10392, 15207, 15208]
-buff 324 level 8 duration 600 self ranks 324,325,905,945,8134,10431,10432 maxlevel 19 maxlevel 19   # Lightning Shield: ranks [324, 325, 905, 945, 8134, 10431, 10432]
-buff 408510 level 20 duration 600 self   # Water Shield: ranks [408510]
+buff 324 level 8 duration 600 self ranks 324,325,905,945,8134,10431,10432   # Lightning Shield: ranks [324, 325, 905, 945, 8134, 10431, 10432]
 
 class 7 spec resto
 row 8042 level 4 target_casting target range 0 20   # Earth Shock: ranks [8042, 8044, 8045, 8046, 10412, 10413, 10414]
@@ -298,9 +291,9 @@ row 5143 level 8 self_aura_at_least 400588 1 target range 0 30   # Arcane Missil
 row 2136 level 6 self_aura_at_least 400573 2 target range 0 20   # Fire Blast: ranks [2136, 2137, 2138, 8412, 8413, 10197, 10199]
 row 400574 level 20 maxlevel 29 self_aura_below 400573 2 target range 0 30
 row 1239696 level 30 self_aura_below 400573 2 target range 0 30   # Arcane Blast: ranks [1239696, 1239697, 1239699, 1239700]
-row 133 level 1 always target range 0 30 maxlevel 29 maxlevel 29   # Fireball: ranks [133, 143, 145, 3140, 8400, 8401, 8402, 10148, 10149, 10150, 10151]
-buff 168 level 1 duration 1800 self ranks 168,7300,7301 maxlevel 29 maxlevel 29 maxlevel 29 maxlevel 29   # Frost Armor: ranks [168, 7300, 7301]
-buff 7302 level 30 duration 1800 self ranks 7302,7320,10219,10220 maxlevel 33 maxlevel 33 maxlevel 33 maxlevel 33   # Ice Armor: ranks [7302, 7320, 10219, 10220]
+row 133 level 1 always target range 0 30 maxlevel 29   # Fireball: ranks [133, 143, 145, 3140, 8400, 8401, 8402, 10148, 10149, 10150, 10151]
+buff 168 level 1 duration 1800 self ranks 168,7300,7301 maxlevel 29   # Frost Armor: ranks [168, 7300, 7301]
+buff 7302 level 30 duration 1800 self ranks 7302,7320,10219,10220 maxlevel 33   # Ice Armor: ranks [7302, 7320, 10219, 10220]
 buff 6117 level 34 duration 1800 self ranks 6117,22782,22783   # Mage Armor: ranks [6117, 22782, 22783]
 buff 1459 level 1 duration 1800 party ranks 1459,1460,1461,10156,10157   # Arcane Intellect: ranks [1459, 1460, 1461, 10156, 10157]
 
@@ -316,8 +309,8 @@ row 2136 level 6 self_aura_at_least 400573 2 target range 0 20   # Fire Blast: r
 row 400574 level 20 maxlevel 29 self_aura_below 400573 2 target range 0 30
 row 1239696 level 30 self_aura_below 400573 2 target range 0 30   # Arcane Blast: ranks [1239696, 1239697, 1239699, 1239700]
 row 133 level 1 always target range 0 30 maxlevel 29   # Fireball: ranks [133, 143, 145, 3140, 8400, 8401, 8402, 10148, 10149, 10150, 10151]
-buff 168 level 1 duration 1800 self ranks 168,7300,7301 maxlevel 29 maxlevel 29 maxlevel 29   # Frost Armor: ranks [168, 7300, 7301]
-buff 7302 level 30 duration 1800 self ranks 7302,7320,10219,10220 maxlevel 33 maxlevel 33 maxlevel 33   # Ice Armor: ranks [7302, 7320, 10219, 10220]
+buff 168 level 1 duration 1800 self ranks 168,7300,7301 maxlevel 29   # Frost Armor: ranks [168, 7300, 7301]
+buff 7302 level 30 duration 1800 self ranks 7302,7320,10219,10220 maxlevel 33   # Ice Armor: ranks [7302, 7320, 10219, 10220]
 buff 6117 level 34 duration 1800 self ranks 6117,22782,22783   # Mage Armor: ranks [6117, 22782, 22783]
 buff 1459 level 1 duration 1800 party ranks 1459,1460,1461,10156,10157   # Arcane Intellect: ranks [1459, 1460, 1461, 10156, 10157]
 
@@ -331,8 +324,8 @@ row 2136 level 6 target_hp_below 25 target range 0 20   # Fire Blast: ranks [213
 row 12505 level 24 self_aura_at_least 400624 2 target range 0 30   # Pyroblast: ranks [12505, 12522, 12523, 12524, 12525, 12526, 18809]
 row 2948 level 22 duration 30 target_hp_above 70 target range 0 30   # Scorch: ranks [2948, 8444, 8445, 8446, 10205, 10206, 10207]
 row 133 level 1 always target range 0 30   # Fireball: ranks [133, 143, 145, 3140, 8400, 8401, 8402, 10148, 10149, 10150, 10151]
-buff 168 level 1 duration 1800 self ranks 168,7300,7301 maxlevel 29 maxlevel 29   # Frost Armor: ranks [168, 7300, 7301]
-buff 7302 level 30 duration 1800 self ranks 7302,7320,10219,10220 maxlevel 33 maxlevel 33   # Ice Armor: ranks [7302, 7320, 10219, 10220]
+buff 168 level 1 duration 1800 self ranks 168,7300,7301 maxlevel 29   # Frost Armor: ranks [168, 7300, 7301]
+buff 7302 level 30 duration 1800 self ranks 7302,7320,10219,10220 maxlevel 33   # Ice Armor: ranks [7302, 7320, 10219, 10220]
 buff 6117 level 34 duration 1800 self ranks 6117,22782,22783   # Mage Armor: ranks [6117, 22782, 22783]
 buff 1459 level 1 duration 1800 party ranks 1459,1460,1461,10156,10157   # Arcane Intellect: ranks [1459, 1460, 1461, 10156, 10157]
 
@@ -340,7 +333,6 @@ class 8 spec frost
 row 2139 level 24 target_casting target range 0 30   # Counterspell: ranks [2139]
 row 122 level 10 enemies 2 self   # Frost Nova: ranks [122, 865, 6131, 10230]
 row 12051 level 20 self_power_below 15 self   # Evocation: ranks [12051]
-row 425121 level 1 target_strong 2 self   # Icy Veins: ranks [425121]
 row 2120 level 16 enemies 4 duration 8 target range 0 30   # Flamestrike: ranks [2120, 2121, 8422, 8423, 10215, 10216]
 row 10 level 20 enemies 4 target range 0 30   # Blizzard: ranks [10, 6141, 8427, 10185, 10186, 10187]
 row 1449 level 14 enemies 3 self   # Arcane Explosion: ranks [1449, 8437, 8438, 8439, 10201, 10202]
@@ -361,7 +353,7 @@ row 980 level 8 duration 24 target_hp_above 70 target range 0 30   # Bane of Ago
 row 5676 level 18 always target range 0 30   # Searing Pain: ranks [5676, 17919, 17920, 17921, 17922, 17923]
 row 689 level 14 always target range 0 30   # Drain Life: ranks [689, 699, 709, 7651, 11699, 11700]
 row 686 level 1 always target range 0 30   # Shadow Bolt: ranks [686, 695, 705, 1088, 1106, 7641, 11659, 11660, 11661]
-buff 687 level 1 duration 1800 self ranks 687,696 maxlevel 19 maxlevel 19 maxlevel 19 maxlevel 19   # Demon Skin: ranks [687, 696]
+buff 687 level 1 duration 1800 self ranks 687,696 maxlevel 19   # Demon Skin: ranks [687, 696]
 buff 706 level 20 duration 1800 self ranks 706,1086,11733,11734,11735   # Demon Armor: ranks [706, 1086, 11733, 11734, 11735]
 buff 712 level 20 duration 3600 self no_pet   # Summon Succubus: ranks [712]
 buff 697 level 10 duration 3600 self no_pet   # Summon Voidwalker: ranks [697]
@@ -374,7 +366,7 @@ row 980 level 8 duration 24 target_hp_above 70 target range 0 30   # Bane of Ago
 row 5676 level 18 always target range 0 30   # Searing Pain: ranks [5676, 17919, 17920, 17921, 17922, 17923]
 row 689 level 14 always target range 0 30   # Drain Life: ranks [689, 699, 709, 7651, 11699, 11700]
 row 686 level 1 always target range 0 30   # Shadow Bolt: ranks [686, 695, 705, 1088, 1106, 7641, 11659, 11660, 11661]
-buff 687 level 1 duration 1800 self ranks 687,696 maxlevel 19 maxlevel 19 maxlevel 19   # Demon Skin: ranks [687, 696]
+buff 687 level 1 duration 1800 self ranks 687,696 maxlevel 19   # Demon Skin: ranks [687, 696]
 buff 706 level 20 duration 1800 self ranks 706,1086,11733,11734,11735   # Demon Armor: ranks [706, 1086, 11733, 11734, 11735]
 buff 712 level 20 duration 3600 self no_pet   # Summon Succubus: ranks [712]
 buff 697 level 10 duration 3600 self no_pet   # Summon Voidwalker: ranks [697]
@@ -387,7 +379,7 @@ row 980 level 8 duration 24 always target range 0 30   # Bane of Agony: ranks [9
 row 348 level 1 duration 15 always target range 0 30   # Immolate: ranks [348, 707, 1094, 2941, 11665, 11667, 11668]
 row 689 level 14 always target range 0 30   # Drain Life: ranks [689, 699, 709, 7651, 11699, 11700]
 row 686 level 1 always target range 0 30   # Shadow Bolt: ranks [686, 695, 705, 1088, 1106, 7641, 11659, 11660, 11661]
-buff 687 level 1 duration 1800 self ranks 687,696 maxlevel 19 maxlevel 19   # Demon Skin: ranks [687, 696]
+buff 687 level 1 duration 1800 self ranks 687,696 maxlevel 19   # Demon Skin: ranks [687, 696]
 buff 706 level 20 duration 1800 self ranks 706,1086,11733,11734,11735   # Demon Armor: ranks [706, 1086, 11733, 11734, 11735]
 buff 697 level 10 duration 3600 self no_pet   # Summon Voidwalker: ranks [697]
 buff 688 level 1 duration 3600 self no_pet   # Summon Imp: ranks [688]

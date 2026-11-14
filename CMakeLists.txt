@@ -77,6 +77,10 @@ add_executable(raid_test tests/raid_test.cpp)
 target_link_libraries(raid_test PRIVATE forever_bots_policy)
 add_test(NAME raid COMMAND raid_test)
 
+add_executable(party_invite_test tests/party_invite_test.cpp)
+target_link_libraries(party_invite_test PRIVATE forever_bots_policy)
+add_test(NAME party_invite COMMAND party_invite_test)
+
 add_executable(quest_test tests/quest_test.cpp)
 target_link_libraries(quest_test PRIVATE forever_bots_policy)
 add_test(NAME quest COMMAND quest_test)

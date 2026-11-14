@@ -636,18 +636,18 @@ void BotPolicy::DriveQuestGroups(WorldTickSnapshotView const& view, std::unorder
     for (quest_group::Invite const& invite : quest_group::PlanInvites(_options.QuestGroups, candidates))
     {
         BotState& leaderState = StateOf(invite.Leader);
-        auto const sent = leaderState.InvitedAtMs.find(invite.Invitee);
         _questGroupLeaders[invite.Leader] = invite.Quest;
-        if (sent != leaderState.InvitedAtMs.end() && nowMs < sent->second + kInviteRetryMs)
-            continue;
+        if (!leaderState.InviteDue(invite.Invitee, nowMs))
+            continue; // invited before and not joined: kInviteRetryMs, then longer per invite (InviteRetryWaitMs)
         BotAction action;
         action.bot_guid = invite.Leader;
         action.type = ActionType::kGroup;
         action.spell_id = kGroupInvite;
         action.target_guid = PlayerRef(invite.Invitee);
         actions.push_back(action);
-        leaderState.InvitedAtMs[invite.Invitee] = nowMs;
-        event("quest_group_invite: leader=" + std::to_string(invite.Leader) + " bot=" + std::to_string(invite.Invitee) + " quest=" + std::to_string(invite.Quest));
+        std::uint32_t const sent = leaderState.NoteInvite(invite.Invitee, nowMs);
+        event("quest_group_invite: leader=" + std::to_string(invite.Leader) + " bot=" + std::to_string(invite.Invitee) + " quest=" + std::to_string(invite.Quest) +
+              (sent > kInviteFreeTries ? " invites=" + std::to_string(sent) + " next_ms=" + std::to_string(InviteRetryWaitMs(sent)) : std::string()));
     }
 
     // 3. An invite from a quest-group leader is accepted (the invitee is free, not in a fight).
@@ -680,11 +680,13 @@ void BotPolicy::DriveQuestGroups(WorldTickSnapshotView const& view, std::unorder
             continue;
         leaderOf[leaderGuid] = leaderGuid;
         membersOf[leaderGuid].clear();
+        BotState& leaderState = StateOf(leaderGuid);
         for (BotSnapshot const& other : view.bots)
             if (other.guid != leaderGuid && other.group_leader_guid == leader.group_leader_guid && leaderOf.count(other.guid) == 0)
             {
                 leaderOf[other.guid] = leaderGuid;
                 membersOf[leaderGuid].push_back(other.guid);
+                leaderState.NoteJoined(other.guid); // joined: a later invite starts at kInviteRetryMs again
             }
     }
 }

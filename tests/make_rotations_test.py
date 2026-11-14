@@ -18,11 +18,11 @@ SPEC = os.path.join(ROOT, "data", "rotation_spec.txt")
 # class -> {name: id}; ids read from the Forever client data (rank 1 / the lowest id of the name in the class's skill lines)
 FOREVER = {
     1: {},   # Shockwave, Spearing Strike, Reckless Swings: no trainer teaches them, so no rows
-    2: {"Rebuke": 425609, "Holy Strike": 678, "Hammer of the Righteous": 407632},
+    2: {"Holy Strike": 678, "Hammer of the Righteous": 407632},   # Rebuke 425609: a rune (AcquireMethod 3), nothing teaches it, so no row
     4: {},   # Saber Slash: no trainer teaches it, so no row
-    5: {"Void Plague": 425204, "Vampiric Touch": 402668},
+    5: {},   # Void Plague 425204, Vampiric Touch 402668: runes, nothing teaches them, so no rows
     7: {"Water Shield": 408510},   # Lava Burst is gone from the 70790 client
-    8: {"Icy Veins": 425121, "Ice Lance": 400640},
+    8: {"Ice Lance": 400640},   # Icy Veins 425121: a rune, nothing teaches it, so no row
     9: {},  # no Forever row: Fel Armor is left out (no trainer teaches it)
     11: {},  # Starsurge and Sunfire: Season of Discovery runes (AcquireMethod 3), nothing teaches them, so no rows
 }
@@ -93,18 +93,28 @@ order = lambda cls, a, b: ids(classes[cls]).index(a) < ids(classes[cls]).index(b
 check(order(2, 678, 20271), "paladin: Holy Strike before Judgement")
 block_order = lambda cls, spec, a, b: ids(blocks[(cls, spec)]).index(a) < ids(blocks[(cls, spec)]).index(b)
 check(order(8, 400640, 116), "mage: Ice Lance before Frostbolt")
-check(block_order(5, "shadow", 402668, 8092), "priest shadow: Vampiric Touch before Mind Blast")
+# Season of Discovery runes (SkillLineAbility AcquireMethod 3, no trainer, quest, item, learn spell or talent): no rows even when the dump has them
+RUNES = {2: {"Rebuke": 425609}, 5: {"Void Plague": 425204, "Vampiric Touch": 402668}, 8: {"Icy Veins": 425121}}
+runes_dump = "\n".join(dump_line(c, {**FOREVER[c], **VANILLA[c], **RUNES.get(c, {})}) for c in FOREVER) + "\n"
+rune_classes, _ = run(runes_dump)
+check(not any(int(r.split()[1]) in (425609, 425204, 402668, 425121) for c in rune_classes for r in rune_classes[c]), "no Rebuke, Void Plague, Vampiric Touch or Icy Veins row")
+classes, err = run(full)
 
 row = lambda cls, sid: next(r for r in classes[cls] if r.split()[1] == str(sid))
 check(not any(r.split()[1] in ("424785", "1310222", "440488", "1329555", "1328548") for c in classes for r in classes[c]), "spells no trainer teaches are no rows")
-check("duration 18" in row(5, 425204) and "duration 15" in row(5, 402668), "priest damage over time lengths")
 check("range 0 5" in row(2, 678), "Holy Strike is a melee strike")
 check(not any(r.split()[1] in ("417157", "414684") for r in classes.get(11, [])), "no Starsurge or Sunfire row")
-check(row(7, 408510).startswith("buff") and "duration 600" in row(7, 408510), "Water Shield is a 10 minute upkeep buff")
+# Water Shield is a talent (trait node 104732) that only the resto talent profile takes: only the resto block has it
+check(any(r.split()[1] == "408510" and r.startswith("buff") and "duration 600" in r for r in blocks[(7, "resto")]), "resto: Water Shield is a 10 minute upkeep buff")
+check(not any(r.split()[1] == "408510" for spec in ("", "enh", "ele") for r in blocks[(7, spec)]), "no Water Shield outside the resto block")
 # Fel Armor (403619) is left out: no trainer teaches it, so a bot never knows it, and a supersede to it would stop Demon Armor for good
 check(not any(r.split()[1] == "403619" for r in classes[9]), "Fel Armor is not a warlock row")
 # the better shield retires the old one from the level it is learned
-check("maxlevel" in row(7, 324), "Lightning Shield is retired by Water Shield")
+block_row = lambda cls, spec, sid: next(r for r in blocks[(cls, spec)] if r.split()[1] == str(sid))
+check("maxlevel" in block_row(7, "resto", 324), "resto: Lightning Shield is retired by Water Shield")
+# a supersede caps the old spell in its own block only (it used to cap Lightning Shield in every shaman block before the resto one)
+check(all("maxlevel" not in block_row(7, spec, 324) for spec in ("", "enh", "ele")), "Lightning Shield stays in the blocks with no Water Shield")
+check(all(r.count("maxlevel") <= 1 for c in classes for r in classes[c]), "no row is capped twice")
 check("maxlevel" not in row(9, 706), "Demon Armor is not retired: it stays the armor")
 
 # 1b. the spec blocks: a block per spec with its own rows, the class default block kept, and the pet summons as no_pet upkeep buffs
