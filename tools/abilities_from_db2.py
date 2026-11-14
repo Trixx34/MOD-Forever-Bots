@@ -77,11 +77,19 @@ def main():
     # What a bot can learn: for a name that some trainer teaches, only the ids a trainer teaches (Execute's damage spell 20647 has a client spell level 1, but only
     # 5308 is taught, at 24; a rune or a trigger spell of the same name is not a rank). A name no trainer teaches keeps its spell-level ids (Summon Hawk, Auto Shot),
     # and a spell with no level at all is kept at level 1 only when no spell of its name has one.
+    # The exception: a rank the class is given at creation (SkillLineAbility AcquireMethod 2: Lightning Bolt 403, Healing Wave 331, Wrath 5176, Raptor Strike 2973,
+    # Holy Light 635) is in no trainer's list, yet the bot knows it from level 1 and the taught ranks only start at rank 2 (Lightning Bolt 529 at level 8). Leaving it out
+    # gave rotation rows that start with rank 2 at its learn level, and a bot of level 1 to 7 had no damage spell.
+    creation = {row[4] for row in ability.values() if row[8] == 2}
     for cls in CLASSES:
         names_taught = {names[s][0] for s in by_class[cls] if s in trainer}
         names_levelled = {names[s][0] for s, learn in by_class[cls].items() if learn}
-        by_class[cls] = {s: (learn or 1) for s, learn in by_class[cls].items()
-                         if (s in trainer if names[s][0] in names_taught else (learn or names[s][0] not in names_levelled))}
+        kept = {s: (learn or 1) for s, learn in by_class[cls].items()
+                if (s in trainer if names[s][0] in names_taught else (learn or names[s][0] not in names_levelled))}
+        for s in by_class[cls]:
+            if s in creation and s not in kept and names[s][0] in names_taught:
+                kept[s] = max(1, level_of.get(s, 1))
+        by_class[cls] = kept
 
     if args.report:
         for cls in CLASSES:

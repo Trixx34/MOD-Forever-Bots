@@ -587,6 +587,78 @@ void TheShippedFilesLoadCleanly()
     CHECK(beasts.ByEntry.count(157) == 1 && beasts.ByEntry.count(834) == 1 && beasts.ByEntry.count(213) == 1);   // Goretusk, Coyote, Starving Dire Wolf (Westfall)
 }
 
+// The audit of 2026-11-14: a bot of level 1 had no damage spell (the rows began with rank 2 at its learn level), Auto Shot was refused inside its minimum range, and rows for spells
+// no trainer teaches were refused on every cast. Every block must have a damage row for level 1, with the rank 1 id the class is given at creation.
+void EveryClassHasADamageRowAtLevelOne()
+{
+    std::string const root = FOREVER_BOTS_SOURCE_DIR;
+    std::vector<std::string> warnings;
+    rotation::RotationData const data = rotation::LoadRotationData(root + "/data/rotations.txt", warnings);
+    CHECK(warnings.empty());
+    auto const atLevelOne = [](rotation::Row const& row) { return !row.Buff && row.MinLevel <= 1 && (row.MaxLevel == 0 || row.MaxLevel >= 1); };
+    // class -> the damage rows of level 1: Heroic Strike, Seal of Righteousness (rank 1; Judgement at 4 needs it), Raptor Strike, Sinister Strike, Smite, Lightning Bolt, Fireball, Shadow Bolt, Wrath.
+    std::map<std::uint32_t, std::vector<std::uint32_t>> const starters = {
+        {1, {78}}, {2, {21084}}, {3, {2973}}, {4, {1752}}, {5, {585}}, {7, {403}}, {8, {133}}, {9, {686}}, {11, {5176}}};
+    auto const check = [&](std::uint32_t cls, std::vector<rotation::Row> const& rows)
+    {
+        bool damage = false;
+        for (rotation::Row const& row : rows)
+            if (atLevelOne(row))
+                for (std::uint32_t spell : starters.at(cls))
+                    damage = damage || row.Spell == spell;
+        CHECK(damage);
+        for (rotation::Row const& row : rows)
+        {
+            if (!atLevelOne(row))
+                continue;
+            // Spells no trainer teaches (Reckless Swings, Spearing Strike, Shockwave, Saber Slash, Oath of Light, Blade Flurry, a talent) are never known at level 1: no row for them.
+            for (std::uint32_t never : {1329555u, 1310222u, 440488u, 424785u, 13877u, 1328548u})
+                CHECK(row.Spell != never);
+            // The first ranks, never rank 2 at its own level.
+            for (std::uint32_t rank2 : {529u, 332u, 5177u, 5186u, 14260u, 639u, 20287u})
+                CHECK(row.Spell != rank2);
+        }
+    };
+    for (auto const& [cls, rows] : data.ByClass)
+        check(cls, rows);
+    for (auto const& [key, rows] : data.BySpec)
+        check(key.first, rows);
+    // The paladin's rank 2 seal takes over at level 10.
+    bool seal2 = false;
+    for (rotation::Row const& row : data.ByClass.at(2))
+        seal2 = seal2 || (row.Spell == 20287 && row.MinLevel == 10);
+    CHECK(seal2);
+
+    // Hunter: a melee row from range 0 at level 1, Auto Shot only outside its 8 yard minimum range, in every spec.
+    auto const hunter = [&](std::vector<rotation::Row> const& rows)
+    {
+        bool melee = false;
+        bool autoShot = false;
+        for (rotation::Row const& row : rows)
+        {
+            if (row.Spell == 2973 && atLevelOne(row) && row.OnTarget && row.MinRange == 0.0f && row.MaxRange >= 5.0f)
+                melee = true;
+            if (row.Spell == 75)
+                autoShot = row.MinRange >= 8.0f && row.MaxRange >= 30.0f && row.OnTarget;
+        }
+        CHECK(melee);
+        CHECK(autoShot);
+    };
+    hunter(data.ByClass.at(3));
+    for (auto const& [key, rows] : data.BySpec)
+        if (key.first == 3)
+            hunter(rows);
+    // A caster has a ranged damage row at level 1.
+    auto const ranged = [&](std::vector<rotation::Row> const& rows, std::uint32_t spell)
+    {
+        for (rotation::Row const& row : rows)
+            if (row.Spell == spell && atLevelOne(row) && row.OnTarget && row.MaxRange >= 30.0f)
+                return true;
+        return false;
+    };
+    CHECK(ranged(data.ByClass.at(7), 403) && ranged(data.ByClass.at(8), 133) && ranged(data.ByClass.at(9), 686) && ranged(data.ByClass.at(5), 585) && ranged(data.ByClass.at(11), 5176));
+}
+
 // Bug #4 of the 2026-11-10 report: a row with two condition keywords keeps both (When and When2, ANDed); a third is a format error.
 void ARowKeepsTwoConditions()
 {
@@ -737,6 +809,7 @@ int main()
     ADemonIsSummonedOnlyWithNoPetAndFallsBack();
     AStanceIsHeldOnlyInAParty();
     TheShippedFilesLoadCleanly();
+    EveryClassHasADamageRowAtLevelOne();
     ARowKeepsTwoConditions();
     ExecuteHasItsHealthConditionAndFeralBuildersGiveComboPoints();
     if (failures == 0)
