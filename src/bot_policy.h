@@ -67,6 +67,7 @@
 #include "lfg_queue_fill.h"
 #include "death_pause.h"
 #include "trade_ads.h"
+#include "group_etiquette.h"
 #include "party_mana.h"
 #include "whisper_matrix.h"
 #include "path_jitter.h"
@@ -475,6 +476,7 @@ struct PolicyOptions
     quest_invite::Settings QuestInvite;
     // TransportRide: a bot rides the ship, zeppelin or elevator its group leader stands on (kTransport; needs the core's Bot.Actions.Transport and Bot.Snapshot.PartyView).
     transport_ride::Settings TransportRide;
+    group_etiquette::Settings GroupEtiquette;   // GroupEtiquette* keys (group_etiquette.h): the pull wait and the party chat lines
     // ADVISOR-OPTIONS
     // Advisor features (docs: config/modules.d/forever-bots.conf.example, "Advisor features"; each off by default). The line pools are read once at start.
     std::shared_ptr<advisor::Pools const> Pools;
@@ -1190,6 +1192,8 @@ private:
     std::unordered_map<std::uint64_t, BotState> _bots; // bot guid -> state
     std::vector<TalentOrder> _talentOrders;            // queued by Decide, taken by TakeTalentOrders
     std::vector<TalentOrder> _respecOrders;            // queued by Decide (TalentRespec), taken by TakeRespecOrders
+    std::map<std::uint64_t, group_etiquette::Waiter> _etiquetteWait;   // party leader -> the etiquette wait (group_etiquette.h)
+    group_etiquette::Chatter _etiquetteChat;                           // greeting, "ready?" and thanks limits
     std::map<std::uint64_t, party_mana::Tracker> _partyMana;   // party leader (a bot) -> who waits for mana (party_mana.h)
     whisper_matrix::Matrix _whisperMatrix;                      // repeat avoidance of the matrix replies
     std::vector<whisper_matrix::Template> _whisperTemplates;    // parsed from Pools->WhisperReplies on first use

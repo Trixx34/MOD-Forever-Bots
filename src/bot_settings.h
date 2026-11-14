@@ -21,6 +21,7 @@
 #include "lfg_queue_fill.h"
 #include "death_pause.h"
 #include "trade_ads.h"
+#include "group_etiquette.h"
 #include "party_mana.h"
 #include "whisper_matrix.h"
 #include "path_jitter.h"
@@ -253,6 +254,8 @@ struct BotSettings
     quest_invite::Settings QuestInvite;
     // Group quests (config QuestGroups, off by default; quest_group.h). WaitMs is QuestGroupWaitMinutes in minutes.
     quest_group::Settings QuestGroups;
+    group_etiquette::Settings GroupEtiquette;
+    std::string GroupEtiquetteFile = "data/group_etiquette.txt";
     // ADVISOR-MEMBERS
     // Supplies (layout 15, config keys Supplies, SupplyAmmoLow, SupplyAmmoTarget, SupplyFoodLow, SupplyFoodTarget, SupplyDrinkLow, SupplyDrinkTarget,
     // SupplyTripSec; off by default): bots buy ammunition, food and drink at vendors that sell what they can use, and eat and drink while resting.

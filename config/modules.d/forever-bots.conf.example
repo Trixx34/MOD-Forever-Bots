@@ -228,6 +228,15 @@ Module.forever-bots.TelemetrySummarySec = 60
 #                         the party's non-combat movement holds until that bot is at 80 percent; never in combat)
 # PartyManaHoldSec = 60  (hard cap of one hold)
 # PartyManaFile = data/party_mana.txt
+# GroupEtiquette = 0     (five-man dungeon party manners: the pull waits while the healer's mana or the tank's health is under GroupEtiquetteReadyPct or a
+#                         member is a straggler; bots say a greeting, "ready?" and thanks in party chat from GroupEtiquetteFile; raids are left alone)
+# GroupEtiquetteReadyPct = 80       (healer mana and tank health the party waits for)
+# GroupEtiquetteWaitSec = 45        (hard cap of one wait, all reasons)
+# GroupEtiquetteStragglerYards = 45 (a member farther than this from the leader is a straggler)
+# GroupEtiquetteStragglerSec = 20   (how long the party waits for a straggler)
+# GroupEtiquetteFile = data/group_etiquette.txt
+# GroupEtiquetteLoot = 0 (need, greed or pass on group loot by upgrade score and class need, never needing what a visible groupmate needs more; the core sends no
+#                         roll event yet, so this has no effect until it does, doc/group-etiquette.md)
 # WhisperMatrix = 0      (a whisper with "where are you", "inv", "group", "lfg", "what level" or "help" is answered from WhisperMatrixFile by the bot's state:
 #                         grinding, questing, travelling, dungeon, full group; the whisper limit of ChatWhisperReplies applies, and no template goes to the
 #                         same player twice in 10 minutes; works without ChatWhisperReplies, which keeps its own replies)

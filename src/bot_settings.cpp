@@ -777,6 +777,14 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
         ReadKey(config, "QuestGroupRangeYards", 10, 1000, range, warnings);
         settings.QuestGroups.RangeYards = float(range);
     }
+    ReadBool(config, "GroupEtiquette", settings.GroupEtiquette.Enabled, warnings);
+    ReadBool(config, "GroupEtiquetteLoot", settings.GroupEtiquette.Loot, warnings);
+    ReadKey(config, "GroupEtiquetteWaitSec", 5, 600, settings.GroupEtiquette.WaitSec, warnings);
+    ReadKey(config, "GroupEtiquetteReadyPct", 1, 100, settings.GroupEtiquette.ReadyPct, warnings);
+    ReadKey(config, "GroupEtiquetteStragglerYards", 30, 200, settings.GroupEtiquette.StragglerYards, warnings);
+    ReadKey(config, "GroupEtiquetteStragglerSec", 1, 300, settings.GroupEtiquette.StragglerSec, warnings);
+    if (auto const it = config.find("GroupEtiquetteFile"); it != config.end())
+        settings.GroupEtiquetteFile = it->second;
     // ADVISOR-KEYS
     ReadBool(config, "InnDowntime", settings.InnDowntime.Enabled, warnings);
     ReadBool(config, "ScenarioConfigGuard", settings.ScenarioConfigGuard, warnings);

@@ -1,0 +1,12 @@
+# Party chat lines of the group etiquette (src/group_etiquette.h): "kind|text", kind greet (on joining a dungeon party), ready (the leader, after a wait)
+# or thanks (a bot that was dead and is up again). One line each, at most 255 bytes.
+greet|Hi all.
+greet|Hello everyone, ready when you are.
+greet|Hey, thanks for the invite.
+greet|Hi, good to run with you.
+ready|Ready?
+ready|Everyone ready? Pulling soon.
+ready|All set? Let's go on.
+thanks|Thanks for the rez.
+thanks|Thank you, back on my feet.
+thanks|Thanks, sorry about that.

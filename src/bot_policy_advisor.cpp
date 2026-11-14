@@ -72,9 +72,46 @@ void BotPolicy::TurnAdvisor(DecideTick& tick, BotTurn& turn)
     std::uint64_t const nowMs = tick.nowMs;
     // Out of combat, no target, nothing hostile in view, alive and on the ground: the only bots the advisor features speak or emote for.
     bool const quiet = bot.in_combat == 0 && bot.life_state == 0 && bot.in_flight == 0 && !turn.hasTarget && !turn.enemyNear && bot.threat_target_guid == 0;
+    bool const inDungeonParty = bot.group_role != 0 && bot.group_size <= 5 && _options.DungeonsByMap.count(bot.map_id) != 0;
+    group_etiquette::Line etiquetteLine = group_etiquette::Line::Greet;
+    std::uint64_t const partyKey = bot.group_role == 2 ? bot.guid : (bot.group_leader_guid & forever_module::kUnitRefCounterMask);
+    if (_options.GroupEtiquette.Enabled && inDungeonParty && bot.life_state != 0)
+    {
+        group_etiquette::ChatFacts dead;
+        dead.InDungeonParty = true;
+        dead.Alive = false;
+        dead.GroupSize = bot.group_size;
+        _etiquetteChat.Note(_options.GroupEtiquette, dead, _options.RandomSeed, bot.guid, partyKey, nowMs, etiquetteLine);   // only notes the death
+    }
     if (!quiet)
         return;
     std::uint64_t const seed = _options.RandomSeed;
+
+    // Group etiquette (GroupEtiquette): a greeting on joining a dungeon party, "ready?" from the leader after a wait, thanks after being got up again.
+    if (_options.GroupEtiquette.Enabled && inDungeonParty && _options.Pools && !_options.Pools->GroupEtiquette.empty())
+    {
+        group_etiquette::ChatFacts facts;
+        facts.InDungeonParty = true;
+        facts.Leader = bot.group_role == 2;
+        facts.GroupSize = bot.group_size;
+        tick.ForParty(partyKey, [&](BotSnapshot const& member)
+        {
+            if (member.guid != bot.guid && member.life_state == 0 && member.map_id == bot.map_id && Distance2d(bot, member) <= 40.0f)
+                facts.GroupMateNear = true;
+        });
+        if (_etiquetteChat.Note(_options.GroupEtiquette, facts, seed, bot.guid, partyKey, nowMs, etiquetteLine))
+        {
+            std::vector<std::string> const lines = group_etiquette::LinesOf(_options.Pools->GroupEtiquette, etiquetteLine);
+            if (!lines.empty())
+            {
+                advisor::Order order;
+                order.What = advisor::Kind::PartySay;
+                order.Bot = bot.guid;
+                order.Text = lines[bot_random::Below(bot_random::Draw(seed, bot.guid, 0xE2, nowMs / 1000), std::uint32_t(lines.size()))];
+                _advisorOrders.push_back(std::move(order));
+            }
+        }
+    }
 
     // Party mana sync (PartyMana): a low healer or caster of a dungeon party says so once; the party's walk holds for it (RouteReadiness asks the tracker).
     if (_options.PartyMana.Enabled && bot.group_role != 0 && _options.DungeonsByMap.count(bot.map_id) != 0)
