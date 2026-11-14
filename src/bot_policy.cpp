@@ -13,13 +13,13 @@ bool BotPolicy::SafeToLogOut(BotSnapshot const& bot) const
     if (found == _bots.end())
         return true;
     BotState const& state = found->second;
-    return !state.ChatStay && state.ChatFollow == 0 && !state.Traveling && !state.SupplyTrip && state.SupplyCheckAtMs == 0 && !state.ServiceUrgent;
+    return !state.ChatStay && state.ChatFollow == 0 && !state.Traveling && !state.SupplyTrip && state.SupplyCheckAtMs == 0 && !state.ServiceUrgent && !state.RepairTrip;
 }
 
 BusyKind BotPolicy::BusyOf(BotSnapshot const& bot) const
 {
     auto const found = _bots.find(bot.guid);
-    bool const travelling = found != _bots.end() && (found->second.Traveling || found->second.SupplyTrip);
+    bool const travelling = found != _bots.end() && (found->second.Traveling || found->second.SupplyTrip || found->second.RepairTrip);
     bool const inDungeon = _options.DungeonsByMap.count(bot.map_id) != 0;
     return BusyReason(bot.in_combat != 0, bot.life_state != 0, inDungeon, travelling);
 }

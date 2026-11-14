@@ -258,6 +258,7 @@ void BotPolicy::TurnRevivedAndRoles(DecideTick& tick, BotTurn& turn)
                              " down_ms=" + std::to_string(nowMs - state.DeathMs) + " health_pct=" +
                              std::to_string(HealthPct(bot, 0)));
         state.Life = 0;
+        state.RepairAfterDeath = true; // a death wears the gear: worn gear is repaired before the next fight (repair_policy.h)
         state.ReleaseNow = false;
         state.Last.reset();
         state.Sitting = false;

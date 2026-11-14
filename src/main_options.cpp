@@ -12,6 +12,7 @@ void PolicyFromSettings(PolicyOptions& policyOptions, BotSettings& settings)
     policyOptions.ServiceEveryMs = std::uint64_t(settings.ServiceEverySec) * 1000;
     policyOptions.TrainEveryMs = std::uint64_t(settings.TrainEverySec) * 1000;
     policyOptions.Supplies = settings.Supplies;
+    policyOptions.Repair = settings.Repair;
     policyOptions.VendorSellGear = settings.VendorSellGear;
     policyOptions.SpiritHealerAfterMs = settings.SpiritHealerAfterMs;
     policyOptions.SpiritHealerOnRepeat = settings.SpiritHealerOnRepeat;

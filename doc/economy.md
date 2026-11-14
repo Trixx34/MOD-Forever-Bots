@@ -47,11 +47,31 @@ and a bot does not walk to an auctioneer to buy (the errands do that for listing
 |---|---|---|
 | A bot's money and bag room | snapshot `copper`, `bag_free_slots` | built |
 | Selling grey items, repairing, buying supplies at vendors | `kVendor`; `doc/supplies-2.md` | built, not run on the sim for long |
+| Urgent repair of broken gear (quest bots, party members, after a death) | `repair_policy.h`, `TurnShopping`; keys `RepairUrgent`, `RepairBrokenPct`, `RepairAfterDeathPct`, `RepairRetrySec`, `RepairLowCopperPerLevel` | built 2026-11-14, on by default; see below |
 | Money reserve | core `Bot.Supplies.ReserveCopperPerLevel` | built (protocol 11) |
 | The nearest auctioneer | snapshot `auctioneer_guid` (an NPC reference) | built |
 | Auction house operations: browse, bid, buyout, list, cancel | Tier 1 `ModuleClient::AuctionHouseForBot`, core `ModuleActions.cpp` (`AuctionHouseAction`) | built in the core and SDK; the module lists (`kList`, `main.cpp`); browse, bid and buyout are not used yet; a browse answers with an `AuctionListingEvent` |
 | The core's own seller bot | worldserver `AuctionHouseBot.*` (off, `Sellers.Count = 0`) | exists in the fork; fills the house with items from a fixed list, not with what bots find |
 | Walking to an auctioneer, standing in reach | the vendor walk (`bot_policy.cpp`, kTravel...) | works for vendors; auctioneers are indexed separately |
+
+## Urgent repair (2026-11-14)
+
+On prod 232 of 463 equipped pieces were at durability 0 (a level 10 paladin with all six pieces broken). The rule itself looked at the worst piece
+(`durability_pct` is the lowest piece, below 50 % the visit went to a repairman), but the visit was only made by an *idle* bot every `ServiceEverySec`,
+and a bot with quest work is never idle; a party member never walks to a vendor at all. So a leveling bot never repaired, fought with no stats from its
+gear and died, and each death wore the gear further.
+
+Now (`repair_policy.h`, on by default, no `AutoGearing` needed): a piece at or below `RepairBrokenPct` (default 0), or after a death a piece below
+`RepairAfterDeathPct` (default 50), starts an urgent trip as soon as the bot is out of a fight; quests wait until the visit. The visit sells the grey items,
+the white junk too when the bot has less than level x `RepairLowCopperPerLevel` copper, then repairs (the core: sell, repair, buy, in that order). It is judged
+5 s later (the worst piece better than before); a visit that repaired nothing, or a trip that did not get there in 10 minutes, waits `RepairRetrySec`
+(300 s) doubled per failure in a row, at most an hour, so a bot with no money never loops. A party leader takes the party to the repairman for a member
+and waits up to 30 s for the member's visit; the member walks the last yards (25 at most) itself.
+
+Limits that need the core: the snapshot has no average durability, no count of broken pieces and no repair cost, so the module cannot judge "mostly worn"
+or whether the money suffices before it walks. The core's `kVendor` calls `Player::DurabilityRepairAll(true, ...)`, which repairs nothing at all when the bot
+cannot pay the whole bill (it does not repair piece by piece), and still reports `kApplied`: a poor bot with every piece broken stays broken until it has the
+money for all of it. A core change (repair piece by piece when the total cannot be paid, worst or cheapest first, and report what was repaired) would fix that.
 
 ## What is missing
 

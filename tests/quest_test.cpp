@@ -670,6 +670,89 @@ void RefusedHandInSendsTheBotToAVendor()
     CHECK(again); // not blocked for a minute any more
 }
 
+// Prod 2026-11-14: half the equipped pieces at durability 0. A bot with quest work is never idle and so never made the routine vendor visit: a broken
+// piece now sends it to its repairman at once, quests waiting; the visit sells and repairs at the repairman, and a visit that repaired nothing (no money)
+// waits RepairRetrySec before the next trip, so it does not loop.
+void QuestBotWithBrokenGearGoesToTheRepairman()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.Quests = Data();
+    options.ServiceEveryMs = 600000;
+    std::vector<std::string> events;
+    options.OnEvent = [&](std::string const& text) { events.push_back(text); };
+    BotPolicy policy(options);
+    constexpr std::uint64_t kRepairman = 0xF130000000001234ull;
+    auto const botAt = [&](float x, std::uint8_t durability, std::uint64_t copper)
+    {
+        BotSnapshot bot = Bot(x, -170.0f);
+        LogQuest(bot, 7, 1, 3); // hunting: quest work, never idle
+        bot.repair_valid = 1;
+        bot.repair_x = -8700.0f;
+        bot.repair_y = -170.0f;
+        bot.repair_z = 82.0f;
+        bot.repair_guid = kRepairman;
+        bot.durability_pct = durability;
+        bot.copper = copper;
+        bot.bag_free_slots = 10; // room in the bags: only the money decides the junk sale
+        return bot;
+    };
+    auto const find = [](std::vector<BotAction> const& actions, ActionType type)
+    {
+        for (BotAction const& action : actions)
+            if (action.type == type)
+                return &action;
+        return static_cast<BotAction const*>(nullptr);
+    };
+    auto const count = [&](char const* prefix)
+    {
+        int n = 0;
+        for (std::string const& line : events)
+            n += line.rfind(prefix, 0) == 0 ? 1 : 0;
+        return n;
+    };
+
+    // Good gear: the bot hunts, no repair trip.
+    auto const hunting = AfterMount(policy, OneBotView(botAt(-8800.0f, 100, 0), {}), 1000);
+    BotAction const* hunt = find(hunting, ActionType::kMoveTo);
+    CHECK(!hunt || hunt->dest_x != -8700.0f);
+    CHECK(count("repair_trip") == 0);
+
+    // A broken piece: the walk goes to the repairman, not to the hunting area.
+    auto walk = policy.Decide(OneBotView(botAt(-8800.0f, 0, 0), {}), 3000); // mounted already: the walk goes out at once (or after a mount)
+    for (BotAction const& action : policy.Decide(OneBotView(botAt(-8800.0f, 0, 0), {}), 3001))
+        walk.push_back(action);
+    BotAction const* move = find(walk, ActionType::kMoveTo);
+    CHECK(move && move->dest_x == -8700.0f);
+    CHECK(count("repair_trip") == 1);
+
+    // In reach: one visit at the repairman that sells grey and (no money) white junk, then repairs.
+    auto const there = policy.Decide(OneBotView(botAt(-8702.0f, 0, 0), {}), 20000);
+    BotAction const* visit = find(there, ActionType::kVendor);
+    CHECK(visit && (visit->spell_id & 3) == 3 && (visit->spell_id & 1024) != 0 && visit->target_guid == kRepairman);
+
+    // Judged 5 s later: still broken (the core could not pay), so no new trip for RepairRetrySec (300 s).
+    policy.Decide(OneBotView(botAt(-8702.0f, 0, 0), {}), 26000);
+    CHECK(count("repair_failed") == 1);
+    bool again = false;
+    for (std::uint64_t at = 30000; at < 320000; at += 10000)
+        again = again || find(policy.Decide(OneBotView(botAt(-8800.0f, 0, 0), {}), at), ActionType::kVendor) != nullptr;
+    CHECK(!again);
+    CHECK(count("repair_trip") == 1);
+    // After the wait it tries again (it may have sold or looted something meanwhile).
+    policy.Decide(OneBotView(botAt(-8800.0f, 0, 50), {}), 330000);
+    CHECK(count("repair_trip") == 2);
+
+    // With money the visit does not sell the white junk, and a repaired bot is judged done.
+    BotPolicy rich(options);
+    events.clear();
+    auto const paid = rich.Decide(OneBotView(botAt(-8702.0f, 0, 100000), {}), 1000); // already in reach: the trip and the visit in one tick
+    BotAction const* paidVisit = find(paid, ActionType::kVendor);
+
+    CHECK(paidVisit && (paidVisit->spell_id & 2) != 0 && (paidVisit->spell_id & 1024) == 0);
+    rich.Decide(OneBotView(botAt(-8702.0f, 100, 90000), {}), 8000);
+    CHECK(count("repair_done") == 1 && count("repair_failed") == 0);
+}
+
 // Three bots sent a refused quest action every three seconds for two hours. A run of refusals (four within five minutes, each answer counted once) pauses the
 // bot's quest actions for ten minutes, whichever quests they were for.
 void ARunOfRefusedQuestActionsPausesTheQuestEngine()
@@ -1231,6 +1314,7 @@ int main()
     PolicyHuntsOnlyTheQuestTargets();
     PolicyWalksToTheHuntingAreaWhenNoTargetIsNear();
     PolicyDefendsAgainstAnyAttackerWhileHunting();
+    QuestBotWithBrokenGearGoesToTheRepairman();
     if (failures == 0)
         std::printf("quest_test: all passed\n");
     return failures == 0 ? 0 : 1;

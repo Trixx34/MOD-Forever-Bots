@@ -61,6 +61,7 @@
 #include "dungeon_events.h"
 #include "errand_trainers.h"
 #include "supply_policy.h"
+#include "repair_policy.h"
 #include "advisor_orders.h"
 #include "advisor_text.h"
 #include "lfg_queue_fill.h"
@@ -385,6 +386,9 @@ struct PolicyOptions
     std::uint64_t WaitForGhostMs = 180000;      // and this long after the ghost entered the corpse's map
     // Supplies (layout 15): a bot short of ammunition, food or drink walks to a vendor that sells it and buys, and eats or drinks while resting.
     supply::Settings Supplies;
+    // Urgent repair trips (repair_policy.h; config keys RepairUrgent, RepairBrokenPct, RepairAfterDeathPct, RepairRetrySec, RepairLowCopperPerLevel): a bot with a
+    // broken piece, or worn gear after a death, goes to its repairman at once, quest work or not; a party leader goes for a broken member.
+    repair::Settings Repair;
     // Config VendorSellGear (default off; needs Bot.Vendor.SellGear in the core): a vendor visit also sells the bag gear the worn gear outclasses (kVendor bit 2048
     // with the bot's gear profile in bits 12-14). The core judges it by the item numbers, never by item id.
     bool VendorSellGear = false;
@@ -779,6 +783,18 @@ private:
         supply::Needs SupplyAsked;                       // what that trip asked for
         supply::Facts SupplyBefore;                      // and what the bot carried before it
         bool SupplyTrip = false;                         // the walk in progress is a supply trip
+        // Urgent repair trips (repair_policy.h).
+        bool RepairTrip = false;                         // an urgent repair trip is under way (quests wait until it is over)
+        std::uint64_t RepairTripStartMs = 0;             // when it began (a trip longer than Repair.TripMaxMs has failed)
+        std::uint64_t NextRepairMs = 0;                  // no new urgent trip before this
+        std::uint32_t RepairFailures = 0;                // trips in a row that repaired nothing
+        std::uint64_t RepairCheckAtMs = 0;               // when the last visit is judged (0 = none pending)
+        std::uint32_t RepairBeforePct = 100;             // the lowest durability before that visit
+        std::uint64_t RepairForGuid = 0;                 // a party leader's trip for a member's broken gear: that member (0 = for itself)
+        std::uint64_t RepairArrivedMs = 0;               // a leader's trip for a member: when it reached the repairman (it waits there for the member)
+        std::uint32_t RepairVisits = 0;                  // urgent repair visits this bot has sent (a leader waiting for a member reads it)
+        std::uint32_t RepairMemberVisitsAtStart = 0;     // a leader's trip for a member: that member's RepairVisits when the trip began
+        bool RepairAfterDeath = false;                   // revived since the last repair visit: worn gear is repaired before the next fight
         std::uint64_t NextConsumeMs = 0;                 // no eat or drink before this
         bool TankLead = false;                           // told "tank lead": this bot walks its group through the dungeon of its map
         bool LevelRun = false;                           // the tank lead is a level-dungeon run of a bot party (no human to wait for)

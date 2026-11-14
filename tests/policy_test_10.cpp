@@ -308,6 +308,100 @@ void MindControlBackupWaitsAndNoRogueCasts()
     CHECK(!CastsSpell(first, 13, 6770));                          // a rogue's Sap needs a target out of combat: not used
 }
 
+// Urgent repair (repair_policy.h). A party member never walks to a vendor: its leader takes the party to the repairman for the member's broken gear,
+// waits there, the member walks the last yards and repairs, and then the leader makes its own visit.
+inline PolicyOptions RepairPartyOptions()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.ClassOf = WarriorLeads;
+    options.PartySize = 5;
+    options.PartyCount = 1;
+    options.ServiceEveryMs = 0; // no routine visits: only the urgent rule moves them
+    options.WanderWhenIdle = false;
+    return options;
+}
+
+inline void SetRepairman(WorldTickSnapshotView& view, float x)
+{
+    for (BotSnapshot& bot : view.bots)
+    {
+        bot.repair_valid = 1;
+        bot.repair_x = x;
+        bot.repair_guid = 0xF130000000000077ull;
+        bot.copper = 100000;
+        bot.level = 10;
+        bot.bag_free_slots = 10; // room in the bags: only the money decides the junk sale
+    }
+}
+
+void LeaderTakesThePartyToTheRepairmanForAMember()
+{
+    BotPolicy policy(RepairPartyOptions());
+    WorldTickSnapshotView view = PartyView({ 11, 12 }); // 12 the warrior leads, 11 follows
+    SetRepairman(view, -200.0f);
+    view.bots[0].durability_pct = 0; // the member's gear is broken, the leader's is fine
+    std::vector<BotAction> const walk = AfterMount(policy, view, 0);
+    bool leaderWalks = false;
+    for (BotAction const& action : walk)
+        leaderWalks = leaderWalks || (action.type == ActionType::kMoveTo && action.bot_guid == 12 && action.dest_x == -200.0f);
+    CHECK(leaderWalks);
+    CHECK(!HasAction(walk, 11, ActionType::kVendor)); // the member is 200 yards away: it follows
+}
+
+void MemberRepairsWhileTheLeaderWaits()
+{
+    BotPolicy policy(RepairPartyOptions());
+    WorldTickSnapshotView view = PartyView({ 11, 12 });
+    SetRepairman(view, -200.0f);
+    view.bots[0].durability_pct = 0;
+    view.bots[0].pos_x = -190.0f; // the member followed to 10 yards
+    view.bots[1].pos_x = -198.0f; // the leader is in reach
+    std::vector<BotAction> const first = policy.Decide(view, 0);
+    bool memberWalks = false;
+    for (BotAction const& action : first)
+        memberWalks = memberWalks || (action.type == ActionType::kMoveTo && action.bot_guid == 11 && action.dest_x == -200.0f);
+    CHECK(memberWalks);
+    CHECK(!HasAction(first, 12, ActionType::kVendor)); // the leader waits for the member
+    view.bots[0].pos_x = -199.0f;
+    std::vector<BotAction> const second = policy.Decide(view, 1000);
+    BotAction const* memberVisit = nullptr;
+    for (BotAction const& action : second)
+        if (action.type == ActionType::kVendor && action.bot_guid == 11)
+            memberVisit = &action;
+    CHECK(memberVisit && (memberVisit->spell_id & 2) != 0 && (memberVisit->spell_id & 1024) == 0); // repairs; has money, so no junk sale
+    CHECK(HasAction(second, 12, ActionType::kVendor)); // the member has been: the leader makes its visit too
+    // Repaired: no new trip.
+    view.bots[0].durability_pct = 100;
+    policy.Decide(view, 7000);
+    for (std::uint64_t at = 8000; at < 60000; at += 5000)
+    {
+        std::vector<BotAction> const later = policy.Decide(view, at);
+        CHECK(!HasAction(later, 11, ActionType::kVendor) && !HasAction(later, 12, ActionType::kVendor));
+    }
+}
+
+// A lone bot with a broken piece and no money: one visit (selling junk), judged, then it waits; the leader-less loop the prod bots would have made is not there.
+void BrokenBotWithoutMoneyDoesNotLoop()
+{
+    PolicyOptions options = RepairPartyOptions();
+    options.PartySize = 0;
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = PartyView({ 10 });
+    SetRepairman(view, -2.0f); // in reach
+    view.bots[0].durability_pct = 0;
+    view.bots[0].copper = 0;
+    int visits = 0;
+    for (std::uint64_t at = 0; at < 3600000; at += 2000)
+        for (BotAction const& action : policy.Decide(view, at))
+            if (action.type == ActionType::kVendor)
+            {
+                ++visits;
+                CHECK((action.spell_id & 1024) != 0); // no money: the white junk is sold first
+            }
+    // 300 s, 600, 1200, 2400 after the first: five visits in the hour, not one every tick.
+    CHECK(visits >= 3 && visits <= 5);
+}
+
 } // namespace
 
 void RunPolicyTestsPart10()
@@ -323,4 +417,7 @@ void RunPolicyTestsPart10()
     PurgeShamanUsesPurgeAndNoOtherClassPurges();
     MindControlMageHoldsTheControlledMember();
     MindControlBackupWaitsAndNoRogueCasts();
+    LeaderTakesThePartyToTheRepairmanForAMember();
+    MemberRepairsWhileTheLeaderWaits();
+    BrokenBotWithoutMoneyDoesNotLoop();
 }
