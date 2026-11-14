@@ -244,6 +244,7 @@ struct PolicyOptions
     battlegrounds::Settings Battlegrounds;
     guild::Settings GuildJoin;
     bot_guilds::Settings Guilds;          // GuildsEnabled: the pool of bots is planned into guilds (DriveGuilds)
+    std::shared_ptr<std::vector<bot_guilds::NameEntry> const> GuildNames;   // GuildsNameFile, read at start (unset or empty: the "BotLvl A001" names)
     gifts::Settings MailGifts;
     // Creature entry -> rank (0 first): the dungeon's kill priority. The damage dealers of a dungeon party fight the best-ranked live hostile next to the tank's target.
     std::map<std::uint32_t, std::uint32_t> KillPriority;
@@ -593,6 +594,11 @@ public:
     void NoteDuelChallenge(std::uint64_t bot, std::uint64_t player);
     void NoteGiftRecipient(std::uint64_t bot, std::uint64_t player);
     void NoteGuildLeaveRequest(std::uint64_t bot);
+    // Bot guilds memory (GuildsRemember): a guild of the last run read back from its store row guild/<guid>. A guild already known is left as it is.
+    void RestoreBotGuild(std::uint64_t guild, bot_guilds::Purpose kind, bool alliance, std::string const& name);
+    // The store rows the guilds turn wants written (a confirmed create: Value set) or removed (a dissolved guild: Remove). Taken once by the pump thread.
+    struct StoreWrite { std::string Key; std::string Value; bool Remove = false; };
+    std::vector<StoreWrite> TakeGuildStoreWrites();
 
 private:
     // The rest, drink and ready marks of this bot: its play style (class and set role) picks the row of role_profile.h.
@@ -1172,8 +1178,12 @@ private:
     std::vector<social::Order> _socialOrders;          // queued by Decide (TurnSocial), taken by TakeSocialOrders
     // Bot guilds state. A guild the policy created or found is listed with its purpose and faction; a create waits (PendingGuild) until the master's
     // snapshot shows the new guild's id; an invited bot accepts a few seconds later (accept due).
-    struct PendingGuild { bot_guilds::Purpose Kind = bot_guilds::Purpose::Leveling; bool Alliance = false; std::uint64_t SinceMs = 0; };
+    struct PendingGuild { bot_guilds::Purpose Kind = bot_guilds::Purpose::Leveling; bool Alliance = false; std::uint64_t SinceMs = 0; std::string Name; bool FromList = false; };
     std::unordered_map<std::uint64_t, bot_guilds::Guild> _botGuilds;     // guild guid -> purpose and faction
+    std::unordered_map<std::uint64_t, std::string> _botGuildNames;      // guild guid -> its name (as created or restored)
+    std::set<std::string> _guildTakenNames;                              // NameKey of names in use: created, restored, or refused as taken by the core
+    std::uint64_t _guildNameDraws = 0;                                   // varies the name draw between creates
+    std::vector<StoreWrite> _guildStoreWrites;
     std::unordered_map<std::uint64_t, PendingGuild> _pendingGuilds;      // master guid -> the guild it is creating
     std::unordered_map<std::uint64_t, std::uint64_t> _guildAcceptDueMs;  // invitee guid -> when it accepts
     struct CreateBlock { std::uint32_t Failures = 0; std::uint64_t UntilMs = 0; bool Logged = false; };

@@ -2,10 +2,14 @@
 // Bot guilds (GuildsEnabled, off by default): the policy's pool-level turn. bot_guilds.h decides who joins which guild (PlanMoves); this turns the plan into
 // social orders: a create (the master names a new guild), an invite (a bot of the guild invites the bot), an accept (the invited bot answers a few seconds
 // later) and a leave. One plan per kGuildPlanMs; each order goes to a bot that has no order in flight, and a plan queues at most kGuildOrdersPerPlan.
+// A create's name comes from the names file (GuildNames, bot_guilds::PickName, weighted by the kind's styles), else the plan's "BotLvl A001" name. A confirmed
+// guild is written to the module store (guild/<guid>), so a restarted module with GuildsRemember knows its kind again (RestoreBotGuild).
 #include "bot_policy_internal.h"
 
 #include <algorithm>
 #include <iterator>
+#include <optional>
+#include <string>
 #include <vector>
 
 namespace {
@@ -27,6 +31,27 @@ void BotPolicy::NoteGuildCreateFailed(std::uint64_t master, std::uint64_t nowMs)
     block.Failures = std::min(block.Failures + 1, kGuildCreateBlockDoublings + 1);
     block.UntilMs = nowMs + (kGuildCreateBlockMs << (block.Failures - 1));
     block.Logged = false;
+}
+
+void BotPolicy::RestoreBotGuild(std::uint64_t guild, bot_guilds::Purpose kind, bool alliance, std::string const& name)
+{
+    if (guild == 0 || _botGuilds.count(guild) != 0)
+        return;
+    _botGuilds[guild] = bot_guilds::Guild{ guild, kind, alliance };
+    if (!name.empty())
+    {
+        _botGuildNames[guild] = name;
+        _guildTakenNames.insert(bot_guilds::NameKey(name));
+    }
+    if (_options.OnEvent)
+        _options.OnEvent("guild_restored: guild=" + std::to_string(guild) + " kind=" + bot_guilds::KindName(kind) + " name=" + name);
+}
+
+std::vector<BotPolicy::StoreWrite> BotPolicy::TakeGuildStoreWrites()
+{
+    std::vector<StoreWrite> writes;
+    writes.swap(_guildStoreWrites);
+    return writes;
 }
 
 void BotPolicy::DriveGuilds(forever_module::WorldTickSnapshotView const& view, std::uint64_t nowMs)
@@ -83,7 +108,14 @@ void BotPolicy::DriveGuilds(forever_module::WorldTickSnapshotView const& view, s
         auto const pending = _pendingGuilds.find(bot.guid);
         if (pending == _pendingGuilds.end() || bot.guild_guid == 0)
             continue;
-        _botGuilds[bot.guild_guid] = bot_guilds::Guild{ bot.guild_guid, pending->second.Kind, pending->second.Alliance };
+        bot_guilds::Guild const made{ bot.guild_guid, pending->second.Kind, pending->second.Alliance };
+        _botGuilds[bot.guild_guid] = made;
+        _botGuildNames[bot.guild_guid] = pending->second.Name;
+        _guildTakenNames.insert(bot_guilds::NameKey(pending->second.Name));
+        _guildStoreWrites.push_back(StoreWrite{ bot_guilds::StoreKeyFor(bot.guild_guid), bot_guilds::EncodeRecord(made, pending->second.Name), false });
+        if (_options.OnEvent)
+            _options.OnEvent("guild_created: guild=" + std::to_string(bot.guild_guid) + " master=" + std::to_string(bot.guid) + " kind=" +
+                             bot_guilds::KindName(made.Kind) + " name=" + pending->second.Name);
         _pendingGuilds.erase(pending);
     }
     // A create nobody confirmed was most likely refused (social orders off, name taken): its master is left out of the next plans for a while, so the
@@ -96,6 +128,7 @@ void BotPolicy::DriveGuilds(forever_module::WorldTickSnapshotView const& view, s
             continue;
         }
         NoteGuildCreateFailed(it->first, nowMs);
+        _guildTakenNames.insert(bot_guilds::NameKey(it->second.Name));   // the name may be what the core refused: the next create draws another
         it = _pendingGuilds.erase(it);
     }
 
@@ -120,7 +153,21 @@ void BotPolicy::DriveGuilds(forever_module::WorldTickSnapshotView const& view, s
 
     bot_guilds::Plan const plan = bot_guilds::PlanMoves(_options.Guilds, guilds, pool);
     for (std::uint64_t const guild : plan.Dissolved)
+    {
+        // The name stays taken: the core may still hold the guild.
         _botGuilds.erase(guild);
+        _botGuildNames.erase(guild);
+        _guildStoreWrites.push_back(StoreWrite{ bot_guilds::StoreKeyFor(guild), std::string(), true });
+    }
+    auto const nameTaken = [&](std::string const& key)
+    {
+        if (_guildTakenNames.count(key) != 0)
+            return true;
+        for (auto const& entry : _pendingGuilds)
+            if (bot_guilds::NameKey(entry.second.Name) == key)
+                return true;
+        return false;
+    };
 
     std::size_t queued = 0;
 
@@ -154,8 +201,20 @@ void BotPolicy::DriveGuilds(forever_module::WorldTickSnapshotView const& view, s
         order.Op = 3;
         order.Bot = master;
         order.Text = created.Name;
+        bool fromList = false;
+        if (_options.GuildNames && !_options.GuildNames->empty())
+        {
+            std::uint64_t const seed = master * 1000003ull + (++_guildNameDraws);
+            if (std::optional<std::string> picked = bot_guilds::PickName(_options.Guilds, *_options.GuildNames, created.Kind, nameTaken, seed))
+            {
+                order.Text = *picked;
+                fromList = true;
+            }
+        }
+        if (_options.OnEvent)
+            _options.OnEvent("guild_create: master=" + std::to_string(master) + " kind=" + bot_guilds::KindName(created.Kind) + " name=" + order.Text);
+        _pendingGuilds[master] = PendingGuild{ created.Kind, created.Alliance, nowMs, order.Text, fromList };
         queue(order);
-        _pendingGuilds[master] = PendingGuild{ created.Kind, created.Alliance, nowMs };
         ++queued;
         ++creates;
         _guildCreateCursor = index + 1;

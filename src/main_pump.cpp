@@ -494,6 +494,12 @@ void main_detail::PumpTier2(forever_module::Tier2Session& session, std::atomic<b
                 for (social::Order const& order : policy.TakeSocialOrders())
                     if (extras.Commands->Social.size() < 64)
                         extras.Commands->Social.push_back(order);
+                for (CommandQueue::GuildRestore const& restored : extras.Commands->GuildRestores)
+                    policy.RestoreBotGuild(restored.Guild, restored.Kind, restored.Alliance, restored.Name);
+                extras.Commands->GuildRestores.clear();
+                for (BotPolicy::StoreWrite& write : policy.TakeGuildStoreWrites())
+                    if (extras.Commands->GuildStore.size() < 256)
+                        extras.Commands->GuildStore.push_back(std::move(write));
                 for (BotPolicy::TalentOrder const& order : talentOrders)
                     if (extras.Commands->Talents.size() < 256)
                         extras.Commands->Talents.push_back(order);

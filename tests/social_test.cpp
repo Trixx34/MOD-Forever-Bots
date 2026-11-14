@@ -414,6 +414,108 @@ void GuildRefusedCreatesAreSkipped()
     CHECK(offSent > 10);   // no window: masters are asked again within the four plans
 }
 
+// Names from the names file: the create carries a listed name of the kind's styles, a confirmed guild is written to the store, a name the core
+// reports as taken is never sent again and the master draws another at the next plan without a wait. Without the file the old name is sent.
+void GuildNamesFromTheList()
+{
+    PolicyOptions on = Quiet();
+    on.Guilds.Enabled = true;
+    on.Guilds.PvpShare = 100;            // every bot here wants pvp
+    on.Guilds.PvpMinLevel = 10;
+    on.GuildNames = std::make_shared<std::vector<bot_guilds::NameEntry>>(std::vector<bot_guilds::NameEntry>{
+        { bot_guilds::NameStyle::Funny, 100, "Funny Name" }, { bot_guilds::NameStyle::Normal, 1, "Night Watch" },
+        { bot_guilds::NameStyle::Lore, 1, "The Silver Hand" } });
+    std::vector<std::string> events;
+    on.OnEvent = [&](std::string const& line) { events.push_back(line); };
+    BotPolicy policy(on);
+    auto view = [&](std::uint32_t masterGuild)
+    {
+        WorldTickSnapshotView v = View(20, 0, {}, 1);
+        v.bots[0].guild_guid = masterGuild;
+        return v;
+    };
+    auto createName = [&](std::uint64_t now, std::uint32_t masterGuild = 0)
+    {
+        policy.Decide(view(masterGuild), now);
+        std::string name;
+        for (social::Order const& order : policy.TakeSocialOrders())
+            if (order.What == social::Kind::Guild && order.Op == 3 && order.Bot == 1)
+                name = order.Text;
+        return name;
+    };
+    std::string const first = createName(kNow);
+    CHECK(first == "Night Watch" || first == "The Silver Hand");   // pvp takes no funny names
+    // The core says the name is in use: the next plan sends the other listed name at once (no 120 s block).
+    social::Outcome taken;
+    taken.What = social::Kind::Guild;
+    taken.Op = 3;
+    taken.Bot = 1;
+    taken.Reason = "a guild with that name exists";
+    policy.NoteSocialOutcome(taken, kNow + 500);
+    std::string const second = createName(kNow + 30000);
+    CHECK(!second.empty() && second != first && second != "Funny Name");
+    // Confirmed: one store row with kind, faction and name.
+    createName(kNow + 60000, 900);
+    std::vector<BotPolicy::StoreWrite> const writes = policy.TakeGuildStoreWrites();
+    CHECK(writes.size() == 1);
+    if (writes.size() == 1)
+        CHECK(writes[0].Key == "guild/900" && writes[0].Value == "pvp H " + second && !writes[0].Remove);
+    bool created = false;
+    for (std::string const& line : events)
+        created = created || line == "guild_created: guild=900 master=1 kind=pvp name=" + second;
+    CHECK(created);
+
+    // Both names pvp may take are in use (by Alliance guilds restored from the store, case ignored): the plan's own name is the fallback.
+    BotPolicy policyAllTaken(on);
+    policyAllTaken.RestoreBotGuild(901, bot_guilds::Purpose::Pvp, true, "night watch");
+    policyAllTaken.RestoreBotGuild(902, bot_guilds::Purpose::Pvp, true, "The Silver Hand");
+    policyAllTaken.Decide(view(0), kNow);
+    std::string fallback;
+    for (social::Order const& order : policyAllTaken.TakeSocialOrders())
+        if (order.What == social::Kind::Guild && order.Op == 3)
+            fallback = order.Text;
+    CHECK(fallback == "BotPvp H001");
+    // No names file: the old name.
+    PolicyOptions noFile = on;
+    noFile.GuildNames.reset();
+    BotPolicy policyNoFile(noFile);
+    policyNoFile.Decide(view(0), kNow);
+    std::string old;
+    for (social::Order const& order : policyNoFile.TakeSocialOrders())
+        if (order.What == social::Kind::Guild && order.Op == 3)
+            old = order.Text;
+    CHECK(old == "BotPvp H001");
+}
+
+// A restored guild (GuildsRemember) is known to the planner: its members stay, a joiner of its kind and faction is invited into it.
+void RestoredGuildKeepsItsKind()
+{
+    PolicyOptions on = Quiet();
+    on.Guilds.Enabled = true;
+    on.Guilds.PvpShare = 100;
+    on.Guilds.PvpMinLevel = 10;
+    BotPolicy policy(on);
+    policy.RestoreBotGuild(500, bot_guilds::Purpose::Pvp, false, "Night Watch");
+    WorldTickSnapshotView v = View(20, 0, {}, 1);
+    v.bots[0].guild_guid = 500;
+    BotSnapshot joiner = v.bots[0];
+    joiner.guid = 2;
+    joiner.guild_guid = 0;
+    v.bots.push_back(joiner);
+    policy.Decide(v, kNow);
+    bool invited = false, created = false, left = false;
+    for (social::Order const& order : policy.TakeSocialOrders())
+    {
+        if (order.What != social::Kind::Guild)
+            continue;
+        invited = invited || (order.Op == 4 && order.Bot == 1 && order.Player == 2);
+        created = created || order.Op == 3;
+        left = left || order.Op == 2;
+    }
+    CHECK(invited && !created && !left);
+    CHECK(policy.TakeGuildStoreWrites().empty());
+}
+
 void GuildAnswersAreSentWhenOnAndNotWhenOff()
 {
     PolicyOptions on = Quiet();
@@ -543,6 +645,8 @@ int main()
     GuildCreateCooldown();
     GuildCreatesRotateAmongMasters();
     GuildRefusedCreatesAreSkipped();
+    GuildNamesFromTheList();
+    RestoredGuildKeepsItsKind();
     GuildAnswersAreSentWhenOnAndNotWhenOff();
     GiftsAreSentWhenOnAndNotWhenOff();
     PickGiftChoosesSmallStacksOnly();

@@ -1,4 +1,4 @@
-# Bot guild names (Bot.Guilds.File, planned). Format: guild|style|weight|name
+# Bot guild names (GuildsNameFile, doc/bot-guilds.md). Format: guild|style|weight|name
 # styles: lore, funny, normal, reallife. weight 1..100. No faction column: any bot may use any name.
 # Rules (guild name): letters, space, apostrophe, hyphen; 2-24 characters; unique case-insensitive.
 
