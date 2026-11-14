@@ -104,3 +104,5 @@ A bad row is logged (`forever-bots: RaidRulesFile: line N: ...`) and skipped. Th
 ## What a sim run checks
 
 Onyxia (`Scenario = onyxia`, the 40-roster) and Zul'Gurub (`Scenario = id:3` with the 20-roster, `ScenarioRaid.id = 1`): the same run with and without `RaidRulesFile`. Compare bosses killed, deaths per raid, time per boss, and the log events `raid_dispel:`, `raid_swap_taunt:` and `interrupt_target:`. Expect `raid_dispel` for Curse of Blood and Shadow Word: Pain in Zul'Gurub; expect no `raid_swap_taunt` unless the roster has two tanks.
+
+Owner decision 2026-11-14: `RaidBossPositions = 1` on the sim and on prod (Onyxia tank spot and flanks on). The module default stays 0.
