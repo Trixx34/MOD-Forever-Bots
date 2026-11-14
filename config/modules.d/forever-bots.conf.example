@@ -557,6 +557,21 @@ Module.forever-bots.TelemetrySummarySec = 60
 # Module.forever-bots.RareHunts = 0
 # Module.forever-bots.RareHuntFile = /srv/forever/sim/modules_runtime/forever-bots/data/rare_hunts.txt
 
+# World events and holidays (off by default): while a game event (Lunar Festival, Hallow's End, Winter Veil ...) is active, a small share of the idle bots walks
+# to a site of the event from WorldEventsFile (data/world_events.txt, ships empty), accepts and hands in the site's talk quests and stays a moment (doc/world-events.md).
+# The core does not report the active events yet: list the ids of the events that run in WorldEventsActive (game_event.eventEntry, comma separated).
+# WorldEventsPct is the percent of the bots on a visit at once (0 to 20), WorldEventsMaxBots the hard cap, WorldEventsPerSite the bots at one site, WorldEventsMaxMin the
+# longest visit, WorldEventsGapMin the wait before a bot's next visit, WorldEventsStartsPerTick the visits started per 10 second check.
+# Module.forever-bots.WorldEvents = 0
+# Module.forever-bots.WorldEventsFile = /srv/forever/sim/modules_runtime/forever-bots/data/world_events.txt
+# Module.forever-bots.WorldEventsActive =
+# Module.forever-bots.WorldEventsPct = 2
+# Module.forever-bots.WorldEventsMaxBots = 10
+# Module.forever-bots.WorldEventsPerSite = 3
+# Module.forever-bots.WorldEventsMaxMin = 10
+# Module.forever-bots.WorldEventsGapMin = 180
+# Module.forever-bots.WorldEventsStartsPerTick = 1
+
 # Bot guilds (off by default; the planner in src/bot_guilds.cpp). Three purposes: leveling (bots below LevelCap, released at the cap, empty guilds dissolved,
 # not capped in size), utility (dungeons, professions, auction house; long-term, not capped) and raiding (RaidMinLevel and qualified; capped at RaidSize).
 # A bot with no set purpose takes its purpose from its guid and these shares (percent, must add up to 100).

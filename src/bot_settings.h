@@ -31,6 +31,7 @@
 #include "quest_invite.h"
 #include "realism.h"
 #include "taxi_policy.h"
+#include "world_events.h"
 
 #include <array>
 #include <cstdint>
@@ -482,6 +483,12 @@ struct BotSettings
     // training trips to a capital trainer, scheduled by errand::Scheduler (errand_policy.h).
     errand::Settings Errand;
     std::string ErrandTrainerFile = "data/errand_trainers.txt"; // the trainer table (ErrandTrainerFile)
+    // World events and holidays (config keys WorldEvents, WorldEventsFile, WorldEventsActive, WorldEventsPct, WorldEventsMaxBots, WorldEventsPerSite,
+    // WorldEventsMaxMin, WorldEventsGapMin, WorldEventsStartsPerTick; off by default): while a game event is active a few bots visit its sites
+    // (world_events.h, doc/world-events.md). Settings.Seed is filled from RandomSeed by the module.
+    world_events::Settings WorldEvents;
+    std::string WorldEventsFile = "data/world_events.txt";
+    std::vector<std::uint32_t> WorldEventsActive;   // the active game events, as the operator lists them (until the core reports them)
     std::uint32_t AutoGearEveryLevels = 5;
     // The scenario's dungeons, in order: one for the single form, one per listed dungeon for Scenario = "dm:10,rfc:10". Scenario is the first of them (or the empty
     // one when the scenario is off), for the code that only knows one.

@@ -111,6 +111,15 @@ struct ErrandOrder
 
 enum class ErrandOutcome : std::uint8_t { kNone, kDone, kFailed };
 
+// A world event visit (world_events.h): walk to the event site, accept and hand in its talk quests there, stay a moment. Ends as an errand does: done or
+// failed (no route), reported once through TakeVisitOutcome.
+struct VisitOrder
+{
+    std::uint32_t Map = 0;
+    Point Dest;
+    std::vector<std::uint32_t> Quests;  // accepted one by one, then handed in one by one (the core refuses what does not apply)
+};
+
 // Where and when a bot died (the death area guard, DeathAreaCount).
 struct BotDeathSpot
 {
@@ -524,6 +533,11 @@ public:
     void StartErrand(std::uint64_t botGuid, ErrandOrder const& order);
     void CancelErrand(std::uint64_t botGuid);
     ErrandOutcome TakeErrandOutcome(std::uint64_t botGuid);
+    // World event visits (WorldEvents): the same three calls; OnErrand says whether the bot is on a town errand (such a bot is not sent on a visit).
+    void StartVisit(std::uint64_t botGuid, VisitOrder const& order);
+    void CancelVisit(std::uint64_t botGuid);
+    ErrandOutcome TakeVisitOutcome(std::uint64_t botGuid);
+    bool OnErrand(std::uint64_t botGuid) const;
 
     // Who said a chat command and where, for ApplyChat. Issuer is the speaker's character guid counter (the group leader), Recipient the
     // whispered bot's guid counter (0 for party or raid chat). Pos and MapId are the speaker's; TargetRef is its selected unit (0 = none).
@@ -999,6 +1013,11 @@ private:
         std::uint64_t ErrandArrivedMs = 0;               // an auction errand: when the bot came in reach of the auctioneer (0 = not yet)
         std::uint32_t ErrandRefusals = 0;                // train refusals in a row
         ErrandOutcome ErrandResult = ErrandOutcome::kNone; // the errand's end, until the module takes it
+        std::optional<VisitOrder> Visit;                 // the world event visit this bot is on (none = not on one)
+        std::uint32_t VisitStep = 0;                     // quest orders sent so far: accepts first, then hand-ins
+        std::uint64_t VisitNextMs = 0;                   // the next quest order, then (after the last) the end of the stay
+        bool VisitArrived = false;
+        ErrandOutcome VisitResult = ErrandOutcome::kNone;
         std::uint64_t RunStartMs = 0;                    // the corpse run began (0 = not yet)
         std::uint64_t InsideSinceMs = 0;                 // the ghost is on the corpse's map since
         bool RunFailed = false;

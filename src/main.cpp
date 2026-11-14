@@ -264,6 +264,8 @@ int main(int argc, char** argv)
         SetUpAuction(client, run, settings, book, extras);
     if (settings.Errand.Enabled && !scenarioOn)
         SetUpErrands(client, settings, commands, book, extras);
+    if (settings.WorldEvents.Enabled && !scenarioOn)
+        SetUpWorldEvents(client, settings, commands, extras);
     if (scenarioOn)
         SetUpScenario(policyOptions, extras, settings, allEvents);
 

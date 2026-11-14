@@ -1,0 +1,7 @@
+# World event sites (WorldEvents = 1): where a few bots go while a game event is active. Ships empty on purpose: the world database has no spawns for the
+# event NPCs (game_event_creature, game_event_gameobject, game_event_npc_vendor are empty), so there is no position to take from it. Fill it from a
+# source that knows where the event NPCs stand (doc/world-events.md, "Making the data").
+# One site per line: event|side|map|x|y|z|minLevel|maxLevel|name|quests
+#   event   the game_event entry (7 Lunar Festival, 12 Hallow's End, 2 Winter Veil ...)
+#   side    0 both, 1 Alliance, 2 Horde
+#   quests  comma list of quest ids the bot accepts and hands in at the site (talk quests with no objectives; the core refuses what does not apply), or empty

@@ -32,6 +32,14 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
         if (_options.OnEvent)
             _options.OnEvent("errand_failed: bot=" + std::to_string(bot.guid) + " reason=no_route");
     }
+    // A world event visit failed to find a route: the visit cannot be made.
+    if (state.Visit && moveNoRoute && !chained)
+    {
+        state.VisitResult = ErrandOutcome::kFailed;
+        state.Visit.reset();
+        if (_options.OnEvent)
+            _options.OnEvent("world_event_visit_failed: bot=" + std::to_string(bot.guid) + " reason=no_route");
+    }
     // A town errand's train order: applied ends the trip; out of range, busy or moving is retried; any other refusal counts toward a failure.
     if (state.Errand && bot.last_action_type == uint8_t(ActionType::kTrain) && bot.last_action_status != BotActionStatus::kNone)
     {
@@ -162,8 +170,12 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
                              ActionStatusName(bot.last_action_status));
     }
 
+    // The answers to a world event visit's quest orders are not the quest engine's: each is marked seen, so it is neither counted nor blocked.
+    bool const visitQuestAnswer = state.Visit && bot.last_action_type == uint8_t(ActionType::kQuest);
+    if (visitQuestAnswer)
+        state.QuestSeenSeq = bot.last_action_sequence;
     // A quest action refused (not eligible, bags full, no NPC in reach): the quest is left alone for a while.
-    if (bot.last_action_type == uint8_t(ActionType::kQuest) && bot.last_action_status == BotActionStatus::kRefused)
+    if (!visitQuestAnswer && bot.last_action_type == uint8_t(ActionType::kQuest) && bot.last_action_status == BotActionStatus::kRefused)
     {
         // Each answer once (the snapshot repeats the last one every tick). Three bots sent a refused quest action every three seconds for two hours (5,400 of the 6,000
         // refusals): a run of refusals, whichever quests they were for, now pauses the quest engine for ten minutes and the bot grinds meanwhile.
