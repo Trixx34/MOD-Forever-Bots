@@ -115,7 +115,13 @@ void RampTick(RunContext& run)
             run.Roster.OnGranted(0, guid);
             run.Classes.Set(guid, combo.Class);
             run.Races.Set(guid, combo.Race);
-            run.Client.StoreSet(bot_store::KeyFor(guid), std::to_string(combo.Race) + " " + std::to_string(combo.Class));
+            // A row that cannot be written (the core keeps at most 1000 rows per module) is said: that bot is not reclaimed after a restart, and the
+            // ramp makes a new character in its place (the 2026-11-14 sim held 1715 characters for 1000 rows, every bot above guid 1000 left offline).
+            run.Client.StoreSet(bot_store::KeyFor(guid), std::to_string(combo.Race) + " " + std::to_string(combo.Class), [guid](forever_module::ActionReply const& saved)
+            {
+                if (!saved.success())
+                    std::cerr << "forever-bots: bot " << guid << " is not saved (" << saved.reason() << "); it is not reclaimed after a restart\n";
+            });
             std::cerr << "forever-bots: spawned bot " << guid << " race " << combo.Race << " class " << combo.Class << "\n";
         });
     }

@@ -82,6 +82,10 @@ constexpr std::chrono::milliseconds kPresenceInterval(5000);
 constexpr std::uint64_t kPresenceFeedMs = 2000;
 constexpr std::uint64_t kPresenceStaleMs = 15000; // a feed older than this is not acted on (the pump stalled)
 constexpr std::uint32_t kSpawnsPerRampTick = 10;
+// The reclaim of the saved bots at start: at most this many control requests (and store reads) wait for the core at once, sent every
+// kReclaimInterval. The core refuses past 256 waiting ("core is busy"); the module's other actions share that queue.
+constexpr std::uint32_t kReclaimsInFlight = 32;
+constexpr std::chrono::milliseconds kReclaimInterval(250);
 constexpr std::uint64_t kSpawnBackoffMs = 30000; // after a refused spawn, wait this long before the next
 
 // Auction house (auction_policy.h, doc/economy.md): the Run() thread visits the house for each idle bot that is due, every kAuctionInterval,
@@ -128,6 +132,7 @@ struct RunContext
     bool Halted = false; // a fixed race and class with no valid combination: nothing is spawned
     pick::SpecTable Specs; // the spec of each scenario bot whose roster entry names one (race:class:spec)
     std::shared_ptr<PresenceFeed> Levels; // set when Presence is on: the bracket counts (brackets need it)
+    bot_store::ReclaimQueue Reclaims{ kReclaimsInFlight }; // the saved bots still to take back, a few at a time (see ReclaimBot in main.cpp)
 };
 
 forever_module::SpawnParams ParamsFor(RaceClass const& combo);
