@@ -174,6 +174,16 @@ struct CommandQueue
     std::vector<std::uint64_t> TalentRefused;                   // bots the core refused a talent order, for the pump thread to retry
     // Duel, battleground, guild and gift orders (social_actions.h): the pump thread queues them, the Run() thread sends them, and the core's answers come back.
     std::vector<social::Order> Social;
+    // Bot guilds memory (GuildsRemember): store rows guild/<guid> read at start on the Run() thread, for the pump thread; and the rows the policy writes.
+    struct GuildRestore
+    {
+        std::uint64_t Guild = 0;
+        bot_guilds::Purpose Kind = bot_guilds::Purpose::Leveling;
+        bool Alliance = false;
+        std::string Name;
+    };
+    std::vector<GuildRestore> GuildRestores;
+    std::vector<BotPolicy::StoreWrite> GuildStore;
     std::vector<advisor::GuildLevel> GuildLevels;                // guild member level events (GuildScript.OnMemberLevel), for the pump thread
     std::vector<lfg_queue_fill::Queue> LfgQueues;                // dungeon finder queue events (LfgScript.OnQueueUpdate), for the pump thread
     std::vector<damage_events::Hit> DamageHits;                  // damage events (PlayerScript.OnDamaged, protocol 29), for the pump thread

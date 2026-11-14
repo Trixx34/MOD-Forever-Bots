@@ -1,0 +1,463 @@
+# Bot guild names (GuildsNameFile, doc/bot-guilds.md). Format: guild|style|weight|name
+# styles: lore, funny, normal, reallife. weight 1..100. No faction column: any bot may use any name.
+# Rules (guild name): letters, space, apostrophe, hyphen; 2-24 characters; unique case-insensitive.
+
+# --- lore ---
+guild|lore|30|The Scarlet Crusade
+guild|lore|30|The Sons of Lothar
+guild|lore|30|The Defias Brotherhood
+guild|lore|30|The Syndicate
+guild|lore|30|The Silver Hand
+guild|lore|30|The Emerald Circle
+guild|lore|30|The Bronzebeard Clan
+guild|lore|30|The Dark Iron
+guild|lore|30|The Blackrock Clan
+guild|lore|30|The Shadow Council
+guild|lore|30|The Burning Blade
+guild|lore|30|The Bleeding Hollow
+guild|lore|30|The Shattered Hand
+guild|lore|30|The Shadowmoon Clan
+guild|lore|30|The Laughing Skull
+guild|lore|30|The Dragonmaw
+guild|lore|30|The Thunderlords
+guild|lore|30|The Gurubashi Empire
+guild|lore|30|The Amani Empire
+guild|lore|30|The Bloodscalp Tribe
+guild|lore|30|The Farstriders
+guild|lore|30|The Blood Knights
+guild|lore|30|The Blue Dragonflight
+guild|lore|30|The Red Dragonflight
+guild|lore|30|The Bronze Dragonflight
+guild|lore|30|The Emerald Enclave
+guild|lore|30|The Black Harvest
+guild|lore|30|The Twilight Hammer
+guild|lore|30|The Cult of the Damned
+guild|lore|30|The Venture Company
+guild|lore|30|The Sentinels
+guild|lore|30|The Watchers
+guild|lore|30|The Wardens
+guild|lore|30|The Moonguard
+guild|lore|30|The Twilight's Hammer
+guild|lore|30|The Scarlet Onslaught
+guild|lore|30|The Obsidian Sanctum
+guild|lore|30|The Valarjar
+guild|lore|30|The Keepers of Tirisfal
+guild|lore|30|The Sons of Arugal
+guild|lore|30|The Stormreavers
+guild|lore|30|The Hand of Tyr
+guild|lore|30|The Black Morass
+guild|lore|30|The Last Guardians
+guild|lore|30|The Ashen Circle
+guild|lore|30|The Moon Guard
+guild|lore|30|The Emerald Wardens
+guild|lore|30|The Lightbringers
+guild|lore|30|The Dawnbringers
+guild|lore|30|The Quel'dorei
+guild|lore|30|The Sin'dorei
+guild|lore|30|The Kaldorei
+guild|lore|30|The Draenei Exiles
+guild|lore|30|The Sons of Cenarius
+
+# --- funny ---
+guild|funny|30|Aggro Management
+guild|funny|30|Pulling Since Yesterday
+guild|funny|30|Oops We Pulled
+guild|funny|30|Loot Ninjas
+guild|funny|30|Need Before Greed
+guild|funny|30|Greed Is Good
+guild|funny|30|Critical Failures
+guild|funny|30|The Wipe Club
+guild|funny|30|Professional Wipers
+guild|funny|30|One More Try
+guild|funny|30|Repair Bill Heroes
+guild|funny|30|Dead Again
+guild|funny|30|Respawn Required
+guild|funny|30|The Floor Inspectors
+guild|funny|30|We Forgot The Boss
+guild|funny|30|AFK Legends
+guild|funny|30|Alt Tab Warriors
+guild|funny|30|Keyboard Turners
+guild|funny|30|Clickers Anonymous
+guild|funny|30|Mouse Wheel Mafia
+guild|funny|30|Noob School
+guild|funny|30|Dungeon Tourists
+guild|funny|30|Raid Wipe Repeat
+guild|funny|30|The Bad Pulls
+guild|funny|30|Unpaid Interns
+guild|funny|30|Bank Alt Society
+guild|funny|30|Guild Bank Robbers
+guild|funny|30|Loot Council Rejects
+guild|funny|30|The Greedy Goblins
+guild|funny|30|Epic Failures
+guild|funny|30|Vendor Trash
+guild|funny|30|Grey Item Heroes
+guild|funny|30|The Repair Bills
+guild|funny|30|No Mana No Problem
+guild|funny|30|Out Of Range
+guild|funny|30|Line Of Sight
+guild|funny|30|Not Enough Rage
+guild|funny|30|OOM Patrol
+guild|funny|30|The Aggro Circus
+guild|funny|30|Threat Issues
+guild|funny|30|Tank You Very Much
+guild|funny|30|Heals On Wheels
+guild|funny|30|Heal Me Maybe
+guild|funny|30|DPS With Benefits
+guild|funny|30|The Bench Warmers
+guild|funny|30|Raid Food Addicts
+guild|funny|30|Potion Commotion
+guild|funny|30|Conjured Snacks
+guild|funny|30|Sheep Happens
+guild|funny|30|Fear And Loathing
+guild|funny|30|Totally Not Bots
+guild|funny|30|We Pull Everything
+guild|funny|30|Not A Speedrun
+guild|funny|30|Lagging Behind
+guild|funny|30|Disconnect Kings
+guild|funny|30|The Ping Problems
+guild|funny|30|Server First Eventually
+guild|funny|30|Last Place Legends
+guild|funny|30|Casual Tryhards
+guild|funny|30|Semi Professional
+guild|funny|30|The Keyboard Smashers
+guild|funny|30|Critical Confusion
+guild|funny|30|Mostly Harmless
+guild|funny|30|Loot Goblins
+guild|funny|30|We Need A Warlock
+guild|funny|30|Summon Me Please
+guild|funny|30|Where Is The Portal
+guild|funny|30|The Hearthstone Heroes
+guild|funny|30|Bubble Hearth Society
+guild|funny|30|The Wand Specialists
+guild|funny|30|Auto Attack Army
+guild|funny|30|Quest Accepted
+guild|funny|30|Quest Abandoned
+guild|funny|30|Kill Steal Inc
+guild|funny|30|The Respawnables
+guild|funny|30|The Loot Scooters
+guild|funny|30|Mount Collectors
+guild|funny|30|Bag Space Crisis
+guild|funny|30|Full Inventory
+guild|funny|30|Mail Box Overflow
+guild|funny|30|The Auction Addicts
+guild|funny|30|Goldshire Survivors
+guild|funny|30|Dance Party Wipes
+guild|funny|30|The Naked Raiders
+guild|funny|30|No Shirt No Problem
+guild|funny|30|The Angry Murlocs
+guild|funny|30|Murloc Management
+guild|funny|30|The Leeroy Society
+guild|funny|30|Chicken Chasers
+guild|funny|30|Professional AFKers
+guild|funny|30|The Keyboard Cowboys
+guild|funny|30|Undergeared Legends
+guild|funny|30|The Patch Survivors
+guild|funny|30|We Blame The Healer
+guild|funny|30|Healer Not Found
+guild|funny|30|Tank Not Found
+guild|funny|30|DPS Not Found
+guild|funny|30|The Wipe Committee
+guild|funny|30|Aggro Anonymous
+guild|funny|30|The Bad Decisions
+guild|funny|30|Unstable Internet
+guild|funny|30|The Lag Lords
+guild|funny|30|Noob But Proud
+guild|funny|30|The Casualties
+
+# --- normal ---
+guild|normal|30|Silver Dawn
+guild|normal|30|Iron Covenant
+guild|normal|30|Eternal Vanguard
+guild|normal|30|Silent Requiem
+guild|normal|30|Dawn Patrol
+guild|normal|30|Crimson Horizon
+guild|normal|30|Obsidian Order
+guild|normal|30|Stormwatch
+guild|normal|30|Frostguard
+guild|normal|30|Shadow Pact
+guild|normal|30|Golden Company
+guild|normal|30|Iron Legion
+guild|normal|30|Silent Guardians
+guild|normal|30|Eternal Flame
+guild|normal|30|Duskfall
+guild|normal|30|Nightfall
+guild|normal|30|Rising Dawn
+guild|normal|30|The Last Stand
+guild|normal|30|Ancient Resolve
+guild|normal|30|Silver Covenant
+guild|normal|30|Dark Horizon
+guild|normal|30|Crimson Vanguard
+guild|normal|30|Iron Wolves
+guild|normal|30|Stormborn
+guild|normal|30|Winterguard
+guild|normal|30|Dawnbringers
+guild|normal|30|Shadow Company
+guild|normal|30|The Forgotten
+guild|normal|30|Ebon Legion
+guild|normal|30|Ashen Vanguard
+guild|normal|30|The Unbroken
+guild|normal|30|Valiant Hearts
+guild|normal|30|Noble Purpose
+guild|normal|30|Oathkeepers
+guild|normal|30|The Iron Pact
+guild|normal|30|Silent Storm
+guild|normal|30|The Northwatch
+guild|normal|30|Stormfront
+guild|normal|30|Raven Guard
+guild|normal|30|Blackened Steel
+guild|normal|30|Golden Dawn
+guild|normal|30|The Resolute
+guild|normal|30|Night Watch
+guild|normal|30|Ashen Order
+guild|normal|30|Fallen Kingdom
+guild|normal|30|The Unyielding
+guild|normal|30|Everlasting
+guild|normal|30|Celestial Dawn
+guild|normal|30|Frostbound
+guild|normal|30|The Vanguard
+guild|normal|30|Silver Wolves
+guild|normal|30|Dark Covenant
+guild|normal|30|The Iron Guard
+guild|normal|30|Duskbringers
+guild|normal|30|Raven Company
+guild|normal|30|Stormcallers
+guild|normal|30|The Dawnwatch
+guild|normal|30|Ashen Brotherhood
+guild|normal|30|The Last Empire
+guild|normal|30|Eternal Watch
+guild|normal|30|The Wild Hunt
+guild|normal|30|Frostfire
+guild|normal|30|Crimson Oath
+guild|normal|30|The Black Banner
+guild|normal|30|Ironbound
+guild|normal|30|The Silver Guard
+guild|normal|30|Night Sentinels
+guild|normal|30|The Fallen
+guild|normal|30|Warborn
+guild|normal|30|The Iron Throne
+guild|normal|30|Shadowborn
+guild|normal|30|The Stormguard
+guild|normal|30|The Ashen Wolves
+guild|normal|30|Eternal Knights
+guild|normal|30|The Grey Company
+guild|normal|30|Winter's Wrath
+guild|normal|30|The Unforgotten
+guild|normal|30|The Last Alliance
+guild|normal|30|Blackstone
+guild|normal|30|Dawnfall
+guild|normal|30|The Silver Pact
+guild|normal|30|The Crimson Order
+guild|normal|30|The Iron Wolves
+
+# --- reallife ---
+guild|reallife|30|The Fellowship
+guild|reallife|30|Second Breakfast
+guild|reallife|30|The Office
+guild|reallife|30|Dunder Mifflin
+guild|reallife|30|The Avengers
+guild|reallife|30|Justice League
+guild|reallife|30|The A Team
+guild|reallife|30|Ghostbusters
+guild|reallife|30|Men In Black
+guild|reallife|30|The Incredibles
+guild|reallife|30|The Expendables
+guild|reallife|30|The Breakfast Club
+guild|reallife|30|Stranger Things
+guild|reallife|30|The Walking Dead
+guild|reallife|30|Breaking Bad
+guild|reallife|30|Better Call Saul
+guild|reallife|30|The Sopranos
+guild|reallife|30|Peaky Blinders
+guild|reallife|30|Game Of Phones
+guild|reallife|30|House Stark
+guild|reallife|30|House Lannister
+guild|reallife|30|The Night Watch
+guild|reallife|30|The Witchers
+guild|reallife|30|The Jedi Order
+guild|reallife|30|Sith Happens
+guild|reallife|30|The Rebel Alliance
+guild|reallife|30|The Galactic Empire
+guild|reallife|30|The Mandalorians
+guild|reallife|30|The Dark Side
+guild|reallife|30|The Matrix
+guild|reallife|30|The Resistance
+guild|reallife|30|The Terminators
+guild|reallife|30|Skynet
+guild|reallife|30|The Highlanders
+guild|reallife|30|The Spartans
+guild|reallife|30|The Gladiators
+guild|reallife|30|The Vikings
+guild|reallife|30|The Knights Templar
+guild|reallife|30|The Illuminati
+guild|reallife|30|The Round Table
+guild|reallife|30|The Three Musketeers
+guild|reallife|30|The Magnificent Seven
+guild|reallife|30|The Dirty Dozen
+guild|reallife|30|The A-Team
+guild|reallife|30|The Blues Brothers
+guild|reallife|30|The Beatles
+guild|reallife|30|The Rolling Stones
+guild|reallife|30|The Ramones
+guild|reallife|30|Metallica
+guild|reallife|30|Iron Maiden
+guild|reallife|30|Black Sabbath
+guild|reallife|30|The Foo Fighters
+guild|reallife|30|The Prodigy
+guild|reallife|30|Daft Punk
+guild|reallife|30|The Spice Girls
+guild|reallife|30|The Village People
+guild|reallife|30|The Backstreet Boys
+guild|reallife|30|The Lonely Island
+guild|reallife|30|The Internet
+guild|reallife|30|Ctrl Alt Defeat
+guild|reallife|30|The Meme Team
+guild|reallife|30|The Flat Earthers
+guild|reallife|30|The Conspiracy Club
+guild|reallife|30|The Tax Evaders
+guild|reallife|30|The Coffee Addicts
+guild|reallife|30|The Night Shift
+guild|reallife|30|The Monday Club
+guild|reallife|30|The Weekend Warriors
+guild|reallife|30|The Procrastinators
+guild|reallife|30|The Book Club
+guild|reallife|30|The Breakfast Squad
+guild|reallife|30|The Last Straw
+guild|reallife|30|The Usual Suspects
+guild|reallife|30|The Magnificent Bastards
+guild|reallife|30|The Wolfpack
+guild|reallife|30|The Underdogs
+guild|reallife|30|The Dream Team
+guild|reallife|30|The Survivors
+guild|reallife|30|The Misfits
+guild|reallife|30|The Outcasts
+guild|reallife|30|The Rejects
+guild|reallife|30|The Renegades
+guild|reallife|30|The Anonymous
+guild|reallife|30|The Professionals
+
+# ---- additional names ----
+# lore
+guild|lore|30|Knights of Silver Hand
+guild|lore|30|Royal Apothecaries
+guild|lore|30|Horse Brotherhood
+guild|lore|30|Silver Dawn Order
+guild|lore|30|The Gilneas Rangers
+guild|lore|30|The Redridge Militia
+guild|lore|30|The Westfall Stand
+guild|lore|30|The Elwynn Wardens
+guild|lore|30|The Barrens Caravan
+guild|lore|30|The Durotar Wolfriders
+guild|lore|30|The Teldrassil Sentries
+guild|lore|30|The Dun Morogh Rifles
+guild|lore|30|The Tirisfal Gravewatch
+guild|lore|30|The Silverpine Rangers
+guild|lore|30|The Hillsbrad Militia
+guild|lore|30|The Arathi Vanguard
+guild|lore|30|The Duskwood Watch
+guild|lore|30|The Deadmines Delvers
+guild|lore|30|The Wailing Raiders
+guild|lore|30|The Uldaman Seekers
+guild|lore|30|The Stratholme Cleansers
+guild|lore|30|The Scholomance Alumni
+guild|lore|30|The Blackrock Delvers
+guild|lore|30|The Molten Vanguard
+guild|lore|30|The Onyxia Slayers
+guild|lore|30|The Gnomeregan Refugees
+guild|lore|30|The Zul'Gurub Hunters
+guild|lore|30|The Ahn'Qiraj Seekers
+guild|lore|30|The Naxxramas Sentinels
+guild|lore|30|The Brill Gravediggers
+guild|lore|30|The Booty Bay Pirates
+# funny
+guild|funny|30|Overgeared Failures
+guild|funny|30|Guild Not Found
+guild|funny|30|Error Four Oh Four
+guild|funny|30|Area Fifty One
+guild|funny|30|Fellowship of the Ring
+guild|funny|30|Pull First Ask Later
+guild|funny|30|The Wrong Boss
+guild|funny|30|Tank Wasnt Ready
+guild|funny|30|Loot Rolled Twice
+guild|funny|30|Out Of Healthstones
+guild|funny|30|Who Has The Key
+guild|funny|30|Where Did The Tank Go
+guild|funny|30|We Do It For The Loot
+guild|funny|30|Still Waiting On Summon
+guild|funny|30|Please Stop Pulling
+guild|funny|30|The Duel Losers
+guild|funny|30|Fishing In Orgrimmar
+guild|funny|30|Jumping In Stormwind
+guild|funny|30|Barrens Chat Veterans
+guild|funny|30|The Chuck Norris Facts
+guild|funny|30|Mages Need Water
+guild|funny|30|Warlocks Need Shards
+guild|funny|30|Hunters Need Ammo
+guild|funny|30|Rogues Need Pockets
+guild|funny|30|Priests Need Coffee
+guild|funny|30|Paladins Need Bubbles
+guild|funny|30|Shamans Need Totems
+guild|funny|30|Druids Need Bears
+guild|funny|30|Warriors Need Rage
+guild|funny|30|The Gnome Kickers
+guild|funny|30|The Murloc Whisperers
+guild|funny|30|The Hogger Hunters
+guild|funny|30|The Defias Pushovers
+guild|funny|30|Elite Casual Club
+guild|funny|30|Hearthstone On Cooldown
+guild|funny|30|Wiped By A Rabbit
+guild|funny|30|Eaten By A Boar
+guild|funny|30|Pet Is Still Pulling
+guild|funny|30|Last Boss Never
+guild|funny|30|Bandage Brigade
+# normal
+guild|normal|30|Ironhold
+guild|normal|30|Stormwatchers
+guild|normal|30|Silverfang
+guild|normal|30|Dawnshield
+guild|normal|30|Ember Company
+guild|normal|30|Highfall
+guild|normal|30|The Wayfarers
+guild|normal|30|Northern Lights
+guild|normal|30|The Hollow Crown
+guild|normal|30|Redstone
+guild|normal|30|The Quiet Hours
+guild|normal|30|Thornwood
+guild|normal|30|Mistral Company
+guild|normal|30|The Ember Throne
+guild|normal|30|Longshadow
+guild|normal|30|Stoneward
+guild|normal|30|The Open Road
+guild|normal|30|Wolfsbane
+guild|normal|30|Greywatch
+guild|normal|30|The Lantern Bearers
+guild|normal|30|Sunward
+guild|normal|30|Hearthfire
+guild|normal|30|The Wandering Few
+guild|normal|30|Brightwater
+guild|normal|30|Ravenmoor
+# reallife
+guild|reallife|30|The Hitchhikers
+guild|reallife|30|Dont Panic
+guild|reallife|30|The Lost Boys
+guild|reallife|30|The Goonies
+guild|reallife|30|The Karate Kids
+guild|reallife|30|Back To The Future
+guild|reallife|30|The Time Travelers
+guild|reallife|30|The Mad Hatters
+guild|reallife|30|The Wonderland Club
+guild|reallife|30|The Pirates
+guild|reallife|30|The Lost Island
+guild|reallife|30|The Last Jedi Knights
+guild|reallife|30|The Dungeon Masters
+guild|reallife|30|Roll For Initiative
+guild|reallife|30|Critical Hit Club
+guild|reallife|30|The Pixel Heroes
+guild|reallife|30|The Arcade Kids
+guild|reallife|30|The Retro Gamers
+guild|reallife|30|The Console Wars
+guild|reallife|30|The Speedrunners
+guild|reallife|30|The Lan Party
+guild|reallife|30|The Dial Up Club
+guild|reallife|30|The Floppy Disks
+guild|reallife|30|The Mixtape Society
+guild|reallife|30|The Saturday Cartoons

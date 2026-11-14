@@ -136,7 +136,7 @@ Module.forever-bots.TelemetrySummarySec = 60
 # InnPowerBelowPct = 30
 # InnMaxRestMin = 10
 # GuildJoin = 0
-# Bot guilds (protocol 24: the core runs GuildAction create and invite). The pool of online bots is planned into guilds of three purposes: leveling
+# Bot guilds (protocol 24: the core runs GuildAction create and invite). The pool of online bots is planned into guilds of three purposes (four with pvp, below): leveling
 # (below GuildsLevelCap, leaves at the cap; not capped), utility (not capped) and raiding (RaidMinLevel and up; at most GuildsRaidSize bots). Each guild has one
 # faction. Off by default: nothing is planned or sent.
 # GuildsEnabled = 0
@@ -147,6 +147,16 @@ Module.forever-bots.TelemetrySummarySec = 60
 # GuildsLevelingShare = 60
 # GuildsRaidingShare = 20
 # GuildsUtilityShare = 20
+# Guild kinds, names and memory (doc/bot-guilds.md). Unset: the guid shares above, the "BotLvl A001" names, no memory (as before).
+# GuildsKindByLevel = 0         (1: raiding when raid ready, leveling below GuildsLevelCap, else utility; 0: the shares above)
+# GuildsPvpShare = 0            (percent of the bots at GuildsPvpMinLevel or more that form pvp guilds; checked before the rest)
+# GuildsPvpMinLevel = 10        (unset: BattlegroundMinLevel)
+# GuildsNameFile =              (data/bot_guilds.txt: guild|style|weight|name; empty = the old names)
+# GuildsNameStylesLeveling = lore:1 funny:1 normal:1 reallife:1
+# GuildsNameStylesUtility = lore:1 funny:1 normal:1 reallife:1
+# GuildsNameStylesRaiding = lore:3 funny:1 normal:3 reallife:1
+# GuildsNameStylesPvp = lore:2 funny:0 normal:3 reallife:2
+# GuildsRemember = 0            (1: read the guild/<id> store rows at start, so the guilds of the last run keep their kind and name)
 # MailGifts = 0
 # MailGiftDailyCap = 1
 # AutoGearEveryLevels = 5
@@ -492,6 +502,8 @@ Module.forever-bots.TelemetrySummarySec = 60
 # A master whose create the core refused (or that was never confirmed) is skipped for 120 s, doubled per failure up to 16 min, so later creates are not starved
 # (event line guild_create_skipped, once per window). 1 = on (default), 0 = every master is retried every plan.
 # Bot.Guilds.RefusalBackoff = 1
+# Kinds (pvp), names and memory: the GuildsKindByLevel, GuildsPvpShare, GuildsPvpMinLevel, GuildsNameFile, GuildsNameStyles* and GuildsRemember keys
+# under "Second-list features" above (doc/bot-guilds.md).
 
 # ---- Keys that were only described in the code (src/bot_settings.h) before. Every key shows its default; the value here is the default unless said.
 

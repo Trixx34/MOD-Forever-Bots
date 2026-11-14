@@ -17,7 +17,7 @@ quests from the database by the rewards of the quest, attunements from quest ids
 | Grind spots | `GrindFile`, `GrindSpotsForBot` in `bot_policy_turn_town.cpp`; idle bots walk to spots that suit their level. |
 | Dungeons | `level_dungeon.*` schedules parties at the high end of a dungeon's level range; `dungeon_files.*`, scenario runs with the roster and `ScenarioGear`. |
 | Errands | `errand_policy.*`: training and auction visits to capitals, with a daily budget. |
-| Raids | `raid_rules.*`, `ScenarioRaid`, guild raids (`GuildsRaid*`). |
+| Raids | `raid_rules.*`, `ScenarioRaid`, guild raids (`GuildsRaid*`; guild kinds in `doc/bot-guilds.md`). |
 
 The level 60 lists (`data/world_quests_<side>_60.txt`) hold only quests of level 60 (`--min-level 60`). The rewards of quests of level 50 to 59 (many pre-raid pieces) are in
 the leveling lists, which a level 60 bot does not use. That is the first gap, and the first slice closes it.

@@ -443,6 +443,7 @@ void SetUpChat(forever_module::ModuleClient& client, std::shared_ptr<CommandQueu
         std::vector<CommandQueue::AmbientLine> ambientLines;
         std::vector<BotPolicy::WhisperReply> whispers;
         std::vector<social::Order> socialOrders;
+        std::vector<BotPolicy::StoreWrite> guildStore;
         std::vector<advisor::Order> advisorOrders;
         {
             std::lock_guard<std::mutex> lock(commands->Lock);
@@ -452,6 +453,7 @@ void SetUpChat(forever_module::ModuleClient& client, std::shared_ptr<CommandQueu
             whispers.swap(commands->WhisperReplies);
             ambientLines.swap(commands->Ambient);
             socialOrders.swap(commands->Social);
+            guildStore.swap(commands->GuildStore);
             advisorOrders.swap(commands->Advisor);
         }
         for (social::Order const& order : socialOrders)
@@ -473,6 +475,13 @@ void SetUpChat(forever_module::ModuleClient& client, std::shared_ptr<CommandQueu
                 std::lock_guard<std::mutex> lock(commands->Lock);
                 commands->SocialOutcomes.push_back(std::move(failed));
             }
+        }
+        for (BotPolicy::StoreWrite const& write : guildStore)
+        {
+            if (write.Remove)
+                client.StoreDelete(write.Key);
+            else
+                client.StoreSet(write.Key, write.Value);
         }
         for (advisor::Order const& order : advisorOrders)
             advisor::Send(client, order);

@@ -216,6 +216,32 @@ int main(int argc, char** argv)
     std::size_t scenarioSpawned = 0;
     StartSpawns(client, run, roster, settings, maxBots, scenarioOn, scenarioSpawned);
 
+    // Bot guilds memory (GuildsRemember): the guilds of the last run, read back from their store rows, keep their kind and name.
+    if (settings.Guilds.Enabled && settings.Guilds.Remember)
+        client.StoreList(bot_guilds::kStorePrefix, [&client, commands](forever_module::ActionReply const& reply)
+        {
+            if (!reply.success())
+            {
+                std::cerr << "forever-bots: could not read saved guilds (" << reply.reason() << ")\n";
+                return;
+            }
+            for (int i = 0; i < reply.keys_size(); ++i)
+            {
+                std::uint64_t guild = 0;
+                if (!bot_guilds::GuildFromStoreKey(reply.keys(i), guild))
+                    continue;
+                client.StoreGet(reply.keys(i), [commands, guild](forever_module::ActionReply const& stored)
+                {
+                    CommandQueue::GuildRestore restored;
+                    restored.Guild = guild;
+                    if (!stored.found() || !bot_guilds::DecodeRecord(stored.value(), restored.Kind, restored.Alliance, restored.Name))
+                        return;
+                    std::lock_guard<std::mutex> lock(commands->Lock);
+                    commands->GuildRestores.push_back(std::move(restored));
+                });
+            }
+        });
+
     // The policy's class lookup: a bot's own class, or the configured class (0 = none) for a bot the table does not know.
     PolicyOptions policyOptions;
     PolicyFromSettings(policyOptions, settings);

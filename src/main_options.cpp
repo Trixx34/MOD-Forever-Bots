@@ -225,6 +225,21 @@ void LoadPolicyTables(PolicyOptions& policyOptions, BotSettings& settings)
         std::cerr << "forever-bots: trade ads: " << pools->TradeAds.size() << " template(s) from " << settings.TradeAdsFile << "\n";
     }
     policyOptions.Pools = pools;
+    // Bot guild names (GuildsNameFile, doc/bot-guilds.md): no file or no valid row keeps the "BotLvl A001" names.
+    if (settings.Guilds.Enabled && !settings.Guilds.NameFile.empty())
+    {
+        std::string const path = BesideTheModule(settings.Guilds.NameFile);
+        std::ifstream in(path);
+        std::ostringstream text;
+        if (in)
+            text << in.rdbuf();
+        std::vector<std::string> warnings;
+        auto names = std::make_shared<std::vector<bot_guilds::NameEntry>>(bot_guilds::ParseNames(text.str(), warnings));
+        for (std::string const& warning : warnings)
+            std::cerr << "forever-bots: " << warning << "\n";
+        std::cerr << "forever-bots: guild names: " << names->size() << " from " << path << (in ? "" : " (not readable: the BotLvl names are used)") << "\n";
+        policyOptions.GuildNames = names;
+    }
     if (settings.Taxi.Enabled)
     {
         // The city named in the taxi journal lines comes from the capitals' trainer table (ErrandTrainerFile); without it every city is "unknown".

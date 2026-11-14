@@ -218,8 +218,18 @@ void BotPolicy::NoteSocialOutcome(social::Outcome const& outcome, std::uint64_t 
     // A refused guild create: the master waits (and the creates behind it get the slots) without waiting for the pending entry to expire.
     if (outcome.What == social::Kind::Guild && outcome.Op == 3 && _options.Guilds.Enabled)
     {
-        if (_pendingGuilds.erase(outcome.Bot) != 0)
-            NoteGuildCreateFailed(outcome.Bot, nowMs);
+        auto const pending = _pendingGuilds.find(outcome.Bot);
+        if (pending != _pendingGuilds.end())
+        {
+            // A name in use is the name's fault, not the master's: the name is marked taken, and a master whose name came from the names file draws
+            // another on the next plan without a wait. The plan's own name ("BotLvl A001") would come back the same, so that master waits as before.
+            bool const nameTaken = outcome.Reason.find("a guild with that name exists") != std::string::npos;
+            if (nameTaken)
+                _guildTakenNames.insert(bot_guilds::NameKey(pending->second.Name));
+            if (!nameTaken || !pending->second.FromList)
+                NoteGuildCreateFailed(outcome.Bot, nowMs);
+            _pendingGuilds.erase(pending);
+        }
     }
     // The guild poll is expected to be refused nearly always ("no pending guild invitation"): not worth a line.
     if (outcome.What == social::Kind::Guild && outcome.Op == 0 && !social::IsUnknownActionReason(outcome.Reason))
