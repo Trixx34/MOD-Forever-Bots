@@ -2092,3 +2092,575 @@ pair|lore|11|2|m|15|Vaelor|Lightforged
 pair|lore|11|5|f|15|Naaru|Gracebringer
 pair|lore|11|7|m|15|Talgor|Earthbinder
 pair|lore|11|8|f|15|Zara|Crystalweaver
+
+# ---- additions, round 2 ----
+# first funny
+first|funny|*|1|*|30|Aggromagnet
+first|funny|*|1|*|30|Cleavemore
+first|funny|*|1|*|30|Tankzilla
+first|funny|*|1|*|30|Blockhead
+first|funny|*|1|*|30|Critzilla
+first|funny|*|1|*|30|Taunticus
+first|funny|*|1|*|30|Overaggro
+first|funny|*|1|*|30|Shieldwall
+first|funny|*|1|*|30|Ragetooth
+first|funny|*|1|*|30|Parrypotter
+first|funny|*|1|*|30|Stunlocker
+first|funny|*|1|*|30|Sundered
+first|funny|*|1|*|30|Tanktop
+first|funny|*|1|*|30|Critney
+first|funny|*|1|*|30|Ragemachine
+first|funny|*|1|*|30|Shieldicus
+first|funny|*|1|*|30|Pummel
+first|funny|*|1|*|30|Intercept
+first|funny|*|2|*|30|Holypoker
+first|funny|*|2|*|30|Blessington
+first|funny|*|2|*|30|Judgemental
+first|funny|*|2|*|30|Hammered
+first|funny|*|2|*|30|Lightbringer
+first|funny|*|2|*|30|Divinewind
+first|funny|*|2|*|30|Manaplate
+first|funny|*|2|*|30|Holyroller
+first|funny|*|2|*|30|Blessbot
+first|funny|*|2|*|30|Repentia
+first|funny|*|2|*|30|Flashbang
+first|funny|*|2|*|30|Pallywhack
+first|funny|*|2|*|30|Sanctimonia
+first|funny|*|3|*|30|Petpuller
+first|funny|*|3|*|30|Feignicus
+first|funny|*|3|*|30|Arrowgance
+first|funny|*|3|*|30|Bowtiful
+first|funny|*|3|*|30|Ammoholic
+first|funny|*|3|*|30|Trapdoor
+first|funny|*|3|*|30|Beastmode
+first|funny|*|3|*|30|Petulant
+first|funny|*|3|*|30|Pullhappy
+first|funny|*|3|*|30|Scatterbrain
+first|funny|*|3|*|30|Kitington
+first|funny|*|3|*|30|Deadzone
+first|funny|*|3|*|30|Quiver
+first|funny|*|4|*|30|Backstabber
+first|funny|*|4|*|30|Vanisher
+first|funny|*|4|*|30|Sneakums
+first|funny|*|4|*|30|Kidneyshot
+first|funny|*|4|*|30|Sapling
+first|funny|*|4|*|30|Lockpick
+first|funny|*|4|*|30|Poisona
+first|funny|*|4|*|30|Gankster
+first|funny|*|4|*|30|Stabbington
+first|funny|*|4|*|30|Cheapshot
+first|funny|*|4|*|30|Ambushkin
+first|funny|*|5|*|30|Healzilla
+first|funny|*|5|*|30|Manaflask
+first|funny|*|5|*|30|Shadowfax
+first|funny|*|5|*|30|Smitey
+first|funny|*|5|*|30|Healbot
+first|funny|*|5|*|30|Dispelina
+first|funny|*|5|*|30|Mindbender
+first|funny|*|5|*|30|Renewable
+first|funny|*|5|*|30|Flashheal
+first|funny|*|5|*|30|Manasink
+first|funny|*|5|*|30|Painkiller
+first|funny|*|5|*|30|Shadowmancer
+first|funny|*|5|*|30|Prayerful
+first|funny|*|5|*|30|Resurrecto
+first|funny|*|7|*|30|Totemancer
+first|funny|*|7|*|30|Ankhready
+first|funny|*|7|*|30|Totemtop
+first|funny|*|7|*|30|Shockwave
+first|funny|*|7|*|30|Earthshaker
+first|funny|*|7|*|30|Manafury
+first|funny|*|7|*|30|Hexcellent
+first|funny|*|7|*|30|Lavawalker
+first|funny|*|7|*|30|Stormcaller
+first|funny|*|7|*|30|Totemly
+first|funny|*|7|*|30|Frostshock
+first|funny|*|7|*|30|Ankhlet
+first|funny|*|7|*|30|Bloodlusty
+first|funny|*|8|*|30|Conjuror
+first|funny|*|8|*|30|Sheepinator
+first|funny|*|8|*|30|Portalmaster
+first|funny|*|8|*|30|Frostybolt
+first|funny|*|8|*|30|Manavore
+first|funny|*|8|*|30|Blinkington
+first|funny|*|8|*|30|Polymorpher
+first|funny|*|8|*|30|Iceblock
+first|funny|*|8|*|30|Evocation
+first|funny|*|8|*|30|Arcaneidiot
+first|funny|*|8|*|30|Vendingmage
+first|funny|*|8|*|30|Frostnova
+first|funny|*|8|*|30|Manaquake
+first|funny|*|8|*|30|Sheepish
+first|funny|*|8|*|30|Pyromaniac
+first|funny|*|9|*|30|Fearmonger
+first|funny|*|9|*|30|Soulstoned
+first|funny|*|9|*|30|Summonator
+first|funny|*|9|*|30|Healthstone
+first|funny|*|9|*|30|Demonbreath
+first|funny|*|9|*|30|Immolator
+first|funny|*|9|*|30|Shadowburn
+first|funny|*|9|*|30|Curseword
+first|funny|*|9|*|30|Soulstealer
+first|funny|*|9|*|30|Felicious
+first|funny|*|9|*|30|Impish
+first|funny|*|9|*|30|Doomcookie
+first|funny|*|9|*|30|Drainbrain
+first|funny|*|9|*|30|Hellfire
+first|funny|*|11|*|30|Bearminimum
+first|funny|*|11|*|30|Catastrophe
+first|funny|*|11|*|30|Barkskin
+first|funny|*|11|*|30|Feralicious
+first|funny|*|11|*|30|Moomkin
+first|funny|*|11|*|30|Pawsh
+first|funny|*|11|*|30|Rootbeer
+first|funny|*|11|*|30|Clawdia
+first|funny|*|11|*|30|Hibernate
+first|funny|*|11|*|30|Bearly
+first|funny|*|11|*|30|Furball
+first|funny|*|11|*|30|Leafblower
+first|funny|*|11|*|30|Purrfect
+first|funny|6|*|*|30|Moozilla
+first|funny|6|*|*|30|Udderly
+first|funny|6|*|*|30|Cowabunga
+first|funny|6|*|*|30|Milktank
+first|funny|6|*|*|30|Steakhouse
+first|funny|6|*|*|30|Hoofington
+first|funny|6|*|*|30|Moocho
+first|funny|6|*|*|30|Bovinia
+first|funny|6|*|*|30|Cuddleston
+first|funny|7|*|*|30|Shortstuff
+first|funny|7|*|*|30|Kneecap
+first|funny|7|*|*|30|Pocketmage
+first|funny|7|*|*|30|Tinyterror
+first|funny|7|*|*|30|Teacup
+first|funny|7|*|*|30|Stumpy
+first|funny|7|*|*|30|Tippytoes
+first|funny|5|*|*|30|Rottingham
+first|funny|5|*|*|30|Gravey
+first|funny|5|*|*|30|Dusty
+first|funny|5|*|*|30|Wormfood
+first|funny|5|*|*|30|Skelly
+first|funny|5|*|*|30|Deadweight
+first|funny|5|*|*|30|Moldy
+first|funny|3|*|*|30|Kegmaster
+first|funny|3|*|*|30|Alejandro
+first|funny|3|*|*|30|Stoutheart
+first|funny|3|*|*|30|Brewster
+first|funny|3|*|*|30|Barrelroll
+first|funny|3|*|*|30|Shortbeard
+first|funny|3|*|*|30|Hopsworth
+first|funny|3|*|*|30|Mugshot
+first|funny|3|*|*|30|Foambeard
+# first lore
+first|lore|1|1,2|m|20|Llane
+first|lore|1|1|m|20|Bolvar
+first|lore|1|1|m|20|Garithos
+first|lore|1|1|m|20|Arthas
+first|lore|1|2|m|20|Tirion
+first|lore|1|2|m|20|Saidan
+first|lore|1|2|m|20|Maraad
+first|lore|1|3|m|20|Nathanos
+first|lore|1|3|m|20|Hemet
+first|lore|1|3|m|20|Rexxar
+first|lore|1|4|m|20|Shaw
+first|lore|1|4|m|20|Garona
+first|lore|1|5|m|20|Alonsus
+first|lore|1|5|m|20|Benedictus
+first|lore|1|5|f|20|Calia
+first|lore|1|8|m|20|Antonidas
+first|lore|1|8|m|20|Nielas
+first|lore|1|9|m|20|Kelthuzad
+first|lore|1|9|m|20|Cho
+first|lore|1|11|m|20|Fandral
+first|lore|1|11|m|20|Broll
+first|lore|1|11|m|20|Arugal
+first|lore|2|1|m|20|Broxigar
+first|lore|2|1|m|20|Kargath
+first|lore|2|1|m|20|Kilrogg
+first|lore|2|1|m|20|Durotan
+first|lore|2|1|m|20|Varok
+first|lore|2|1|m|20|Dranosh
+first|lore|2|3|m|20|Jorin
+first|lore|2|3|m|20|Gamon
+first|lore|2|7|m|20|Nobundo
+first|lore|2|9|m|20|Nerzhul
+first|lore|2|9|m|20|Teron
+first|lore|2|9|m|20|Zeliek
+first|lore|2|11|m|20|Hamuul
+first|lore|2|11|m|20|Cairne
+first|lore|2|11|m|20|Magatha
+first|lore|3|1|m|20|Thoras
+first|lore|3|1|m|20|Kurdran
+first|lore|3|1|m|20|Dagran
+first|lore|3|1|m|20|Thane
+first|lore|3|2|m|20|Brann
+first|lore|3|3|m|20|Yorg
+first|lore|3|4|m|20|Kharan
+first|lore|3|8|m|20|Hogger
+first|lore|3|8|m|20|Gelbin
+first|lore|3|9|m|20|Modimus
+first|lore|4|1|m|20|Jarod
+first|lore|4|1|m|20|Illidan
+first|lore|4|1|m|20|Shandris
+first|lore|4|1|f|20|Maiev
+first|lore|4|1|f|20|Naisha
+first|lore|4|5|f|20|Delas
+first|lore|4|5|f|20|Elerethe
+first|lore|4|11|m|20|Cenarius
+first|lore|4|11|m|20|Broll
+first|lore|4|11|f|20|Elune
+first|lore|4|11|f|20|Lunara
+first|lore|4|8|m|20|Xavius
+first|lore|4|8|f|20|Alandien
+first|lore|5|1|m|20|Nathanos
+first|lore|5|1|m|20|Lilian
+first|lore|5|1|m|20|Marlene
+first|lore|5|1|m|20|Koltharius
+first|lore|5|4|m|20|Valeera
+first|lore|5|5|m|20|Zeliek
+first|lore|5|5|f|20|Whitemane
+first|lore|5|8|m|20|Araj
+first|lore|5|8|m|20|Amnennar
+first|lore|5|9|m|20|Varimathras
+first|lore|5|9|m|20|Balnazzar
+first|lore|5|9|m|20|Detheroc
+first|lore|5|11|m|20|Gorefiend
+first|lore|6|1|m|20|Tagar
+first|lore|6|3|m|20|Hamuul
+first|lore|6|7|m|20|Magatha
+first|lore|6|11|m|20|Runetotem
+first|lore|7|1|m|20|Gelbin
+first|lore|7|1|m|20|Sicco
+first|lore|7|3|m|20|Toshley
+first|lore|7|4|m|20|Kelsey
+first|lore|7|8|m|20|Millhouse
+first|lore|7|8|m|20|Mekgineer
+first|lore|7|8|m|20|Sprocket
+first|lore|8|1|m|20|Zuljin
+first|lore|8|3|m|20|Rokhan
+first|lore|8|3|m|20|Jin
+first|lore|8|7|m|20|Zuljin
+first|lore|8|7|m|20|Zul
+first|lore|8|9|m|20|Zanzil
+first|lore|8|9|m|20|Zul
+first|lore|8|11|m|20|Zalazane
+first|lore|10|1|m|20|Lorthemar
+first|lore|10|1|m|20|Halduron
+first|lore|10|1|m|20|Rommath
+first|lore|10|1|f|20|Liadrin
+first|lore|10|2|m|20|Aethas
+first|lore|10|4|m|20|Valeera
+first|lore|10|5|m|20|Salandria
+first|lore|10|8|m|20|Thalorien
+first|lore|10|8|m|20|Astalor
+first|lore|10|9|m|20|Darkhan
+first|lore|10|11|m|20|Arator
+first|lore|11|1|m|20|Yrel
+first|lore|11|2|m|20|Tirion
+first|lore|11|2|m|20|Ishanah
+first|lore|11|5|f|20|Ishanah
+first|lore|11|7|m|20|Nobundo
+first|lore|11|8|m|20|Velen
+first|lore|11|8|m|20|Hatuun
+first|lore|11|9|m|20|Socrethar
+# last funny
+last|funny|*|1|*|30|Aggro Magnet
+last|funny|*|1|*|30|Critical Failure
+last|funny|*|1|*|30|Rage Quit
+last|funny|*|1|*|30|Shield Wall
+last|funny|*|1|*|30|Meat Shield
+last|funny|*|1|*|30|Taunt Factory
+last|funny|*|1|*|30|Over Pull
+last|funny|*|1|*|30|Repair Bill
+last|funny|*|1|*|30|Angry Hamster
+last|funny|*|1|*|30|Critical Mass
+last|funny|*|2|*|30|Bubble Trouble
+last|funny|*|2|*|30|Holy Roller
+last|funny|*|2|*|30|Divine Intervention
+last|funny|*|2|*|30|Hammer Time
+last|funny|*|2|*|30|Light Snack
+last|funny|*|2|*|30|Blessing Bot
+last|funny|*|2|*|30|Mana Plate
+last|funny|*|2|*|30|Holy Cow
+last|funny|*|2|*|30|Bubble Bath
+last|funny|*|3|*|30|Pet Pulled
+last|funny|*|3|*|30|Feign Death
+last|funny|*|3|*|30|Arrow Tax
+last|funny|*|3|*|30|Trap Happy
+last|funny|*|3|*|30|Beast Feast
+last|funny|*|3|*|30|Dead Zone
+last|funny|*|3|*|30|Ammo Shortage
+last|funny|*|3|*|30|Oops Pull
+last|funny|*|3|*|30|Scatter Brain
+last|funny|*|3|*|30|Quiver Me Timbers
+last|funny|*|4|*|30|Kidney Shot
+last|funny|*|4|*|30|Cheap Thrills
+last|funny|*|4|*|30|Vanish Now
+last|funny|*|4|*|30|Sap Happy
+last|funny|*|4|*|30|Back Stabber
+last|funny|*|4|*|30|Pick Pocket
+last|funny|*|4|*|30|Poison Ivy
+last|funny|*|4|*|30|Sneaky Pete
+last|funny|*|4|*|30|Lock Stock
+last|funny|*|4|*|30|Shadow Boxer
+last|funny|*|5|*|30|Oom Again
+last|funny|*|5|*|30|Mana Problems
+last|funny|*|5|*|30|Heal Me
+last|funny|*|5|*|30|Shadow Business
+last|funny|*|5|*|30|Mind Control
+last|funny|*|5|*|30|Bandage Spec
+last|funny|*|5|*|30|Flash Heal
+last|funny|*|5|*|30|Prayer Circle
+last|funny|*|5|*|30|Holy Smokes
+last|funny|*|5|*|30|Renew Please
+last|funny|*|7|*|30|Totem Pole
+last|funny|*|7|*|30|Windfury Proc
+last|funny|*|7|*|30|Ankh Ready
+last|funny|*|7|*|30|Chain Reaction
+last|funny|*|7|*|30|Lava Lamp
+last|funny|*|7|*|30|Earth Shaker
+last|funny|*|7|*|30|Shock Therapy
+last|funny|*|7|*|30|Blood Lust
+last|funny|*|7|*|30|Spirit Guide
+last|funny|*|7|*|30|Mana Tide
+last|funny|*|8|*|30|Conjure Water
+last|funny|*|8|*|30|Portal Please
+last|funny|*|8|*|30|Sheep Herder
+last|funny|*|8|*|30|Frosty Reception
+last|funny|*|8|*|30|Ice Ice Baby
+last|funny|*|8|*|30|Blink Twice
+last|funny|*|8|*|30|Mana Deposit
+last|funny|*|8|*|30|Arcane Failure
+last|funny|*|8|*|30|Polymorph Party
+last|funny|*|8|*|30|Vending Machine
+last|funny|*|9|*|30|Summon Please
+last|funny|*|9|*|30|Fear Me
+last|funny|*|9|*|30|Cookie Jar
+last|funny|*|9|*|30|Dot Dot Dot
+last|funny|*|9|*|30|Soul Deposit
+last|funny|*|9|*|30|Health Stone
+last|funny|*|9|*|30|Demon Taxi
+last|funny|*|9|*|30|Imp Delivery
+last|funny|*|9|*|30|Hell To Pay
+last|funny|*|9|*|30|Dark Contract
+last|funny|*|11|*|30|Bear Ass
+last|funny|*|11|*|30|Moonfire Spam
+last|funny|*|11|*|30|Cat Nap
+last|funny|*|11|*|30|Tree Hugger
+last|funny|*|11|*|30|Feral Instinct
+last|funny|*|11|*|30|Root Beer
+last|funny|*|11|*|30|Bark Twice
+last|funny|*|11|*|30|Mighty Oak
+last|funny|*|11|*|30|Paw Patrol
+last|funny|*|11|*|30|Natural Disaster
+last|funny|6|*|*|30|Sir Loin
+last|funny|6|*|*|30|Milk Shake
+last|funny|6|*|*|30|Holy Cow
+last|funny|6|*|*|30|Beef Wellington
+last|funny|6|*|*|30|Udder Nonsense
+last|funny|6|*|*|30|Moo Juice
+last|funny|6|*|*|30|Prime Rib
+last|funny|6|*|*|30|Steak Dinner
+last|funny|6|*|*|30|Cow Tipping
+last|funny|6|*|*|30|Hoof Hearted
+last|funny|7|*|*|30|Pocket Sized
+last|funny|7|*|*|30|Knee High
+last|funny|7|*|*|30|Little Trouble
+last|funny|7|*|*|30|Short Circuit
+last|funny|7|*|*|30|Small Wonder
+last|funny|7|*|*|30|Punt Practice
+last|funny|7|*|*|30|Low Ceiling
+last|funny|7|*|*|30|Tiny Terror
+last|funny|7|*|*|30|Ankle Biter
+last|funny|7|*|*|30|Little Package
+last|funny|5|*|*|30|Rattle Bones
+last|funny|5|*|*|30|Dead Tired
+last|funny|5|*|*|30|Rotten Luck
+last|funny|5|*|*|30|Bone Appetit
+last|funny|5|*|*|30|Grave Mistake
+last|funny|5|*|*|30|Mold Problem
+last|funny|5|*|*|30|Worm Food
+last|funny|5|*|*|30|Dust Bunny
+last|funny|5|*|*|30|No Pulse
+last|funny|5|*|*|30|Dead Serious
+last|funny|3|*|*|30|Ale Chugger
+last|funny|3|*|*|30|Keg Stand
+last|funny|3|*|*|30|Beard Trouble
+last|funny|3|*|*|30|Stout Fellow
+last|funny|3|*|*|30|Barrel Roller
+last|funny|3|*|*|30|Foam Beard
+last|funny|3|*|*|30|Brew Master
+last|funny|3|*|*|30|Hops Collector
+last|funny|3|*|*|30|Mug Holder
+last|funny|3|*|*|30|Short Pour
+# last lore
+last|lore|1|*|*|25|Magi
+last|lore|1|*|*|25|Theron
+last|lore|1|*|*|25|Furlbrow
+last|lore|1|*|*|25|Redpath
+last|lore|1|*|*|25|Perenolde
+last|lore|1|*|*|25|Crestfall
+last|lore|1|*|*|25|Ashbury
+last|lore|1|*|*|25|Hammertoe
+last|lore|2|*|*|25|Laughing Skull
+last|lore|2|*|*|25|Twilight
+last|lore|2|*|*|25|Burning Blade
+last|lore|2|*|*|25|Mok'Nathal
+last|lore|2|*|*|25|Whiteclaw
+last|lore|3|*|*|25|Darkiron
+last|lore|3|*|*|25|Anvilmar
+last|lore|3|*|*|25|Barbe
+last|lore|3|*|*|25|Stonefist
+last|lore|3|*|*|25|Coppervein
+last|lore|3|*|*|25|Grimstone
+last|lore|4|*|*|25|Shandris
+last|lore|4|*|*|25|Nightshade
+last|lore|4|*|*|25|Moonwhisper
+last|lore|4|*|*|25|Starbreeze
+last|lore|4|*|*|25|Dawnstrider
+last|lore|5|*|*|25|Mograine
+last|lore|5|*|*|25|Whitemane
+last|lore|5|*|*|25|Fairbanks
+last|lore|5|*|*|25|Barov
+last|lore|5|*|*|25|Darrow
+last|lore|5|*|*|25|Ravenholdt
+last|lore|5|*|*|25|Nerub
+last|lore|5|*|*|25|Rotheart
+last|lore|5|*|*|25|Graveborn
+last|lore|5|*|*|25|Duskbringer
+last|lore|6|*|*|25|Skychaser
+last|lore|6|*|*|25|Thunderhoof
+last|lore|6|*|*|25|Wildmane
+last|lore|6|*|*|25|Dawnstrider
+last|lore|6|*|*|25|Stonehoof
+last|lore|6|*|*|25|Highmountain
+last|lore|7|*|*|25|Geargrinder
+last|lore|7|*|*|25|Sparknozzle
+last|lore|7|*|*|25|Gizelton
+last|lore|7|*|*|25|Cogspinner
+last|lore|7|*|*|25|Wrenchwhistle
+last|lore|7|*|*|25|Sprocket
+last|lore|7|*|*|25|Copperclaw
+last|lore|8|*|*|25|Farraki
+last|lore|8|*|*|25|Bloodscalp
+last|lore|8|*|*|25|Skullsplitter
+last|lore|10|*|*|25|Dawnblade
+last|lore|10|*|*|25|Bloodhawk
+last|lore|10|*|*|25|Duskwither
+last|lore|10|*|*|25|Windrunner
+last|lore|10|*|*|25|Brightwing
+last|lore|10|*|*|25|Spellbreaker
+last|lore|11|*|*|25|Vindicator
+last|lore|11|*|*|25|Stillpine
+last|lore|11|*|*|25|Auchenai
+last|lore|11|*|*|25|Lightforged
+last|lore|11|*|*|25|Anchorite
+last|lore|11|*|*|25|Draenei
+last|lore|11|*|*|25|Hatuun
+last|lore|11|*|*|25|Sunsworn
+last|lore|11|*|*|25|Sha'tar
+# pair funny
+pair|funny|*|1|m|30|Rage|Quit
+pair|funny|*|1|m|30|Tank|You
+pair|funny|*|1|m|30|Big|Taunt
+pair|funny|*|1|f|30|Miss|Demeanor
+pair|funny|*|1|f|30|Lady|Rage
+pair|funny|*|2|m|30|Bubble|Trouble
+pair|funny|*|2|m|30|Holy|Roller
+pair|funny|*|2|f|30|Miss|Blessing
+pair|funny|*|2|f|30|Dame|Divine
+pair|funny|*|3|m|30|Feign|Death
+pair|funny|*|3|m|30|Oops|Pull
+pair|funny|*|3|f|30|Miss|Fire
+pair|funny|*|3|f|30|Lady|Kite
+pair|funny|*|4|m|30|Cheap|Shot
+pair|funny|*|4|m|30|Vanish|Now
+pair|funny|*|4|f|30|Stab|Happy
+pair|funny|*|4|f|30|Miss|Stealth
+pair|funny|*|5|m|30|Oom|Again
+pair|funny|*|5|m|30|Heal|Please
+pair|funny|*|5|f|30|Miss|Heal
+pair|funny|*|5|f|30|Holy|Moly
+pair|funny|*|7|m|30|Ankh|Ready
+pair|funny|*|7|f|30|Miss|Totem
+pair|funny|*|7|f|30|Lady|Lava
+pair|funny|*|8|m|30|Frost|Bite
+pair|funny|*|8|f|30|Miss|Polymorph
+pair|funny|*|8|f|30|Lady|Blink
+pair|funny|*|9|f|30|Miss|Demon
+pair|funny|*|9|f|30|Lady|Curse
+pair|funny|*|11|m|30|Moonfire|Spam
+pair|funny|*|11|m|30|Root|Beer
+pair|funny|*|11|f|30|Miss|Tree
+pair|funny|*|11|f|30|Lady|Claw
+pair|funny|6|*|m|30|Moo|Juice
+pair|funny|6|*|f|30|Miss|Steak
+pair|funny|7|*|m|30|Tiny|Terror
+pair|funny|7|*|f|30|Miss|Short
+pair|funny|5|*|f|30|Miss|Rotten
+pair|funny|3|*|m|30|Ale|Chugger
+pair|funny|3|*|f|30|Lady|Keg
+# pair lore
+pair|lore|1|1|m|15|Llane|Wrynn
+pair|lore|1|1|m|15|Varian|Wrynn
+pair|lore|1|1|m|15|Anduin|Wrynn
+pair|lore|1|1|m|15|Bolvar|Fordragon
+pair|lore|1|1|m|15|Garithos|Mendicant
+pair|lore|1|2|m|15|Tirion|Fordring
+pair|lore|1|2|m|15|Saidan|Dathrohan
+pair|lore|1|2|m|15|Maraad|Lightbringer
+pair|lore|1|3|m|15|Hemet|Nesingwary
+pair|lore|1|4|m|15|Mathias|Shaw
+pair|lore|1|5|f|15|Calia|Menethil
+pair|lore|1|8|m|15|Khadgar|Medivh
+pair|lore|1|8|m|15|Nielas|Aran
+pair|lore|1|9|m|15|Kelthuzad|Sunstrider
+pair|lore|1|11|m|15|Broll|Bearmantle
+pair|lore|2|1|m|15|Orgrim|Doomhammer
+pair|lore|2|1|m|15|Durotan|Frostwolf
+pair|lore|2|1|m|15|Garrosh|Hellscream
+pair|lore|2|1|m|15|Kargath|Bladefist
+pair|lore|2|1|m|15|Kilrogg|Deadeye
+pair|lore|2|1|m|15|Broxigar|Saurfang
+pair|lore|2|1|m|15|Dranosh|Saurfang
+pair|lore|2|7|m|15|Drekthar|Frostwolf
+pair|lore|2|9|m|15|Guldan|Stormreaver
+pair|lore|2|9|m|15|Nerzhul|Shadowmoon
+pair|lore|2|9|m|15|Teron|Gorefiend
+pair|lore|2|11|m|15|Cairne|Bloodhoof
+pair|lore|2|11|m|15|Hamuul|Runetotem
+pair|lore|3|1|m|15|Thoras|Trollbane
+pair|lore|3|1|m|15|Falstad|Wildhammer
+pair|lore|3|1|m|15|Kurdran|Wildhammer
+pair|lore|3|1|m|15|Dagran|Thaurissan
+pair|lore|3|8|m|15|Gelbin|Mekkatorque
+pair|lore|4|1|m|15|Jarod|Shadowsong
+pair|lore|4|1|m|15|Malfurion|Stormrage
+pair|lore|4|1|m|15|Illidan|Stormrage
+pair|lore|4|1|f|15|Maiev|Shadowsong
+pair|lore|4|11|m|15|Cenarius|Wildmane
+pair|lore|4|11|m|15|Fandral|Staghelm
+pair|lore|4|11|f|15|Elerethe|Renferal
+pair|lore|5|1|m|15|Nathanos|Marr
+pair|lore|5|5|f|15|Sally|Whitemane
+pair|lore|5|5|m|15|Leonid|Barov
+pair|lore|5|9|m|15|Varimathras|Dreadlord
+pair|lore|5|9|m|15|Balnazzar|Dreadlord
+pair|lore|6|1|m|15|Baine|Bloodhoof
+pair|lore|6|11|m|15|Hamuul|Runetotem
+pair|lore|7|8|m|15|Millhouse|Manastorm
+pair|lore|7|9|m|15|Sicco|Thermaplugg
+pair|lore|8|1|m|15|Zuljin|Amani
+pair|lore|8|3|m|15|Rokhan|Darkspear
+pair|lore|8|9|m|15|Zanzil|Hexxer
+pair|lore|8|11|m|15|Zalazane|Darkspear
+pair|lore|10|1|m|15|Lorthemar|Theron
+pair|lore|10|1|m|15|Halduron|Brightwing
+pair|lore|10|2|f|15|Liadrin|Sunstrider
+pair|lore|10|8|m|15|Rommath|Sunstrider
+pair|lore|10|4|f|15|Valeera|Sanguinar
+pair|lore|10|9|m|15|Darkhan|Drathir
+pair|lore|11|8|m|15|Velen|Prophet
+pair|lore|11|7|m|15|Nobundo|The Wise
+pair|lore|11|5|f|15|Ishanah|Auchenai
+first|funny|*|4|*|30|Shankapotam
