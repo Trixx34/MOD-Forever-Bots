@@ -146,7 +146,8 @@ void BotPolicy::MoveToTarget(DecideTick& tick, BotTurn& turn)
     // the tank instead of the tank walking into the pack's throw range. The other members wait (TurnTargeting's tank-first hold).
     if (turn.partyLeaderBot && turn.routeOn && targetUnit && _options.RaidRules)
     {
-        if (std::optional<raid_rules::PullPosition> const pos = _options.RaidRules->PullPositionOf(bot.map_id, forever_module::UnitRefEntry(targetRef)))
+        if (std::optional<raid_rules::PullPosition> const pos =
+                _options.RaidRules->PullPositionOf(bot.map_id, forever_module::UnitRefEntry(targetRef), targetUnit->pos_x, targetUnit->pos_y))
         {
             if (state.PullPosRef != targetRef)
             {

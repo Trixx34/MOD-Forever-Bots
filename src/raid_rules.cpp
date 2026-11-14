@@ -159,6 +159,15 @@ Table Parse(std::string_view text, std::vector<std::string>& errors)
             else if (!table.Edit(map).PullPositions.emplace(a, PullPosition{ x, y, z, yards }).second)
                 bad("pullpos: entry " + std::to_string(a) + " is listed twice; the first position is kept");
         }
+        else if (kind == "pullpos_near")
+        {
+            float x = 0.0f, y = 0.0f, z = 0.0f, yards = 0.0f, cx = 0.0f, cy = 0.0f, reach = 0.0f;
+            if (f.size() < 10 || !Id(f[2], a) || !Coordinate(f[3], x) || !Coordinate(f[4], y) || !Coordinate(f[5], z) || !Radius(f[6], yards) || yards < 2.0f ||
+                yards > 40.0f || !Coordinate(f[7], cx) || !Coordinate(f[8], cy) || !Radius(f[9], reach) || reach < 2.0f || reach > 200.0f)
+                bad("pullpos_near: expected 'pullpos_near|map|entry|x|y|z|yards|cx|cy|reach|name' (yards 2..40, reach 2..200)");
+            else
+                table.Edit(map).ScopedPullPositions.push_back(ScopedPullPosition{ a, PullPosition{ x, y, z, yards }, cx, cy, reach });
+        }
         else if (kind == "tank_spot")
         {
             float x = 0.0f, y = 0.0f, z = 0.0f, yards = 0.0f;
@@ -302,6 +311,29 @@ std::optional<PullPosition> Table::PullPositionOf(std::uint32_t map, std::uint32
         if (auto const it = r->PullPositions.find(entry); it != r->PullPositions.end())
             return it->second;
     return std::nullopt;
+}
+
+std::optional<PullPosition> Table::PullPositionOf(std::uint32_t map, std::uint32_t entry, float unitX, float unitY) const
+{
+    MapRules const* r = Find(map);
+    if (!r)
+        return std::nullopt;
+    ScopedPullPosition const* best = nullptr;
+    float bestYards = 0.0f;
+    for (ScopedPullPosition const& row : r->ScopedPullPositions)
+    {
+        if (row.Entry != entry)
+            continue;
+        float const yards = std::hypot(unitX - row.CenterX, unitY - row.CenterY);
+        if (yards <= row.Reach && (!best || yards < bestYards))
+        {
+            best = &row;
+            bestYards = yards;
+        }
+    }
+    if (best)
+        return best->Pos;
+    return PullPositionOf(map, entry);
 }
 
 bool Table::NoAoe(std::uint32_t map, std::uint32_t bossEntry) const

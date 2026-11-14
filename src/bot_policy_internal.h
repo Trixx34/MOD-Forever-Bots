@@ -518,6 +518,7 @@ constexpr std::uint64_t kCorpseReviveDelayMs = 8000;       // the Recover tactic
 constexpr float kReviveHostileYards = 30.0f;               // revive-loop guard: no corpse revive next to a member while a live hostile is this close to it (the stockade, rfd and gnomer 2026-11-07 runs revived a bot every 8 s beside its killer: 106-127 deaths)
 constexpr std::uint64_t kReviveWindowMs = 120000;          // and at most kReviveWindowMax (the three tries of one death) corpse revives per bot in this window
 constexpr std::uint32_t kReviveWindowMax = 3;
+constexpr std::uint64_t kReviveCapWindowMs = 60000;       // DungeonRevivesPerMinute: the window the party's revives are counted in
 constexpr std::uint64_t kGhostHoldLogMs = 10000;           // ghost_teleport_hold: one line per bot in this time
 constexpr std::uint32_t kOutOfCombatReviveTries = 3;       // and after this many tries the ghost walks back to its corpse as before
 constexpr std::uint64_t kLeaderGhostWaitMs = 60000;        // DungeonLeaderRejoin: a dead leader's ghost waits this long (from its release) for its party's fight to end, then goes to the entrance as before

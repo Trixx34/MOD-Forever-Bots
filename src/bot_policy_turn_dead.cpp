@@ -190,6 +190,7 @@ void BotPolicy::DeadRecord(DecideTick& tick, BotTurn& turn)
         state.RunTimeoutTeleported = false;
         state.GhostHoldSinceMs = 0;
         state.GhostHoldLoggedMs = 0;
+        state.GhostFightHoldSinceMs = 0;
         state.GhostSinceMs = 0;
         state.RunFailedNoCorpse = false;
         state.RunFailedAtMs = 0;
@@ -382,6 +383,59 @@ bool BotPolicy::GhostAvoidEnemyHeld(DecideTick& tick, BotTurn& turn, std::uint32
                          " waited_ms=" + std::to_string(nowMs - state.DeathMs));
     }
     return true;
+}
+
+// GhostHoldPartyFightMaxMs: the entrance teleport of a dungeon ghost (the core revives it on entering, at half health, and it walks back to its party) waits while a living
+// member of the party is in combat, at most GhostHoldPartyFightMaxMs per death. After the fight the ghost is taken to the leader (party_teleport, revived beside it). Not the
+// leader's own ghost.
+bool BotPolicy::GhostPartyFightHeld(DecideTick& tick, BotTurn& turn, std::uint64_t party)
+{
+    // The leader's own ghost (the tank) is not held: the raid cannot fight on without it (the Onyxia Warder holds of 2026-11-08 kept the raid tankless).
+    if (_options.GhostHoldPartyFightMaxMs == 0 || party == 0 || party == turn.bot.guid || !PartyFighting(tick, party))
+        return false;
+    std::uint64_t const nowMs = tick.nowMs;
+    BotState& state = turn.state;
+    if (state.GhostFightHoldSinceMs == 0)
+        state.GhostFightHoldSinceMs = nowMs;
+    std::uint64_t const heldMs = nowMs - state.GhostFightHoldSinceMs;
+    if (heldMs >= _options.GhostHoldPartyFightMaxMs)
+        return false;
+    if (_options.OnEvent && (state.GhostHoldLoggedMs == 0 || nowMs - state.GhostHoldLoggedMs >= kGhostHoldLogMs))
+    {
+        state.GhostHoldLoggedMs = nowMs;
+        _options.OnEvent("ghost_teleport_hold: bot=" + std::to_string(turn.bot.guid) + " reason=party_fight dest=entrance party=" + std::to_string(party) +
+                         " held_ms=" + std::to_string(heldMs) + " waited_ms=" + std::to_string(nowMs - state.DeathMs));
+    }
+    return true;
+}
+
+// DungeonRevivesPerMinute: the party's ghosts put back into the instance in the last 60 s.
+bool BotPolicy::GhostReviveCapHeld(DecideTick& tick, BotTurn& turn, std::uint64_t party)
+{
+    if (_options.DungeonRevivesPerMinute == 0 || party == 0)
+        return false;
+    std::uint64_t const nowMs = tick.nowMs;
+    auto const it = _partyRevivesMs.find(party);
+    if (it == _partyRevivesMs.end())
+        return false;
+    std::vector<std::uint64_t>& times = it->second;
+    std::erase_if(times, [nowMs](std::uint64_t at) { return at > nowMs || nowMs - at >= kReviveCapWindowMs; });
+    if (times.size() < _options.DungeonRevivesPerMinute)
+        return false;
+    BotState& state = turn.state;
+    if (_options.OnEvent && (state.GhostHoldLoggedMs == 0 || nowMs - state.GhostHoldLoggedMs >= kGhostHoldLogMs))
+    {
+        state.GhostHoldLoggedMs = nowMs;
+        _options.OnEvent("ghost_teleport_hold: bot=" + std::to_string(turn.bot.guid) + " reason=revive_cap party=" + std::to_string(party) + " in_minute=" +
+                         std::to_string(times.size()) + " waited_ms=" + std::to_string(nowMs - state.DeathMs));
+    }
+    return true;
+}
+
+void BotPolicy::NoteDungeonRevive(std::uint64_t party, std::uint64_t nowMs)
+{
+    if (_options.DungeonRevivesPerMinute != 0 && party != 0)
+        _partyRevivesMs[party].push_back(nowMs);
 }
 
 bool BotPolicy::GhostTeleportHeld(DecideTick& tick, BotTurn& turn, std::uint32_t map, Point const& dest, char const* what)
@@ -736,9 +790,11 @@ void BotPolicy::DeadGhostRun(DecideTick& tick, BotTurn& turn)
     {
         BotSnapshot const& leader = view.bots[leaderAt->second];
         bool const withLeader = bot.map_id == leader.map_id && DistanceTo(bot, Point{ leader.pos_x, leader.pos_y, leader.pos_z }) <= kEntryYards;
-        if (!withLeader && nowMs >= state.CorpseTeleportRetryMs && !GhostTeleportHeld(tick, turn, leader.map_id, Point{ leader.pos_x, leader.pos_y, leader.pos_z }, "leader") && GhostTeleportSlot(nowMs))
+        if (!withLeader && nowMs >= state.CorpseTeleportRetryMs && !GhostTeleportHeld(tick, turn, leader.map_id, Point{ leader.pos_x, leader.pos_y, leader.pos_z }, "leader") &&
+            !GhostReviveCapHeld(tick, turn, deadParty) && GhostTeleportSlot(nowMs))
         {
             state.CorpseTeleportRetryMs = nowMs + kEntryTeleportRetryMs;
+            NoteDungeonRevive(deadParty, nowMs);
             BotAction toLeader;
             toLeader.bot_guid = bot.guid;
             toLeader.type = ActionType::kTeleport;
@@ -765,9 +821,11 @@ void BotPolicy::DeadGhostRun(DecideTick& tick, BotTurn& turn)
         {
             bool const withMember = bot.map_id == member->map_id && DistanceTo(bot, Point{ member->pos_x, member->pos_y, member->pos_z }) <= kEntryYards;
             if (!withMember && nowMs >= state.CorpseTeleportRetryMs &&
-                !GhostAvoidEnemyHeld(tick, turn, member->map_id, Point{ member->pos_x, member->pos_y, member->pos_z }, "member") && GhostTeleportSlot(nowMs))
+                !GhostAvoidEnemyHeld(tick, turn, member->map_id, Point{ member->pos_x, member->pos_y, member->pos_z }, "member") &&
+                !GhostReviveCapHeld(tick, turn, deadParty) && GhostTeleportSlot(nowMs))
             {
                 state.CorpseTeleportRetryMs = nowMs + kEntryTeleportRetryMs;
+                NoteDungeonRevive(deadParty, nowMs);
                 BotAction toMember;
                 toMember.bot_guid = bot.guid;
                 toMember.type = ActionType::kTeleport;
@@ -794,13 +852,23 @@ void BotPolicy::DeadGhostRun(DecideTick& tick, BotTurn& turn)
     }
     bool entryHeld = false;
     if (instanceParty && entryOf != _options.DungeonsByMap.end() && entryOf->second.HasEntry && !atEntry && nowMs >= state.CorpseTeleportRetryMs)
-        entryHeld = GhostTeleportHeld(tick, turn, bot.corpse_map, entryOf->second.Entry, "entrance");
+    {
+        // GhostHoldPartyFightMaxMs: while the party fights, the entrance wait (kDungeonEntryWaitMs) starts over, so a ghost whose hold ends goes to the entrance as
+        // before and not on a corpse run into the fight.
+        bool const fightHeld = GhostPartyFightHeld(tick, turn, deadParty);
+        if (fightHeld)
+            state.EntrySinceMs = nowMs;
+        else if (state.GhostFightHoldSinceMs != 0)
+            state.EntrySinceMs = std::max(state.EntrySinceMs, std::min(nowMs, state.GhostFightHoldSinceMs + _options.GhostHoldPartyFightMaxMs));
+        entryHeld = fightHeld || GhostTeleportHeld(tick, turn, bot.corpse_map, entryOf->second.Entry, "entrance") || GhostReviveCapHeld(tick, turn, deadParty);
+    }
     // A held ghost keeps waiting past kDungeonEntryWaitMs: the corpse run would walk it to the pack as well.
     if (instanceParty && entryOf != _options.DungeonsByMap.end() && entryOf->second.HasEntry && (nowMs - state.EntrySinceMs < kDungeonEntryWaitMs || entryHeld))
     {
         if (!atEntry && !entryHeld && nowMs >= state.CorpseTeleportRetryMs && GhostTeleportSlot(nowMs))
         {
             state.CorpseTeleportRetryMs = nowMs + kEntryTeleportRetryMs;
+            NoteDungeonRevive(deadParty, nowMs);
             BotAction entry;
             entry.bot_guid = bot.guid;
             entry.type = ActionType::kTeleport;

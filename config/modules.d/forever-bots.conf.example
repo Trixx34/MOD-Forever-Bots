@@ -421,6 +421,11 @@ Module.forever-bots.TelemetrySummarySec = 60
 # GhostTeleportHoldMaxMs = 120000   (the longest a ghost is held for a hostile, per death; 1000 to 3600000)
 # GhostHoldAvoidEnemyMaxMs = 0 (off; 300000 is a good value)   (a dungeon ghost's teleport, to the entrance, the leader, a member (leader rejoin) or its corpse, waits while a hostile of an avoid_enemy row of
 #                                      the raid rules is fighting within max(30, the row's yards) of the destination, this long at most per death; ghost_teleport_hold reason=avoid_enemy; 0 = off)
+# GhostHoldPartyFightMaxMs = 0 (off; 180000 is a good value)   (a dungeon ghost's teleport to the instance entrance, where the core revives it at half health and it walks back into the fight,
+#                                      waits while a living member of its party is in combat, this long at most per death; after the fight it is revived beside the leader; the leader's own
+#                                      ghost is not held; ghost_teleport_hold reason=party_fight; 0 = off, else 1000 to 3600000. doc/zulgurub-route-plan.md)
+# DungeonRevivesPerMinute = 0 (off)   (at most this many ghosts of one dungeon party are put back into the instance, at the entrance, beside the leader or by the leader rejoin, in any
+#                                      60 s; the others wait; ghost_teleport_hold reason=revive_cap; 0 = off, else 1 to 40)
 # DeathLockoutCount = 4   (a bot that died this many times within DeathLockoutWindowMs waits DeathLockoutHoldMs more before its ghost teleport, reason=lockout; 0 = off, else 2 to 50)
 # DeathLockoutWindowMs = 600000   (10000 to 86400000)
 # DeathLockoutHoldMs = 90000   (0 to 3600000)

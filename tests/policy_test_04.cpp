@@ -1107,6 +1107,10 @@ void TheTankWalksToThePullPositionFirst()
     CHECK(first("", 0.0f, 0.0f) == "pull");
     CHECK(first("pullpos|36|9|0|-10|0|4|other\n", 0.0f, 0.0f) == "pull");            // another entry
     CHECK(first("pullpos|309|1|0|-10|0|4|other\n", 0.0f, 0.0f) == "pull");           // another map
+    // pullpos_near: only the camp within the reach of its centre (the hostile stands at 30,3)
+    CHECK(first("pullpos_near|36|1|0|-10|0|4|28|0|10|camp\n", 0.0f, 0.0f) == "move:0,-10");
+    CHECK(first("pullpos_near|36|1|0|-10|0|4|200|0|10|other camp\n", 0.0f, 0.0f) == "pull");
+    CHECK(first("pullpos_near|36|1|0|-10|0|4|200|0|10|other camp\npullpos|36|1|5|-20|0|4|map-wide\n", 0.0f, 0.0f) == "move:5,-20");   // the fallback row
 }
 
 // Once the pull has landed (the tank is in combat with the target, still 30 yards off) the tank goes back to the position, holds there while the pack comes, and fights on

@@ -540,6 +540,33 @@ void CutOffBossesAreBridgedByTeleportEvents()
     CheckOneCutOffBoss(json, { 90, "electrocutioner-bridge", 7079, -537.9f, 528.3f, -216.1f, "electrocutioner-back", 6235, false });
 }
 
+// ---- Zul'Gurub proposal (2026-11-15, doc/zulgurub-route-plan.md): data/dungeons-proposed is loaded only with DungeonDir; it must load clean ----------------
+
+void ZulGurubProposedRouteLoads()
+{
+    std::string const root = FOREVER_BOTS_SOURCE_DIR;
+    std::vector<std::string> warnings;
+    std::vector<Dungeon> const json = LoadDungeonDir(root + "/data/dungeons-proposed", true, warnings);
+    for (std::string const& w : warnings)
+        std::printf("dungeons-proposed: %s\n", w.c_str());
+    CHECK(warnings.empty());
+    CHECK(json.size() == 1);
+    if (json.size() != 1)
+        return;
+    Dungeon const& z = json[0];
+    CHECK(z.Id == "zulgurub" && z.MapId() == 309 && z.Route.size() == 141);
+    std::vector<std::uint32_t> order;
+    for (DungeonWaypoint const& w : z.Route)
+        if (w.BossEntry != 0)
+            order.push_back(w.BossEntry);
+    // Venoxis first, Hakkar last, no boss point on the neutral Zanza the Restless (15042)
+    CHECK((order == std::vector<std::uint32_t>{ 14507, 14517, 14510, 11382, 11348, 11347, 14509, 11380, 14834 }));
+    CHECK(z.Route[24].BossEntry == 14507 && z.Route[140].BossEntry == 14834);
+    // the ledge as shipped: the pull spot of the shelf snakes and the stairs thrower camp (raid_rules pullpos_near) is route point 5
+    CHECK(z.Route[5].X == -11872.5f && z.Route[5].Y == -1287.7f);
+    CHECK((z.KillPriority == std::vector<std::uint32_t>{ 11830, 11350 }));
+}
+
 // ---- Gnomeregan (2026-11-07): the route of forever-ops docs/gnomer-route-20261107.md, an Alliance party, 3600 s ------------------------------------------
 
 void GnomereganRouteRosterAndDuration()
@@ -724,6 +751,7 @@ int main()
     ShippedFilesEqualTheOldTextFiles();
     CutOffBossesAreBridgedByTeleportEvents();
     GnomereganRouteRosterAndDuration();
+    ZulGurubProposedRouteLoads();
     RazorfenDownsKillPriority();
     BlackfathomDeepsKillPriority();
     ConfigKeysNameTheFolders();
