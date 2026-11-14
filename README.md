@@ -94,6 +94,7 @@ line to the module's stderr. A config reload updates the ramp, the random picks 
 | `OffMapRecover`, `OffMapSeconds`, `OffMapCooldownSec`, `OffMapMarginYards` | 1, 60, 600, 500 | A living bot more than the margin outside the known places of its map (quest points, grind spots, hubs) for that many seconds is teleported to the nearest known place of its faction, once per cooldown (`off_map_seen`, `off_map_home`; needs `Bot.Actions.Teleport = 1`) |
 | `TrainEverySec` | 0 (off) | Seconds between trainer checks, also after a level-up (0, or 60 to 86400) |
 | `PartySize`, `PartyCount` | 0 (off), 1 | Bots per party (at most 5) and number of parties |
+| `DynamicParties`, `PartyJoinYards`, `PartyKeepYards`, `PartyRejoinSec`, `PartyErrandEveryMinutes`, `PartyErrandBreakMinutes` | 1, 150, 400, 60, 30, 5 | A party member is in its party only while it shares an unfinished quest with its leader, the leader has a group quest, or the party is due for a level dungeon; only on the leader's map and near it; it leaves for errands and an errand break (`party_join`, `party_leave`). Dungeon runs, tank-led routes and scenarios keep their parties |
 | `Hub<map>_<n>` | none | Hub positions `"x y z"` per map, in order |
 | `TestSpell` | 0 (off) | A spell cast at the target every few ticks instead of the rotation, to test the cast path |
 | `TelemetryFile`, `TelemetryMaxMB`, `TelemetryKeep`, `TelemetrySummarySec` | `forever-bots-telemetry.csv`, 64, 5, 60 | The telemetry file (empty turns it off), its rotation, and the summary interval |
@@ -162,6 +163,11 @@ Each tick the policy (`src/bot_policy.cpp`) reads the bot's snapshot and sends a
   auto-vendor-trash sells a bot's grey drops.
 - **Parties.** With `PartySize` set, the lowest-guid bots are cut into parties. The leader (the first warrior, else the lowest guid)
   invites; members accept, leave a foreign party, follow the leader when more than 8 yards away and fight the leader's target.
+  With `DynamicParties` (on by default) the cut only says who may party with whom: a member is invited while it has a reason (the same
+  unfinished quest as its leader, the leader's group quest, a level dungeon the party is due for), on the leader's map and within
+  `PartyJoinYards`, and it leaves when the reason ends, when the leader changes map or is farther than `PartyKeepYards`, when it is on
+  or needs an errand (trainer, Auction House, vendor, repair, supplies, a flight), and for an errand break; it may rejoin after
+  `PartyRejoinSec`. A level dungeon run, a tank-led route and a scenario (ZG, Onyxia, MC/BWL) are assigned groups and stay whole.
 
 The spell ids are rank 1 ids from the classic spell tables. They were checked against the Forever trainer data: every trainable one has
 its vanilla level. Sunder Armor (7386) has no trainer row there. The module logs once per spell id the core does not know.

@@ -777,6 +777,25 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
         ReadKey(config, "QuestGroupRangeYards", 10, 1000, range, warnings);
         settings.QuestGroups.RangeYards = float(range);
     }
+    ReadBool(config, "DynamicParties", settings.DynamicParties.Enabled, warnings);
+    {
+        party_reason::Settings& parties = settings.DynamicParties;
+        std::uint32_t join = std::uint32_t(parties.JoinYards);
+        ReadKey(config, "PartyJoinYards", 10, 2000, join, warnings);
+        parties.JoinYards = float(join);
+        std::uint32_t keep = std::uint32_t(parties.KeepYards);
+        ReadKey(config, "PartyKeepYards", 10, 5000, keep, warnings);
+        parties.KeepYards = float(std::max(keep, join));
+        std::uint32_t rejoin = std::uint32_t(parties.RejoinMs / 1000);
+        ReadKey(config, "PartyRejoinSec", 0, 3600, rejoin, warnings);
+        parties.RejoinMs = std::uint64_t(rejoin) * 1000;
+        std::uint32_t every = std::uint32_t(parties.ErrandEveryMs / 60000);
+        ReadKey(config, "PartyErrandEveryMinutes", 0, 1440, every, warnings);
+        parties.ErrandEveryMs = std::uint64_t(every) * 60000;
+        std::uint32_t pause = std::uint32_t(parties.ErrandBreakMs / 60000);
+        ReadKey(config, "PartyErrandBreakMinutes", 1, 240, pause, warnings);
+        parties.ErrandBreakMs = std::uint64_t(pause) * 60000;
+    }
     // ADVISOR-KEYS
     ReadBool(config, "InnDowntime", settings.InnDowntime.Enabled, warnings);
     ReadBool(config, "ScenarioConfigGuard", settings.ScenarioConfigGuard, warnings);

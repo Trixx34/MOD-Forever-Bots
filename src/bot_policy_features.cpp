@@ -688,3 +688,15 @@ void BotPolicy::DriveQuestGroups(WorldTickSnapshotView const& view, std::unorder
             }
     }
 }
+
+bool BotPolicy::LevelDungeonDue(std::uint64_t leaderGuid, std::uint32_t partyLevel)
+{
+    if (!_options.LevelDungeons || partyLevel == 0)
+        return false;
+    KnownDungeons const known = KnownDungeonsOf(_options);
+    if (known.List.empty())
+        return false;
+    level_dungeon::Book const empty;
+    auto const book = _levelBooks.find(leaderGuid);
+    return level_dungeon::Due(known.List, partyLevel, book == _levelBooks.end() ? empty : book->second, _options.LevelDungeonRuns) >= 0;
+}

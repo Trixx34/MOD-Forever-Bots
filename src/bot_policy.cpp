@@ -729,6 +729,8 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
     std::unordered_map<std::uint64_t, std::uint64_t> leaderOf;                // bot guid -> its party's leader
     std::unordered_map<std::uint64_t, std::vector<std::uint64_t>> membersOf;  // leader guid -> the other members
     BuildParties(view, indexOf, leaderOf, membersOf);
+    // Dynamic parties: only the members with a reason to be in their party now stay in the cut (party_reason.h).
+    ApplyPartyReasons(view, indexOf, leaderOf, membersOf, nowMs);
 
     // Level dungeons and LFG: sends parties into their dungeon and back, and starts the tank lead once they are in (it sets TankLead, which the loop below reads).
     if (_options.LevelDungeons || !_lfgOrders.empty())

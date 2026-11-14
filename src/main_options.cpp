@@ -310,6 +310,7 @@ void LoadPolicyTables(PolicyOptions& policyOptions, BotSettings& settings)
     policyOptions.OffMap.CooldownMs = std::uint64_t(settings.OffMapCooldownSec) * 1000;
     policyOptions.OffMap.MarginYards = float(settings.OffMapMarginYards);
     policyOptions.QuestGroups = settings.QuestGroups;
+    policyOptions.DynamicParties = settings.DynamicParties;
     if (!settings.TameBeastFile.empty())
     {
         std::vector<std::string> tameWarnings;
@@ -385,6 +386,7 @@ void SetUpScenario(PolicyOptions& policyOptions, PumpExtras& extras, BotSettings
     policyOptions.PartySize = std::uint32_t(settings.Scenario.Roster.size());
     policyOptions.PartyCount = ScenarioPartyCount(settings.Scenarios);
     policyOptions.PartyPercent = 100; // every bot of the roster is in its party
+    policyOptions.DynamicParties.Enabled = false; // and stays in it: a scenario's parties (ZG, Onyxia, MC/BWL) are assigned groups
     policyOptions.RandomPct = 0;      // and a scenario is a test run: it is not varied
     policyOptions.Crafting = false;
     policyOptions.ServiceEveryMs = 0;

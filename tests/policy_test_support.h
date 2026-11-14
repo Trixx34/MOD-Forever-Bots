@@ -1260,3 +1260,4 @@ void RunPolicyTestsPart8();
 void RunPolicyTestsPart9();
 void RunPolicyTestsPart10();
 void RunPolicyTestsPart11();
+void RunPolicyTestsPart12();
