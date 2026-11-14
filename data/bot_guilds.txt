@@ -3,25 +3,14 @@
 # Rules (guild name): letters, space, apostrophe, hyphen; 2-24 characters; unique case-insensitive.
 
 # --- lore ---
-guild|lore|30|The Argent Dawn
 guild|lore|30|The Scarlet Crusade
-guild|lore|30|The Ashen Verdict
-guild|lore|30|The Argent Crusade
 guild|lore|30|The Sons of Lothar
-guild|lore|30|The League of Arathor
 guild|lore|30|The Defias Brotherhood
 guild|lore|30|The Syndicate
-guild|lore|30|The Kirin Tor
-guild|lore|30|The Violet Eye
 guild|lore|30|The Silver Hand
-guild|lore|30|The Cenarion Circle
 guild|lore|30|The Emerald Circle
-guild|lore|30|The Earthen Ring
-guild|lore|30|The Wildhammer Clan
 guild|lore|30|The Bronzebeard Clan
 guild|lore|30|The Dark Iron
-guild|lore|30|The Frostwolves
-guild|lore|30|The Warsong Clan
 guild|lore|30|The Blackrock Clan
 guild|lore|30|The Shadow Council
 guild|lore|30|The Burning Blade
@@ -31,22 +20,11 @@ guild|lore|30|The Shadowmoon Clan
 guild|lore|30|The Laughing Skull
 guild|lore|30|The Dragonmaw
 guild|lore|30|The Thunderlords
-guild|lore|30|The Darkspear Tribe
 guild|lore|30|The Gurubashi Empire
 guild|lore|30|The Amani Empire
-guild|lore|30|The Zandalari
 guild|lore|30|The Bloodscalp Tribe
 guild|lore|30|The Farstriders
-guild|lore|30|The Sunreavers
 guild|lore|30|The Blood Knights
-guild|lore|30|The Scryers
-guild|lore|30|The Aldor
-guild|lore|30|The Sha'tar
-guild|lore|30|The Sons of Hodir
-guild|lore|30|The Frostborn
-guild|lore|30|The Explorers League
-guild|lore|30|The Keepers of Time
-guild|lore|30|The Wyrmrest Accord
 guild|lore|30|The Blue Dragonflight
 guild|lore|30|The Red Dragonflight
 guild|lore|30|The Bronze Dragonflight
@@ -54,13 +32,7 @@ guild|lore|30|The Emerald Enclave
 guild|lore|30|The Black Harvest
 guild|lore|30|The Twilight Hammer
 guild|lore|30|The Cult of the Damned
-guild|lore|30|The Ebon Blade
-guild|lore|30|The Forsaken
-guild|lore|30|The Steamwheedle Cartel
 guild|lore|30|The Venture Company
-guild|lore|30|The Defilers
-guild|lore|30|The Frostwolf Guard
-guild|lore|30|The Stormwind Guard
 guild|lore|30|The Sentinels
 guild|lore|30|The Watchers
 guild|lore|30|The Wardens
@@ -68,7 +40,6 @@ guild|lore|30|The Moonguard
 guild|lore|30|The Twilight's Hammer
 guild|lore|30|The Scarlet Onslaught
 guild|lore|30|The Obsidian Sanctum
-guild|lore|30|The Argent Vanguard
 guild|lore|30|The Valarjar
 guild|lore|30|The Keepers of Tirisfal
 guild|lore|30|The Sons of Arugal
@@ -81,7 +52,6 @@ guild|lore|30|The Moon Guard
 guild|lore|30|The Emerald Wardens
 guild|lore|30|The Lightbringers
 guild|lore|30|The Dawnbringers
-guild|lore|30|The Ironforge Guard
 guild|lore|30|The Quel'dorei
 guild|lore|30|The Sin'dorei
 guild|lore|30|The Kaldorei
@@ -396,13 +366,7 @@ guild|lore|30|The Gnomeregan Refugees
 guild|lore|30|The Zul'Gurub Hunters
 guild|lore|30|The Ahn'Qiraj Seekers
 guild|lore|30|The Naxxramas Sentinels
-guild|lore|30|The Light's Hope Chapel
 guild|lore|30|The Brill Gravediggers
-guild|lore|30|The Undercity Guard
-guild|lore|30|The Orgrimmar Grunts
-guild|lore|30|The Thunder Bluff Elders
-guild|lore|30|The Silvermoon Magisters
-guild|lore|30|The Exodar Defenders
 guild|lore|30|The Booty Bay Pirates
 # funny
 guild|funny|30|Overgeared Failures
