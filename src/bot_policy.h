@@ -70,6 +70,7 @@
 #include "party_mana.h"
 #include "whisper_matrix.h"
 #include "path_jitter.h"
+#include "personality.h"
 #include "guild_milestone.h"
 #include "city_inspect.h"
 #include "city_greet.h"
@@ -469,6 +470,7 @@ struct PolicyOptions
     party_mana::Settings PartyMana;
     whisper_matrix::Settings WhisperMatrix;
     path_jitter::Settings PathJitter;
+    personality::Settings Personality;   // per-bot stable traits that tune rest, idle dwell, pulls and town AFK a little (personality.h; off by default)
     guild_milestone::Settings GuildMilestone;
     city_inspect::Settings CityInspect;
     city_greet::Settings CityGreet;
@@ -895,6 +897,10 @@ private:
         std::uint32_t PassingBuffCounter = 0;
         std::uint64_t AfkUntilMs = 0;                    // town AFK: stays at the hub until this time
         std::uint32_t AfkCounter = 0;
+        std::uint32_t PullCounter = 0;                   // personality: solo pull decisions made (the counter of its random draws)
+        std::uint32_t PullSkips = 0;                     // personality: packs a wary bot skipped in a row (capped at personality::kMaxPullSkips)
+        std::uint64_t PullReactRef = 0;                  // personality: the mob the reaction delay runs for, until PullReactUntilMs
+        std::uint64_t PullReactUntilMs = 0;
         taxi::Flight TaxiFlight;                         // the flight ordered and not ended yet (for the landing and timeout log lines)
         std::uint64_t NextPotionMs = 0;                  // no potion before this (the game shares one cooldown between potions)
         std::uint64_t TravelStartMs = 0;                 // when this walk began; it is dropped after kTravelTimeoutMs

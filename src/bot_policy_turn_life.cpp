@@ -132,6 +132,9 @@ BotPolicy::TurnFlow BotPolicy::TurnBegin(DecideTick& tick, BotTurn& turn)
             state.LeaderYards = float(bot_random::Vary(std::uint64_t(kFollowLeaderYards * 10.0f), _options.RandomPct,
                                                        bot_random::Draw(_options.RandomSeed, bot.guid, bot_random::kSaltRest, 1))) / 10.0f;
         }
+        // Personality (off by default): the caution trait moves the rest threshold a few points, within 70..98.
+        if (_options.Personality.Enabled)
+            state.RestPct = personality::RestPct(_options.Personality, personality::TraitsFor(_options.RandomSeed, bot.guid), state.RestPct);
     }
     if (state.OrderAction)
     {

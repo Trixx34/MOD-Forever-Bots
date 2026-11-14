@@ -483,10 +483,15 @@ void BotPolicy::TurnWander(DecideTick& tick, BotTurn& turn)
                 state.IdleSinceMs = arrived ? nowMs : nowMs - (kWanderIdleMs - kHubRetryIdleMs);
                 // Town AFK: now and then a bot that reached a hub stays for 5 to 20 minutes (it stands; no new order is sent), unless the map already has its quota of
                 // staying bots. The stay only holds back the next walk; any fight or order ends it.
+                // Personality (off by default): sociability scales the chance, the session trait the length.
+                personality::Traits const traits = personality::TraitsFor(_options.RandomSeed, bot.guid);
+                realism::AfkSettings afk = _options.TownAfk;
+                afk.ChancePct = personality::AfkChancePct(_options.Personality, traits, afk.ChancePct);
                 if (arrived && _options.TownAfk.Enabled && bot.in_combat == 0 && !turn.enemyNear &&
-                    realism::AfkRoll(_options.TownAfk, _options.RandomSeed, bot.guid, state.AfkCounter))
+                    realism::AfkRoll(afk, _options.RandomSeed, bot.guid, state.AfkCounter))
                 {
-                    std::uint64_t const stay = realism::AfkDurationMs(_options.TownAfk, _options.RandomSeed, bot.guid, state.AfkCounter);
+                    std::uint64_t const stay = personality::AfkStayMs(_options.Personality, traits,
+                                                                      realism::AfkDurationMs(_options.TownAfk, _options.RandomSeed, bot.guid, state.AfkCounter));
                     if (_afkZones.TryStart(bot.map_id, bot.guid, nowMs, nowMs + stay, _options.TownAfk.ZoneMax))
                     {
                         state.AfkUntilMs = nowMs + stay;

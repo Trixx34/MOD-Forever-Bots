@@ -280,6 +280,7 @@ constexpr std::uint32_t kMaxLevelAbove = 2;      // a bot does not pull a creatu
 constexpr float kLootRangeYards = 25.0f;         // the core loots a corpse within 30 yards; the bot asks within 25
 constexpr std::uint64_t kLootWindowMs = 120000;  // a corpse is looted within this long after the fight, or forgotten
 constexpr std::uint64_t kAvoidMs = 30000;        // a target that refused an attack or a cast is skipped for this long
+constexpr std::uint64_t kPersonalitySkipMs = 15000;  // personality: a pack a wary bot leaves is skipped for this long
 constexpr std::uint32_t kMaxAvoidDoublings = 2;  // each repeat avoid doubles the time: 30 s, 60 s, then 120 s at most
 constexpr std::uint64_t kWanderIdleMs = 30000;   // idle for this long, seeing nothing, before walking to a hub
 constexpr std::uint64_t kWanderTimeoutMs = 180000; // a walk to a hub longer than this is dropped

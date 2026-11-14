@@ -851,6 +851,57 @@ BotPolicy::TurnFlow BotPolicy::TurnTaming(DecideTick& tick, BotTurn& turn)
     {
         targetUnit = hostile;
         targetRef = hostile->guid;
+        // Personality (off by default): a solo bot out of combat on no route varies this pull a little: a short reaction pause, a wary bot leaving the largest packs
+        // (at most kMaxPullSkips in a row), and now and then a small mistake, another mob than the best one. Every PullTarget guard still holds for the other mob; the
+        // bot's own pack cap applies to it. Party, route, forced and in-combat pulls are never touched.
+        if (_options.Personality.Enabled && bot.in_combat == 0 && !routeOn && !partyMember && partyLeader == 0 && bot.group_leader_guid == 0 && targetRef != state.ForcedTarget)
+        {
+            personality::Traits const traits = personality::TraitsFor(_options.RandomSeed, bot.guid);
+            std::uint64_t const counter = hostile->guid + std::uint64_t(state.PullCounter) * 0x9E3779B1ull;
+            if (personality::MakesMistake(_options.Personality, traits, _options.RandomSeed, bot.guid, counter))
+            {
+                std::uint64_t const first = hostile->guid;
+                auto const avoidedFn = turn.AvoidedFn();
+                if (NearbyUnit const* other = PullTarget(bot, nearby, [&](std::uint64_t ref) { return ref == first || avoidedFn(ref); }, false, huntEntries, routeOn, leashed))
+                {
+                    targetUnit = other;
+                    targetRef = other->guid;
+                    if (_options.OnEvent)
+                        _options.OnEvent("personality_mistake: bot=" + std::to_string(bot.guid) + " instead_of=" + std::to_string(first) + " took=" + std::to_string(targetRef));
+                }
+            }
+            std::size_t group = 0;
+            for (NearbyUnit const& other : nearby)
+                if (IsLiveMob(other) && DistanceBetween(*targetUnit, other) <= kPullRadius)
+                    ++group;
+            if (group > personality::PackCap(_options.Personality, traits, kMaxPull) && state.PullSkips < personality::kMaxPullSkips)
+            {
+                ++state.PullSkips;
+                state.AvoidUntilMs[targetRef] = nowMs + kPersonalitySkipMs;
+                targetRef = 0;
+                targetUnit = nullptr;
+            }
+            else if (_options.Personality.ReactionMaxMs != 0)
+            {
+                if (state.PullReactRef != targetRef)
+                {
+                    state.PullReactRef = targetRef;
+                    state.PullReactUntilMs = nowMs + personality::ReactionDelayMs(_options.Personality, traits, _options.RandomSeed, bot.guid, counter);
+                }
+                if (nowMs < state.PullReactUntilMs)
+                {
+                    targetRef = 0;
+                    targetUnit = nullptr;
+                }
+            }
+            if (targetRef != 0)
+            {
+                // The pull goes ahead: the next decision draws afresh.
+                state.PullSkips = 0;
+                state.PullReactRef = 0;
+                ++state.PullCounter;
+            }
+        }
     }
     // Onyxia threat discipline (study item 2): the damage dealers hold for a short time after the tank's first pull of her (the stamp is set in
     // TurnTargeting). A healer does not attack anyway.

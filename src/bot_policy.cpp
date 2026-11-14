@@ -1120,10 +1120,13 @@ std::uint64_t BotPolicy::WanderIdleFor(BotTurn& turn) const
 {
     BotSnapshot const& bot = turn.bot;
     BotState& state = turn.state;
+    // Personality (off by default): patience and pace scale the dwell by up to +-60 percent.
+    auto const traited = [&](std::uint64_t ms)
+    { return _options.Personality.Enabled ? personality::IdleDwellMs(_options.Personality, personality::TraitsFor(_options.RandomSeed, bot.guid), ms) : ms; };
     if (_options.RandomPct == 0)
-        return kWanderIdleMs;
+        return traited(kWanderIdleMs);
     if (state.WanderIdleMs == 0)
-        state.WanderIdleMs = bot_random::Vary(kWanderIdleMs, std::min<std::uint32_t>(_options.RandomPct * 2, 90),
-                                              bot_random::Draw(_options.RandomSeed, bot.guid, bot_random::kSaltIdle, state.WanderCycles));
+        state.WanderIdleMs = traited(bot_random::Vary(kWanderIdleMs, std::min<std::uint32_t>(_options.RandomPct * 2, 90),
+                                                      bot_random::Draw(_options.RandomSeed, bot.guid, bot_random::kSaltIdle, state.WanderCycles)));
     return state.WanderIdleMs;
 }

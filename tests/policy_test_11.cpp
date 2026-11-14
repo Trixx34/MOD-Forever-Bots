@@ -288,10 +288,138 @@ void ThreeDeathsAtOneSpotMakeTheBotAvoidIt()
     CHECK(!Logged(offEvents, "death_area:"));
 }
 
+// Personality (personality.h): off by default, a solo pull is varied by a reaction pause, a pack cap for wary bots, and a small mistake.
+PolicyOptions PersonalityOptions(std::uint64_t seed)
+{
+    PolicyOptions options = AggressiveOptions();
+    options.RandomSeed = seed;
+    options.Personality.Enabled = true;
+    options.Personality.ReactionMaxMs = 0;
+    options.Personality.CautionStrength = 0;
+    options.Personality.MistakeMaxPct = 0;
+    return options;
+}
+
+bool Pulls(std::vector<BotAction> const& actions, std::uint64_t unit)
+{
+    return HasAction(actions, 10, ActionType::kAttackTarget, unit) || HasAction(actions, 10, ActionType::kFollow, unit);
+}
+
+void PersonalityIsOffByDefault()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.Personality.ReactionMaxMs = 10000;
+    options.Personality.CautionStrength = 100;
+    options.Personality.MistakeMaxPct = 30;
+    WorldTickSnapshotView view = PartyView({ 10 });
+    AddNearby(view, 0, Hostile(7, 3.0f, 100));
+    AddNearby(view, 0, Hostile(8, 3.5f, 100));
+    AddNearby(view, 0, Hostile(9, 4.0f, 100));
+    BotPolicy policy(options);
+    CHECK(Pulls(policy.Decide(view, 0), MakeUnitRef(8, 1, 7)));
+}
+
+void ASlowBotPausesBeforeAPullThenPulls()
+{
+    std::uint64_t seed = 1;
+    std::uint64_t delay = 0;
+    for (; seed < 5000; ++seed)
+    {
+        personality::Settings s;
+        s.Enabled = true;
+        s.ReactionMaxMs = 10000;
+        delay = personality::ReactionDelayMs(s, personality::TraitsFor(seed, 10), seed, 10, MakeUnitRef(8, 1, 7));
+        if (delay >= 3000)
+            break;
+    }
+    CHECK(delay >= 3000);
+    PolicyOptions options = PersonalityOptions(seed);
+    options.Personality.ReactionMaxMs = 10000;
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = PartyView({ 10 });
+    AddNearby(view, 0, Hostile(7, 3.0f, 100));
+    CHECK(!Pulls(policy.Decide(view, 1000), MakeUnitRef(8, 1, 7)));
+    CHECK(!Pulls(policy.Decide(view, 1000 + delay - 500), MakeUnitRef(8, 1, 7)));
+    CHECK(Pulls(policy.Decide(view, 1000 + delay + 1), MakeUnitRef(8, 1, 7)));
+}
+
+void AWaryBotLeavesAFullPackAtMostThreeTimesThenPulls()
+{
+    std::uint64_t seed = 1;
+    for (; seed < 5000; ++seed)
+        if (personality::TraitsFor(seed, 10).Caution >= 90)
+            break;
+    PolicyOptions options = PersonalityOptions(seed);
+    options.Personality.CautionStrength = 50;
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = PartyView({ 10 });
+    AddNearby(view, 0, Hostile(7, 3.0f, 100));
+    AddNearby(view, 0, Hostile(8, 3.5f, 100));
+    AddNearby(view, 0, Hostile(9, 4.0f, 100));
+    bool pulled = false;
+    for (std::uint64_t tick = 0; tick < 3; ++tick)
+        for (std::uint64_t unit = 7; unit <= 9; ++unit)
+            pulled = pulled || Pulls(policy.Decide(view, tick * 100), MakeUnitRef(8, 1, unit));
+    CHECK(!pulled);
+    CHECK(Pulls(policy.Decide(view, 16000), MakeUnitRef(8, 1, 7)) || Pulls(policy.Decide(view, 16100), MakeUnitRef(8, 1, 8)) ||
+          Pulls(policy.Decide(view, 16200), MakeUnitRef(8, 1, 9)));
+}
+
+void ABoldBotMakingAMistakePullsAnotherMob()
+{
+    std::uint64_t seed = 1;
+    for (; seed < 100000; ++seed)
+    {
+        personality::Settings s;
+        s.Enabled = true;
+        s.MistakeMaxPct = 30;
+        if (personality::MakesMistake(s, personality::TraitsFor(seed, 10), seed, 10, MakeUnitRef(8, 1, 7)))
+            break;
+    }
+    PolicyOptions options = PersonalityOptions(seed);
+    options.Personality.MistakeMaxPct = 30;
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = PartyView({ 10 });
+    AddNearby(view, 0, Hostile(7, 3.0f, 100));
+    AddNearby(view, 0, Hostile(8, 4.0f, 100));
+    auto const actions = policy.Decide(view, 0);
+    CHECK(Pulls(actions, MakeUnitRef(8, 1, 8)));
+    CHECK(!Pulls(actions, MakeUnitRef(8, 1, 7)));
+}
+
+void AMistakeNeverPicksAMobThePullGuardsRefuse()
+{
+    std::uint64_t seed = 1;
+    for (; seed < 100000; ++seed)
+    {
+        personality::Settings s;
+        s.Enabled = true;
+        s.MistakeMaxPct = 30;
+        if (personality::MakesMistake(s, personality::TraitsFor(seed, 10), seed, 10, MakeUnitRef(8, 1, 7)))
+            break;
+    }
+    PolicyOptions options = PersonalityOptions(seed);
+    options.Personality.MistakeMaxPct = 30;
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = PartyView({ 10 });
+    view.bots[0].level = 1;
+    AddNearby(view, 0, Hostile(7, 3.0f, 100));
+    NearbyUnit strong = Hostile(8, 4.0f, 100);
+    strong.level = 9;
+    AddNearby(view, 0, strong);
+    auto const actions = policy.Decide(view, 0);
+    CHECK(!Pulls(actions, MakeUnitRef(8, 1, 8)));
+}
+
 } // namespace
 
 void RunPolicyTestsPart11()
 {
+    PersonalityIsOffByDefault();
+    ASlowBotPausesBeforeAPullThenPulls();
+    AWaryBotLeavesAFullPackAtMostThreeTimesThenPulls();
+    ABoldBotMakingAMistakePullsAnotherMob();
+    AMistakeNeverPicksAMobThePullGuardsRefuse();
     ADefensiveBotWalksOnPastACreatureThatAttacksNobody();
     ACasterWithNoSpellAtItsLevelMelees();
     AMemberDoesNotAssistOnACreatureFarAboveItsLevel();
