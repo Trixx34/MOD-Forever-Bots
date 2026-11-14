@@ -154,6 +154,14 @@ WorldTickSnapshotView TwoTankView(std::vector<std::uint64_t> const& loose, float
     return view;
 }
 
+bool MovesTowardLoose(std::vector<BotAction> const& actions)
+{
+    for (BotAction const& action : actions)
+        if (action.type == ActionType::kMoveTo && (action.bot_guid == 10 || action.bot_guid == 13) && action.dest_x > 0.5f && action.dest_x < 24.0f)
+            return true;
+    return false;
+}
+
 PolicyOptions LooseOptions()
 {
     PolicyOptions options = TankOptions(kTwoTanks);
@@ -212,6 +220,35 @@ void LooseTakesTheMobOnTheHealerFirst()
     for (std::string const& line : events)
         healer = healer || line.find("reason=healer act=taunt") != std::string::npos;
     CHECK(healer);
+}
+
+// TankLooseSkipAvoidEnemy (ZG lever): a loose mob of an avoid_enemy entry (here 1001 on map 309) is neither taunted nor walked to; the key off, or a row for another
+// entry, and the elected tank taunts it as before.
+void LooseSkipsAnAvoidEnemyMob()
+{
+    auto const run = [](bool skip, char const* rows, std::vector<std::string>* events)
+    {
+        PolicyOptions options = LooseOptions();
+        options.TankLooseSkipAvoidEnemy = skip;
+        std::vector<std::string> errors;
+        options.RaidRules = std::make_shared<raid_rules::Table>(raid_rules::Parse(rows, errors));
+        CHECK(errors.empty());
+        if (events)
+            options.OnEvent = [events](std::string const& line) { events->push_back(line); };
+        BotPolicy policy(options);
+        policy.SetRouteActive(true);
+        WorldTickSnapshotView view = TwoTankView({ kLooseOne }, 25.0f, 24.0f);
+        for (BotSnapshot& bot : view.bots)
+            bot.map_id = 309;
+        std::vector<BotAction> const actions = policy.Decide(view, 1000);
+        return CastsSpell(actions, 13, 355, kLooseOne) || CastsSpell(actions, 10, 355, kLooseOne) || MovesTowardLoose(actions);
+    };
+    char const* const row = "avoid_enemy|309|1001|33|melee|thrower\n";      // melee rows do nothing without RaidAvoidEnemyMelee: nobody moves for it here
+    std::vector<std::string> events;
+    CHECK(!run(true, row, &events));
+    CHECK(Logged(events, "tank_loose_skip: tank=") && LoggedWith(events, "target=1001 reason=avoid_enemy"));
+    CHECK(run(false, row, nullptr));
+    CHECK(run(true, "avoid_enemy|309|1002|33|melee|someone else\n", nullptr));
 }
 
 bool MovesAhead(std::vector<BotAction> const& actions, std::uint64_t bot)
@@ -685,6 +722,7 @@ void RunPolicyTestsPart9()
     LooseElectsTheNearestTankOnly();
     LooseKeepsTheOldWayWithoutTheKeyOrTheRoute();
     LooseTakesTheMobOnTheHealerFirst();
+    LooseSkipsAnAvoidEnemyMob();
     LooseWalksTowardAMobOutOfReachAndNeverWithoutTheChaseYards();
     LooseNeedsLineOfSight();
     HealerKeepsAManaFloorInCombat();

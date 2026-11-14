@@ -912,6 +912,23 @@ bool BotPolicy::PartyFighting(DecideTick const& tick, std::uint64_t leaderGuid) 
     return fighting;
 }
 
+bool BotPolicy::RallyWaitsFor(BotState const& leader, std::uint64_t member, std::uint64_t nowMs) const
+{
+    if (_options.RegroupRallyMs == 0 || leader.RegroupStuck.count(member) == 0)
+        return false;
+    auto const since = leader.RegroupFarSinceMs.find(member);
+    return since != leader.RegroupFarSinceMs.end() && nowMs < since->second + kRegroupStuckMs + _options.RegroupRallyMs;
+}
+
+bool BotPolicy::StuckExcused(BotState const& leader, std::uint64_t member, std::uint64_t nowMs, bool forPull) const
+{
+    if (leader.RegroupStuck.count(member) == 0)
+        return false;
+    if (forPull && _options.PullOnePack)
+        return false;
+    return !RallyWaitsFor(leader, member, nowMs);
+}
+
 // The distinct live hostiles this party's members are already fighting (their own threat targets, deduped). kMaxDungeonEngaged caps how far
 // the pack-focus widening below may reach for a hostile nobody has engaged yet (see kMaxDungeonEngaged).
 std::set<std::uint64_t> BotPolicy::PartyEngagedTargets(DecideTick const& tick, std::uint64_t leaderGuid) const

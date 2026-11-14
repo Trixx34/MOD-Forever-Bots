@@ -299,6 +299,7 @@ constexpr float kRouteSkipMaxZYards = 12.0f;
 constexpr float kPartyChaseYards = 45.0f;
 constexpr float kRoutePointReachYards = 6.0f;    // the leader has arrived at a route waypoint this close to it
 constexpr float kFocusPackYards = 12.0f;         // a unit this close to the tank's target is of the same pack: the damage dealers may take it first
+constexpr float kFocusAvoidEnemyYards = 40.0f;    // RaidFocusAvoidEnemy: a ranged damage dealer takes a fighting avoid_enemy hostile this near first (the nearby list reaches 40)
 // Ragefire Chasm's Searing Blade camp (2026-10-27 soak): kMaxDungeonPull caps the tank's own pull, but nothing capped what the pack-focus scan below
 // reached for afterwards. kFocusPackYards is wider than kPullRadius, and the scan has no size limit of its own, so as a fight went on it kept
 // reaching a little further for whichever unlisted hostile happened to stand nearby next -- a party ended up fighting the Enforcer, then some

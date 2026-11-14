@@ -85,7 +85,7 @@ void BotPolicy::TurnQuestsAndHold(DecideTick& tick, BotTurn& turn)
                     ready = false;
                     not_ready_reason = "mana bot=" + std::to_string(member.guid) + " pct=" + std::to_string(std::uint64_t(member.power) * 100 / member.max_power);
                 }
-                else if (Distance2d(bot, member) > kRouteWaitYards && state.RegroupStuck.count(member.guid) == 0)
+                else if (Distance2d(bot, member) > kRouteWaitYards && !StuckExcused(state, member.guid, nowMs, true))
                 {
                     ready = false;
                     not_ready_reason = "far bot=" + std::to_string(member.guid);
@@ -467,7 +467,11 @@ void BotPolicy::TurnTargeting(DecideTick& tick, BotTurn& turn)
                 // (the 2026-11-13 ZG run: the pack beside the ramp was taken up one unit at a time as the "best" of the tank's pack).
                 std::uint32_t const mapLeash = _options.RaidRules ? _options.RaidRules->PullLeash(bot.map_id) : 0u;
                 auto const unengagedOffLeash = [&](NearbyUnit const& unit)
-                { return mapLeash != 0 && engaged.count(unit.guid) == 0 && OffPartyLeash(tick, partyLeader, bot.map_id, unit.pos_x, unit.pos_y, mapLeash, true, false); };
+                {
+                    if (_options.PullOnePack && engaged.count(unit.guid) == 0 && unit.victim_ref == 0)
+                        return true;   // PullOnePack: a unit that fights nobody is not reached for
+                    return mapLeash != 0 && engaged.count(unit.guid) == 0 && OffPartyLeash(tick, partyLeader, bot.map_id, unit.pos_x, unit.pos_y, mapLeash, true, false);
+                };
                 for (NearbyUnit const& unit : nearby)
                     if (unit.is_hostile && unit.health != 0 && IsLiveMob(unit) && !turn.Avoided(unit.guid) && unit.guid != assist->guid && !unengagedOffLeash(unit) &&
                         std::hypot(unit.pos_x - assist->pos_x, unit.pos_y - assist->pos_y) <=
@@ -486,6 +490,32 @@ void BotPolicy::TurnTargeting(DecideTick& tick, BotTurn& turn)
                                          std::to_string(forever_module::UnitRefEntry(assist->guid)) + (best->casting != 0 ? " casting" : ""));
                     }
                 }
+            }
+        }
+    }
+    // RaidFocusAvoidEnemy (ZG lever, default off): a ranged damage dealer takes the nearest fighting hostile of an avoid_enemy entry (the Gurubashi Axe Thrower 11350)
+    // within kFocusAvoidEnemyYards first (over its own target and the pack focus), wherever it stands relative to the tank's pack; it ignores that unit's circle (TurnRaidSpacing), the others keep theirs.
+    if (_options.RaidFocusAvoidEnemy && routeOn && partyMember && !pullHeld && state.ForcedTarget == 0 && (bot.in_combat != 0 || groupFighting) && _options.RaidRules && _options.RaidRules->HasAvoidEnemy(bot.map_id) &&
+        SpreadKindOf(classId, false) == raid_rules::kWhoRanged && (state.Role_ == BotState::Role::Dps || HealSpellFor(classId, bot.level) == 0))
+    {
+        NearbyUnit const* thrower = nullptr;
+        float bestDist = kFocusAvoidEnemyYards;
+        for (NearbyUnit const& unit : nearby)
+            if (unit.is_hostile && unit.health != 0 && IsLiveMob(unit) && unit.victim_ref != 0 && !turn.Avoided(unit.guid) &&
+                !_options.RaidRules->AvoidEnemyFor(bot.map_id, forever_module::UnitRefEntry(unit.guid)).empty())
+                if (float const dist = std::hypot(unit.pos_x - bot.pos_x, unit.pos_y - bot.pos_y); dist <= bestDist)
+                {
+                    bestDist = dist;
+                    thrower = &unit;
+                }
+        if (thrower != nullptr)
+        {
+            targetRef = thrower->guid;
+            if (state.FocusLoggedFor != thrower->guid && _options.OnEvent)
+            {
+                state.FocusLoggedFor = thrower->guid;
+                _options.OnEvent("focus_avoid_enemy: bot=" + std::to_string(bot.guid) + " entry=" + std::to_string(forever_module::UnitRefEntry(thrower->guid)) +
+                                 " dist=" + std::to_string(int(bestDist)));
             }
         }
     }
@@ -773,6 +803,13 @@ BotPolicy::TurnFlow BotPolicy::TurnTaming(DecideTick& tick, BotTurn& turn)
     if (leashYards != 0)
         leashed = [this, &tick, leashParty, leashYards, leaderPull, mapId = bot.map_id](NearbyUnit const& unit)
         { return OffPartyLeash(tick, leashParty, mapId, unit.pos_x, unit.pos_y, leashYards, !leaderPull, true); };
+    // PullOnePack (ZG lever, default off): while the bot or its party fights, a hostile that fights nobody (victim_ref 0: a second pack, or the rest of one still in its
+    // spot) is not picked; the party finishes what it fights first.
+    if (_options.PullOnePack && routeOn && leashParty != 0 && (bot.in_combat != 0 || PartyFighting(tick, leashParty)))
+    {
+        std::function<bool(NearbyUnit const&)> const outer = leashed;
+        leashed = [outer](NearbyUnit const& unit) { return unit.victim_ref == 0 || (outer && outer(unit)); };
+    }
     if (targetRef != 0)
     {
         for (NearbyUnit const& unit : nearby)

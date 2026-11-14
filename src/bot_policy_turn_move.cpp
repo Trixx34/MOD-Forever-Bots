@@ -459,6 +459,21 @@ void BotPolicy::MoveWithoutTarget(DecideTick& tick, BotTurn& turn)
                              std::to_string(int(std::hypot(bot.pos_x - turn.aoeWarder->pos_x, bot.pos_y - turn.aoeWarder->pos_y))));
         }
     }
+    // RegroupRallyMs (ZG lever, default off): a member its leader flagged stuck walks to the leader's spot (the rally point: the leader holds there while it waits,
+    // RouteReadiness) instead of standing or following from afar, until it is back or the rally time is over. Not in a fight, not a ghost.
+    if (_options.RegroupRallyMs != 0 && routeOn && partyMember && leaderSnap && bot.life_state == 0 && bot.in_combat == 0 && leaderSnap->life_state == 0 &&
+        leaderSnap->map_id == bot.map_id)
+        if (auto const leaderState = _bots.find(turn.partyLeader); leaderState != _bots.end() && RallyWaitsFor(leaderState->second, bot.guid, nowMs))
+        {
+            wanted = Decision{ ActionType::kMoveTo, 0, Point{ leaderSnap->pos_x, leaderSnap->pos_y, leaderSnap->pos_z } };
+            turn.moveWhy = "regroup_rally";
+            if (_options.OnEvent && (state.RallyLogMs == 0 || nowMs - state.RallyLogMs >= 10000))
+            {
+                state.RallyLogMs = nowMs;
+                _options.OnEvent("regroup_rally: bot=" + std::to_string(bot.guid) + " leader=" + std::to_string(leaderSnap->guid) + " yards=" +
+                                 std::to_string(int(Distance2d(bot, *leaderSnap))) + " to=" + std::to_string(int(leaderSnap->pos_x)) + "," + std::to_string(int(leaderSnap->pos_y)));
+            }
+        }
     // A member that has lost its leader in a dungeon (far away, or on another level of the instance, so that it has no way to follow) is put next to it after a while
     // (DungeonTeleport; the core's Bot.Actions.Teleport). Not in a fight, and not again for 30 seconds.
     // A leader just revived at the instance entrance is not followed there: it comes back to the party (leader_recover, in the route below).
@@ -570,7 +585,7 @@ void BotPolicy::RouteReadiness(DecideTick& tick, BotTurn& turn, RouteLeg& route)
     tick.ForEachPartyMember(bot.guid, [&](BotSnapshot const& member)
     {
         if (member.life_state == 0)
-            together = together && (state.RegroupStuck.count(member.guid) != 0 || Distance2d(bot, member) <= kRouteWaitYards);
+            together = together && ((state.RegroupStuck.count(member.guid) != 0 && !RallyWaitsFor(state, member.guid, nowMs)) || Distance2d(bot, member) <= kRouteWaitYards);
     });
     if (state.TankLead && !IsRouteActive(bot.guid))
     {

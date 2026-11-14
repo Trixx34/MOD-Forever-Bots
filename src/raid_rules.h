@@ -16,7 +16,7 @@
 //   noaoe|map|boss_entry|name                  no area damage in this fight (boss_entry 0 = every fight on the map)
 //   frontal|map|boss_entry|spell_id|name       a frontal cast of the boss: the tank keeps the boss turned away from the raid (data only, see the README)
 //   spread|map|boss_entry|yards|who|name      while an engaged hostile of this entry is in view (0 = any), the planner's raid members of group `who` stay at least `yards` apart (chain lightning, bombs, Holy Wrath); who: all, ranged, healers or melee; tanks never move
-//   avoid_enemy|map|entry|yards|who|name       a non-tank member of group `who` keeps at least `yards` from a live hostile of this entry (Holy Nova, a charging add, melee reach)
+//   avoid_enemy|map|entry|yards|who|name       (who also `tanks`, see kWhoTanks) a member of group `who` keeps at least `yards` from a live hostile of this entry (Holy Nova, a charging add, melee reach)
 //   avoid_enemy_aura|map|entry|yards|who|aura_id|name   the same, but only while the hostile carries the aura (Axe Flurry 24018). The snapshot has no aura list for
 //                                              nearby units, only target_auras of a bot's current target: the circle is dropped only when a bot that has the unit as its
 //                                              target sees a complete aura list without the aura; with no such bot (or a full list) the circle stays, as avoid_enemy
@@ -54,8 +54,9 @@ struct TankSwap
     std::uint32_t Stacks = 0;
 };
 
-// Who a spread or avoid_enemy row applies to (a bit mask): melee damage dealers, ranged damage dealers, healers. Tanks are never moved by either row.
-constexpr std::uint8_t kWhoMelee = 1, kWhoRanged = 2, kWhoHealers = 4, kWhoAll = 7;
+// Who a spread or avoid_enemy row applies to (a bit mask): melee damage dealers, ranged damage dealers, healers; `all` is these three. `tanks` (8, not part of `all`)
+// is read only by avoid_enemy rows and only with the setting RaidAvoidEnemyTank; a spread row never moves a tank. Melee rows of avoid_enemy act only with RaidAvoidEnemyMelee.
+constexpr std::uint8_t kWhoMelee = 1, kWhoRanged = 2, kWhoHealers = 4, kWhoAll = 7, kWhoTanks = 8;
 
 struct SpreadRule
 {
