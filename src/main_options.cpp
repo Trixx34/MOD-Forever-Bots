@@ -281,6 +281,19 @@ void LoadPolicyTables(PolicyOptions& policyOptions, BotSettings& settings)
             policyOptions.TaxiPlaces = std::make_shared<std::vector<taxi::Place>>(errand::CityPlaces(errand::ParseTrainerTable(text.str(), ignored)));
         }
     }
+    policyOptions.Reputation = settings.Reputation;
+    if (settings.Reputation.Enabled)
+    {
+        std::ifstream in(settings.ReputationGoalFile);
+        std::ostringstream text;
+        text << in.rdbuf();
+        std::vector<std::string> goalWarnings;
+        policyOptions.ReputationGoals = reputation::ParseGoals(text.str(), goalWarnings);
+        for (std::string const& warning : goalWarnings)
+            std::cerr << "forever-bots: " << settings.ReputationGoalFile << ": " << warning << "\n";
+        std::cerr << "forever-bots: reputation goals: " << policyOptions.ReputationGoals.size() << " from " << settings.ReputationGoalFile
+                  << (in ? "" : " (not readable)") << "; no reputation facts from the core yet, so no visits happen (doc/reputation.md)\n";
+    }
     policyOptions.PartySize = settings.PartySize;
     policyOptions.PartyCount = settings.PartyCount;
     policyOptions.PartyPercent = settings.PartyPercent;

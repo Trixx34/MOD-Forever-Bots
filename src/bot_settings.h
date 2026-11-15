@@ -19,6 +19,7 @@
 #include "bot_ramp.h"
 #include "sell_policy.h"
 #include "supply_policy.h"
+#include "reputation.h"
 #include "lfg_queue_fill.h"
 #include "death_pause.h"
 #include "trade_ads.h"
@@ -407,6 +408,11 @@ struct BotSettings
     std::uint32_t MountReserveCopperPerLevel = 5000;
     std::string RidingTrainerFile = "data/riding_trainers.txt";
     std::string MountVendorFile = "data/mount_vendors.txt";
+    // Reputation goals (ReputationGrind = 1, off by default; keys ReputationMinLevel, ReputationTripSec, ReputationMinCopper, ReputationGoalFile): a bot picks a faction
+    // whose reputation gates equipment (data/reputation_goals.txt) and buys the reward gear at the faction's vendor when the core says one sells it something it can
+    // use now (reputation.h, doc/reputation.md). Needs the core's reputation facts and vendor buy, which do not exist yet: until then the keys change nothing.
+    reputation::Settings Reputation;
+    std::string ReputationGoalFile = "data/reputation_goals.txt";
     // Weapon skills (WeaponTraining = 1, off by default): a bot learns its class's weapon skills at its class trainer (weapon_training.h).
     bool WeaponTraining = false;
     // Fishing (Fishing = 1, off by default): a bot with a pole walks to the nearest spot of FishingSpotFile (data/fishing_spots.txt) and fishes there

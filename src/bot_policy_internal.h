@@ -194,6 +194,7 @@ bool HasLine(BotSnapshot const& bot, std::uint32_t line);
 constexpr std::uint32_t kServiceSellJunk = 1024;   // SDK 0.16: also sell white junk (trade goods, spare bags, miscellaneous items)
 constexpr std::uint32_t kServiceSellGear = 2048;   // SDK 0.28 (protocol 27): sell the bag gear the worn gear outclasses; bits 12-14 carry the gear profile
 constexpr std::uint32_t kServiceGearProfileShift = 12;
+constexpr std::uint32_t kServiceBuyReputation = 32768; // NOT IN THE SDK YET (needs a core change, doc/reputation.md): buy the best reputation-gated upgrade the vendor sells
 constexpr std::uint32_t kBagsLowSlots = 4;         // a vendor visit of a bot with this many free slots or fewer also sells the white junk
 constexpr std::uint32_t kServiceBuyAmmo = 8;     // layout 15: buy ammunition (dest_x = the count to carry), food (dest_y), drink (dest_z)
 constexpr std::uint32_t kServiceBuyFood = 16;

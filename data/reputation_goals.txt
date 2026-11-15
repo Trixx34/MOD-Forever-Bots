@@ -1,0 +1,11 @@
+# Reputation goals (tools/gen_reputation_goals.py): factions whose reputation gates equipment. One faction per line, '|' separated:
+#   faction | name | side (0 both, 1 Alliance, 2 Horde) | min level | max level | min rank | items | vendors | quests
+# min level, max level: the required levels of the faction-gated gear. min rank: the lowest reputation rank (0 Hated, 3 Neutral, 4 Friendly, 5 Honored,
+# 6 Revered, 7 Exalted) any of it asks for. items: gated pieces of gear. vendors: creatures in npc_vendor that sell any of them (0: nobody sells them yet, so a bot
+# has nothing to buy and the faction is no goal). quests: quests that reward reputation with it. PvP factions are left out (see the tool).
+21|Booty Bay|0|30|30|5|1|0|110
+910|Brood of Nozdormu|0|60|60|3|35|0|69
+2758|Nightclaw Druids|0|15|15|7|1|1|12
+2798|Darkspear Raiders|0|28|60|5|30|0|0
+2799|Theramore Expeditionary Force|0|28|60|5|30|0|0
+2819|The Watchers|0|60|60|4|16|0|0

@@ -67,6 +67,11 @@ line to the module's stderr. A config reload updates the ramp, the random picks 
 | `SupplyAmmoLow`, `SupplyAmmoTarget` | 100, 400 | A bot with fewer pieces of ammunition goes shopping, and buys up to the target |
 | `SupplyFoodLow`, `SupplyFoodTarget`, `SupplyDrinkLow`, `SupplyDrinkTarget` | 3, 10, 3, 10 | The same for food, and for drink (bots with mana) |
 | `SupplyTripSec` | 120 | A bot that needs supplies makes a trip at most this often (30 to 3600); a trip that bought nothing waits 10 minutes, doubling each time (an hour at most) |
+| `ReputationGrind` | 0 (off) | Bots pick a faction whose reputation gates equipment (`data/reputation_goals.txt`) and buy its reward gear at the faction's vendor; needs core reputation facts and a vendor buy bit that do not exist yet (`doc/reputation.md`) |
+| `ReputationMinLevel` | 10 | The level from which a bot makes a reputation goal (1 to 60) |
+| `ReputationTripSec` | 600 | The least time between two reputation vendor visits of a bot (60 to 86400); a visit that bought nothing waits 30 minutes, doubling, six hours at most |
+| `ReputationMinCopper` | 10000 | A bot with less money than this does not shop for reputation gear |
+| `ReputationGoalFile` | `data/reputation_goals.txt` | The factions that gate equipment (made by `tools/gen_reputation_goals.py`) |
 | `CorpseRunTeleportSec` | 60 | A ghost whose corpse run takes longer is put at its corpse (the teleport needs `Bot.Actions.Teleport`); the four-minute teleport is brought forward to this. 0 is off (10 to 3600); a ghost already at its corpse is left alone |
 | `DungeonPullLeashYards` | 30 | A dungeon party's route leader, out of a fight, pulls only a hostile within this many yards of the leg of the route it walks (0 is off, 10 to 80) |
 | `DungeonChaseLeashYards` | 40 | A dungeon party's bot does not walk after, or pick in a fight, a hostile farther than this from both that leg and its leader (a fled creature, the next pack); a member goes back to its leader instead (0 is off, 10 to 80) |
