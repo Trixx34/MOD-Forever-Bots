@@ -80,6 +80,13 @@ void ScenarioDirector::MarkBossKilled(std::uint32_t entry, std::string const& na
                 end.Outcome = _attemptEntry == entry ? "killed" : "aborted";
                 end.Damage = _attemptDmg.Format();
                 _attemptDmg.Clear();
+                if (_plan.DamageTelemetry)
+                {
+                    end.DamageDone = _attemptDone.Format();
+                    end.Split = run_telemetry::FormatSplit(_attemptSplit);
+                    _attemptDone.Clear();
+                    _attemptSplit = {};
+                }
                 _telemetry.push_back(run_telemetry::FormatBossAttempt({ _plan.Name, "" }, end));
                 _attemptOpen = false;
             }
@@ -273,6 +280,8 @@ void ScenarioDirector::TrackRun(forever_module::WorldTickSnapshotView const& vie
                     _attemptLastFightMs = nowMs;
                     _attemptDeaths0 = _deathEvents;
                     _attemptDmg.Clear();
+                    _attemptDone.Clear();
+                    _attemptSplit = {};
                     run_telemetry::BossAttempt start;
                     start.TS = tS;
                     start.Boss = _attemptBoss;
@@ -296,6 +305,13 @@ void ScenarioDirector::TrackRun(forever_module::WorldTickSnapshotView const& vie
                 end.Outcome = "aborted";
                 end.Damage = _attemptDmg.Format();
                 _attemptDmg.Clear();
+                if (_plan.DamageTelemetry)
+                {
+                    end.DamageDone = _attemptDone.Format();
+                    end.Split = run_telemetry::FormatSplit(_attemptSplit);
+                    _attemptDone.Clear();
+                    _attemptSplit = {};
+                }
                 _telemetry.push_back(run_telemetry::FormatBossAttempt(id, end));
                 _attemptOpen = false;
             }
@@ -405,6 +421,19 @@ void ScenarioDirector::Finish(std::string outcome, std::uint64_t nowMs)
     result.Wipes = _wipes;
     for (std::uint64_t const guid : _members)
         result.Party.emplace_back(_plan.RaceOf ? _plan.RaceOf(guid) : 0, _plan.ClassOf ? _plan.ClassOf(guid) : 0);
+    if (_plan.DamageTelemetry && _runStartMs != 0)
+    {
+        // The whole run's estimate, one line: the damage_done: line (t_s is the run length).
+        std::string const done = _runDone.Format();
+        if (!done.empty())
+        {
+            std::string scenario;
+            std::uint32_t party = 1;
+            run_telemetry::SplitName(_plan.Name, scenario, party);
+            _telemetry.push_back("damage_done: scenario=" + scenario + " party=" + std::to_string(party) + " variant= t_s=" + std::to_string(result.RunMs / 1000) + " total=" +
+                                 std::to_string(_runDone.Total()) + done);
+        }
+    }
     _result = result;
     _phase = ScenarioPhase::Done;
 }
@@ -1006,7 +1035,7 @@ void ScenarioDirector::Decide(forever_module::WorldTickSnapshotView const& view,
                 if (_stateLastMs != 0 && nowMs > _stateLastMs && nowMs - _stateLastMs <= kTimeStateMaxGapMs)
                 {
                     TimeState state = TimeState::Idle;
-                    bool fight = false, down = false, rest = false, far = false;
+                    bool fight = false, down = false, rest = false, far = false, restMana = false, bossTargeted = false;
                     for (BotSnapshot const& bot : bots)
                     {
                         if (bot.life_state != 0)
@@ -1015,8 +1044,11 @@ void ScenarioDirector::Decide(forever_module::WorldTickSnapshotView const& view,
                             continue;
                         }
                         fight = fight || bot.in_combat != 0;
-                        rest = rest || (bot.max_health > 0 && std::uint64_t(bot.health) * 100 < std::uint64_t(bot.max_health) * kTimeRestHealthPct) ||
-                               (bot.power_type == 0 && bot.max_power > 0 && std::uint64_t(bot.power) * 100 < std::uint64_t(bot.max_power) * kTimeRestPowerPct);
+                        bossTargeted = bossTargeted || (_attemptOpen && bot.threat_target_guid != 0 && forever_module::UnitRefType(bot.threat_target_guid) == 8 &&
+                                                        forever_module::UnitRefEntry(bot.threat_target_guid) == _attemptEntry);
+                        bool const lowMana = bot.power_type == 0 && bot.max_power > 0 && std::uint64_t(bot.power) * 100 < std::uint64_t(bot.max_power) * kTimeRestPowerPct;
+                        restMana = restMana || lowMana;
+                        rest = rest || (bot.max_health > 0 && std::uint64_t(bot.health) * 100 < std::uint64_t(bot.max_health) * kTimeRestHealthPct) || lowMana;
                         if (&bot != leader && leader->life_state == 0)
                         {
                             float const dx = bot.pos_x - leader->pos_x, dy = bot.pos_y - leader->pos_y;
@@ -1035,6 +1067,17 @@ void ScenarioDirector::Decide(forever_module::WorldTickSnapshotView const& view,
                         state = TimeState::Far;
                     _stateMs[std::size_t(state)] += nowMs - _stateLastMs;
                     _step = kTimeStateNames[std::size_t(state)];
+                    if (_plan.DamageTelemetry && _attemptOpen)
+                    {
+                        // The attempt's time split: the fight is the boss's or the adds' (nobody targets the boss), the rest by what the party waits for.
+                        using run_telemetry::AttemptState;
+                        AttemptState const at = state == TimeState::Fight ? (bossTargeted ? AttemptState::Boss : AttemptState::Adds)
+                                              : state == TimeState::Walk ? AttemptState::Approach
+                                              : state == TimeState::Dead ? AttemptState::Dead
+                                              : state == TimeState::Rest ? (restMana ? AttemptState::ManaRest : AttemptState::HealthRest)
+                                              : state == TimeState::Far ? AttemptState::Waiting : AttemptState::Idle;
+                        _attemptSplit[std::size_t(at)] += nowMs - _stateLastMs;
+                    }
                     std::uint64_t const dt = nowMs - _stateLastMs;
                     if (state == TimeState::Rest)
                         _window.RestMs += dt;
@@ -1044,6 +1087,26 @@ void ScenarioDirector::Decide(forever_module::WorldTickSnapshotView const& view,
                         _window.FightMs += dt;
                 }
                 _stateLastMs = nowMs;
+            }
+            // DamageTelemetry: the health the party takes off its targets, shared among the bots on each target (damage_done.h).
+            if (_plan.DamageTelemetry)
+            {
+                std::vector<damage_done::Sample> samples;
+                for (std::size_t b = 0; b < bots.size(); ++b)
+                {
+                    BotSnapshot const& bot = bots[b];
+                    if (bot.life_state != 0 || bot.threat_target_guid == 0)
+                        continue;
+                    for (forever_module::NearbyUnit const& unit : view.NearbyOf(b))
+                        if (unit.guid == bot.threat_target_guid)
+                        {
+                            if (unit.is_hostile)
+                                samples.push_back({ bot.guid, _plan.ClassOf ? _plan.ClassOf(bot.guid) : 0, unit.guid, unit.health });
+                            break;
+                        }
+                }
+                _runDone.Observe(samples, nowMs);
+                _attemptDone.Observe(samples, nowMs);
             }
             // A boss counts as killed once any bot sees its corpse (a creature of that entry with no health).
             if (!_plan.Bosses.empty())

@@ -266,6 +266,10 @@ A scenario run (dungeon or raid) writes three kinds of event lines, so a run can
 gives one warning and the file stays off). The file is opened once, written buffered and flushed every 30 s; it is never rotated, so point it at a folder you clean.
 (`TelemetryFile` is the bots' CSV, a different file.)
 
+With `Module.forever-bots.DamageTelemetry = 1` (default 0; on in the sim) a `boss_attempt` end line also carries `dmg_done_by_class=cls:dmg:bots,...`, `dmg_done_by_bot=bot:cls:dmg,...` and
+`split_s=approach:..,boss:..,adds:..,waiting:..,mana_rest:..,hp_rest:..,dead:..,idle:..` (seconds), and the run ends with a `damage_done:` line. Damage is an estimate: the drop in the
+target's health, shared among the bots on it (the core has no damage-done hook).
+
 All lines start with `scenario=<name> party=<n> variant= t_s=<seconds since the party's run start>`. `variant` is reserved for a later strategy variant and is empty today.
 Fields come in a fixed order; new fields are only added at the end.
 

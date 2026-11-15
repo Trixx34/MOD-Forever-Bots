@@ -547,6 +547,10 @@ Module.forever-bots.TelemetrySummarySec = 60
 # Run telemetry of a scenario run (doc/dungeon-strategy.md, "Telemetry"): the party_tl:, party_stalled: and boss_attempt: lines, with an ISO time in front, are appended to
 # <dir>/run-telemetry.log (read it with tools/run_telemetry.py). An absolute directory path; empty (default) = off. The lines are in the journal in any case.
 # Module.forever-bots.RunTelemetryDir = /var/log/forever/sim
+# Damage telemetry of a scenario run (1 = on, default 0; the sim sets 1): the boss_attempt: end lines carry dmg_done_by_class= (class:damage:bots) and dmg_done_by_bot= (bot:class:damage), an estimate
+# of the health the party took off its targets (shared equally among the bots on one target), and split_s= (seconds of the attempt in approach, boss, adds, waiting, mana_rest, hp_rest, dead, idle);
+# a damage_done: line closes the run. Journal lines only.
+# Module.forever-bots.DamageTelemetry = 0
 # Dungeon = rfc
 # ScenarioRequireBosses = 1                      # complete when every boss of ScenarioBosses is seen dead (the dungeon file turns it on when it lists bosses)
 

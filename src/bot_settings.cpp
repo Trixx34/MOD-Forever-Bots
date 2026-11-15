@@ -1081,6 +1081,7 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
         else
             warnings.push_back("Module.forever-bots.RunTelemetryDir: '" + it->second + "' is not an absolute path; the run telemetry file stays off.");
     }
+    ReadBool(config, "DamageTelemetry", settings.DamageTelemetry, warnings);
     if (auto const it = config.find("DungeonEventsFile"); it != config.end())
         settings.DungeonEventsFile = it->second;
     ReadBool(config, "Presence", settings.Presence.Enabled, warnings);

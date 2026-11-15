@@ -23,6 +23,7 @@ void main_detail::PumpTier2(forever_module::Tier2Session& session, std::atomic<b
         for (std::uint32_t k = 0; k < std::max<std::uint32_t>(1, extras.Scenarios[d].Parties); ++k)
         {
             ScenarioPlan plan = extras.Scenarios[d].Plan;
+            plan.DamageTelemetry = settings.DamageTelemetry;
             if (scenarioParties > 1)
                 plan.Name += "#" + std::to_string(k + 1);
             directorNames.push_back(plan.Name);

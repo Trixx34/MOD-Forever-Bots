@@ -254,6 +254,51 @@ void DirectorBossAttempt()
     }
 }
 
+void DirectorDamageDoneAndTimeSplit()
+{
+    // DamageTelemetry on: the attempt's end line has the estimated damage done and the time split; off (the default) it has neither.
+    for (bool const on : { true, false })
+    {
+        std::uint64_t t, tick;
+        std::vector<BotSnapshot> bots;
+        ScenarioPlan plan = LongPlan();
+        plan.DamageTelemetry = on;
+        ScenarioDirector director = RunningDirector(t, tick, bots, plan);
+        std::vector<BotAction> actions;
+        std::vector<std::string> all;
+        director.Decide(View(++tick, bots), t += 5000, actions);
+        auto const fight = [&](std::uint32_t bossHealth, bool combat)
+        {
+            bots[1].in_combat = combat;
+            bots[1].threat_target_guid = forever_module::MakeUnitRef(8, 644, 5);
+            WorldTickSnapshotView view = View(++tick, bots);
+            view.bots[1].nearby_count = 1;
+            view.nearby[1].guid = forever_module::MakeUnitRef(8, 644, 5);
+            view.nearby[1].health = bossHealth;
+            view.nearby[1].max_health = 1000;
+            view.nearby[1].is_hostile = true;
+            director.Decide(view, t += 5000, actions);
+        };
+        fight(900, true);
+        fight(500, true);
+        fight(300, true);
+        fight(0, false);
+        auto const attempts = Lines(director, "boss_attempt", all);
+        CHECK(attempts.size() == 2);
+        if (attempts.size() == 2)
+        {
+            CHECK(Has(attempts[1], "dmg_done_by_bot=") == on);
+            CHECK(Has(attempts[1], " split_s=approach:") == on);
+            if (on)
+                CHECK(Has(attempts[1], "dmg_done_by_bot=" + std::to_string(bots[1].guid) + ":5:900") && Has(attempts[1], ",boss:"));
+        }
+        bool done = false;
+        for (std::string const& line : all)
+            done = done || Has(line, "damage_done: ");
+        CHECK(!done); // the run line comes at the end of the run, not here
+    }
+}
+
 void DirectorDamageAggregates()
 {
     std::uint64_t t, tick;
@@ -346,6 +391,7 @@ int main()
     DirectorBossAttempt();
     DirectorBossAbort();
     DirectorDamageAggregates();
+    DirectorDamageDoneAndTimeSplit();
     if (failures == 0)
         std::printf("run_telemetry_test: all checks passed\n");
     return failures == 0 ? 0 : 1;

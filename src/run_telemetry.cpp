@@ -119,7 +119,16 @@ std::string FormatStall(PartyId const& id, Stall const& s)
 std::string FormatBossAttempt(PartyId const& id, BossAttempt const& b)
 {
     return Head("boss_attempt", id, b.TS) + " boss=" + Word(b.Boss) + " stage=" + (b.End ? "end" : "start") + " dur_s=" + std::to_string(b.DurS) +
-           " deaths=" + std::to_string(b.Deaths) + " outcome=" + b.Outcome + b.Damage;
+           " deaths=" + std::to_string(b.Deaths) + " outcome=" + b.Outcome + b.Damage + b.DamageDone + b.Split;
+}
+
+std::string FormatSplit(AttemptSplit const& ms)
+{
+    static constexpr char const* kNames[] = { "approach", "boss", "adds", "waiting", "mana_rest", "hp_rest", "dead", "idle" };
+    std::string out = " split_s=";
+    for (std::size_t i = 0; i < ms.size(); ++i)
+        out += (i ? "," : "") + std::string(kNames[i]) + ":" + std::to_string(ms[i] / 1000);
+    return out;
 }
 
 std::string FormatResultFields(std::uint32_t stalls, std::string const& lastCause, std::uint64_t lastTS)
