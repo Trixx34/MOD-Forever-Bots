@@ -155,7 +155,7 @@ void ALeaderAtTheEntranceGoesToAFightingPartyAfterAWhile()
 }
 
 // The Stockade's revived tank (2026-10-28 sim: 31 of 96 tank deaths came within 120 s of the same tank's last one, 24 of 60 leader_recover teleports ended in its death):
-// a leader revived at the entrance at half health rests there until it is fit to walk (80 %), at most two minutes, and the members deep in the dungeon do not walk back to it.
+// a leader revived at the entrance at half health rests there until it is fit to walk (70 %), at most two minutes, and the members deep in the dungeon do not walk back to it.
 void ARevivedLeaderRestsAtTheEntranceBeforeItGoesToItsParty()
 {
     PolicyOptions options = AggressiveOptions();
@@ -211,10 +211,10 @@ void ARevivedLeaderRestsAtTheEntranceBeforeItGoesToItsParty()
     CHECK(!TeleportOf(fiftyNine.Decide(hurtLeaderView(599), 1000), 12).has_value());
     BotPolicy fighting(options);
     fighting.SetRouteActive(true);
-    WorldTickSnapshotView busyParty = hurtLeaderView(700);
+    WorldTickSnapshotView busyParty = hurtLeaderView(650);                // below kRouteMinHealthPct (70 %)
     busyParty.bots[3].in_combat = 1;                                  // a member deep in the dungeon fights
     CHECK(!TeleportOf(fighting.Decide(busyParty, 1000), 12).has_value());
-    // Fit (80 % or more): at once, as before.
+    // Fit (70 % or more, kRouteMinHealthPct): at once, as before.
     BotPolicy fit(options);
     fit.SetRouteActive(true);
     std::optional<BotAction> now = TeleportOf(fit.Decide(hurtLeaderView(850), 1000), 12);

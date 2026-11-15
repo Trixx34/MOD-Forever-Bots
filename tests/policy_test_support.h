@@ -579,7 +579,7 @@ inline BotPolicy DungeonPolicy(std::function<std::uint32_t(std::uint64_t)> class
 }
 
 
-// The tank's own health (below kTankRestPct, 80 %) holds its pulls on its own clock, past the party hold's 45 s cap and up to kPullHoldAbsMaxMs (180 s), and the
+// The tank's own health (below kTankRestPct, 65 %) holds its pulls on its own clock, past the party hold's 45 s cap and up to kPullHoldAbsMaxMs (90 s), and the
 // pull comes once its health is back. Run 5 of 2026-11-08: the tank, revived at 49 %, pulled a Warder in the second it came back, 47 deaths in the hour.
 
 
@@ -732,6 +732,8 @@ inline PolicyOptions DeadOptions(std::vector<std::string>* events, std::function
     options.PortalMap = 0;
     options.PortalPoint = { 500.0f, 0.0f, 0.0f };
     options.PortalInsideMap = 36;
+    options.CorpseRunTeleportMs = 60000;   // the dead tests keep the old timings (60 s corpse run, 45 s spirit healer); the new defaults (30 s, 15 s) are pinned in settings_test
+    options.SpiritHealerAfterMs = 45000;
     if (events)
         options.OnEvent = [events](std::string const& text) { events->push_back(text); };
     return options;

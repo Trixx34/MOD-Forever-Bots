@@ -14,6 +14,7 @@ namespace
 
 // Tuning values only this file uses (moved from scenario.h; the ones the tests also name stay in the header).
 constexpr char const* kTimeStateNames[] = { "fight", "walk", "dead", "rest", "far", "idle" };
+constexpr char const* kHoldNames[] = { "health", "mana", "far", "dead" };
 constexpr std::uint32_t kOnyxiaBossEntry = 10184; // Onyxia, the Onyxia raid's last boss (bot_policy_internal.h): her health is the result's onyxia_hp=
 constexpr std::uint32_t kTimeRestHealthPct = 90;
 constexpr std::uint32_t kTimeRestPowerPct = 95;
@@ -78,6 +79,8 @@ void ScenarioDirector::MarkBossKilled(std::uint32_t entry, std::string const& na
                 end.DurS = nowMs >= _attemptStartMs ? (nowMs - _attemptStartMs) / 1000 : 0;
                 end.Deaths = _deathEvents - _attemptDeaths0;
                 end.Outcome = _attemptEntry == entry ? "killed" : "aborted";
+                if (_attemptEntry == entry)
+                    _bossCleanMs += end.DurS * 1000;
                 end.Damage = _attemptDmg.Format();
                 _attemptDmg.Clear();
                 _telemetry.push_back(run_telemetry::FormatBossAttempt({ _plan.Name, "" }, end));
@@ -394,6 +397,10 @@ void ScenarioDirector::Finish(std::string outcome, std::uint64_t nowMs)
     result.BossKillMs = _bossKillMs;
     result.OnyxiaHealthPct = _onyxiaHealthPct;
     result.StateMs = _stateMs;
+    result.FightTargetMs = _fightTargetMs;
+    result.FightWaitMs = _fightWaitMs;
+    result.BossCleanMs = _bossCleanMs;
+    result.HoldMs = _holdMs;
     result.Stalled = _stall.Count();
     result.LastStallCause = _lastStallCause;
     result.LastStallS = _lastStallS;
@@ -1006,7 +1013,7 @@ void ScenarioDirector::Decide(forever_module::WorldTickSnapshotView const& view,
                 if (_stateLastMs != 0 && nowMs > _stateLastMs && nowMs - _stateLastMs <= kTimeStateMaxGapMs)
                 {
                     TimeState state = TimeState::Idle;
-                    bool fight = false, down = false, rest = false, far = false;
+                    bool fight = false, down = false, rest = false, far = false, fightTarget = false, restHealth = false;
                     for (BotSnapshot const& bot : bots)
                     {
                         if (bot.life_state != 0)
@@ -1015,6 +1022,8 @@ void ScenarioDirector::Decide(forever_module::WorldTickSnapshotView const& view,
                             continue;
                         }
                         fight = fight || bot.in_combat != 0;
+                        fightTarget = fightTarget || (bot.in_combat != 0 && bot.threat_target_guid != 0);
+                        restHealth = restHealth || (bot.max_health > 0 && std::uint64_t(bot.health) * 100 < std::uint64_t(bot.max_health) * kTimeRestHealthPct);
                         rest = rest || (bot.max_health > 0 && std::uint64_t(bot.health) * 100 < std::uint64_t(bot.max_health) * kTimeRestHealthPct) ||
                                (bot.power_type == 0 && bot.max_power > 0 && std::uint64_t(bot.power) * 100 < std::uint64_t(bot.max_power) * kTimeRestPowerPct);
                         if (&bot != leader && leader->life_state == 0)
@@ -1042,6 +1051,14 @@ void ScenarioDirector::Decide(forever_module::WorldTickSnapshotView const& view,
                         _window.DeadMs += dt;
                     else if (state == TimeState::Fight)
                         _window.FightMs += dt;
+                    if (state == TimeState::Fight)
+                        (fightTarget ? _fightTargetMs : _fightWaitMs) += dt;
+                    else if (state == TimeState::Rest)
+                        _holdMs[restHealth ? 0 : 1] += dt;
+                    else if (state == TimeState::Far)
+                        _holdMs[2] += dt;
+                    else if (state == TimeState::Dead)
+                        _holdMs[3] += dt;
                 }
                 _stateLastMs = nowMs;
             }
@@ -1209,6 +1226,12 @@ std::string FormatScenarioResult(ScenarioResult const& result)
             out << " time_s=";
             for (std::size_t i = 0; i < result.StateMs.size(); ++i)
                 out << (i ? "," : "") << kTimeStateNames[i] << ":" << result.StateMs[i] / 1000;
+            // Honest-result fields (time quick win 1), after time_s= and before bosses=/killed= so the parsers that read killed= to the end of the head still work.
+            out << " fight_target_s=" << result.FightTargetMs / 1000 << " fight_wait_s=" << result.FightWaitMs / 1000 << " boss_clean_s=" << result.BossCleanMs / 1000
+                << " hold_s=";
+            for (std::size_t i = 0; i < result.HoldMs.size(); ++i)
+                out << (i ? "," : "") << kHoldNames[i] << ":" << result.HoldMs[i] / 1000;
+            out << " deaths_total=" << result.DeathEvents;
         }
     }
     if (std::string const stall = run_telemetry::FormatResultFields(result.Stalled, result.LastStallCause, result.LastStallS); !stall.empty())

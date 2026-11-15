@@ -358,7 +358,7 @@ constexpr std::uint64_t kCcRefreshBeforeMs = 3000;
 constexpr float kHealerFetchYards = 45.0f;       // a leader below kRouteMinHealthPct whose nearest healer is farther than this (2D) walks back to it after kHealerFetchAfterMs
 constexpr std::uint64_t kHealerFetchAfterMs = 45000;  // 2026-11-12 sim: parties stood 10 minutes in route_hold why=health with the healer 200 to 350 yards behind, nobody to heal the leader
 constexpr float kRouteWaitYards = 30.0f;         // the leader waits for a member farther behind than this
-constexpr std::uint32_t kRouteMinHealthPct = 80; // and for its own health to be at least this
+constexpr std::uint32_t kRouteMinHealthPct = 70; // and for its own health to be at least this
 constexpr std::uint32_t kRouteMinManaPct = 70;   // the leader walks on only when every mana user of the party has at least this much mana (the healer walked into fights at 3%)
 constexpr std::uint64_t kRouteManaAbsMaxMs = 180000; // 0.44.14: the wait is cut off here even while mana still rises (a full priest needs about 90 s of drinking from 3%)
 constexpr std::uint64_t kRouteManaMaxMs = 35000;  // and never waits longer than this for mana (no drink left, or a member that cannot sit)
@@ -376,14 +376,15 @@ constexpr std::uint32_t kPartyReadySitHealthPct = 95; // a sitting member rests 
 constexpr std::uint64_t kPullHoldClearMs = 10000;  // the party must be ready this long in a row before a pull hold ends
 constexpr std::uint32_t kRecoveryRisePct = 8;        // a rise counts as recovery when it is this much of the summed maximum within kRecoveryWindowMs (drinking gives about 14 % in 10 s, plain regeneration about 3 %)
 constexpr std::uint64_t kRecoveryWindowMs = 10000;
-constexpr std::uint64_t kPullHoldAbsMaxMs = 180000;  // 0.44.14: the hold is cut off here even while the party still recovers (the 45 s cap below counts from the last rise)
+constexpr std::uint64_t kPullHoldAbsMaxMs = 90000;   // 0.44.14: the hold is cut off here even while the party still recovers (the 45 s cap below counts from the last rise)
 constexpr std::uint64_t kPullPosWalkMs = 30000;     // the tank gives up walking to a raid rules pull position after this long and pulls from where it is
 constexpr std::uint64_t kPullPosHoldMs = 15000;     // after the pull landed the tank holds at the pull position this long for the pack to come to it
 constexpr std::uint64_t kPullSingleHoldMaxMs = 60000;  // RaidPullSingle: the route leader holds its walk for a pair of a `pull_single` entry this long at most, then goes on as before
 constexpr float kPullSingleApproachYards = 20.0f;      // RaidPullSingle: a pair counts as near while one of the two is within the row's yards plus this of the leader
 constexpr std::uint64_t kPullSingleLogMs = 10000;
+constexpr std::uint64_t kHoldBudgetMaxGapMs = 5000;  // a gap between two ticks longer than this does not count against the hold budget
 constexpr std::uint64_t kPullHoldMaxMs = 45000;     // the party never waits longer than this for itself
-constexpr std::uint32_t kTankRestPct = 80;          // a dungeon party leader (the tank) below this health pulls nothing until it is back above, up to kPullHoldAbsMaxMs
+constexpr std::uint32_t kTankRestPct = 65;          // a dungeon party leader (the tank) below this health pulls nothing until it is back above, up to kPullHoldAbsMaxMs
 
 
 // Recovery tracking for the mana and pull waits: true when the summed resource `sum` (of `alive` living members, `maxSum` at most) has risen by

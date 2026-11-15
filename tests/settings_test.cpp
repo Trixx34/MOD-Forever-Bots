@@ -48,13 +48,25 @@ void ReadsValidValues()
     CHECK(warnings.empty());
 }
 
+// PullHoldBudgetSec: 600 by default, 0 turns the budget off, 30..86400 otherwise (a value below keeps the default, with a warning).
+void PullHoldBudgetSettings()
+{
+    std::vector<std::string> warnings;
+    CHECK(ParseBotSettings({}, warnings).PullHoldBudgetSec == 600);
+    CHECK(ParseBotSettings({ { "PullHoldBudgetSec", "0" } }, warnings).PullHoldBudgetSec == 0);
+    CHECK(ParseBotSettings({ { "PullHoldBudgetSec", "300" } }, warnings).PullHoldBudgetSec == 300);
+    CHECK(warnings.empty());
+    CHECK(ParseBotSettings({ { "PullHoldBudgetSec", "5" } }, warnings).PullHoldBudgetSec == 600);
+    CHECK(warnings.size() == 1);
+}
+
 void ChatSettings()
 {
     std::vector<std::string> warnings;
     CHECK(ParseBotSettings({}, warnings).VendorSellGear && !ParseBotSettings({ { "VendorSellGear", "0" } }, warnings).VendorSellGear); // on by default
-    // Protocol 28: the spirit healer rules (45 s, on a repeated killer) are on, the heal downrank is off
+    // Protocol 28: the spirit healer rules (15 s, on a repeated killer) are on, the heal downrank is off
     BotSettings const spiritDefault = ParseBotSettings({}, warnings);
-    CHECK(spiritDefault.SpiritHealerAfterMs == 45000 && spiritDefault.SpiritHealerOnRepeat && !spiritDefault.HealDownrank);
+    CHECK(spiritDefault.SpiritHealerAfterMs == 15000 && spiritDefault.SpiritHealerOnRepeat && !spiritDefault.HealDownrank);
     BotSettings const spiritSet = ParseBotSettings({ { "SpiritHealerAfterMs", "0" }, { "SpiritHealerOnRepeat", "0" }, { "HealDownrank", "1" } }, warnings);
     CHECK(spiritDefault.HealPlan && spiritDefault.HealPlanPreHealMs == 4000 && spiritDefault.HealPlanPreHealPct == 96);
     BotSettings const healPlanSet = ParseBotSettings({ { "HealPlan", "0" }, { "HealPlanPreHealMs", "0" }, { "HealPlanPreHealPct", "90" } }, warnings);
@@ -644,15 +656,15 @@ void ErrandSettings()
     CHECK(warnings.size() == 2);
 }
 
-// CorpseRunTeleportSec: 60 by default, 0 turns it off, 10..3600 otherwise (a value below keeps the default, with a warning).
+// CorpseRunTeleportSec: 30 by default, 0 turns it off, 10..3600 otherwise (a value below keeps the default, with a warning).
 void CorpseRunTeleportSettings()
 {
     std::vector<std::string> warnings;
-    CHECK(ParseBotSettings({}, warnings).CorpseRunTeleportSec == 60);
+    CHECK(ParseBotSettings({}, warnings).CorpseRunTeleportSec == 30);
     CHECK(ParseBotSettings({ { "CorpseRunTeleportSec", "0" } }, warnings).CorpseRunTeleportSec == 0);
     CHECK(ParseBotSettings({ { "CorpseRunTeleportSec", "120" } }, warnings).CorpseRunTeleportSec == 120);
     CHECK(warnings.empty());
-    CHECK(ParseBotSettings({ { "CorpseRunTeleportSec", "5" } }, warnings).CorpseRunTeleportSec == 60);
+    CHECK(ParseBotSettings({ { "CorpseRunTeleportSec", "5" } }, warnings).CorpseRunTeleportSec == 30);
     CHECK(warnings.size() == 1);
 }
 
@@ -831,6 +843,7 @@ int main()
     ScenarioGearFileSetting();
     RealismSettings();
     CorpseRunTeleportSettings();
+    PullHoldBudgetSettings();
     GhostTeleportHoldSettings();
     ZgLeverSettings();
     RaidBossPositionsSetting();

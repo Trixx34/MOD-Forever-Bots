@@ -437,7 +437,7 @@ struct PolicyOptions
     std::uint64_t ReleaseCombatHoldMs = 60000;  // and a release is held back while the party fights, but never longer than this after death
     std::uint64_t CorpseRunTimeoutMs = 240000;  // a ghost that has not reached its corpse by then gives up
     // A corpse run that takes longer than this (config CorpseRunTeleportSec, 0 = off) puts the ghost at its corpse (the CorpseRunTimeoutMs teleport, brought forward).
-    std::uint64_t CorpseRunTeleportMs = 60000;
+    std::uint64_t CorpseRunTeleportMs = 30000;
     // At most this many ghost teleports (corpse, entrance, leader) a second for the whole policy; 0 = no limit. Config GhostTeleportPerSecond.
     std::uint32_t GhostTeleportPerSecond = 2;
     // Ghost teleport hold (config GhostTeleportHold, GhostTeleportHoldMaxMs, DeathLockoutCount, DeathLockoutWindowMs, DeathLockoutHoldMs): the entrance and party teleports of a
@@ -477,7 +477,9 @@ struct PolicyOptions
     // Protocol 28 (config SpiritHealerAfterMs, SpiritHealerOnRepeat): a ghost at its corpse with a live hostile within 30 yards takes the spirit healer (kResurrect spell_id 2)
     // after the hostile has stood there SpiritHealerAfterMs (0 = never for that reason), or at once when it is the second death to the same creature entry within five minutes
     // (SpiritHealerOnRepeat). Needs Bot.Actions.SpiritHealer in the core (the core refuses it otherwise and the old hold and reclaim go on).
-    std::uint64_t SpiritHealerAfterMs = 45000;
+    std::uint64_t SpiritHealerAfterMs = 15000;
+    // Time quick win 4 (config PullHoldBudgetSec): the most a dungeon leader's pull holds (party not ready, tank rest) may hold in one run, ms; 0 = no budget.
+    std::uint64_t PullHoldBudgetMs = 600000;
     bool SpiritHealerOnRepeat = true;
     // Leveling deaths (prod 2026-11-14: 7441 deaths against 25 level-ups in 200k telemetry lines, 56 of 150 online bots ghosts).
     // IdleEnemyAttackersOnly (default on): a bot that starts no fight of its own (noSelfPull) is kept from idling, walking to a grind spot or an errand only by a creature
@@ -1028,6 +1030,9 @@ private:
         std::uint64_t HoldProgressMs = 0;                // 0.44.14: the last tick the party's health plus mana rose during the hold (the kPullHoldMaxMs cap counts from here)
         std::uint64_t HoldBaseSum = 0, HoldBaseMs = 0;   // RecoveryProgress baseline of the hold (0 = none yet; cleared when the party is ready)
         std::uint32_t HoldBaseAlive = 0;
+        std::uint64_t HoldBudgetUsedMs = 0;              // PullHoldBudgetSec: the time the pull holds have held this run so far (reset while the route is off)
+        std::uint64_t HoldBudgetLastMs = 0;              // the last tick a hold counted against the budget (0 = not holding)
+        bool HoldBudgetLogged = false;                   // hold_budget_spent was logged for this run
         std::uint64_t HoldSinceMs = 0;                   // the party leader waits for the party to be ready since this time (0 = not waiting)
         std::uint64_t RegroupSinceMs = 0;                // the party leader's regroup started at this time (a member dead or out of range; 0 = none)
         std::map<std::uint64_t, std::uint64_t> RegroupFarSinceMs; // member guid -> the time it was first out of range (cleared once it is back or dead)

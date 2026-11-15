@@ -885,6 +885,10 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
         settings.Repair.LowCopperPerLevel = lowCopper;
     }
     ReadKey(config, "SpiritHealerAfterMs", 0, 3600000, settings.SpiritHealerAfterMs, warnings);
+    if (auto const budget = config.find("PullHoldBudgetSec"); budget != config.end() && budget->second == "0")
+        settings.PullHoldBudgetSec = 0; // explicitly off: the holds have no total
+    else
+        ReadKey(config, "PullHoldBudgetSec", 30, 86400, settings.PullHoldBudgetSec, warnings);
     ReadBool(config, "SpiritHealerOnRepeat", settings.SpiritHealerOnRepeat, warnings);
     ReadBool(config, "HealDownrank", settings.HealDownrank, warnings);
     ReadBool(config, "IdleEnemyAttackersOnly", settings.IdleEnemyAttackersOnly, warnings);

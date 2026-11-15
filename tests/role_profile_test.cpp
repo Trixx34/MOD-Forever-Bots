@@ -36,11 +36,14 @@ int main()
     CHECK(StyleOf(2, PlayedRole::Tank) == Style::Tank);       // protection paladin
     CHECK(StyleOf(11, PlayedRole::Tank) == Style::Tank);      // bear druid
     CHECK(StyleOf(8, PlayedRole::Healer) == Style::Healer);
-    // Every profile equals the old constants (kDungeonDrinkBelowPct 50, kDungeonDrinkUpToPct 95, kRouteMinManaPct 70, kPartyReadyPowerPct 85, kPartyReadyHealthPct 90)
+    // Drink and route marks are the old constants for every style; the tank and the healer keep the old ready marks (power 85, health 90), the damage styles
+    // are readier at 70 % mana and 80 % health (time quick win 3).
     for (Style s : { Style::Tank, Style::Healer, Style::MeleeDps, Style::RangedDps, Style::CasterDps })
     {
         Profile const p = ProfileOf(s);
-        CHECK(p.DrinkBelowPct == 50 && p.DrinkUpToPct == 95 && p.RouteMinManaPct == 70 && p.ReadyPowerPct == 85 && p.ReadyHealthPct == 90);
+        CHECK(p.DrinkBelowPct == 50 && p.DrinkUpToPct == 95 && p.RouteMinManaPct == 70);
+        bool const dps = s == Style::MeleeDps || s == Style::RangedDps || s == Style::CasterDps;
+        CHECK(p.ReadyPowerPct == (dps ? 70u : 85u) && p.ReadyHealthPct == (dps ? 80u : 90u));
     }
     if (failures == 0)
         std::puts("role_profile_test: all passed");

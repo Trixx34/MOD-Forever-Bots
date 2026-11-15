@@ -130,6 +130,28 @@ void BotPolicy::TurnQuestsAndHold(DecideTick& tick, BotTurn& turn)
     auto& dungeonHold = turn.dungeonHold;
     turn.tankHeadStart = false;
     auto& tankHeadStart = turn.tankHeadStart;
+    // Time quick win 4: a hold is one episode out of combat. The leader's fight ends it (before, HoldSinceMs and TankRestSinceMs lived on across the fights: after
+    // the first 180 s cap the next hold never started again until the party was ready for 10 s, and `pull hold ended` logged waited_ms up to 1490 s). The budget
+    // of the run (PullHoldBudgetSec) is kept while the route is on and reset with it.
+    if (!routeOn)
+    {
+        state.HoldBudgetUsedMs = 0;
+        state.HoldBudgetLastMs = 0;
+        state.HoldBudgetLogged = false;
+    }
+    else if (partyLeaderBot && bot.in_combat != 0)
+    {
+        if (state.HoldSinceMs != 0)
+        {
+            if (_options.OnEvent)
+                _options.OnEvent("pull hold ended: leader=" + std::to_string(bot.guid) + " waited_ms=" +
+                                 std::to_string(state.HoldLastNotReadyMs > state.HoldSinceMs ? state.HoldLastNotReadyMs - state.HoldSinceMs : 0) + " by=fight");
+            state.HoldSinceMs = 0;
+            state.HoldBaseMs = 0;
+        }
+        state.TankRestSinceMs = 0;
+        state.HoldBudgetLastMs = 0;
+    }
     if (routeOn && partyLeader != 0 && bot.in_combat == 0)
     {
         if (partyLeaderBot)
@@ -289,6 +311,24 @@ void BotPolicy::TurnQuestsAndHold(DecideTick& tick, BotTurn& turn)
             }
             else
                 state.TankRestSinceMs = 0;
+            // The run's hold budget (PullHoldBudgetSec, 0 = none): the time the pull holds (party and tank rest) really held counts against it; once it is used up
+            // the leader pulls on whatever the party's state.
+            if (dungeonHold && _options.PullHoldBudgetMs != 0)
+            {
+                if (state.HoldBudgetLastMs != 0 && nowMs > state.HoldBudgetLastMs && nowMs - state.HoldBudgetLastMs <= kHoldBudgetMaxGapMs)
+                    state.HoldBudgetUsedMs += nowMs - state.HoldBudgetLastMs;
+                state.HoldBudgetLastMs = nowMs;
+                if (state.HoldBudgetUsedMs >= _options.PullHoldBudgetMs)
+                {
+                    dungeonHold = false;
+                    if (!state.HoldBudgetLogged && _options.OnEvent)
+                        _options.OnEvent("hold_budget_spent: leader=" + std::to_string(bot.guid) + " used_ms=" + std::to_string(state.HoldBudgetUsedMs) + " budget_ms=" +
+                                         std::to_string(_options.PullHoldBudgetMs));
+                    state.HoldBudgetLogged = true;
+                }
+            }
+            else
+                state.HoldBudgetLastMs = 0;
         }
         else
         {
