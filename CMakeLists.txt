@@ -328,6 +328,9 @@ add_test(NAME party_planner COMMAND party_planner_test)
 add_executable(heal_plan_test tests/heal_plan_test.cpp)
 target_link_libraries(heal_plan_test PRIVATE forever_bots_policy)
 add_test(NAME heal_plan COMMAND heal_plan_test)
+add_executable(heal_spell_test tests/heal_spell_test.cpp)
+target_link_libraries(heal_spell_test PRIVATE forever_bots_policy)
+add_test(NAME heal_spell COMMAND heal_spell_test)
 
 # Layout 25: the party view and the telegraphs read from a crafted snapshot through the SDK's view helpers and the planner adapter.
 add_executable(party_view_test tests/party_view_test.cpp)

@@ -82,6 +82,7 @@ void PolicyFromSettings(PolicyOptions& policyOptions, BotSettings& settings)
     policyOptions.TankLooseChaseYards = settings.TankLooseChaseYards;
     policyOptions.PullTankFirst = settings.PullTankFirst;
     policyOptions.HealWaitTankHold = settings.HealWaitTankHold;
+    policyOptions.HealSpellMix = settings.HealSpellMix;
     policyOptions.PullTankHoldMs = settings.PullTankHoldMs;
     policyOptions.PullMemberRangeYards = settings.PullMemberRangeYards;
     policyOptions.PullMinHpPct = settings.PullMinHpPct;

@@ -33,6 +33,7 @@
 #include "damage_events.h"
 #include "party_planner.h"
 #include "heal_plan.h"
+#include "heal_spell.h"
 #include "party_view_adapter.h"
 #include "transport_ride.h"
 #include "role_profile.h"
@@ -347,6 +348,8 @@ struct PolicyOptions
     // threat_top_ref, else its victim_ref, is not the tank). A heal then only puts the healer on the pack's threat list (ZG 2026-11-13: tank_loose reason=healer
     // 5 s after the pull). A target that is not in view counts as held. 0 = off here (the tests); the module's settings turn it on.
     bool HealWaitTankHold = false;
+    // HealSpellMix (config, default off): the healer's spell is chosen by heal_spell::Choose (missing health, incoming damage, tank or not, mana, rank) instead of the one spell per class.
+    bool HealSpellMix = false;
     std::uint64_t PullTankHoldMs = 12000;
     std::uint32_t PullMemberRangeYards = 12;
     // PullMinHpPct: a member of a route party below this health percent, not in combat, starts no fight and does not walk to the leader's fight; it stands and rests (at most
@@ -722,6 +725,8 @@ private:
         std::uint64_t PullReadyLogMs = 0;
         std::uint32_t WipeEpochSeen = 0;                 // the last wipe-recovery rewind this leader applied
         std::uint64_t PullHoldLogMs = 0;                 // last pull_hold event (at most one per 10 s)
+        struct HealSeen { std::uint32_t Health = 0; std::uint64_t AtMs = 0; std::uint32_t PerSec = 0; };
+        std::unordered_map<std::uint64_t, HealSeen> HealSeenOf;   // HealSpellMix: target guid -> its health when last looked at and the damage per second it took since
         std::uint64_t HealHoldLogMs = 0;                 // last heal_hold event (HealWaitTankHold, at most one per 10 s)
         std::uint64_t ThreatGraceUntilMs = 0;            // a hold that ran out its maximum: no new hold until then
         std::uint64_t ThreatDropAtMs = 0;                // a threat-drop ability may be tried again at this time

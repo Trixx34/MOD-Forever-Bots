@@ -7,7 +7,7 @@
 namespace heal_ranks
 {
 struct Rank { std::uint32_t Chain; std::uint32_t Spell; std::uint32_t Level; std::uint32_t Mana; std::uint32_t Amount; };
-enum : std::uint32_t { kChainLesserHeal = 0, kChainHeal = 1, kChainHolyLight = 2, kChainHealingWave = 3, kChainHealingTouch = 4 };
+enum : std::uint32_t { kChainLesserHeal = 0, kChainHeal = 1, kChainHolyLight = 2, kChainHealingWave = 3, kChainHealingTouch = 4, kChainFlashHeal = 5, kChainGreaterHeal = 6, kChainFlashOfLight = 7, kChainLesserHealingWave = 8, kChainChainHeal = 9, kChainRegrowth = 10 };
 inline constexpr Rank kRanks[] = {
     { kChainLesserHeal, 2050, 1, 30, 52 },   // Lesser Heal
     { kChainLesserHeal, 2052, 4, 45, 79 },   // Lesser Heal
@@ -46,5 +46,41 @@ inline constexpr Rank kRanks[] = {
     { kChainHealingTouch, 9888, 50, 630, 1517 },   // Healing Touch
     { kChainHealingTouch, 9889, 56, 755, 1921 },   // Healing Touch
     { kChainHealingTouch, 25297, 60, 840, 2333 },   // Healing Touch
+    { kChainFlashHeal, 2061, 20, 125, 195 },   // Flash Heal
+    { kChainFlashHeal, 9472, 26, 155, 250 },   // Flash Heal
+    { kChainFlashHeal, 9473, 32, 185, 313 },   // Flash Heal
+    { kChainFlashHeal, 9474, 38, 215, 384 },   // Flash Heal
+    { kChainFlashHeal, 10915, 44, 265, 508 },   // Flash Heal
+    { kChainFlashHeal, 10916, 50, 315, 645 },   // Flash Heal
+    { kChainFlashHeal, 10917, 56, 380, 826 },   // Flash Heal
+    { kChainGreaterHeal, 2060, 40, 370, 845 },   // Greater Heal
+    { kChainGreaterHeal, 10963, 46, 455, 1100 },   // Greater Heal
+    { kChainGreaterHeal, 10964, 52, 545, 1404 },   // Greater Heal
+    { kChainGreaterHeal, 10965, 58, 655, 1783 },   // Greater Heal
+    { kChainGreaterHeal, 25314, 60, 710, 1961 },   // Greater Heal
+    { kChainFlashOfLight, 19750, 20, 35, 47 },   // Flash of Light
+    { kChainFlashOfLight, 19939, 26, 50, 67 },   // Flash of Light
+    { kChainFlashOfLight, 19940, 34, 70, 102 },   // Flash of Light
+    { kChainFlashOfLight, 19941, 42, 90, 152 },   // Flash of Light
+    { kChainFlashOfLight, 19942, 50, 115, 224 },   // Flash of Light
+    { kChainFlashOfLight, 19943, 58, 140, 304 },   // Flash of Light
+    { kChainLesserHealingWave, 8004, 20, 105, 154 },   // Lesser Healing Wave
+    { kChainLesserHealingWave, 8008, 28, 145, 225 },   // Lesser Healing Wave
+    { kChainLesserHealingWave, 8010, 36, 185, 305 },   // Lesser Healing Wave
+    { kChainLesserHealingWave, 10466, 44, 235, 427 },   // Lesser Healing Wave
+    { kChainLesserHealingWave, 10467, 52, 305, 609 },   // Lesser Healing Wave
+    { kChainLesserHealingWave, 10468, 60, 380, 821 },   // Lesser Healing Wave
+    { kChainChainHeal, 1064, 40, 260, 252 },   // Chain Heal
+    { kChainChainHeal, 10622, 46, 315, 336 },   // Chain Heal
+    { kChainChainHeal, 10623, 54, 405, 491 },   // Chain Heal
+    { kChainRegrowth, 8936, 12, 70, 88 },   // Regrowth
+    { kChainRegrowth, 8938, 18, 125, 165 },   // Regrowth
+    { kChainRegrowth, 8939, 24, 170, 236 },   // Regrowth
+    { kChainRegrowth, 8940, 30, 210, 312 },   // Regrowth
+    { kChainRegrowth, 8941, 36, 250, 395 },   // Regrowth
+    { kChainRegrowth, 9750, 42, 305, 505 },   // Regrowth
+    { kChainRegrowth, 9856, 48, 370, 646 },   // Regrowth
+    { kChainRegrowth, 9857, 54, 445, 818 },   // Regrowth
+    { kChainRegrowth, 9858, 60, 525, 1022 },   // Regrowth
 };
 }

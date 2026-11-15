@@ -373,6 +373,9 @@ struct BotSettings
     bool PullTankFirst = true;
     // HealWaitTankHold = 0 (default, 1 = on): a healer casts no heal (Renew) on the party's tank at full health until the tank holds its target (heal_hold event).
     bool HealWaitTankHold = false;
+    // HealSpellMix = 0 (default, 1 = on): healers pick between their heal spells (priest Flash Heal, Heal, Greater Heal, Renew, Power Word: Shield; paladin Flash of Light, Holy Light,
+    // Lay on Hands; shaman Healing Wave, Lesser Healing Wave, Chain Heal; druid Healing Touch, Regrowth, Rejuvenation) by the missing health, incoming damage, tank, mana and rank (heal_spell.h).
+    bool HealSpellMix = false;
     std::uint32_t PullTankHoldMs = 12000;
     std::uint32_t PullMemberRangeYards = 12;
     // PullMinHpPct = 60 (default): a member of a dungeon, raid or tank-led party below this health percent that nothing attacks stands and rests instead of engaging or walking into the

@@ -20,7 +20,10 @@ import db2_reader  # noqa: E402
 
 # (chain id, first rank's spell id, name): the ladders HealSpellFor offers (class 5 priest below level 16: Lesser Heal, from 16: Heal; 2 paladin; 7 shaman; 11 druid)
 CHAINS = (("kChainLesserHeal", 2050, "Lesser Heal"), ("kChainHeal", 2054, "Heal"), ("kChainHolyLight", 635, "Holy Light"),
-          ("kChainHealingWave", 331, "Healing Wave"), ("kChainHealingTouch", 5185, "Healing Touch"))
+          ("kChainHealingWave", 331, "Healing Wave"), ("kChainHealingTouch", 5185, "Healing Touch"),
+          # the extra heals of the heal plan (HealSpellPlan, src/heal_spell.h): fast and efficient heals besides the one HealSpellFor names
+          ("kChainFlashHeal", 2061, "Flash Heal"), ("kChainGreaterHeal", 2060, "Greater Heal"), ("kChainFlashOfLight", 19750, "Flash of Light"),
+          ("kChainLesserHealingWave", 8004, "Lesser Healing Wave"), ("kChainChainHeal", 1064, "Chain Heal"), ("kChainRegrowth", 8936, "Regrowth"))
 # The rank chains of data/spell_costs.txt have two gaps (the core's rank groups split there): Heal 2055 -> 6063 and Holy Light 10328 -> 10329 (next_rank 1313352, a
 # Forever spell the file has no row for); the next ranks are the same family, icon and name at the next level.
 EXTRA_LINKS = {2055: 6063, 10328: 10329}
