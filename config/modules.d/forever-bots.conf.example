@@ -202,6 +202,24 @@ Module.forever-bots.TelemetrySummarySec = 60
 # GuildsRemember = 0            (1: read the guild/<id> store rows at start, so the guilds of the last run keep their kind and name)
 # MailGifts = 0
 # MailGiftDailyCap = 1
+#
+# BotMail = 0   (doc/bot-trade-mail.md: bots mail gold and crafting materials to the other bots of their own guild, of their faction. The core sends the mail with its
+#                gift action (Bot.Social.Enabled = 1; materials also list the bags: Bot.Trade.Enabled = 1); it charges 30 copper postage, delivers after Mail.DeliveryDelay
+#                (3600 s) and refuses a gift worth more than Bot.Social.GiftMaxCopper (10000). No mailbox visit. Gear between bots is not sent yet: it needs item facts
+#                from the core. A receiving bot only collects the mail with a core that collects bot-to-bot mail: see the doc.)
+# BotMailGold = 1                (a bot above BotMailGoldKeepCopper gives to a guildmate below BotMailNeedyBelowCopper)
+# BotMailMaterials = 1           (gathered ore, bars, herbs, leather and cloth go to a guildmate whose profession uses them and the sender's does not)
+# BotMailDailyCap = 2            (mails per bot per day, 0 to 20)
+# BotMailCooldownSec = 3600      (between two mails of one bot, 60 to 86400)
+# BotMailRecipientDailyCap = 3   (mails one bot may receive per day, 1 to 50)
+# BotMailPlanEverySec = 120      (how often the pool is looked at, 30 to 3600)
+# BotMailMaxPerPlan = 2          (mails started per look, 1 to 10)
+# BotMailGoldKeepCopper = 50000  (a bot keeps at least this much, 5 gold)
+# BotMailGoldMinCopper = 10000   (a smaller gift is not worth the postage and the delay)
+# BotMailGoldMaxCopper = 10000   (per mail; raise it together with Bot.Social.GiftMaxCopper)
+# BotMailNeedyBelowCopper = 20000 (a guildmate with less than this is helped, up to twice this)
+# BotMailMaterialMinCount = 5    (a smaller stack stays where it is)
+# BotMailMaterialMaxCount = 200  (a bigger one too: the core sends whole stacks and caps their vendor value)
 # AutoGearEveryLevels = 5
 #
 # Realism without combat (docs/bot-realism-backlog.md items 1 to 5 and 7), all off by default. None of them touches a fight: each acts only out of combat,

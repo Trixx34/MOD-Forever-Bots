@@ -686,6 +686,53 @@ void OrdersWithoutABotOrAnUnknownCoreAreHandled()
     CHECK(orders.size() == 1 && gap);
 }
 
+void BotMailIsPlannedFromTheGuildAndSentAsGiftMail()
+{
+    auto const pool = []
+    {
+        WorldTickSnapshotView view = View(30, 0);
+        BotSnapshot rich = view.bots[0];
+        rich.guid = 1; rich.guild_guid = 5; rich.copper = 500000;
+        BotSnapshot poor = rich;
+        poor.guid = 2; poor.copper = 100;
+        view.bots = { rich, poor };
+        return view;
+    };
+    PolicyOptions on = Quiet();
+    on.BotMail.Enabled = true;
+    BotPolicy policy(on);
+    std::vector<social::Order> orders = OrdersOf(on, pool(), policy);
+    CHECK(orders.size() == 1);
+    if (orders.size() == 1)
+    {
+        CHECK(orders[0].What == social::Kind::Mail && orders[0].Op == 0 && orders[0].Bot == 1 && orders[0].Player == 2 && orders[0].Copper == 10000);
+        std::vector<ActionRequest> const sent = Deliver(orders);
+        CHECK(sent.size() == 1 && sent[0].has_gift_mail() && sent[0].gift_mail().bot_guid() == 1 && sent[0].gift_mail().recipient_guid() == 2 &&
+              sent[0].gift_mail().copper() == 10000 && sent[0].gift_mail().item_guid() == 0);
+    }
+    // Refused: the slots come back, the cooldown holds (BotMailCooldownSec 3600), and after it the same mail is planned again.
+    social::Outcome refused;
+    refused.What = social::Kind::Mail;
+    refused.Bot = 1;
+    refused.Reason = "the recipient's mailbox is full";
+    policy.NoteSocialOutcome(refused, kNow + 1000);
+    CHECK(OrdersOf(on, pool(), policy, kNow + 200000).empty());
+    CHECK(OrdersOf(on, pool(), policy, kNow + 3700000).size() == 1);
+    // Off: nothing, and a material order lists the bags first.
+    BotPolicy off{ Quiet() };
+    CHECK(OrdersOf(Quiet(), pool(), off).empty());
+    social::Order materials;
+    materials.What = social::Kind::Mail;
+    materials.Bot = 1;
+    materials.Player = 2;
+    materials.Op = 1;
+    materials.MinCount = 5;
+    materials.MaxCount = 200;
+    std::vector<ActionRequest> const bags = Deliver({ materials });
+    CHECK(bags.size() == 1 && bags[0].has_bot_trade() && bags[0].bot_trade().op() == forever_module::BotTradeAction::kListBags);
+    CHECK(std::string(social::GapEventName(social::Kind::Mail)) == "mail_gap");
+}
+
 }  // namespace
 
 int main()
@@ -701,6 +748,7 @@ int main()
     GuildAnswersAreSentWhenOnAndNotWhenOff();
     GiftsAreSentWhenOnAndNotWhenOff();
     PickGiftChoosesSmallStacksOnly();
+    BotMailIsPlannedFromTheGuildAndSentAsGiftMail();
     OrdersWithoutABotOrAnUnknownCoreAreHandled();
     if (failures == 0)
         std::printf("social: all checks passed\n");

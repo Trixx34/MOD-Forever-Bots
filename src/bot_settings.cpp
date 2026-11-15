@@ -838,6 +838,36 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     settings.Guilds = bot_guilds::LoadSettings(config, warnings);
     ReadBool(config, "MailGifts", settings.MailGifts.Enabled, warnings);
     ReadKey(config, "MailGiftDailyCap", 0, 20, settings.MailGifts.DailyCap, warnings);
+    ReadBool(config, "BotMail", settings.BotMail.Enabled, warnings);
+    ReadBool(config, "BotMailGold", settings.BotMail.Gold, warnings);
+    ReadBool(config, "BotMailMaterials", settings.BotMail.Materials, warnings);
+    ReadKey(config, "BotMailDailyCap", 0, 20, settings.BotMail.DailyCap, warnings);
+    ReadKey(config, "BotMailCooldownSec", 60, 86400, settings.BotMail.CooldownSec, warnings);
+    ReadKey(config, "BotMailRecipientDailyCap", 1, 50, settings.BotMail.RecipientDailyCap, warnings);
+    ReadKey(config, "BotMailPlanEverySec", 30, 3600, settings.BotMail.PlanEverySec, warnings);
+    ReadKey(config, "BotMailMaxPerPlan", 1, 10, settings.BotMail.MaxPerPlan, warnings);
+    {
+        std::uint32_t copper = static_cast<std::uint32_t>(settings.BotMail.GoldKeepCopper);
+        ReadKey(config, "BotMailGoldKeepCopper", 0, 100000000, copper, warnings);
+        settings.BotMail.GoldKeepCopper = copper;
+    }
+    {
+        std::uint32_t copper = static_cast<std::uint32_t>(settings.BotMail.GoldMinCopper);
+        ReadKey(config, "BotMailGoldMinCopper", 100, 10000000, copper, warnings);
+        settings.BotMail.GoldMinCopper = copper;
+    }
+    {
+        std::uint32_t copper = static_cast<std::uint32_t>(settings.BotMail.GoldMaxCopper);
+        ReadKey(config, "BotMailGoldMaxCopper", 100, 10000000, copper, warnings);
+        settings.BotMail.GoldMaxCopper = copper;
+    }
+    {
+        std::uint32_t copper = static_cast<std::uint32_t>(settings.BotMail.NeedyBelowCopper);
+        ReadKey(config, "BotMailNeedyBelowCopper", 0, 100000000, copper, warnings);
+        settings.BotMail.NeedyBelowCopper = copper;
+    }
+    ReadKey(config, "BotMailMaterialMinCount", 1, 200, settings.BotMail.MaterialMinCount, warnings);
+    ReadKey(config, "BotMailMaterialMaxCount", 1, 1000, settings.BotMail.MaterialMaxCount, warnings);
     ReadBool(config, "Supplies", settings.Supplies.Enabled, warnings);
     ReadBool(config, "VendorSellGear", settings.VendorSellGear, warnings);
     ReadBool(config, "RepairUrgent", settings.Repair.Enabled, warnings);

@@ -56,6 +56,7 @@
 #include "battlegrounds.h"
 #include "duels.h"
 #include "guild_join.h"
+#include "bot_mail.h"
 #include "mail_gifts.h"
 #include "social_actions.h"
 #include "bot_guilds.h"
@@ -285,6 +286,7 @@ struct PolicyOptions
     bot_guilds::Settings Guilds;          // GuildsEnabled: the pool of bots is planned into guilds (DriveGuilds)
     std::shared_ptr<std::vector<bot_guilds::NameEntry> const> GuildNames;   // GuildsNameFile, read at start (unset or empty: the "BotLvl A001" names)
     gifts::Settings MailGifts;
+    botmail::Settings BotMail;            // BotMail (bot_mail.h): bots mail gold and materials to guildmates (DriveMail)
     // Creature entry -> rank (0 first): the dungeon's kill priority. The damage dealers of a dungeon party fight the best-ranked live hostile next to the tank's target.
     std::map<std::uint32_t, std::uint32_t> KillPriority;
     // The dungeon's summons (ScenarioSummons, on where DungeonSummons lists the dungeon): creature entries a summoner makes, which the party fights first, as an
@@ -1224,6 +1226,8 @@ private:
     void TurnSocial(DecideTick& tick, BotTurn& turn);
     // Bot guilds (GuildsEnabled): plans the pool of online bots every kGuildPlanMs and queues the create, invite and leave orders the plan asks for.
     void DriveGuilds(forever_module::WorldTickSnapshotView const& view, std::uint64_t nowMs);
+    // BotMail: every BotMailPlanEverySec the pool is planned (botmail::Plan) and the mail orders are queued (bot_policy_mail.cpp).
+    void DriveMail(forever_module::WorldTickSnapshotView const& view, std::uint64_t nowMs);
     // A guild create of this master was refused by the core or never confirmed: the master is skipped for a growing window (GuildsRefusalBackoff).
     void NoteGuildCreateFailed(std::uint64_t master, std::uint64_t nowMs);
     void TurnAdvisor(DecideTick& tick, BotTurn& turn);   // the advisor features (bot_policy_advisor.cpp); out of combat only
@@ -1320,6 +1324,8 @@ private:
     struct CreateBlock { std::uint32_t Failures = 0; std::uint64_t UntilMs = 0; bool Logged = false; };
     std::unordered_map<std::uint64_t, CreateBlock> _guildCreateBlocks;   // master guid -> its unconfirmed creates and when it may try again
     std::uint64_t _guildPlanAtMs = 0;
+    botmail::State _mailState;
+    std::unordered_map<std::uint64_t, std::uint64_t> _mailTo;   // sender -> recipient of its order in flight (to give the slot back on a refusal)
     std::size_t _guildCreateCursor = 0;   // where the next plan starts walking its creates and moves (round robin)
     std::size_t _guildMoveCursor = 0;
     std::vector<WhisperReply> _whisperReplies;         // queued by Decide (busy refusals), taken by TakeWhisperReplies
