@@ -1063,6 +1063,7 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadBool(config, "RaidPullSingle", settings.RaidPullSingle, warnings);
     if (config.count("RaidGhostFightHoldMaxMs") != 0 && config.at("RaidGhostFightHoldMaxMs") != "0")
         ReadKey(config, "RaidGhostFightHoldMaxMs", 10000, 3600000, settings.RaidGhostFightHoldMaxMs, warnings);
+    ReadKey(config, "WalkDecideEvery", 1, 10, settings.WalkDecideEvery, warnings);
     if (config.count("RegroupRallyMs") != 0 && config.at("RegroupRallyMs") != "0")
         ReadKey(config, "RegroupRallyMs", 5000, 600000, settings.RegroupRallyMs, warnings);
     if (auto const it = config.find("AvoidSpellsFile"); it != config.end())

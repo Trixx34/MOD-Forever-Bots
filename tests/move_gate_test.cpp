@@ -64,6 +64,19 @@ void OtherBotsAndOtherActionsAreNotHeld()
     CHECK(Sent(gate, { Move(2, 100, 200), stop }, 1000) == 2);                 // bot 2 and a stop of bot 1 pass
 }
 
+void FilterKeepsTheOrderOfWhatPasses()
+{
+    move_gate::MoveGate gate;
+    Sent(gate, { Move(1, 100, 200) }, 0);
+    gate.Observe(1, kMove, BotActionStatus::kNoRoute, 1, 100);
+    BotAction stop;
+    stop.bot_guid = 3;
+    stop.type = ActionType::kStop;
+    std::vector<BotAction> actions{ Move(2, 1, 1), Move(1, 100, 200), stop, Move(4, 5, 5), Move(1, 100, 201) };
+    CHECK(gate.Filter(actions, 1000) == 2);
+    CHECK(actions.size() == 3 && actions[0].bot_guid == 2 && actions[1].bot_guid == 3 && actions[2].bot_guid == 4);
+}
+
 void AnAppliedMoveEndsTheRunOfRefusals()
 {
     move_gate::MoveGate gate;
@@ -113,6 +126,7 @@ int main()
 {
     ARefusedMoveWaitsAndTheWaitDoubles();
     OtherBotsAndOtherActionsAreNotHeld();
+    FilterKeepsTheOrderOfWhatPasses();
     AnAppliedMoveEndsTheRunOfRefusals();
     TheSameAnswerIsCountedOnce();
     AWalkThatMadeProgressIsReleasedAtOnce();

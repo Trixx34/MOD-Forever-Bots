@@ -29,6 +29,7 @@
 #pragma once
 
 #include <optional>
+#include "calm_walk.h"
 #include "wipe_hold.h"
 #include "damage_events.h"
 #include "party_planner.h"
@@ -199,6 +200,8 @@ struct PolicyOptions
     // the healer role; a party with a warrior keeps him as tank. An explicit role or roster spec is never changed. A paladin or druid tank pulls fewer mobs (DungeonPullCap).
     bool FlexRoles = false;
     std::uint64_t RegroupRallyMs = 0;
+    // WalkDecideEvery (1 = off; calm_walk.h): a solo bot that only walks to a place the policy sent it to, with nothing hostile near, takes its full turn on one tick in this many.
+    std::uint32_t WalkDecideEvery = 1;
     // RaidBossPositions (default off): `tank_spot` and `flank` rows of the raid rule table act (MoveBossPosition): the boss's victim, a tank, holds it from the tank spot,
     // everyone else that fights it stands on its flanks, out of its front and rear cones; a tank on a frontal telegraph holds.
     bool RaidBossPositions = false;
@@ -563,6 +566,8 @@ public:
     // the staging place, and the scenario's teleport to the tame spot is undone at once), and stands still when there is nothing to tame in view.
     void SetTamingFor(std::function<bool(std::uint64_t)> fn) { _tamingFn = std::move(fn); }
     // The bot's scenario party is not inside yet (Waiting to Entering): it holds at the staging place, with no quest, grind walk or pull of its own.
+    // Turns skipped for calm walkers (WalkDecideEvery) since the policy was made; the pump reports it once a minute.
+    std::uint64_t CalmSkippedTurns() const { return _calmSkips; }
     void SetStagingHoldFor(std::function<bool(std::uint64_t)> fn) { _stagingHoldFn = std::move(fn); }
     // Wipe recovery (the scenario director, scenario.cpp): after a wipe the members hold (rest, no pull) while Hold; the route leader holds until LeaderFree (it goes first,
     // the tank gets to the pack before the members); after a backoff RewindTo is the route point the leader is set back to once per Epoch.
@@ -705,6 +710,7 @@ private:
 
     struct BotState
     {
+        calm_walk::Gate Calm;                            // WalkDecideEvery: the walking bot's skipped turns
         std::optional<Decision> Last;                    // the last movement or attack decision sent
         std::optional<Decision> LastMove;                // the last kMoveTo sent: the walk a no-route result refers to (Last can be a stop sent after it)
         bool InFight = false;
@@ -1287,6 +1293,8 @@ private:
     bool HealerBelowManaFloor(forever_module::BotSnapshot const& bot, BotState const& state, std::uint32_t classId, std::uint64_t partyLeader) const;
     // What the steps ask about the bots of this tick.
     bool IsRouteActive(std::uint64_t guid) const;
+    std::uint64_t _calmSkips = 0;   // turns skipped by WalkDecideEvery since the policy was made
+    calm_walk::Facts CalmFactsOf(BotState const& state, forever_module::BotSnapshot const& bot, std::uint64_t nowMs) const;
     std::set<std::uint32_t> const& KilledBossesOf(std::uint64_t guid) const;
     bool IsRezzer(forever_module::BotSnapshot const& member) const;
     bool PartyFighting(DecideTick const& tick, std::uint64_t leaderGuid) const;

@@ -118,7 +118,10 @@ void main_detail::PumpTier2(forever_module::Tier2Session& session, std::atomic<b
     {
         forever_module::WorldTickSnapshotView const& view = session.ReadLatestSnapshot();
 
-        // Report what the core did with each action: a refusal is logged with its reason, once per action.
+        // Report what the core did with each action: a refusal is logged with its reason, once per action. Only for a new snapshot: the pump polls every 5 ms, the
+        // snapshot changes once per world tick, and the sequences of an old one were all seen.
+        bool const newSnapshot = !sawSnapshot || view.tick_number != lastTick;
+        if (newSnapshot)
         for (forever_module::BotSnapshot const& bot : view.bots)
         {
             auto seen = seenSequence.find(bot.guid);
@@ -155,7 +158,7 @@ void main_detail::PumpTier2(forever_module::Tier2Session& session, std::atomic<b
             }
         }
 
-        if (!sawSnapshot || view.tick_number != lastTick)
+        if (newSnapshot)
         {
             sawSnapshot = true;
             lastTick = view.tick_number;
@@ -701,12 +704,13 @@ void main_detail::PumpTier2(forever_module::Tier2Session& session, std::atomic<b
             if (extras.Sell)
                 AppendSales(*extras.Sell, settings, view, actions, session.MaxActions(), nowMs(), extras.Alts);
             // Every source's moves pass the gate: a move to a place the core just found no route to is not sent again before the pause is over.
+            std::uint64_t const gateNow = nowMs();
             for (forever_module::BotSnapshot const& bot : view.bots)
             {
-                moveGate.Observe(bot.guid, bot.last_action_type, bot.last_action_status, bot.last_action_sequence, nowMs(), bot.pos_x, bot.pos_y);
-                moveGate.Progress(bot.guid, bot.pos_x, bot.pos_y, nowMs());
+                moveGate.Observe(bot.guid, bot.last_action_type, bot.last_action_status, bot.last_action_sequence, gateNow, bot.pos_x, bot.pos_y);
+                moveGate.Progress(bot.guid, bot.pos_x, bot.pos_y, gateNow);
             }
-            moveGate.Filter(actions, nowMs());
+            moveGate.Filter(actions, gateNow);
             actionsTotal += actions.size();
             if (settings.ActionStats)
             {
@@ -736,7 +740,7 @@ void main_detail::PumpTier2(forever_module::Tier2Session& session, std::atomic<b
         if (now - reportedAt >= kPumpReportMs && ticks > 0)
         {
             std::cerr << "forever-bots: pump: " << lastBotCount << " bots, decide avg " << decideTotalUs / ticks << " us, max "
-                      << decideMaxUs << " us over " << ticks << " ticks, " << ActionsPerTick(actionsTotal, ticks) << " actions per tick\n";
+                      << decideMaxUs << " us over " << ticks << " ticks, " << ActionsPerTick(actionsTotal, ticks) << " actions per tick, " << policy.CalmSkippedTurns() << " calm-walk turns skipped in all\n";
             reportedAt = now;
             ticks = 0;
             decideTotalUs = 0;

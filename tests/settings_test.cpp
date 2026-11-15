@@ -684,6 +684,17 @@ void ZgLeverSettings()
     CHECK(ParseBotSettings({ { "RegroupRallyMs", "1000" } }, w).RegroupRallyMs == 0 && !w.empty());
 }
 
+// WalkDecideEvery (perf, 2026-11-15): default 2, 1 = off, 1..10; a value outside keeps the default with a warning.
+void WalkDecideEverySetting()
+{
+    std::vector<std::string> w;
+    CHECK(ParseBotSettings({}, w).WalkDecideEvery == 2 && w.empty());
+    CHECK(ParseBotSettings({ { "WalkDecideEvery", "1" } }, w).WalkDecideEvery == 1 && w.empty());
+    CHECK(ParseBotSettings({ { "WalkDecideEvery", "10" } }, w).WalkDecideEvery == 10 && w.empty());
+    CHECK(ParseBotSettings({ { "WalkDecideEvery", "0" } }, w).WalkDecideEvery == 2 && w.size() == 1);
+    CHECK(ParseBotSettings({ { "WalkDecideEvery", "11" } }, w).WalkDecideEvery == 2 && w.size() == 2);
+}
+
 // RaidBossPositions (Onyxia fix 1): off by default, on with 1.
 void RaidBossPositionsSetting()
 {
@@ -853,6 +864,7 @@ int main()
     CorpseRunTeleportSettings();
     PullHoldBudgetSettings();
     GhostTeleportHoldSettings();
+    WalkDecideEverySetting();
     ZgLeverSettings();
     RaidBossPositionsSetting();
     RaidPullSingleSettings();

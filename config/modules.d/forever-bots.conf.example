@@ -607,6 +607,10 @@ Module.forever-bots.TelemetrySummarySec = 60
 # Module.forever-bots.PullOnePack = 0
 # Module.forever-bots.TankLooseSkipAvoidEnemy = 0
 # Module.forever-bots.RegroupRallyMs = 0
+# WalkDecideEvery (default 2, 1 = off, 1..10; perf, docs/perf-bots-module-20261115.md): a solo bot that is only walking to a place the policy sent it to (out of combat, nothing
+# hostile near, no group, dungeon, errand or transport) takes its full decision turn on one world tick in this many. Anything that changes (a new result, a hostile, combat,
+# an invite, the end of the walk) ends the skipping at once.
+# Module.forever-bots.WalkDecideEvery = 2
 # FlexRoles (default 0 = off; doc/flex-roles.md): when a party is formed with no warrior, a paladin (first) or a druid takes the tank role (the prot / feral_tank rows, leads and pulls),
 # and one priest, shaman, druid or paladin the healer role; a warrior stays tank. Explicit roles and roster specs are never changed. A paladin or druid tank pulls at most 3 mobs
 # (a warrior 4). Event `flex_roles`.

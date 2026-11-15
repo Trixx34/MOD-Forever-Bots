@@ -719,6 +719,15 @@ bool EngageTooStrong(BotSnapshot const& bot, NearbyUnit const& unit, std::uint32
 // The death area (DeathAreaCount, DeathAreaYards): how many of the death spots lie on `map` within `yards` of (x, y) and are no older than windowMs.
 std::uint32_t DeathsNear(std::vector<BotDeathSpot> const& spots, std::uint32_t map, float x, float y, float yards, std::uint64_t nowMs, std::uint64_t windowMs);
 
+// Drops the counters of units that are no longer avoided once there are more than kMaxUnitCounters of them.
+constexpr std::size_t kMaxUnitCounters = 64;
+inline void PruneUnitCounters(std::unordered_map<std::uint64_t, std::uint32_t>& counters, std::unordered_map<std::uint64_t, std::uint64_t> const& avoidUntil)
+{
+    if (counters.size() <= kMaxUnitCounters)
+        return;
+    for (auto it = counters.begin(); it != counters.end();)
+        it = avoidUntil.find(it->first) == avoidUntil.end() ? counters.erase(it) : std::next(it);
+}
 // Avoids a unit for kAvoidMs, doubled for each earlier time it was avoided, so a unit that keeps coming back (a trainer the
 // bot cannot attack) is left alone for longer each time.
 void AvoidUnit(std::unordered_map<std::uint64_t, std::uint64_t>& avoidUntil, std::unordered_map<std::uint64_t, std::uint32_t>& count,
@@ -800,6 +809,22 @@ struct BotPolicy::DecideTick
     std::unordered_map<std::uint64_t, std::vector<std::uint64_t>>& membersOf;  // leader guid -> the other members
     std::unordered_set<std::uint64_t> const& tankLed;                         // the tanks leading their group ("tank lead")
     std::unordered_map<std::uint64_t, party_planner::Order> const* partyOrders = nullptr; // each party's plan (null with the planner off)
+
+    // True when a living member of the group led by `groupLeaderRef` (BotSnapshot::group_leader_guid) is in combat. Built once per tick: it was a scan of
+    // every bot for every grouped bot (n squared at 500 bots).
+    bool GroupInCombat(std::uint64_t groupLeaderRef) const
+    {
+        if (!fightingGroupsBuilt)
+        {
+            fightingGroupsBuilt = true;
+            for (BotSnapshot const& other : view.bots)
+                if (other.group_leader_guid != 0 && other.in_combat != 0 && other.life_state == 0)
+                    fightingGroups.insert(other.group_leader_guid);
+        }
+        return fightingGroups.count(groupLeaderRef) != 0;
+    }
+    mutable std::unordered_set<std::uint64_t> fightingGroups;
+    mutable bool fightingGroupsBuilt = false;
 
     party_planner::Order const* PlanOf(std::uint64_t leaderGuid) const
     {

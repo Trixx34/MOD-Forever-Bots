@@ -473,6 +473,10 @@ struct BotSettings
     // Explicit roles and roster specs are unchanged. flex_roles.h; log event flex_roles.
     bool FlexRoles = false;
     std::uint32_t RegroupRallyMs = 0;
+    // WalkDecideEvery (default 2, 1 = off, 1..10): a solo bot that is walking to a place the policy sent it to, out of combat with no hostile near, in no group, dungeon or
+    // errand, takes its full decision turn on one tick in this many (calm_walk.h). Any change (a new result, a hostile, combat, an invite, the end of the walk) ends the calm
+    // and the next tick is a full turn. At a world update of 500..1700 ms the delay is at most (N-1) ticks before a calm walker reacts to something that is not in the snapshot.
+    std::uint32_t WalkDecideEvery = 2;
     // RaidBossPositions (default OFF; Onyxia fix 1, doc/raid-rules.md "Boss positions"): the `tank_spot` and `flank` rows act. The tank the boss attacks holds it from the
     // tank spot (so the boss faces the way the row sets), the other members that fight it stand on its flanks, none in its front or rear cone. Without rows nothing changes.
     bool RaidBossPositions = false;

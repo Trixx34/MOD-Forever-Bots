@@ -837,6 +837,8 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
     std::unordered_set<std::uint64_t> present;
     // Parties (M8): the lowest-guid bots, in guid order, cut into parties of PartySize. Computed once per tick.
     std::unordered_map<std::uint64_t, std::size_t> indexOf; // bot guid -> index in view.bots
+    indexOf.reserve(view.bots.size());
+    present.reserve(view.bots.size());
     for (std::size_t i = 0; i < view.bots.size(); ++i)
         indexOf[view.bots[i].guid] = i;
 
@@ -952,6 +954,27 @@ void BotPolicy::DecideBot(DecideTick& tick, std::size_t i)
     tick.present.insert(bot.guid);
     BotTurn turn{ i, bot, StateOf(bot.guid), tick.nowMs };
     turn.actionsAtStart = tick.actions.size();
+    // WalkDecideEvery: a calm walker (calm_walk.h) takes its full turn on one tick in N. The turn that ends decides the next one: Gate.Ran records whether the bot was calm
+    // and the last result sequence it had seen, so a new result or any change in the snapshot ends the skipping at once.
+    calm_walk::Facts const calmFacts = CalmFactsOf(turn.state, bot, tick.nowMs);
+    bool const calmNow = _options.WalkDecideEvery > 1 && calm_walk::IsCalm(bot, tick.view.NearbyOf(i), calmFacts);
+    if (_options.WalkDecideEvery > 1 && turn.state.Calm.Skip(_options.WalkDecideEvery, calmNow, bot.last_action_sequence))
+    {
+        ++_calmSkips;
+        return;
+    }
+    struct CalmRecorder
+    {
+        BotState& state;
+        BotSnapshot const& bot;
+        bool calm;
+        bool on;
+        ~CalmRecorder()
+        {
+            if (on)
+                state.Calm.Ran(calm, bot.last_action_sequence);
+        }
+    } calmRecorder{ turn.state, bot, calmNow, _options.WalkDecideEvery > 1 };
     // A passenger is carried by its transport: whatever step asked it to walk to a world point, the kMoveTo is dropped when the turn ends (TurnTransport sets
     // the hold), and the bot's remembered last order is cleared so the walk is sent again once it is off the deck.
     struct TransportMoveFilter
@@ -1024,6 +1047,18 @@ void BotPolicy::DecideBot(DecideTick& tick, std::size_t i)
     TurnCraftGather(tick, turn);
     if (TurnRotation(tick, turn) == TurnFlow::kSkip)
         return;
+}
+
+// What calm_walk::IsCalm needs of the policy's own state: a walk ordered, and nothing the policy drives by its own timers.
+calm_walk::Facts BotPolicy::CalmFactsOf(BotState const& state, BotSnapshot const& bot, std::uint64_t nowMs) const
+{
+    calm_walk::Facts facts;
+    facts.WalkOrdered = state.Last && state.Last->Type == ActionType::kMoveTo;
+    facts.OnOrder = state.Errand.has_value() || state.Visit.has_value() || state.TankLead || state.ForcedHeal != 0 || state.LosRepositionTarget != 0 ||
+                    nowMs < state.LevelHoldUntilMs || state.TaxiFlight.OrderedMs != 0 || IsRouteActive(bot.guid) ||
+                    (_stagingHoldFn && _stagingHoldFn(bot.guid)) || _options.DungeonsByMap.find(bot.map_id) != _options.DungeonsByMap.end();
+    facts.HasLootOrFight = !state.FoughtAtMs.empty() || state.InFight;
+    return facts;
 }
 
 bool BotPolicy::DecideTick::IsOurBot(std::uint64_t ref) const

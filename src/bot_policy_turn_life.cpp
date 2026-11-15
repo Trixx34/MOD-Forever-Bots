@@ -232,6 +232,10 @@ void BotPolicy::TurnTargetMemory(DecideTick& tick, BotTurn& turn)
     }
     for (auto it = state.AvoidUntilMs.begin(); it != state.AvoidUntilMs.end();)
         it = nowMs >= it->second ? state.AvoidUntilMs.erase(it) : std::next(it);
+    // The per-unit escalation counters were never dropped: one entry for every creature a bot ever avoided (the unit reference is unique per spawn). Past the cap,
+    // the counters of units that are not avoided now go (their next avoid starts at the base time again).
+    PruneUnitCounters(state.AvoidCount, state.AvoidUntilMs);
+    PruneUnitCounters(state.StallCount, state.AvoidUntilMs);
 
     turn.nearby = view.NearbyOf(i);
     auto& nearby = turn.nearby;

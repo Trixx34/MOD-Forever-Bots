@@ -72,10 +72,11 @@ public:
     std::size_t Filter(std::vector<forever_module::BotAction>& actions, std::uint64_t nowMs)
     {
         std::size_t held = 0;
-        std::vector<forever_module::BotAction> kept;
-        kept.reserve(actions.size());
-        for (forever_module::BotAction const& action : actions)
+        // In place: no second vector per tick.
+        std::size_t kept = 0;
+        for (std::size_t i = 0; i < actions.size(); ++i)
         {
+            forever_module::BotAction const& action = actions[i];
             if (action.type == forever_module::ActionType::kMoveTo)
             {
                 Entry& entry = _bots[action.bot_guid];
@@ -88,9 +89,11 @@ public:
                 entry.SentX = action.dest_x;
                 entry.SentY = action.dest_y;
             }
-            kept.push_back(action);
+            if (kept != i)
+                actions[kept] = action;
+            ++kept;
         }
-        actions = std::move(kept);
+        actions.resize(kept);
         return held;
     }
 

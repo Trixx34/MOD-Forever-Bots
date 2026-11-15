@@ -409,8 +409,7 @@ void BotPolicy::TurnTargeting(DecideTick& tick, BotTurn& turn)
     // Chat orders: a passive or staying bot starts no fight of its own; a pull order points the bot at the speaker's target.
     bool groupFighting = false;
     if (bot.group_leader_guid != 0)
-        for (BotSnapshot const& other : view.bots)
-            groupFighting = groupFighting || (other.group_leader_guid == bot.group_leader_guid && other.in_combat != 0 && other.life_state == 0);
+        groupFighting = tick.GroupInCombat(bot.group_leader_guid);
     if (partyLeader != 0 && PartyFighting(tick, partyLeader))
         groupFighting = true;
     turn.noSelfPull = (state.Stance_ == BotState::Stance::Passive || state.ChatStay ||
