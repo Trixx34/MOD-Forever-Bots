@@ -938,7 +938,7 @@ BotPolicy::TurnFlow BotPolicy::TurnTaming(DecideTick& tick, BotTurn& turn)
                     targetUnit = &unit;
     }
     else if (NearbyUnit const* hostile = (dungeonHold || noSelfPull || tameNow || (stagingHold && bot.in_combat == 0)) ? nullptr
-                 : PullTarget(bot, nearby, turn.AvoidedFn(), bot.in_combat != 0, huntEntries, routeOn, leashed))
+                 : PullTarget(bot, nearby, turn.AvoidedFn(), bot.in_combat != 0, huntEntries, routeOn, leashed, DungeonPullCapOf(partyLeader != 0 ? partyLeader : bot.guid)))
     {
         targetUnit = hostile;
         targetRef = hostile->guid;

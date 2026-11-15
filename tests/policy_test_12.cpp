@@ -3,6 +3,7 @@
 // (the same quests, a group quest, a dungeon), it leaves for its errands, and it never groups with a bot on another map.
 #include "policy_test_support.h"
 #include "bot_policy_internal.h"
+#include "flex_roles.h"
 
 namespace {
 
@@ -147,10 +148,108 @@ void OffKeepsTheStaticParties()
     CHECK(HasGroup(policy.Decide(view, 1000), 12, kInvite, PlayerOf(10)));   // the old behaviour: the cut is the party
 }
 
+// FlexRoles (flex_roles.h). Five bots 10..14: a priest, a mage, a rogue and a hunter, and a paladin (13) in the guid order's last place. Without a warrior the lowest guid leads;
+// with the key on the paladin tanks and so leads.
+std::uint32_t NoWarriorClasses(std::uint64_t guid)
+{
+    switch (guid)
+    {
+        case 10: return 5;    // priest
+        case 11: return 8;    // mage
+        case 12: return 4;    // rogue
+        case 13: return 2;    // paladin
+        default: return 3;    // hunter
+    }
+}
+
+BotPolicy FlexPolicy(bool on, std::function<std::uint32_t(std::uint64_t)> classes, std::vector<std::string>* events = nullptr,
+                     std::function<std::string(std::uint64_t)> specOf = nullptr)
+{
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 5;
+    options.PartyCount = 1;
+    options.ClassOf = classes;
+    options.FlexRoles = on;
+    options.SpecOf = specOf;
+    if (events)
+        options.OnEvent = [events](std::string const& text) { events->push_back(text); };
+    return BotPolicy(options);
+}
+
+void FlexRolesOffKeepsTheLowestGuidAsLeader()
+{
+    BotPolicy policy = FlexPolicy(false, NoWarriorClasses);
+    auto const actions = policy.Decide(PartyView({ 10, 11, 12, 13, 14 }, NoWarriorClasses), 0);
+    CHECK(HasGroup(actions, 10, kInvite, PlayerOf(13)));
+    CHECK(!HasAnyGroup(actions, 13));
+}
+
+void FlexRolesPicksAPaladinAsTankAndLeader()
+{
+    std::vector<std::string> events;
+    BotPolicy policy = FlexPolicy(true, NoWarriorClasses, &events);
+    auto const actions = policy.Decide(PartyView({ 10, 11, 12, 13, 14 }, NoWarriorClasses), 0);
+    CHECK(HasGroup(actions, 13, kInvite, PlayerOf(10)));      // the paladin tanks and leads
+    CHECK(HasGroup(actions, 13, kInvite, PlayerOf(14)));
+    CHECK(!HasAnyGroup(actions, 10));
+    bool logged = false;
+    for (std::string const& line : events)
+        logged = logged || (line.find("flex_roles: party=") == 0 && line.find("tank=13(class 2) healer=10(class 5)") != std::string::npos);
+    CHECK(logged);
+}
+
+void AWarriorStaysTheTankWithFlexRoles()
+{
+    // 13 is a warrior this time and 10 a paladin: the warrior leads, the paladin is no tank.
+    auto const classes = [](std::uint64_t guid) -> std::uint32_t { return guid == 13 ? 1 : guid == 10 ? 2 : guid == 11 ? 5 : 8; };
+    BotPolicy policy = FlexPolicy(true, classes);
+    auto const actions = policy.Decide(PartyView({ 10, 11, 12, 13, 14 }, classes), 0);
+    CHECK(HasGroup(actions, 13, kInvite, PlayerOf(10)));
+    CHECK(!HasAnyGroup(actions, 10));
+}
+
+void ARosterSpecIsNeverChangedByFlexRoles()
+{
+    // The paladin has the roster spec ret (damage): explicit, so it is no tank candidate and the party is led by the lowest guid as before.
+    auto const specOf = [](std::uint64_t guid) { return guid == 13 ? std::string("ret") : std::string(); };
+    BotPolicy policy = FlexPolicy(true, NoWarriorClasses, nullptr, specOf);
+    auto const actions = policy.Decide(PartyView({ 10, 11, 12, 13, 14 }, NoWarriorClasses), 0);
+    CHECK(HasGroup(actions, 10, kInvite, PlayerOf(13)));
+    CHECK(!HasAnyGroup(actions, 13));
+}
+
+void ADruidTanksWhenNoPaladinIsThere()
+{
+    auto const classes = [](std::uint64_t guid) -> std::uint32_t { return guid == 14 ? 11 : guid == 10 ? 5 : 8; };
+    BotPolicy policy = FlexPolicy(true, classes);
+    auto const actions = policy.Decide(PartyView({ 10, 11, 12, 13, 14 }, classes), 0);
+    CHECK(HasGroup(actions, 14, kInvite, PlayerOf(10)));
+}
+
+void AFlexTankPullsFewerMobsThanAWarrior()
+{
+    BotSnapshot bot;
+    bot.guid = 5;
+    std::vector<NearbyUnit> units;
+    for (std::uint64_t i = 0; i < 4; ++i)
+        units.push_back(Hostile(100 + i, 5.0f + float(i), 100));
+    auto const none = [](std::uint64_t) { return false; };
+    CHECK(PullTarget(bot, units, none, false, {}, true, {}, kMaxDungeonPull) != nullptr);
+    CHECK(PullTarget(bot, units, none, false, {}, true, {}, flex_roles::DungeonPullCap(2, kMaxDungeonPull)) == nullptr);
+    CHECK(flex_roles::DungeonPullCap(1, kMaxDungeonPull) == kMaxDungeonPull);
+    CHECK(flex_roles::DungeonPullCap(11, kMaxDungeonPull) < kMaxDungeonPull);
+}
+
 } // namespace
 
 void RunPolicyTestsPart12()
 {
+    FlexRolesOffKeepsTheLowestGuidAsLeader();
+    FlexRolesPicksAPaladinAsTankAndLeader();
+    AWarriorStaysTheTankWithFlexRoles();
+    ARosterSpecIsNeverChangedByFlexRoles();
+    ADruidTanksWhenNoPaladinIsThere();
+    AFlexTankPullsFewerMobsThanAWarrior();
     NoSharedQuestNoInvite();
     AFinishedQuestIsNoReason();
     AGroupedPairWithNoReasonSplitsUp();

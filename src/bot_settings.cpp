@@ -1053,6 +1053,7 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadBool(config, "RaidFocusAvoidEnemy", settings.RaidFocusAvoidEnemy, warnings);
     ReadBool(config, "PullOnePack", settings.PullOnePack, warnings);
     ReadBool(config, "TankLooseSkipAvoidEnemy", settings.TankLooseSkipAvoidEnemy, warnings);
+    ReadBool(config, "FlexRoles", settings.FlexRoles, warnings);
     ReadBool(config, "RaidBossPositions", settings.RaidBossPositions, warnings);
     ReadBool(config, "RaidPullSingle", settings.RaidPullSingle, warnings);
     if (config.count("RaidGhostFightHoldMaxMs") != 0 && config.at("RaidGhostFightHoldMaxMs") != "0")

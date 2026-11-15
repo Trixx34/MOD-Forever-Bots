@@ -59,7 +59,7 @@ bool OnOtherLevel(BotSnapshot const& bot, NearbyUnit const& unit)
 NearbyUnit const* PullTarget(BotSnapshot const& bot, std::span<NearbyUnit const> units,
                             std::function<bool(std::uint64_t)> const& avoided, bool defending,
                             std::vector<std::uint32_t> const& onlyEntries, bool dungeon,
-                            std::function<bool(NearbyUnit const&)> const& leashed)
+                            std::function<bool(NearbyUnit const&)> const& leashed, std::size_t dungeonCap)
 {
     NearbyUnit const* best = nullptr;
     float bestHealth = 0.0f;
@@ -97,7 +97,7 @@ NearbyUnit const* PullTarget(BotSnapshot const& bot, std::span<NearbyUnit const>
         for (NearbyUnit const& other : units)
             if (IsLiveMob(other) && DistanceBetween(candidate, other) <= kPullRadius)
                 ++group;
-        if (!defending && group > (dungeon ? kMaxDungeonPull : kMaxPull))
+        if (!defending && group > (dungeon ? dungeonCap : kMaxPull))
             continue;
 
         best = &candidate;

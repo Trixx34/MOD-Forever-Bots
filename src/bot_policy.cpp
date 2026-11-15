@@ -3,6 +3,7 @@
 #include <cmath>
 #include "bot_policy_internal.h"
 #include "text_case.h"
+#include "flex_roles.h"
 
 
 bool BotPolicy::SafeToLogOut(BotSnapshot const& bot) const
@@ -502,14 +503,20 @@ void BotPolicy::BuildParties(WorldTickSnapshotView const& view,
     if (parties.size() > _options.PartyCount)
         parties.resize(_options.PartyCount);
 
+    if (_options.FlexRoles)
+        _flexRoles.clear();
     for (std::vector<std::uint64_t> const& party : parties)
     {
         std::size_t const start = 0;
         std::size_t const end = party.size();
+        if (_options.FlexRoles)
+            AssignFlexRoles(view, indexOf, party);
         // A tank leads, whatever its place in guid order (a raid's tanks come from the roster's prot specs). Only without one does a warrior with no role lead.
         auto const isTank = [this](std::uint64_t guid)
         {
             auto const known = _bots.find(guid);
+            if (auto const flex = _flexRoles.find(guid); flex != _flexRoles.end() && flex->second == 1)
+                return true;
             return known != _bots.end() && known->second.Role_ == BotState::Role::Tank;
         };
         std::size_t leader = end;
@@ -531,6 +538,49 @@ void BotPolicy::BuildParties(WorldTickSnapshotView const& view,
             if (p != leader)
                 membersOf[leaderGuid].push_back(party[p]);
         }
+    }
+}
+
+std::size_t BotPolicy::DungeonPullCapOf(std::uint64_t leaderGuid) const
+{
+    if (!_options.FlexRoles)
+        return kMaxDungeonPull;
+    return flex_roles::DungeonPullCap(ClassFor(_options, leaderGuid), kMaxDungeonPull);
+}
+
+// FlexRoles (flex_roles.h): picks the party's tank and healer from its classes, notes them in _flexRoles and logs a change once.
+void BotPolicy::AssignFlexRoles(WorldTickSnapshotView const& view, std::unordered_map<std::uint64_t, std::size_t> const& indexOf,
+                                std::vector<std::uint64_t> const& party) const
+{
+    std::vector<flex_roles::Member> members;
+    for (std::uint64_t guid : party)
+    {
+        flex_roles::Member member;
+        member.Guid = guid;
+        member.ClassId = ClassFor(_options, guid);
+        if (auto const at = indexOf.find(guid); at != indexOf.end())
+            member.Level = view.bots[at->second].level;
+        auto const known = _bots.find(guid);
+        if (known != _bots.end() && known->second.Role_ != BotState::Role::Auto && !known->second.FlexRole)
+            member.Explicit = known->second.Role_ == BotState::Role::Tank ? 1u : known->second.Role_ == BotState::Role::Healer ? 2u : 3u;
+        else if (_options.SpecOf)
+            if (std::string const spec = _options.SpecOf(guid); !spec.empty())
+                member.Explicit = rotation::SpecRole(member.ClassId, spec);   // a roster spec is explicit: it sets the role on its own
+        members.push_back(member);
+    }
+    flex_roles::Result const result = flex_roles::Assign(members);
+    for (auto const& pick : result.Role)
+        _flexRoles[pick.first] = pick.second;
+    if (party.empty())
+        return;
+    std::string line = "flex_roles: party=" + std::to_string(party.front()) + " " + result.Reason +
+                       " size=" + std::to_string(party.size()) + " no_tank=" + (result.HasTank ? "0" : "1") + " no_healer=" + (result.HasHealer ? "0" : "1");
+    std::string& last = _flexLogged[party.front()];
+    if (last != line)
+    {
+        last = line;
+        if (_options.OnEvent)
+            _options.OnEvent(line);
     }
 }
 
@@ -793,6 +843,25 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
     std::unordered_map<std::uint64_t, std::uint64_t> leaderOf;                // bot guid -> its party's leader
     std::unordered_map<std::uint64_t, std::vector<std::uint64_t>> membersOf;  // leader guid -> the other members
     BuildParties(view, indexOf, leaderOf, membersOf);
+    // FlexRoles: the picked tank and healer take their role now, so the leader, the rotation and the party planner of this tick see it; a bot that no longer has a pick goes back to Auto.
+    if (_options.FlexRoles)
+    {
+        for (auto& entry : _bots)
+            if (entry.second.FlexRole && _flexRoles.find(entry.first) == _flexRoles.end())
+            {
+                entry.second.Role_ = BotState::Role::Auto;
+                entry.second.FlexRole = false;
+            }
+        for (auto const& pick : _flexRoles)
+        {
+            BotState& state = StateOf(pick.first);
+            if (state.Role_ == BotState::Role::Auto || state.FlexRole)
+            {
+                state.Role_ = pick.second == 1 ? BotState::Role::Tank : BotState::Role::Healer;
+                state.FlexRole = true;
+            }
+        }
+    }
     // Dynamic parties: only the members with a reason to be in their party now stay in the cut (party_reason.h).
     ApplyPartyReasons(view, indexOf, leaderOf, membersOf, nowMs);
 

@@ -596,6 +596,10 @@ Module.forever-bots.TelemetrySummarySec = 60
 # Module.forever-bots.PullOnePack = 0
 # Module.forever-bots.TankLooseSkipAvoidEnemy = 0
 # Module.forever-bots.RegroupRallyMs = 0
+# FlexRoles (default 0 = off; doc/flex-roles.md): when a party is formed with no warrior, a paladin (first) or a druid takes the tank role (the prot / feral_tank rows, leads and pulls),
+# and one priest, shaman, druid or paladin the healer role; a warrior stays tank. Explicit roles and roster specs are never changed. A paladin or druid tank pulls at most 3 mobs
+# (a warrior 4). Event `flex_roles`.
+# Module.forever-bots.FlexRoles = 0
 # RaidBossPositions (default 0 = off; doc/raid-rules.md "Boss positions"): the raid rule rows `tank_spot` (the tank the boss attacks holds it from this point, so the boss faces
 # that way: Onyxia north of her spawn, facing the north wall) and `flank` (every other member fighting the boss stands on its flanks, none in its front or rear cone) act;
 # a tank also holds through a frontal telegraph (Flame Breath). Without such rows nothing changes. Log lines tank_spot: and boss_flank:.

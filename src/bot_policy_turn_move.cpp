@@ -1587,7 +1587,7 @@ void BotPolicy::TurnIdle(DecideTick& tick, BotTurn& turn)
             }
     }
     else
-        enemyNear = PullTarget(bot, nearby, turn.AvoidedFn(), false, huntEntries, routeOn) != nullptr;
+        enemyNear = PullTarget(bot, nearby, turn.AvoidedFn(), false, huntEntries, routeOn, {}, DungeonPullCapOf(turn.partyLeader != 0 ? turn.partyLeader : bot.guid)) != nullptr;
     // The death area (DeathAreaCount): a solo bot out of combat does not walk back into the place where it keeps dying, whatever sends it there (a quest, a hub, a
     // grind spot). The walk is dropped while the area is avoided; the death area escape (TurnRevivedAndRoles) moves a bot that is inside it away.
     if (wanted.Type == ActionType::kMoveTo && bot.in_combat == 0 && turn.partyLeader == 0 && !routeOn && nowMs < state.AvoidAreaUntilMs &&

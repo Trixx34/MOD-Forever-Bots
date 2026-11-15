@@ -463,6 +463,9 @@ struct BotSettings
     bool RaidFocusAvoidEnemy = false;
     bool PullOnePack = false;
     bool TankLooseSkipAvoidEnemy = false;
+    // FlexRoles (default OFF): a party with no warrior gets a paladin or druid as its tank (and one healer from priest, shaman, druid, paladin); they pull at most one mob fewer than a warrior.
+    // Explicit roles and roster specs are unchanged. flex_roles.h; log event flex_roles.
+    bool FlexRoles = false;
     std::uint32_t RegroupRallyMs = 0;
     // RaidBossPositions (default OFF; Onyxia fix 1, doc/raid-rules.md "Boss positions"): the `tank_spot` and `flank` rows act. The tank the boss attacks holds it from the
     // tank spot (so the boss faces the way the row sets), the other members that fight it stand on its flanks, none in its front or rear cone. Without rows nothing changes.

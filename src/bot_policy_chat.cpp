@@ -186,6 +186,7 @@ std::vector<std::string> BotPolicy::ApplyChat(WorldTickSnapshotView const& view,
             case ChatVerb::Role:
                 state.Role_ = command.Arg == "tank" ? BotState::Role::Tank : command.Arg == "healer" ? BotState::Role::Healer
                               : command.Arg == "dps" ? BotState::Role::Dps : BotState::Role::Auto;
+                state.FlexRole = false;
                 break;
             case ChatVerb::Focus:
                 if (chat.TargetRef == 0 || forever_module::UnitRefType(chat.TargetRef) != 8)
