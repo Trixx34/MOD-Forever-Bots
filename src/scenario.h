@@ -138,6 +138,11 @@ struct ScenarioResult
     std::optional<std::uint32_t> OnyxiaHealthPct;
     // Where the run's time went (ms per state, in kTimeStateNames order): time_s= in the result line. See TimeState.
     std::array<std::uint64_t, 6> StateMs = {};
+    // Time quick win 1 (docs/dungeon-time-loss-20261115.md): the fight state split into ticks where a fighting member has a target (FightTargetMs) and the rest, a member
+    // in combat with no target, an in-combat wait (FightWaitMs); the time of the boss attempts that ended in the boss's death (BossCleanMs); and the hold seconds per
+    // reason, as the snapshots show them with the policy's priority (HoldMs: health, mana, far, dead). Printed after time_s=, nothing for a run without time_s.
+    std::uint64_t FightTargetMs = 0, FightWaitMs = 0, BossCleanMs = 0;
+    std::array<std::uint64_t, 4> HoldMs = {};
     // Run telemetry: the party_stalled: verdicts of the run (stalled=N last_stall=<cause>@<t_s> in the result line; nothing when there was none).
     std::uint32_t Stalled = 0;
     std::string LastStallCause;
@@ -281,6 +286,8 @@ private:
     std::map<std::uint64_t, std::uint32_t> _grantSeqSeen; // bot -> last_action_sequence of the last grant result looked at
     std::set<std::uint64_t> _grantRefusedBy;               // bots whose dressing grant the core refused
     std::vector<std::pair<std::string, std::uint64_t>> _bossKillMs; // boss name and ms into the run, in the order seen dead
+    std::uint64_t _fightTargetMs = 0, _fightWaitMs = 0, _bossCleanMs = 0;   // see ScenarioResult::FightTargetMs
+    std::array<std::uint64_t, 4> _holdMs = {};
     std::array<std::uint64_t, 6> _stateMs = {};                     // ms per TimeState while Running
     std::uint64_t _stateLastMs = 0;                                 // the last tick that was counted
     ScenarioPhase _phase = ScenarioPhase::Waiting;

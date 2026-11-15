@@ -291,6 +291,8 @@ void CountsWhereTheTimeGoes()
     {
         std::printf("%s\n", FormatScenarioResult(*result).c_str());
         CHECK(FormatScenarioResult(*result).find(" time_s=fight:2,walk:3,dead:5,rest:5,far:4,idle:5") != std::string::npos);
+        // The honest-result fields: the 2 s of fight had no target (a wait), the rest was health, the hold seconds follow the states, deaths_total counts every death.
+        CHECK(FormatScenarioResult(*result).find(" fight_target_s=0 fight_wait_s=2 boss_clean_s=0 hold_s=health:5,mana:0,far:4,dead:5 deaths_total=") != std::string::npos);
     }
 }
 
