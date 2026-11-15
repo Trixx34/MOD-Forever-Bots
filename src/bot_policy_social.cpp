@@ -132,6 +132,7 @@ void BotPolicy::TurnSocial(DecideTick& tick, BotTurn& turn)
         ctx.InCombat = fighting;
         ctx.Level = bot.level;
         ctx.InBattleground = social::IsBattlegroundMap(bot.map_id);
+        ctx.InGroup = bot.group_role != 0;
         battlegrounds::Action const action = battlegrounds::Decide(_options.Battlegrounds, state.BgState, ctx, nowMs);
         if (action == battlegrounds::Action::Queue)
         {
@@ -139,6 +140,7 @@ void BotPolicy::TurnSocial(DecideTick& tick, BotTurn& turn)
             if (id != 0)
             {
                 state.BgId = id;
+                battlegrounds::NoteQueueSent(state.BgState, _options.Battlegrounds, nowMs);
                 social::Order order;
                 order.What = social::Kind::Battleground;
                 order.Op = 0;   // kQueue

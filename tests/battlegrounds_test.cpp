@@ -38,6 +38,19 @@ int main()
     CHECK(Decide(on, left, idle, 5000) == Action::None);                       // cooldown
     CHECK(Decide(on, left, idle, 5000 + 60ull * 60000ull) == Action::Queue);
 
+    // A party (dungeon or raid run): no queue, and a queue already held is left.
+    Context grouped = idle; grouped.InGroup = true;
+    CHECK(Decide(on, fresh, grouped, 0) == Action::None);
+    CHECK(Decide(on, queued, grouped, 2000) == Action::Leave);
+    Context groupedIn = grouped; groupedIn.InBattleground = true;
+    CHECK(Decide(on, queued, groupedIn, 2000) == Action::None);               // already inside: not pulled out
+
+    // A queue order handed out starts the cooldown at once: no second queue if the answer never comes.
+    State sent;
+    NoteQueueSent(sent, on, 7000);
+    CHECK(Decide(on, sent, idle, 7000 + 30000) == Action::None);
+    CHECK(Decide(on, sent, idle, 7000 + 60ull * 60000ull) == Action::Queue);
+
     if (failures == 0) std::printf("battlegrounds: all checks passed\n");
     return failures == 0 ? 0 : 1;
 }
