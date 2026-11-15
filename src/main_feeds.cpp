@@ -94,7 +94,7 @@ void SetUpLootBooks(forever_module::ModuleClient& client, RunContext& run, BotSe
         forever_module::PlayerItemLootedEvent const& event = notify.player_item_looted();
         if (!run.Roster.Owned().count(event.player_guid()))
             return;
-        if (settings.Sell.Enabled)
+        if (settings.Sell.Enabled && FromLootWindow(event))
         {
             sell::Item const sold = SellItemOf(event);
             if (sell::Sellable(sold))
@@ -107,7 +107,13 @@ void SetUpLootBooks(forever_module::ModuleClient& client, RunContext& run, BotSe
         }
         if (!settings.Auction.Enabled)
             return;
-        auction::Candidate const item = CandidateOf(event);
+        auction::Candidate item = CandidateOf(event, settings.Auction.GearExact);
+        // An expired listing back from the mail (the core's Modules.ItemReceivedEvent.Enabled): the second listing need not wait out the hold again.
+        if (event.has_source() && event.source() == kItemSourceMail)
+        {
+            auto const standing = book->Standing.find(event.player_guid());
+            item.Returned = standing != book->Standing.end() && standing->second.Attempts.count(item.ItemGuid) != 0;
+        }
         // Goods (AuctionGoodsSell) are listed from white quality up; the rest from uncommon, as before.
         bool const goods = settings.Auction.GoodsSell && item.Goods;
         if (!goods && event.quality() < auction::kUncommon)

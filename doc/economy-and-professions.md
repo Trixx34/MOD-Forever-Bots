@@ -40,6 +40,12 @@ is an upgrade; a worn BoE item is soulbound, and the core's `HandleAuctionSellIt
 never be listed (the refusal drops it from the book). The hold covers the items the bot could not wear yet when it looted them. It is a proxy;
 the exact rule needs the core change at the end of this page.
 
+**The exact rule (`AuctionGearExact`, off by default; branch `feature/loot-item-facts` in core, SDK and module).** A core with the change sends
+the item facts in the loot event (`required_level`, `inventory_type`, `bound`, `upgrade_score`, `usable`, `source`). With `AuctionGearExact = 1`:
+an item the core scores as an upgrade the bot would wear now is `Needed` and never listed; a soulbound item is `Bound`; a piece the bot may use
+(`usable`) whose required level is above the bot's and at most `AuctionGearHoldLevels` above its loot level is kept until the bot is one level
+past that required level (the bag pass wears it first); anything else is listed at once. A core without the facts: the hold, as before.
+
 ## The chain, link by link
 
 | Link | Wired? | Module keys | Core keys (default) | Data files | Sim (2026-11-14) | Prod (read-only 2026-11-14) |
@@ -69,7 +75,9 @@ the stock the fixed listing would offer.
   what it passes. Skinning works on its own kills.
 - **Crafting.** The core picks a recipe the bot knows and has materials for. Smelting needs a forge and cooking a fire: without `CraftingFociFile`
   the answer is `kNeedsFocus` and nothing happens, which is what prod's bags show (meat and ore piling up). Crafted items do not raise the loot event,
-  so they are not auction candidates; a crafted upgrade is worn by the bag gear pass.
+  so they are not auction candidates; a crafted upgrade is worn by the bag gear pass. With the core change and `Modules.ItemReceivedEvent.Enabled = 1`
+  a bot's crafted items, quest rewards and items taken from auction mail raise the loot event too (with `source` 1, 2, 3): they join the auction
+  book, never the vendor sale book.
 - **Vendor.** `VendorSellGear` (on by default, and the core's `Bot.Vendor.SellGear` is on by default) sells green-or-lower bag gear the worn gear
   outclasses on every vendor visit. Those items are exactly the ones worth listing. With the auction on, set `VendorSellGear = 0`, or accept that a
   vendor visit before the hold ends takes them (a later listing is then refused "item is no longer in the player's bags" and dropped).
@@ -82,7 +90,9 @@ the stock the fixed listing would offer.
   threshold and the bot is in or near a capital).
 - **Mail.** `WorldSession::CollectMailAsBot` takes money and items from delivered `MAIL_AUCTION` mail (sale money after `MailDeliveryDelay`, 3600 s),
   so the empty `mail` table is expected while nothing is listed. An expired listing comes back by mail into the bags but not into the module's book
-  (no loot event): it is not listed again (`AuctionRelistPct` is not used yet) and stays until a vendor visit or the junk sale takes it.
+  (no loot event): it is not listed again (`AuctionRelistPct` is not used yet) and stays until a vendor visit or the junk sale takes it. With the
+  core change and `Modules.ItemReceivedEvent.Enabled = 1` it comes back into the book (source 3) and is listed a second time without a new hold;
+  `PlanListings` leaves it after the second listing.
 
 ## Switching it on in prod, in order
 
@@ -167,7 +177,14 @@ Needs a core with protocol 19 (browse by filter with `upgrade_score`). Today it 
 - **Listing what is worth equipping for someone else.** That is the point: players and other bots can buy it.
 - **Crafting materials.** Kept from vendors by default (`SellVendorGoods = 0`); listed only with `AuctionGoodsSell`.
 
-## Core changes needed (minimal, not made here)
+## Core changes needed (minimal)
+
+Items 1 and 2 are made on `feature/loot-item-facts` (core, SDK, module; not merged, not built by Jenkins yet), additive within protocol 29: new
+optional fields 9 to 14 of `PlayerItemLootedEvent`, the same hook `PlayerScript.OnLootItem`, no new hook (a new hook would need a new
+`module approve` and a core that knows it), no protocol or layout bump. Switching on: core `Modules.ItemReceivedEvent.Enabled = 1` (sources 1 to 3,
+bots only) and module `AuctionGearExact = 1`. Keep `Modules.ItemReceivedEvent.Enabled = 0` while the module that runs is older than this branch:
+it would take a crafted item for loot and offer it to the vendor sale. Item 3 is not made: the snapshot is the Tier 2 layout, and any change
+to it bumps `kTier2LayoutVersion` and the protocol (`ModuleTier2Layout.h`, the growth rule), which protocol 29 must not.
 
 1. **Loot event facts** (the exact "do not list what the bot needs" rule): add to `PlayerItemLootedEvent` (`proto/events.proto` in the SDK and
    `ModuleWire::PlayerItemLooted` in the core) `required_level`, `inventory_type`, `bound` (`item->IsSoulBound()`) and `upgrade_score`

@@ -69,8 +69,42 @@ static void Text()
     CHECK(text_split::Split("a,,b", ',').size() == 3);
 }
 
+// The loot event's item facts (core fields 9 to 14) reach the auction candidate only with AuctionGearExact, and only loot-window items are vendor fodder.
+static void LootFacts()
+{
+    forever_module::PlayerItemLootedEvent event;
+    event.set_player_guid(1);
+    event.set_item_guid(77);
+    event.set_item_entry(15210);
+    event.set_count(1);
+    event.set_quality(2);
+    event.set_item_class(kItemClassWeapon);
+    event.set_sell_price(900);
+    auction::Candidate const old = CandidateOf(event, true);              // an older core: no facts
+    CHECK(old.Equipment && !old.HasFacts && !old.Needed && !old.Bound);
+    CHECK(FromLootWindow(event));
+    event.set_required_level(23);
+    event.set_inventory_type(13);
+    event.set_bound(true);
+    event.set_upgrade_score(7);
+    event.set_usable(true);
+    event.set_source(0);
+    auction::Candidate const hold = CandidateOf(event, false);            // AuctionGearExact off: as before
+    CHECK(!hold.HasFacts && !hold.Needed && !hold.Bound);
+    auction::Candidate const exact = CandidateOf(event, true);
+    CHECK(exact.HasFacts && exact.RequiredLevel == 23 && exact.Usable && exact.Bound && exact.Needed);
+    event.set_upgrade_score(0);
+    CHECK(!CandidateOf(event, true).Needed);
+    CHECK(FromLootWindow(event));
+    event.set_source(1);                                                   // crafted
+    CHECK(!FromLootWindow(event));
+    event.set_source(kItemSourceMail);
+    CHECK(!FromLootWindow(event));
+}
+
 int main()
 {
+    LootFacts();
     Names();
     Routes();
     Text();

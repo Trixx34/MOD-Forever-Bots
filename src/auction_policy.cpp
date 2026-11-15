@@ -95,8 +95,18 @@ bool GearReady(Settings const& settings, Candidate const& item, std::uint32_t bo
 {
     if (!item.Equipment)
         return true;
-    if (!settings.GearSell || item.LootLevel == 0 || botLevel == 0)
+    if (!settings.GearSell)
         return false;
+    if (item.Returned)
+        return true;
+    if (item.LootLevel == 0 || botLevel == 0)
+        return false;
+    if (settings.GearExact && item.HasFacts)
+    {
+        // An upgrade it wears now is Needed (Listable refuses it). A piece it will wear within the hold's levels waits until it is one level past it.
+        bool const later = item.Usable && item.RequiredLevel > item.LootLevel && item.RequiredLevel <= item.LootLevel + settings.GearHoldLevels;
+        return !later || botLevel > item.RequiredLevel;
+    }
     return botLevel >= item.LootLevel + settings.GearHoldLevels;
 }
 

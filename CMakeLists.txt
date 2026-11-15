@@ -158,7 +158,7 @@ target_link_libraries(bot_guild_kinds_test PRIVATE forever_bots_guilds)
 target_compile_definitions(bot_guild_kinds_test PRIVATE FOREVER_BOT_GUILDS_FILE="${CMAKE_CURRENT_SOURCE_DIR}/data/bot_guilds.txt")
 add_test(NAME bot_guild_kinds COMMAND bot_guild_kinds_test)
 
-add_executable(main_util_test tests/main_util_test.cpp src/main_util.cpp)
+add_executable(main_util_test tests/main_util_test.cpp src/main_util.cpp src/main_sales.cpp)
 target_link_libraries(main_util_test PRIVATE forever_bots_policy forever_bots_settings forever_bots_store forever_bots_files forever_bots_live forever_bots_telemetry forever_bots_trade forever_bots_roster)
 target_compile_definitions(main_util_test PRIVATE FOREVER_MODULE_VERSION="test")
 add_test(NAME main_util COMMAND main_util_test)

@@ -64,6 +64,11 @@ struct Settings
     // upgrade score (doc/economy-and-professions.md, the core change), so the levels gained stand in for it.
     bool GearSell = true;
     std::uint32_t GearHoldLevels = 2;
+    // The exact rule (config key AuctionGearExact, off by default): when the loot event carries the core's item facts (Candidate::HasFacts), the hold
+    // above gives way to them. An upgrade the bot would wear now (upgrade_score > 0) is Needed and never listed; a piece the bot may use (Usable) whose
+    // required level is above the bot's and at most GearHoldLevels above its loot level is kept until the bot is one level past that required level
+    // (the bag equip pass wears it first); any other piece is ready at once. Without the facts (an older core) the hold applies as before.
+    bool GearExact = false;
 };
 
 // One item in a bot's bags as the core describes it for selling.
@@ -81,12 +86,18 @@ struct Candidate
     bool Goods = false;                         // trade goods: a stack for a commodity listing when Stackable (see PlanGoods)
     bool Equipment = false;                     // a weapon or a piece of armour: listed only when GearReady
     std::uint32_t LootLevel = 0;                // the bot's level when it looted the item (0: not known yet; StampLootLevel sets it)
+    // The core's item facts (PlayerItemLootedEvent fields 9 to 14), for Settings::GearExact. HasFacts is false when the core did not send them.
+    bool HasFacts = false;
+    std::uint32_t RequiredLevel = 0;            // 0: none
+    bool Usable = false;                        // the bot's class, race and skills allow it, the required level aside
+    bool Returned = false;                      // a listing of it ran out and the core gave it back from the mail: it already waited out its hold
 };
 
 // The bot's level as the loot level of the items that have none yet (the loot event does not carry the level; the first feed after the loot does).
 void StampLootLevel(std::vector<Candidate*> const& items, std::uint32_t botLevel);
 
-// Whether a piece of equipment may be listed now: gear selling is on, the loot level is known, and the bot has gained GearHoldLevels since.
+// Whether a piece of equipment may be listed now: gear selling is on, the loot level is known, and the bot has gained GearHoldLevels since (or, with
+// GearExact and the core's facts, the exact rule of Settings::GearExact).
 // Anything that is not equipment is ready (its own rules apply: Listable, PlanGoods).
 bool GearReady(Settings const& settings, Candidate const& item, std::uint32_t botLevel);
 

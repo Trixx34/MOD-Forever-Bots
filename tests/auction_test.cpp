@@ -497,8 +497,50 @@ void EquipmentIsListedAfterItsHold()
     CHECK(!HasListable(s, { bound }, 30));
 }
 
+// AuctionGearExact: with the core's item facts the hold gives way to the item's own required level; an upgrade is Needed (CandidateOf), and an item back
+// from an expired listing waits no second hold.
+void GearExactFollowsTheCoresFacts()
+{
+    Settings s = On();
+    Candidate sword = Gear(7, kUncommon, 500);
+    sword.Equipment = true;
+    sword.LootLevel = 10;
+    sword.HasFacts = true;
+    sword.Usable = true;
+    sword.RequiredLevel = 8;                                               // usable now and no upgrade (else it would be Needed)
+    CHECK(!GearReady(s, sword, 10));                                       // off by default: the hold applies
+    Settings exact = s;
+    exact.GearExact = true;
+    CHECK(GearReady(exact, sword, 10));                                    // listed at once
+    Candidate later = sword;
+    later.RequiredLevel = 12;                                              // a piece it will wear within the two hold levels
+    CHECK(!GearReady(exact, later, 10) && !GearReady(exact, later, 12));   // kept till one level past it: the bag pass wears it first
+    CHECK(GearReady(exact, later, 13));
+    Candidate farAhead = sword;
+    farAhead.RequiredLevel = 13;                                           // beyond the window: not kept
+    CHECK(GearReady(exact, farAhead, 10));
+    Candidate notForUs = later;
+    notForUs.Usable = false;                                               // its class cannot use it: not kept
+    CHECK(GearReady(exact, notForUs, 10));
+    Candidate noFacts = later;
+    noFacts.HasFacts = false;                                              // an older core: the hold
+    CHECK(!GearReady(exact, noFacts, 11) && GearReady(exact, noFacts, 12));
+    Candidate unstamped = sword;
+    unstamped.LootLevel = 0;                                               // the loot level is not known yet
+    CHECK(!GearReady(exact, unstamped, 10));
+    Candidate returned = Gear(9, kUncommon, 500);
+    returned.Equipment = true;
+    returned.Returned = true;                                              // back from an expired listing: no second hold, in both modes
+    CHECK(GearReady(s, returned, 10) && GearReady(exact, returned, 10));
+    Settings noGear = exact;
+    noGear.GearSell = false;
+    CHECK(!GearReady(noGear, returned, 10) && !GearReady(noGear, sword, 30));
+    CHECK(GearReady(exact, Gear(10, kUncommon, 500), 1));                  // not equipment: no hold
+}
+
 int main()
 {
+    GearExactFollowsTheCoresFacts();
     RoundPricesAreRoundAndWithinTheCap();
     RoundPricesAreOffByDefaultAndKeepThePlan();
     TheListingsThatRanOutAreDropped();

@@ -1086,6 +1086,7 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     }
     ReadBool(config, "AuctionGearSell", settings.Auction.GearSell, warnings);
     ReadKey(config, "AuctionGearHoldLevels", 0, 10, settings.Auction.GearHoldLevels, warnings);
+    ReadBool(config, "AuctionGearExact", settings.Auction.GearExact, warnings);
     ReadKey(config, "AuctionRoundStep", 0, 1000000, settings.Auction.RoundStepCopper, warnings);
     ReadKey(config, "AuctionRoundMaxPct", 0, 10, settings.Auction.RoundMaxPct, warnings);
     ReadBool(config, "SellVendor", settings.Sell.Enabled, warnings);
