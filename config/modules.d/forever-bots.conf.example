@@ -515,6 +515,10 @@ Module.forever-bots.TelemetrySummarySec = 60
 #                      it is; solo bots and leveling parties are never held; 0 = every member pulls on its own, as before)
 # HealWaitTankHold = 0 (1 = on)   (a healer casts no heal, Renew included, on the party's tank at full health until the tank holds its target: the target's threat top, else its
 #                         victim, is the tank; a target out of view counts as held; event heal_hold; 0 = Renew on the fighting tank as before)
+# HealSpellMix = 0 (1 = on)   (healers choose between their heal spells by missing health, incoming damage, tank or not, mana and rank, see src/heal_spell.h: priest Flash Heal,
+#                         Heal, Greater Heal, Renew, Power Word: Shield; paladin Flash of Light, Holy Light, Lay on Hands; shaman Healing Wave, Lesser Healing Wave, Chain Heal with 3 or
+#                         more hurt; druid Healing Touch, Regrowth, Rejuvenation. The lowest rank that covers the deficit is named exactly (like HealDownrank, kNotKnown pauses it),
+#                         a deficit under a third of the smallest heal is not healed, the pulling tank gets a shield or heal over time. 0 = one heal spell per class as before)
 # PullTankHoldMs = 12000   (the longest a member waits, so a dead or stuck tank cannot freeze the party; 1000 to 120000)
 # WarderPartyHold = 1   (a member with no target of its own holds outside an Onyxian Warder's Fire Nova instead of following the tank into it; 0 = follow as before)
 # PullMinHpPct = 60   (a member of a route/raid party below this health percent that nothing attacks rests instead of engaging or joining the tank's fight, at most 2 minutes; 0 = off)

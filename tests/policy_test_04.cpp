@@ -642,6 +642,41 @@ void HealDownrankCastsTheRankThatCoversTheDeficit()
     CHECK(offCast && offCast->spell_id == 2054 && offCast->dest_x == 0.0f);
 }
 
+// HealSpellMix: the priest casts the fast heal (Flash Heal, a named rank) at an emergency and the efficient Heal rank that covers a routine deficit; a deficit that is not worth a cast gets none.
+void HealSpellMixPicksTheSpellByTheDeficit()
+{
+    auto const run = [](bool mix, std::uint32_t health, std::uint32_t maxHealth)
+    {
+        PolicyOptions options = AggressiveOptions();
+        options.PartySize = 5;
+        options.PartyCount = 1;
+        options.ClassOf = WarriorLeads;
+        options.HealSpellMix = mix;
+        BotPolicy policy(options);
+        policy.SetRouteActive(true);
+        WorldTickSnapshotView view = LeveledDungeonView(30);
+        view.bots[3].health = health;      // bot 13
+        view.bots[3].max_health = maxHealth;
+        return policy.Decide(view, 1000);
+    };
+    auto const castOf = [](std::vector<BotAction> const& actions) -> BotAction const*
+    {
+        for (BotAction const& action : actions)
+            if (action.type == ActionType::kCastSpell && action.bot_guid == 10)
+                return &action;
+        return nullptr;
+    };
+    std::vector<BotAction> const routine = run(true, 400, 800);        // 50 %: Heal rank 2 (406)
+    BotAction const* routineCast = castOf(routine);
+    CHECK(routineCast && routineCast->spell_id == 2055 && routineCast->dest_x == 1.0f && routineCast->target_guid == PlayerOf(13));
+    std::vector<BotAction> const emergency = run(true, 100, 500);      // 20 %: a Flash Heal rank (9472 at level 30)
+    BotAction const* emergencyCast = castOf(emergency);
+    CHECK(emergencyCast && emergencyCast->spell_id == 9472 && emergencyCast->dest_x == 1.0f);
+    std::vector<BotAction> const off = run(false, 100, 500);           // default: the class heal as before (Flash Heal, rank 1 named, the core takes the highest known)
+    BotAction const* offCast = castOf(off);
+    CHECK(offCast && offCast->dest_x == 0.0f);
+}
+
 void HealDownrankPausesAfterAnUnknownRank()
 {
     std::vector<std::string> events;
@@ -1305,6 +1340,7 @@ void RunPolicyTestsPart4()
     HealPlanSwitchesWhenTheOwnerCannotHeal();
     HealPlanPreHealsTheTankAtTheStartOfAFight();
     HealDownrankCastsTheRankThatCoversTheDeficit();
+    HealSpellMixPicksTheSpellByTheDeficit();
     HealDownrankPausesAfterAnUnknownRank();
     HealerHealsItselfWithoutATarget();
     PriestWithNoLineOfSightRepositionsBeforeRetryingDps();

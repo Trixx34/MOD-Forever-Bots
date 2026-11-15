@@ -297,6 +297,72 @@ BotPolicy::TurnFlow BotPolicy::PartyHeal(DecideTick& tick, BotTurn& turn)
             hurtPct = std::uint64_t(leaderTopUp->health) * 100 / leaderTopUp->max_health;
             note = "top_up";
         }
+        // HealSpellMix (heal_spell.h): the spell, and its rank, from the target's missing health, the damage it takes, tank or not, mana and what the ranks cost. It replaces the class's one
+        // heal (and Flash Heal); Prayer, shield, Renew and Binding Heal of the chain above are left as they are, except that the pulling tank gets a shield or heal over time first.
+        bool planExact = false;
+        if (_options.HealSpellMix && healSpell != 0)
+        {
+            bool const direct = target && (spellToCast == healSpell || (priest && spellToCast == kFlashHeal));
+            bool const holdBlocked = _options.HealWaitTankHold && tankMember && tankMember->health >= tankMember->max_health && !TankHoldsTarget(tick, turn, *tankMember);
+            bool const proactive = !target && tankMember && tankMember->in_combat != 0 && !holdBlocked;
+            if (direct || proactive)
+            {
+                BotSnapshot const& subject = direct ? *target : *tankMember;
+                heal_spell::Input in;
+                in.ClassId = classId;
+                in.Level = bot.level;
+                in.Mana = bot.power_type == 0 ? bot.power : 0;
+                in.MaxMana = std::max<std::uint32_t>(bot.max_power, 1);
+                in.Health = subject.health;
+                in.MaxHealth = subject.max_health;
+                in.IsTank = &subject == tankMember;
+                in.InCombat = subject.in_combat != 0 || subject.threat_target_guid != 0;
+                in.Proactive = proactive;
+                in.LayOnHandsReady = ready(heal_spell::kLayOnHands);
+                auto& seen = state.HealSeenOf[subject.guid];
+                if (seen.AtMs != 0 && nowMs > seen.AtMs && nowMs - seen.AtMs <= 5000)
+                    seen.PerSec = seen.Health > subject.health ? static_cast<std::uint32_t>(std::uint64_t(seen.Health - subject.health) * 1000 / (nowMs - seen.AtMs)) : seen.PerSec / 2;
+                else
+                    seen.PerSec = 0;
+                seen.Health = subject.health;
+                seen.AtMs = nowMs;
+                in.IncomingPerSec = seen.PerSec;
+                tick.ForParty(partyLeader != 0 ? partyLeader : bot.guid, [&](BotSnapshot const& member)
+                {
+                    if (member.life_state == 0 && member.max_health != 0 && Distance2d(bot, member) <= kHealRangeYards && std::uint64_t(member.health) * 100 / member.max_health < 75)
+                        ++in.HurtCount;
+                });
+                // The module's own timers (the bot sees only its own auras): heal over time under PlayerRef (as Renew always was), the shield under 0 for the bot itself.
+                auto const buffOn = [&](std::uint32_t spell, std::uint64_t ref)
+                {
+                    auto const it = state.BuffUntilMs.find({ spell, ref });
+                    return it != state.BuffUntilMs.end() && nowMs < it->second;
+                };
+                in.HotActive = buffOn(heal_spell::kRenew, PlayerRef(subject.guid)) || buffOn(heal_spell::kRejuvenation, PlayerRef(subject.guid));
+                in.ShieldLocked = buffOn(heal_spell::kPowerWordShield, subject.guid == bot.guid ? 0 : PlayerRef(subject.guid));
+                heal_spell::Choice const choice = heal_spell::Choose(in);
+                if (choice.Skip)
+                {
+                    target = nullptr;
+                    spellToCast = 0;
+                }
+                else if (choice.Spell != 0)
+                {
+                    spellToCast = choice.Spell;
+                    planExact = choice.Exact;
+                    target = &subject;
+                    if (proactive)
+                    {
+                        hurtPct = tankPct;
+                        note = choice.Note;
+                    }
+                    else
+                        note = note.empty() ? choice.Note : note + " " + choice.Note;
+                }
+                else if (proactive)
+                    target = nullptr;
+            }
+        }
         // Binding Heal heals the priest and the tank together: when both are hurt and the chosen heal is for the tank.
         if (priest && target && target != &bot && target == tankMember && spellToCast != kPrayerOfHealing && spellToCast != kRenew && bot.level >= kBindingHealLevel &&
             ready(kBindingHeal) && std::uint64_t(bot.health) * 100 / std::max<std::uint32_t>(bot.max_health, 1) < kBindingBelowPct && tankPct < kBindingBelowPct)
@@ -345,11 +411,22 @@ BotPolicy::TurnFlow BotPolicy::PartyHeal(DecideTick& tick, BotTurn& turn)
                             heal.dest_x = 1.0f;
                         }
                     }
+                    if (planExact)
+                    {
+                        // A rank named by the heal mix; paused after a kNotKnown, the first rank of its ladder is cast without naming one (the core takes the highest it knows).
+                        if (nowMs >= state.HealDownrankPausedUntilMs)
+                            heal.dest_x = 1.0f;
+                        else
+                            heal.spell_id = heal_spell::FirstRankOf(spellToCast);
+                        downrank = spellToCast;
+                    }
                     actions.push_back(heal);
                     state.CastTarget[heal.spell_id] = heal.target_guid;
                     state.CastTarget[spellToCast] = heal.target_guid;
-                    if (spellToCast == kRenew)
-                        state.BuffUntilMs[{ kRenew, PlayerRef(target->guid) }] = nowMs + kRenewMs;
+                    if (spellToCast == kRenew || spellToCast == heal_spell::kRejuvenation)
+                        state.BuffUntilMs[{ spellToCast, PlayerRef(target->guid) }] = nowMs + kRenewMs;
+                    if (spellToCast == heal_spell::kLayOnHands)
+                        state.RetryAtMs[heal_spell::kLayOnHands] = nowMs + 3600000;
                     if (spellToCast == kPowerWordShield)
                         state.BuffUntilMs[{ kPowerWordShield, heal.target_guid }] = nowMs + kShieldLockMs;
                     _healClaims[target->guid] = HealClaim{ healGroup, nowMs + kHealClaimMs };

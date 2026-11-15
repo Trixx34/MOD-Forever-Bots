@@ -429,6 +429,9 @@ void DungeonLearningKnobsAreBounded()
     CHECK(!defaults.HealWaitTankHold);
     BotSettings const healWait = ParseBotSettings({ { "HealWaitTankHold", "1" } }, warnings);
     CHECK(healWait.HealWaitTankHold && warnings.empty());
+    CHECK(!defaults.HealSpellMix);
+    BotSettings const healMix = ParseBotSettings({ { "HealSpellMix", "1" } }, warnings);
+    CHECK(healMix.HealSpellMix && warnings.empty());
 
     BotSettings const candidate = ParseBotSettings({ { "DungeonHealBelowPct", "60" }, { "DungeonTankHealBelowPct", "80" },
                                                      { "HealerDpsManaPct", "50" }, { "HealerLosMoveYards", "8" } }, warnings);

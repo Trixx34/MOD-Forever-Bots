@@ -275,7 +275,7 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
 
     // Protocol 28 (HealDownrank): an exact heal rank the bot has not learned (the level in the ladder is the trainer's, a bot may be behind): the plain heal (the core casts the
     // highest rank it knows) for ten minutes.
-    if (bot.last_action_type == uint8_t(ActionType::kCastSpell) && bot.last_action_status == BotActionStatus::kNotKnown && _options.HealDownrank &&
+    if (bot.last_action_type == uint8_t(ActionType::kCastSpell) && bot.last_action_status == BotActionStatus::kNotKnown && (_options.HealDownrank || _options.HealSpellMix) &&
         heal_ranks::IsLadderSpell(bot.last_action_spell))
     {
         state.HealDownrankPausedUntilMs = nowMs + kHealDownrankPauseMs;
