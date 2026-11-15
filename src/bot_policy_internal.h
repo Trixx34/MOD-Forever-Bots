@@ -687,7 +687,7 @@ NearbyUnit const* PullSinglePartner(std::span<NearbyUnit const> units, NearbyUni
 NearbyUnit const* PullTarget(BotSnapshot const& bot, std::span<NearbyUnit const> units,
                             std::function<bool(std::uint64_t)> const& avoided, bool defending,
                             std::vector<std::uint32_t> const& onlyEntries = {}, bool dungeon = false,
-                            std::function<bool(NearbyUnit const&)> const& leashed = {});
+                            std::function<bool(NearbyUnit const&)> const& leashed = {}, std::size_t dungeonCap = kMaxDungeonPull);
 
 // The flat distance from (x, y) to the leg of a dungeon route its leader is walking: the segment from point index - 1 to point index (at index 0, from `start`, the
 // instance entry, when known, else point 0 alone). Infinity for an empty route or an index past its end (the boss sweep after the route goes anywhere).

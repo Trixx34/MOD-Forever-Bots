@@ -194,6 +194,9 @@ struct PolicyOptions
     bool RaidFocusAvoidEnemy = false;
     bool PullOnePack = false;
     bool TankLooseSkipAvoidEnemy = false;
+    // FlexRoles (default off; flex_roles.h): when a party is formed with no warrior, a paladin or druid (in that order) takes the tank role, and one priest, shaman, druid or paladin
+    // the healer role; a party with a warrior keeps him as tank. An explicit role or roster spec is never changed. A paladin or druid tank pulls fewer mobs (DungeonPullCap).
+    bool FlexRoles = false;
     std::uint64_t RegroupRallyMs = 0;
     // RaidBossPositions (default off): `tank_spot` and `flank` rows of the raid rule table act (MoveBossPosition): the boss's victim, a tank, holds it from the tank spot,
     // everyone else that fights it stands on its flanks, out of its front and rear cones; a tank on a frontal telegraph holds.
@@ -986,6 +989,7 @@ private:
         enum class Stance : std::uint8_t { Aggressive, Defensive, Passive };
         Stance Stance_ = Stance::Defensive;              // aggressive: fights what the group fights or meets; defensive: only what attacks it or the group; passive: only what attacks it
         enum class Role : std::uint8_t { Auto, Tank, Healer, Dps };
+        bool FlexRole = false;                           // Role_ was set by FlexRoles (flex_roles.h) and is re-decided with each party cut; a chat role order clears it
         bool SpecRoleApplied = false;                    // the role was set from the roster spec once
         Role Role_ = Role::Auto;                         // overrides what the class gives (tank pulls and leads, dps does not heal on its own)
         std::uint64_t FocusMissingMs = 0;                // since when the focus target has not been in view
@@ -1155,6 +1159,10 @@ private:
     // The party planner (party_planner.h): one plan per party leader, from the members' merged view. Called by Decide with the planner on.
     void PlanParties(forever_module::WorldTickSnapshotView const& view, std::unordered_map<std::uint64_t, std::size_t> const& indexOf,
                      std::unordered_map<std::uint64_t, std::vector<std::uint64_t>> const& membersOf, std::uint64_t nowMs);
+    // The dungeon pull cap for a party led by `leaderGuid`: kMaxDungeonPull, one less under FlexRoles when a paladin or a druid leads (it is the tank).
+    std::size_t DungeonPullCapOf(std::uint64_t leaderGuid) const;
+    void AssignFlexRoles(forever_module::WorldTickSnapshotView const& view, std::unordered_map<std::uint64_t, std::size_t> const& indexOf,
+                         std::vector<std::uint64_t> const& party) const;
     void BuildParties(forever_module::WorldTickSnapshotView const& view,
                        std::unordered_map<std::uint64_t, std::size_t> const& indexOf,
                        std::unordered_map<std::uint64_t, std::uint64_t>& leaderOf,
@@ -1308,6 +1316,9 @@ private:
     std::uint32_t _ghostTeleportsInSecond = 0;
     std::unordered_map<std::uint64_t, std::vector<std::uint64_t>> _partyRevivesMs; // DungeonRevivesPerMinute: party leader guid -> the times its ghosts were put back (last 60 s)
     std::unordered_map<std::uint64_t, BotState> _bots; // bot guid -> state
+    // FlexRoles: the roles BuildParties picked this tick (guid -> 1 tank, 2 healer) and the last log line of each party, so a pick is logged once.
+    mutable std::unordered_map<std::uint64_t, std::uint32_t> _flexRoles;
+    mutable std::map<std::uint64_t, std::string> _flexLogged;
     std::vector<TalentOrder> _talentOrders;            // queued by Decide, taken by TakeTalentOrders
     std::vector<TalentOrder> _respecOrders;            // queued by Decide (TalentRespec), taken by TakeRespecOrders
     std::map<std::uint64_t, group_etiquette::Waiter> _etiquetteWait;   // party leader -> the etiquette wait (group_etiquette.h)

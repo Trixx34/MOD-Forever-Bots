@@ -665,6 +665,7 @@ void ZgLeverSettings()
                                               { "TankLooseSkipAvoidEnemy", "1" }, { "RegroupRallyMs", "60000" } }, w);
     CHECK(on.RaidAvoidEnemyMelee && on.RaidAvoidEnemyTank && on.RaidFocusAvoidEnemy && on.PullOnePack && on.TankLooseSkipAvoidEnemy && on.RegroupRallyMs == 60000 && w.empty());
     CHECK(ParseBotSettings({ { "RegroupRallyMs", "0" } }, w).RegroupRallyMs == 0 && w.empty());
+    CHECK(!defaults.FlexRoles && ParseBotSettings({ { "FlexRoles", "1" } }, w).FlexRoles && w.empty());
     CHECK(ParseBotSettings({ { "RegroupRallyMs", "1000" } }, w).RegroupRallyMs == 0 && !w.empty());
 }
 
