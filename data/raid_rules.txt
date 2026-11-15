@@ -10,6 +10,7 @@
 #   frontal|map|boss_entry|spell_id|name
 #   tank_spot|map|boss_entry|x|y|z|yards|name    the boss's victim (a tank) holds it from here, within yards (1..15); RaidBossPositions
 #   flank|map|boss_entry|front_deg|rear_deg|rear_yards|name   the rest stand out of the front cone and the rear cone (within rear_yards); RaidBossPositions
+#   pull_single|map|entry|yards|name             one at a time: not pulled while a second one of the entry stands within yards (5..60); RaidPullSingle
 #   spread|map|boss_entry|yards|who|name         who: all/ranged/healers/melee; boss_entry 0 = any engaged hostile of the map
 #   avoid_enemy|map|entry|yards|who|name         who also tanks (only with RaidAvoidEnemyTank); melee rows act only with RaidAvoidEnemyMelee
 #   avoid_enemy_aura|map|entry|yards|who|aura_id|name   as avoid_enemy, only while the hostile carries the aura (seen in a member's target_auras; unknown keeps the circle)
@@ -43,6 +44,11 @@ frontal|249|10184|18435|Flame Breath
 # within 30 yd. Flank points: the band middles (melee 5.5, healers 23, ranged 26 yd) at 74..106 degrees off her facing, by guid (the study's spots: 90 and 100 degrees).
 tank_spot|249|10184|-0.9|-217.2|-86.0|5|Onyxia: tank north of her spawn, she faces the north wall
 flank|249|10184|120|120|30|Onyxia: Flame Breath / Wing Buffet front 120, Tail Sweep rear 120 within 30 yd
+# Warders one at a time (module switch RaidPullSingle, default 0: the row does nothing then; the ghost hold RaidGhostFightHoldMaxMs acts on this map because of it).
+# 2026-11-13/14: 85% of the map's deaths were Warders on the way in (Fire Nova 20203, 20 yd; melee; Cleave 15754), 34-76 pulls per stall. Four Warders patrol the tunnel,
+# never within 10 yd of each other (study 2026-11-07); 30 yd = the nova's 20 plus a margin for the pulled one walking to the tank (an estimate, not measured).
+# No pullpos row: a pullpos is one fixed point per entry, and the Warders patrol different stretches of the tunnel.
+pull_single|249|12129|30|Onyxian Warder: one at a time (Fire Nova 20 yd)
 # Bellowing Roar (fear; the spell data has it as 22686, 18431 does not exist there): no tremor totem or fear ward is required of the party; nothing is listed on purpose.
 
 # ---- Zul'Gurub (map 309, 20-man) ----

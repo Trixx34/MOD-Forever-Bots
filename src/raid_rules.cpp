@@ -159,6 +159,14 @@ Table Parse(std::string_view text, std::vector<std::string>& errors)
             else if (!table.Edit(map).PullPositions.emplace(a, PullPosition{ x, y, z, yards }).second)
                 bad("pullpos: entry " + std::to_string(a) + " is listed twice; the first position is kept");
         }
+        else if (kind == "pull_single")
+        {
+            float yards = 0.0f;
+            if (f.size() < 4 || !Id(f[2], a) || !Radius(f[3], yards) || yards < 5.0f || yards > 60.0f)
+                bad("pull_single: expected 'pull_single|map|entry|yards|name' (yards 5..60)");
+            else if (!table.Edit(map).PullSingle.emplace(a, yards).second)
+                bad("pull_single: entry " + std::to_string(a) + " is listed twice; the first row is kept");
+        }
         else if (kind == "tank_spot")
         {
             float x = 0.0f, y = 0.0f, z = 0.0f, yards = 0.0f;
@@ -399,6 +407,20 @@ bool Table::HasTankSpot(std::uint32_t map) const
 {
     MapRules const* r = Find(map);
     return r && !r->TankSpots.empty();
+}
+
+float Table::PullSingleYards(std::uint32_t map, std::uint32_t entry) const
+{
+    if (MapRules const* r = Find(map))
+        if (auto const it = r->PullSingle.find(entry); it != r->PullSingle.end())
+            return it->second;
+    return 0.0f;
+}
+
+bool Table::HasPullSingle(std::uint32_t map) const
+{
+    MapRules const* r = Find(map);
+    return r && !r->PullSingle.empty();
 }
 
 namespace {

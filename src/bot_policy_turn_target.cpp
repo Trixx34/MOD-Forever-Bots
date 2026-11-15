@@ -4,6 +4,71 @@
 #include <cmath>
 #include "bot_policy_internal.h"
 
+// RaidPullSingle: another live unit of `unit`'s entry within `yards` of it, in `units` (nullptr: none).
+NearbyUnit const* bot_policy_detail::PullSinglePartner(std::span<NearbyUnit const> units, NearbyUnit const& unit, float yards)
+{
+    std::uint32_t const entry = forever_module::UnitRefEntry(unit.guid);
+    for (NearbyUnit const& other : units)
+        if (other.guid != unit.guid && IsLiveMob(other) && forever_module::UnitRefEntry(other.guid) == entry &&
+            std::hypot(other.pos_x - unit.pos_x, other.pos_y - unit.pos_y) <= yards)
+            return &other;
+    return nullptr;
+}
+
+// RaidPullSingle (Onyxia fix 3): the route leader, out of a fight, watches for a pair of a `pull_single` entry (two Onyxian Warders within the row's yards of each other,
+// one of them within the yards plus kPullSingleApproachYards of the leader). While there is one it holds its walk (RouteReadiness) and does not pull either of the two,
+// so the patrols part before one is pulled alone; kPullSingleHoldMaxMs after the hold began it goes on as before (the pair may stand still for good).
+void BotPolicy::PullSingleWatch(DecideTick& tick, BotTurn& turn)
+{
+    BotSnapshot const& bot = turn.bot;
+    BotState& state = turn.state;
+    std::uint64_t const nowMs = tick.nowMs;
+    turn.pullSingleHold = false;
+    turn.pullSinglePairs = false;
+    if (!_options.RaidPullSingle || !_options.RaidRules || !_options.RaidRules->HasPullSingle(bot.map_id) || !turn.routeOn || !turn.partyLeaderBot || bot.in_combat != 0 ||
+        PartyFighting(tick, bot.guid))
+    {
+        state.PullSingleSinceMs = 0;
+        return;
+    }
+    NearbyUnit const* first = nullptr;
+    NearbyUnit const* second = nullptr;
+    for (NearbyUnit const& unit : turn.nearby)
+    {
+        if (!IsLiveMob(unit))
+            continue;
+        float const yards = _options.RaidRules->PullSingleYards(bot.map_id, forever_module::UnitRefEntry(unit.guid));
+        if (yards <= 0.0f || std::hypot(unit.pos_x - bot.pos_x, unit.pos_y - bot.pos_y) > yards + kPullSingleApproachYards)
+            continue;
+        if (NearbyUnit const* partner = PullSinglePartner(turn.nearby, unit, yards))
+        {
+            first = &unit;
+            second = partner;
+            break;
+        }
+    }
+    if (!first)
+    {
+        state.PullSingleSinceMs = 0;
+        turn.pullSinglePairs = true;
+        return;
+    }
+    if (state.PullSingleSinceMs == 0)
+        state.PullSingleSinceMs = nowMs;
+    std::uint64_t const heldMs = nowMs - state.PullSingleSinceMs;
+    bool const capped = heldMs >= kPullSingleHoldMaxMs;
+    turn.pullSingleHold = !capped;
+    turn.pullSinglePairs = !capped;
+    if (_options.OnEvent && (state.PullSingleLogMs == 0 || nowMs - state.PullSingleLogMs >= kPullSingleLogMs))
+    {
+        state.PullSingleLogMs = nowMs;
+        _options.OnEvent(std::string("pull_single_hold: bot=") + std::to_string(bot.guid) + " entry=" + std::to_string(forever_module::UnitRefEntry(first->guid)) +
+                         " apart=" + std::to_string(int(std::hypot(first->pos_x - second->pos_x, first->pos_y - second->pos_y))) +
+                         " yards=" + std::to_string(int(std::hypot(first->pos_x - bot.pos_x, first->pos_y - bot.pos_y))) + " held_ms=" + std::to_string(heldMs) +
+                         (capped ? " reason=cap" : " reason=pair"));
+    }
+}
+
 void BotPolicy::TurnQuestsAndHold(DecideTick& tick, BotTurn& turn)
 {
     WorldTickSnapshotView const& view = tick.view;
@@ -471,6 +536,9 @@ void BotPolicy::TurnTargeting(DecideTick& tick, BotTurn& turn)
                 {
                     if (_options.PullOnePack && engaged.count(unit.guid) == 0 && unit.victim_ref == 0)
                         return true;   // PullOnePack: a unit that fights nobody is not reached for
+                    if (_options.RaidPullSingle && _options.RaidRules && engaged.count(unit.guid) == 0 && unit.victim_ref == 0 &&
+                        _options.RaidRules->PullSingleYards(bot.map_id, forever_module::UnitRefEntry(unit.guid)) > 0.0f)
+                        return true;   // RaidPullSingle: a Warder that fights nobody is not reached for by the pack focus either
                     return mapLeash != 0 && engaged.count(unit.guid) == 0 && OffPartyLeash(tick, partyLeader, bot.map_id, unit.pos_x, unit.pos_y, mapLeash, true, false);
                 };
                 for (NearbyUnit const& unit : nearby)
@@ -821,6 +889,7 @@ BotPolicy::TurnFlow BotPolicy::TurnTaming(DecideTick& tick, BotTurn& turn)
     // The combat-drift leash of a dungeon party (DungeonPullLeashYards, DungeonChaseLeashYards; PullTarget's `leashed`): the leader out of a fight pulls only along the
     // leg of the route it walks; a bot in a fight picks nothing that is off both that leg and its leader. The 2026-11-07 sim: the leaders' pulls were a median 66-72
     // yards off the route in Shadowfang Keep, the Stockade and Razorfen Kraul (10-20 in the Deadmines, Wailing Caverns, Ragefire Chasm), the route index frozen.
+    PullSingleWatch(tick, turn);
     std::function<bool(NearbyUnit const&)> leashed;
     std::uint64_t const leashParty = turn.partyLeader;
     bool const leaderPull = turn.partyLeaderBot && bot.in_combat == 0;
@@ -834,6 +903,26 @@ BotPolicy::TurnFlow BotPolicy::TurnTaming(DecideTick& tick, BotTurn& turn)
     {
         std::function<bool(NearbyUnit const&)> const outer = leashed;
         leashed = [outer](NearbyUnit const& unit) { return unit.victim_ref == 0 || (outer && outer(unit)); };
+    }
+    // RaidPullSingle (Onyxia fix 3, default off): a creature of a `pull_single` entry (Onyxian Warder) is taken one at a time. In a fight (the bot's or its party's) one that
+    // fights nobody is not picked (a second Warder patrolling past); out of a fight the leader does not pull one that has a second one of its entry within the row's yards,
+    // until the hold is over its cap (PullSingleWatch). Other creatures are not touched.
+    if (_options.RaidPullSingle && routeOn && leashParty != 0 && _options.RaidRules && _options.RaidRules->HasPullSingle(bot.map_id))
+    {
+        bool const fighting = bot.in_combat != 0 || PartyFighting(tick, leashParty);
+        bool const skipPairs = leaderPull && turn.pullSinglePairs;
+        if (fighting || skipPairs)
+        {
+            std::function<bool(NearbyUnit const&)> const outer = leashed;
+            std::span<NearbyUnit const> const units = nearby;
+            leashed = [outer, units, fighting, skipPairs, rules = _options.RaidRules.get(), mapId = bot.map_id](NearbyUnit const& unit)
+            {
+                float const yards = rules->PullSingleYards(mapId, forever_module::UnitRefEntry(unit.guid));
+                if (yards > 0.0f && ((fighting && unit.victim_ref == 0) || (!fighting && skipPairs && PullSinglePartner(units, unit, yards) != nullptr)))
+                    return true;
+                return outer && outer(unit);
+            };
+        }
     }
     if (targetRef != 0)
     {

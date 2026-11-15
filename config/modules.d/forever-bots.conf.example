@@ -535,6 +535,13 @@ Module.forever-bots.TelemetrySummarySec = 60
 # that way: Onyxia north of her spawn, facing the north wall) and `flank` (every other member fighting the boss stands on its flanks, none in its front or rear cone) act;
 # a tank also holds through a frontal telegraph (Flame Breath). Without such rows nothing changes. Log lines tank_spot: and boss_flank:.
 # Module.forever-bots.RaidBossPositions = 0
+# RaidPullSingle (default 0 = off; doc/raid-rules.md "Pull one at a time", Onyxia fix 3): the raid rule rows `pull_single` act. The route leader does not pull a creature
+# of a listed entry (Onyxian Warder) while a second one of the entry stands within the row's yards of it, and holds its walk while such a pair is near (60 s at most);
+# in a fight nobody picks one that fights nobody. Log line pull_single_hold:.
+# Module.forever-bots.RaidPullSingle = 0
+# RaidGhostFightHoldMaxMs (default 0 = off, else 10000..3600000; 300000 is a good value): on a map with a `pull_single` row (Onyxia's Lair) a dungeon ghost's teleport into
+# the instance (entrance, leader, corpse) waits while its party fights, at most this long per death. Log line ghost_teleport_hold: ... reason=party_fight.
+# Module.forever-bots.RaidGhostFightHoldMaxMs = 0
 
 # Mounts: a bot asks to mount up for a long walk only from MountMinLevel (default 40: classic riding is learned at 40; 0 = any level).
 # Module.forever-bots.MountMinLevel = 40

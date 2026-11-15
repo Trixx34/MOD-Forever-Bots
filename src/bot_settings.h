@@ -436,6 +436,12 @@ struct BotSettings
     // RaidBossPositions (default OFF; Onyxia fix 1, doc/raid-rules.md "Boss positions"): the `tank_spot` and `flank` rows act. The tank the boss attacks holds it from the
     // tank spot (so the boss faces the way the row sets), the other members that fight it stand on its flanks, none in its front or rear cone. Without rows nothing changes.
     bool RaidBossPositions = false;
+    // RaidPullSingle (default OFF; Onyxia fix 3, doc/raid-rules.md "Pull one at a time"): the `pull_single` rows act (a listed creature is pulled only when no second one of
+    // its entry stands within the row's yards of it; the leader holds its walk meanwhile, 60 s at most; in a fight nobody picks one that fights nobody).
+    bool RaidPullSingle = false;
+    // RaidGhostFightHoldMaxMs (0 = off, the default, else 10000..3600000; 300000 is a good value): on a map with a `pull_single` row a dungeon ghost's teleport into the
+    // instance waits while its party fights, at most this long per death.
+    std::uint32_t RaidGhostFightHoldMaxMs = 0;
     // RaidRulesFile (absolute path, data/raid_rules.txt; empty = none): the raid rule table, see raid_rules.h and the README.
     std::string RaidRulesFile;
     // CorpseRunTeleportSec (0 = off, else 10..3600): a ghost whose corpse run takes longer is put at its corpse (needs Bot.Actions.Teleport).

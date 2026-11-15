@@ -288,10 +288,152 @@ void ThreeDeathsAtOneSpotMakeTheBotAvoidIt()
     CHECK(!Logged(offEvents, "death_area:"));
 }
 
+// ---- RaidPullSingle and RaidGhostFightHoldMaxMs (Onyxia fix 3) ----
+
+// The pull_single row for the test creatures (HostileAt: entry 1) on the drift map 36.
+std::shared_ptr<raid_rules::Table const> PullSingleRules(char const* text = "pull_single|36|1|30|test Warder\n")
+{
+    std::vector<std::string> errors;
+    auto table = std::make_shared<raid_rules::Table>(raid_rules::Parse(text, errors));
+    CHECK(errors.empty());
+    return table;
+}
+
+NearbyUnit OtherEntryAt(std::uint64_t counter, float x, float y)
+{
+    NearbyUnit unit = HostileAt(counter, x, y);
+    unit.guid = MakeUnitRef(8, 2, counter);
+    return unit;
+}
+
+// The route leader (12) does not pull either of two listed creatures 15 yards apart and holds its walk (pull_single_hold); 60 s on it pulls as before. One alone is
+// pulled at once; without the key, or without a row, the pair is pulled as before.
+void PullSingleHoldsThePairAndPullsOneAlone()
+{
+    struct Result { bool pulled = false; bool walked = false; };
+    auto const run = [](bool key, char const* rules, float secondX, std::uint64_t until, std::vector<std::string>* events)
+    {
+        PolicyOptions options = DriftOptions(0, 0, events);
+        options.RaidPullSingle = key;
+        options.RaidRules = PullSingleRules(rules);
+        BotPolicy policy(options);
+        policy.SetRouteActive(true);
+        Result result;
+        for (std::uint64_t now = 1000; now <= until; now += 1000)
+        {
+            WorldTickSnapshotView view = DriftView();
+            AddNearby(view, 2, HostileAt(7, 20.0f, 0.0f));
+            AddNearby(view, 2, HostileAt(8, secondX, 0.0f));
+            std::vector<BotAction> const actions = policy.Decide(view, now);
+            for (std::uint64_t counter : { 7u, 8u })
+                result.pulled = result.pulled || HasAction(actions, 12, ActionType::kFollow, MakeUnitRef(8, 1, counter)) ||
+                                HasAction(actions, 12, ActionType::kAttackTarget, MakeUnitRef(8, 1, counter));
+            result.walked = result.walked || LeaderWalk(actions) == 100.0f;
+        }
+        return result;
+    };
+    char const* const row = "pull_single|36|1|30|test Warder\n";
+    std::vector<std::string> events;
+    Result const held = run(true, row, 35.0f, 30000, &events);
+    CHECK(!held.pulled && !held.walked);
+    CHECK(Logged(events, "pull_single_hold: bot=12 entry=1 apart=15"));
+    CHECK(run(true, row, 35.0f, 70000, nullptr).pulled);                        // past the 60 s cap
+    CHECK(run(true, row, 80.0f, 5000, nullptr).pulled);                         // 60 yards apart: one alone, pulled at once
+    CHECK(run(false, row, 35.0f, 5000, nullptr).pulled);                        // key off
+    CHECK(run(true, "pull_single|36|2|30|another entry\n", 35.0f, 5000, nullptr).pulled);   // no row for entry 1
+    CHECK(run(true, "pull_single|249|1|30|another map\n", 35.0f, 5000, nullptr).pulled);    // no row for the map
+}
+
+// In a fight a bot with no target of its own does not pick a listed creature that fights nobody (a second Warder walking past), even when it is the weaker; it takes
+// the one that fights the party. A creature of another entry, or the key off, is picked as before.
+void PullSingleInAFightTakesOnlyWhatFights()
+{
+    auto const picks = [](bool key, NearbyUnit idle)
+    {
+        PolicyOptions options = DriftOptions(0, 0);
+        options.RaidPullSingle = key;
+        options.RaidRules = PullSingleRules();
+        BotPolicy policy(options);
+        policy.SetRouteActive(true);
+        policy.Decide(DriftView(), 1000);
+        WorldTickSnapshotView view = DriftView();
+        view.bots[0].in_combat = 1;
+        view.bots[2].in_combat = 1;
+        idle.health = 15;                                                         // hurt: the weakest pick, but it fights nobody
+        NearbyUnit fighting = HostileAt(8, 3.0f, 0.0f);
+        fighting.victim_ref = PlayerOf(12);
+        AddNearby(view, 0, idle);
+        AddNearby(view, 0, fighting);
+        std::vector<BotAction> const actions = policy.Decide(view, 1500);
+        return HasAction(actions, 10, ActionType::kFollow, idle.guid) || HasAction(actions, 10, ActionType::kAttackTarget, idle.guid);
+    };
+    CHECK(picks(false, HostileAt(7, 6.0f, 0.0f)));
+    CHECK(!picks(true, HostileAt(7, 6.0f, 0.0f)));
+    CHECK(picks(true, OtherEntryAt(7, 6.0f, 0.0f)));                              // entry 2 has no row
+}
+
+// RaidGhostFightHoldMaxMs: on a map with a pull_single row a ghost of a fighting party is not put at the entrance (held, reason party_fight), and goes to its leader
+// once the fight is over; at most the key's time per death. Without the row or with the key at 0 it goes to the entrance during the fight as before.
+void AGhostWaitsOutThePartysFightOnAPullSingleMap()
+{
+    auto const build = [](bool fighting)
+    {
+        WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 });
+        for (BotSnapshot& bot : v.bots)
+        {
+            bot.map_id = 36;
+            bot.pos_x = 200.0f;
+        }
+        Ghost(v.bots[3], 0.0f, 36, 190.0f);
+        v.bots[3].map_id = 0;                                                      // the ghost is outside, at the graveyard
+        v.bots[1].in_combat = fighting ? 1 : 0;
+        return v;
+    };
+    auto const optionsOf = [](std::vector<std::string>* events, std::uint64_t maxMs, char const* rules)
+    {
+        PolicyOptions options = DeadOptions(events, AllWarriors);
+        options.RaidGhostFightHoldMaxMs = maxMs;
+        options.RaidRules = PullSingleRules(rules);
+        PolicyOptions::DungeonRoute dungeon;
+        dungeon.HasEntry = true;
+        dungeon.Entry = Point{ 0.0f, 0.0f, 0.0f };
+        options.DungeonsByMap[36] = dungeon;
+        return options;
+    };
+    char const* const row = "pull_single|36|1|30|test Warder\n";
+    std::vector<std::string> events;
+    BotPolicy policy(optionsOf(&events, 300000, row));
+    policy.SetRouteActive(true);
+    CHECK(!TeleportOf(policy.Decide(build(true), 1000), 13).has_value());
+    CHECK(Logged(events, "ghost_teleport_hold: bot=13 reason=party_fight dest=entrance map=36"));
+    CHECK(!TeleportOf(policy.Decide(build(true), 200000), 13).has_value());      // past the entrance wait: still held, no corpse run either
+    std::optional<BotAction> const quiet = TeleportOf(policy.Decide(build(false), 201000), 13);
+    CHECK(quiet.has_value() && quiet->spell_id == 36 && quiet->dest_x == 200.0f);  // the fight is over: to the leader
+    // the maximum: 300 s after the first held decision the ghost is no longer held; the entrance wait is long over, so it starts its corpse run as before
+    std::vector<std::string> expiryEvents;
+    BotPolicy expiring(optionsOf(&expiryEvents, 300000, row));
+    expiring.SetRouteActive(true);
+    CHECK(!TeleportOf(expiring.Decide(build(true), 1000), 13).has_value());
+    CHECK(!Logged(expiryEvents, "corpse_run_start: bot=13"));
+    expiring.Decide(build(true), 302000);
+    CHECK(Logged(expiryEvents, "corpse_run_start: bot=13"));
+    // no pull_single row for the map, or the key at 0: the entrance teleport during the fight, as before
+    BotPolicy otherMap(optionsOf(nullptr, 300000, "pull_single|249|1|30|another map\n"));
+    otherMap.SetRouteActive(true);
+    std::optional<BotAction> const entrance = TeleportOf(otherMap.Decide(build(true), 1000), 13);
+    CHECK(entrance.has_value() && entrance->dest_x == 0.0f);
+    BotPolicy off(optionsOf(nullptr, 0, row));
+    off.SetRouteActive(true);
+    CHECK(TeleportOf(off.Decide(build(true), 1000), 13).has_value());
+}
+
 } // namespace
 
 void RunPolicyTestsPart11()
 {
+    PullSingleHoldsThePairAndPullsOneAlone();
+    PullSingleInAFightTakesOnlyWhatFights();
+    AGhostWaitsOutThePartysFightOnAPullSingleMap();
     ADefensiveBotWalksOnPastACreatureThatAttacksNobody();
     ACasterWithNoSpellAtItsLevelMelees();
     AMemberDoesNotAssistOnACreatureFarAboveItsLevel();

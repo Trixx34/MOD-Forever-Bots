@@ -821,6 +821,9 @@ void BotPolicy::RouteReadiness(DecideTick& tick, BotTurn& turn, RouteLeg& route)
         else if (state.PullReadyStartMs == 0)
             state.PullReadyStartMs = nowMs;
         bool const gated = tired && nowMs - state.PullReadyStartMs < o.PullReadyMaxMs;
+        // RaidPullSingle: a pair of a pull_single entry near the leader holds the walk until they part (PullSingleWatch logs it, pull_single_hold).
+        if (!gated && !wipeWait && turn.pullSingleHold)
+            route.pullReady = false;
         if (gated || wipeWait)
         {
             route.pullReady = false;
