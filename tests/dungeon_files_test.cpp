@@ -712,6 +712,48 @@ void ConfigKeysNameTheFolders()
 
 } // namespace
 
+// ---- Ruins of Lordaeron and Hall of Thanes (2026-11-15): the proposed routes of doc/rol-hot-route-plan.md (data/dungeons-proposed, DungeonDir only) --------
+void RuinsAndHallProposedRoutesLoad()
+{
+    std::string const root = FOREVER_BOTS_SOURCE_DIR;
+    std::vector<std::string> warnings;
+    std::vector<Dungeon> const json = LoadDungeonDir(root + "/data/dungeons-proposed", true, warnings);
+    for (std::string const& w : warnings)
+        std::printf("dungeons-proposed: %s\n", w.c_str());
+    CHECK(warnings.empty());
+    auto const find = [&json](std::string const& id) -> Dungeon const* {
+        for (Dungeon const& d : json)
+            if (d.Id == id)
+                return &d;
+        return nullptr;
+    };
+    auto const bossPoints = [](Dungeon const& d) {
+        std::vector<std::pair<std::size_t, std::uint32_t>> out;
+        for (std::size_t i = 0; i < d.Route.size(); ++i)
+            if (d.Route[i].BossEntry != 0)
+                out.emplace_back(i, d.Route[i].BossEntry);
+        return out;
+    };
+    Dungeon const* rol = find("rol");
+    CHECK(rol && rol->MapId() == 2999 && rol->Route.size() == 39 && rol->DurationSec == 2700);
+    if (rol)
+    {
+        // the shipped boss order, the last boss is the last point (no walk on after Rath'mael), and the stop east of the Mangled Cadaver pack before the Baron
+        CHECK((bossPoints(*rol) == std::vector<std::pair<std::size_t, std::uint32_t>>{ { 4, 250483 }, { 14, 250660 }, { 32, 256097 }, { 38, 250657 } }));
+        CHECK(rol->Route[10].X == 1545.0f && rol->Route[10].Y == 140.0f);
+        CHECK(rol->Route[13].X == 1491.2f && rol->Route[13].Y == 153.9f);
+        CHECK((rol->KillPriority == std::vector<std::uint32_t>{ 250623 }));   // Mangled Cadaver (Cadaver Worms)
+    }
+    Dungeon const* hot = find("hot");
+    CHECK(hot && hot->MapId() == 3065 && hot->Route.size() == 16);
+    if (hot)
+    {
+        // Faldrim, Plunder (on the way: he patrols the hall), Magmatus, Durgen; no side-wing loops
+        CHECK((bossPoints(*hot) == std::vector<std::pair<std::size_t, std::uint32_t>>{ { 3, 261306 }, { 5, 261311 }, { 8, 261316 }, { 15, 261319 } }));
+        CHECK((hot->KillPriority == std::vector<std::uint32_t>{ 263397 }));   // Dark Iron Engineer (Throw Dynamite)
+    }
+}
+
 int main()
 {
     JsonReader();
@@ -727,6 +769,7 @@ int main()
     RazorfenDownsKillPriority();
     BlackfathomDeepsKillPriority();
     ConfigKeysNameTheFolders();
+    RuinsAndHallProposedRoutesLoad();
     if (failures != 0)
     {
         std::printf("dungeon_files_test: %d failure(s)\n", failures);

@@ -1,0 +1,56 @@
+{
+  "schema": 1,
+  "id": "hot",
+  "map": 3065,
+  "name": "Hall of Thanes",
+  "levels": [13, 18],
+  "roster": "2:1,5:5,8:8,2:9,5:4",
+  "entrance": {
+    "staging": { "map": 1, "x": 1629, "y": -4373, "z": 31 },
+    "portal": { "map": 0, "x": -4821, "y": -937.6, "z": 399.1 },
+    "entry": { "map": 3065, "x": -95.62, "y": -0.16, "z": 510.94 }
+  },
+  "run": { "duration_sec": 1800, "wipe_recovery_sec": 300 },
+  "route": [
+    { "x": -85.3, "y": 0.0, "z": 508.7 },
+    { "x": 19.5, "y": 2.9, "z": 500.2 },
+    { "x": 49.1, "y": 8.8, "z": 501.8 },
+    { "x": 61.1, "y": 8.2, "z": 501.6, "boss": 261306 },
+    { "x": 88.8, "y": 2.9, "z": 500.2 },
+    { "x": 129.9, "y": 0.0, "z": 500.2, "boss": 261311 },
+    { "x": 134.1, "y": -9.3, "z": 500.2 },
+    { "x": 149.3, "y": -64.0, "z": 493.0 },
+    { "x": 164.2, "y": -195.5, "z": 486.3, "boss": 261316 },
+    { "x": 148.5, "y": -42.7, "z": 499.1 },
+    { "x": 156.3, "y": -31.2, "z": 502.1 },
+    { "x": 177.3, "y": -2.9, "z": 500.2 },
+    { "x": 242.9, "y": -2.7, "z": 500.2 },
+    { "x": 304.0, "y": -2.7, "z": 500.2 },
+    { "x": 323.2, "y": -2.9, "z": 500.2 },
+    { "x": 351.6, "y": -9.8, "z": 500.8, "boss": 261319 }
+  ],
+  "bosses": [
+    {
+      "entry": 261306,
+      "name": "Faldrim Anvilmar",
+      "strategy": {}
+    },
+    {
+      "entry": 261311,
+      "name": "Plunder",
+      "strategy": {}
+    },
+    {
+      "entry": 261316,
+      "name": "Magmatus",
+      "strategy": {}
+    },
+    {
+      "entry": 261319,
+      "name": "Durgen Dirgehammer",
+      "strategy": {}
+    }
+  ],
+  "kill_priority": [263397],
+  "notes": "Proposed route 2026-11-15 (doc/rol-hot-route-plan.md), not the shipped one: load it with DungeonDir = <this folder>. Boss to boss over the navmesh (forever-ops ds_plan.py, plan_20261115): Faldrim Anvilmar (point 3), Plunder (5, he patrols the hall the party crosses anyway; 2 of 6 parties of 2026-11-13 killed him second), Magmatus (8), Durgen Dirgehammer (15). The west and east side-wing loops of the shipped route are dropped: 807 instead of 1679 yards, 63 instead of 107 hostiles. Every leg checked with navtool (path ok). kill_priority (acts with the focus tactic): Dark Iron Engineer (Throw Dynamite killed 6 of the 15 members that died in the six 2026-11-13 runs)."
+}

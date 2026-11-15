@@ -258,6 +258,7 @@ void TestShippedFile()
     CHECK(*t.AddRank(309, 11368) == 0 && *t.AddRank(309, 14965) == 0);
     CHECK(t.DispelKindOf(309, 16098) == DispelKind::Curse);
     CHECK(t.DispelKindOf(309, 23952) == DispelKind::Magic);
+    CHECK(t.DispelKindOf(2999, 16143) == DispelKind::Disease);    // Ruins of Lordaeron: Cadaver Worms (doc/rol-hot-route-plan.md)
     // trap objects are spell rows (kind 3 ground effects carry the trap's spell)
     {
         auto const zones = t.AvoidOf(309, false);

@@ -348,6 +348,34 @@ void PurgeCastsDispelMagicOnTheBuffedBoss()
     CHECK(!CastsSpell(elsewhere.Decide(otherMap, 1000), 14, 527));
 }
 
+// ---- dispel rows in a 5-man dungeon (Ruins of Lordaeron, doc/rol-hot-route-plan.md) ----
+// Cadaver Worms (16143, a disease) on the leader after the fight: the party's priest casts Cure Disease (528) on it, out of combat, on the dungeon map only.
+void DungeonPartyCuresCadaverWormsOutOfCombat()
+{
+    char const* const rule = "dispel|2999|16143|disease|Cadaver Worms\n";
+    RaidFixture f{ Classes, { { 4, 0 }, { 6, 0 }, { 0, 0 }, { 8, 0 }, { 10, 0 } }, false, 200.0f };
+    auto const quiet = [&f](std::uint32_t map) {
+        WorldTickSnapshotView view = RaidView(f, map);
+        for (BotSnapshot& bot : view.bots)
+        {
+            bot.in_combat = 0;
+            bot.threat_target_guid = 0;
+            bot.level = 20;
+        }
+        view.bots[2].aura_count = 1;                      // the warrior leader (12) carries the disease
+        view.bots[2].auras[0].spell_id = 16143;
+        return view;
+    };
+    BotPolicy policy(RaidOptions(Classes, rule));
+    CHECK(CastsSpell(policy.Decide(quiet(2999), 1000), 14, 528));
+    // the row is for map 2999: elsewhere nobody casts it
+    BotPolicy elsewhere(RaidOptions(Classes, rule));
+    CHECK(!CastsSpell(elsewhere.Decide(quiet(309), 1000), 14, 528));
+    // no row: no cast (the behaviour before the row)
+    BotPolicy noRow(RaidOptions(Classes, "dispel|309|16098|curse|x\n"));
+    CHECK(!CastsSpell(noRow.Decide(quiet(2999), 1000), 14, 528));
+}
+
 void PurgeShamanUsesPurgeAndNoOtherClassPurges()
 {
     auto const classes = [](std::uint64_t guid) -> std::uint32_t { return guid == 12 ? 1u : guid == 14 ? 7u : 8u; };   // 14 a shaman
@@ -690,6 +718,7 @@ void RunPolicyTestsPart10()
     RangedFocusIgnoresTheCircleOfItsOwnTarget();
     AvoidEnemyAuraHoldsOnlyWhileTheAuraIsOnOrUnknown();
     PurgeCastsDispelMagicOnTheBuffedBoss();
+    DungeonPartyCuresCadaverWormsOutOfCombat();
     PurgeShamanUsesPurgeAndNoOtherClassPurges();
     MindControlMageHoldsTheControlledMember();
     MindControlBackupWaitsAndNoRogueCasts();
