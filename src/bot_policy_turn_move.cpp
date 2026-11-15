@@ -1119,6 +1119,35 @@ void BotPolicy::RouteEvents(DecideTick& tick, BotTurn& turn, RouteLeg& route)
                 if (_options.DungeonTeleport)
                 {
                     wanted = Decision{ ActionType::kTeleport, 0, Point{ command.X, command.Y, command.Z }, bot.map_id };
+                    if (command.Party)
+                    {
+                        // teleport_party: the living members of this leader's party in the same instance go too, one slot each on a ring round the place so that they do not
+                        // stack. A dead member or ghost is not moved (its own recovery brings it to the party); a member on another map stays.
+                        std::vector<BotSnapshot const*> movers;
+                        if (auto const mine = tick.membersOf.find(bot.guid); mine != tick.membersOf.end())
+                            for (std::uint64_t member : mine->second)
+                                if (auto const at = tick.indexOf.find(member); at != tick.indexOf.end())
+                                {
+                                    BotSnapshot const& other = tick.view.bots[at->second];
+                                    if (other.life_state == 0 && other.map_id == bot.map_id)
+                                        movers.push_back(&other);
+                                }
+                        for (std::size_t slot = 0; slot < movers.size(); ++slot)
+                        {
+                            dungeon_events::Offset const off = dungeon_events::PartySpreadOffset(slot, movers.size());
+                            BotAction jump;
+                            jump.bot_guid = movers[slot]->guid;
+                            jump.type = ActionType::kTeleport;
+                            jump.spell_id = bot.map_id;
+                            jump.dest_x = command.X + off.Dx;
+                            jump.dest_y = command.Y + off.Dy;
+                            jump.dest_z = command.Z;
+                            actions.push_back(jump);
+                        }
+                        if (_options.OnEvent)
+                            _options.OnEvent("event_party_teleport: bot=" + std::to_string(bot.guid) + " members=" + std::to_string(movers.size()) + " to=" + std::to_string(int(command.X)) +
+                                             "," + std::to_string(int(command.Y)) + "," + std::to_string(int(command.Z)));
+                    }
                     // The route goes on from where the teleport puts the leader: the route point nearest to the destination, from the current one on (a bridge to a boss
                     // on a cut-off island lands on a point before the boss, the way back on the point after it). Without this the index stays at the point left behind.
                     if (route.routePoints && state.RouteIndex < route.routePoints->size())

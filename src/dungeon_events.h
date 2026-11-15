@@ -15,6 +15,8 @@
 //                                   (counted from 0), which starts a scripted event such as an escort (kGossip, SDK 0.24)
 //   follow <creature entry> <seconds>   step: follow that creature (an escort walking to its goal) for that long; a fight in the meantime holds the step
 //   teleport <x> <y> <z>            step: put the leader at the place (a scenario tool: DungeonTeleport, for a place the navmesh does not connect)
+//   teleport_party <x> <y> <z>      step: as teleport, and every living member of the leader's party in the same instance is put on a ring of 1 yard round the place,
+//                                   one slot each, so they do not stack (the leader stays at the place itself; ghosts are not moved: they have their own recovery)
 //   wait <seconds>                  step: stand still
 //   timeout <seconds>               the event is given up after this long (default 120)
 //   end
@@ -40,6 +42,7 @@ struct Step
     std::uint32_t Item = 0;       // Use: 0 = a click, else an item entry used on the object
     float X = 0.0f, Y = 0.0f, Z = 0.0f;
     std::uint32_t WaitSec = 0;    // Wait, Follow
+    bool Party = false;           // Teleport: the living party members go too (teleport_party / "party": true); false = the leader only
 };
 
 struct Event
@@ -81,7 +84,7 @@ struct Command
         Use,        // send kUseObject: Object, Item, with the place (X, Y, Z)
         Talk,       // send kGossip: Creature, Option, with the place (X, Y, Z)
         Follow,     // follow the creature Creature (kFollow); stand still when it is not in view
-        Teleport,   // put the leader at (X, Y, Z)
+        Teleport,   // put the leader at (X, Y, Z); with Party also its living members, spread round the place
     };
     What Do = What::Nothing;
     float X = 0.0f, Y = 0.0f, Z = 0.0f;
@@ -89,7 +92,14 @@ struct Command
     std::uint32_t Item = 0;
     std::uint32_t Creature = 0;
     std::uint32_t Option = 0;
+    bool Party = false;       // Teleport: the members go too
 };
+
+// Where member number `slot` (0-based) of `count` lands when the party is teleported to (x, y): a ring of kPartySpreadYards round the place, the first slot
+// straight east. The leader is at the centre.
+struct Offset { float Dx; float Dy; };
+Offset PartySpreadOffset(std::size_t slot, std::size_t count);
+constexpr float kPartySpreadYards = 1.0f;
 
 // The result of a kUseObject or kGossip that was sent.
 // Unclear: the core refused a Talk, but the creature's script may have run all the same (the Disciple of Naralex walks off); GoneAway: invalid target, the creature moved away.

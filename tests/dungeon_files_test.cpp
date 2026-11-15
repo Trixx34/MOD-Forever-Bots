@@ -459,6 +459,7 @@ struct CutOff
     float BX, BY, BZ;        // where the leader is put
     char const* BackId;
     std::uint32_t Boss;      // the cut-off boss
+    bool Party = false;      // both teleports move the whole party (teleport party: true), else the leader only
     bool BackToBoss = true;  // the back event lands on the route point of the boss before (else on a point of its own after the cut-off boss)
 };
 
@@ -503,6 +504,7 @@ void CheckOneCutOffBoss(std::vector<Dungeon> const& json, CutOff const& c)
     CHECK(bridge->Steps[0].X == c.BX && bridge->Steps[0].Y == c.BY && bridge->Steps[0].Z == c.BZ);
     CHECK(back->When == Event::Trigger::AfterBoss && back->Boss == c.Boss);
     CHECK(back->Steps.size() == 2 && back->Steps[0].What == Step::Kind::Teleport && back->Steps[1].What == Step::Kind::Wait);
+    CHECK(bridge->Steps[0].Party == c.Party && back->Steps[0].Party == c.Party);
     if (c.BackToBoss && at + 1 < d->Route.size())
         CHECK(back->Steps[0].X == d->Route[at].X && back->Steps[0].Y == d->Route[at].Y && back->Steps[0].Z == d->Route[at].Z);
 
@@ -538,7 +540,7 @@ void CutOffBossesAreBridgedByTeleportEvents()
     CHECK(warnings.empty());
     CheckOneCutOffBoss(json, { 48, "sarevess-bridge", 4887, -355.5f, 295.5f, -55.8f, "sarevess-back", 4831 });
     CheckOneCutOffBoss(json, { 48, "serrakis-bridge", 4832, -831.7f, -109.6f, -35.2f, "serrakis-back", 4830 });
-    CheckOneCutOffBoss(json, { 90, "electrocutioner-bridge", 7079, -537.9f, 528.3f, -216.1f, "electrocutioner-back", 6235, false });
+    CheckOneCutOffBoss(json, { 90, "electrocutioner-bridge", 7079, -537.9f, 528.3f, -216.1f, "electrocutioner-back", 6235, true, false });
 }
 
 // ---- Zul'Gurub proposal (2026-11-15, doc/zulgurub-route-plan.md): data/dungeons-proposed is loaded only with DungeonDir; it must load clean ----------------

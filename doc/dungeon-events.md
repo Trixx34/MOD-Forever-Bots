@@ -18,6 +18,7 @@ file. Format (`src/dungeon_events.h`):
     talk <creature entry> <option> <x> <y> <z>   (bots 0.42.0) walk to within 4 yards, then talk to the creature and pick gossip option <option> (from 0): kGossip
     follow <creature entry> <seconds>   (bots 0.42.0) follow that creature (an escort) for that long
     teleport <x> <y> <z>                (bots 0.42.0) put the leader at the place (DungeonTeleport)
+    teleport_party <x> <y> <z>          as teleport, and the living members of the leader's party on the map go too, on a 1-yard ring round the place (ghosts stay; JSON: "party": true)
     after_bosses <entry> <entry> ...    trigger (bots 0.42.0): once every one of those bosses is dead
     wait <seconds>
     timeout <seconds>                   given up after this long (default 120)
