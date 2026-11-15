@@ -416,7 +416,9 @@ void BotPolicy::TurnTargeting(DecideTick& tick, BotTurn& turn)
         }
         NearbyUnit const* near = FindLiveMob(nearby, leaderTarget);
         // A target with a raid rules `pullpos` row is pulled by the tank from its position: no member is excused from the hold for standing near it.
-        bool const positioned = _options.RaidRules && _options.RaidRules->PullPositionOf(bot.map_id, forever_module::UnitRefEntry(leaderTarget)).has_value();
+        bool const positioned = _options.RaidRules &&
+                                (near ? _options.RaidRules->PullPositionOf(bot.map_id, forever_module::UnitRefEntry(leaderTarget), near->pos_x, near->pos_y)
+                                      : _options.RaidRules->PullPositionOf(bot.map_id, forever_module::UnitRefEntry(leaderTarget))).has_value();
         bool const noWalk = !positioned && near && std::hypot(near->pos_x - bot.pos_x, near->pos_y - bot.pos_y) <= float(_options.PullMemberRangeYards);
         pullHeld = nowMs - state.PullHoldSinceMs < _options.PullTankHoldMs && !noWalk;
         if (pullHeld && _options.OnEvent && (state.PullHoldLogMs == 0 || nowMs - state.PullHoldLogMs >= 10000))

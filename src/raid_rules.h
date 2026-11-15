@@ -25,6 +25,9 @@
 //   leash|map|yards|name                       the route leader of a dungeon party pulls only hostiles within `yards` (10..80) of the route leg on this map (narrows DungeonPullLeashYards, never widens it); it also narrows the pick of a new target by a party in a fight (the chase leash), not the defence against what attacks
 //   pullpos|map|entry|x|y|z|yards[|name]       the tank pulls a creature of this entry from this position (outside its throw range, or behind a corner): it walks to within `yards` (2..40) of the point
 //                                              before it pulls, goes back to it once the pull has landed, and the other members stay where they are until the tank is in the fight
+//   pullpos_near|map|entry|x|y|z|yards|cx|cy|reach[|name]   the same, but only for a creature of this entry that stands within `reach` (2..200) yards of (cx, cy): one camp, not
+//                                              every creature of the entry on the map. Several rows per entry; the one whose (cx, cy) is nearest the creature wins, and a `pullpos`
+//                                              row of the entry is the fallback for a creature outside every reach
 //   tank_spot|map|boss_entry|x|y|z|yards|name  the tank the boss is attacking holds it from this point (within `yards`, 1..15): the boss turns to face the tank, so the point
 //                                              sets which way its frontal casts go (Onyxia: north of her spawn, she faces the north wall). Module switch RaidBossPositions
 //   flank|map|boss_entry|front_deg|rear_deg|rear_yards|name   the members other than the boss's victim stand on its flanks: none in the front cone (front_deg wide, any
@@ -88,6 +91,16 @@ struct PullPosition
     float Yards = 0.0f;
 };
 
+// pullpos_near: a pull position for one camp of an entry (the creatures within Reach yards of CenterX, CenterY).
+struct ScopedPullPosition
+{
+    std::uint32_t Entry = 0;
+    PullPosition Pos;
+    float CenterX = 0.0f;
+    float CenterY = 0.0f;
+    float Reach = 0.0f;
+};
+
 // tank_spot: where the tank holds the boss from (the boss faces the tank, so it faces from its own position toward this point).
 struct TankSpot
 {
@@ -121,6 +134,7 @@ struct MapRules
     std::map<std::uint32_t, std::string> Purge;             // enemy aura id -> name
     std::map<std::uint32_t, std::string> MindControl;       // aura id on a member -> name
     std::map<std::uint32_t, PullPosition> PullPositions;    // creature entry -> where the tank pulls it from
+    std::vector<ScopedPullPosition> ScopedPullPositions;    // pullpos_near rows, in file order
     std::map<std::uint32_t, TankSpot> TankSpots;            // boss entry -> where its tank holds it from
     std::map<std::uint32_t, FlankRule> Flanks;              // boss entry -> its front and rear cones
     std::map<std::uint32_t, float> PullSingle;              // creature entry -> the yards within which a second one of the entry makes a pair (pull_single)
@@ -155,6 +169,9 @@ public:
     bool IsMindControlAura(std::uint32_t map, std::uint32_t aura) const;
     // Where the tank pulls a creature of this entry from, nullopt when the map has no `pullpos` row for it.
     std::optional<PullPosition> PullPositionOf(std::uint32_t map, std::uint32_t entry) const;
+    // The same for one creature standing at (unitX, unitY): the `pullpos_near` row of its entry whose centre is nearest it within the row's reach, else the
+    // map-wide `pullpos` row, else nullopt.
+    std::optional<PullPosition> PullPositionOf(std::uint32_t map, std::uint32_t entry, float unitX, float unitY) const;
     bool IsFrontal(std::uint32_t map, std::uint32_t bossEntry, std::uint32_t spell) const;
     // A frontal row of any boss of the map names the spell (a telegraph carries a caster ref, not a boss entry).
     bool IsFrontalAny(std::uint32_t map, std::uint32_t spell) const;

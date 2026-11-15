@@ -1,0 +1,166 @@
+# Zul'Gurub (map 309): proposed bot route, 2026-11-15 (bots branch feature/zg-route-plan, doc/zulgurub-route-plan.md). Made by forever-ops scripts/dungeon-study/ds_plan.py (DS_PLAN_KEY=plan_zg_20261115)
+# from the sim's world DB (read-only) and the map-309 navmesh (the sim's mmaps). NOT applied to data/dungeons.txt or 309-zulgurub.json:
+# The same route as JSON: data/dungeons-proposed/309-zulgurub.json (DungeonDir). That file adds the entry point as route point 0, so its index = the index here + 1.
+# copy it over the `zulgurub` block (or into the JSON "route") after a sim run. Docs: docs/dungeon-studies.md, docs/dungeon-studies/zulgurub_route_study.html.
+# Verdict: PROPOSED (to the first boss: 32 hostiles instead of 40, danger 355 instead of 432, largest pack 7 instead of 15 (+10); every leg walkable (the shipped route has 2 blocked legs and a boss point on the neutral Zanza)).
+#
+# Shipped route (origin/test): 224 points, 4884 walked yards, meets 217 hostiles (204 elites), 19 packs over the 4-mob cap, danger 2690.0.
+# This route:                  140 points, 5504 walked yards, meets 246 hostiles (215 elites), 22 packs over the 4-mob cap, danger 2954.0.
+# Boss order: Venoxis, Jeklik, Mar'li, Mandokir, Zath/Lor'Khan/Thekal, Jin'do, Hakkar (Hakkar last: the priests empower him). Zanza the Restless (15042, neutral) is no boss point.
+# Venoxis and Jeklik stand on navmesh islands of their own: their boss points are the nearest main-mesh points (15 and 12 yards off).
+# Every `go` point is a corner of the navmesh path (on the mesh by construction), except event teleport landings, which stay route points so
+# that the teleport snaps the route index to them. The boss order is the one noted above; ZG has no events.
+# Safe rest points (route index, 0-based, as in the log's point=N): 0, 1, 2, 6, 7, 8, 9, 11, 12, 15, 17, 27, 28, 29, 30, 32, 33, 38, 40, 41, 42, 43, 44, 45, 48, 52, 56, 59, 60, 61, 67, 68, 69, 70, 71, 72, 73, 74, 88, 89, 90, 91, 92, 93, 95, 96, 100, 107, 108, 109, 112, 113, 114, 116, 119, 123, 125, 128, 129.
+# Last rest point before each boss: High Priest Venoxis: 17; High Priestess Jeklik: 33; High Priestess Mar'li: 61; Bloodlord Mandokir: 74; Zealot Zath: 100; Zealot Lor'Khan: 107; High Priest Thekal: 108; Jin'do the Hexxer: 119; Hakkar: 129.
+# Not verified without a sim run: line of sight (the vmaps are not read here), doors (navmesh paths ignore them), event timing.
+
+dungeon zulgurub
+name Zul'Gurub
+levels 60 60
+roster 2:1,5:5,8:8,2:9,5:4
+staging 1 -4753.31 -3752.42 48.2
+portal 0 -11916.7 -1215.7 92.3
+entry 309 -11913 -1226 92.5
+duration 3600
+wipe_recovery 300
+go -11914.4 -1250.7 92.7
+go -11909.9 -1266.9 90.8
+go -11906.9 -1269.9 87.3
+go -11890.1 -1275.7 85.5
+go -11872.5 -1287.7 82.3
+go -11869.6 -1289.1 79.9
+go -11840.0 -1301.3 66.3
+go -11810.7 -1317.6 62.0
+go -11820.0 -1330.4 65.2
+go -11833.6 -1337.1 64.7
+go -11854.7 -1354.1 62.8
+go -11882.7 -1408.0 61.5
+go -11917.3 -1441.6 41.7
+go -11939.5 -1519.7 42.8
+go -11944.3 -1531.7 39.6
+go -11972.5 -1553.3 40.9
+go -11987.2 -1567.2 26.5
+go -12001.1 -1600.0 26.0
+go -12002.1 -1611.5 32.9
+go -11996.5 -1622.1 33.4
+go -11996.8 -1653.3 34.0
+go -11998.7 -1666.7 32.4
+go -12009.1 -1688.0 32.4
+boss 14507 -12018.6 -1698.4 39.5 High Priest Venoxis
+go -12011.5 -1689.6 32.4
+go -11998.7 -1666.7 32.4
+go -11989.3 -1621.3 33.4
+go -11988.5 -1600.0 26.0
+go -11984.5 -1568.0 26.5
+go -11979.5 -1558.7 34.8
+go -11968.0 -1546.7 41.5
+go -12010.7 -1514.7 66.0
+go -12042.4 -1483.2 82.5
+go -12102.1 -1472.8 130.0
+go -12181.3 -1450.7 130.8
+go -12245.3 -1408.0 130.8
+go -12273.6 -1389.1 132.3
+boss 14517 -12289.5 -1384.6 133.7 High Priestess Jeklik
+go -12266.7 -1386.7 130.8
+go -12202.7 -1472.0 130.8
+go -12044.8 -1482.4 83.9
+go -12010.7 -1514.7 66.0
+go -11965.6 -1540.8 43.1
+go -11972.5 -1553.3 40.9
+go -11987.2 -1567.2 26.5
+go -12001.1 -1600.0 26.0
+go -12002.1 -1611.5 32.9
+go -11996.5 -1622.1 33.4
+go -12010.7 -1642.7 36.4
+go -12032.0 -1649.9 40.1
+go -12046.1 -1667.7 41.7
+go -12052.0 -1682.4 43.6
+go -12053.9 -1695.7 44.1
+go -12053.3 -1728.0 49.7
+go -12049.9 -1742.9 54.0
+go -12048.0 -1757.3 57.4
+go -12069.1 -1776.8 71.0
+go -12092.0 -1791.7 80.6
+go -12104.3 -1786.9 81.2
+go -12117.3 -1749.3 80.1
+go -12128.3 -1694.1 82.8
+go -12224.0 -1685.3 125.2
+go -12273.6 -1652.5 131.2
+go -12288.0 -1639.7 132.0
+boss 14510 -12326.5 -1577.1 133.6 High Priestess Mar'li
+go -12309.3 -1621.3 130.9
+go -12300.8 -1635.7 131.7
+go -12245.3 -1685.3 130.8
+go -12220.8 -1691.5 125.2
+go -12131.5 -1693.1 83.8
+go -12126.1 -1723.2 81.2
+go -12125.1 -1758.7 81.2
+go -12119.7 -1800.3 80.4
+go -12124.5 -1809.1 80.6
+go -12138.7 -1813.3 84.1
+go -12239.7 -1829.9 131.8
+go -12248.8 -1835.2 132.1
+go -12266.7 -1877.3 133.3
+go -12282.7 -1893.1 132.5
+go -12266.7 -1920.0 130.4
+go -12224.0 -1941.3 130.5
+go -12196.5 -1945.9 130.5
+boss 11382 -12167.8 -1927.2 153.7 Bloodlord Mandokir
+go -12196.5 -1945.9 130.5
+go -12224.0 -1941.3 130.5
+go -12266.7 -1920.0 130.4
+go -12284.0 -1901.3 130.4
+go -12266.7 -1856.0 132.3
+go -12248.8 -1835.2 132.1
+go -12239.7 -1829.9 131.8
+go -12181.3 -1813.3 104.4
+go -12126.1 -1809.6 81.2
+go -12096.0 -1792.0 80.6
+go -12053.3 -1770.7 62.5
+go -12042.1 -1763.5 58.2
+go -12017.3 -1762.1 55.6
+go -12002.4 -1762.1 55.6
+go -11982.7 -1765.6 55.8
+go -11968.0 -1770.7 54.5
+go -11921.6 -1805.3 51.3
+go -11904.0 -1813.3 51.3
+go -11858.7 -1817.6 51.6
+go -11842.9 -1820.8 52.1
+go -11818.7 -1834.7 50.2
+go -11734.9 -1857.1 41.4
+go -11724.8 -1861.6 42.3
+go -11712.0 -1962.7 59.1
+boss 11348 -11699.3 -1992.6 62.0 Zealot Zath
+boss 11347 -11702.6 -1992.6 62.0 Zealot Lor'Khan
+boss 14509 -11700.8 -1998.9 62.4 High Priest Thekal
+go -11712.0 -1920.0 55.9
+go -11713.6 -1869.9 45.2
+go -11662.7 -1822.4 43.6
+go -11648.0 -1792.0 39.6
+go -11645.3 -1766.4 33.5
+go -11641.6 -1725.6 36.4
+go -11631.7 -1585.9 40.8
+go -11626.7 -1536.0 40.8
+go -11603.2 -1362.1 79.0
+go -11568.8 -1316.0 79.2
+go -11534.1 -1286.4 79.2
+boss 11380 -11515.8 -1275.5 79.7 Jin'do the Hexxer
+go -11531.7 -1286.7 79.5
+go -11567.7 -1314.7 79.2
+go -11600.8 -1358.4 79.0
+go -11642.9 -1490.4 44.6
+go -11656.5 -1510.4 40.6
+go -11669.3 -1510.7 40.8
+go -11740.3 -1491.2 41.7
+go -11776.0 -1536.0 19.9
+go -11783.7 -1564.5 20.9
+go -11783.7 -1578.7 31.1
+go -11783.2 -1590.1 37.2
+go -11752.8 -1602.1 40.9
+go -11742.7 -1642.7 34.0
+go -11742.9 -1658.7 37.2
+go -11744.3 -1681.9 40.9
+go -11765.1 -1687.2 52.1
+go -11776.0 -1685.3 52.9
+boss 14834 -11787.4 -1649.3 54.1 Hakkar
+end

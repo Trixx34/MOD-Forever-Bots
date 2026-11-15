@@ -460,6 +460,12 @@ struct BotSettings
     // GhostHoldAvoidEnemyMaxMs (default 0 = off, else up to 3600000; 300000 is a good value): a dungeon ghost's teleport (entrance, party, leader rejoin, corpse) waits while a fighting hostile of
     // an avoid_enemy row stands within max(30, the row's yards) of the destination, at most this long per death (ghost_teleport_hold reason=avoid_enemy).
     std::uint32_t GhostHoldAvoidEnemyMaxMs = 0;
+    // GhostHoldPartyFightMaxMs (default 0 = off, else 1000..3600000; 180000 is a good value): a dungeon ghost's entrance teleport (the core revives it there at half health) waits while a
+    // living member of its party is in combat, this long at most per death; after the fight it is revived beside the leader (ghost_teleport_hold reason=party_fight).
+    std::uint32_t GhostHoldPartyFightMaxMs = 0;
+    // DungeonRevivesPerMinute (default 0 = off, else 1..40): at most this many ghosts of one dungeon party are put back into the instance (entrance, leader, leader rejoin) in 60 s
+    // (ghost_teleport_hold reason=revive_cap).
+    std::uint32_t DungeonRevivesPerMinute = 0;
     std::uint32_t DeathLockoutCount = 4;
     std::uint32_t DeathLockoutWindowMs = 600000;
     std::uint32_t DeathLockoutHoldMs = 90000;

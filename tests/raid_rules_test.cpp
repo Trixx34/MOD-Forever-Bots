@@ -167,6 +167,33 @@ void TestPullSingle()
     CHECK(t.HasPullSingle(249) && !t.HasPullSingle(309));
 }
 
+// pullpos_near: one camp of an entry; the nearest centre within its reach wins, a `pullpos` row of the entry is the fallback, the 2-argument query sees only `pullpos` rows.
+void TestScopedPullPosition()
+{
+    std::vector<std::string> errors;
+    Table t = Parse("pullpos_near|309|11350|-11872.5|-1287.7|82.3|8|-11830|-1321|12|stairs camp\n"
+                    "pullpos_near|309|11350|-11939.5|-1519.7|42.8|8|-11965|-1552|12|south camp\n"
+                    "pullpos_near|309|11350|1|2|3|8|-11968|-1556|12|overlapping, farther centre\n"
+                    "pullpos_near|309|11830|1|2|3|8|4|5|1|reach too small\n"
+                    "pullpos_near|309|11830|1|2|3|8|4|5|201|reach too big\n"
+                    "pullpos_near|309|11830|1|2|3|41|4|5|10|yards too big\n"
+                    "pullpos_near|309|11830|1|2|3|8|4|5\n",          // too short
+                    errors);
+    CHECK(errors.size() == 4);
+    std::optional<PullPosition> const stairs = t.PullPositionOf(309, 11350, -11830.6f, -1317.0f);
+    CHECK(stairs.has_value() && stairs->X == -11872.5f && stairs->Y == -1287.7f && stairs->Yards == 8.0f);
+    std::optional<PullPosition> const south = t.PullPositionOf(309, 11350, -11966.0f, -1553.0f);
+    CHECK(south.has_value() && south->X == -11939.5f);
+    CHECK(!t.PullPositionOf(309, 11350, -11882.7f, -1316.1f));    // the shelf throwers: in no reach
+    CHECK(!t.PullPositionOf(309, 11350));                          // no map-wide row
+    CHECK(!t.PullPositionOf(309, 11830, 4.0f, 5.0f) && !t.PullPositionOf(249, 11350, -11830.6f, -1317.0f));
+    Table both = Parse("pullpos|309|11371|-11810|-1317|62|8|map-wide\n"
+                       "pullpos_near|309|11371|-11872.5|-1287.7|82.3|8|-11864|-1315|10|shelf camp\n", errors);
+    CHECK(both.PullPositionOf(309, 11371, -11866.1f, -1313.0f)->X == -11872.5f);
+    CHECK(both.PullPositionOf(309, 11371, -11738.0f, -1336.0f)->X == -11810.0f);
+    CHECK(both.PullPositionOf(309, 11371)->X == -11810.0f);
+}
+
 void TestErrors()
 {
     std::vector<std::string> errors;
@@ -295,7 +322,7 @@ void TestShippedFile()
     CHECK(t.IsPurgeAura(309, 23895) && t.IsMindControlAura(309, 24327));
     CHECK(!t.AvoidEnemyFor(309, 14507).empty() && t.AvoidEnemyFor(309, 14507)[0].Yards == 15.0f);
     CHECK(!t.SpreadFor(309, 14507).empty());
-    CHECK(!t.PullPositionOf(309, 11350));    // the lone thrower shares the entry: no pullpos row, Axe Flurry is avoided (avoid_enemy)
+    CHECK(!t.PullPositionOf(309, 11350));    // no map-wide row for the thrower (the entry has many camps); pullpos_near rows below
     // healers, ranged, and (ZG levers, acted on only with RaidAvoidEnemyMelee / RaidAvoidEnemyTank) melee and tanks
     auto const thrower = t.AvoidEnemyFor(309, 11350);
     CHECK(thrower.size() == 4);
@@ -305,9 +332,15 @@ void TestShippedFile()
     CHECK(groups == (kWhoAll | kWhoTanks));
     for (std::uint32_t entry : { 11371u, 11372u })
     {
-        std::optional<PullPosition> const pos = t.PullPositionOf(309, entry);
+        CHECK(!t.PullPositionOf(309, entry));    // no map-wide row since 2026-11-15: the shelf camp only (pullpos_near)
+        std::optional<PullPosition> const pos = t.PullPositionOf(309, entry, -11866.1f, -1313.0f);
         CHECK(pos.has_value() && pos->X == -11872.5f && pos->Y == -1287.7f && pos->Yards == 8.0f);
+        CHECK(!t.PullPositionOf(309, entry, -11737.7f, -1335.7f));    // the snakes at shipped route point 14: no pull position
     }
+    // the stairs camp (pack 72) is pulled from the ledge; the shelf throwers (pack 61) have no pull position
+    CHECK(t.PullPositionOf(309, 11350, -11830.6f, -1317.0f)->X == -11872.5f && t.PullPositionOf(309, 11830, -11829.2f, -1324.6f)->X == -11872.5f);
+    CHECK(!t.PullPositionOf(309, 11350, -11882.7f, -1316.1f));
+    CHECK(t.PullPositionOf(309, 11350, -11969.0f, -1558.0f)->X == -11939.5f);    // pack 122, proposed route point 14
 }
 
 } // namespace
@@ -322,6 +355,7 @@ int main()
     TestTanksGroup();
     TestPullPosition();
     TestPullSingle();
+    TestScopedPullPosition();
     TestErrors();
     TestMerge();
     TestBossPositionRows();

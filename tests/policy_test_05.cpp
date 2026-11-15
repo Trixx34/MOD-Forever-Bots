@@ -1317,8 +1317,110 @@ void AGhostTeleportWaitsForAFightingAvoidEnemyHostile()
     CHECK(TeleportOf(off.Decide(build(true, 11350), 1000), 13).has_value());
 }
 
+// GhostHoldPartyFightMaxMs: a dungeon ghost is not put at the entrance (revived there mid-fight) while a living member of its party fights; after the fight it goes to
+// the leader; the hold ends at the maximum (then the entrance, not a corpse run); 0 = the old behaviour (the entrance at once).
+void AGhostWaitsForItsPartysFightToEnd()
+{
+    auto const build = [](bool fighting)
+    {
+        WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 });
+        for (BotSnapshot& bot : v.bots)
+        {
+            bot.map_id = 36;
+            bot.pos_x = 200.0f;
+        }
+        Ghost(v.bots[3], 0.0f, 36, 190.0f);                                    // 13: a ghost outside at the graveyard, its corpse at 190
+        v.bots[3].map_id = 0;
+        v.bots[0].in_combat = fighting ? 1 : 0;                                // 10 fights
+        return v;
+    };
+    auto const optionsOf = [](std::vector<std::string>* events, std::uint64_t maxMs)
+    {
+        PolicyOptions options = DeadOptions(events, AllWarriors);
+        options.GhostHoldPartyFightMaxMs = maxMs;
+        PolicyOptions::DungeonRoute dungeon;
+        dungeon.HasEntry = true;
+        dungeon.Entry = Point{ 0.0f, 0.0f, 0.0f };
+        options.DungeonsByMap[36] = dungeon;
+        return options;
+    };
+    std::vector<std::string> events;
+    BotPolicy policy(optionsOf(&events, 180000));
+    policy.SetRouteActive(true);
+    CHECK(!TeleportOf(policy.Decide(build(true), 1000), 13).has_value());
+    CHECK(Logged(events, "ghost_teleport_hold: bot=13 reason=party_fight dest=entrance"));
+    CHECK(!TeleportOf(policy.Decide(build(true), 120000), 13).has_value());   // past the entrance wait's 90 s: still held, no corpse run
+    CHECK(!Logged(events, "corpse_run_start: bot=13"));
+    std::optional<BotAction> const toLeader = TeleportOf(policy.Decide(build(false), 121000), 13);
+    CHECK(toLeader.has_value() && toLeader->spell_id == 36 && toLeader->dest_x == 200.0f);   // the fight is over: beside the leader
+    // the maximum: 180 s after the first hold the ghost goes to the entrance anyway
+    std::vector<std::string> expiringEvents;
+    BotPolicy expiring(optionsOf(&expiringEvents, 180000));
+    expiring.SetRouteActive(true);
+    CHECK(!TeleportOf(expiring.Decide(build(true), 1000), 13).has_value());
+    std::optional<BotAction> const late = TeleportOf(expiring.Decide(build(true), 182000), 13);
+    CHECK(late.has_value() && late->spell_id == 36 && late->dest_x == 0.0f);
+    CHECK(!Logged(expiringEvents, "corpse_run_start: bot=13"));
+    // the leader's own ghost (10, the first warrior) is not held for the fight; a member's ghost (13) still is
+    std::vector<std::string> leaderEvents;
+    BotPolicy leaderDead(optionsOf(&leaderEvents, 180000));
+    leaderDead.SetRouteActive(true);
+    WorldTickSnapshotView tankless = build(false);
+    Ghost(tankless.bots[0], 0.0f, 36, 190.0f);
+    tankless.bots[0].map_id = 0;
+    tankless.bots[1].in_combat = 1;                                            // 11 fights
+    for (std::uint64_t at = 1000; at <= 200000; at += 20000)
+        leaderDead.Decide(tankless, at);
+    CHECK(!LoggedWith(leaderEvents, "ghost_teleport_hold: bot=10 reason=party_fight"));
+    CHECK(LoggedWith(leaderEvents, "ghost_teleport_hold: bot=13 reason=party_fight"));
+    // off: the entrance at once, as before
+    BotPolicy off(optionsOf(nullptr, 0));
+    off.SetRouteActive(true);
+    std::optional<BotAction> const now = TeleportOf(off.Decide(build(true), 1000), 13);
+    CHECK(now.has_value() && now->dest_x == 0.0f);
+}
+
+// DungeonRevivesPerMinute: at most N ghosts of one party are put back in any 60 s; the others wait (reason revive_cap); 0 = no cap.
+void APartysRevivesAreCappedPerMinute()
+{
+    auto const build = []()
+    {
+        WorldTickSnapshotView v = PartyView({ 10, 11, 12, 13, 14 });
+        for (BotSnapshot& bot : v.bots)
+        {
+            bot.map_id = 36;
+            bot.pos_x = 200.0f;
+        }
+        for (std::size_t i : { 3, 4 })
+        {
+            Ghost(v.bots[i], 0.0f, 36, 190.0f);                                // 13 and 14: ghosts outside, the party is quiet
+            v.bots[i].map_id = 0;
+        }
+        return v;
+    };
+    auto const count = [](std::vector<BotAction> const& actions)
+    {
+        return int(TeleportOf(actions, 13).has_value()) + int(TeleportOf(actions, 14).has_value());
+    };
+    std::vector<std::string> events;
+    PolicyOptions options = DeadOptions(&events, AllWarriors);
+    options.DungeonRevivesPerMinute = 1;
+    BotPolicy policy(options);
+    policy.SetRouteActive(true);
+    CHECK(count(policy.Decide(build(), 1000)) == 1);
+    CHECK(Logged(events, "ghost_teleport_hold:") && LoggedWith(events, "reason=revive_cap"));
+    CHECK(count(policy.Decide(build(), 30000)) == 0);                          // one already went this minute
+    CHECK(count(policy.Decide(build(), 62000)) == 1);                          // the window has moved on
+    PolicyOptions uncapped = DeadOptions(nullptr, AllWarriors);
+    BotPolicy off(uncapped);
+    off.SetRouteActive(true);
+    CHECK(count(off.Decide(build(), 1000)) == 2);
+}
+
 void RunPolicyTestsPart5()
 {
+    AGhostWaitsForItsPartysFightToEnd();
+    APartysRevivesAreCappedPerMinute();
     AGhostTeleportWaitsForAFightingAvoidEnemyHostile();
     AutoShotIsNotReissuedWhileActive();
     AutoShotIsReissuedAfterTheFightAndWhenRefused();

@@ -50,6 +50,8 @@ void PolicyFromSettings(PolicyOptions& policyOptions, BotSettings& settings)
     policyOptions.GhostTeleportHold = settings.GhostTeleportHold;
     policyOptions.GhostTeleportHoldMaxMs = settings.GhostTeleportHoldMaxMs;
     policyOptions.GhostHoldAvoidEnemyMaxMs = settings.GhostHoldAvoidEnemyMaxMs;
+    policyOptions.GhostHoldPartyFightMaxMs = settings.GhostHoldPartyFightMaxMs;
+    policyOptions.DungeonRevivesPerMinute = settings.DungeonRevivesPerMinute;
     policyOptions.DeathLockoutCount = settings.DeathLockoutCount;
     policyOptions.DeathLockoutWindowMs = settings.DeathLockoutWindowMs;
     policyOptions.DeathLockoutHoldMs = settings.DeathLockoutHoldMs;

@@ -417,6 +417,13 @@ struct PolicyOptions
     // corpse run's teleport to the corpse) also waits while a live hostile of an `avoid_enemy`/`avoid_enemy_aura` entry of the raid rules is in a fight (it has a victim)
     // within max(30, the row's yards) of the destination, at most this long per death (ZG 2026-11-13 r4: 111 of 297 re-deaths within 30 s of the revive, Axe Flurry).
     std::uint64_t GhostHoldAvoidEnemyMaxMs = 0;
+    // GhostHoldPartyFightMaxMs (0 = off, the default): a dungeon ghost's teleport to the instance entrance (where the core revives it at half health) waits while a living
+    // member of its party is in combat, at most this long per death; once the fight is over the ghost goes to the leader as before (party_teleport, revived at its side).
+    // ZG 2026-11-14: 2130 revives for 2209 deaths, 685 of 2042 revived bots dead again within 30 s; revived at the entrance mid-fight, they walked back into the fight.
+    std::uint64_t GhostHoldPartyFightMaxMs = 0;
+    // DungeonRevivesPerMinute (0 = off, the default): at most this many ghosts of one dungeon party are put back into the instance (entrance, beside the leader, leader
+    // rejoin) in any 60 s; the others wait (ghost_teleport_hold reason=revive_cap).
+    std::uint32_t DungeonRevivesPerMinute = 0;
     std::uint32_t DeathLockoutCount = 4;                // 0 = no lockout
     std::uint64_t DeathLockoutWindowMs = 600000;
     std::uint64_t DeathLockoutHoldMs = 90000;
@@ -1026,6 +1033,7 @@ private:
         std::vector<std::uint64_t> DeathHistoryMs;       // recent death times (newest last), for the DeathLockoutCount lockout; trimmed to DeathLockoutWindowMs
         std::uint64_t GhostHoldSinceMs = 0;              // when this death's ghost first came to a teleport decision (0 = not yet): the hold limits count from here
         std::uint64_t GhostHoldLoggedMs = 0;             // the last ghost_teleport_hold line
+        std::uint64_t GhostFightHoldSinceMs = 0;         // GhostHoldPartyFightMaxMs: this death's ghost was first held for its party's fight (0 = not yet)
         std::uint64_t DeathTimesMs[3] = { 0, 0, 0 };     // when this bot last died (newest last): two deaths close together mean it dies where it stands up (DeathLoopMs)
         std::uint32_t LastKillerEntry = 0;               // the entry of the creature that killed the bot last (0 = none seen)
         bool KillerRepeat = false;                       // the last death was to the same creature entry as the one before: a death loop one death sooner
@@ -1122,6 +1130,11 @@ private:
     bool GhostFightHeld(DecideTick& tick, BotTurn& turn, std::uint32_t map, char const* what);
     // RaidPullSingle: the route leader's watch for a pair of a `pull_single` entry near it (sets the turn's pullSingleHold and pullSinglePairs).
     void PullSingleWatch(DecideTick& tick, BotTurn& turn);
+    // GhostHoldPartyFightMaxMs: the ghost's party (leader guid `party`) is fighting, so its entrance teleport waits (reason party_fight).
+    bool GhostPartyFightHeld(DecideTick& tick, BotTurn& turn, std::uint64_t party);
+    // DungeonRevivesPerMinute: the party already had that many ghosts put back in the last 60 s (reason revive_cap). NoteDungeonRevive counts one that goes now.
+    bool GhostReviveCapHeld(DecideTick& tick, BotTurn& turn, std::uint64_t party);
+    void NoteDungeonRevive(std::uint64_t party, std::uint64_t nowMs);
     TurnFlow DeadReviveByLeader(DecideTick& tick, BotTurn& turn);
     void DeadGhostRun(DecideTick& tick, BotTurn& turn);
     void DeadEmit(DecideTick& tick, BotTurn& turn, Decision const& wantedDead);
@@ -1224,6 +1237,7 @@ private:
     bool GhostTeleportSlot(std::uint64_t nowMs);
     std::uint64_t _ghostTeleportSecondMs = 0;
     std::uint32_t _ghostTeleportsInSecond = 0;
+    std::unordered_map<std::uint64_t, std::vector<std::uint64_t>> _partyRevivesMs; // DungeonRevivesPerMinute: party leader guid -> the times its ghosts were put back (last 60 s)
     std::unordered_map<std::uint64_t, BotState> _bots; // bot guid -> state
     std::vector<TalentOrder> _talentOrders;            // queued by Decide, taken by TakeTalentOrders
     std::vector<TalentOrder> _respecOrders;            // queued by Decide (TalentRespec), taken by TakeRespecOrders

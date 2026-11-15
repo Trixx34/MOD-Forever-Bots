@@ -903,6 +903,14 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadBool(config, "GhostTeleportHold", settings.GhostTeleportHold, warnings);
     ReadKey(config, "GhostTeleportHoldMaxMs", 1000, 3600000, settings.GhostTeleportHoldMaxMs, warnings);
     ReadKey(config, "GhostHoldAvoidEnemyMaxMs", 0, 3600000, settings.GhostHoldAvoidEnemyMaxMs, warnings);
+    if (auto const fight = config.find("GhostHoldPartyFightMaxMs"); fight != config.end() && fight->second == "0")
+        settings.GhostHoldPartyFightMaxMs = 0;
+    else
+        ReadKey(config, "GhostHoldPartyFightMaxMs", 1000, 3600000, settings.GhostHoldPartyFightMaxMs, warnings);
+    if (auto const cap = config.find("DungeonRevivesPerMinute"); cap != config.end() && cap->second == "0")
+        settings.DungeonRevivesPerMinute = 0;
+    else
+        ReadKey(config, "DungeonRevivesPerMinute", 1, 40, settings.DungeonRevivesPerMinute, warnings);
     if (auto const lockout = config.find("DeathLockoutCount"); lockout != config.end() && lockout->second == "0")
         settings.DeathLockoutCount = 0; // explicitly off
     else

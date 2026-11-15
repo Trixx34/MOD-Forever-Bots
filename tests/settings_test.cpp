@@ -675,6 +675,17 @@ void GhostTeleportHoldSettings()
         CHECK(ParseBotSettings({ { "GhostHoldAvoidEnemyMaxMs", "300000" } }, w).GhostHoldAvoidEnemyMaxMs == 300000 && w.empty());
         CHECK(ParseBotSettings({ { "GhostHoldAvoidEnemyMaxMs", "9999999" } }, w).GhostHoldAvoidEnemyMaxMs == 0 && !w.empty());
     }
+    {
+        std::vector<std::string> w;
+        BotSettings const d = ParseBotSettings({}, w);
+        CHECK(d.GhostHoldPartyFightMaxMs == 0 && d.DungeonRevivesPerMinute == 0);
+        CHECK(ParseBotSettings({ { "GhostHoldPartyFightMaxMs", "180000" }, { "DungeonRevivesPerMinute", "6" } }, w).GhostHoldPartyFightMaxMs == 180000 && w.empty());
+        CHECK(ParseBotSettings({ { "DungeonRevivesPerMinute", "6" } }, w).DungeonRevivesPerMinute == 6 && w.empty());
+        CHECK(ParseBotSettings({ { "GhostHoldPartyFightMaxMs", "0" }, { "DungeonRevivesPerMinute", "0" } }, w).GhostHoldPartyFightMaxMs == 0 && w.empty());
+        CHECK(ParseBotSettings({ { "GhostHoldPartyFightMaxMs", "500" } }, w).GhostHoldPartyFightMaxMs == 0 && !w.empty());
+        w.clear();
+        CHECK(ParseBotSettings({ { "DungeonRevivesPerMinute", "41" } }, w).DungeonRevivesPerMinute == 0 && !w.empty());
+    }
     std::vector<std::string> warnings;
     BotSettings const defaults = ParseBotSettings({}, warnings);
     CHECK(defaults.GhostTeleportHold && defaults.GhostTeleportHoldMaxMs == 120000 && defaults.DeathLockoutCount == 4 && defaults.DeathLockoutWindowMs == 600000 &&
