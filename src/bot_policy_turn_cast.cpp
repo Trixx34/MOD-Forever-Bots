@@ -985,7 +985,8 @@ BotPolicy::TurnFlow BotPolicy::TurnRotation(DecideTick& tick, BotTurn& turn)
             continue;
         // The effect is still up (on the target, or on the bot for a self buff): recasting only refreshes it.
         auto const dot = state.Dots.find(row.Spell);
-        bool const sameTarget = dot != state.Dots.end() && dot->second.Target == (row.OnTarget ? targetRef : 0);
+        // Slice and Dice is cast at the enemy (its first effect needs one) but the buff sits on the rogue: one running buff covers every target.
+        bool const sameTarget = dot != state.Dots.end() && dot->second.Target == (row.OnTarget && row.Spell != kSliceAndDice ? targetRef : 0);
         if (sameTarget && nowMs < dot->second.UntilMs)
             continue;
 

@@ -118,6 +118,7 @@ constexpr float kFleeYards = 15.0f;          // below 30% health: flees while a 
 constexpr std::uint64_t kGlobalCooldownMs = 1500;
 constexpr std::uint64_t kDispelRetryMs = 2500;      // a bot sends the same dispel again no sooner than this (raid rules)
 constexpr std::uint64_t kRetryMs = 1000;     // out of range, invalid target, refused, not enough power
+constexpr std::uint64_t kInvalidTargetMaxMs = 16000; // the longest wait after repeated invalid-target answers for one fight spell
 constexpr std::uint64_t kCooldownRetryMs = 2000;
 constexpr float kRangeSlackYards = 2.0f;        // a ranged row is used this far inside its range: the snapshot is a tick old and the units move
 constexpr std::uint64_t kPowerRetryMs = 2000;    // a cast refused for lack of mana, rage or energy: power comes back slowly

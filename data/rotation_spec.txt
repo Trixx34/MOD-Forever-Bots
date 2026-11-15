@@ -210,7 +210,8 @@ class 4
 # The default rogue: Combat.
 row "Kick" target_casting target range 0 5
 row "Evasion" self_hp_below 40 self
-row "Slice and Dice" combo 2 duration 20 self
+row "Eviscerate" combo 3 target_hp_below 25 target range 0 5   # a finisher at three points when the target is about to die: waiting for five wastes the points
+row "Slice and Dice" combo 2 duration 20 target range 0 5   # the DB2 effect 0 is a dummy on TARGET_UNIT_TARGET_ENEMY (effect 1 gives the buff to the caster): a self cast is refused as bad target (sim 2026-11-15: 1048 refusals, 0 applied)
 row 1316709 level 40 combo 5 target_strong 1 target range 0 5   # Forever: level 40 finisher, kept for strong targets
 row "Eviscerate" combo 5 target range 0 5
 # row "Saber Slash" duration 12 always target range 0 5   # not a row: no trainer teaches it, so a bot never knows it ("spell not known" on every cast); add it back when the core grants it
@@ -222,7 +223,8 @@ row "Kick" target_casting target range 0 5
 row "Evasion" self_hp_below 40 self
 row 13877 level 30 enemies 2 duration 15 self   # a level 30 talent: no bot has it before level 30 (a row at level 1 was refused on every cast)
 row "Expose Armor" target_strong 1 duration 30 target range 0 5
-row "Slice and Dice" combo 2 duration 20 self
+row "Eviscerate" combo 3 target_hp_below 25 target range 0 5   # a finisher at three points when the target is about to die: waiting for five wastes the points
+row "Slice and Dice" combo 2 duration 20 target range 0 5   # the DB2 effect 0 is a dummy on TARGET_UNIT_TARGET_ENEMY (effect 1 gives the buff to the caster): a self cast is refused as bad target (sim 2026-11-15: 1048 refusals, 0 applied)
 row 1316709 level 40 combo 5 target_strong 1 target range 0 5   # Forever: level 40 finisher, kept for strong targets
 row "Eviscerate" combo 5 target range 0 5
 # row "Saber Slash" duration 12 always target range 0 5   # not a row: no trainer teaches it, so a bot never knows it ("spell not known" on every cast); add it back when the core grants it
@@ -232,7 +234,8 @@ class 4 spec assassination
 # Assassination: Mutilate (level 40, two combo points) as the builder, the same finishers. Below level 40 Sinister Strike builds. Cold Blood and the poisons are not cast.
 row "Kick" target_casting target range 0 5
 row "Evasion" self_hp_below 40 self
-row "Slice and Dice" combo 2 duration 20 self
+row "Eviscerate" combo 3 target_hp_below 25 target range 0 5   # a finisher at three points when the target is about to die: waiting for five wastes the points
+row "Slice and Dice" combo 2 duration 20 target range 0 5   # the DB2 effect 0 is a dummy on TARGET_UNIT_TARGET_ENEMY (effect 1 gives the buff to the caster): a self cast is refused as bad target (sim 2026-11-15: 1048 refusals, 0 applied)
 row 1316709 level 40 combo 5 target_strong 1 target range 0 5   # Forever: level 40 finisher, kept for strong targets
 row "Eviscerate" combo 5 target range 0 5
 row "Mutilate" always target range 0 5
@@ -242,7 +245,8 @@ class 4 spec subtlety
 # Subtlety: Hemorrhage (level 30) as the builder, the same finishers; Garrote and the opener need Stealth and are not cast.
 row "Kick" target_casting target range 0 5
 row "Evasion" self_hp_below 40 self
-row "Slice and Dice" combo 2 duration 20 self
+row "Eviscerate" combo 3 target_hp_below 25 target range 0 5   # a finisher at three points when the target is about to die: waiting for five wastes the points
+row "Slice and Dice" combo 2 duration 20 target range 0 5   # the DB2 effect 0 is a dummy on TARGET_UNIT_TARGET_ENEMY (effect 1 gives the buff to the caster): a self cast is refused as bad target (sim 2026-11-15: 1048 refusals, 0 applied)
 row 1316709 level 40 combo 5 target_strong 1 target range 0 5   # Forever: level 40 finisher, kept for strong targets
 row "Eviscerate" combo 5 target range 0 5
 row "Hemorrhage" duration 15 always target range 0 5

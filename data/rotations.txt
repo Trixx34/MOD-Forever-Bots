@@ -163,7 +163,8 @@ buff 13165 level 10 duration 3600 self ranks 13165,14318,14319,14320,14321,14322
 class 4
 row 1766 level 12 target_casting target range 0 5   # Kick: ranks [1766, 1767, 1768, 1769]
 row 5277 level 8 self_hp_below 40 self   # Evasion: ranks [5277]
-row 5171 level 10 combo 2 duration 20 self   # Slice and Dice: ranks [5171, 6774]
+row 2098 level 1 combo 3 target_hp_below 25 target range 0 5   # Eviscerate: ranks [2098, 6760, 6761, 6762, 8623, 8624, 11299, 11300]
+row 5171 level 10 combo 2 duration 20 target range 0 5   # Slice and Dice: ranks [5171, 6774]
 row 1316709 level 40 combo 5 target_strong 1 target range 0 5
 row 2098 level 1 combo 5 target range 0 5   # Eviscerate: ranks [2098, 6760, 6761, 6762, 8623, 8624, 11299, 11300]
 row 1752 level 1 always target range 0 5   # Sinister Strike: ranks [1752, 1757, 1758, 1759, 1760, 8621, 11293, 11294]
@@ -173,7 +174,8 @@ row 1766 level 12 target_casting target range 0 5   # Kick: ranks [1766, 1767, 1
 row 5277 level 8 self_hp_below 40 self   # Evasion: ranks [5277]
 row 13877 level 30 enemies 2 duration 15 self
 row 8647 level 14 target_strong 1 duration 30 target range 0 5   # Expose Armor: ranks [8647, 8649, 8650, 11197, 11198]
-row 5171 level 10 combo 2 duration 20 self   # Slice and Dice: ranks [5171, 6774]
+row 2098 level 1 combo 3 target_hp_below 25 target range 0 5   # Eviscerate: ranks [2098, 6760, 6761, 6762, 8623, 8624, 11299, 11300]
+row 5171 level 10 combo 2 duration 20 target range 0 5   # Slice and Dice: ranks [5171, 6774]
 row 1316709 level 40 combo 5 target_strong 1 target range 0 5
 row 2098 level 1 combo 5 target range 0 5   # Eviscerate: ranks [2098, 6760, 6761, 6762, 8623, 8624, 11299, 11300]
 row 1752 level 1 always target range 0 5   # Sinister Strike: ranks [1752, 1757, 1758, 1759, 1760, 8621, 11293, 11294]
@@ -181,7 +183,8 @@ row 1752 level 1 always target range 0 5   # Sinister Strike: ranks [1752, 1757,
 class 4 spec assassination
 row 1766 level 12 target_casting target range 0 5   # Kick: ranks [1766, 1767, 1768, 1769]
 row 5277 level 8 self_hp_below 40 self   # Evasion: ranks [5277]
-row 5171 level 10 combo 2 duration 20 self   # Slice and Dice: ranks [5171, 6774]
+row 2098 level 1 combo 3 target_hp_below 25 target range 0 5   # Eviscerate: ranks [2098, 6760, 6761, 6762, 8623, 8624, 11299, 11300]
+row 5171 level 10 combo 2 duration 20 target range 0 5   # Slice and Dice: ranks [5171, 6774]
 row 1316709 level 40 combo 5 target_strong 1 target range 0 5
 row 2098 level 1 combo 5 target range 0 5   # Eviscerate: ranks [2098, 6760, 6761, 6762, 8623, 8624, 11299, 11300]
 row 399956 level 40 always target range 0 5   # Mutilate: ranks [399956, 1241582, 1241584]
@@ -190,7 +193,8 @@ row 1752 level 1 always target range 0 5   # Sinister Strike: ranks [1752, 1757,
 class 4 spec subtlety
 row 1766 level 12 target_casting target range 0 5   # Kick: ranks [1766, 1767, 1768, 1769]
 row 5277 level 8 self_hp_below 40 self   # Evasion: ranks [5277]
-row 5171 level 10 combo 2 duration 20 self   # Slice and Dice: ranks [5171, 6774]
+row 2098 level 1 combo 3 target_hp_below 25 target range 0 5   # Eviscerate: ranks [2098, 6760, 6761, 6762, 8623, 8624, 11299, 11300]
+row 5171 level 10 combo 2 duration 20 target range 0 5   # Slice and Dice: ranks [5171, 6774]
 row 1316709 level 40 combo 5 target_strong 1 target range 0 5
 row 2098 level 1 combo 5 target range 0 5   # Eviscerate: ranks [2098, 6760, 6761, 6762, 8623, 8624, 11299, 11300]
 row 16511 level 30 duration 15 always target range 0 5   # Hemorrhage: ranks [16511]

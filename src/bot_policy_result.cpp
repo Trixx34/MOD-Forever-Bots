@@ -642,7 +642,8 @@ void BotPolicy::ReadCastResult(BotState& state, BotSnapshot const& bot, std::uin
     {
         // The cast had no valid target: that unit is avoided too, so the next cast goes to another one.
         auto const cast = state.CastTarget.find(spell);
-        if (cast != state.CastTarget.end() && cast->second != 0)
+        // Not for a finisher (Slice and Dice): its refusal says nothing about the mob.
+        if (cast != state.CastTarget.end() && cast->second != 0 && spell != kSliceAndDice)
             AvoidUnit(state.AvoidUntilMs, state.AvoidCount, cast->second, nowMs);
     }
     if (bot.last_action_status == BotActionStatus::kNoLineOfSight)
@@ -693,7 +694,7 @@ void BotPolicy::ReadCastResult(BotState& state, BotSnapshot const& bot, std::uin
             std::uint64_t const duration = DurationMsOf(ClassFor(_options, bot.guid), spell, SpecFor(bot.guid, ClassFor(_options, bot.guid)));
             if (duration != 0)
             {
-                state.Dots[spell] = Dot{ cast->second, nowMs + duration };
+                state.Dots[spell] = Dot{ spell == kSliceAndDice ? 0 : cast->second, nowMs + duration }; // Slice and Dice: the buff is on the rogue, whoever it was cast at
                 state.BuffUntilMs[{ spell, cast->second }] = nowMs + duration;
             }
 
@@ -777,9 +778,13 @@ void BotPolicy::ReadCastResult(BotState& state, BotSnapshot const& bot, std::uin
             if (spell != kCallPet && spell != kRevivePet && spell != kMendPet)
                 state.NextCastMs = std::max(state.NextCastMs, nowMs + kHeldCastMs);
             break;
+        case BotActionStatus::kInvalidTarget:
+            // An invalid target repeats until something else changes (a spell that needs another target, a target that is immune): back off 1 s, 2 s, 4 s ... up to kInvalidTargetMaxMs
+            // instead of asking again every second (Slice and Dice: 1048 refusals, no cast applied, in one sim day).
+            state.RetryAtMs[spell] = nowMs + (buff ? failWait(kBuffFailBaseMs) : std::min(failWait(kRetryMs), kInvalidTargetMaxMs));
+            break;
         case BotActionStatus::kOutOfRange:
         case BotActionStatus::kNoLineOfSight:
-        case BotActionStatus::kInvalidTarget:
             state.RetryAtMs[spell] = nowMs + (buff ? failWait(kBuffFailBaseMs) : kRetryMs);
             break;
         case BotActionStatus::kApplied:
