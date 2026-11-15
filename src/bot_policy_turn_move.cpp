@@ -1682,6 +1682,50 @@ void BotPolicy::TurnIdle(DecideTick& tick, BotTurn& turn)
         idle = false;
     }
 
+    // A world event visit (world_events.h): walk to the site, in reach accept the listed quests one by one, hand them in one by one, then stay a
+    // moment and end as done. The core refuses a quest that does not apply (done, wrong level, no giver); the refusal is read by the visit, not
+    // by the quest engine (bot_policy_result.cpp), so a visit never pauses a bot's own quests.
+    if (state.Visit && !state.Errand && !hasTarget && !enemyNear && wanted.Type == ActionType::kStop && questStep.Kind == QuestStepKind::None && !routeBusy)
+    {
+        VisitOrder const& order = *state.Visit;
+        float const dist = bot.map_id == order.Map ? std::hypot(bot.pos_x - order.Dest.X, bot.pos_y - order.Dest.Y) : 1e9f;
+        if (dist <= kVisitReachYards)
+        {
+            std::uint32_t const total = std::uint32_t(order.Quests.size()) * 2;
+            if (!state.VisitArrived)
+            {
+                state.VisitArrived = true;
+                state.VisitNextMs = nowMs;
+            }
+            if (state.VisitStep < total && nowMs >= state.VisitNextMs && bot.in_combat == 0 && bot.life_state == 0)
+            {
+                std::uint32_t const n = std::uint32_t(order.Quests.size());
+                BotAction quest;
+                quest.bot_guid = bot.guid;
+                quest.type = ActionType::kQuest;
+                quest.spell_id = QuestCode(state.VisitStep < n ? kQuestAccept : kQuestHandIn, order.Quests[state.VisitStep % n]);
+                actions.push_back(quest);
+                ++state.VisitStep;
+                state.VisitNextMs = nowMs + (state.VisitStep < total ? kVisitQuestGapMs : kVisitDwellMs);
+            }
+            else if (state.VisitStep >= total && nowMs >= state.VisitNextMs)
+            {
+                state.VisitResult = ErrandOutcome::kDone;
+                state.Visit.reset();
+                if (_options.OnEvent)
+                    _options.OnEvent("world_event_visit_done: bot=" + std::to_string(bot.guid));
+            }
+            wanted = Decision{};
+        }
+        else
+        {
+            wanted = Decision{ ActionType::kMoveTo, 0, order.Dest };
+            moveWhy = "visit.Dest";
+        }
+        routeBusy = true;
+        idle = false;
+    }
+
     // Seeing nothing and doing nothing, for hubs (M7): the idle time starts when the bot first is idle, and any activity
     // resets it.
     if (!idle)

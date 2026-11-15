@@ -612,6 +612,53 @@ void MountVendorErrandHandsOutOnePurchaseAndEndsWithTheAnswer()
         }
         CHECK(policy.TakeErrandOutcome(kBot) == ErrandOutcome::kFailed);                     // no answer in 30 s
     }
+// A world event visit (world_events.h): the bot in reach of the site accepts the listed quests one by one, hands them in, stays, then it is done. A far
+// bot walks. The visit's quest answers are not the quest engine's: a refusal does not pause the bot's quests.
+void WorldEventVisitAcceptsHandsInAndStays()
+{
+    BotPolicy policy{ PolicyOptions{} };
+    VisitOrder order;
+    order.Map = 0;
+    order.Dest = Point{ 2.0f, 0.0f, 0.0f };
+    order.Quests = { 8619, 8620 };
+    WorldTickSnapshotView const view = View(1, 0, {});
+    policy.Decide(view, 500);
+    policy.StartVisit(kBot, order);
+    std::vector<std::uint32_t> codes;
+    for (std::uint64_t at = 1000; at <= 40000; at += 1000)
+        for (BotAction const& action : policy.Decide(view, at))
+            if (action.bot_guid == kBot && action.type == ActionType::kQuest)
+                codes.push_back(action.spell_id);
+    CHECK(codes.size() == 4);
+    CHECK(codes.size() == 4 && codes[0] == QuestCode(kQuestAccept, 8619) && codes[1] == QuestCode(kQuestAccept, 8620));
+    CHECK(codes.size() == 4 && codes[2] == QuestCode(kQuestHandIn, 8619) && codes[3] == QuestCode(kQuestHandIn, 8620));
+    CHECK(policy.TakeVisitOutcome(kBot) == ErrandOutcome::kDone);
+    CHECK(policy.TakeVisitOutcome(kBot) == ErrandOutcome::kNone);   // reported once
+    CHECK(!policy.OnErrand(kBot));
+
+    // Far from the site: the bot walks to it.
+    auto const walksTo = [&view](BotPolicy& p, float x)
+    {
+        for (std::uint64_t at = 1000; at <= 4000; at += 1000)
+            for (BotAction const& action : p.Decide(view, at))
+                if (action.bot_guid == kBot && action.type == ActionType::kMoveTo && action.dest_x == x)
+                    return true;
+        return false;
+    };
+    VisitOrder far;
+    far.Map = 0;
+    far.Dest = Point{ 300.0f, 0.0f, 0.0f };
+    far.Quests = { 8619 };
+    BotPolicy walker{ PolicyOptions{} };
+    walker.Decide(view, 500);
+    walker.StartVisit(kBot, far);
+    CHECK(walksTo(walker, 300.0f));
+    // A cancelled visit does not walk.
+    BotPolicy cancelled{ PolicyOptions{} };
+    cancelled.Decide(view, 500);
+    cancelled.StartVisit(kBot, far);
+    cancelled.CancelVisit(kBot);
+    CHECK(!walksTo(cancelled, 300.0f));
 }
 
 // ---- RaidBossPositions: tank_spot and flank rows (Onyxia fix 1) ----
@@ -793,6 +840,7 @@ void RunPolicyTestsPart10()
     BrokenBotWithoutMoneyDoesNotLoop();
     AuctionErrandStandsAtTheAuctioneerBeforeItEnds();
     MountVendorErrandHandsOutOnePurchaseAndEndsWithTheAnswer();
+    WorldEventVisitAcceptsHandsInAndStays();
     BossPositionsKeyOnPutsTheRaidOnHerFlanks();
     BossPositionsKeyOffChangesNothing();
     BossPositionsLeaveAloneCases();

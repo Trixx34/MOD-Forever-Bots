@@ -37,6 +37,7 @@ void main_detail::PumpTier2(forever_module::Tier2Session& session, std::atomic<b
     std::uint64_t presenceFedMs = 0;
     std::uint64_t auctionFedMs = 0;
     std::uint64_t errandFedMs = 0;
+    std::uint64_t visitFedMs = 0;
     // Last action sequence seen per bot, so each result is reported once.
     std::unordered_map<std::uint64_t, std::uint32_t> seenSequence;
     std::unordered_map<std::uint64_t, std::uint64_t> serviceNoticeMs; // bot -> when a service refusal was last logged
@@ -221,6 +222,18 @@ void main_detail::PumpTier2(forever_module::Tier2Session& session, std::atomic<b
                         policy.CancelErrand(item.Guid);
                     else
                         policy.StartErrand(item.Guid, item.Order);
+                }
+                std::vector<CommandQueue::VisitItem> visits;
+                {
+                    std::lock_guard<std::mutex> lock(extras.Commands->Lock);
+                    visits.swap(extras.Commands->Visits);
+                }
+                for (CommandQueue::VisitItem const& item : visits)
+                {
+                    if (item.Cancel)
+                        policy.CancelVisit(item.Guid);
+                    else
+                        policy.StartVisit(item.Guid, item.Order);
                 }
             }
             if (extras.Commands)
@@ -582,6 +595,36 @@ void main_detail::PumpTier2(forever_module::Tier2Session& session, std::atomic<b
                         extras.Errand->Outcomes.push_back(outcome);
                 for (auto& buy : buys)
                     extras.Errand->Buys.push_back(std::move(buy));
+            }
+            if (extras.Visit && nowMs() - visitFedMs >= kPresenceFeedMs)
+            {
+                visitFedMs = nowMs();
+                std::vector<world_events::Bot> list;
+                list.reserve(view.bots.size());
+                std::vector<std::pair<std::uint64_t, ErrandOutcome>> outcomes;
+                for (forever_module::BotSnapshot const& bot : view.bots)
+                {
+                    if (ErrandOutcome const outcome = policy.TakeVisitOutcome(bot.guid); outcome != ErrandOutcome::kNone)
+                        outcomes.emplace_back(bot.guid, outcome);
+                    if ((extras.Alts && extras.Alts->Has(bot.guid)) || bot.life_state != 0)
+                        continue;
+                    world_events::Bot entry;
+                    entry.Guid = bot.guid;
+                    entry.Available = bot.in_combat == 0 && bot.in_flight == 0 && !policy.OnErrand(bot.guid);
+                    entry.Called = bot.group_role != 0 || bot.group_leader_guid != 0;
+                    entry.Side = options.SideOf ? options.SideOf(bot.guid) : 0;
+                    entry.Level = bot.level;
+                    entry.Map = bot.map_id;
+                    entry.X = bot.pos_x;
+                    entry.Y = bot.pos_y;
+                    list.push_back(entry);
+                }
+                std::lock_guard<std::mutex> lock(extras.Visit->Lock);
+                extras.Visit->Bots.swap(list);
+                extras.Visit->AtMs = visitFedMs;
+                for (auto& outcome : outcomes)
+                    if (extras.Visit->Outcomes.size() < 256)
+                        extras.Visit->Outcomes.push_back(outcome);
             }
             if (extras.Auction && nowMs() - auctionFedMs >= kPresenceFeedMs)
             {

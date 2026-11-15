@@ -317,6 +317,37 @@ std::uint32_t BotPolicy::MountRefusals(std::uint64_t botGuid) const
 {
     auto const it = _bots.find(botGuid);
     return it == _bots.end() ? 0 : it->second.MountFails;
+void BotPolicy::StartVisit(std::uint64_t botGuid, VisitOrder const& order)
+{
+    BotState& state = StateOf(botGuid);
+    state.Visit = order;
+    state.VisitStep = 0;
+    state.VisitNextMs = 0;
+    state.VisitArrived = false;
+    state.VisitResult = ErrandOutcome::kNone;
+}
+
+void BotPolicy::CancelVisit(std::uint64_t botGuid)
+{
+    auto const it = _bots.find(botGuid);
+    if (it != _bots.end())
+        it->second.Visit.reset();
+}
+
+ErrandOutcome BotPolicy::TakeVisitOutcome(std::uint64_t botGuid)
+{
+    auto const it = _bots.find(botGuid);
+    if (it == _bots.end())
+        return ErrandOutcome::kNone;
+    ErrandOutcome const result = it->second.VisitResult;
+    it->second.VisitResult = ErrandOutcome::kNone;
+    return result;
+}
+
+bool BotPolicy::OnErrand(std::uint64_t botGuid) const
+{
+    auto const it = _bots.find(botGuid);
+    return it != _bots.end() && it->second.Errand.has_value();
 }
 
 ErrandOutcome BotPolicy::TakeErrandOutcome(std::uint64_t botGuid)

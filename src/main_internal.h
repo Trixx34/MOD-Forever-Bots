@@ -167,6 +167,14 @@ struct CommandQueue
         ErrandOrder Order;
     };
     std::vector<ErrandItem> Errands;
+    // World event visits (world_events.h) from the Run() thread: start (with the order) or cancel, applied on the pump thread before the decisions.
+    struct VisitItem
+    {
+        std::uint64_t Guid = 0;
+        bool Cancel = false;
+        VisitOrder Order;
+    };
+    std::vector<VisitItem> Visits;
     std::vector<ChatAck> Says;                                  // lines a bot says out loud for an order it took (ChatSay)
     // Ambient lines for the Run() thread to say on General or Trade (AmbientChat); the pump thread picks them.
     struct AmbientLine
@@ -352,6 +360,14 @@ struct MountBook
         if (Trips.erase(guid) != 0)
             Bots[guid].HoldUntilMs = now + kMountEndedHoldMs;
     }
+// World event visits (world_events.h): the pump's view of each bot every kPresenceFeedMs and how each visit ended; a timer on the Run() thread decides.
+constexpr std::chrono::milliseconds kWorldEventsInterval(10000);
+struct VisitFeed
+{
+    std::mutex Lock;
+    std::vector<world_events::Bot> Bots;
+    std::vector<std::pair<std::uint64_t, ErrandOutcome>> Outcomes;
+    std::uint64_t AtMs = 0;
 };
 
 // The auction state, used on the Run() thread only (the loot notify and the visit timer both run there).
@@ -418,6 +434,7 @@ struct PumpExtras
     std::shared_ptr<AuctionFeed> Auction;     // set when Auction is on
     std::shared_ptr<SellBook> Sell;           // set when vendor sales are on
     std::shared_ptr<ErrandFeed> Errand;       // set when Errands is on
+    std::shared_ptr<VisitFeed> Visit;         // set when WorldEvents is on
     std::shared_ptr<AltRegistry> Alts;
     // The scenario's dungeons, in order (one for the single form, several for Scenario = "dm:10,rfc:10"): each with its plan, its number of parallel parties (each
     // with its own director) and the route, events, kill priority and portal its parties use.
@@ -468,6 +485,8 @@ void SetUpPresence(forever_module::ModuleClient& client, RunContext& run, BotSet
 void SetUpLootBooks(forever_module::ModuleClient& client, RunContext& run, BotSettings& settings, std::shared_ptr<AuctionBook> const& book,
                     std::shared_ptr<SellBook> const& sells, PumpExtras& extras);
 void SetUpAuction(forever_module::ModuleClient& client, RunContext& run, BotSettings& settings, std::shared_ptr<AuctionBook> const& book, PumpExtras& extras);
+// World events and holidays: the site table, the pump's feed and a timer that starts and ends the visits (world_events.h).
+void SetUpWorldEvents(forever_module::ModuleClient& client, BotSettings& settings, std::shared_ptr<CommandQueue> const& commands, PumpExtras& extras);
 void SetUpErrands(forever_module::ModuleClient& client, BotSettings& settings, std::shared_ptr<CommandQueue> const& commands, std::shared_ptr<AuctionBook> const& book,
                   PumpExtras& extras);
 

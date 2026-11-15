@@ -1210,6 +1210,23 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadBool(config, "RareHunts", settings.RareHunts, warnings);
     if (auto const it = config.find("RareHuntFile"); it != config.end())
         settings.RareHuntFile = it->second;
+    ReadBool(config, "WorldEvents", settings.WorldEvents.Enabled, warnings);
+    ReadKey(config, "WorldEventsPct", 0, 20, settings.WorldEvents.SharePct, warnings);
+    ReadKey(config, "WorldEventsMaxBots", 0, 100, settings.WorldEvents.MaxBots, warnings);
+    ReadKey(config, "WorldEventsPerSite", 1, 20, settings.WorldEvents.MaxPerSite, warnings);
+    ReadKey(config, "WorldEventsMaxMin", 1, 120, settings.WorldEvents.MaxMinutes, warnings);
+    ReadKey(config, "WorldEventsGapMin", 0, 10080, settings.WorldEvents.GapMinutes, warnings);
+    ReadKey(config, "WorldEventsStartsPerTick", 1, 10, settings.WorldEvents.MaxStartsPerTick, warnings);
+    if (auto const it = config.find("WorldEventsFile"); it != config.end())
+        settings.WorldEventsFile = it->second;
+    if (auto const it = config.find("WorldEventsActive"); it != config.end())
+    {
+        std::vector<std::string> bad;
+        settings.WorldEventsActive = world_events::ParseEventIds(it->second, bad);
+        for (std::string const& b : bad)
+            warnings.push_back("Module.forever-bots.WorldEventsActive: " + b + "; left out.");
+    }
+    settings.WorldEvents.Seed = settings.RandomSeed;
     ReadKey(config, "ErrandDailyMin", 1, 1440, settings.Errand.DailyMinutes, warnings);
     ReadKey(config, "ErrandGapMin", 0, 1440, settings.Errand.GapMinutes, warnings);
     ReadKey(config, "ErrandMaxMin", 5, 240, settings.Errand.MaxMinutes, warnings);

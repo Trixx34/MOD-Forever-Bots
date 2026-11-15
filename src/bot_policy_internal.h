@@ -472,6 +472,10 @@ constexpr std::uint64_t kErrandTrainRetryMs = 3000; // the next train order of a
 constexpr std::uint64_t kAuctionDwellMs = 25000;
 constexpr std::uint64_t kErrandBuyWaitMs = 30000;   // a mount purchase handed to the Run() thread: no answer within this ends the errand as failed
 constexpr float kMountVendorReachYards = 8.0f;     // a mount vendor errand: the nearest vendor the snapshot names counts as the errand's vendor within this of its spot
+// A world event visit (world_events.h): in reach of the site's NPC at this distance, one quest order every kVisitQuestGapMs, then the bot stays kVisitDwellMs.
+constexpr float kVisitReachYards = 5.0f;
+constexpr std::uint64_t kVisitQuestGapMs = 3000;
+constexpr std::uint64_t kVisitDwellMs = 20000;
 constexpr std::uint32_t kErrandTrainRefusalMax = 3; // train refusals in a row that end the errand as failed
 constexpr std::uint64_t kAvoidKeepMs = 3000;          // a walk out of a ground effect keeps its end point this long
 constexpr float kMountMinDistanceYards = 100.0f;   // a walk this long: mount up before it

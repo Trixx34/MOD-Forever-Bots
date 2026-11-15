@@ -547,4 +547,87 @@ void SetUpErrands(forever_module::ModuleClient& client, BotSettings& settings, s
     }
 }
 
+// World events and holidays (WorldEvents = 1): the site table, the pump's feed and a timer that starts and ends the visits. The active events are the
+// operator's list (WorldEventsActive, read on every tick so a config reload takes effect); the core does not report them yet (doc/world-events.md).
+void SetUpWorldEvents(forever_module::ModuleClient& client, BotSettings& settings, std::shared_ptr<CommandQueue> const& commands, PumpExtras& extras)
+{
+    auto sites = std::make_shared<std::vector<world_events::Site>>();
+    std::ifstream in(settings.WorldEventsFile);
+    if (!in)
+        std::cerr << "forever-bots: WorldEventsFile: cannot read '" << settings.WorldEventsFile << "'; world events are off\n";
+    else
+    {
+        std::ostringstream text;
+        text << in.rdbuf();
+        std::vector<std::string> siteWarnings;
+        *sites = world_events::ParseSites(text.str(), siteWarnings);
+        for (std::string const& warning : siteWarnings)
+            std::cerr << "forever-bots: " << settings.WorldEventsFile << ": " << warning << "\n";
+        std::cerr << "forever-bots: world events: " << sites->size() << " sites from " << settings.WorldEventsFile << "\n";
+    }
+    if (sites->empty())
+        return;
+
+    auto feed = std::make_shared<VisitFeed>();
+    extras.Visit = feed;
+    auto scheduler = std::make_shared<world_events::Scheduler>(settings.WorldEvents);
+    std::shared_ptr<CommandQueue> queue = commands;
+    client.AddTimer(kWorldEventsInterval, [feed, scheduler, sites, queue, &settings]
+    {
+        std::uint64_t const now = nowMs();
+        scheduler->SetSettings(settings.WorldEvents);
+        std::vector<world_events::Bot> bots;
+        std::vector<std::pair<std::uint64_t, ErrandOutcome>> outcomes;
+        std::uint64_t fedAt = 0;
+        {
+            std::lock_guard<std::mutex> lock(feed->Lock);
+            bots = feed->Bots;
+            outcomes.swap(feed->Outcomes);
+            fedAt = feed->AtMs;
+        }
+        for (auto const& [guid, outcome] : outcomes)
+        {
+            std::size_t const site = scheduler->SiteOf(guid);
+            std::uint64_t const took = scheduler->Finish(guid, now);
+            if (site < sites->size())
+                std::cerr << "forever-bots: event "
+                          << world_events::EndLine(guid, (*sites)[site], world_events::EndReason::kDone, outcome == ErrandOutcome::kFailed, took) << "\n";
+        }
+        if (fedAt == 0 || now - fedAt > kPresenceStaleMs)
+            return;
+
+        world_events::ActiveEvents active;
+        active.SetConfigured(settings.WorldEventsActive);
+        world_events::Decisions const decisions = scheduler->Tick(now, *sites, active.Current(), bots);
+        std::vector<CommandQueue::VisitItem> items;
+        for (world_events::End const& end : decisions.Ends)
+        {
+            std::cerr << "forever-bots: event " << world_events::EndLine(end.Guid, (*sites)[end.Site], end.Why, false, end.TookMs) << "\n";
+            CommandQueue::VisitItem item;
+            item.Guid = end.Guid;
+            item.Cancel = true;
+            items.push_back(item);
+        }
+        for (world_events::Start const& start : decisions.Starts)
+        {
+            world_events::Site const& site = (*sites)[start.Site];
+            CommandQueue::VisitItem item;
+            item.Guid = start.Guid;
+            item.Order.Map = site.Map;
+            item.Order.Dest = Point{ site.X, site.Y, site.Z };
+            item.Order.Quests = site.Quests;
+            items.push_back(std::move(item));
+            std::cerr << "forever-bots: event " << world_events::StartLine(start.Guid, site) << "\n";
+        }
+        if (!items.empty() && queue)
+        {
+            std::lock_guard<std::mutex> lock(queue->Lock);
+            for (auto& item : items)
+                queue->Visits.push_back(std::move(item));
+        }
+    });
+    std::cerr << "forever-bots: world events are on: a check every " << kWorldEventsInterval.count() / 1000 << " s, events "
+              << settings.WorldEventsActive.size() << " listed in WorldEventsActive\n";
+}
+
 } // namespace main_detail

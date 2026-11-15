@@ -605,6 +605,26 @@ void WipeRecoverySettings()
     CHECK(s.Scenario.HasPortal);
 }
 
+void WorldEventsSettings()
+{
+    std::vector<std::string> warnings;
+    BotSettings const off = ParseBotSettings({}, warnings);
+    CHECK(!off.WorldEvents.Enabled && off.WorldEvents.SharePct == 2 && off.WorldEvents.MaxBots == 10 && off.WorldEvents.MaxPerSite == 3);
+    CHECK(off.WorldEvents.MaxMinutes == 10 && off.WorldEvents.GapMinutes == 180 && off.WorldEvents.MaxStartsPerTick == 1);
+    CHECK(off.WorldEventsActive.empty() && off.WorldEventsFile == "data/world_events.txt");
+    BotSettings const on = ParseBotSettings({ { "WorldEvents", "1" }, { "WorldEventsPct", "5" }, { "WorldEventsMaxBots", "4" }, { "WorldEventsPerSite", "2" },
+                                              { "WorldEventsMaxMin", "6" }, { "WorldEventsGapMin", "30" }, { "WorldEventsStartsPerTick", "2" },
+                                              { "WorldEventsActive", "7, 12" }, { "RandomSeed", "9" } }, warnings);
+    CHECK(on.WorldEvents.Enabled && on.WorldEvents.SharePct == 5 && on.WorldEvents.MaxBots == 4 && on.WorldEvents.MaxPerSite == 2);
+    CHECK(on.WorldEvents.MaxMinutes == 6 && on.WorldEvents.GapMinutes == 30 && on.WorldEvents.MaxStartsPerTick == 2 && on.WorldEvents.Seed == 9);
+    CHECK(on.WorldEventsActive == (std::vector<std::uint32_t>{ 7, 12 }));
+    CHECK(warnings.empty());
+    warnings.clear();
+    BotSettings const bad = ParseBotSettings({ { "WorldEventsPct", "90" }, { "WorldEventsPerSite", "0" }, { "WorldEventsActive", "7,x" } }, warnings);
+    CHECK(bad.WorldEvents.SharePct == 2 && bad.WorldEvents.MaxPerSite == 3 && bad.WorldEventsActive == std::vector<std::uint32_t>{ 7 });
+    CHECK(warnings.size() == 3);
+}
+
 void ErrandSettings()
 {
     std::vector<std::string> warnings;
@@ -811,6 +831,7 @@ int main()
     RaidPullSingleSettings();
     CombatDriftSettings();
     ErrandSettings();
+    WorldEventsSettings();
     ChatSettings();
     QuestListSettings();
     LevelDungeonSettings();
