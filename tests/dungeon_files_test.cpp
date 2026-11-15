@@ -8,6 +8,7 @@
 #include "dungeon_files.h"
 #include "mini_json.h"
 
+#include <cmath>
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
@@ -735,14 +736,17 @@ void RuinsAndHallProposedRoutesLoad()
         return out;
     };
     Dungeon const* rol = find("rol");
-    CHECK(rol && rol->MapId() == 2999 && rol->Route.size() == 39 && rol->DurationSec == 2700);
+    CHECK(rol && rol->MapId() == 2999 && rol->Route.size() == 42 && rol->DurationSec == 2700);
     if (rol)
     {
         // the shipped boss order, the last boss is the last point (no walk on after Rath'mael), and the stop east of the Mangled Cadaver pack before the Baron
-        CHECK((bossPoints(*rol) == std::vector<std::pair<std::size_t, std::uint32_t>>{ { 4, 250483 }, { 14, 250660 }, { 32, 256097 }, { 38, 250657 } }));
+        CHECK((bossPoints(*rol) == std::vector<std::pair<std::size_t, std::uint32_t>>{ { 4, 250483 }, { 14, 250660 }, { 34, 256097 }, { 41, 250657 } }));
         CHECK(rol->Route[10].X == 1545.0f && rol->Route[10].Y == 140.0f);
         CHECK(rol->Route[13].X == 1491.2f && rol->Route[13].Y == 153.9f);
         CHECK((rol->KillPriority == std::vector<std::uint32_t>{ 250623 }));   // Mangled Cadaver (Cadaver Worms)
+        // no point within 30 yards of the statue stalker (1601.4, 341.8, 67.2): its 25-yard trigger starts the waves and The Abandoned
+        for (DungeonWaypoint const& w : rol->Route)
+            CHECK(std::hypot(w.X - 1601.4f, w.Y - 341.8f, w.Z - 67.2f) >= 30.0f);
     }
     Dungeon const* hot = find("hot");
     CHECK(hot && hot->MapId() == 3065 && hot->Route.size() == 16);
