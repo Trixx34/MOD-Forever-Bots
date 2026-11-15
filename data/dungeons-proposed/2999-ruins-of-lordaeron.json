@@ -1,0 +1,82 @@
+{
+  "schema": 1,
+  "id": "rol",
+  "map": 2999,
+  "name": "Ruins of Lordaeron",
+  "levels": [15, 20],
+  "roster": "2:1,5:5,8:8,2:9,5:4",
+  "entrance": {
+    "staging": { "map": 1, "x": 1629, "y": -4373, "z": 31 },
+    "portal": { "map": 0, "x": 1804.9, "y": 184.8, "z": 70.4 },
+    "entry": { "map": 2999, "x": 1804.15, "y": 149.17, "z": 70.4 }
+  },
+  "run": { "duration_sec": 2700, "wipe_recovery_sec": 300 },
+  "route": [
+    { "x": 1781.3, "y": 134.9, "z": 70.9 },
+    { "x": 1766.9, "y": 118.9, "z": 61.8 },
+    { "x": 1749.3, "y": 96.8, "z": 61.8 },
+    { "x": 1749.9, "y": 68.0, "z": 61.8 },
+    { "x": 1745.0, "y": 58.4, "z": 61.7, "boss": 250483 },
+    { "x": 1706.7, "y": 64.0, "z": 61.8 },
+    { "x": 1664.8, "y": 82.1, "z": 62.4 },
+    { "x": 1636.0, "y": 88.8, "z": 61.8 },
+    { "x": 1623.2, "y": 105.9, "z": 61.8 },
+    { "x": 1559.2, "y": 127.3, "z": 61.7 },
+    { "x": 1545.0, "y": 140.0, "z": 61.6 },
+    { "x": 1529.1, "y": 139.5, "z": 61.6 },
+    { "x": 1509.9, "y": 142.1, "z": 62.4 },
+    { "x": 1491.2, "y": 153.9, "z": 61.6 },
+    { "x": 1470.4, "y": 167.1, "z": 61.6, "boss": 250660 },
+    { "x": 1490.9, "y": 134.7, "z": 63.0 },
+    { "x": 1477.3, "y": 107.7, "z": 61.9 },
+    { "x": 1464.8, "y": 113.9, "z": 62.4 },
+    { "x": 1450.7, "y": 128.0, "z": 62.4 },
+    { "x": 1441.6, "y": 136.8, "z": 62.4 },
+    { "x": 1424.0, "y": 160.5, "z": 62.4 },
+    { "x": 1417.6, "y": 168.5, "z": 63.2 },
+    { "x": 1408.3, "y": 200.0, "z": 61.6 },
+    { "x": 1422.1, "y": 213.3, "z": 64.3 },
+    { "x": 1475.7, "y": 278.4, "z": 61.6 },
+    { "x": 1514.7, "y": 320.0, "z": 61.9 },
+    { "x": 1536.0, "y": 384.0, "z": 61.6 },
+    { "x": 1556.5, "y": 394.7, "z": 62.4 },
+    { "x": 1568.8, "y": 399.7, "z": 62.4 },
+    { "x": 1601.1, "y": 395.2, "z": 61.8 },
+    { "x": 1608.3, "y": 385.9, "z": 61.8 },
+    { "x": 1620.5, "y": 371.5, "z": 63.7 },
+    { "x": 1664.0, "y": 341.3, "z": 61.8 },
+    { "x": 1677.6, "y": 332.5, "z": 61.8 },
+    { "x": 1700.3, "y": 319.7, "z": 61.8, "boss": 256097 },
+    { "x": 1664.0, "y": 298.7, "z": 61.8 },
+    { "x": 1642.7, "y": 298.7, "z": 61.8 },
+    { "x": 1625.0, "y": 305.0, "z": 61.8 },
+    { "x": 1617.9, "y": 312.8, "z": 61.8 },
+    { "x": 1600.0, "y": 300.0, "z": 64.7 },
+    { "x": 1589.3, "y": 302.9, "z": 63.2 },
+    { "x": 1530.0, "y": 311.6, "z": 61.7, "boss": 250657 }
+  ],
+  "bosses": [
+    {
+      "entry": 250483,
+      "name": "Witherfang",
+      "strategy": {}
+    },
+    {
+      "entry": 250660,
+      "name": "The Baron",
+      "strategy": {}
+    },
+    {
+      "entry": 256097,
+      "name": "Bjork",
+      "strategy": {}
+    },
+    {
+      "entry": 250657,
+      "name": "Rath'mael",
+      "strategy": {}
+    }
+  ],
+  "kill_priority": [250623],
+  "notes": "Proposed route 2026-11-15 (doc/rol-hot-route-plan.md), not the shipped one: load it with DungeonDir = <this folder>. Boss to boss over the navmesh (forever-ops ds_plan.py, plan_20261115), shipped boss order: Witherfang (point 4), the Baron (14), Bjork (34), Rath'mael (41). It keeps 33+ yards from the statue stalker at 1601,342 (its 25-yard 'player in range' trigger starts the waves and The Abandoned, which held all 20 parties of the 2026-11-15 overnight run at shipped point 36): north round to Bjork (points 26-33), back along the south side of the corridor (35-40). No upper gallery (shipped points 14-17) and no walk on after the last boss (shipped legs 56-58 and 63-65 are not walkable). Before the Baron the party stops east of the Mangled Cadaver pack (points 9, 10) and pulls the Baron from 1491,154 (13). 1252 instead of 4506 yards, 144 instead of 242 hostiles. duration_sec 2700: the 2026-11-15 parties needed 1422-2112 s to the Baron alone. Every leg checked with navtool (path ok). kill_priority (acts with the focus tactic): Mangled Cadaver (Cadaver Worms killed 10 of 23 rol deaths on 2026-11-13 and 76 of 453 on 2026-11-15)."
+}

@@ -141,3 +141,9 @@ spread|309|14507|10|healers|Venoxis Holy Wrath (jump radius is an estimate)
 purge|309|23895|Venoxis Renew
 # Hakkar's Cause Insanity (charm): the member is not attacked and a mage polymorphs it
 mindcontrol|309|24327|Hakkar Cause Insanity
+
+# ---- Ruins of Lordaeron (map 2999, 5-man; dispels act for any party through the party planner, PartyPlanner on, the default) ----
+# Cadaver Worms (16143, SpellCategories DispelType 3 = disease) from the Mangled Cadavers (250623, smart script: every 6 s on the victim) ticks for 150 on level-20 bots and
+# killed 10 of 23 members in the six 2026-11-13 rol runs, most of them after the fight while the party sat in a health hold beside the Baron (doc/rol-hot-route-plan.md).
+# The undead priest of the base roster has Cure Disease (528, level 14).
+dispel|2999|16143|disease|Cadaver Worms (Mangled Cadaver)
