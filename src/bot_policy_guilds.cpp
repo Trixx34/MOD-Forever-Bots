@@ -118,6 +118,15 @@ void BotPolicy::DriveGuilds(forever_module::WorldTickSnapshotView const& view, s
                              bot_guilds::KindName(made.Kind) + " name=" + pending->second.Name);
         _pendingGuilds.erase(pending);
     }
+    // Expired blocks are forgotten once the failure history has also faded (a block's longest window after it ended), so the map does not grow for
+    // masters that never come back; a block that is just over keeps its failure count for the next doubling.
+    for (auto it = _guildCreateBlocks.begin(); it != _guildCreateBlocks.end();)
+    {
+        if (it->second.UntilMs + (kGuildCreateBlockMs << kGuildCreateBlockDoublings) < nowMs)
+            it = _guildCreateBlocks.erase(it);
+        else
+            ++it;
+    }
     // A create nobody confirmed was most likely refused (social orders off, name taken): its master is left out of the next plans for a while, so the
     // same refused masters do not take every plan's create slots and starve the creates behind them.
     for (auto it = _pendingGuilds.begin(); it != _pendingGuilds.end();)
@@ -184,18 +193,32 @@ void BotPolicy::DriveGuilds(forever_module::WorldTickSnapshotView const& view, s
             break;
         if (created.Members.empty())
             continue;
-        std::uint64_t const master = created.Master;
-        if (busy(master) || _pendingGuilds.count(master))   // a create in flight is not sent again (it would restart the pending clock and no block would ever be set)
+        // The master is the lowest guid of the members; when it is blocked (a refused create) or has a create in flight, the next member in guid order
+        // that is free takes the create, so one refused master does not hold back its whole guild.
+        std::uint64_t master = 0;
+        bool inFlight = false;
+        for (std::uint64_t const member : created.Members)
+            inFlight = inFlight || _pendingGuilds.count(member) != 0;   // a create in flight is not sent again (it would restart the pending clock and no block would ever be set)
+        if (inFlight)
             continue;
-        if (auto const blocked = _guildCreateBlocks.find(master); blocked != _guildCreateBlocks.end() && blocked->second.UntilMs > nowMs)
+        for (std::uint64_t const member : created.Members)
         {
-            // One line per block, not per plan: the window is long and the plan runs every 30 s.
-            if (!blocked->second.Logged && _options.OnEvent)
-                _options.OnEvent("guild_create_skipped: master=" + std::to_string(master) + " failures=" + std::to_string(blocked->second.Failures) +
-                                 " wait_s=" + std::to_string((blocked->second.UntilMs - nowMs) / 1000));
-            blocked->second.Logged = true;
-            continue;
+            if (busy(member))
+                continue;
+            if (auto const blocked = _guildCreateBlocks.find(member); blocked != _guildCreateBlocks.end() && blocked->second.UntilMs > nowMs)
+            {
+                // One line per block, not per plan: the window is long and the plan runs every 30 s.
+                if (!blocked->second.Logged && _options.OnEvent)
+                    _options.OnEvent("guild_create_skipped: master=" + std::to_string(member) + " failures=" + std::to_string(blocked->second.Failures) +
+                                     " wait_s=" + std::to_string((blocked->second.UntilMs - nowMs) / 1000));
+                blocked->second.Logged = true;
+                continue;
+            }
+            master = member;
+            break;
         }
+        if (master == 0)
+            continue;
         social::Order order;
         order.What = social::Kind::Guild;
         order.Op = 3;
