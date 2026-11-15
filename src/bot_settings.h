@@ -290,8 +290,8 @@ struct BotSettings
     repair::Settings Repair;
     // VendorSellGear (default on; needs Bot.Vendor.SellGear in the core): a vendor visit also sells the bag gear the worn gear outclasses.
     bool VendorSellGear = true;
-    // Protocol 28: SpiritHealerAfterMs (default 45000; 0 = off), SpiritHealerOnRepeat (default on), HealDownrank (default off); see PolicyOptions.
-    std::uint32_t SpiritHealerAfterMs = 45000;
+    // Protocol 28: SpiritHealerAfterMs (default 15000 since the time quick wins, was 45000; 0 = off), SpiritHealerOnRepeat (default on), HealDownrank (default off); see PolicyOptions.
+    std::uint32_t SpiritHealerAfterMs = 15000;
     bool SpiritHealerOnRepeat = true;
     bool HealDownrank = false;
     // Leveling deaths (see PolicyOptions): IdleEnemyAttackersOnly (default on), CasterMeleeWithoutSpell (default on), EngageMaxLevelAbove (default 5, 0 = off, 0..60),
@@ -485,7 +485,7 @@ struct BotSettings
     // RaidRulesFile (absolute path, data/raid_rules.txt; empty = none): the raid rule table, see raid_rules.h and the README.
     std::string RaidRulesFile;
     // CorpseRunTeleportSec (0 = off, else 10..3600): a ghost whose corpse run takes longer is put at its corpse (needs Bot.Actions.Teleport).
-    std::uint32_t CorpseRunTeleportSec = 60;
+    std::uint32_t CorpseRunTeleportSec = 30; // was 60 before the time quick wins (docs/dungeon-time-loss-20261115.md item 7)
     // PullHoldBudgetSec (default 600, 0 = no budget, else 30..86400): the most a dungeon leader's pull holds (party not ready, tank rest) may hold in one run; once it is
     // used up the leader pulls without waiting for health or mana (hold_budget_spent event). Each hold is also cut at kPullHoldAbsMaxMs (90 s) and ends with the leader's fight.
     std::uint32_t PullHoldBudgetSec = 600;
