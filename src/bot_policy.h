@@ -732,6 +732,8 @@ private:
         std::uint64_t PickupAoeAtMs = 0;                 // tank pickup, the area taunt (Challenging Shout or Roar): no cast before this
         std::uint64_t SwapTauntAtMs = 0;                 // Taunt after a tank swap (raid rules): no cast before this
         std::uint64_t OnyxiaTauntAtMs = 0;               // Taunt on Onyxia (the warrior tank): no cast before this
+        std::uint64_t OffTankTauntAtMs = 0;              // the off-tank's Taunt on a Warder that hits another member: no cast before this
+        std::uint64_t OffTankTarget = 0;                 // the Warder the off-tank last picked up (offtank_pickup is logged on a change)
         int OnyxiaPhase = 0;                             // the raid's tank: Onyxia's phase by her health (0 = not seen in this fight)
         std::uint64_t OnyxiaLandedMs = 0;                // the raid's tank: when she was first seen at 40% or below in this fight (0 = not landed)
         bool OnyxiaTankOnHer = false;                    // the raid's tank: its threat target is her now (read by the damage dealers' landing hold)

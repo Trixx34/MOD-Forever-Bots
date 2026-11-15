@@ -69,7 +69,7 @@ void BotPolicy::TurnMoveChoice(DecideTick& tick, BotTurn& turn)
             wanted = followRef ? Decision{ ActionType::kFollow, followRef } : Decision{ ActionType::kStop, 0 };
         }
     }
-    else if (partyMember && aoeWarder != nullptr &&
+    else if (partyMember && !turn.offTank && aoeWarder != nullptr &&
              std::hypot(bot.pos_x - aoeWarder->pos_x, bot.pos_y - aoeWarder->pos_y) < kAoeStandYards - 0.5f)
     {
         // An Onyxian Warder is near (kAoeStandYards, in combat or not): every party member other than the tank (the leader) gets out of its Fire Nova, whatever it is fighting or healing (the 2026-10-29 wipe:
@@ -301,7 +301,7 @@ void BotPolicy::MoveToTarget(DecideTick& tick, BotTurn& turn)
     if (nowMs < state.RangeCloserUntilMs)
         approach = std::min(approach, approach > kMeleeApproachYards + 0.5f ? kCasterCloserYards : kMeleeCloserYards);
     // Around an area-attack target a party member other than the tank never closes in: it holds at kite distance.
-    bool const aoeTarget = partyMember && targetUnit && forever_module::UnitRefEntry(targetUnit->guid) == kOnyxianWarderEntry;
+    bool const aoeTarget = partyMember && !turn.offTank && targetUnit && forever_module::UnitRefEntry(targetUnit->guid) == kOnyxianWarderEntry;   // the off-tank melees it
     if (aoeTarget)
         approach = std::max(approach, kAoeStandYards);
     // Onyxia herself: the bot's role band (healer, ranged or melee) sets how close it comes. It closes to the band's far edge, and a healer or ranged bot

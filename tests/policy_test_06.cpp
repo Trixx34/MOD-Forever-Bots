@@ -482,6 +482,55 @@ void TheLeaderLogsADeadWarderOnce()
     CHECK(lines == 1);
 }
 
+// The off-tank: the party's first warrior member after its leader (11 here). It taunts and fights a Warder whose newest hit landed on another member (the mage, 12),
+// and it does not kite that Warder; the mage still kites. A second warrior later in the party is not an off-tank.
+void TheOffTankPicksUpAWarderHittingAMember()
+{
+    std::vector<std::string> events;
+    PolicyOptions options = AggressiveOptions();
+    options.PartySize = 4;
+    options.PartyCount = 1;
+    options.WanderWhenIdle = false;
+    options.ClassOf = [](std::uint64_t guid) { return guid == 12 ? 8u : 1u; };   // 10 the tank, 11 the off-tank, 12 a mage, 13 another warrior
+    options.OnEvent = [&events](std::string const& text) { events.push_back(text); };
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13 }, options.ClassOf);
+    NearbyUnit warder = Hostile(2, 10.0f, 100);
+    warder.guid = MakeUnitRef(8, 12129, 2);
+    view.bots[0].pos_x = -60.0f;                      // the tank, busy far off
+    view.bots[2].in_combat = 1;                       // the mage, hit by the Warder
+    view.bots[2].threat_target_guid = warder.guid;
+    view.bots[2].damage_hit_count = 1;
+    view.bots[2].damage_sequence = 1;
+    view.bots[2].damage_hits[0].source_guid = warder.guid;
+    view.bots[2].damage_hits[0].amount = 1200;
+    view.bots[2].damage_hits[0].sequence = 1;
+    AddNearby(view, 2, warder);                       // only the mage sees it
+    int taunts = 0, offTankKites = 0, mageKites = 0, offTankEngages = 0, otherTaunts = 0;
+    for (std::uint64_t at = 1000; at < 4000; at += 100)
+    {
+        view.tick_number = at / 100;
+        for (BotAction const& action : policy.Decide(view, at))
+        {
+            if (action.bot_guid == 11 && action.type == ActionType::kCastSpell && action.spell_id == 355 && action.target_guid == warder.guid)
+                ++taunts;
+            if (action.bot_guid == 13 && action.type == ActionType::kCastSpell && action.spell_id == 355)
+                ++otherTaunts;
+            if (action.bot_guid == 11 && (action.type == ActionType::kFollow || action.type == ActionType::kAttackTarget) && action.target_guid == warder.guid)
+                ++offTankEngages;
+            bool const kite = action.type == ActionType::kMoveTo && action.target_guid == 0;
+            offTankKites += action.bot_guid == 11 && kite;
+            mageKites += action.bot_guid == 12 && kite;
+        }
+    }
+    CHECK(taunts == 1);
+    CHECK(otherTaunts == 0);
+    CHECK(offTankEngages > 0);
+    CHECK(offTankKites == 0);
+    CHECK(mageKites > 0);
+    CHECK(Logged(events, "offtank_pickup: bot=11"));
+}
+
 // WarderPartyHold: a member with no target of its own does not follow the tank into a Warder's Fire Nova; it holds outside the nova, and follows again once the Warder is dead.
 bool MemberFollowsTankAtWarder(bool hold, bool warderAlive)
 {
@@ -1020,6 +1069,7 @@ void RunPolicyTestsPart6()
     RaidCasterAtTheWarderStandCastsOnIt();
     RaidMemberSeesTheWarderInItsLeadersView();
     TheLeaderLogsADeadWarderOnce();
+    TheOffTankPicksUpAWarderHittingAMember();
     KiteRetreatsAlongTheEntryRouteAndFallsBackToTheCircle();
     MemberHoldsOutsideTheNovaWhileTheTankPullsTheWarder();
     PartyMemberDoesNotFleeOnLowHealth();
