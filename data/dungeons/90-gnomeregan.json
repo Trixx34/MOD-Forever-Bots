@@ -145,23 +145,23 @@
   ],
   "events": [
     {
-      // Electrocutioner 6000 is on island 3 of the map-90 mesh, 1.4 yards from the main mesh: the leader is put on the island side of the gap.
+      // Electrocutioner 6000 is on island 3 of the map-90 mesh, 1.4 yards from the main mesh: the whole party (leader at the point, living members on a 1-yard ring round it; ghosts are not moved) is put on the island side of the gap. A leader-only teleport left the members to member_recover after 20 s, and the sim parties wiped at the gap (8 of 13 runs stall at route index 27, 2026-11-15).
       "id": "electrocutioner-bridge",
       "name": "Bridge to Electrocutioner 6000 (his island has no navmesh link)",
       "trigger": { "type": "after_boss", "boss": 7079 },
       "steps": [
-        { "type": "teleport", "x": -537.9, "y": 528.3, "z": -216.1 },
+        { "type": "teleport", "x": -537.9, "y": 528.3, "z": -216.1, "party": true },
         { "type": "wait", "seconds": 5 }
       ]
     },
     {
-      // To the main-mesh side of the gap, a route point of its own (the teleport snaps the route index to it); the route walks on to Crowd Pummeler from there.
+      // The whole party to the main-mesh side of the gap (no walk back past Mechanized Sentries 6233), a route point of its own (the teleport snaps the route index to it); the route walks on to Crowd Pummeler from there.
       // The old "cave-ins" event (after the last boss) is gone: it walked the leader ~1000 yards back to the entrance, and Grubbis is an escort event, not the charges.
       "id": "electrocutioner-back",
       "name": "Back from Electrocutioner 6000 (the main-mesh side of the gap)",
       "trigger": { "type": "after_boss", "boss": 6235 },
       "steps": [
-        { "type": "teleport", "x": -538.1, "y": 530.6, "z": -216.3 },
+        { "type": "teleport", "x": -538.1, "y": 530.6, "z": -216.3, "party": true },
         { "type": "wait", "seconds": 5 }
       ]
     }

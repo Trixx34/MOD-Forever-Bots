@@ -2,6 +2,10 @@
 // Policy tests, part 3 of 8 (split out of policy_test.cpp; the helpers are in policy_test_support.h).
 #include "policy_test_support.h"
 
+#include <cmath>
+#include <map>
+#include <set>
+
 namespace {
 
 // Refused targets (M7 fix). A bot that is refused an attack, or a cast with no valid target, picks another unit.
@@ -843,6 +847,57 @@ void ATeleportEventSnapsTheRouteIndexToThePointItLandsOn()
     CHECK(snapped);
 }
 
+// teleport_party: the leader and every living member of its party on the map are put at the place, the members on distinct spots of a 1-yard ring; a ghost is left
+// alone. A plain teleport still moves the leader only (Gnomeregan, Electrocutioner 6000, 2026-11-15).
+void APartyTeleportEventMovesTheLivingMembersAndASingleOneOnlyTheLeader()
+{
+    for (bool const party : { true, false })
+    {
+        PolicyOptions options = LeadOptions();
+        options.DungeonTeleport = true;
+        PolicyOptions::DungeonRoute route;
+        route.Route = { Point{ 100.0f, 0.0f, 0.0f }, Point{ 300.0f, 0.0f, 0.0f }, Point{ 340.0f, 0.0f, 0.0f }, Point{ 100.0f, 0.0f, 0.0f } };
+        route.BossAt[0] = 644;
+        route.BossAt[2] = 645;
+        std::vector<std::string> warnings;
+        route.Events = dungeon_events::Parse(std::string("event 36 bridge Bridge\nafter_boss 644\n") + (party ? "teleport_party" : "teleport") + " 300 0 0\nwait 5\nend\n", warnings);
+        CHECK(warnings.empty());
+        options.DungeonsByMap[36] = route;
+        BotPolicy policy(options);
+        WorldTickSnapshotView view = PlayerGroupView(98.0f);
+        policy.Decide(view, 0);
+        policy.ApplyChat(view, FromPlayer(), TankLead(), 1000);
+        view.bots[4].life_state = 1;                                   // a ghost (guid 14)
+        NearbyUnit corpse;
+        corpse.guid = MakeUnitRef(8, 644, 55);
+        corpse.health = 0;
+        AddNearby(view, 3, corpse);
+        std::vector<BotAction> const actions = policy.Decide(view, 2000);
+        std::map<std::uint64_t, BotAction> jumps;
+        for (BotAction const& a : actions)
+            if (a.type == ActionType::kTeleport && a.dest_x > 250.0f)
+                jumps[a.bot_guid] = a;
+        CHECK(jumps.count(view.bots[2].guid) == 1 && jumps[view.bots[2].guid].dest_x == 300.0f);
+        CHECK(jumps.count(view.bots[4].guid) == 0);                    // the ghost stays
+        if (!party)
+        {
+            CHECK(jumps.size() == 1);
+            continue;
+        }
+        CHECK(jumps.size() == 4);
+        std::set<std::pair<int, int>> spots;
+        for (auto const& [guid, a] : jumps)
+        {
+            if (guid == view.bots[2].guid)
+                continue;
+            float const d = std::sqrt((a.dest_x - 300.0f) * (a.dest_x - 300.0f) + a.dest_y * a.dest_y);
+            CHECK(std::fabs(d - dungeon_events::kPartySpreadYards) < 0.01f && a.spell_id == 36);
+            spots.insert({ int(std::lround(a.dest_x * 100.0f)), int(std::lround(a.dest_y * 100.0f)) });
+        }
+        CHECK(spots.size() == 3);
+    }
+}
+
 // The snap stops at a boss still alive (Shadowfang Keep, 2026-11-07: the courtyard-door teleport lands on route point 31, and a leader at point 1-3 was
 // snapped there past four living bosses). A teleport that lands past a living boss leaves the route index where it was.
 void ATeleportEventDoesNotSnapPastALivingBoss()
@@ -963,6 +1018,7 @@ void RunPolicyTestsPart3()
     TheTankHoldsAtABossUntilItIsSeenDead();
     ALeverIsPulledWhenTheTankComesNear();
     ATeleportEventSnapsTheRouteIndexToThePointItLandsOn();
+    APartyTeleportEventMovesTheLivingMembersAndASingleOneOnlyTheLeader();
     ATeleportEventDoesNotSnapPastALivingBoss();
     TheLeaderWaitsAtABossPointUntilTheBossIsDead();
     ABossPointWhoseBossDiedElsewhereIsPassed();

@@ -2,6 +2,7 @@
 // Unit tests for the dungeon event table and its runner (src/dungeon_events.h). No core or SDK needed.
 #include "dungeon_events.h"
 
+#include <cmath>
 #include <cstdio>
 
 using namespace dungeon_events;
@@ -320,6 +321,32 @@ end
     CHECK(bridge.Next(g, 100).Do == Command::What::Nothing && !bridge.Active());        // a teleport has no answer to wait for
 }
 
+// teleport_party parses to a Party step; teleport stays the leader only; the ring offsets of the members are distinct and one yard from the place.
+void ATeleportPartyStepIsParsedAndSpreadsTheMembers()
+{
+    std::vector<std::string> warnings;
+    std::vector<Event> const all = Parse("event 90 a A\nafter_boss 1\nteleport_party 1 2 3\nwait 5\nend\nevent 90 b B\nafter_boss 2\nteleport 1 2 3\nend\nevent 90 c C\nafter_boss 3\nteleport_party 1 2\nend\n", warnings);
+    CHECK(all.size() == 2 && warnings.size() == 1);
+    CHECK(all[0].Steps[0].What == Step::Kind::Teleport && all[0].Steps[0].Party && !all[1].Steps[0].Party);
+    Runner runner({ all[0] });
+    std::set<std::uint32_t> killed{ 1 };
+    Facts f;
+    f.KilledBosses = &killed;
+    Command const jump = runner.Next(f, 0);
+    CHECK(jump.Do == Command::What::Teleport && jump.Party && jump.X == 1.0f && jump.Y == 2.0f);
+    Runner single({ all[1] });
+    killed.insert(2);
+    CHECK(!single.Next(f, 0).Party);
+    std::set<std::pair<int, int>> spots;
+    for (std::size_t i = 0; i < 4; ++i)
+    {
+        Offset const o = PartySpreadOffset(i, 4);
+        CHECK(std::fabs(std::sqrt(o.Dx * o.Dx + o.Dy * o.Dy) - kPartySpreadYards) < 0.001f);
+        spots.insert({ int(std::lround(o.Dx * 100.0f)), int(std::lround(o.Dy * 100.0f)) });
+    }
+    CHECK(spots.size() == 4);
+}
+
 // A refused first talk may have started the escort: on to the follow. A second refusal is a failure; an invalid target after a try goes on too.
 void ARefusedNaralexTalkMovesOnToTheFollow()
 {
@@ -389,6 +416,7 @@ void ATimeoutWithOnlyAWaitLeftIsDone()
 
 int main()
 {
+    ATeleportPartyStepIsParsedAndSpreadsTheMembers();
     TheFileIsParsedAndBadBlocksAreDropped();
     TheTriggersFire();
     AnEventWalksUsesAndWaits();

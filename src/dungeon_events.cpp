@@ -9,6 +9,14 @@
 
 namespace dungeon_events {
 
+Offset PartySpreadOffset(std::size_t slot, std::size_t count)
+{
+    if (count == 0)
+        return { 0.0f, 0.0f };
+    float const angle = 6.2831853f * float(slot % count) / float(count);
+    return { kPartySpreadYards * std::cos(angle), kPartySpreadYards * std::sin(angle) };
+}
+
 namespace {
 
 // Was a local ToUint/ToFloat pair; now the shared single-token parser (text_number.h) used by every
@@ -187,15 +195,16 @@ std::vector<Event> Parse(std::string_view text, std::vector<std::string>& warnin
                 bad = true;
             }
         }
-        else if (w[0] == "teleport")
+        else if (w[0] == "teleport" || w[0] == "teleport_party")
         {
             Step step;
             step.What = Step::Kind::Teleport;
+            step.Party = w[0] == "teleport_party";
             if (w.size() == 4 && ToFloat(w[1], step.X) && ToFloat(w[2], step.Y) && ToFloat(w[3], step.Z))
                 current.Steps.push_back(step);
             else
             {
-                warn("teleport needs <x> <y> <z>");
+                warn(w[0] + " needs <x> <y> <z>");
                 bad = true;
             }
         }
@@ -432,6 +441,7 @@ Command Runner::Next(Facts const& facts, std::uint64_t nowMs)
         teleport.X = step.X;
         teleport.Y = step.Y;
         teleport.Z = step.Z;
+        teleport.Party = step.Party;
         ++_step;                  // a teleport has no answer to wait for
         _stepSinceMs = nowMs;
         return teleport;

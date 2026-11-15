@@ -140,12 +140,12 @@ end
 # the route walks on to Crowd Pummeler from there (no walk back past Fallout). The cave-ins event is gone: it walked ~1000 yards back to the entrance after the last boss.
 event 90 electrocutioner-bridge Bridge to Electrocutioner 6000 (his island has no navmesh link)
 after_boss 7079
-teleport -537.9 528.3 -216.1
+teleport_party -537.9 528.3 -216.1
 wait 5
 end
 
 event 90 electrocutioner-back Back from Electrocutioner 6000 (the main-mesh side of the gap)
 after_boss 6235
-teleport -538.1 530.6 -216.3
+teleport_party -538.1 530.6 -216.3
 wait 5
 end

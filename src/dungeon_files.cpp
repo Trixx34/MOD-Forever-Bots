@@ -315,8 +315,14 @@ dungeon_events::Event ReadEvent(Reader const& r, Value const& value, std::string
         }
         else if (stepKind == "teleport")
         {
-            r.CheckKeys(step, stepAt, { "type", "x", "y", "z" });
+            r.CheckKeys(step, stepAt, { "type", "x", "y", "z", "party" });
             s.What = Step::Kind::Teleport;
+            if (Value const* party = step.Find("party"))
+            {
+                if (party->What != Value::Kind::Bool)
+                    r.Fail(stepAt + ".party", "must be true or false");
+                s.Party = party->Boolean;
+            }
             s.X = r.Float(step, stepAt, "x");
             s.Y = r.Float(step, stepAt, "y");
             s.Z = r.Float(step, stepAt, "z");
