@@ -36,6 +36,8 @@ enum class Cond : std::uint8_t
     NoPet,             // the snapshot reports no pet (pet_state 0): a summon spell is due. A dead pet (state 2) is not 'no pet'
     SelfAuraBelow,     // Param: aura spell id, Param2: stacks. The bot has fewer stacks of the aura than this (0 stacks when it is missing)
     SelfAuraAtLeast,   // Param: aura spell id, Param2: stacks. The bot carries the aura with this many stacks or more (a proc such as Missile Barrage)
+    OutOfCombat,       // the bot is not in combat (Charge: refused by the core once the bot fights)
+    BossFight,         // the target is a boss of the dungeon or raid being run (the policy sets Facts::BossFight): cooldown rows
 };
 
 // What a rule reads. Built from a snapshot by FactsFor().
@@ -52,6 +54,8 @@ struct Facts
     std::uint64_t FightMs = 0;
     std::int32_t ComboPoints = 0;
     bool InParty = false;
+    bool InCombat = false;                        // the bot is in combat (snapshot in_combat)
+    bool BossFight = false;                       // the target is a boss of the route or raid rules; set by the policy, not by FactsFor
     std::uint32_t PetState = 0;                   // the snapshot's pet_state: 0 none, 1 alive, 2 dead
     std::uint32_t AuraCount = 0;                  // the bot's own auras (layout 13), as many as the snapshot lists
     std::uint32_t AuraSpell[16] = {};
@@ -79,6 +83,7 @@ struct Row
     // From a rotation file (RotationData); the built-in rows leave these at their defaults.
     std::uint32_t MinLevel = 0;     // the bot's level that learns the spell (0 = the built-in LearnLevel table decides)
     std::uint32_t MaxLevel = 0;     // not used above this level, when a better spell replaces it (0 = no limit)
+    std::uint32_t RetrySec = 0;     // `retry <sec>`: after a refused cast the row waits at least this long (a spell that only works after a proc: Revenge, Overpower), 0 = the default
     std::uint32_t DurationSec = 0;  // how long the effect lasts: a damage-over-time effect or a buff is not recast while it runs
     bool Buff = false;              // an upkeep spell cast out of combat, not part of the fight rotation
     bool Party = false;             // a buff: cast on every member of the bot's group (itself included), not only on the bot
@@ -108,7 +113,8 @@ bool RowHasCondition(Row const& row, Cond cond);
 //   buff <spell> [level <n>] [maxlevel <n>] duration <sec> self|party [ranks <id,id,...>]                    an upkeep spell, cast out of combat when it has run out;
 //                                                                                                           ranks: the spell ids of every rank (the aura shows the rank cast)
 // Conditions: always | target_hp_above N | target_hp_below N | self_hp_below N | self_power_below N | self_power_above N | enemies N |
-// target_casting | opener N | target_strong N | combo N | enemies_below N | in_party | no_pet | self_aura_below <spell> <stacks> | self_aura_at_least <spell> <stacks>.
+// target_casting | opener N | target_strong N | combo N | enemies_below N | in_party | no_pet | self_aura_below <spell> <stacks> | self_aura_at_least <spell> <stacks> |
+// out_of_combat | boss_fight.  Row keyword `retry <sec>`: the wait after a refused cast.
 struct RotationData
 {
     std::map<std::uint32_t, std::vector<Row>> ByClass;                          // `class <id>`: the class's default rows, and the fallback for a spec with no block

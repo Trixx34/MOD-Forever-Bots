@@ -20,11 +20,11 @@ row "Taunt" enemies 2 target range 0 5
 row "Challenging Shout" enemies 4 self           # AoE taunt, 10 min cooldown; the tank turn also casts it when two or more mobs are loose (TankPickup)
 row "Bloodrage" self_power_below 20 self
 # row "Reckless Swings" self_power_below 30 self   # not a row: no trainer teaches it, so a bot never knows it ("spell not known" on every cast); add it back when the core grants it
-row "Charge" opener 8 target range 8 25
+row "Charge" out_of_combat self_aura_below 71 1 target range 8 25   # Battle/Berserker Stance only and out of combat only: a tank in Defensive Stance never charges
 row "Shield Block" duration 5 always self
-row "Revenge" always target range 0 5
+row "Revenge" self_aura_at_least 71 1 retry 4 target range 0 5   # Defensive Stance, after a block, dodge or parry: a refusal waits 4 s
 row "Thunder Clap" enemies 2 self
-row "Retaliation" enemies 3 self
+row "Retaliation" enemies 3 self_aura_below 71 1 retry 5 self   # Battle Stance only
 row "Demoralizing Shout" enemies 3 self duration 30
 row "Sunder Armor" in_party target range 0 5
 row "Cleave" enemies 2 target range 0 5
@@ -42,12 +42,12 @@ row "Taunt" enemies 2 target range 0 5
 row "Challenging Shout" enemies 4 self           # AoE taunt, 10 min cooldown; the tank turn also casts it when two or more mobs are loose (TankPickup)
 row "Bloodrage" self_power_below 20 self
 # row "Reckless Swings" self_power_below 30 self   # not a row: no trainer teaches it, so a bot never knows it ("spell not known" on every cast); add it back when the core grants it
-row "Charge" opener 8 target range 8 25
+row "Charge" out_of_combat self_aura_below 71 1 target range 8 25   # Battle/Berserker Stance only and out of combat only: a tank in Defensive Stance never charges
 row "Shield Block" duration 5 always self
-row "Revenge" always target range 0 5
+row "Revenge" self_aura_at_least 71 1 retry 4 target range 0 5   # Defensive Stance, after a block, dodge or parry: a refusal waits 4 s
 row "Thunder Clap" enemies 2 self
 # row "Shockwave" enemies 2 self   # not a row: no trainer teaches it, so a bot never knows it ("spell not known" on every cast); add it back when the core grants it
-row "Retaliation" enemies 3 self
+row "Retaliation" enemies 3 self_aura_below 71 1 retry 5 self   # Battle Stance only
 row "Demoralizing Shout" enemies 3 self duration 30
 row "Sunder Armor" in_party target range 0 5
 # row "Spearing Strike" self_power_above 30 target range 0 5   # not a row: no trainer teaches it, so a bot never knows it ("spell not known" on every cast); add it back when the core grants it
@@ -60,14 +60,16 @@ buff "Defensive Stance" duration 120 self in_party
 class 1 spec arms
 # Arms (damage). Sweeping Strikes against two, Overpower after a dodge (refused otherwise), Mortal Strike from level 48, Rend, Sunder Armor in a group, Execute at the end.
 # Berserker Stance comes from the level 30 class quest and is not cast; the warrior stays in Battle Stance.
+row 20572 level 1 boss_fight duration 15 self   # Blood Fury (orc): a cooldown on a boss only
+row 20554 level 1 boss_fight duration 10 self   # Berserking (troll): a cooldown on a boss only
 row "Pummel" target_casting self_aura_at_least 2458 1 target range 0 5   # interrupt, Berserker Stance only: the module never enters it, so this fires for a warrior that someone put there
 row "Execute" target_hp_below 20 target range 0 5
 row "Bloodrage" self_power_below 20 self
 # row "Reckless Swings" self_power_below 30 self   # not a row: no trainer teaches it, so a bot never knows it ("spell not known" on every cast); add it back when the core grants it
-row "Charge" opener 8 target range 8 25
+row "Charge" out_of_combat self_aura_below 71 1 target range 8 25   # Battle/Berserker Stance only and out of combat only: a tank in Defensive Stance never charges
 row 12292 level 30 enemies 2 duration 10 self      # Sweeping Strikes (the talent spell; 12723 is its effect)
 row "Mortal Strike" always target range 0 5
-row "Overpower" always target range 0 5
+row "Overpower" retry 4 always target range 0 5   # after a dodge only: a refusal waits 4 s
 row "Thunder Clap" enemies 2 self
 row "Sunder Armor" in_party target range 0 5
 row "Rend" duration 21 always target range 0 5
@@ -79,14 +81,16 @@ buff "Battle Shout" duration 120 self
 class 1 spec fury
 # Fury (damage). Death Wish and Bloodthirst (talents: refused until learned), Execute, Overpower (rage-efficient), Sunder Armor as a debuff; Cleave and Heroic Strike only with
 # lots of rage (the guide calls them rage-inefficient). Whirlwind and Berserker Rage need Berserker Stance and are not cast.
+row 20572 level 1 boss_fight duration 15 self   # Blood Fury (orc): a cooldown on a boss only
+row 20554 level 1 boss_fight duration 10 self   # Berserking (troll): a cooldown on a boss only
 row "Pummel" target_casting self_aura_at_least 2458 1 target range 0 5   # interrupt, Berserker Stance only: the module never enters it, so this fires for a warrior that someone put there
 row "Execute" target_hp_below 20 target range 0 5
 row "Bloodrage" self_power_below 20 self
 # row "Reckless Swings" self_power_below 30 self   # not a row: no trainer teaches it, so a bot never knows it ("spell not known" on every cast); add it back when the core grants it
-row "Charge" opener 8 target range 8 25
+row "Charge" out_of_combat self_aura_below 71 1 target range 8 25   # Battle/Berserker Stance only and out of combat only: a tank in Defensive Stance never charges
 row "Death Wish" target_strong 1 self
 row "Bloodthirst" always target range 0 5
-row "Overpower" always target range 0 5
+row "Overpower" retry 4 always target range 0 5   # after a dodge only: a refusal waits 4 s
 row "Sunder Armor" in_party target range 0 5
 row "Cleave" enemies 3 self_power_above 70 target range 0 5
 row "Heroic Strike" self_power_above 70 target range 0 5
@@ -141,6 +145,8 @@ supersede "Devotion Aura" by "Retribution Aura"
 class 2 spec ret
 # Retribution (damage): Judgement of the Crusader with the first Judgement, Seal of Righteousness, Holy Strike on cooldown, Consecration for three or more, Hammer of Wrath to finish.
 # row "Rebuke" target_casting target range 0 5   # not a row: a Season of Discovery rune (SkillLineAbility AcquireMethod 3, never learned); no trainer, quest, item, learn spell or talent gives it, so a bot never knows it
+row 20572 level 1 boss_fight duration 15 self   # Blood Fury (orc): a cooldown on a boss only
+row 20554 level 1 boss_fight duration 10 self   # Berserking (troll): a cooldown on a boss only
 row "Hammer of Justice" target_casting target range 0 10
 row "Holy Light" self_hp_below 50 self
 row "Hammer of Wrath" target_hp_below 20 target range 0 30
@@ -157,6 +163,9 @@ supersede "Devotion Aura" by "Retribution Aura"
 
 class 3
 # The default hunter is Beast Mastery.
+row 19574 level 40 boss_fight duration 18 self   # Bestial Wrath: a cooldown on a boss only
+row 20572 level 1 boss_fight duration 15 self   # Blood Fury (orc): a cooldown on a boss only
+row 20554 level 1 boss_fight duration 10 self   # Berserking (troll): a cooldown on a boss only
 row "Hunter's Mark" duration 120 always target range 0 35
 row 1293241 level 25 duration 18 always target range 0 35       # Summon Hawk (no trainer teaches rank 1: the core refuses it until the bot has it)
 row "Multi-Shot" enemies 2 target range 8 35
@@ -170,6 +179,9 @@ class 3 spec bm
 # Beast Mastery (level 30 guide): before Summon Hawk (level 25) Aimed Shot (one target) or Multi-Shot (several) and Arcane Shot on cooldown; with the Hawk, a guardian for 18 s:
 # Hawk, Aimed/Multi, Hawk, Aimed/Multi, Arcane. The Hawk is cast whenever it is ready (a cooldown refusal skips it). With no ammunition the policy leaves the ranged rows out and
 # Raptor Strike is what remains. The pet is the policy's own logic (Tame Beast, then Call Pet), not a row.
+row 19574 level 40 boss_fight duration 18 self   # Bestial Wrath: a cooldown on a boss only
+row 20572 level 1 boss_fight duration 15 self   # Blood Fury (orc): a cooldown on a boss only
+row 20554 level 1 boss_fight duration 10 self   # Berserking (troll): a cooldown on a boss only
 row "Hunter's Mark" duration 120 always target range 0 35
 row 1293241 level 25 duration 18 always target range 0 35       # Summon Hawk (rank 1; no trainer teaches it: the core refuses it until the bot has it)
 row "Multi-Shot" enemies 2 target range 8 35
@@ -181,6 +193,8 @@ buff "Aspect of the Hawk" duration 3600 self
 
 class 3 spec mm
 # Marksmanship: Hunter's Mark, Aimed Shot and Arcane Shot on cooldown, Multi-Shot on cooldown for several targets, Trueshot Aura (Forever, level 32). Auto Shot has no cast time.
+row 20572 level 1 boss_fight duration 15 self   # Blood Fury (orc): a cooldown on a boss only
+row 20554 level 1 boss_fight duration 10 self   # Berserking (troll): a cooldown on a boss only
 row "Hunter's Mark" duration 120 always target range 0 35
 row "Rapid Fire" target_strong 1 self
 row "Multi-Shot" enemies 2 target range 8 35
@@ -194,9 +208,11 @@ buff "Trueshot Aura" duration 3600 self
 class 3 spec sv
 # Survival: ranged rows first (Serpent Sting, Arcane Shot, Aimed Shot), and the melee rows (Raptor Strike, then Mongoose Bite, Strider Kick, Counterattack) for a target that is within
 # five yards. The bot does not walk in to weave melee: the policy keeps a hunter at range, so the melee rows fire only for a mob that reached it.
+row 20572 level 1 boss_fight duration 15 self   # Blood Fury (orc): a cooldown on a boss only
+row 20554 level 1 boss_fight duration 10 self   # Berserking (troll): a cooldown on a boss only
 row "Hunter's Mark" duration 120 always target range 0 35
 row "Strider Kick" target_casting target range 0 5     # Forever: melee interrupt
-row "Counterattack" always target range 0 5
+row "Counterattack" retry 4 always target range 0 5   # after a parry only
 row "Mongoose Bite" always target range 0 5
 row "Raptor Strike" always target range 0 8     # rank 1 (2973) is known at level 1: a hunter in melee range has a strike, Auto Shot needs 8 yards
 row "Serpent Sting" duration 15 always target range 8 35
@@ -208,6 +224,9 @@ buff "Aspect of the Hawk" duration 3600 self
 
 class 4
 # The default rogue: Combat.
+row 13750 level 30 boss_fight duration 15 self   # Adrenaline Rush: a cooldown on a boss only
+row 20572 level 1 boss_fight duration 15 self   # Blood Fury (orc): a cooldown on a boss only
+row 20554 level 1 boss_fight duration 10 self   # Berserking (troll): a cooldown on a boss only
 row "Kick" target_casting target range 0 5
 row "Evasion" self_hp_below 40 self
 row "Eviscerate" combo 3 target_hp_below 25 target range 0 5   # a finisher at three points when the target is about to die: waiting for five wastes the points
@@ -219,6 +238,9 @@ row "Sinister Strike" always target range 0 5
 
 class 4 spec combat
 # Combat: Kick to interrupt, Blade Flurry against several, Expose Armor on a strong target, Slice and Dice, Rupture (high armor) or Eviscerate at five points, Sinister Strike.
+row 13750 level 30 boss_fight duration 15 self   # Adrenaline Rush: a cooldown on a boss only
+row 20572 level 1 boss_fight duration 15 self   # Blood Fury (orc): a cooldown on a boss only
+row 20554 level 1 boss_fight duration 10 self   # Berserking (troll): a cooldown on a boss only
 row "Kick" target_casting target range 0 5
 row "Evasion" self_hp_below 40 self
 row 13877 level 30 enemies 2 duration 15 self   # a level 30 talent: no bot has it before level 30 (a row at level 1 was refused on every cast)
@@ -232,6 +254,8 @@ row "Sinister Strike" always target range 0 5
 
 class 4 spec assassination
 # Assassination: Mutilate (level 40, two combo points) as the builder, the same finishers. Below level 40 Sinister Strike builds. Cold Blood and the poisons are not cast.
+row 20572 level 1 boss_fight duration 15 self   # Blood Fury (orc): a cooldown on a boss only
+row 20554 level 1 boss_fight duration 10 self   # Berserking (troll): a cooldown on a boss only
 row "Kick" target_casting target range 0 5
 row "Evasion" self_hp_below 40 self
 row "Eviscerate" combo 3 target_hp_below 25 target range 0 5   # a finisher at three points when the target is about to die: waiting for five wastes the points
@@ -243,6 +267,8 @@ row "Sinister Strike" always target range 0 5
 
 class 4 spec subtlety
 # Subtlety: Hemorrhage (level 30) as the builder, the same finishers; Garrote and the opener need Stealth and are not cast.
+row 20572 level 1 boss_fight duration 15 self   # Blood Fury (orc): a cooldown on a boss only
+row 20554 level 1 boss_fight duration 10 self   # Berserking (troll): a cooldown on a boss only
 row "Kick" target_casting target range 0 5
 row "Evasion" self_hp_below 40 self
 row "Eviscerate" combo 3 target_hp_below 25 target range 0 5   # a finisher at three points when the target is about to die: waiting for five wastes the points
@@ -260,6 +286,7 @@ row "Holy Fire" opener 3 target range 0 30
 row "Shadow Word: Pain" duration 18 always target range 0 30
 row "Mind Blast" always target range 0 30
 row "Smite" always target range 0 30
+row 5019 level 1 self_power_below 20 retry 60 target range 5 30   # the wand: auto-repeat, cast when the spell rows cannot be paid; refused (no wand) it waits a minute
 buff "Power Word: Fortitude" duration 1800 party
 buff "Inner Fire" duration 600 self
 buff "Divine Spirit" duration 1800 party
@@ -271,6 +298,7 @@ row "Holy Fire" opener 3 target range 0 30
 row "Shadow Word: Pain" duration 18 always target range 0 30
 row "Mind Blast" always target range 0 30
 row "Smite" always target range 0 30
+row 5019 level 1 self_power_below 20 retry 60 target range 5 30   # the wand: auto-repeat, cast when the spell rows cannot be paid; refused (no wand) it waits a minute
 buff "Power Word: Fortitude" duration 1800 party
 buff "Inner Fire" duration 600 self
 buff "Divine Spirit" duration 1800 party
@@ -282,6 +310,7 @@ row "Holy Fire" opener 3 target range 0 30
 row "Shadow Word: Pain" duration 18 always target range 0 30
 row "Mind Blast" always target range 0 30
 row "Smite" always target range 0 30
+row 5019 level 1 self_power_below 20 retry 60 target range 5 30   # the wand: auto-repeat, cast when the spell rows cannot be paid; refused (no wand) it waits a minute
 buff "Power Word: Fortitude" duration 1800 party
 buff "Inner Fire" duration 600 self
 buff "Divine Spirit" duration 1800 party
@@ -289,6 +318,8 @@ buff "Divine Spirit" duration 1800 party
 class 5 spec shadow
 # Shadow (damage): Power Word: Shield and Inner Fire before the pull, Pain on the target, Mind Blast on cooldown, Devouring Plague only if the mob lives (above half health), Mind Flay (level 28),
 # Smite as the filler (the wand is not cast), Vampiric Embrace. Shadowform is not before level 40 and is not cast.
+row 20572 level 1 boss_fight duration 15 self   # Blood Fury (orc): a cooldown on a boss only
+row 20554 level 1 boss_fight duration 10 self   # Berserking (troll): a cooldown on a boss only
 row "Power Word: Shield" self_hp_below 50 duration 30 self
 row "Shadow Word: Pain" duration 18 always target range 0 30
 # row "Void Plague" duration 18 always target range 0 30   # not a row: a Season of Discovery rune (SkillLineAbility AcquireMethod 3, never learned); no trainer, quest, item, learn spell or talent gives it, so a bot never knows it
@@ -297,6 +328,7 @@ row "Mind Blast" always target range 0 30
 row "Devouring Plague" duration 24 target_hp_above 50 target range 0 30
 row "Mind Flay" always target range 0 30
 row "Smite" always target range 0 30
+row 5019 level 1 self_power_below 20 retry 60 target range 5 30   # the wand: auto-repeat, cast when the spell rows cannot be paid; refused (no wand) it waits a minute
 buff "Power Word: Fortitude" duration 1800 party
 buff "Inner Fire" duration 600 self
 buff "Vampiric Embrace" duration 60 self
@@ -318,6 +350,8 @@ buff "Rockbiter Weapon" duration 300 self
 class 7 spec enh
 # Enhancement (damage): Stormstrike now and then (level 40), Earth Shock to interrupt, Searing Totem and Fire Nova for groups, Lightning Shield between pulls, Windfury Weapon from level 30
 # (it retires Rockbiter). The shaman fights at range in the policy, so the melee rows fire only for a mob that reached it; Lightning Bolt is the filler.
+row 20572 level 1 boss_fight duration 15 self   # Blood Fury (orc): a cooldown on a boss only
+row 20554 level 1 boss_fight duration 10 self   # Berserking (troll): a cooldown on a boss only
 row "Earth Shock" target_casting target range 0 20
 row "Healing Wave" self_hp_below 40 self
 row "Stormstrike" always target range 0 5
@@ -332,6 +366,9 @@ supersede "Rockbiter Weapon" by "Windfury Weapon"
 
 class 7 spec ele
 # Elemental (damage): shocks, Fire Nova on cooldown, a fire totem (Searing, Magma against three), Chain Lightning for three or more, Lightning Bolt. Lightning Shield (Water Shield is a Restoration talent).
+row 16166 level 40 boss_fight self   # Elemental Mastery: a cooldown on a boss only
+row 20572 level 1 boss_fight duration 15 self   # Blood Fury (orc): a cooldown on a boss only
+row 20554 level 1 boss_fight duration 10 self   # Berserking (troll): a cooldown on a boss only
 row "Earth Shock" target_casting target range 0 20
 row "Healing Wave" self_hp_below 40 self
 row "Searing Totem" duration 55 always self
@@ -358,6 +395,9 @@ supersede "Lightning Shield" by "Water Shield"
 
 class 8
 # The default mage: Arcane (below).
+row 12042 level 40 boss_fight duration 15 self   # Arcane Power: a cooldown on a boss only
+row 20572 level 1 boss_fight duration 15 self   # Blood Fury (orc): a cooldown on a boss only
+row 20554 level 1 boss_fight duration 10 self   # Berserking (troll): a cooldown on a boss only
 row "Counterspell" target_casting target range 0 30
 row "Frost Nova" enemies 2 self
 row "Evocation" self_power_below 15 self
@@ -366,21 +406,24 @@ row "Flamestrike" enemies 3 duration 8 target range 0 30
 row "Arcane Explosion" enemies 3 self
 row "Arcane Missiles" self_aura_at_least 400588 1 target range 0 30
 row "Fire Blast" self_aura_at_least 400573 2 target range 0 20
-row 400574 level 20 maxlevel 29 self_aura_below 400573 2 target range 0 30   # Arcane Blast as the guide has it at level 20: no trainer teaches this id, so the core refuses it and Fireball carries levels 20 to 29
 row "Arcane Blast" self_aura_below 400573 2 target range 0 30   # the rank a trainer teaches (1239696, level 30)
 row "Fireball" always target range 0 30
+row 5019 level 1 self_power_below 20 retry 60 target range 5 30   # the wand: auto-repeat, cast when the spell rows cannot be paid; refused (no wand) it waits a minute
 buff "Frost Armor" duration 1800 self
 buff "Ice Armor" duration 1800 self
 buff "Mage Armor" duration 1800 self
 buff "Arcane Intellect" duration 1800 party
 supersede "Frost Armor" by "Ice Armor"
 supersede "Ice Armor" by "Mage Armor"
-supersede "Fireball" by "Arcane Blast"
+# Fireball stays the filler at every level (no supersede by Arcane Blast): when Arcane Blast is not known or holds two stacks the mage still casts
 
 class 8 spec arcane
 # Arcane (level 30 guide). Fireball until Arcane Blast (the guide: level 20; the sim's trainers teach it from 30). Then Arcane Blast while fewer than two stacks (the guide: never above two
 # unless a boss; the stack aura is read as 400573), Arcane Missiles on a Missile Barrage proc (aura 400588), Fire Blast to reset the stacks when no proc came, AoE Flamestrike then Arcane
 # Explosion. Both aura ids are the spell names' ids in the client data; whether the bot's aura list reports them under these ids is checked on the sim.
+row 12042 level 40 boss_fight duration 15 self   # Arcane Power: a cooldown on a boss only
+row 20572 level 1 boss_fight duration 15 self   # Blood Fury (orc): a cooldown on a boss only
+row 20554 level 1 boss_fight duration 10 self   # Berserking (troll): a cooldown on a boss only
 row "Counterspell" target_casting target range 0 30
 row "Frost Nova" enemies 2 self
 row "Evocation" self_power_below 15 self
@@ -390,19 +433,22 @@ row "Arcane Explosion" enemies 3 self
 row "Arcane Wrath" always target range 0 30   # Forever: level 36 nuke, extra damage from maximum mana
 row "Arcane Missiles" self_aura_at_least 400588 1 target range 0 30
 row "Fire Blast" self_aura_at_least 400573 2 target range 0 20
-row 400574 level 20 maxlevel 29 self_aura_below 400573 2 target range 0 30   # Arcane Blast as the guide has it at level 20: no trainer teaches this id, so the core refuses it and Fireball carries levels 20 to 29
 row "Arcane Blast" self_aura_below 400573 2 target range 0 30   # the rank a trainer teaches (1239696, level 30)
 row "Fireball" always target range 0 30
+row 5019 level 1 self_power_below 20 retry 60 target range 5 30   # the wand: auto-repeat, cast when the spell rows cannot be paid; refused (no wand) it waits a minute
 buff "Frost Armor" duration 1800 self
 buff "Ice Armor" duration 1800 self
 buff "Mage Armor" duration 1800 self
 buff "Arcane Intellect" duration 1800 party
 supersede "Frost Armor" by "Ice Armor"
 supersede "Ice Armor" by "Mage Armor"
-supersede "Fireball" by "Arcane Blast"
+# Fireball stays the filler at every level (no supersede by Arcane Blast): when Arcane Blast is not known or holds two stacks the mage still casts
 
 class 8 spec fire
 # Fire: Scorch (up to five, on a healthy target), Pyroblast when Heating Up has stacked (aura 400624), Fireball, Fire Blast to finish, Flamestrike then Arcane Explosion for packs.
+row 11129 level 40 boss_fight self   # Combustion: a cooldown on a boss only
+row 20572 level 1 boss_fight duration 15 self   # Blood Fury (orc): a cooldown on a boss only
+row 20554 level 1 boss_fight duration 10 self   # Berserking (troll): a cooldown on a boss only
 row "Counterspell" target_casting target range 0 30
 row "Frost Nova" enemies 2 self
 row "Evocation" self_power_below 15 self
@@ -412,6 +458,7 @@ row "Fire Blast" target_hp_below 25 target range 0 20
 row "Pyroblast" self_aura_at_least 400624 2 target range 0 30
 row "Scorch" duration 30 target_hp_above 70 target range 0 30
 row "Fireball" always target range 0 30
+row 5019 level 1 self_power_below 20 retry 60 target range 5 30   # the wand: auto-repeat, cast when the spell rows cannot be paid; refused (no wand) it waits a minute
 buff "Frost Armor" duration 1800 self
 buff "Ice Armor" duration 1800 self
 buff "Mage Armor" duration 1800 self
@@ -422,6 +469,8 @@ supersede "Ice Armor" by "Mage Armor"
 class 8 spec frost
 # Frost: Frostbolt, Ice Lance on a Fingers of Frost proc (aura 400647), Frost Nova then run, Cone of Cold against several, Blizzard or Flamestrike and
 # Arcane Explosion for packs, Counterspell.
+row 20572 level 1 boss_fight duration 15 self   # Blood Fury (orc): a cooldown on a boss only
+row 20554 level 1 boss_fight duration 10 self   # Berserking (troll): a cooldown on a boss only
 row "Counterspell" target_casting target range 0 30
 row "Frost Nova" enemies 2 self
 row "Evocation" self_power_below 15 self
@@ -434,6 +483,7 @@ row "Ice Lance" self_aura_at_least 400647 1 target range 0 30   # Forever
 row "Fire Blast" target_hp_below 25 target range 0 20
 row "Fireball" always target range 0 30 maxlevel 3   # Frostbolt is learned at 4: a frost mage of level 1 to 3 casts Fireball (rank 1, from creation)
 row "Frostbolt" always target range 0 30
+row 5019 level 1 self_power_below 20 retry 60 target range 5 30   # the wand: auto-repeat, cast when the spell rows cannot be paid; refused (no wand) it waits a minute
 buff "Frost Armor" duration 1800 self
 buff "Ice Armor" duration 1800 self
 buff "Mage Armor" duration 1800 self
@@ -443,12 +493,15 @@ supersede "Ice Armor" by "Mage Armor"
 
 class 9
 # The default warlock: Demonology (below).
+row 20572 level 1 boss_fight duration 15 self   # Blood Fury (orc): a cooldown on a boss only
+row 20554 level 1 boss_fight duration 10 self   # Berserking (troll): a cooldown on a boss only
 row "Life Tap" self_power_below 25 self
 row "Corruption" duration 18 always target range 0 30
 row "Bane of Agony" duration 24 target_hp_above 70 target range 0 30
-row "Searing Pain" always target range 0 30
-row "Drain Life" always target range 0 30
-row "Shadow Bolt" always target range 0 30
+row "Immolate" duration 15 target_hp_above 40 target range 0 30
+row "Drain Life" self_hp_below 35 target_hp_above 30 target range 0 30   # an emergency heal, not a filler (as a filler row it blocked Shadow Bolt)
+row "Shadow Bolt" always target range 0 30   # Searing Pain is no longer a row: above Shadow Bolt it took every cast from level 18 (4299 casts, 0 Shadow Bolts in the sim)
+row 5019 level 1 self_power_below 20 retry 60 target range 5 30   # the wand: auto-repeat, cast when the spell rows cannot be paid; refused (no wand) it waits a minute
 buff "Demon Skin" duration 1800 self
 buff "Demon Armor" duration 1800 self
 # Fel Armor (403619, Forever) is left out: no trainer teaches it, so a bot never knows it (every cast is "not known") and a supersede to it stops Demon Armor.
@@ -461,12 +514,15 @@ class 9 spec demonology
 # Demonology (level 30 guide): the demon does most of the damage. Corruption, Bane of Agony on a mob with a lot of health, Searing Pain, Drain Life as the filler, Life Tap when low, Shadow Bolt
 # below level 14. The demon is a buff row with no_pet: Succubus (level 20 quest), else Voidwalker (level 10 quest), else Imp; a summon the bot has not learned is refused and the next one is
 # tried after a minute. Voidwalker and Succubus use a Soul Shard each.
+row 20572 level 1 boss_fight duration 15 self   # Blood Fury (orc): a cooldown on a boss only
+row 20554 level 1 boss_fight duration 10 self   # Berserking (troll): a cooldown on a boss only
 row "Life Tap" self_power_below 25 self
 row "Corruption" duration 18 always target range 0 30
 row "Bane of Agony" duration 24 target_hp_above 70 target range 0 30
-row "Searing Pain" always target range 0 30
-row "Drain Life" always target range 0 30
-row "Shadow Bolt" always target range 0 30
+row "Immolate" duration 15 target_hp_above 40 target range 0 30
+row "Drain Life" self_hp_below 35 target_hp_above 30 target range 0 30   # an emergency heal, not a filler (as a filler row it blocked Shadow Bolt)
+row "Shadow Bolt" always target range 0 30   # Searing Pain is no longer a row: above Shadow Bolt it took every cast from level 18 (4299 casts, 0 Shadow Bolts in the sim)
+row 5019 level 1 self_power_below 20 retry 60 target range 5 30   # the wand: auto-repeat, cast when the spell rows cannot be paid; refused (no wand) it waits a minute
 buff "Demon Skin" duration 1800 self
 buff "Demon Armor" duration 1800 self
 buff "Summon Succubus" duration 3600 self no_pet
@@ -476,12 +532,15 @@ supersede "Demon Skin" by "Demon Armor"
 
 class 9 spec affliction
 # Affliction: Corruption, Bane of Agony, Immolate, Drain Life as the filler, Life Tap when low, Shadow Bolt below level 14. The Voidwalker holds threat (the Succubus does not), so it is the demon.
+row 20572 level 1 boss_fight duration 15 self   # Blood Fury (orc): a cooldown on a boss only
+row 20554 level 1 boss_fight duration 10 self   # Berserking (troll): a cooldown on a boss only
 row "Life Tap" self_power_below 25 self
 row "Corruption" duration 18 always target range 0 30
 row "Bane of Agony" duration 24 always target range 0 30
 row "Immolate" duration 15 always target range 0 30
 row "Drain Life" always target range 0 30
 row "Shadow Bolt" always target range 0 30
+row 5019 level 1 self_power_below 20 retry 60 target range 5 30   # the wand: auto-repeat, cast when the spell rows cannot be paid; refused (no wand) it waits a minute
 buff "Demon Skin" duration 1800 self
 buff "Demon Armor" duration 1800 self
 buff "Summon Voidwalker" duration 3600 self no_pet
@@ -490,6 +549,8 @@ supersede "Demon Skin" by "Demon Armor"
 
 class 9 spec destruction
 # Destruction: Bane of Agony and Immolate kept up, Conflagrate (Forever, level 32) before Immolate runs out, Shadowburn to finish, Shadow Bolt, Life Tap when low. The Voidwalker is the demon.
+row 20572 level 1 boss_fight duration 15 self   # Blood Fury (orc): a cooldown on a boss only
+row 20554 level 1 boss_fight duration 10 self   # Berserking (troll): a cooldown on a boss only
 row "Life Tap" self_power_below 25 self
 row "Shadowburn" target_hp_below 20 target range 0 20
 row "Conflagrate" always target range 0 30
@@ -497,6 +558,7 @@ row "Bane of Agony" duration 24 always target range 0 30
 row "Immolate" duration 15 always target range 0 30
 row "Corruption" duration 18 always target range 0 30
 row "Shadow Bolt" always target range 0 30
+row 5019 level 1 self_power_below 20 retry 60 target range 5 30   # the wand: auto-repeat, cast when the spell rows cannot be paid; refused (no wand) it waits a minute
 buff "Demon Skin" duration 1800 self
 buff "Demon Armor" duration 1800 self
 buff "Summon Voidwalker" duration 3600 self no_pet
@@ -516,6 +578,8 @@ buff "Thorns" duration 600 party
 
 class 11 spec balance
 # Balance (damage): Entangling Roots on a pull, Moonfire and Insect Swarm on the target, Starfire and Wrath, Thorns and Rejuvenation on the druid.
+row 20572 level 1 boss_fight duration 15 self   # Blood Fury (orc): a cooldown on a boss only
+row 20554 level 1 boss_fight duration 10 self   # Berserking (troll): a cooldown on a boss only
 row "Healing Touch" self_hp_below 40 self
 row "Rejuvenation" self_hp_below 70 duration 12 self
 row "Moonfire" duration 12 always target range 0 30
@@ -546,6 +610,8 @@ buff "Mark of the Wild" duration 1800 party
 class 11 spec feral_cat
 # Feral DPS (Cat Form from level 20): Tiger's Fury, Rake, Shred and Claw (Shred needs the position behind the target and is refused from the front), Faerie Fire. Combo points are not counted for a
 # druid (Rip and Ferocious Bite are left out). The form is an upkeep buff cast only when the aura list does not show it (see feral_tank).
+row 20572 level 1 boss_fight duration 15 self   # Blood Fury (orc): a cooldown on a boss only
+row 20554 level 1 boss_fight duration 10 self   # Berserking (troll): a cooldown on a boss only
 row "Tiger's Fury" target_strong 1 self
 row "Faerie Fire" duration 40 opener 3 target range 0 30
 row "Ferocious Bite" combo 5 target range 0 5   # finisher, level 32

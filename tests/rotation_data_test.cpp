@@ -587,6 +587,53 @@ void TheShippedFilesLoadCleanly()
     CHECK(beasts.ByEntry.count(157) == 1 && beasts.ByEntry.count(834) == 1 && beasts.ByEntry.count(213) == 1);   // Goretusk, Coyote, Starving Dire Wolf (Westfall)
 }
 
+// The rotation fixes of 2026-11-15 (bot-damage-audit): the new row keywords, and the shipped rows they are used in.
+void TheRotationFixesOfTheDamageAudit()
+{
+    std::vector<std::string> warnings;
+    auto const parsed = Parse("class 1\nrow 100 level 1 out_of_combat retry 4 target\nrow 101 level 1 boss_fight self\n", warnings);
+    CHECK(warnings.empty() && parsed->ByClass.at(1).size() == 2);
+    if (parsed->ByClass.at(1).size() == 2)
+    {
+        CHECK(parsed->ByClass.at(1)[0].RetrySec == 4);
+        CHECK(parsed->ByClass.at(1)[1].RetrySec == 0);
+    }
+    std::string const root = FOREVER_BOTS_SOURCE_DIR;
+    std::vector<std::string> shippedWarnings;
+    rotation::RotationData const data = rotation::LoadRotationData(root + "/data/rotations.txt", shippedWarnings);
+    auto const find = [](std::vector<rotation::Row> const* rows, std::uint32_t spell) -> rotation::Row const*
+    {
+        if (rows)
+            for (rotation::Row const& row : *rows)
+                if (row.Spell == spell)
+                    return &row;
+        return nullptr;
+    };
+    auto const indexOf = [](std::vector<rotation::Row> const* rows, std::uint32_t spell) -> int
+    {
+        for (std::size_t i = 0; rows && i < rows->size(); ++i)
+            if ((*rows)[i].Spell == spell)
+                return int(i);
+        return -1;
+    };
+    for (char const* spec : { "combat", "assassination", "subtlety", "" })
+    {
+        auto const* rows = rotation::RowsFor(data, 4, spec);
+        rotation::Row const* snd = find(rows, 5171);
+        CHECK(snd && snd->OnTarget);                                           // Slice and Dice is cast at the enemy (its first effect targets one)
+        CHECK(indexOf(rows, 2098) >= 0 && indexOf(rows, 2098) < indexOf(rows, 5171));   // Eviscerate on a dying target comes first
+    }
+    auto const* tank = rotation::RowsFor(data, 1, "prot");
+    CHECK(find(tank, 100) && find(tank, 100)->RetrySec == 0);   // Charge is 100
+    CHECK(find(tank, 6572) && find(tank, 6572)->RetrySec == 4);  // Revenge waits 4 s after a refusal
+    CHECK(find(tank, 20230) && find(tank, 20230)->RetrySec == 5);   // Retaliation
+    CHECK(find(rotation::RowsFor(data, 9, ""), 5676) == nullptr);     // no Searing Pain above Shadow Bolt
+    CHECK(find(rotation::RowsFor(data, 9, ""), 348) != nullptr);      // Immolate
+    CHECK(find(rotation::RowsFor(data, 8, ""), 400574) == nullptr);   // the Arcane Blast nobody teaches
+    for (std::uint32_t cls : { 5u, 8u, 9u })
+        CHECK(find(rotation::RowsFor(data, cls, ""), 5019) != nullptr);   // the wand
+}
+
 // The audit of 2026-11-14: a bot of level 1 had no damage spell (the rows began with rank 2 at its learn level), Auto Shot was refused inside its minimum range, and rows for spells
 // no trainer teaches were refused on every cast. Every block must have a damage row for level 1, with the rank 1 id the class is given at creation.
 void EveryClassHasADamageRowAtLevelOne()
@@ -920,6 +967,7 @@ int main()
     ADemonIsSummonedOnlyWithNoPetAndFallsBack();
     AStanceIsHeldOnlyInAParty();
     TheShippedFilesLoadCleanly();
+    TheRotationFixesOfTheDamageAudit();
     EveryClassHasADamageRowAtLevelOne();
     RangedRowsCarryTheirMinimumRangeAndNoRuneRows();
     NoRowForASpellNothingGrants();

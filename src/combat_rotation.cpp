@@ -131,6 +131,8 @@ bool Allowed(Rule const& rule, Facts const& f)
         case Cond::NoPet:          return f.PetState == 0;
         case Cond::SelfAuraBelow:  return AuraStacks(f, std::uint32_t(rule.Param)) < std::uint32_t(std::max(rule.Param2, 1));
         case Cond::SelfAuraAtLeast: return AuraStacks(f, std::uint32_t(rule.Param)) >= std::uint32_t(std::max(rule.Param2, 1));
+        case Cond::OutOfCombat:    return !f.InCombat;
+        case Cond::BossFight:      return f.BossFight;
     }
     return false;
 }
@@ -351,6 +353,7 @@ Facts FactsFor(BotSnapshot const& bot, std::span<NearbyUnit const> nearby, Nearb
     }
 
     facts.InParty = bot.group_role != 0;
+    facts.InCombat = bot.in_combat != 0;
     facts.PetState = bot.pet_state;
     for (std::uint32_t i = 0; i < bot.aura_count && i < forever_module::kMaxAuras && i < 16; ++i)
     {
@@ -460,6 +463,7 @@ RotationData ParseRotationData(std::istream& in, std::vector<std::string>& warni
             if (key == "level") ok = arg(row.MinLevel);
             else if (key == "maxlevel") ok = arg(row.MaxLevel);
             else if (key == "duration") ok = arg(row.DurationSec);
+            else if (key == "retry") ok = arg(row.RetrySec);
             else if (key == "self") { row.OnTarget = false; targetGiven = true; }
             else if (key == "target") { row.OnTarget = true; targetGiven = true; }
             else if (key == "party") { row.Party = true; row.OnTarget = false; targetGiven = true; }
@@ -497,6 +501,8 @@ RotationData ParseRotationData(std::istream& in, std::vector<std::string>& warni
             else if (key == "enemies_below") { ok = arg(n); setCond(Rule{ Cond::EnemiesBelow, std::int32_t(n) }); }
             else if (key == "in_party") setCond(Rule{ Cond::InParty, 0 });
             else if (key == "no_pet") setCond(Rule{ Cond::NoPet, 0 });
+            else if (key == "out_of_combat") setCond(Rule{ Cond::OutOfCombat, 0 });
+            else if (key == "boss_fight") setCond(Rule{ Cond::BossFight, 0 });
             else if (key == "self_aura_below" || key == "self_aura_at_least")
             {
                 std::uint32_t spell = 0;

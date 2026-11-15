@@ -23,6 +23,8 @@ copied from another branch, and a wrong id fails silently.
   does not show it).
 - Conditions: `always`, `target_hp_above/below N`, `self_hp_below N`, `self_power_below/above N`, `enemies N`, `enemies_below N`, `target_casting`, `opener N`, `target_strong N`,
   `combo N`, `in_party`, `no_pet`, `self_aura_below <spell> <stacks>` and `self_aura_at_least <spell> <stacks>` (a proc such as Missile Barrage, or a stack count such as Arcane Blast's).
+  `out_of_combat` and `boss_fight` (the target is a route boss or a raid-rules boss; used by the cooldown rows: racials, Adrenaline Rush, Arcane Power, Combustion, Bestial Wrath).
+  `retry <sec>` after the conditions: how long the row waits after the core refused it (Revenge 4 s, Retaliation 5 s), instead of burning the 1.5 s module gap.
   One condition per row. `self_aura_*` read the bot's own auras (layout 13: at most 16, with their stacks).
 - Heals and resurrects are not rows: the policy's heal block and rez logic do them (they need the group's health). See "The priest" below.
 
