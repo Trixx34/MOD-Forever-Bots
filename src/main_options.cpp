@@ -228,6 +228,7 @@ void LoadPolicyTables(PolicyOptions& policyOptions, BotSettings& settings)
     policyOptions.TransportRide = settings.TransportRide;
     policyOptions.CityGreet = settings.CityGreet;
     policyOptions.QuestInvite = settings.QuestInvite;
+    policyOptions.MeetGreet = settings.MeetGreet;
     // ADVISOR-COPY
     // ADVISOR-POOLS
     if (settings.CityGreet.Enabled)
@@ -235,6 +236,8 @@ void LoadPolicyTables(PolicyOptions& policyOptions, BotSettings& settings)
         pools->CityGreetings = advisor::LoadLines(BesideTheModule(settings.CityGreetFile));
         pools->AuctionTalk = advisor::LoadLines(BesideTheModule(settings.AuctionTalkFile));
     }
+    if (settings.MeetGreet.Enabled)
+        pools->MeetGreetings = advisor::LoadLines(BesideTheModule(settings.MeetGreetFile));
     if (settings.GuildMilestone.Enabled)
         pools->GuildMilestones = advisor::LoadLines(BesideTheModule(settings.GuildMilestoneFile));
     if (settings.WhisperMatrix.Enabled)

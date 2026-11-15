@@ -74,6 +74,7 @@
 #include "guild_milestone.h"
 #include "city_inspect.h"
 #include "city_greet.h"
+#include "meet_greet.h"
 #include "quest_invite.h"
 #include "realism.h"
 #include "taxi_policy.h"
@@ -495,6 +496,7 @@ struct PolicyOptions
     quest_invite::Settings QuestInvite;
     // TransportRide: a bot rides the ship, zeppelin or elevator its group leader stands on (kTransport; needs the core's Bot.Actions.Transport and Bot.Snapshot.PartyView).
     transport_ride::Settings TransportRide;
+    meet_greet::Settings MeetGreet;
     // ADVISOR-OPTIONS
     // Advisor features (docs: config/modules.d/forever-bots.conf.example, "Advisor features"; each off by default). The line pools are read once at start.
     std::shared_ptr<advisor::Pools const> Pools;
@@ -1245,6 +1247,7 @@ private:
     whisper_matrix::Matrix _whisperMatrix;                      // repeat avoidance of the matrix replies
     std::vector<whisper_matrix::Template> _whisperTemplates;    // parsed from Pools->WhisperReplies on first use
     bool _whisperTemplatesLoaded = false;
+    meet_greet::Greeter _meetGreet;                             // limits and line memory of the field greetings
     city_greet::Greeter _cityGreet;                             // limits of the capital greetings
     city_inspect::Inspector _cityInspect;                       // limits of the capital emotes
     damage_events::HitLog _damage;                              // the last hits each bot took, from the core's damage events (protocol 29)

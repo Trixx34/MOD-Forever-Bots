@@ -99,6 +99,45 @@ void BotPolicy::TurnAdvisor(DecideTick& tick, BotTurn& turn)
         }
     }
 
+    // Meeting greeting (MeetGreet): a bot on its own passes a player or another bot in the field and waves, or says a short hello.
+    if (_options.MeetGreet.Enabled && _options.Pools && !_options.Pools->MeetGreetings.empty() && bot.group_role == 0 && bot.group_size <= 1 &&
+        !(bot.in_capital && _options.CityGreet.Enabled))
+    {
+        std::vector<std::string> const& pool = _options.Pools->MeetGreetings;
+        for (forever_module::NearbyUnit const& unit : turn.nearby)
+        {
+            if (forever_module::UnitRefType(unit.guid) != 2 || unit.is_hostile)
+                continue;   // players and bots only
+            meet_greet::Facts facts;
+            facts.Quiet = true;
+            facts.Free = true;
+            facts.Distance = rotation::DistanceYards(bot, unit);
+            std::uint64_t const other = unit.guid & forever_module::kUnitRefCounterMask;
+            meet_greet::Greeting greeting;
+            if (!_meetGreet.Try(_options.MeetGreet, facts, seed, bot.guid, other, bot.map_id, nowMs, greeting))
+                continue;
+            if (greeting.Emote)
+            {
+                advisor::Order order;
+                order.What = advisor::Kind::Emote;
+                order.Bot = bot.guid;
+                order.Target = other;
+                order.Arg = greeting.EmoteKind;
+                _advisorOrders.push_back(order);
+            }
+            if (greeting.Say)
+            {
+                advisor::Order order;
+                order.What = advisor::Kind::Say;
+                order.Bot = bot.guid;
+                order.Target = other;
+                order.Text = pool[_meetGreet.PickLine(bot.guid, pool.size(), greeting.Draw)];
+                _advisorOrders.push_back(std::move(order));
+            }
+            break;
+        }
+    }
+
     // Capital inspection (CityInspect) and quest group invites (QuestInvite): both look at the players near an idle bot.
     bool const calm = turn.idle && bot.group_role != 1;
     // The facts come from the snapshot (layout 23): BotSnapshot::in_capital and item_level, NearbyUnit::item_level and shared_objective.

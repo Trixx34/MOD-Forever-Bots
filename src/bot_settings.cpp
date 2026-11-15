@@ -796,6 +796,15 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
         ReadKey(config, "PartyErrandBreakMinutes", 1, 240, pause, warnings);
         parties.ErrandBreakMs = std::uint64_t(pause) * 60000;
     }
+    ReadBool(config, "MeetGreet", settings.MeetGreet.Enabled, warnings);
+    ReadKey(config, "MeetGreetChancePct", 0, 100, settings.MeetGreet.ChancePct, warnings);
+    ReadKey(config, "MeetGreetZoneMax", 0, 100, settings.MeetGreet.ZoneMax, warnings);
+    ReadKey(config, "MeetGreetBotCooldownSec", 0, 86400, settings.MeetGreet.BotCooldownSec, warnings);
+    ReadKey(config, "MeetGreetPairCooldownSec", 0, 86400, settings.MeetGreet.PairCooldownSec, warnings);
+    ReadKey(config, "MeetGreetWavePct", 0, 100, settings.MeetGreet.WavePct, warnings);
+    ReadKey(config, "MeetGreetSayPct", 0, 100, settings.MeetGreet.SayPct, warnings);
+    if (auto const it = config.find("MeetGreetFile"); it != config.end())
+        settings.MeetGreetFile = it->second;
     // ADVISOR-KEYS
     ReadBool(config, "InnDowntime", settings.InnDowntime.Enabled, warnings);
     ReadBool(config, "ScenarioConfigGuard", settings.ScenarioConfigGuard, warnings);

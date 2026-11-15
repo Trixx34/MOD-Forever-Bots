@@ -24,6 +24,7 @@ struct Pools
     std::vector<std::string> GuildMilestones;
     std::vector<std::string> CityGreetings;       // /say to a player nearby in a capital
     std::vector<std::string> AuctionTalk;         // the same at the auction house
+    std::vector<std::string> MeetGreetings;       // /say to a player or bot passed in the field (MeetGreet)
 };
 
 }  // namespace advisor

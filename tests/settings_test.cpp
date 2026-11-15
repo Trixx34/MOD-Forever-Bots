@@ -758,9 +758,21 @@ void ScenarioGearFileSetting()
     std::filesystem::remove_all(dir);
 }
 
+void MeetGreetSettings()
+{
+    std::vector<std::string> warnings;
+    BotSettings const off = ParseBotSettings({}, warnings);
+    CHECK(!off.MeetGreet.Enabled && !off.AmbientChat && off.MeetGreet.ChancePct == 3 && off.MeetGreet.BotCooldownSec == 600 && off.MeetGreetFile == "data/meet_greetings.txt");
+    BotSettings const on = ParseBotSettings({ { "MeetGreet", "1" }, { "MeetGreetChancePct", "10" }, { "MeetGreetPairCooldownSec", "60" }, { "MeetGreetWavePct", "70" },
+                                              { "MeetGreetFile", "x.txt" } }, warnings);
+    CHECK(on.MeetGreet.Enabled && on.MeetGreet.ChancePct == 10 && on.MeetGreet.PairCooldownSec == 60 && on.MeetGreet.WavePct == 70 && on.MeetGreetFile == "x.txt");
+    CHECK(warnings.empty());
+}
+
 int main()
 {
     DynamicPartySettings();
+    MeetGreetSettings();
     ScenarioGearFileSetting();
     RealismSettings();
     CorpseRunTeleportSettings();
