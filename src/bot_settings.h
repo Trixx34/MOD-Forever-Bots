@@ -6,6 +6,7 @@
 #include "battlegrounds.h"
 #include "repair_policy.h"
 #include "quest_group.h"
+#include "party_reason.h"
 #include "bot_guilds.h"
 #include "duels.h"
 #include "errand_policy.h"
@@ -253,6 +254,9 @@ struct BotSettings
     quest_invite::Settings QuestInvite;
     // Group quests (config QuestGroups, off by default; quest_group.h). WaitMs is QuestGroupWaitMinutes in minutes.
     quest_group::Settings QuestGroups;
+    // Dynamic parties (config DynamicParties, on by default; party_reason.h): a world party member is in its party only while there is a reason (a shared
+    // unfinished quest, the leader's group quest, a level dungeon due), on the leader's map and near it; it leaves for errands and an errand break.
+    party_reason::Settings DynamicParties = [] { party_reason::Settings on; on.Enabled = true; return on; }();
     // ADVISOR-MEMBERS
     // Supplies (layout 15, config keys Supplies, SupplyAmmoLow, SupplyAmmoTarget, SupplyFoodLow, SupplyFoodTarget, SupplyDrinkLow, SupplyDrinkTarget,
     // SupplyTripSec; off by default): bots buy ammunition, food and drink at vendors that sell what they can use, and eat and drink while resting.

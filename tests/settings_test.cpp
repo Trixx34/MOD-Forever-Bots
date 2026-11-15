@@ -347,6 +347,21 @@ void RandomnessAndStanceSettings()
     CHECK(warnings.size() == 1);
 }
 
+void DynamicPartySettings()
+{
+    std::vector<std::string> warnings;
+    BotSettings const defaults = ParseBotSettings({}, warnings);
+    CHECK(defaults.DynamicParties.Enabled);   // on: a bot is in a party only while there is a reason
+    CHECK(defaults.DynamicParties.JoinYards == 150.0f && defaults.DynamicParties.KeepYards == 400.0f && defaults.DynamicParties.RejoinMs == 60000);
+    CHECK(defaults.DynamicParties.ErrandEveryMs == 30ull * 60000 && defaults.DynamicParties.ErrandBreakMs == 5ull * 60000);
+    BotSettings const s = ParseBotSettings({ { "DynamicParties", "0" }, { "PartyJoinYards", "100" }, { "PartyKeepYards", "50" }, { "PartyRejoinSec", "30" },
+                                             { "PartyErrandEveryMinutes", "0" }, { "PartyErrandBreakMinutes", "10" } }, warnings);
+    CHECK(warnings.empty());
+    CHECK(!s.DynamicParties.Enabled && s.DynamicParties.JoinYards == 100.0f && s.DynamicParties.RejoinMs == 30000);
+    CHECK(s.DynamicParties.KeepYards == 100.0f);   // never below the join distance
+    CHECK(s.DynamicParties.ErrandEveryMs == 0 && s.DynamicParties.ErrandBreakMs == 10ull * 60000);
+}
+
 void HubSettings()
 {
     std::vector<std::string> warnings;
@@ -734,6 +749,7 @@ void ScenarioGearFileSetting()
 
 int main()
 {
+    DynamicPartySettings();
     ScenarioGearFileSetting();
     RealismSettings();
     CorpseRunTeleportSettings();

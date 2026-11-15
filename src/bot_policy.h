@@ -46,6 +46,7 @@
 #include "raid_rules.h"
 #include "quest_planner.h"
 #include "quest_group.h"
+#include "party_reason.h"
 #include "spell_costs.h"
 #include "tame_beasts.h"
 #include "crafting_foci.h"
@@ -212,6 +213,11 @@ struct PolicyOptions
     off_map::Options OffMap;
     // Group quests (config QuestGroups, off by default; quest_group.h): quests marked 'group <n>' are taken, and the bot waits for a party of n.
     quest_group::Settings QuestGroups;
+    // Dynamic parties (config DynamicParties, PartyJoinYards, PartyKeepYards, PartyRejoinSec, PartyErrandEveryMinutes, PartyErrandBreakMinutes; party_reason.h):
+    // a member of a world party (PartySize) is in it only while it shares an unfinished quest with its leader, the leader has a group quest, or the party is due
+    // for a level dungeon, and only on its leader's map and near it; it leaves for errands and an errand break. Off here (the tests' static parties); on in the
+    // config. A scenario (ZG, Onyxia, MC/BWL) turns it off: those parties are assigned. A level dungeon run and a tank-led route are never judged.
+    party_reason::Settings DynamicParties;
     // Dungeon recovery by teleport (config DungeonTeleport; needs Bot.Actions.Teleport in the core, so for tests and scenarios): a leader that has no route to a waypoint is put
     // back on the route once, and a member that has lost its leader (far away, or on another level) is put next to it. Off by default.
     bool DungeonTeleport = false;
@@ -1023,6 +1029,8 @@ private:
         std::uint64_t DeathTimesMs[3] = { 0, 0, 0 };     // when this bot last died (newest last): two deaths close together mean it dies where it stands up (DeathLoopMs)
         std::uint32_t LastKillerEntry = 0;               // the entry of the creature that killed the bot last (0 = none seen)
         bool KillerRepeat = false;                       // the last death was to the same creature entry as the one before: a death loop one death sooner
+        party_reason::Memory PartyMemory;                // dynamic parties: this bot as a member of its world party (in or out, why, the rejoin wait, the next errand break)
+        party_reason::Memory PartyLeadMemory;            // dynamic parties: this bot as a leader (its own errand break)
         std::uint64_t LeaderAwaySinceMs = 0;             // since when this party member's living leader has been on another map (0 = not); kLeaderAwaySoloMs
         std::uint64_t RecoverSinceMs = 0;                // since when a solo bot out of combat has been under kRecoverPullPct health (0 = not hurt); kRecoverHoldMs caps the hold
         std::uint64_t EscapeUntilMs = 0;                 // after a death loop the bot is put at a suitable grind spot; not again before this
@@ -1077,6 +1085,16 @@ private:
                        std::unordered_map<std::uint64_t, std::size_t> const& indexOf,
                        std::unordered_map<std::uint64_t, std::uint64_t>& leaderOf,
                        std::unordered_map<std::uint64_t, std::vector<std::uint64_t>>& membersOf) const;
+
+    // Dynamic parties (party_reason.h; bot_policy_parties.cpp): drops from `leaderOf` and `membersOf` (BuildParties' cut) every member that has no reason to be in
+    // its party this tick, is on another map, too far, or on an errand, and every leader whose party is then empty or off. Called by Decide right after BuildParties.
+    void ApplyPartyReasons(forever_module::WorldTickSnapshotView const& view, std::unordered_map<std::uint64_t, std::size_t> const& indexOf,
+                           std::unordered_map<std::uint64_t, std::uint64_t>& leaderOf,
+                           std::unordered_map<std::uint64_t, std::vector<std::uint64_t>>& membersOf, std::uint64_t nowMs);
+    // Whether the party led by `leaderGuid` is due for a level dungeon at `partyLevel` (LevelDungeons; bot_policy_features.cpp).
+    bool LevelDungeonDue(std::uint64_t leaderGuid, std::uint32_t partyLevel);
+    std::unordered_map<std::uint32_t, std::uint32_t> _questGroupSize;   // quest id -> its 'group <n>' (n >= 2), from _options.Quests (dynamic parties)
+    bool _questGroupSizeBuilt = false;
 
     // Decide, one bot at a time: DecideBot runs the steps of a bot's turn in order (bot_policy.cpp; the steps are in bot_policy_turn_*.cpp). DecideTick
     // is what all the turns of one Decide call share, BotTurn what one bot's turn carries from one step to the next (both in bot_policy_internal.h). The

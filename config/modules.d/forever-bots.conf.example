@@ -61,6 +61,20 @@ Module.forever-bots.TelemetrySummarySec = 60
 # the invites and the group rules; the module only sends the actions. Needs the core with layout 5 (party state).
 #   Module.forever-bots.PartySize = 5
 #   Module.forever-bots.PartyCount = 1
+# Dynamic parties (on by default): a party member is in its party only while there is a reason: a quest it and its leader both
+# have and have not finished, a group quest ('group <n>') of the leader, or a level dungeon the party is due for. It is only
+# invited on its leader's map and within PartyJoinYards of it, and leaves when the reason ends, when the leader is on another
+# map or farther than PartyKeepYards, when it is on or needs an errand (trainer, Auction House, vendor, repair, supplies, a
+# flight), and for an errand break of PartyErrandBreakMinutes after PartyErrandEveryMinutes in the party (0 = no break), so the
+# profession and auction errands, which skip grouped bots, can take it. After leaving it waits PartyRejoinSec. A dungeon run,
+# a tank-led route and a scenario (ZG, Onyxia, MC/BWL) keep their parties whole. DynamicParties = 0 keeps every bot of the cut
+# in its party all the time (the old behaviour). Events: party_join (why=) and party_leave (why=).
+#   Module.forever-bots.DynamicParties = 1
+#   Module.forever-bots.PartyJoinYards = 150
+#   Module.forever-bots.PartyKeepYards = 400
+#   Module.forever-bots.PartyRejoinSec = 60
+#   Module.forever-bots.PartyErrandEveryMinutes = 30
+#   Module.forever-bots.PartyErrandBreakMinutes = 5
 
 # Travel (M6): an idle bot due a vendor visit (ServiceEverySec) walks to the nearest vendor on its own map and visits it.
 # The core finds the vendor (layout 6 core). Needs no position settings.
