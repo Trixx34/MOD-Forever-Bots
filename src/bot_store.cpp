@@ -27,4 +27,33 @@ bool GuidFromKey(std::string const& key, std::uint64_t& botGuid)
     return true;
 }
 
+bool IsBusyReason(std::string const& reason)
+{
+    return reason.rfind("core is busy", 0) == 0;
+}
+
+std::vector<std::uint64_t> ReclaimQueue::Take()
+{
+    std::vector<std::uint64_t> out;
+    while (_inFlight < _maxInFlight && !_waiting.empty())
+    {
+        out.push_back(_waiting.front());
+        _waiting.pop_front();
+        ++_inFlight;
+    }
+    return out;
+}
+
+void ReclaimQueue::Done()
+{
+    if (_inFlight > 0)
+        --_inFlight;
+}
+
+void ReclaimQueue::Retry(std::uint64_t botGuid)
+{
+    Done();
+    _waiting.push_back(botGuid);
+}
+
 } // namespace bot_store

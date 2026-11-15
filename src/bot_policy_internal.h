@@ -524,6 +524,9 @@ constexpr std::uint64_t kDeathAreaWalkMs = 600000;       // ... and its walk, wh
 constexpr std::uint64_t kDeathLoopCooldownMs = 120000; // after an escape the bot is not moved again before this
 constexpr std::uint32_t kRecoverPullPct = 75;           // a solo bot out of combat below this health starts no fight and no quest walk: it backs off and rests first (prod 2026-11-12: bots revived at 49% pulled the creature that had killed them, 812 deaths in 90 minutes)
 constexpr std::uint64_t kRecoverHoldMs = 150000;       // ... for at most this long, so a bot that cannot regenerate does not stand for good
+// A party member whose leader is alive on another map (another continent: the party was cut across starting areas, or the leader took a boat) cannot follow
+// it; after this long it grinds and wanders on its own until the leader is on its map again. Not in a dungeon party (routeOn), not when told to follow.
+constexpr std::uint64_t kLeaderAwaySoloMs = 120000;
 constexpr float kRecoverSafeYards = 30.0f;              // ... and it sits down only with no live creature this close (it walks away from one that is)
 constexpr float kDeathLoopAwayYards = 400.0f;           // ... one at least this far from where it keeps dying
 constexpr std::uint64_t kCorpseTeleportRetryMs = 15000; // a ghost off its corpse's map with no portal is teleported to the corpse, not again before this
@@ -735,6 +738,10 @@ float DistanceTo(BotSnapshot const& bot, Point const& point);
 
 // The class of a bot: its own from the class table, else the configured class (0 = none).
 std::uint32_t ClassFor(PolicyOptions const& options, std::uint64_t guid);
+// The starting area of a race, for the bot parties (BuildParties): races that start together share a number. Human 1; Dwarf and Gnome 2 (Dun Morogh);
+// Night Elf 3 (Teldrassil); Orc and Troll 4 (Durotar); Undead 5 (Tirisfal); Tauren 6 (Mulgore); Skyborne, both sides, 7 (map 2991). Any other race is its own
+// area (1000 + race); race 0 (not known) is 0.
+std::uint32_t StartAreaOfRace(std::uint32_t race);
 
 // A hunter whose ranged weapon uses ammunition and who carries none (layout 15: the core fills ammo_entry and ammo_count).
 bool NoAmmo(BotSnapshot const& bot, std::uint32_t classId);
@@ -865,6 +872,7 @@ struct BotPolicy::BotTurn
     bool returningToDungeon = false;
     std::uint64_t leaderRef = 0;
     BotSnapshot const* leaderSnap = nullptr;
+    bool leaderAwaySolo = false;                          // TurnRevivedAndRoles: a member whose living leader has been on another map for kLeaderAwaySoloMs grinds and wanders on its own
     std::uint64_t followRef = 0;
     std::uint8_t deadWaitKind = 0;
     QuestStep questStep{};                                // TurnQuestsAndHold

@@ -66,34 +66,61 @@ void WatchRevocations(forever_module::ModuleClient& client, BotRoster& roster, s
     });
 }
 
-// Bots from last run are rows in the module store (bot/<guid>). Each row's value is "race class", read before the
-// bot is requested so the rotation knows its class. A revoke keeps the row, since the core revokes every bot at
-// shutdown; only "character not found" removes one. Spawning for the rest is the ramp's job.
+// Bots from last run are rows in the module store (bot/<guid>). Each row's value is "race class". A revoke keeps the row, since the core
+// revokes every bot at shutdown; only "character not found" removes one. Spawning for the rest is the ramp's job.
+// The reclaim asks for control first: a granted reply carries the bot's race and class (the core reads them from the character), so no store
+// read is needed. Only a core that sends no class is asked for the store row. Both used to go out for every saved bot at once, and the core
+// refused most of them "core is busy" (2026-11-14 sim: 712 of 1000 bots without a class, 488 not reclaimed at all); now a few go at a time
+// (ReclaimPump) and a busy answer puts the bot back in the queue.
 void ReclaimBot(RunContext& run, std::uint64_t guid)
 {
-    run.Roster.NoteRequestSent(guid);
-    run.Client.StoreGet(bot_store::KeyFor(guid), [&run, guid](forever_module::ActionReply const& stored)
+    run.Client.RequestControl(guid, {}, [&run, guid](forever_module::ControlResponse const& reply)
     {
-        RaceClass combo{};
-        if (stored.found() && ParseRaceClass(stored.value(), combo))
-            run.Classes.Set(guid, combo.Class), run.Races.Set(guid, combo.Race);
-        else
-            std::cerr << "forever-bots: bot " << guid << " has no saved class; its rotation is off until it is set\n";
-
-        run.Client.RequestControl(guid, {}, [&run, guid](forever_module::ControlResponse const& reply)
+        if (!reply.granted() && bot_store::IsBusyReason(reply.reason()))
         {
-            if (reply.granted())
-            {
-                run.Roster.OnGranted(guid, reply.bot_guid());
-                std::cerr << "forever-bots: reclaimed bot " << guid << "\n";
-                return;
-            }
+            run.Reclaims.Retry(guid); // still pending in the roster: sent again from the queue
+            return;
+        }
+        if (!reply.granted())
+        {
+            run.Reclaims.Done();
             run.Roster.OnDenied(guid);
             if (reply.reason() == "character not found")
                 run.Client.StoreDelete(bot_store::KeyFor(guid));
             std::cerr << "forever-bots: could not reclaim bot " << guid << ": " << reply.reason() << "\n";
+            return;
+        }
+        if (reply.class_id() != 0)
+        {
+            run.Classes.Set(guid, reply.class_id());   // before the roster has it, so its first decision knows the class
+            if (reply.race() != 0)
+                run.Races.Set(guid, reply.race());
+            run.Roster.OnGranted(guid, reply.bot_guid());
+            run.Reclaims.Done();
+            std::cerr << "forever-bots: reclaimed bot " << guid << "\n";
+            return;
+        }
+        run.Roster.OnGranted(guid, reply.bot_guid());
+        // A core that does not say the class: the store row has it. The read stays in flight in the queue's count until it is answered.
+        std::cerr << "forever-bots: reclaimed bot " << guid << "\n";
+        run.Client.StoreGet(bot_store::KeyFor(guid), [&run, guid](forever_module::ActionReply const& stored)
+        {
+            run.Reclaims.Done();
+            RaceClass combo{};
+            if (stored.found() && ParseRaceClass(stored.value(), combo))
+                run.Classes.Set(guid, combo.Class), run.Races.Set(guid, combo.Race);
+            else
+                std::cerr << "forever-bots: bot " << guid << " has no saved class" << (stored.success() ? "" : " (" + stored.reason() + ")")
+                          << "; its rotation is off until it is set\n";
         });
     });
+}
+
+// Sends the next few saved bots of the reclaim queue (kReclaimsInFlight at most waiting for an answer).
+void ReclaimPump(RunContext& run)
+{
+    for (std::uint64_t guid : run.Reclaims.Take())
+        ReclaimBot(run, guid);
 }
 
 // The spawns: a scenario's roster one bot at a time, or else the bots of the last run reclaimed and the ramp for the rest.
@@ -124,9 +151,16 @@ void StartSpawns(forever_module::ModuleClient& client, RunContext& run, BotRoste
         {
             std::uint64_t guid = 0;
             if (bot_store::GuidFromKey(reply.keys(i), guid) && run.Roster.CanRequest())
-                ReclaimBot(run, guid);
+            {
+                run.Roster.NoteRequestSent(guid); // pending from now: the ramp does not spawn a new bot in a saved one's place
+                run.Reclaims.Add(guid);
+            }
         }
+        std::cerr << "forever-bots: reclaiming " << run.Reclaims.Waiting() << " saved bot(s), " << kReclaimsInFlight << " at a time\n";
+        ReclaimPump(run);
     });
+    if (!scenarioOn)
+        client.AddTimer(kReclaimInterval, [&run] { ReclaimPump(run); });
 
     if (!scenarioOn)
         client.AddTimer(kRampInterval, [&run] { RampTick(run); });

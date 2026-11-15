@@ -363,6 +363,14 @@ void BotPolicy::TurnRevivedAndRoles(DecideTick& tick, BotTurn& turn)
             leaderSnap = &view.bots[at->second];
     }
     bool const atLeader = leaderSnap && Distance2d(bot, *leaderSnap) <= (state.FollowYards > 0.0f ? state.FollowYards : state.LeaderYards);
+    // The leader alive on another map: the member cannot follow it (below), and a party member does not grind or wander, so it stood for the whole run.
+    bool const leaderAway = partyMember && !routeOn && leaderSnap && leaderSnap->map_id != bot.map_id && leaderSnap->life_state == 0 && bot.life_state == 0 &&
+                            state.ChatFollow == 0 && !state.ChatStay;
+    if (!leaderAway)
+        state.LeaderAwaySinceMs = 0;
+    else if (state.LeaderAwaySinceMs == 0)
+        state.LeaderAwaySinceMs = nowMs;
+    turn.leaderAwaySolo = leaderAway && nowMs - state.LeaderAwaySinceMs >= kLeaderAwaySoloMs;
 
     // Who an idle bot follows: a member its leader (and stays put once close). A bot nobody has invited into a
     // group does not follow a nearby player just because it is close (that made every uncontrolled bot latch
