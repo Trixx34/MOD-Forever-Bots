@@ -836,6 +836,45 @@ void BotPolicy::RouteReadiness(DecideTick& tick, BotTurn& turn, RouteLeg& route)
             }
         }
     }
+    // GroupEtiquette: do not pull on while the healer or tank is not ready or a member is a straggler (capped; group_etiquette.h). The leader says "ready?" when the wait ends.
+    if (_options.GroupEtiquette.Enabled && route.pullReady && bot.in_combat == 0 && bot.group_size <= 5)   // a five-man party; raids (ZG, Onyxia) keep their own readiness
+    {
+        std::vector<group_etiquette::Member> party;
+        auto const add = [&](BotSnapshot const& member)
+        {
+            std::uint32_t const classId = ClassFor(_options, member.guid);
+            role_profile::PlayedRole played = role_profile::PlayedRole::Auto;
+            if (auto const st = _bots.find(member.guid); st != _bots.end())
+                played = st->second.Role_ == BotState::Role::Tank ? role_profile::PlayedRole::Tank : st->second.Role_ == BotState::Role::Healer ? role_profile::PlayedRole::Healer :
+                         st->second.Role_ == BotState::Role::Dps ? role_profile::PlayedRole::Dps : played;
+            role_profile::Style const style = role_profile::StyleOf(classId, played);
+            group_etiquette::Member m;
+            m.Bot = member.guid;
+            m.Tank = style == role_profile::Style::Tank;
+            m.Healer = style == role_profile::Style::Healer;
+            m.Alive = member.life_state == 0;
+            m.ManaUser = member.power_type == 0 && member.max_power > 0;
+            m.HealthPct = member.max_health > 0 ? std::uint32_t(std::uint64_t(member.health) * 100 / member.max_health) : 100;
+            m.ManaPct = member.max_power > 0 ? std::uint32_t(std::uint64_t(member.power) * 100 / member.max_power) : 100;
+            m.LeaderYards = Distance2d(bot, member);
+            party.push_back(m);
+        };
+        add(bot);
+        tick.ForEachPartyMember(bot.guid, add);
+        bool ended = false;
+        if (_etiquetteWait[bot.guid].Holding(_options.GroupEtiquette, party, false, nowMs, &ended))
+        {
+            route.pullReady = false;
+            if (_options.OnEvent && (state.PullReadyLogMs == 0 || nowMs - state.PullReadyLogMs >= 10000))
+            {
+                state.PullReadyLogMs = nowMs;
+                _options.OnEvent("pull_hold: bot=" + std::to_string(bot.guid) + " reason=etiquette_" + group_etiquette::HoldName(group_etiquette::Evaluate(_options.GroupEtiquette, party)) +
+                                 " point=" + std::to_string(state.RouteIndex));
+            }
+        }
+        else if (ended)
+            _etiquetteChat.MarkReady(bot.guid);
+    }
     // A waypoint the core finds no route to (a spawn on a ledge or off the navmesh, a generated point inside a wall) would hold the whole run for
     // good: after kRouteNoRouteSkip refusals in a row the leader gives that point up and goes on to the next one.
     // A boss point is never skipped: the boss stands between the party and the rest of the dungeon (a locked door opens when it dies, or it guards

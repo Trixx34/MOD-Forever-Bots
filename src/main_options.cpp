@@ -229,7 +229,10 @@ void LoadPolicyTables(PolicyOptions& policyOptions, BotSettings& settings)
     policyOptions.CityGreet = settings.CityGreet;
     policyOptions.QuestInvite = settings.QuestInvite;
     policyOptions.MeetGreet = settings.MeetGreet;
+    policyOptions.GroupEtiquette = settings.GroupEtiquette;
     // ADVISOR-COPY
+    if (settings.GroupEtiquette.Enabled)
+        pools->GroupEtiquette = advisor::LoadLines(BesideTheModule(settings.GroupEtiquetteFile));
     // ADVISOR-POOLS
     if (settings.CityGreet.Enabled)
     {

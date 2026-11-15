@@ -20,6 +20,7 @@ struct Pools
 {
     std::vector<std::string> TradeAds;
     std::vector<std::string> PartyMana;
+    std::vector<std::string> GroupEtiquette;      // kind|text, kind greet, ready or thanks (group_etiquette.h)
     std::vector<std::string> WhisperReplies;      // keyword|state|text, see whisper_matrix.h
     std::vector<std::string> GuildMilestones;
     std::vector<std::string> CityGreetings;       // /say to a player nearby in a capital
