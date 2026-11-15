@@ -266,11 +266,7 @@ void GuildCreateCooldown()
     {
         WorldTickSnapshotView v = View(20, 0, {}, 1);
         v.bots[0].guild_guid = masterGuild;
-        BotSnapshot second = v.bots[0];
-        second.guid = 2;
-        second.guild_guid = 0;
-        v.bots.push_back(second);
-        return v;
+        return v;   // a lone bot: nobody else in its guild can take over, so the cooldown alone is measured (the reroute has its own test)
     };
     auto creates = [&](std::uint64_t now)
     {
@@ -306,6 +302,37 @@ void GuildCreateCooldown()
     CHECK(creates(t0 + 3270000) == 0);
 }
 
+// The master's create is refused: while it is blocked, the next member of the same guild takes the create instead of the whole guild waiting.
+void GuildMasterBlockedReroutes()
+{
+    PolicyOptions on = Quiet();
+    on.Guilds.Enabled = true;
+    BotPolicy policy(on);
+    auto view = [&]()
+    {
+        WorldTickSnapshotView v = View(20, 0, {}, 1);
+        v.bots[0].guild_guid = 0;
+        BotSnapshot second = v.bots[0];
+        second.guid = 2;
+        v.bots.push_back(second);
+        return v;
+    };
+    auto creator = [&](std::uint64_t now) -> std::uint64_t
+    {
+        policy.Decide(view(), now);
+        std::uint64_t who = 0;
+        for (social::Order const& order : policy.TakeSocialOrders())
+            if (order.What == social::Kind::Guild && order.Op == 3)
+                who = order.Bot;
+        return who;
+    };
+    std::uint64_t const t0 = kNow;
+    CHECK(creator(t0) == 1);              // the lowest guid is the master
+    CHECK(creator(t0 + 30000) == 0);      // in flight
+    CHECK(creator(t0 + 90000) == 2);      // master 1 unconfirmed: blocked, bot 2 of the same guild creates
+    CHECK(creator(t0 + 120000) == 0);     // bot 2's create is in flight
+}
+
 // Ten raiding masters, the core refuses every create: each plan sends at most 3 creates, and the masters come round (none is retried before all had a turn).
 void GuildCreatesRotateAmongMasters()
 {
@@ -339,7 +366,7 @@ void GuildCreatesRotateAmongMasters()
         for (std::uint64_t const master : masters)
             CHECK(seen.insert(master).second);   // nobody is asked twice while others have not had a turn
     }
-    CHECK(seen.size() == 10);
+    CHECK(seen.size() >= 10);   // every guild had a turn; a guild whose master was refused may go on to another member (reroute), so more than 10 bots may be asked
 }
 
 // The core refuses every create (outcomes come back): a refused master is skipped at once (no 60 s pending wait), the later masters get the slots, one
@@ -395,7 +422,7 @@ void GuildRefusedCreatesAreSkipped()
         for (std::uint64_t const master : masters)
             CHECK(seen.insert(master).second);   // a refused master is not asked again inside its window
     }
-    CHECK(seen.size() == 10);
+    CHECK(seen.size() >= 10);   // every guild had a turn; a guild whose master was refused may go on to another member (reroute), so more than 10 bots may be asked
     // The skipped masters are logged once each, not once per plan.
     int skipped = 0;
     for (std::string const& line : events)
@@ -740,6 +767,7 @@ int main()
     DuelsAreSentWhenOnAndNotWhenOff();
     BattlegroundsAreSentWhenOnAndNotWhenOff();
     GuildCreateCooldown();
+    GuildMasterBlockedReroutes();
     GuildCreatesRotateAmongMasters();
     GuildRefusedCreatesAreSkipped();
     GuildNamesFromTheList();
