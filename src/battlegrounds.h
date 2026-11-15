@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Battlegrounds (config key Battlegrounds, off by default): an idle bot at least BattlegroundMinLevel queues for a battleground. A queue that has not
 // popped within BattlegroundMaxWaitMin is left. Pure logic. The policy (TurnSocial) turns a decision into social::Order, which main_commands.cpp sends with
-// ModuleClient::BotBattleground. A core without the battleground action refuses it and the policy logs the event battleground_gap.
+// ModuleClient::BotBattleground. A bot in a party (a dungeon or raid run) does not queue and leaves a queue it holds. Accepting a popped invite needs a core/SDK
+// action that protocol 29 lacks (doc/pvp-track.md section 6); until then an unanswered pop lapses and the queue is left at BattlegroundMaxWaitMin. A core without the battleground action refuses it and the policy logs the event battleground_gap.
 #pragma once
 
 #include <cstdint>
@@ -29,12 +30,15 @@ struct Context
     bool InCombat = false;
     std::uint32_t Level = 0;
     bool InBattleground = false;      // the queue popped and the bot is inside
+    bool InGroup = false;             // in a party or raid (a dungeon or raid run): no queue is started, and a queue the bot still holds is left
 };
 
 enum class Action { None, Queue, Leave };
 
 Action Decide(Settings const& settings, State const& state, Context const& ctx, std::uint64_t nowMs);
 void NoteQueued(State& state, std::uint64_t nowMs);
+// Called when the queue order is handed out, before the core's answer: an answer that never arrives (or a lost order) must not let the bot queue again at once.
+void NoteQueueSent(State& state, Settings const& settings, std::uint64_t nowMs);
 void NoteLeft(State& state, Settings const& settings, std::uint64_t nowMs);
 
 }  // namespace battlegrounds
