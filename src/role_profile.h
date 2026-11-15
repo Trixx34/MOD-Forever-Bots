@@ -58,16 +58,24 @@ constexpr Style StyleOf(std::uint32_t classId, PlayedRole role)
     }
 }
 
-// The marks of a style. All rows equal Defaults() in this version.
+// The marks of a style. Tank and Healer equal Defaults(); the three damage styles are readier at 80 % health and 70 % mana.
 constexpr Profile ProfileOf(Style style)
 {
     switch (style)
     {
-        case Style::Tank:
-        case Style::Healer:
         case Style::MeleeDps:
         case Style::RangedDps:
         case Style::CasterDps:
+        {
+            // Time quick win 3 (docs/dungeon-time-loss-20261115.md): a damage dealer no longer holds the party for the last 10-15 % of health or mana. The tank
+            // and the healer keep the old marks (they carry the next pull and the heals).
+            Profile p = Defaults();
+            p.ReadyHealthPct = 80;
+            p.ReadyPowerPct = 70;
+            return p;
+        }
+        case Style::Tank:
+        case Style::Healer:
             break;
     }
     return Defaults();
