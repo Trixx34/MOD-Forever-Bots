@@ -149,6 +149,7 @@ def main():
             return
         out.append("")
         out.append(f"class {cls}" + (f" spec {spec_key}" if spec_key else ""))
+        block_start = len(out)   # a supersede caps the old spell in this block only (it used to cap it in every earlier block too: enh lost Lightning Shield at 20)
         levels = {}
         for kind, tokens, name_token in pending:
             sid, level, ranks = resolve(spells.get(cls, {}), name_token, warnings, f"class {cls}")
@@ -169,7 +170,8 @@ def main():
                 warnings.append(f"class {cls}: supersede '{old}' by '{new}' needs both spells found")
                 continue
             sid_old = resolve(spells.get(cls, {}), old, [], "")[0]
-            for i, line in enumerate(out):
+            for i in range(block_start, len(out)):
+                line = out[i]
                 if line.startswith(("row ", "buff ")) and line.split()[1] == str(sid_old):
                     parts = line.split("#")[0].rstrip()
                     out[i] = parts + f" maxlevel {max(new_level - 1, 1)}" + (("   #" + line.split("#", 1)[1]) if "#" in line else "")

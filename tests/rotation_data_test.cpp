@@ -702,6 +702,74 @@ void RangedRowsCarryTheirMinimumRangeAndNoRuneRows()
         }
 }
 
+// 2026-11-14: more Season of Discovery runes (SkillLineAbility AcquireMethod 3) that no trainer, quest reward, item, learn spell or talent gives: Rebuke 425609,
+// Void Plague 425204, Vampiric Touch 402668, Icy Veins 425121. A row for one is refused ("spell not known") on every try, so none comes back. Water Shield 408510 is
+// the exception: a Restoration talent (trait node 104732) that the resto talent profile takes, so only the resto shaman block keeps it, and Lightning Shield is no
+// longer capped at level 19 in the blocks without it (the generator used to apply the resto block's supersede to every shaman block before it).
+void NoRowForASpellNothingGrants()
+{
+    std::string const root = FOREVER_BOTS_SOURCE_DIR;
+    std::vector<std::string> warnings;
+    rotation::RotationData const data = rotation::LoadRotationData(root + "/data/rotations.txt", warnings);
+    CHECK(warnings.empty());
+    std::set<std::uint32_t> const runes = { 417157, 414684, 425609, 425204, 402668, 425121 };
+    auto const noRune = [&](std::vector<rotation::Row> const& rows)
+    {
+        for (rotation::Row const& row : rows)
+        {
+            CHECK(!runes.count(row.Spell));
+            for (std::uint32_t const rank : row.Ranks)
+                CHECK(!runes.count(rank));
+        }
+    };
+    for (auto const& [cls, rows] : data.ByClass)
+        noRune(rows);
+    for (auto const& [key, rows] : data.BySpec)
+        noRune(rows);
+
+    auto const has = [](std::vector<rotation::Row> const& rows, std::uint32_t spell) -> rotation::Row const*
+    {
+        for (rotation::Row const& row : rows)
+            if (row.Spell == spell)
+                return &row;
+        return nullptr;
+    };
+    std::size_t shamanBlocks = 0;
+    auto const shaman = [&](std::string const& spec, std::vector<rotation::Row> const& rows)
+    {
+        ++shamanBlocks;
+        rotation::Row const* const lightning = has(rows, 324);
+        rotation::Row const* const water = has(rows, 408510);
+        CHECK(lightning != nullptr);
+        if (spec == "resto")
+        {
+            CHECK(water != nullptr && water->Buff);
+            CHECK(lightning != nullptr && lightning->MaxLevel != 0 && lightning->MaxLevel < water->MinLevel);
+        }
+        else
+        {
+            CHECK(water == nullptr);
+            CHECK(lightning != nullptr && lightning->MaxLevel == 0);   // the shield stays: nothing replaces it in this block
+        }
+    };
+    shaman("", data.ByClass.at(7));
+    for (auto const& [key, rows] : data.BySpec)
+        if (key.first == 7)
+            shaman(key.second, rows);
+    CHECK(shamanBlocks == 4);   // default, enh, ele, resto
+
+    // The paladins still interrupt (Hammer of Justice), the shadow priest still has its damage over time (Shadow Word: Pain), the frost mage its Frostbolt.
+    for (auto const& [key, rows] : data.BySpec)
+    {
+        if (key.first == 2)
+            CHECK(has(rows, 853) != nullptr);
+        if (key.first == 5 && key.second == "shadow")
+            CHECK(has(rows, 589) != nullptr);
+        if (key.first == 8 && key.second == "frost")
+            CHECK(has(rows, 116) != nullptr);
+    }
+}
+
 // Bug #4 of the 2026-11-10 report: a row with two condition keywords keeps both (When and When2, ANDed); a third is a format error.
 void ARowKeepsTwoConditions()
 {
@@ -854,6 +922,7 @@ int main()
     TheShippedFilesLoadCleanly();
     EveryClassHasADamageRowAtLevelOne();
     RangedRowsCarryTheirMinimumRangeAndNoRuneRows();
+    NoRowForASpellNothingGrants();
     ARowKeepsTwoConditions();
     ExecuteHasItsHealthConditionAndFeralBuildersGiveComboPoints();
     if (failures == 0)

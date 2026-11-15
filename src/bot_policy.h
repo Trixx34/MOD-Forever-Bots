@@ -970,6 +970,11 @@ private:
         std::size_t RouteIndex = 0;                      // the leader's next route waypoint
         QuestMemory Quest;                               // the quest planner's memory of this bot
         std::unordered_map<std::uint64_t, std::uint64_t> InvitedAtMs; // member guid -> when this bot last invited it
+        std::unordered_map<std::uint64_t, std::uint32_t> InvitesSent; // member guid -> invites sent since it last joined (InviteRetryWaitMs)
+        // Whether this bot (a leader) may invite `member` now, and the invite noted when it may (InvitedAtMs, InvitesSent). `sent` is the count after this invite.
+        bool InviteDue(std::uint64_t member, std::uint64_t nowMs) const;
+        std::uint32_t NoteInvite(std::uint64_t member, std::uint64_t nowMs);
+        void NoteJoined(std::uint64_t member) { InvitesSent.erase(member); }
         // Death and recovery.
         std::uint8_t Life = 0;                           // life_state at the last tick (0 alive, 1 corpse, 2 ghost)
         std::uint64_t DeathMs = 0;
