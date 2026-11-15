@@ -51,6 +51,14 @@ The module logs `event grind_spot: bot=... level=... map=... spot=... levels=a-b
 
 4. Set `GrindFile = "data/grind_spots.txt"` in the module's config (a path relative to the module's working directory).
 
+## Custom maps (2991, the Skyborne start)
+
+The export query above takes only the maps listed in `c.map IN (...)`; a custom map is missing from the file until it is added (map 2991 was: its bots
+logged `grind_none` and wandered). Levels in this fork come from `creature_classic_level` (`level_min`, `level_max`), not from `creature_template`.
+For a map with mmaps, run the spawns through `tools/snap_grind_spots.py` after `make_grind_spots.py`: it moves each spot onto the navmesh of the map's main
+island (the one most spawns stand on), or onto the nearest spawn there, and drops what it cannot place. Map 2991: 1371 spawns, 106 spots, levels 1 to 14.
+`tests/grind_data_test.py` fails when 0, 1 or 2991 has no spots or 2991 lacks a spot for a level from 3 to 14.
+
 ## Known limits
 
 - The spot is the average position of the creatures in a 120-yard cell: a cell cut by a lake or a cliff can put the spot where nothing is (the bot walks
