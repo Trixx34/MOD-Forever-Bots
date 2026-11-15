@@ -461,6 +461,8 @@ void AGhostWaitsOutThePartysFightOnAPullSingleMap()
     BotPolicy off(optionsOf(nullptr, 0, row));
     off.SetRouteActive(true);
     CHECK(TeleportOf(off.Decide(build(true), 1000), 13).has_value());
+}
+
 // Personality (personality.h): off by default, a solo pull is varied by a reaction pause, a pack cap for wary bots, and a small mistake.
 PolicyOptions PersonalityOptions(std::uint64_t seed)
 {

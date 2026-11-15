@@ -798,6 +798,8 @@ void MeetGreetSettings()
                                               { "MeetGreetFile", "x.txt" } }, warnings);
     CHECK(on.MeetGreet.Enabled && on.MeetGreet.ChancePct == 10 && on.MeetGreet.PairCooldownSec == 60 && on.MeetGreet.WavePct == 70 && on.MeetGreetFile == "x.txt");
     CHECK(warnings.empty());
+}
+
 // BotMail: off by default, every key read and bounded.
 void BotMailSettings()
 {

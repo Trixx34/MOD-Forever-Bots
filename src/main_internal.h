@@ -360,6 +360,8 @@ struct MountBook
         if (Trips.erase(guid) != 0)
             Bots[guid].HoldUntilMs = now + kMountEndedHoldMs;
     }
+};
+
 // World event visits (world_events.h): the pump's view of each bot every kPresenceFeedMs and how each visit ended; a timer on the Run() thread decides.
 constexpr std::chrono::milliseconds kWorldEventsInterval(10000);
 struct VisitFeed

@@ -551,10 +551,14 @@ void ZulGurubProposedRouteLoads()
     for (std::string const& w : warnings)
         std::printf("dungeons-proposed: %s\n", w.c_str());
     CHECK(warnings.empty());
-    CHECK(json.size() == 1);
-    if (json.size() != 1)
+    Dungeon const* found = nullptr; // data/dungeons-proposed also holds the RoL and HoT proposals
+    for (Dungeon const& d : json)
+        if (d.Id == "zulgurub")
+            found = &d;
+    CHECK(found != nullptr);
+    if (!found)
         return;
-    Dungeon const& z = json[0];
+    Dungeon const& z = *found;
     CHECK(z.Id == "zulgurub" && z.MapId() == 309 && z.Route.size() == 141);
     std::vector<std::uint32_t> order;
     for (DungeonWaypoint const& w : z.Route)

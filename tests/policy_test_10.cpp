@@ -612,6 +612,8 @@ void MountVendorErrandHandsOutOnePurchaseAndEndsWithTheAnswer()
         }
         CHECK(policy.TakeErrandOutcome(kBot) == ErrandOutcome::kFailed);                     // no answer in 30 s
     }
+}
+
 // A world event visit (world_events.h): the bot in reach of the site accepts the listed quests one by one, hands them in, stays, then it is done. A far
 // bot walks. The visit's quest answers are not the quest engine's: a refusal does not pause the bot's quests.
 void WorldEventVisitAcceptsHandsInAndStays()

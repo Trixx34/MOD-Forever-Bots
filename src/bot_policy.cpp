@@ -317,6 +317,8 @@ std::uint32_t BotPolicy::MountRefusals(std::uint64_t botGuid) const
 {
     auto const it = _bots.find(botGuid);
     return it == _bots.end() ? 0 : it->second.MountFails;
+}
+
 void BotPolicy::StartVisit(std::uint64_t botGuid, VisitOrder const& order)
 {
     BotState& state = StateOf(botGuid);
