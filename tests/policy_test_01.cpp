@@ -700,11 +700,11 @@ void CooldownRefusalHoldsEverySpellForAMoment()
 
 void RepeatedLineOfSightRefusalsAvoidTheTarget()
 {
-    // result 71: closing in is tried first; three refusals in a row and the target is dropped for a while.
+    // result 71: closing in is tried first; six refusals in a row (each retried after 300 ms) and the target is dropped for a while.
     BotPolicy policy = ClassPolicy(8);
     CHECK(HasCast(policy.Decide(View(1, 0, { Hostile(2, 10.0f, 100) }), 1000), 133));
     std::uint64_t now = 4000;
-    for (std::uint64_t n = 1; n <= 3; ++n, now += 3000)
+    for (std::uint64_t n = 1; n <= 6; ++n, now += 3000)
         policy.Decide(CastResultView(1 + n, { Hostile(2, 10.0f, 100) }, n, 133, BotActionStatus::kNoLineOfSight), now);
     for (BotAction const& action : policy.Decide(View(9, 0, { Hostile(2, 10.0f, 100) }), now))
         CHECK(action.type != ActionType::kCastSpell && action.target_guid != MakeUnitRef(8, 1, 2));
@@ -816,6 +816,76 @@ void SaberSlashCountsAsAComboPoint()
         else
             CHECK(HasCast(actions, 2098));
     }
+}
+
+// Slice and Dice (5171): its DB2 effect 0 targets an enemy, so the row casts at the target (a self cast came back "invalid target" 1048 times in the sim). One buff covers every
+// target: it is not cast again while it runs, and an invalid-target answer for it does not make the mob avoided or the row hammer at 1 s.
+void SliceAndDiceIsCastAtTheEnemyAndAnAnswerDoesNotAvoidTheMob()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.ClassId = 4;
+    std::istringstream file("class 4\nrow 2098 combo 3 target_hp_below 25 target range 0 5\nrow 5171 combo 2 duration 20 target range 0 5\nrow 1752 always target range 0 5\n");
+    std::vector<std::string> warnings;
+    options.Rotations = std::make_shared<rotation::RotationData>(rotation::ParseRotationData(file, warnings));
+    CHECK(warnings.empty());
+    BotPolicy policy(options);
+    CHECK(HasCast(policy.Decide(View(1, 0, { Hostile(2, 3.0f, 100) }), 1000), 1752));
+    std::uint64_t now = 1000;
+    std::uint32_t seq = 0;
+    auto const result = [&](std::uint32_t spell, BotActionStatus status, std::uint32_t hostileHealth)
+    {
+        now += 1600;
+        ++seq;
+        WorldTickSnapshotView next = View(1 + seq, 0, { Hostile(2, 3.0f, hostileHealth) });
+        next.bots[0].last_action_sequence = seq;
+        next.bots[0].last_action_type = uint8_t(ActionType::kCastSpell);
+        next.bots[0].last_action_spell = spell;
+        next.bots[0].last_action_status = status;
+        return policy.Decide(next, now);
+    };
+    result(1752, BotActionStatus::kApplied, 100);
+    auto actions = result(1752, BotActionStatus::kApplied, 100);   // two combo points now
+    bool atEnemy = false;
+    for (BotAction const& action : actions)
+        atEnemy = atEnemy || (action.type == ActionType::kCastSpell && action.spell_id == 5171 && action.target_guid == MakeUnitRef(8, 1, 2));
+    CHECK(atEnemy);
+    // Applied: the buff runs, so the next builders go on and Slice and Dice is not cast again (combo points were spent).
+    actions = result(5171, BotActionStatus::kApplied, 100);
+    CHECK(!HasCast(actions, 5171));
+    // A dying target with three points: Eviscerate first, before Slice and Dice.
+    result(1752, BotActionStatus::kApplied, 20);
+    actions = result(1752, BotActionStatus::kApplied, 20);
+    result(1752, BotActionStatus::kApplied, 20);
+    CHECK(HasCast(result(1752, BotActionStatus::kApplied, 20), 2098));
+}
+
+void SliceAndDiceInvalidTargetBacksOffAndKeepsTheMob()
+{
+    PolicyOptions options = AggressiveOptions();
+    options.ClassId = 4;
+    std::istringstream file("class 4\nrow 5171 combo 1 duration 20 target range 0 5\nrow 1752 always target range 0 5\n");
+    std::vector<std::string> warnings;
+    options.Rotations = std::make_shared<rotation::RotationData>(rotation::ParseRotationData(file, warnings));
+    BotPolicy policy(options);
+    CHECK(HasCast(policy.Decide(View(1, 0, { Hostile(2, 3.0f, 100) }), 1000), 1752));
+    WorldTickSnapshotView built = View(2, 0, { Hostile(2, 3.0f, 100) });
+    built.bots[0].last_action_sequence = 1;
+    built.bots[0].last_action_type = uint8_t(ActionType::kCastSpell);
+    built.bots[0].last_action_spell = 1752;
+    built.bots[0].last_action_status = BotActionStatus::kApplied;
+    CHECK(HasCast(policy.Decide(built, 2600), 5171));
+    WorldTickSnapshotView refused = View(3, 0, { Hostile(2, 3.0f, 100) });
+    refused.bots[0].last_action_sequence = 2;
+    refused.bots[0].last_action_type = uint8_t(ActionType::kCastSpell);
+    refused.bots[0].last_action_spell = 5171;
+    refused.bots[0].last_action_status = BotActionStatus::kInvalidTarget;
+    // The mob is not avoided: Sinister Strike goes on at it, and Slice and Dice is not asked again within the next 1.5 s.
+    auto actions = policy.Decide(refused, 4200);
+    CHECK(!HasCast(actions, 5171));
+    bool strikes = false;
+    for (BotAction const& action : actions)
+        strikes = strikes || (action.type == ActionType::kCastSpell && action.spell_id == 1752 && action.target_guid == MakeUnitRef(8, 1, 2));
+    CHECK(strikes);
 }
 
 void HostilePlayerDoesNotBlockRest()
@@ -1117,6 +1187,8 @@ void RunPolicyTestsPart1()
     SealIsNotRecastWhileUp();
     EviscerateAtFivePoints();
     SaberSlashCountsAsAComboPoint();
+    SliceAndDiceIsCastAtTheEnemyAndAnAnswerDoesNotAvoidTheMob();
+    SliceAndDiceInvalidTargetBacksOffAndKeepsTheMob();
     HostilePlayerDoesNotBlockRest();
     RangedBotWithoutPowerWalksIn();
     MageCastsFromRange();

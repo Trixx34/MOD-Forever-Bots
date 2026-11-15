@@ -632,7 +632,7 @@ void BotPolicy::ReadCastResult(BotState& state, BotSnapshot const& bot, std::uin
                 break; // busy, moving, cooldown, no power, out of range: the usual retry below, the pet state is unchanged
         }
     }
-    if (spell == kAutoShot && bot.last_action_status == BotActionStatus::kApplied)
+    if (IsAutoRepeat(spell) && bot.last_action_status == BotActionStatus::kApplied)
     {
         auto const shot = state.CastTarget.find(spell);
         if (shot != state.CastTarget.end())
@@ -642,7 +642,8 @@ void BotPolicy::ReadCastResult(BotState& state, BotSnapshot const& bot, std::uin
     {
         // The cast had no valid target: that unit is avoided too, so the next cast goes to another one.
         auto const cast = state.CastTarget.find(spell);
-        if (cast != state.CastTarget.end() && cast->second != 0)
+        // Not for a finisher (Slice and Dice): its refusal says nothing about the mob.
+        if (cast != state.CastTarget.end() && cast->second != 0 && spell != kSliceAndDice)
             AvoidUnit(state.AvoidUntilMs, state.AvoidCount, cast->second, nowMs);
     }
     if (bot.last_action_status == BotActionStatus::kNoLineOfSight)
@@ -693,7 +694,7 @@ void BotPolicy::ReadCastResult(BotState& state, BotSnapshot const& bot, std::uin
             std::uint64_t const duration = DurationMsOf(ClassFor(_options, bot.guid), spell, SpecFor(bot.guid, ClassFor(_options, bot.guid)));
             if (duration != 0)
             {
-                state.Dots[spell] = Dot{ cast->second, nowMs + duration };
+                state.Dots[spell] = Dot{ spell == kSliceAndDice ? 0 : cast->second, nowMs + duration }; // Slice and Dice: the buff is on the rogue, whoever it was cast at
                 state.BuffUntilMs[{ spell, cast->second }] = nowMs + duration;
             }
 
@@ -777,9 +778,27 @@ void BotPolicy::ReadCastResult(BotState& state, BotSnapshot const& bot, std::uin
             if (spell != kCallPet && spell != kRevivePet && spell != kMendPet)
                 state.NextCastMs = std::max(state.NextCastMs, nowMs + kHeldCastMs);
             break;
-        case BotActionStatus::kOutOfRange:
-        case BotActionStatus::kNoLineOfSight:
         case BotActionStatus::kInvalidTarget:
+            // An invalid target repeats until something else changes (a spell that needs another target, a target that is immune): back off 1 s, 2 s, 4 s ... up to kInvalidTargetMaxMs
+            // instead of asking again every second (Slice and Dice: 1048 refusals, no cast applied, in one sim day).
+            state.RetryAtMs[spell] = nowMs + (buff ? failWait(kBuffFailBaseMs) : std::min(failWait(kRetryMs), kInvalidTargetMaxMs));
+            break;
+        case BotActionStatus::kNoLineOfSight:
+        {
+            // A line-of-sight refusal costs no global cooldown in the core, and the closing-in walk (CloserUntilMs, set above) is already on its way: ask again after a
+            // step (kLosRetryMs) instead of leaving the module's 1.5 s cast gap and the 1 s retry in place. Casts at a party member (a heal) keep the long wait.
+            auto const cast = state.CastTarget.find(spell);
+            bool const atMob = cast != state.CastTarget.end() && cast->second != 0 && forever_module::UnitRefType(cast->second) != kPlayerType;
+            if (!buff && atMob)
+            {
+                state.RetryAtMs[spell] = nowMs + kLosRetryMs;
+                state.NextCastMs = std::min(state.NextCastMs, nowMs + kLosRetryMs);
+            }
+            else
+                state.RetryAtMs[spell] = nowMs + (buff ? failWait(kBuffFailBaseMs) : kRetryMs);
+            break;
+        }
+        case BotActionStatus::kOutOfRange:
             state.RetryAtMs[spell] = nowMs + (buff ? failWait(kBuffFailBaseMs) : kRetryMs);
             break;
         case BotActionStatus::kApplied:
@@ -787,4 +806,13 @@ void BotPolicy::ReadCastResult(BotState& state, BotSnapshot const& bot, std::uin
         case BotActionStatus::kNotOnline:
             break;
     }
+    // A row with `retry <sec>` (Revenge, Overpower: usable only after a proc) waits that long after a refusal instead of asking again every GCD.
+    if (bot.last_action_status == BotActionStatus::kRefused || bot.last_action_status == BotActionStatus::kInvalidTarget)
+        for (rotation::Row const& row : RowsFor(ClassFor(_options, bot.guid), SpecFor(bot.guid, ClassFor(_options, bot.guid))))
+            if (!row.Buff && row.Spell == spell && row.RetrySec != 0)
+            {
+                std::uint64_t& at = state.RetryAtMs[spell];
+                at = std::max(at, nowMs + std::uint64_t(row.RetrySec) * 1000);
+                break;
+            }
 }

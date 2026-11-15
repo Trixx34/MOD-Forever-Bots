@@ -14,6 +14,7 @@
 #pragma once
 
 #include "forever_module/tier2_session.h"
+#include "damage_done.h"
 #include "damage_events.h"
 #include "run_telemetry.h"
 #include "wipe_hold.h"
@@ -68,6 +69,8 @@ struct ScenarioPlan
     // A grant is one stack at most, kAmmoStackMax (200): the core refuses a larger count.
     std::uint32_t AmmoCount = 200;
     std::vector<std::pair<std::uint32_t, std::string>> Bosses; // creature entry and name of each boss; one seen dead counts as killed
+    // DamageTelemetry: the damage-done estimate per class and bot (damage_done.h) and the time split of each boss attempt, in the boss_attempt: end lines and a damage_done: line at the end.
+    bool DamageTelemetry = false;
     std::function<std::uint32_t(std::uint64_t)> ClassOf;      // bot guid -> class id
     std::function<std::uint32_t(std::uint64_t)> RaceOf;       // bot guid -> race id (for the roster in the result line)
     // Dead-bot recovery. With WipeRecovery on, an all-down state starts a timer of WipeRecoveryMs: if a bot is alive again before it ends,
@@ -374,6 +377,9 @@ private:
     std::map<std::uint64_t, bool> _inCombat;            // bot -> in combat at the last tick (a fight start is a change from false to true)
     std::map<std::uint64_t, std::uint32_t> _moveSeq;    // leader guid -> last action sequence looked at
     damage_events::Aggregate _attemptDmg;                  // damage events since the boss attempt opened
+    damage_done::Tracker _attemptDone;                     // DamageTelemetry: the estimated damage done since the boss attempt opened
+    damage_done::Tracker _runDone;                         // and since the run began
+    run_telemetry::AttemptSplit _attemptSplit = {};        // DamageTelemetry: ms per AttemptState since the boss attempt opened
     damage_events::Aggregate _windowDmg;                   // damage events since the last party_tl: line
     bool _attemptOpen = false;
     std::uint32_t _attemptEntry = 0;

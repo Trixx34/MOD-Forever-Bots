@@ -759,6 +759,14 @@ void RealismSettings()
     CHECK(warnings.empty());
 }
 
+void DamageTelemetrySetting()
+{
+    std::vector<std::string> warnings;
+    CHECK(!ParseBotSettings({}, warnings).DamageTelemetry); // off unless the config turns it on (the sim does)
+    CHECK(ParseBotSettings({ { "DamageTelemetry", "1" } }, warnings).DamageTelemetry);
+    CHECK(warnings.empty());
+}
+
 void RunTelemetryDirSetting()
 {
     std::vector<std::string> warnings;
@@ -857,6 +865,7 @@ int main()
     SayAndSupplySettings();
     RepairSettings();
     RunTelemetryDirSetting();
+    DamageTelemetrySetting();
     DefaultsWhenEmpty();
     RaidRuleRowSwitches();
     TelemetrySettings();

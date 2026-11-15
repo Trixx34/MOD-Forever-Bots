@@ -264,7 +264,17 @@ void BotPolicy::MoveToTarget(DecideTick& tick, BotTurn& turn)
     // A ranged bot that has run out of power closes to melee range: its spells are spent.
     bool const outOfPower = bot.max_power > 0 && BelowPct(bot.power, bot.max_power, kOutOfPowerPct);
     // A hunter with no ammunition cannot shoot (the core refuses every ranged attack): it closes to melee range as well.
-    float approach = (outOfPower || NoAmmo(bot, classId)) && !healerSupport ? kMeleeApproachYards : rotation::ApproachYards(classId, spec);
+    // A caster with a wand row keeps its stand-off at low mana and shoots (the row is set back a minute when the core refuses it: no wand equipped).
+    bool wandRow = false;
+    if (outOfPower && !healerSupport && classId != kHunterClass)
+        for (rotation::Row const& row : RowsFor(classId, spec))
+            if (row.Spell == kShoot && !row.Buff && (bot.level == 0 || row.MinLevel <= bot.level))
+            {
+                auto const retry = state.RetryAtMs.find(kShoot);
+                wandRow = retry == state.RetryAtMs.end() || retry->second <= nowMs + kNoSpellRetryMs;
+                break;
+            }
+    float approach = ((outOfPower && !wandRow) || NoAmmo(bot, classId)) && !healerSupport ? kMeleeApproachYards : rotation::ApproachYards(classId, spec);
     // CasterMeleeWithoutSpell: a ranged bot with no damage spell it can cast at its level (no unconditional target row learned by now, or every one came back "not
     // known" from the core) closes to melee and auto-attacks. It used to stand at its 25-yard stand-off casting nothing, the fight watchdog gave the target up
     // (kStallAvoidMs, 5 to 40 minutes), and soon every creature around was avoided: the 2026-11-14 sim's level 1 shamans (Lightning Bolt's row starts at rank 2,

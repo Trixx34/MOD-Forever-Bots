@@ -120,6 +120,7 @@ constexpr float kFleeYards = 15.0f;          // below 30% health: flees while a 
 constexpr std::uint64_t kGlobalCooldownMs = 1500;
 constexpr std::uint64_t kDispelRetryMs = 2500;      // a bot sends the same dispel again no sooner than this (raid rules)
 constexpr std::uint64_t kRetryMs = 1000;     // out of range, invalid target, refused, not enough power
+constexpr std::uint64_t kInvalidTargetMaxMs = 16000; // the longest wait after repeated invalid-target answers for one fight spell
 constexpr std::uint64_t kCooldownRetryMs = 2000;
 constexpr float kRangeSlackYards = 2.0f;        // a ranged row is used this far inside its range: the snapshot is a tick old and the units move
 constexpr std::uint64_t kPowerRetryMs = 2000;    // a cast refused for lack of mana, rage or energy: power comes back slowly
@@ -129,7 +130,8 @@ constexpr std::uint64_t kHeldCastMs = 500;       // after a cooldown or generic 
 constexpr std::uint64_t kCloserAfterRangeMs = 5000; // after an out-of-range refusal the bot stands closer for this long
 constexpr float kCasterCloserYards = 15.0f;      // the closer stand-off of a ranged bot after an out-of-range refusal
 constexpr float kMeleeCloserYards = 3.0f;        // and of a melee bot
-constexpr std::uint32_t kLosRefusalsAvoid = 3;   // this many line-of-sight refusals in a row and the target is avoided
+constexpr std::uint64_t kLosRetryMs = 300;      // a line-of-sight refusal at a mob: the same spell is tried again after this (the bot steps closer meanwhile)
+constexpr std::uint32_t kLosRefusalsAvoid = 6;   // this many line-of-sight refusals in a row and the target is avoided
 constexpr std::uint64_t kBusyRetryMs = 300;  // a cast refused because the bot was casting or moving: tried again very soon
 constexpr std::uint64_t kNotKnownRetryMs = 60000; // the spell may be learned later
 // CasterMeleeWithoutSpell: a spell whose retry still lies further ahead than this is not counted as castable ("not known" waits 60 s and doubles per streak). It must be
@@ -209,6 +211,8 @@ constexpr std::uint64_t kSupplyJudgeAfterMs = 7000; // a supply trip is judged t
 constexpr std::uint32_t kSinisterStrike = 1752;
 constexpr std::uint32_t kEviscerate = 2098;
 constexpr std::uint32_t kAutoShot = 75;
+constexpr std::uint32_t kShoot = 5019;              // the wand: an auto-repeat ranged attack like Auto Shot (mage, priest, warlock rows at low mana)
+constexpr bool IsAutoRepeat(std::uint32_t spell) { return spell == kAutoShot || spell == kShoot; }
 constexpr std::uint32_t kCallPet = 883;
 constexpr std::uint32_t kRevivePet = 982;
 constexpr std::uint32_t kMendPet = 136;
@@ -462,7 +466,7 @@ constexpr float kExploreReachYards = 6.0f;
 constexpr std::uint64_t kAcceptInviteRetryMs = 3000; // an invite from a player is answered again after this long if it is still pending
 constexpr std::uint64_t kGotoTimeoutMs = 90000;     // a goto order is dropped after this long
 constexpr std::uint64_t kPullOrderMs = 30000;      // a pull order is dropped after this long, or when the target is gone
-constexpr std::uint64_t kCloserAfterLosMs = 5000;   // after a line-of-sight refusal the bot closes to melee range for this long
+constexpr std::uint64_t kCloserAfterLosMs = 3000;   // after a line-of-sight refusal the bot closes to melee range for this long
 // Gear a bot carries (traded, looted, a quest reward) is worn when it is better. The core compares item levels; asking is cheap, so every
 // bot asks this often, spread by guid so a few hundred bots do not all ask in one tick.
 constexpr std::uint64_t kBagGearEveryMs = 300000;

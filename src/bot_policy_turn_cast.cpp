@@ -934,6 +934,7 @@ BotPolicy::TurnFlow BotPolicy::TurnRotation(DecideTick& tick, BotTurn& turn)
     std::vector<BotAction>& actions = tick.actions;
     BotSnapshot const& bot = turn.bot;
     BotState& state = turn.state;
+    PolicyOptions::ScenarioRoute const& scenario = *turn.scenario;
     auto& nearby = turn.nearby;
     auto const& classId = turn.classId;
     auto const& spec = turn.spec;
@@ -987,6 +988,14 @@ BotPolicy::TurnFlow BotPolicy::TurnRotation(DecideTick& tick, BotTurn& turn)
         state.ComboPoints = 0;
     }
     facts.ComboPoints = int32_t(state.ComboPoints);
+    // boss_fight: the target is a boss of the dungeon being run (the scenario's boss points) or of the raid rules' table; the cooldown rows use it.
+    if (targetUnit)
+    {
+        std::uint32_t const targetEntry = forever_module::UnitRefEntry(targetUnit->guid);
+        for (auto const& bossAt : scenario.RouteBossAt)
+            facts.BossFight = facts.BossFight || bossAt.second == targetEntry;
+        facts.BossFight = facts.BossFight || (_options.RaidRules && _options.RaidRules->IsBoss(bot.map_id, targetEntry));
+    }
     state.PetFought = true;
     // Auto Shot runs until the target changes or the bot moves; casting it again would not help (and may toggle it off).
     if (state.AutoShotTarget != 0 && (state.AutoShotTarget != targetRef || bot.moving != 0))
@@ -1028,7 +1037,7 @@ BotPolicy::TurnFlow BotPolicy::TurnRotation(DecideTick& tick, BotTurn& turn)
             continue; // upkeep spells are cast out of combat, below
         if (manaFloor && row.OnTarget)
             continue; // below the healer's combat mana floor: attacks wait, self and party spells stay
-        if (row.Spell == kAutoShot && state.AutoShotTarget == targetRef)
+        if (IsAutoRepeat(row.Spell) && state.AutoShotTarget == targetRef)
             continue; // already shooting this target
         if (row.OnTarget && row.MaxRange > kMeleeApproachYards + 1.0f && NoAmmo(bot, classId))
             continue; // a ranged attack of a hunter with no ammunition: refused by the core, so only the melee rows are used
@@ -1062,7 +1071,8 @@ BotPolicy::TurnFlow BotPolicy::TurnRotation(DecideTick& tick, BotTurn& turn)
             continue;
         // The effect is still up (on the target, or on the bot for a self buff): recasting only refreshes it.
         auto const dot = state.Dots.find(row.Spell);
-        bool const sameTarget = dot != state.Dots.end() && dot->second.Target == (row.OnTarget ? targetRef : 0);
+        // Slice and Dice is cast at the enemy (its first effect needs one) but the buff sits on the rogue: one running buff covers every target.
+        bool const sameTarget = dot != state.Dots.end() && dot->second.Target == (row.OnTarget && row.Spell != kSliceAndDice ? targetRef : 0);
         if (sameTarget && nowMs < dot->second.UntilMs)
             continue;
 

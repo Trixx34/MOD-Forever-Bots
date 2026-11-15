@@ -5,6 +5,7 @@
 // Every line is "<kind>: key=value key=value ...", in a fixed field order (new fields are appended at the end).
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <fstream>
 #include <string>
@@ -101,7 +102,15 @@ struct BossAttempt
     std::uint32_t Deaths = 0;
     std::string Outcome;     // "open" at the start, "killed" or "aborted" at the end
     std::string Damage;      // damage_events::Aggregate::Format() of the attempt (leading space), at the end only, empty when no damage event came
+    std::string DamageDone;  // damage_done::Tracker::Format() of the attempt (leading space; DamageTelemetry), at the end only
+    std::string Split;       // FormatSplit of the attempt (leading space; DamageTelemetry), at the end only
 };
+
+// Where the time of a boss attempt goes (DamageTelemetry), one state per snapshot tick.
+enum class AttemptState : std::uint8_t { Approach, Boss, Adds, Waiting, ManaRest, HealthRest, Dead, Idle, Count };
+using AttemptSplit = std::array<std::uint64_t, std::size_t(AttemptState::Count)>;
+// " split_s=approach:12,boss:40,adds:30,waiting:5,mana_rest:20,hp_rest:0,dead:0,idle:3" (leading space, whole seconds, fixed order).
+std::string FormatSplit(AttemptSplit const& ms);
 
 // "party_tl: scenario=dm party=2 variant= t_s=120 leader=5 map=36 pos=-14.5,-380.2,62.0 step=walk route=3/40 target=0 alive=5/5 fight=0 last=boss:Rhahk'Zor@100"
 // and, only when a damage event came in the 30 s before: " dmg_by_spell=20566:3100:4:1 dmg_by_attacker=11502:5200:6:1 death_by_spell=20566:1:250 death_by_attacker=11502:1:250" (damage_events.h)
