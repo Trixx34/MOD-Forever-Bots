@@ -175,6 +175,9 @@ struct BotSettings
     // Per faction and band (config keys QuestFileAlliance, QuestFileHorde, QuestFileAlliance60, QuestFileHorde60): a bot of that side uses the list; from level 60 the
     // "60" list. Empty keys fall back (level 60 -> the side's leveling list -> QuestFile).
     std::string QuestFileAlliance, QuestFileHorde, QuestFileAlliance60, QuestFileHorde60;
+    // The Onyxia's Lair attunement (config key AttunementFile, data/attunement_quests.txt beside the module): its quests replace the same quests in
+    // QuestFile and are taken at level 60 only. Empty turns the attunement off. Used only when QuestFile is set.
+    std::string AttunementFile = "data/attunement_quests.txt";
     // QuestTeleport (0 or 1, off by default): a quest walk that has not moved for two minutes teleports to the giver. Needs
     // Bot.Actions.Teleport = 1 in the core. Off, that start is dropped and the bot grinds instead of retrying a refused teleport.
     bool QuestTeleport = false;

@@ -307,6 +307,12 @@ void LoadPolicyTables(PolicyOptions& policyOptions, BotSettings& settings)
     {
         std::vector<std::string> questWarnings;
         auto quests = std::make_shared<QuestData>(LoadQuestData(settings.QuestFile, questWarnings));
+        if (!settings.AttunementFile.empty())
+        {
+            QuestData const attunement = LoadQuestData(BesideTheModule(settings.AttunementFile), questWarnings);
+            MergeQuestData(*quests, attunement);
+            std::cerr << "forever-bots: attunement: " << attunement.Starts.size() << " start(s) from " << BesideTheModule(settings.AttunementFile) << "\n";
+        }
         for (std::string const& warning : questWarnings)
             std::cerr << "forever-bots: " << warning << "\n";
         std::cerr << "forever-bots: quests: " << quests->Starts.size() << " start(s) from " << settings.QuestFile << "\n";

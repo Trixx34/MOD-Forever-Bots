@@ -1,0 +1,57 @@
+# Onyxia's Lair attunement, Alliance, the part a bot can do alone. Made from the sim world database (quest_template, quest_objectives,
+# creature_queststarter/questender, creature spawns); the hunting areas are the spawn points of the targets, as in world_quests.txt. Format: src/quest_data.h.
+# Read beside the module (config AttunementFile) and merged into QuestFile: a quest here replaces the same quest there, so every
+# quest below is taken at level 60 only. Race: the Alliance races (the sim database says "any race" for these quests; the givers are Alliance).
+# Quests are done in the order given. Quests after 4224 are parked below; the Horde chain is not here (see the end of this file).
+
+# Burning Steppes: Dragonkin Menace (Helendis Riverhorn) and The True Masters (to Magistrate Solomon)
+start Burning Steppes
+anchor 0 -8377.17 -2780.48 193.69
+# 4182 Dragonkin Menace: 15 Black Broodling, 10 Black Dragonspawn, 1 Black Drake, 4 Black Wyrmkin
+quest 4182 giver -8377.17 -2780.48 193.69 ender -8377.17 -2780.48 193.69
+req 4182 minlevel 60 level 54 races 6130900294268439629
+hunt 4182 0 15 7047
+hunt 4182 1 10 7040
+hunt 4182 2 1 7044
+hunt 4182 3 4 7041
+area 4182 -8243.4 -2744.5 136.3
+area 4182 -8238.0 -2679.0 135.3
+area 4182 -8246.0 -2547.5 138.5
+# 4183 The True Masters: its item (11366) is the quest's start item, so there is nothing to hunt
+quest 4183 giver -8377.17 -2780.48 193.69 ender -9218.61 -2221.80 67.62
+req 4183 minlevel 60 level 54 prev 4182 races 6130900294268439629
+
+# Magistrate Solomon: The True Masters (4184), and the last of them (4223) to Marshal Maxwell
+start Magistrate Solomon
+anchor 0 -9218.61 -2221.80 67.62
+# 4184 The True Masters: Solomon to Highlord Bolvar Fordragon
+quest 4184 giver -9218.61 -2221.80 67.62 ender -8439.98 329.39 122.58
+req 4184 minlevel 60 level 54 prev 4183 races 6130900294268439629
+# 4223 The True Masters: Solomon to Marshal Maxwell
+quest 4223 giver -9218.61 -2221.80 67.62 ender -8378.54 -2748.94 186.73
+req 4223 minlevel 60 level 54 prev 4186 races 6130900294268439629
+
+# Highlord Bolvar Fordragon: The True Masters (4185 and 4186)
+start Highlord Bolvar
+anchor 0 -8439.98 329.39 122.58
+quest 4185 giver -8439.98 329.39 122.58 ender -8439.98 329.39 122.58
+req 4185 minlevel 60 level 54 prev 4184 races 6130900294268439629
+quest 4186 giver -8439.98 329.39 122.58 ender -9218.61 -2221.80 67.62
+req 4186 minlevel 60 level 54 prev 4185 races 6130900294268439629
+
+# Marshal Maxwell: the last The True Masters quest (4224), given and handed in by Maxwell
+start Marshal Maxwell
+anchor 0 -8378.54 -2748.94 186.73
+quest 4224 giver -8378.54 -2748.94 186.73 ender -8378.54 -2748.94 186.73
+req 4224 minlevel 60 level 54 prev 4223 races 6130900294268439629
+
+# Parked (not in this file): a bot cannot finish these alone, or the sim database has no place for their NPC.
+#   4241 Marshal Windsor, then 4242 Abandoned Hope, 4264 A Crumpled Up Note, 4282 A Shred of Hope, 4322 Jail Break!: Windsor is in
+#        Blackrock Depths (map 230). 4282 needs General Angerforge and Golem Lord Argelmach (Blackrock Depths elites).
+#   6402 Stormwind Rendezvous, 6403 The Great Masquerade: Reginald Windsor (creature 12580) has no spawn in the sim world database.
+#   6501 The Dragon's Eye, 6502 Drakefire Amulet: item 16663 drops only from General Drakkisath (Upper Blackrock Spire, map 229).
+# Horde (not here): Warlord's Command (4903) has no starter row in the sim database (its ender is Warlord Goretooth) and its
+#   targets are Lower Blackrock Spire bosses; 4974 For The Horde! needs Rend Blackhand (Upper Blackrock Spire); 6569 Oculus Illusions
+#   needs Rage Talon Dragonspawn (Upper Blackrock Spire) and Death Talons (Blackwing Lair); 6602 Blood of the Black Dragon Champion
+#   needs Drakkisath. The four Test of Skulls (6582-6585) are single open-world elites (Scryer, Somnus, Chronalis, Axtroz), a solo
+#   candidate once the chain before them can be reached. Blood and Thunder (25949) has no starter row either.

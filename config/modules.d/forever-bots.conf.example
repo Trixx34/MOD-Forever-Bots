@@ -105,6 +105,8 @@ Module.forever-bots.TelemetrySummarySec = 60
 # QuestFileHorde = data/world_quests_horde.txt
 # QuestFileAlliance60 = data/world_quests_alliance_60.txt
 # QuestFileHorde60 = data/world_quests_horde_60.txt
+# The Onyxia's Lair attunement (level 60, Alliance; data/attunement_quests.txt beside the module) is merged into QuestFile. Empty turns it off.
+# AttunementFile = data/attunement_quests.txt
 # A walk to a giver that does not move for two minutes is dropped (the bot grinds) unless this is 1. 1 teleports the bot to the giver
 # once; the core still refuses that unless Bot.Actions.Teleport = 1. A refused teleport drops the start either way.
 # QuestTeleport = 0

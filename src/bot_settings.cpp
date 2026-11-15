@@ -1258,5 +1258,7 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
         settings.QuestFileAlliance60 = it->second;
     if (auto const it = config.find("QuestFileHorde60"); it != config.end())
         settings.QuestFileHorde60 = it->second;
+    if (auto const it = config.find("AttunementFile"); it != config.end())
+        settings.AttunementFile = it->second;
     return settings;
 }
