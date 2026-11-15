@@ -90,6 +90,42 @@ void ACasterWithNoSpellAtItsLevelMelees()
     CHECK(!decide(true, 10));     // level 10 has Lightning Bolt: it stays at range
 }
 
+// A level 10 shaman whose Lightning Bolt came back "not known" (60 s retry) stays in melee until the retry has run out. It used to leave melee 30 s in, then stand at
+// range casting nothing (the cast loop skips the spell until its retry ends) for the other 30 s.
+void ACasterWithNotKnownSpellStaysInMeleeUntilRetry()
+{
+    auto const kites = [](std::uint64_t nowMs)
+    {
+        std::vector<std::string> warnings;
+        std::istringstream rows("class 7\nrow 529 level 8 always target range 0 30\n");
+        PolicyOptions options = AggressiveOptions();
+        options.Rotations = std::make_shared<rotation::RotationData>(rotation::ParseRotationData(rows, warnings));
+        options.ClassOf = [](std::uint64_t) { return 7u; };
+        BotPolicy policy(options);
+        NearbyUnit boar = Hostile(7, 8.0f, 100);
+        boar.level = 10;
+        WorldTickSnapshotView view = View(1, 0, { boar });
+        view.bots[0].level = 10;
+        view.bots[0].power_type = 0;
+        view.bots[0].power = 100;
+        view.bots[0].max_power = 100;
+        view.bots[0].last_action_sequence = 1;
+        view.bots[0].last_action_type = static_cast<std::uint8_t>(ActionType::kCastSpell);
+        view.bots[0].last_action_spell = 529;
+        view.bots[0].last_action_status = BotActionStatus::kNotKnown;
+        policy.Decide(view, 1000);                                   // the answer is heard: retry at 61000
+        view.bots[0].last_action_status = BotActionStatus::kNone;
+        std::vector<BotAction> const actions = policy.Decide(view, nowMs);
+        bool backs = false;
+        for (BotAction const& action : actions)
+            backs = backs || (action.bot_guid == kBot && action.type == ActionType::kMoveTo && action.dest_x < 0.0f);
+        return backs;
+    };
+    CHECK(!kites(5000));          // just after the answer: melee, no kiting back to the stand-off
+    CHECK(!kites(45000));         // 44 s later (retry 16 s away): still melee, not the 30 s flip
+    CHECK(kites(62000));        // the retry has run out: the spell is tried again from range
+}
+
 // A party member does not take up its leader's target when that creature is far above its level (out of combat, no route); a creature already in a fight is helped.
 void AMemberDoesNotAssistOnACreatureFarAboveItsLevel()
 {
@@ -436,6 +472,7 @@ void RunPolicyTestsPart11()
     AGhostWaitsOutThePartysFightOnAPullSingleMap();
     ADefensiveBotWalksOnPastACreatureThatAttacksNobody();
     ACasterWithNoSpellAtItsLevelMelees();
+    ACasterWithNotKnownSpellStaysInMeleeUntilRetry();
     AMemberDoesNotAssistOnACreatureFarAboveItsLevel();
     TheLevelGapRule();
     AGhostWithNoCorpseTakesTheSpiritHealer();

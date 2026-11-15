@@ -130,7 +130,10 @@ constexpr float kMeleeCloserYards = 3.0f;        // and of a melee bot
 constexpr std::uint32_t kLosRefusalsAvoid = 3;   // this many line-of-sight refusals in a row and the target is avoided
 constexpr std::uint64_t kBusyRetryMs = 300;  // a cast refused because the bot was casting or moving: tried again very soon
 constexpr std::uint64_t kNotKnownRetryMs = 60000; // the spell may be learned later
-constexpr std::uint64_t kNoSpellRetryMs = 30000;  // CasterMeleeWithoutSpell: a spell whose retry lies further ahead than this is not counted as castable (a "not known", a long failure streak)
+// CasterMeleeWithoutSpell: a spell whose retry still lies further ahead than this is not counted as castable ("not known" waits 60 s and doubles per streak). It must be
+// short: the cast loop skips a spell until its retry has run out, so with a 30 s threshold against the 60 s retry the caster left melee after 30 s and then stood at
+// range casting nothing for the other 30 s (the 2026-11-14 flip). Short retries (power, cooldown, range: 1-2 s) stay below it, so they do not flip to melee.
+constexpr std::uint64_t kNoSpellRetryMs = 5000;
 constexpr float kOtherLevelHeight = 12.0f;  // yards: a hostile this far above or below the bot ...
 constexpr float kOtherLevelSlope = 0.5f;    // ... and steeper than this (height over flat distance, ~27 degrees) is on another level: a wall walk, a ledge, a floor above or below
 constexpr float kPullRadius = 10.0f;         // yards: hostiles this close to a candidate are pulled with it
