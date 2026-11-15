@@ -1633,7 +1633,33 @@ void BotPolicy::TurnIdle(DecideTick& tick, BotTurn& turn)
             }
             wanted = Decision{};
         }
-        else if (dist <= kTrainReachYards)
+        else if (order.Vendor && dist <= kMountVendorReachYards)
+        {
+            // A mount purchase (mount_plan.h): the snapshot's nearest vendor is the one the purchase names; the Run() thread makes the Tier 1 call and answers
+            // through FinishBuy. No answer in time, or no vendor in reach, and the errand fails (the module holds the bot off for a while).
+            if (state.ErrandBuySentMs == 0)
+            {
+                if (bot.in_combat == 0 && bot.life_state == 0 && bot.vendor_valid != 0 && bot.vendor_guid != 0 &&
+                    std::hypot(bot.vendor_x - order.Dest.X, bot.vendor_y - order.Dest.Y) <= kMountVendorReachYards &&
+                    realism::ReadReady(_options.ReadDelay, state.TrainRead, kTrainReadKey, _options.RandomSeed, bot.guid, nowMs))
+                {
+                    realism::Close(state.TrainRead);
+                    state.ErrandBuy = BuyRequest{ bot.vendor_guid, order.Item };
+                    state.ErrandBuySentMs = nowMs;
+                }
+            }
+            else if (nowMs - state.ErrandBuySentMs >= kErrandBuyWaitMs)
+            {
+                state.ErrandResult = ErrandOutcome::kFailed;
+                state.Errand.reset();
+                state.ErrandBuy.reset();
+                state.ErrandBuySentMs = 0;
+                if (_options.OnEvent)
+                    _options.OnEvent("errand_failed: bot=" + std::to_string(bot.guid) + " reason=mount_no_answer");
+            }
+            wanted = Decision{};
+        }
+        else if (!order.Vendor && dist <= kTrainReachYards)
         {
             if (bot.in_combat == 0 && bot.life_state == 0 && nowMs >= state.ErrandTrainSentMs &&
                 realism::ReadReady(_options.ReadDelay, state.TrainRead, kTrainReadKey, _options.RandomSeed, bot.guid, nowMs))

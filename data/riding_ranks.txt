@@ -1,2 +1,6 @@
 # spell|minLevel|skill|copper|name
-# Riding ranks for RidingTraining (src/riding_training.h). Empty until the stable masters' spells and costs are checked against the world DB.
+# Riding ranks for RidingTraining (src/riding_training.h), cheapest first. Source (read only, forever-test, 2026-11-14): trainer_spell rows of the riding
+# trainers (data/riding_trainers.txt). Apprentice Riding is learned at level 40 for 90 gold, Journeyman Riding at level 60 for 900 gold; the trainers
+# teach both to every race of their side. UNVERIFIED in game: that the core's kTrain learns them for a bot.
+33388|40|75|900000|Apprentice Riding
+33391|60|150|9000000|Journeyman Riding

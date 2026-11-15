@@ -19,6 +19,7 @@
 #include "move_gate.h"
 #include "errand_policy.h"
 #include "errand_trainers.h"
+#include "mount_plan.h"
 #include "bot_store.h"
 #include "bot_live.h"
 #include "bot_telemetry.h"
@@ -272,6 +273,9 @@ struct ErrandBot
     bool AuctioneerValid = false; // the snapshot found the bot's faction's auctioneer on its map
     float AuctioneerX = 0.0f, AuctioneerY = 0.0f, AuctioneerZ = 0.0f;
     std::uint32_t Level = 0;  // for the hold of looted equipment (auction::GearReady)
+    std::uint32_t Race = 0;   // the bot's race id (mounts: its race's vendor)
+    std::uint64_t Copper = 0; // money carried (mounts)
+    std::uint32_t MountRefusals = 0; // mount requests the core refused in a row: no riding skill or no mount (mounts)
 };
 
 struct ErrandFeed
@@ -279,7 +283,75 @@ struct ErrandFeed
     std::mutex Lock;
     std::vector<ErrandBot> Bots;
     std::vector<std::pair<std::uint64_t, ErrandOutcome>> Outcomes; // taken by the Run() thread; kept until then
+    struct Buy
+    {
+        std::uint64_t Bot = 0;
+        BuyRequest Request;
+    };
+    std::vector<Buy> Buys;                                         // mount purchases for the Run() thread to make (MountBuy)
+    std::vector<std::pair<std::uint64_t, bool>> BuyResults;        // their answers, for the pump thread to give back (FinishBuy)
     std::uint64_t AtMs = 0;
+};
+
+// The mount trips (MountBuy), used on the errand timer (Run() thread) only. The module cannot see a bot's riding skill or bags, so it keeps its own book: the skill
+// a bot learned on a riding errand (mounts::SkillAfterTraining), whether it bought a mount, and a hold after a trip that failed or was cut short.
+constexpr std::uint32_t kRidingSkillLine = 762;             // the riding skill line, the "skill" of the riding trainers in data/riding_trainers.txt
+constexpr std::uint32_t kRidingAssumedSkill = 75;           // RidingTraining = 0: the bot is assumed to have the first rank, so it only buys a mount
+constexpr std::uint64_t kMountFailHoldMs = 6ull * 3600000;  // a trip that failed (no route, refused, no answer): the next one is this far off
+constexpr std::uint64_t kMountEndedHoldMs = 3600000;         // a trip that the scheduler ended (time limit, called away)
+
+struct MountBook
+{
+    struct Entry
+    {
+        std::uint32_t Skill = 0;
+        bool Bought = false;
+        std::uint64_t HoldUntilMs = 0;
+    };
+    struct Running
+    {
+        mounts::Plan What;
+        std::uint32_t Level = 0;
+        std::uint64_t Spendable = 0;
+    };
+    std::unordered_map<std::uint64_t, Entry> Bots;
+    std::unordered_map<std::uint64_t, Running> Trips;
+    std::unordered_map<std::uint64_t, mounts::Plan> Planned;    // the plan of the bot's due trip, taken when the scheduler starts it
+
+    mounts::Plan Plan(BotSettings const& settings, std::vector<riding::Rank> const& ranks, mounts::Table const& table, ErrandBot const& bot, std::uint64_t now)
+    {
+        Entry const& entry = Bots[bot.Guid];
+        if (entry.Bought || now < entry.HoldUntilMs)
+            return {};
+        std::uint32_t const skill = settings.RidingTraining ? entry.Skill : kRidingAssumedSkill;
+        mounts::Plan plan = mounts::Decide(ranks, table, bot.MountRefusals > 0, bot.Race, bot.Level, skill, bot.Copper, settings.MountReserveCopperPerLevel, bot.Map, bot.X, bot.Y);
+        if (plan.What == mounts::Step::Train && !settings.RidingTraining)
+            plan = {};
+        return plan;
+    }
+    void OnStart(std::uint64_t guid, mounts::Plan const& plan, ErrandBot const& bot, BotSettings const& settings, std::uint64_t)
+    {
+        Trips[guid] = Running{ plan, bot.Level, mounts::Spendable(bot.Copper, bot.Level, settings.MountReserveCopperPerLevel) };
+    }
+    void OnOutcome(std::uint64_t guid, bool done, std::vector<riding::Rank> const& ranks, std::uint64_t now)
+    {
+        auto const trip = Trips.find(guid);
+        if (trip == Trips.end())
+            return;
+        Entry& entry = Bots[guid];
+        if (!done)
+            entry.HoldUntilMs = now + kMountFailHoldMs;
+        else if (trip->second.What.What == mounts::Step::Train)
+            entry.Skill = mounts::SkillAfterTraining(ranks, trip->second.Level, entry.Skill, trip->second.Spendable);
+        else if (trip->second.What.What == mounts::Step::Buy)
+            entry.Bought = true;
+        Trips.erase(trip);
+    }
+    void OnEnded(std::uint64_t guid, std::uint64_t now)
+    {
+        if (Trips.erase(guid) != 0)
+            Bots[guid].HoldUntilMs = now + kMountEndedHoldMs;
+    }
 };
 
 // The auction state, used on the Run() thread only (the loot notify and the visit timer both run there).

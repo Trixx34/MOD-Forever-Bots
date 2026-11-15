@@ -533,8 +533,21 @@ void main_detail::PumpTier2(forever_module::Tier2Session& session, std::atomic<b
                 std::vector<ErrandBot> list;
                 list.reserve(view.bots.size());
                 std::vector<std::pair<std::uint64_t, ErrandOutcome>> outcomes;
+                std::vector<ErrandFeed::Buy> buys;
+                {
+                    // The answers of the mount purchases the Run() thread made: they end the vendor errands.
+                    std::vector<std::pair<std::uint64_t, bool>> results;
+                    {
+                        std::lock_guard<std::mutex> lock(extras.Errand->Lock);
+                        results.swap(extras.Errand->BuyResults);
+                    }
+                    for (auto const& [guid, bought] : results)
+                        policy.FinishBuy(guid, bought);
+                }
                 for (forever_module::BotSnapshot const& bot : view.bots)
                 {
+                    if (auto const request = policy.TakeBuyRequest(bot.guid))
+                        buys.push_back(ErrandFeed::Buy{ bot.guid, *request });
                     if (ErrandOutcome const outcome = policy.TakeErrandOutcome(bot.guid); outcome != ErrandOutcome::kNone)
                         outcomes.emplace_back(bot.guid, outcome);
                     if ((extras.Alts && extras.Alts->Has(bot.guid)) || bot.life_state != 0)
@@ -556,6 +569,9 @@ void main_detail::PumpTier2(forever_module::Tier2Session& session, std::atomic<b
                     entry.AuctioneerY = bot.auctioneer_y;
                     entry.AuctioneerZ = bot.auctioneer_z;
                     entry.Level = bot.level;
+                    entry.Race = options.RaceOf ? options.RaceOf(bot.guid) : 0;
+                    entry.Copper = bot.copper;
+                    entry.MountRefusals = policy.MountRefusals(bot.guid);
                     list.push_back(entry);
                 }
                 std::lock_guard<std::mutex> lock(extras.Errand->Lock);
@@ -564,6 +580,8 @@ void main_detail::PumpTier2(forever_module::Tier2Session& session, std::atomic<b
                 for (auto& outcome : outcomes)
                     if (extras.Errand->Outcomes.size() < 256)
                         extras.Errand->Outcomes.push_back(outcome);
+                for (auto& buy : buys)
+                    extras.Errand->Buys.push_back(std::move(buy));
             }
             if (extras.Auction && nowMs() - auctionFedMs >= kPresenceFeedMs)
             {

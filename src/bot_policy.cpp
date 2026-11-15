@@ -279,6 +279,8 @@ void BotPolicy::StartErrand(std::uint64_t botGuid, ErrandOrder const& order)
     state.ErrandArrivedMs = 0;
     state.ErrandRefusals = 0;
     state.ErrandResult = ErrandOutcome::kNone;
+    state.ErrandBuy.reset();
+    state.ErrandBuySentMs = 0;
 }
 
 void BotPolicy::CancelErrand(std::uint64_t botGuid)
@@ -286,6 +288,35 @@ void BotPolicy::CancelErrand(std::uint64_t botGuid)
     auto const it = _bots.find(botGuid);
     if (it != _bots.end())
         it->second.Errand.reset();
+}
+
+std::optional<BuyRequest> BotPolicy::TakeBuyRequest(std::uint64_t botGuid)
+{
+    auto const it = _bots.find(botGuid);
+    if (it == _bots.end() || !it->second.ErrandBuy)
+        return std::nullopt;
+    std::optional<BuyRequest> const request = it->second.ErrandBuy;
+    it->second.ErrandBuy.reset();
+    return request;
+}
+
+void BotPolicy::FinishBuy(std::uint64_t botGuid, bool bought)
+{
+    auto const it = _bots.find(botGuid);
+    if (it == _bots.end() || !it->second.Errand || !it->second.Errand->Vendor)
+        return;
+    it->second.ErrandResult = bought ? ErrandOutcome::kDone : ErrandOutcome::kFailed;
+    it->second.Errand.reset();
+    it->second.ErrandBuy.reset();
+    it->second.ErrandBuySentMs = 0;
+    if (_options.OnEvent)
+        _options.OnEvent(std::string(bought ? "errand_done: bot=" : "errand_failed: bot=") + std::to_string(botGuid) + (bought ? " mount_bought" : " reason=mount_refused"));
+}
+
+std::uint32_t BotPolicy::MountRefusals(std::uint64_t botGuid) const
+{
+    auto const it = _bots.find(botGuid);
+    return it == _bots.end() ? 0 : it->second.MountFails;
 }
 
 ErrandOutcome BotPolicy::TakeErrandOutcome(std::uint64_t botGuid)

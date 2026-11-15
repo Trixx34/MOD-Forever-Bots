@@ -398,6 +398,13 @@ struct BotSettings
     // when its level and gold allow (riding_training.h). The table ships empty until the stable masters' spells and costs are checked.
     bool RidingTraining = false;
     std::string RidingRankFile = "data/riding_ranks.txt";
+    // Mounts (MountBuy = 1, off by default; needs Errands = 1 and the core's mount refusal as its sign): a bot that the core refused a mount walks to a riding trainer
+    // (RidingTraining = 1: the ranks of RidingRankFile at RidingTrainerFile's trainers) and then to a vendor of its race (MountVendorFile) and buys a mount. Both
+    // trips keep MountReserveCopperPerLevel copper per level in the bot's purse. mount_plan.h, doc/mounts.md.
+    bool MountBuy = false;
+    std::uint32_t MountReserveCopperPerLevel = 5000;
+    std::string RidingTrainerFile = "data/riding_trainers.txt";
+    std::string MountVendorFile = "data/mount_vendors.txt";
     // Weapon skills (WeaponTraining = 1, off by default): a bot learns its class's weapon skills at its class trainer (weapon_training.h).
     bool WeaponTraining = false;
     // Fishing (Fishing = 1, off by default): a bot with a pole walks to the nearest spot of FishingSpotFile (data/fishing_spots.txt) and fishes there

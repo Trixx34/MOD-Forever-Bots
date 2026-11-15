@@ -1148,6 +1148,12 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadBool(config, "RidingTraining", settings.RidingTraining, warnings);
     if (auto const it = config.find("RidingRankFile"); it != config.end())
         settings.RidingRankFile = it->second;
+    ReadBool(config, "MountBuy", settings.MountBuy, warnings);
+    ReadKey(config, "MountReserveCopperPerLevel", 0, 1000000, settings.MountReserveCopperPerLevel, warnings);
+    if (auto const it = config.find("RidingTrainerFile"); it != config.end())
+        settings.RidingTrainerFile = it->second;
+    if (auto const it = config.find("MountVendorFile"); it != config.end())
+        settings.MountVendorFile = it->second;
     ReadBool(config, "WeaponTraining", settings.WeaponTraining, warnings);
     ReadBool(config, "Fishing", settings.Fishing, warnings);
     if (auto const it = config.find("FishingSpotFile"); it != config.end())

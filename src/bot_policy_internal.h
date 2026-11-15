@@ -468,6 +468,8 @@ constexpr std::uint64_t kErrandTrainRetryMs = 3000; // the next train order of a
 // An auction errand keeps the bot standing at the auctioneer this long before it ends: the listing visit runs on the module's own timer (every 10 s,
 // from a feed refreshed every 2 s), so a bot that walked on at once was gone before the visit saw it in reach.
 constexpr std::uint64_t kAuctionDwellMs = 25000;
+constexpr std::uint64_t kErrandBuyWaitMs = 30000;   // a mount purchase handed to the Run() thread: no answer within this ends the errand as failed
+constexpr float kMountVendorReachYards = 8.0f;     // a mount vendor errand: the nearest vendor the snapshot names counts as the errand's vendor within this of its spot
 constexpr std::uint32_t kErrandTrainRefusalMax = 3; // train refusals in a row that end the errand as failed
 constexpr std::uint64_t kAvoidKeepMs = 3000;          // a walk out of a ground effect keeps its end point this long
 constexpr float kMountMinDistanceYards = 100.0f;   // a walk this long: mount up before it

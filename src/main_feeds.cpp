@@ -303,6 +303,41 @@ void SetUpErrands(forever_module::ModuleClient& client, BotSettings& settings, s
             std::cerr << "forever-bots: " << settings.ErrandTrainerFile << ": " << warning << "\n";
         std::cerr << "forever-bots: errands: " << trainers->size() << " trainers from " << settings.ErrandTrainerFile << "\n";
     }
+    // Mounts (MountBuy): the riding trainers join the trainer table (skill 762), the mount vendors and the riding ranks have their own tables. Any of the three
+    // missing or empty and the mount trips stay off.
+    auto ranks = std::make_shared<std::vector<riding::Rank>>();
+    auto mountTable = std::make_shared<mounts::Table>();
+    bool mountsOn = false;
+    if (settings.MountBuy)
+    {
+        auto const slurp = [](std::string const& path, std::string& out)
+        {
+            std::ifstream file(path);
+            if (!file)
+                return false;
+            std::ostringstream text;
+            text << file.rdbuf();
+            out = text.str();
+            return true;
+        };
+        std::string ridingTrainers, rankText, vendorText;
+        if (!slurp(settings.RidingTrainerFile, ridingTrainers) || !slurp(settings.MountVendorFile, vendorText) || (settings.RidingTraining && !slurp(settings.RidingRankFile, rankText)))
+            std::cerr << "forever-bots: MountBuy: cannot read RidingTrainerFile, MountVendorFile or RidingRankFile; mount trips are off\n";
+        else
+        {
+            std::vector<std::string> mountWarnings;
+            std::vector<errand::Trainer> riders = errand::ParseTrainerTable(ridingTrainers, mountWarnings);
+            *ranks = riding::ParseRanks(rankText, mountWarnings);
+            *mountTable = mounts::ParseTable(vendorText, mountWarnings);
+            for (std::string const& warning : mountWarnings)
+                std::cerr << "forever-bots: mounts: " << warning << "\n";
+            for (errand::Trainer& rider : riders)
+                trainers->push_back(std::move(rider));
+            mountsOn = !mountTable->Items.empty() && (!settings.RidingTraining || !ranks->empty());
+            std::cerr << "forever-bots: mounts: " << riders.size() << " riding trainers, " << ranks->size() << " ranks, " << mountTable->Vendors.size() << " vendors, "
+                      << mountTable->Items.size() << " mounts" << (mountsOn ? "" : "; a table is empty, mount trips are off") << "\n";
+        }
+    }
     if (!trainers->empty())
     {
         auto feed = std::make_shared<ErrandFeed>();
@@ -310,20 +345,38 @@ void SetUpErrands(forever_module::ModuleClient& client, BotSettings& settings, s
         auto scheduler = std::make_shared<errand::Scheduler>(settings.Errand);
         auto journal = std::make_shared<errand::Journal>(errand::CityName); // the event lines (errand_policy.h)
         std::shared_ptr<CommandQueue> queue = commands;
-        client.AddTimer(kErrandInterval, [feed, scheduler, journal, trainers, queue, book, &settings]
+        auto mountBook = std::make_shared<MountBook>();
+        client.AddTimer(kErrandInterval, [&client, feed, scheduler, journal, trainers, queue, book, ranks, mountTable, mountsOn, mountBook, &settings]
         {
             std::uint64_t const now = nowMs();
             std::vector<ErrandBot> list;
             std::vector<std::pair<std::uint64_t, ErrandOutcome>> outcomes;
+            std::vector<ErrandFeed::Buy> buys;
             std::uint64_t fedAt = 0;
             {
                 std::lock_guard<std::mutex> lock(feed->Lock);
                 list = feed->Bots;
                 outcomes.swap(feed->Outcomes);
+                buys.swap(feed->Buys);
                 fedAt = feed->AtMs;
+            }
+            // Mount purchases: the Tier 1 call from here; the answer goes back to the pump, which ends the vendor errand with it.
+            for (ErrandFeed::Buy const& buy : buys)
+            {
+                std::uint64_t const botGuid = buy.Bot;
+                std::uint32_t const item = buy.Request.Item;
+                std::cerr << "forever-bots: event mount_buy: bot=" << botGuid << " item=" << item << "\n";
+                client.BuyItemForBot(botGuid, buy.Request.Vendor, item, 1, [feed, botGuid, item](forever_module::ActionReply const& reply)
+                {
+                    std::cerr << "forever-bots: event mount_buy_" << (reply.success() ? "done" : "refused") << ": bot=" << botGuid << " item=" << item
+                              << (reply.success() ? "" : " reason=" + reply.reason()) << "\n";
+                    std::lock_guard<std::mutex> lock(feed->Lock);
+                    feed->BuyResults.emplace_back(botGuid, reply.success());
+                });
             }
             for (auto const& [guid, outcome] : outcomes)
             {
+                mountBook->OnOutcome(guid, outcome == ErrandOutcome::kDone, *ranks, now);
                 scheduler->Finish(guid, now); // done or failed: the trip is over either way
                 if (auto const line = journal->OnEnd(guid, errand::EndReason::kDone, outcome == ErrandOutcome::kFailed, now))
                     std::cerr << "forever-bots: event " << *line << "\n";
@@ -350,6 +403,33 @@ void SetUpErrands(forever_module::ModuleClient& client, BotSettings& settings, s
                     }
                     b.TrainDue = !b.Cities.empty();
                 }
+                // Mounts: a bot with no profession to train that the core refused a mount goes to the riding trainer or the mount vendor (mount_plan.h).
+                if (mountsOn && !b.TrainDue && !b.AuctionDue && bot.Side != 0 && bot.Level >= 1)
+                {
+                    mounts::Plan const plan = mountBook->Plan(settings, *ranks, *mountTable, bot, now);
+                    if (plan.What == mounts::Step::Train)
+                    {
+                        for (std::uint32_t city = errand::kStormwind; city <= errand::kThunderBluff; ++city)
+                        {
+                            auto const pick = errand::ChooseTrainer(*trainers, bot.Side, kRidingSkillLine, city, bot.Map, bot.X, bot.Y, bot.Z);
+                            if (pick && (*trainers)[*pick].Map == bot.Map)
+                                b.Cities.push_back(city);
+                        }
+                        b.TrainDue = !b.Cities.empty();
+                    }
+                    else if (plan.What == mounts::Step::Buy)
+                    {
+                        b.TrainDue = true;
+                        if (bot.Side == errand::kAlliance)
+                            b.Cities = { errand::kStormwind, errand::kIronforge, errand::kDarnassus };
+                        else
+                            b.Cities = { errand::kUndercity, errand::kOrgrimmar, errand::kThunderBluff };
+                    }
+                    if (b.TrainDue)
+                        mountBook->Planned[bot.Guid] = plan;
+                    else
+                        mountBook->Planned.erase(bot.Guid);
+                }
                 // Looted items to list (the Auction House, when it is on): the walk goes to the faction's auctioneer on the bot's map, and the
                 // visit (the listing timer) lists the items once the bot is there. Off until both the errands and the auction are on.
                 // Only items the bot may list now: equipment on its hold (auction::GearReady) is no reason for a trip.
@@ -374,6 +454,7 @@ void SetUpErrands(forever_module::ModuleClient& client, BotSettings& settings, s
             errand::Decisions const decisions = scheduler->Tick(now, bots);
             for (errand::End const& end : decisions.Ends) // before the starts: a bot may start again in the same tick
             {
+                mountBook->OnEnded(end.Guid, now);
                 if (auto const line = journal->OnEnd(end.Guid, end.Why, false, now))
                     std::cerr << "forever-bots: event " << *line << "\n";
             }
@@ -400,6 +481,40 @@ void SetUpErrands(forever_module::ModuleClient& client, BotSettings& settings, s
                     item.Order.Auction = true;
                     items.push_back(item);
                     std::cerr << "forever-bots: errand: bot " << start.Guid << " to the auctioneer (city " << start.City << ")\n";
+                    std::cerr << "forever-bots: event " << journal->OnStart(start, now) << "\n";
+                    continue;
+                }
+                if (auto const planned = mountBook->Planned.find(start.Guid); mountsOn && planned != mountBook->Planned.end() && !bot.TrainDue)
+                {
+                    mounts::Plan const plan = planned->second;
+                    mountBook->OnStart(start.Guid, plan, bot, settings, now);
+                    if (plan.What == mounts::Step::Buy)
+                    {
+                        mounts::Vendor const& vendor = mountTable->Vendors[plan.Mount.Vendor];
+                        CommandQueue::ErrandItem item;
+                        item.Guid = start.Guid;
+                        item.Order.Map = vendor.Map;
+                        item.Order.Dest = Point{ vendor.X, vendor.Y, vendor.Z };
+                        item.Order.Vendor = true;
+                        item.Order.Item = mountTable->Items[plan.Mount.Item].Entry;
+                        item.Order.Entry = vendor.Entry;
+                        items.push_back(item);
+                        std::cerr << "forever-bots: errand: bot " << start.Guid << " to the mount vendor " << vendor.Name << " for " << mountTable->Items[plan.Mount.Item].Name << "\n";
+                        std::cerr << "forever-bots: event " << journal->OnStart(start, now) << "\n";
+                        continue;
+                    }
+                    auto const rider = errand::ChooseTrainer(*trainers, bot.Side, kRidingSkillLine, start.City, bot.Map, bot.X, bot.Y, bot.Z);
+                    if (!rider)
+                        continue;
+                    errand::Trainer const& trainer = (*trainers)[*rider];
+                    CommandQueue::ErrandItem item;
+                    item.Guid = start.Guid;
+                    item.Order.Map = trainer.Map;
+                    item.Order.Dest = Point{ trainer.X, trainer.Y, trainer.Z };
+                    item.Order.Skill = trainer.Skill;
+                    item.Order.Entry = trainer.Entry;
+                    items.push_back(item);
+                    std::cerr << "forever-bots: errand: bot " << start.Guid << " to the riding trainer " << trainer.Name << "\n";
                     std::cerr << "forever-bots: event " << journal->OnStart(start, now) << "\n";
                     continue;
                 }
