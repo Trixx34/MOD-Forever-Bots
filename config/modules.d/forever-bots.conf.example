@@ -258,6 +258,15 @@ Module.forever-bots.TelemetrySummarySec = 60
 # PathJitter = 0         (an out-of-combat walking move target is offset by up to PathJitterYards in a random direction; never within 2 yards of a point
 #                         the route data marks as not walkable (blocked grind spots), never across a required route waypoint, never in a dungeon or party route)
 # PathJitterYards = 1.0  (0..5)
+# Personality = 0        (each bot gets five stable traits from RandomSeed and its guid: pace, caution, sociability, session length, patience. They tune existing
+#                         behaviours a little so bots do not all act alike. Only a bot without a party or route, out of combat, is varied in its pulls; no survival rule,
+#                         level or elite guard, rotation, party, dungeon route or raid is changed. Every effect has its own strength; 0 switches that effect off)
+# PersonalityRestStrength = 50     (0..100: the rest-below-health threshold moves up to +-8 points at 100, cautious bots rest earlier; stays within 70..98)
+# PersonalityIdleStrength = 50     (0..100: the idle dwell before a walk is scaled by up to +-60 percent at 100 by patience and pace)
+# PersonalityReactionMaxMs = 3000  (0..10000: the longest pause before a solo pull for the slowest bot; fast bots pause less; 0 = none)
+# PersonalityCautionStrength = 50  (0..100: at 100 half of the bots, at 50 a quarter, pull one mob fewer than the shared pack cap; they skip at most 3 packs in a row)
+# PersonalityMistakeMaxPct = 5     (0..30: the chance per solo pull of the least cautious bot to take another mob than the best one; the usual pull guards still apply)
+# PersonalitySocialStrength = 50   (0..100: with TownAfk on, the AFK chance and stay vary by up to +-100 percent at 100 by sociability and session length)
 # GuildMilestone = 0     (protocol 21, guilds from the protocol 22 snapshot: when a player member of a guild that has a bot member gains a level, one random bot of the guild says a line from
 #                         GuildMilestoneFile in guild chat, with the chance below; a second bot never answers the same event)
 # GuildMilestoneChancePct = 30

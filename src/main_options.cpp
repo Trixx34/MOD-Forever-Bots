@@ -223,6 +223,7 @@ void LoadPolicyTables(PolicyOptions& policyOptions, BotSettings& settings)
     policyOptions.PartyMana = settings.PartyMana;
     policyOptions.WhisperMatrix = settings.WhisperMatrix;
     policyOptions.PathJitter = settings.PathJitter;
+    policyOptions.Personality = settings.Personality;
     policyOptions.GuildMilestone = settings.GuildMilestone;
     policyOptions.CityInspect = settings.CityInspect;
     policyOptions.TransportRide = settings.TransportRide;

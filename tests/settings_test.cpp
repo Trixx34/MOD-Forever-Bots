@@ -711,6 +711,13 @@ void RealismSettings()
     BotSettings const on = ParseBotSettings({ { "IdleFidget", "1" }, { "ReadDelay", "1" }, { "PassingBuff", "1" }, { "TownAfk", "1" }, { "AuctionRoundStep", "10000" },
                                               { "TownAfkZoneMax", "3" }, { "PassingBuffCooldownSec", "900" }, { "ReadDelayMinSec", "5" }, { "ReadDelayMaxSec", "2" } }, warnings);
     CHECK(on.Fidget.Enabled && on.ReadDelay.Enabled && on.PassingBuff.Enabled && on.TownAfk.Enabled && on.Auction.RoundStepCopper == 10000);
+    {
+        std::vector<std::string> w;
+        BotSettings const pOff = ParseBotSettings({}, w);
+        CHECK(!pOff.Personality.Enabled && pOff.Personality.RestStrength == 50 && pOff.Personality.ReactionMaxMs == 3000 && pOff.Personality.MistakeMaxPct == 5);
+        BotSettings const pOn = ParseBotSettings({ { "Personality", "1" }, { "PersonalityRestStrength", "0" }, { "PersonalityReactionMaxMs", "500" }, { "PersonalityMistakeMaxPct", "99" } }, w);
+        CHECK(pOn.Personality.Enabled && pOn.Personality.RestStrength == 0 && pOn.Personality.ReactionMaxMs == 500 && pOn.Personality.MistakeMaxPct == 5);
+    }
     CHECK(on.TownAfk.ZoneMax == 3 && on.PassingBuff.CooldownSec == 900);
     CHECK(on.ReadDelay.MaxSec >= on.ReadDelay.MinSec);   // an upside-down range is fixed
     CHECK(warnings.empty());

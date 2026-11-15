@@ -26,6 +26,7 @@
 #include "party_mana.h"
 #include "whisper_matrix.h"
 #include "path_jitter.h"
+#include "personality.h"
 #include "guild_milestone.h"
 #include "city_inspect.h"
 #include "transport_ride.h"
@@ -246,6 +247,7 @@ struct BotSettings
     whisper_matrix::Settings WhisperMatrix;
     std::string WhisperMatrixFile = "data/whisper_replies.txt";
     path_jitter::Settings PathJitter;
+    personality::Settings Personality;      // Personality and the PersonalityRestStrength, ...IdleStrength, ...ReactionMaxMs, ...CautionStrength, ...MistakeMaxPct, ...SocialStrength keys (personality.h)
     guild_milestone::Settings GuildMilestone;
     std::string GuildMilestoneFile = "data/guild_milestones.txt";
     city_inspect::Settings CityInspect;

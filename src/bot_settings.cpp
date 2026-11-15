@@ -749,6 +749,13 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
         else
             warnings.push_back("Module.forever-bots.PathJitterYards: '" + it->second + "' is not a number from 0 to 5; using the default.");
     }
+    ReadBool(config, "Personality", settings.Personality.Enabled, warnings);
+    ReadKey(config, "PersonalityRestStrength", 0, 100, settings.Personality.RestStrength, warnings);
+    ReadKey(config, "PersonalityIdleStrength", 0, 100, settings.Personality.IdleStrength, warnings);
+    ReadKey(config, "PersonalityReactionMaxMs", 0, 10000, settings.Personality.ReactionMaxMs, warnings);
+    ReadKey(config, "PersonalityCautionStrength", 0, 100, settings.Personality.CautionStrength, warnings);
+    ReadKey(config, "PersonalityMistakeMaxPct", 0, 30, settings.Personality.MistakeMaxPct, warnings);
+    ReadKey(config, "PersonalitySocialStrength", 0, 100, settings.Personality.SocialStrength, warnings);
     ReadBool(config, "GuildMilestone", settings.GuildMilestone.Enabled, warnings);
     ReadKey(config, "GuildMilestoneChancePct", 0, 100, settings.GuildMilestone.ChancePct, warnings);
     if (auto const it = config.find("GuildMilestoneFile"); it != config.end())
