@@ -15,6 +15,7 @@ void PolicyFromSettings(PolicyOptions& policyOptions, BotSettings& settings)
     policyOptions.Repair = settings.Repair;
     policyOptions.VendorSellGear = settings.VendorSellGear;
     policyOptions.SpiritHealerAfterMs = settings.SpiritHealerAfterMs;
+    policyOptions.PullHoldBudgetMs = std::uint64_t(settings.PullHoldBudgetSec) * 1000;
     policyOptions.SpiritHealerOnRepeat = settings.SpiritHealerOnRepeat;
     policyOptions.HealDownrank = settings.HealDownrank;
     policyOptions.IdleEnemyAttackersOnly = settings.IdleEnemyAttackersOnly;

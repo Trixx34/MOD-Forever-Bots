@@ -339,7 +339,7 @@ Module.forever-bots.TelemetrySummarySec = 60
 # spell_id 2): 50% health, resurrection sickness and a durability loss, but at the graveyard. The core walks the ghost to the nearest spirit healer within 40 yards and
 # falls back to the plain reclaim on a map with none. A refused answer sends the ghost back to the old wait (up to two minutes) and reclaim for two minutes.
 # SpiritHealerAfterMs: how long the hostile must have stood near the corpse before the ghost takes the spirit healer (0 = not for that reason).
-# SpiritHealerAfterMs = 45000
+# SpiritHealerAfterMs = 15000   (45000 before the time quick wins)
 # SpiritHealerOnRepeat: the second death to the same creature entry within five minutes takes the spirit healer at once, while a hostile is near the corpse.
 # SpiritHealerOnRepeat = 1
 
@@ -480,7 +480,8 @@ Module.forever-bots.TelemetrySummarySec = 60
 # ScenarioLevel.rfc = 17
 # Offline policy lab: each candidate applies to all ScenarioParties in that run. Defaults preserve current behavior;
 # bounded parameter ranges are validated by the module. See tools/dungeon_learning/README.md.
-# CorpseRunTeleportSec = 60   (a corpse run longer than this puts the ghost at its corpse, the four-minute teleport brought forward; 0 = off, 10 to 3600)
+# CorpseRunTeleportSec = 30   (a corpse run longer than this puts the ghost at its corpse, the four-minute teleport brought forward; 0 = off, 10 to 3600)
+# PullHoldBudgetSec = 600   (the most a dungeon leader's pull holds, party health/mana not ready or tank rest, may hold in one run; then it pulls without waiting, event hold_budget_spent; 0 = no budget, else 30 to 86400)
 # GhostTeleportHold = 1   (a dungeon ghost's entrance or party teleport waits while a live hostile is within 30 yards of the destination; log: ghost_teleport_hold: ... reason=hostile; 0 = teleport at once as before)
 # GhostTeleportHoldMaxMs = 120000   (the longest a ghost is held for a hostile, per death; 1000 to 3600000)
 # GhostHoldAvoidEnemyMaxMs = 0 (off; 300000 is a good value)   (a dungeon ghost's teleport, to the entrance, the leader, a member (leader rejoin) or its corpse, waits while a hostile of an avoid_enemy row of
