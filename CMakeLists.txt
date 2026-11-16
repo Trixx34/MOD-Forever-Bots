@@ -483,3 +483,8 @@ add_test(NAME quest_invite COMMAND quest_invite_test)
 add_executable(transport_ride_test tests/transport_ride_test.cpp)
 target_include_directories(transport_ride_test PRIVATE src)
 add_test(NAME transport_ride COMMAND transport_ride_test)
+
+# Bot AI plan items of the overnight job 2026-11-16 (DotPerTarget, the solo ready gate, the buff gate, the target switch).
+add_executable(ai_next_test tests/ai_next_test.cpp)
+target_link_libraries(ai_next_test PRIVATE forever_bots_policy forever_bots_settings)
+add_test(NAME ai_next COMMAND ai_next_test)

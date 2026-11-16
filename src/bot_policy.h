@@ -364,6 +364,9 @@ struct PolicyOptions
     // PullReadyMaxMs, so a party without a drink is not frozen. 0 = off here (the tests); the module's settings default to 60.
     std::uint32_t PullReadyManaPct = 0;
     std::uint64_t PullReadyMaxMs = 90000;
+    // DotPerTarget: a damage-over-time or debuff row is tracked per (spell, target), not one slot per spell, so a bot that switches targets does not recast an effect that is still up
+    // on the first one when it returns, and does not skip the cast on a new target (bug 14). 0 = off here (the tests); the module's settings default to off.
+    bool DotPerTarget = false;
     // WarderPartyHold: a party member with no target of its own does not follow its leader (the tank) into an Onyxian Warder's Fire Nova: while a live Warder stands within
     // the nova stand distance of the leader, the member holds where it is (outside it) and the tank pulls the Warder alone; the members then fight it from range as before.
     // 0 = off here (the tests); the module's settings default to on.
@@ -755,6 +758,7 @@ private:
         bool OnyxiaTankOnHer = false;                    // the raid's tank: its threat target is her now (read by the damage dealers' landing hold)
         std::map<std::pair<std::uint32_t, std::uint64_t>, std::uint64_t> BuffUntilMs; // (spell, recipient reference; 0 = the bot itself) -> when the buff runs out
         std::unordered_map<std::uint32_t, Dot> Dots;     // spell -> effect on a target, while it lasts
+        std::map<std::pair<std::uint32_t, std::uint64_t>, std::uint64_t> DotUntilMs; // DotPerTarget: (spell, target) -> when the effect runs out (target 0: on the bot itself)
         std::optional<std::uint64_t> LastTestCastTick;
         std::uint64_t AutoShotTarget = 0;                // the unit Auto Shot was accepted on and is believed to be shooting (0 = not active)
         std::uint64_t SeenThreatTarget = 0;              // the threat target of the last tick, to see it go away

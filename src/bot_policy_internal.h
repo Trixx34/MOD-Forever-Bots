@@ -264,6 +264,7 @@ std::uint32_t ComboPointsGained(std::uint32_t spell);
 // A ranged bot below this share of its power walks to melee range and fights there, since its spells are spent.
 constexpr std::uint32_t kOutOfPowerPct = 15;
 constexpr float kMeleeApproachYards = 5.0f;
+constexpr std::size_t kDotMemory = 64;       // DotPerTarget: effects remembered per bot before the expired ones are dropped
 constexpr std::uint32_t kRestBelowPct = 90;  // an idle bot below this health sits down to rest
 // Parties (M8). kGroup's spell_id (the core's ModuleBotActions): invite the bot named by target_guid, accept the bot's
 // pending invite, leave the party.

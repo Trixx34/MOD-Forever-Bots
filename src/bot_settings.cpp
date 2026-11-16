@@ -1001,6 +1001,7 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadKey(config, "PullMinHpPct", 0, 100, settings.PullMinHpPct, warnings);
     ReadKey(config, "PullReadyManaPct", 0, 100, settings.PullReadyManaPct, warnings);
     ReadKey(config, "PullReadyMaxMs", 1000, 600000, settings.PullReadyMaxMs, warnings);
+    ReadBool(config, "DotPerTarget", settings.DotPerTarget, warnings);
     ReadKey(config, "WipeReadyPct", 0, 100, settings.WipeReadyPct, warnings);
     ReadKey(config, "WipeReadyMaxMs", 10000, 1800000, settings.WipeReadyMaxMs, warnings);
     ReadKey(config, "WipeBackoffCount", 0, 20, settings.WipeBackoffCount, warnings);

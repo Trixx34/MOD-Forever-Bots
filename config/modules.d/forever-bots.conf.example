@@ -528,6 +528,8 @@ Module.forever-bots.TelemetrySummarySec = 60
 # PullReadyManaPct = 60   (ready gate before a pull: a mana user below this mana percent rests, pull_hold reason=low_mana, and the route leader does not walk on to the next pack while a
 #                          member is below PullMinHpPct health or this mana; 0 = off)
 # PullReadyMaxMs = 90000   (the longest the ready gate holds; 1000 to 600000)
+# DotPerTarget = 0   (1: damage-over-time and debuff rows are tracked per (spell, target) instead of one slot per spell, so a bot that switches targets neither recasts an effect that is
+#                     still up on the first one nor skips the cast on the new one; bug 14 of the bot AI plan; doc/ai-plan-next.md)
 # WipeReadyPct = 80   (after a wipe nobody pulls until all have revived and have this health and mana percent; the tank goes first; wipe_recovery: events; needs ScenarioWipeRecovery = 1; 0 = off)
 # WipeReadyMaxMs = 240000   (the longest the wipe hold lasts; 10000 to 1800000)
 # WipeBackoffCount = 3   (this many wipes at one route segment: the party waits WipeBackoffMs longer and is put back two route points before the pack; 0 = off)

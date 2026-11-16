@@ -1070,10 +1070,17 @@ BotPolicy::TurnFlow BotPolicy::TurnRotation(DecideTick& tick, BotTurn& turn)
             (InterruptTaken(targetRef, nowMs) || !party_planner::MayInterrupt(_options.PartyPlanner, tick.PlanOf(partyLeader), bot.guid, targetRef, nowMs)))
             continue;
         // The effect is still up (on the target, or on the bot for a self buff): recasting only refreshes it.
+        if (_options.DotPerTarget)
+        {
+            // Per (spell, target): the effect on this target (0 for a self buff or Slice and Dice) is what counts, not the last one cast.
+            auto const known = state.DotUntilMs.find({ row.Spell, row.OnTarget && row.Spell != kSliceAndDice ? targetRef : 0 });
+            if (known != state.DotUntilMs.end() && nowMs < known->second)
+                continue;
+        }
         auto const dot = state.Dots.find(row.Spell);
         // Slice and Dice is cast at the enemy (its first effect needs one) but the buff sits on the rogue: one running buff covers every target.
         bool const sameTarget = dot != state.Dots.end() && dot->second.Target == (row.OnTarget && row.Spell != kSliceAndDice ? targetRef : 0);
-        if (sameTarget && nowMs < dot->second.UntilMs)
+        if (!_options.DotPerTarget && sameTarget && nowMs < dot->second.UntilMs)
             continue;
 
         // A spell with a cast time cannot start while the bot moves: stop first (the cast follows on the next tick). The stop is

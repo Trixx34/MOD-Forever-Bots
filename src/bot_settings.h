@@ -386,6 +386,8 @@ struct BotSettings
     // PullReadyMaxMs (default 90000, 1000 to 600000), so a party with no drink is not frozen. 0 = off (the health gate PullMinHpPct stays).
     std::uint32_t PullReadyManaPct = 60;
     std::uint32_t PullReadyMaxMs = 90000;
+    // DotPerTarget = 0 (default): 1 tracks damage-over-time and debuff rows per (spell, target) instead of one slot per spell (bug 14 of the bot AI plan).
+    bool DotPerTarget = false;
     // Wipe recovery (a scenario run with ScenarioWipeRecovery = 1; Karrz1's raid logic): after a wipe (everybody down, or nearly) the party holds, nobody pulls, until all have revived
     // and have WipeReadyPct health and mana (0 = off, 1 to 100, default 80) or WipeReadyMaxMs has passed (default 240000, 10000 to 1800000); the leader (tank) is freed first. After
     // WipeBackoffCount wipes at the same route segment (default 3, 0 = off) the run backs off: it waits WipeBackoffMs longer (default 90000, 0 to 900000) and the party is put back at a
