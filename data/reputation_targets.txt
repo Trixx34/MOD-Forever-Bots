@@ -1,0 +1,13 @@
+# Reputation targets of the bot progression path (leveling -> pre-raid gear -> ZG/Onyxia -> higher raids), hand written; read by tools/gen_reputation_sources.py and
+# src/reputation_plan.cpp. One faction per line, '|' separated:
+#   faction | name | side (0 both, 1 Alliance, 2 Horde) | min level | goal rank | tier | why
+# goal rank: the core's ReputationRank to work towards (4 Friendly, 5 Honored, 6 Revered, 7 Exalted). tier: lower tiers are chosen first (1 attunement or access, 2 gear
+# and raid consumables, 3 late raids); bots of one tier spread over the factions by a hash of the guid. The factions are the Classic 1.60 faction ids of Faction.db2.
+# Battleground factions are not here: the core awards those at the end of a battle (doc/reputation.md, doc/pvp-track.md).
+529|Argent Dawn|0|50|6|1|Naxxramas and Scholomance attunement, Revered gear, Scourgestone turn-ins
+576|Timbermaw Hold|0|48|4|1|Winterspring and Felwood access, Friendly for the Furbolg quests
+270|Zandalarian Emissaries|0|56|7|2|ZG coins and quests, the Zandalar enchants
+609|Cenarion Circle|0|52|6|2|Silithus, AQ attunement chain, Revered gear
+59|Thorium Brotherhood|0|50|5|2|Molten Core and Blackrock Depths faction, Honored recipes
+749|Hydraxian Waterlords|0|60|5|3|Molten Core, Honored for the Hydraxis quests
+910|Brood of Nozdormu|0|60|4|3|Ahn'Qiraj access and Scarab Lord line

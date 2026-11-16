@@ -665,6 +665,18 @@ Module.forever-bots.TelemetrySummarySec = 60
 # Module.forever-bots.ReputationTripSec = 600
 # Module.forever-bots.ReputationMinCopper = 10000
 # Module.forever-bots.ReputationGoalFile = /srv/forever/sim/modules_runtime/forever-bots/data/reputation_goals.txt
+# Reputation planner (off by default; needs ReputationGrind = 1; doc/reputation.md): a bot picks a faction of the progression path that fits its level and side
+# (data/reputation_targets.txt: Argent Dawn, Timbermaw Hold, Zandalarian Emissaries, Cenarion Circle, Thorium Brotherhood, Hydraxian Waterlords, Brood of Nozdormu) and a
+# quest, item hand-in or open-world creature that earns its reputation (data/reputation_sources.txt, made by tools/gen_reputation_sources.py), and writes a rep_plan
+# journal line. The choice is deterministic by guid. ReputationPlanBudget (1..5000) is the most sources one planning call looks at (the cost cap per bot and call),
+# ReputationPlanSec (10..86400) the least time between two plans of a bot, ReputationStallSec (60..86400) how long a source may raise the standing by nothing before the bot
+# gives it up (only when the core sends standings).
+# Module.forever-bots.ReputationPlan = 0
+# Module.forever-bots.ReputationPlanBudget = 64
+# Module.forever-bots.ReputationPlanSec = 120
+# Module.forever-bots.ReputationStallSec = 1800
+# Module.forever-bots.ReputationTargetFile = /srv/forever/sim/modules_runtime/forever-bots/data/reputation_targets.txt
+# Module.forever-bots.ReputationSourceFile = /srv/forever/sim/modules_runtime/forever-bots/data/reputation_sources.txt
 # Module.forever-bots.Fishing = 0
 # Module.forever-bots.FishingSpotFile = /srv/forever/sim/modules_runtime/forever-bots/data/fishing_spots.txt
 # Module.forever-bots.RareHunts = 0

@@ -1211,6 +1211,22 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     }
     if (auto const it = config.find("ReputationGoalFile"); it != config.end())
         settings.ReputationGoalFile = it->second;
+    ReadBool(config, "ReputationPlan", settings.ReputationPlan.Enabled, warnings);
+    {
+        std::uint32_t budget = settings.ReputationPlan.Budget;
+        ReadKey(config, "ReputationPlanBudget", 1, 5000, budget, warnings);
+        settings.ReputationPlan.Budget = budget;
+        std::uint32_t planSec = static_cast<std::uint32_t>(settings.ReputationPlan.ReplanMs / 1000);
+        ReadKey(config, "ReputationPlanSec", 10, 86400, planSec, warnings);
+        settings.ReputationPlan.ReplanMs = std::uint64_t(planSec) * 1000;
+        std::uint32_t stallSec = static_cast<std::uint32_t>(settings.ReputationPlan.StallMs / 1000);
+        ReadKey(config, "ReputationStallSec", 60, 86400, stallSec, warnings);
+        settings.ReputationPlan.StallMs = std::uint64_t(stallSec) * 1000;
+    }
+    if (auto const it = config.find("ReputationTargetFile"); it != config.end())
+        settings.ReputationTargetFile = it->second;
+    if (auto const it = config.find("ReputationSourceFile"); it != config.end())
+        settings.ReputationSourceFile = it->second;
     ReadBool(config, "WeaponTraining", settings.WeaponTraining, warnings);
     ReadBool(config, "Fishing", settings.Fishing, warnings);
     if (auto const it = config.find("FishingSpotFile"); it != config.end())

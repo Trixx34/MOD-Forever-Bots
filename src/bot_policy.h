@@ -43,6 +43,7 @@
 #include "chat_reply.h"
 #include "combat_rotation.h"
 #include "grind_data.h"
+#include "reputation_plan.h"
 #include "level_dungeon.h"
 #include "ground_avoid.h"
 #include "raid_rules.h"
@@ -471,6 +472,10 @@ struct PolicyOptions
     reputation::Settings Reputation;
     std::vector<reputation::Goal> ReputationGoals;
     std::function<reputation::Facts(forever_module::BotSnapshot const&)> ReputationFacts;
+    // The reputation planner (reputation_plan.h, config ReputationPlan, off by default): the faction and the source a bot works on, journalled as rep_plan. It needs no
+    // core facts (a missing standing counts as 0 and nothing is given up), the standings of the core make it exact.
+    reputation::PlanSettings ReputationPlan;
+    std::shared_ptr<reputation::PlanData const> ReputationPlanData;
     // Urgent repair trips (repair_policy.h; config keys RepairUrgent, RepairBrokenPct, RepairAfterDeathPct, RepairRetrySec, RepairLowCopperPerLevel): a bot with a
     // broken piece, or worn gear after a death, goes to its repairman at once, quest work or not; a party leader goes for a broken member.
     repair::Settings Repair;
@@ -923,6 +928,7 @@ private:
         bool Traveling = false;                          // walking to the vendor for a visit
         // Reputation goals (reputation.h).
         reputation::Book RepBook;
+        reputation::Track RepTrack;                      // the planner's faction and source (reputation_plan.h)
         std::uint32_t RepGoal = 0;                       // the faction the bot works on (0 = none)
         bool RepTrip = false;                            // walking to the vendor of a reputation upgrade
         std::uint64_t RepTripStartMs = 0;
