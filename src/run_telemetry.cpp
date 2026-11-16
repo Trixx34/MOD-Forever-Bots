@@ -142,7 +142,11 @@ std::string RunFile::IsoTime(std::int64_t epochSeconds)
 {
     std::time_t const t = std::time_t(epochSeconds);
     std::tm tm{};
+#ifdef _WIN32
+    gmtime_s(&tm, &t);
+#else
     gmtime_r(&t, &tm);
+#endif
     char buffer[32];
     std::strftime(buffer, sizeof buffer, "%Y-%m-%dT%H:%M:%SZ", &tm);
     return buffer;
