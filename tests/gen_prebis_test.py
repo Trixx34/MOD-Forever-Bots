@@ -132,7 +132,8 @@ with tempfile.TemporaryDirectory() as tmp:
     fake = os.path.join(tmp, "fakesql.py")
     with open(fake, "w") as f:
         f.write("import sys\nsql = sys.stdin.read()\nprint('a\\tb')\nprint('1\\tNULL')\nprint('x y\\t' + str(len(sql)))\n")
-    db = g.Db("%s %s" % (sys.executable, fake))
+    # shlex.split (POSIX mode) eats backslashes, so hand it forward slashes; Windows accepts them in a command path
+    db = g.Db("%s %s" % (sys.executable.replace("\\", "/"), fake.replace("\\", "/")))
     rows = db.rows("SELECT 1")
     check(rows == [{"a": "1", "b": None}, {"a": "x y", "b": "8"}], "tab separated rows, NULL is None")
     try:

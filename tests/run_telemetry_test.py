@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Tests for tools/run_telemetry.py on tests/data/run-telemetry-sample.log (a run file and a journal line mixed)."""
+import tempfile
 import os
 import subprocess
 import sys
@@ -46,7 +47,7 @@ check(("644", "0") in table and table[("644", "0")][-4:] == ["1", "800", "10", "
 check(("none", "3355") in table, "a death with no attacker entry")
 check(("1196", "?") in table and "guess" in deaths.stdout, "the guess row is marked")
 check("6 deaths, 2 without a damage event (guess)" in deaths.stdout, "the totals: " + deaths.stdout)
-names = os.path.join(os.environ.get("TMPDIR", "/tmp"), f"spells-{os.getpid()}.txt")
+names = os.path.join(tempfile.gettempdir(), f"spells-{os.getpid()}.txt")
 with open(names, "w") as handle:
     handle.write("# id name\n20566 Wound Crush\n3355,Freezing Trap\n0 Melee swing\n")
 try:
