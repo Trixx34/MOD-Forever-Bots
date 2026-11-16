@@ -370,6 +370,24 @@ BotPolicy::TurnFlow BotPolicy::PartyHeal(DecideTick& tick, BotTurn& turn)
             spellToCast = kBindingHeal;
             note = note.empty() ? "binding" : note + " binding";
         }
+        // Personality (off by default): a reaction delay on a heal call for an ordinary hurt member (the "normal" pick: not an emergency, the tank, a shield or a Renew, and not
+        // below 50 percent). The delay runs once per member until it is healed or the member changes. Not in a dungeon or raid unless PersonalityInstances.
+        if (target && _options.Personality.Enabled && _options.Personality.JitterMaxMs != 0 && target == hurt && note.empty() && hurtPct >= 50)
+        {
+            if (state.HealReactRef != target->guid || nowMs > state.HealReactUntilMs + 5000)
+            {
+                state.HealReactRef = target->guid;
+                state.HealReactUntilMs = nowMs + personality::JitterMs(_options.Personality, personality::TraitsFor(_options.RandomSeed, bot.guid), PersonalityInstanced(bot),
+                                                                       _options.RandomSeed, bot.guid, target->guid + std::uint64_t(++state.PersonalityCounter) * 0x9E3779B1ull);
+            }
+            if (nowMs < state.HealReactUntilMs)
+            {
+                target = nullptr;
+                spellToCast = 0;
+            }
+        }
+        else if (!target || target != hurt)
+            state.HealReactRef = 0;   // the next ordinary heal call is a new one
         if (target)
         {
             // Check we can pay for the chosen spell, so a cheaper heal is used when the healer is low on mana.
@@ -750,7 +768,10 @@ void BotPolicy::TurnUpkeepBuffs(DecideTick& tick, BotTurn& turn)
                 if (recipient == 0)
                 {
                     if (AuraRunning(bot, row.Spell, row.Ranks))
+                    {
+                        state.BuffForgetRolled.erase(row.Spell);
                         continue;
+                    }
                 }
                 else
                 {
@@ -762,6 +783,15 @@ void BotPolicy::TurnUpkeepBuffs(DecideTick& tick, BotTurn& turn)
                 auto const claimed = _buffClaims.find({ row.Spell, recipient });
                 if (claimed != _buffClaims.end() && nowMs < claimed->second.UntilMs && claimed->second.Group == buffGroup)
                     continue;
+                // Personality (off by default): the bot forgets this upkeep buff for 30 to 120 s. One roll per buff until it is cast, so the chance does not grow with the ticks it
+                // is due; not in a dungeon or raid unless PersonalityInstances, and never a pet summon (earlier).
+                if (_options.Personality.Enabled && _options.Personality.ForgetBuffPct != 0 && state.BuffForgetRolled.insert(row.Spell).second &&
+                    personality::ForgetsBuff(_options.Personality, personality::TraitsFor(_options.RandomSeed, bot.guid), PersonalityInstanced(bot), _options.RandomSeed, bot.guid,
+                                             row.Spell + std::uint64_t(++state.PersonalityCounter) * 0x9E3779B1ull))
+                {
+                    state.RetryAtMs[row.Spell] = nowMs + personality::ForgetMs(_options.RandomSeed, bot.guid, row.Spell + std::uint64_t(state.PersonalityCounter) * 0x9E3779B1ull);
+                    continue;
+                }
                 BotAction buff;
                 buff.bot_guid = bot.guid;
                 buff.type = ActionType::kCastSpell;
@@ -769,6 +799,7 @@ void BotPolicy::TurnUpkeepBuffs(DecideTick& tick, BotTurn& turn)
                 buff.target_guid = recipient;
                 actions.push_back(buff);
                 state.CastTarget[row.Spell] = recipient;
+                state.BuffForgetRolled.erase(row.Spell);
                 state.NextCastMs = nowMs + kGlobalCooldownMs;
                 std::uint64_t const untilMs = nowMs + std::uint64_t(row.DurationSec) * 1000;
                 _buffClaims[{ row.Spell, recipient }] = BuffClaim{ buffGroup, untilMs };
@@ -1065,6 +1096,22 @@ BotPolicy::TurnFlow BotPolicy::TurnRotation(DecideTick& tick, BotTurn& turn)
         if (rotation::RowHasCondition(row, rotation::Cond::TargetCasting) && targetUnit && targetUnit->cast_remaining_ms != 0 &&
             targetUnit->cast_remaining_ms < kInterruptMinRemainingMs)
             continue;
+        // Personality (off by default): a reaction delay on a new interrupt window. It is only taken when the cast outlasts it by the kick's minimum, so it never makes the
+        // interrupt miss; the same cast keeps its delay (InterruptReactRef). Not in a dungeon or raid unless PersonalityInstances.
+        if (_options.Personality.Enabled && _options.Personality.JitterMaxMs != 0 && rotation::RowHasCondition(row, rotation::Cond::TargetCasting))
+        {
+            if (state.InterruptReactRef != targetRef || nowMs > state.InterruptReactUntilMs + 3000)
+            {
+                state.InterruptReactRef = targetRef;
+                std::uint64_t delay = personality::JitterMs(_options.Personality, personality::TraitsFor(_options.RandomSeed, bot.guid), PersonalityInstanced(bot),
+                                                            _options.RandomSeed, bot.guid, targetRef + std::uint64_t(++state.PersonalityCounter) * 0x9E3779B1ull);
+                if (targetUnit && targetUnit->cast_remaining_ms != 0 && delay + kInterruptMinRemainingMs >= targetUnit->cast_remaining_ms)
+                    delay = 0;
+                state.InterruptReactUntilMs = nowMs + delay;
+            }
+            if (nowMs < state.InterruptReactUntilMs)
+                continue;
+        }
         // Only one member of the party stops a cast: when a party member already claimed this target's interrupt, this bot uses its next row.
         if (rotation::RowHasCondition(row, rotation::Cond::TargetCasting) &&
             (InterruptTaken(targetRef, nowMs) || !party_planner::MayInterrupt(_options.PartyPlanner, tick.PlanOf(partyLeader), bot.guid, targetRef, nowMs)))

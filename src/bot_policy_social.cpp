@@ -59,7 +59,8 @@ void BotPolicy::TurnSocial(DecideTick& tick, BotTurn& turn)
         guild::Action const action = guild::Decide(_options.GuildJoin, ctx);
         if (action == guild::Action::Join)
         {
-            state.GuildPollAtMs = nowMs + kGuildPollMs;
+            state.GuildPollAtMs = nowMs + (_options.Personality.Enabled ? personality::GuildPollMs(_options.Personality, personality::TraitsFor(_options.RandomSeed, bot.guid), kGuildPollMs)
+                                                                         : kGuildPollMs);   // personality: sociable bots look sooner
             social::Order order;
             order.What = social::Kind::Guild;
             order.Op = 0;   // kAccept

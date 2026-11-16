@@ -151,7 +151,10 @@ void BotPolicy::TurnAdvisor(DecideTick& tick, BotTurn& turn)
             facts.Distance = rotation::DistanceYards(bot, unit);
             std::uint64_t const other = unit.guid & forever_module::kUnitRefCounterMask;
             meet_greet::Greeting greeting;
-            if (!_meetGreet.Try(_options.MeetGreet, facts, seed, bot.guid, other, bot.map_id, nowMs, greeting))
+            meet_greet::Settings greetSettings = _options.MeetGreet;
+            if (_options.Personality.Enabled)   // sociability scales the chance
+                greetSettings.ChancePct = personality::GreetChancePct(_options.Personality, personality::TraitsFor(_options.RandomSeed, bot.guid), greetSettings.ChancePct);
+            if (!_meetGreet.Try(greetSettings, facts, seed, bot.guid, other, bot.map_id, nowMs, greeting))
                 continue;
             if (greeting.Emote)
             {
@@ -192,7 +195,10 @@ void BotPolicy::TurnAdvisor(DecideTick& tick, BotTurn& turn)
             facts.InCapital = true;
             facts.Distance = rotation::DistanceYards(bot, unit);
             std::uint32_t draw = 0;
-            if (_cityGreet.Try(_options.CityGreet, facts, seed, bot.guid, unit.guid & forever_module::kUnitRefCounterMask, bot.map_id, nowMs, draw))
+            city_greet::Settings cityGreetSettings = _options.CityGreet;
+            if (_options.Personality.Enabled)   // sociability scales the chance
+                cityGreetSettings.ChancePct = personality::GreetChancePct(_options.Personality, personality::TraitsFor(_options.RandomSeed, bot.guid), cityGreetSettings.ChancePct);
+            if (_cityGreet.Try(cityGreetSettings, facts, seed, bot.guid, unit.guid & forever_module::kUnitRefCounterMask, bot.map_id, nowMs, draw))
             {
                 advisor::Order order;
                 order.What = advisor::Kind::Say;

@@ -16,6 +16,9 @@ constexpr std::uint32_t kSaltSession = 0xA3;
 constexpr std::uint32_t kSaltPatience = 0xA4;
 constexpr std::uint32_t kSaltReaction = 0xA5;
 constexpr std::uint32_t kSaltMistake = 0xA6;
+constexpr std::uint32_t kSaltJitter = 0xA7;
+constexpr std::uint32_t kSaltForget = 0xA8;
+constexpr std::uint32_t kSaltForgetFor = 0xA9;
 
 std::uint32_t Trait(std::uint64_t seed, std::uint64_t bot, std::uint32_t salt)
 {
@@ -101,6 +104,59 @@ std::uint64_t AfkStayMs(Settings const& settings, Traits const& traits, std::uin
     if (!settings.Enabled || settings.SocialStrength == 0)
         return baseMs;
     return std::uint64_t(double(baseMs) * std::max(0.1, 1.0 + Centered(traits.Session) * Strength(settings.SocialStrength)));
+}
+
+std::uint32_t GreetChancePct(Settings const& settings, Traits const& traits, std::uint32_t basePct)
+{
+    return AfkChancePct(settings, traits, basePct);
+}
+
+std::uint64_t GuildPollMs(Settings const& settings, Traits const& traits, std::uint64_t baseMs)
+{
+    if (!settings.Enabled || settings.SocialStrength == 0 || baseMs == 0)
+        return baseMs;
+    double const factor = std::clamp(1.0 - Centered(traits.Sociability) * 0.5 * Strength(settings.SocialStrength), 0.5, 1.5);
+    return std::uint64_t(double(baseMs) * factor);
+}
+
+std::uint64_t SessionMs(Settings const& settings, Traits const& traits, std::uint64_t baseMs)
+{
+    if (!settings.Enabled || settings.SessionStrength == 0 || baseMs == 0)
+        return baseMs;
+    double const factor = std::clamp(1.0 + Centered(traits.Session) * 0.6 * Strength(settings.SessionStrength), 0.4, 1.6);
+    return std::uint64_t(double(baseMs) * factor);
+}
+
+std::uint32_t SessionPct(Settings const& settings, Traits const& traits)
+{
+    return std::uint32_t(SessionMs(settings, traits, 100000) / 1000);
+}
+
+bool ImperfectionAllowed(Settings const& settings, bool instanced)
+{
+    return settings.Enabled && (!instanced || settings.Instances);
+}
+
+std::uint64_t JitterMs(Settings const& settings, Traits const& traits, bool instanced, std::uint64_t seed, std::uint64_t bot, std::uint64_t counter)
+{
+    if (!ImperfectionAllowed(settings, instanced) || settings.JitterMaxMs == 0)
+        return 0;
+    std::uint64_t const top = std::uint64_t(std::min(settings.JitterMaxMs, kMaxJitterMs)) * (100 - std::min<std::uint32_t>(traits.Pace, 100)) / 100;
+    return top == 0 ? 0 : bot_random::Draw(seed, bot, kSaltJitter, counter) % (top + 1);
+}
+
+bool ForgetsBuff(Settings const& settings, Traits const& traits, bool instanced, std::uint64_t seed, std::uint64_t bot, std::uint64_t counter)
+{
+    if (!ImperfectionAllowed(settings, instanced) || settings.ForgetBuffPct == 0)
+        return false;
+    // In per-mille: ForgetBuffPct * 10 * (100 - Caution) / 100.
+    std::uint32_t const chance = std::min<std::uint32_t>(settings.ForgetBuffPct, 30) * (100 - std::min<std::uint32_t>(traits.Caution, 100)) / 10;
+    return bot_random::Below(bot_random::Draw(seed, bot, kSaltForget, counter), 1000) < chance;
+}
+
+std::uint64_t ForgetMs(std::uint64_t seed, std::uint64_t bot, std::uint64_t counter)
+{
+    return kForgetMinMs + bot_random::Draw(seed, bot, kSaltForgetFor, counter) % (kForgetMaxMs - kForgetMinMs + 1);
 }
 
 } // namespace personality

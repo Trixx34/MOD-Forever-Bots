@@ -6,6 +6,18 @@
 #include "flex_roles.h"
 
 
+std::uint32_t BotPolicy::SessionPctOf(std::uint64_t guid) const
+{
+    if (!_options.Personality.Enabled || _options.Personality.SessionStrength == 0)
+        return 100;
+    return personality::SessionPct(_options.Personality, personality::TraitsFor(_options.RandomSeed, guid));
+}
+
+bool BotPolicy::PersonalityInstanced(BotSnapshot const& bot) const
+{
+    return IsRouteActive(bot.guid) || bot.group_size > 5 || _options.DungeonsByMap.count(bot.map_id) != 0;
+}
+
 bool BotPolicy::SafeToLogOut(BotSnapshot const& bot) const
 {
     if (bot.in_combat != 0 || bot.life_state != 0 || bot.group_role != 0 || bot.group_invite_from != 0)

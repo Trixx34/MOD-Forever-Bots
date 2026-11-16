@@ -756,6 +756,10 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadKey(config, "PersonalityCautionStrength", 0, 100, settings.Personality.CautionStrength, warnings);
     ReadKey(config, "PersonalityMistakeMaxPct", 0, 30, settings.Personality.MistakeMaxPct, warnings);
     ReadKey(config, "PersonalitySocialStrength", 0, 100, settings.Personality.SocialStrength, warnings);
+    ReadKey(config, "PersonalitySessionStrength", 0, 100, settings.Personality.SessionStrength, warnings);
+    ReadKey(config, "PersonalityJitterMaxMs", 0, 2000, settings.Personality.JitterMaxMs, warnings);
+    ReadKey(config, "PersonalityForgetBuffPct", 0, 30, settings.Personality.ForgetBuffPct, warnings);
+    ReadBool(config, "PersonalityInstances", settings.Personality.Instances, warnings);
     ReadBool(config, "GuildMilestone", settings.GuildMilestone.Enabled, warnings);
     ReadKey(config, "GuildMilestoneChancePct", 0, 100, settings.GuildMilestone.ChancePct, warnings);
     if (auto const it = config.find("GuildMilestoneFile"); it != config.end())
