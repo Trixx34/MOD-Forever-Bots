@@ -4,6 +4,22 @@
 #include <cmath>
 #include "bot_policy_internal.h"
 
+namespace
+{
+// FightStallDiag: the fields that tell a stall at a short ground distance apart (a target in the air or on a ledge, a caster without power, a bot that is moving or refused, a target that
+// casts or fights somebody else).
+std::string StallDiagFields(forever_module::BotSnapshot const& bot, std::uint32_t classId, forever_module::NearbyUnit const* unit)
+{
+    std::string text = " class=" + std::to_string(classId) + " level=" + std::to_string(bot.level) + " power=" + std::to_string(bot.power) + "/" + std::to_string(bot.max_power) +
+                       " moving=" + std::to_string(int(bot.moving)) + " combat=" + std::to_string(int(bot.in_combat)) + " last_action=" + std::to_string(int(bot.last_action_type)) +
+                       " last_status=" + ActionStatusName(bot.last_action_status) + " at=" + std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) + "," + std::to_string(int(bot.pos_z));
+    if (unit != nullptr)
+        text += " dz=" + std::to_string(int(unit->pos_z - bot.pos_z)) + " dist3d=" + std::to_string(int(rotation::DistanceYards3d(bot, *unit))) + " target_victim=" +
+                std::to_string(unit->victim_ref != 0 ? 1 : 0) + " target_casting=" + std::to_string(int(unit->casting)) + " target_level=" + std::to_string(unit->level);
+    return text;
+}
+} // namespace
+
 // RaidPullSingle: another live unit of `unit`'s entry within `yards` of it, in `units` (nullptr: none).
 NearbyUnit const* bot_policy_detail::PullSinglePartner(std::span<NearbyUnit const> units, NearbyUnit const& unit, float yards)
 {
@@ -1371,7 +1387,7 @@ void BotPolicy::TurnFightWatch(DecideTick& tick, BotTurn& turn)
             if (_options.OnEvent)
                 _options.OnEvent("fight_stalled: bot=" + std::to_string(bot.guid) + " target_entry=" + std::to_string(forever_module::UnitRefEntry(targetRef)) +
                                  " target_hp=" + (targetUnit ? std::to_string(targetUnit->health) : std::string("unseen")) +
-                                 " distance=" + std::to_string(int(distance)));
+                                 " distance=" + std::to_string(int(distance)) + (_options.FightStallDiag ? StallDiagFields(bot, turn.classId, targetUnit) : std::string()));
             state.StallTarget = 0;
             // Given up for good this tick too: the bot must not keep attacking it until the next one.
             targetRef = 0;

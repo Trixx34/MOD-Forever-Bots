@@ -326,6 +326,33 @@ void BotPolicy::MoveToTarget(DecideTick& tick, BotTurn& turn)
         state.Approaching = false;
         return;
     }
+    // FightHeightAvoidMs (default off): a melee bot (not a healer) whose target is within the ground approach range but out of vertical reach (a hovering or flying creature, or one on a
+    // ledge) swings at air; neither side does damage and the 45 s watchdog ends it. After the key's time the target is avoided and the bot takes another. Not a raid boss.
+    if (_options.FightHeightAvoidMs != 0 && targetUnit && !healerSupport && approach <= kMeleeApproachYards + 0.5f && distance <= approach &&
+        std::fabs(targetUnit->pos_z - bot.pos_z) >= kHeightUnreachableYards &&
+        !(_options.RaidRules && _options.RaidRules->IsBoss(bot.map_id, forever_module::UnitRefEntry(targetUnit->guid))))
+    {
+        if (state.HeightTarget != targetRef || state.HeightSinceMs == 0)
+        {
+            state.HeightTarget = targetRef;
+            state.HeightSinceMs = nowMs;
+        }
+        else if (nowMs - state.HeightSinceMs >= _options.FightHeightAvoidMs)
+        {
+            AvoidUnit(state.AvoidUntilMs, state.AvoidCount, targetRef, nowMs);
+            if (_options.OnEvent)
+                _options.OnEvent("fight_height_avoid: bot=" + std::to_string(bot.guid) + " target_entry=" + std::to_string(forever_module::UnitRefEntry(targetRef)) +
+                                 " ground=" + std::to_string(int(distance)) + " dz=" + std::to_string(int(targetUnit->pos_z - bot.pos_z)) +
+                                 " held_ms=" + std::to_string(nowMs - state.HeightSinceMs));
+            state.HeightSinceMs = 0;
+            state.Approaching = false;
+            wanted = Decision{ ActionType::kStop, 0 };
+            moveWhy = "fight_height_avoid";
+            return;
+        }
+    }
+    else
+        state.HeightSinceMs = 0;
     if (distance <= approach)
     {
         // A ranged bot that has walked into casting range stops there: the core's follow keeps running it into the target,

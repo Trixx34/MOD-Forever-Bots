@@ -586,10 +586,77 @@ void AMistakeNeverPicksAMobThePullGuardsRefuse()
     CHECK(!Pulls(actions, MakeUnitRef(8, 1, 8)));
 }
 
+// FightHeightAvoidMs: a warrior (melee) with a creature 3 yards away on the ground but 9 yards above it swings at air. Off: it keeps attacking. On: after the key's time the creature
+// is avoided (event fight_height_avoid) and the attack stops; a creature at the same height is attacked as ever; a bot that is not in range of the target is not affected.
+void AMeleeBotAvoidsATargetOutOfVerticalReach()
+{
+    auto const run = [](std::uint64_t keyMs, float dz, std::string& events, bool& attackedEver, bool& attackedAtEnd)
+    {
+        PolicyOptions options = AggressiveOptions();
+        options.ClassOf = [](std::uint64_t) { return 1u; };
+        options.FightHeightAvoidMs = keyMs;
+        options.OnEvent = [&events](std::string const& line) { events += line + "\n"; };
+        BotPolicy policy(options);
+        NearbyUnit flyer = Hostile(7, 3.0f, 100);
+        flyer.pos_z = dz;
+        WorldTickSnapshotView view = View(1, 0, { flyer });
+        view.bots[0].in_combat = 1;
+        attackedEver = false;
+        attackedAtEnd = false;   // an attack order after the key's time has run out
+        for (std::uint64_t now = 1000; now <= 9000; now += 1000)
+        {
+            std::vector<BotAction> const actions = policy.Decide(view, now);
+            if (HasAction(actions, kBot, ActionType::kAttackTarget, flyer.guid))
+                attackedEver = true;
+            if (now > 4000 && HasAction(actions, kBot, ActionType::kAttackTarget, flyer.guid))
+                attackedAtEnd = true;
+        }
+    };
+    std::string events;
+    bool attacked = false;
+    bool late = false;
+    run(0, 9.0f, events, attacked, late);
+    CHECK(attacked && events.find("fight_height_avoid") == std::string::npos);                 // off: swings at air as before
+    events.clear();
+    run(3000, 9.0f, events, attacked, late);
+    CHECK(attacked && !late && events.find("fight_height_avoid: bot=42 target_entry=1 ground=3 dz=9") != std::string::npos);
+    events.clear();
+    run(3000, 2.0f, events, attacked, late);
+    CHECK(attacked && events.find("fight_height_avoid") == std::string::npos);                 // 2 yards of height is a slope, not the air
+}
+
+// FightStallDiag: the fight_stalled line carries the extra fields only with the key.
+void TheStallEventCarriesDiagnosticsOnlyWithItsKey()
+{
+    auto const run = [](bool diag)
+    {
+        std::string events;
+        PolicyOptions options = AggressiveOptions();
+        options.ClassOf = [](std::uint64_t) { return 1u; };
+        options.FightStallDiag = diag;
+        options.OnEvent = [&events](std::string const& line) { events += line + "\n"; };
+        BotPolicy policy(options);
+        NearbyUnit mob = Hostile(7, 3.0f, 100);
+        mob.pos_z = 9.0f;
+        WorldTickSnapshotView view = View(1, 0, { mob });
+        view.bots[0].in_combat = 1;
+        for (std::uint64_t now = 1000; now <= 50000; now += 1000)
+            policy.Decide(view, now);
+        return events;
+    };
+    std::string const off = run(false);
+    std::string const on = run(true);
+    CHECK(off.find("fight_stalled: bot=42 target_entry=1") != std::string::npos && off.find("dist3d=") == std::string::npos);
+    CHECK(on.find("fight_stalled: bot=42 target_entry=1") != std::string::npos && on.find("class=1") != std::string::npos && on.find("dz=9") != std::string::npos &&
+          on.find("dist3d=9") != std::string::npos);
+}
+
 } // namespace
 
 void RunPolicyTestsPart11()
 {
+    AMeleeBotAvoidsATargetOutOfVerticalReach();
+    TheStallEventCarriesDiagnosticsOnlyWithItsKey();
     PullSingleHoldsThePairAndPullsOneAlone();
     PullSingleInAFightTakesOnlyWhatFights();
     AGhostWaitsOutThePartysFightOnAPullSingleMap();
