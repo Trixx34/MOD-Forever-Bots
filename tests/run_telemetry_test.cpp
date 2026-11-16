@@ -4,11 +4,11 @@
 #include "scenario_test_support.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
-#include <unistd.h>
 
 using namespace run_telemetry;
 
@@ -115,7 +115,7 @@ void LineFormats()
 void RunFileAppendsAndWarns()
 {
     namespace fs = std::filesystem;
-    fs::path const dir = fs::temp_directory_path() / ("run_telemetry_test_" + std::to_string(::getpid()));
+    fs::path const dir = fs::temp_directory_path() / ("run_telemetry_test_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     fs::create_directories(dir);
     {
         RunFile file(dir.string());
