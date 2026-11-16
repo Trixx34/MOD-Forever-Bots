@@ -832,10 +832,30 @@ void BotPolicy::RouteReadiness(DecideTick& tick, BotTurn& turn, RouteLeg& route)
         else if (state.PullReadyStartMs == 0)
             state.PullReadyStartMs = nowMs;
         bool const gated = tired && nowMs - state.PullReadyStartMs < o.PullReadyMaxMs;
+        // PullBuffGate: the walk to the next pack also waits while a member (the leader included) has an upkeep buff to cast, at most PullWaitMaxMs (pull_hold reason=buff).
+        bool buffDue = false;
+        if (o.PullBuffGate && bot.in_combat == 0 && !tired && !wipeWait)
+        {
+            auto const due = [&](BotSnapshot const& member)
+            {
+                if (buffDue)
+                    return;
+                if (auto const known = _bots.find(member.guid); known != _bots.end() && UpkeepBuffDue(member, known->second, nowMs))
+                    buffDue = true;
+            };
+            due(bot);
+            tick.ForEachPartyMember(bot.guid, due);
+        }
+        bool buffTimedOut = false;
+        bool const buffHold = pull_ready::Hold(state.RouteBuffGate, buffDue, nowMs, o.PullWaitMaxMs, buffTimedOut);
+        if (buffTimedOut && o.OnEvent)
+            o.OnEvent("pull_wait_timeout: bot=" + std::to_string(bot.guid) + " reason=buff point=" + std::to_string(state.RouteIndex) + " wait_ms=" + std::to_string(nowMs - state.RouteBuffGate.SinceMs));
         // RaidPullSingle: a pair of a pull_single entry near the leader holds the walk until they part (PullSingleWatch logs it, pull_single_hold).
         if (!gated && !wipeWait && turn.pullSingleHold)
             route.pullReady = false;
-        if (gated || wipeWait)
+        if (buffHold)
+            tiredWhy = "buff";
+        if (gated || wipeWait || buffHold)
         {
             route.pullReady = false;
             if (o.OnEvent && (state.PullReadyLogMs == 0 || nowMs - state.PullReadyLogMs >= 10000))

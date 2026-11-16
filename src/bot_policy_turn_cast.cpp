@@ -1028,7 +1028,8 @@ BotPolicy::TurnFlow BotPolicy::TurnRotation(DecideTick& tick, BotTurn& turn)
         }
     }
 
-    bool const noAoe = party_planner::NoAoeNow(tick.PlanOf(partyLeader));
+    bool noAoe = party_planner::NoAoeNow(tick.PlanOf(partyLeader));
+    bool ccChecked = false;
     // Healer mana floor (HealerCombatManaPct, bug 11): a healer in a party fight does not spend its last mana on attacks; the heals (PartyHeal) are not rows and are not held.
     bool const manaFloor = HealerBelowManaFloor(bot, state, classId, partyLeader);
     for (rotation::Row const& row : RowsFor(classId, spec))
@@ -1043,8 +1044,20 @@ BotPolicy::TurnFlow BotPolicy::TurnRotation(DecideTick& tick, BotTurn& turn)
             continue; // a ranged attack of a hunter with no ammunition: refused by the core, so only the melee rows are used
         if (row.MaxLevel != 0 && bot.level > row.MaxLevel)
             continue; // a better spell has replaced it
-        if (noAoe && rotation::IsAoeRow(row))
-            continue; // the raid rules' noaoe fight: no area damage now
+        if (rotation::IsAoeRow(row))
+        {
+            // AoeCcProtect: no area damage while a creature a party member holds (Polymorph, Sap, Banish) is within kAoeCcProtectYards of the target; looked at once per turn, and
+            // only when an area row is reached.
+            if (!noAoe && _options.AoeCcProtect && !ccChecked)
+            {
+                ccChecked = true;
+                noAoe = CcHeldNearTarget(tick, turn);
+                if (noAoe && _options.OnEvent && pull_ready::LogDue(state.AoeCcGate, nowMs, 10000))
+                    _options.OnEvent("aoe_cc_protect: bot=" + std::to_string(bot.guid) + " spell=" + std::to_string(row.Spell) + " target=" + std::to_string(forever_module::UnitRefEntry(targetRef)));
+            }
+            if (noAoe)
+                continue; // the raid rules' noaoe fight, or a held creature next to the target: no area damage now
+        }
         // Not learned yet: below the level a trainer teaches it (the rotation file's level, else the built-in table). (A level of 0 is unknown.)
         if (bot.level != 0 && (row.MinLevel != 0 ? row.MinLevel : rotation::LearnLevel(row.Spell)) > bot.level)
             continue;

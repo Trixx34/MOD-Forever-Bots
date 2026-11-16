@@ -388,6 +388,16 @@ struct BotSettings
     std::uint32_t PullReadyMaxMs = 90000;
     // DotPerTarget = 0 (default): 1 tracks damage-over-time and debuff rows per (spell, target) instead of one slot per spell (bug 14 of the bot AI plan).
     bool DotPerTarget = false;
+    // The ready gate before a pull (doc/ai-plan-next.md). SoloPullManaPct = 0 (default, 0..90): a solo mana user below this mana percent starts no fight, it sits and drinks up to this plus 20
+    // (event pull_wait reason=mana). PullBuffGate = 0: a solo bot, or a route party's leader, waits for the upkeep buffs its rotation casts out of combat (pull_wait / pull_hold reason=buff).
+    // PullWaitMaxMs = 60000 (1000..600000): the longest each of these waits; a wait that times out logs pull_wait_timeout and does not start again until the need was over once.
+    // KillerAvoidMs = 0 (default; 0, or 10000..86400000): a solo bot that died to a creature does not pull creatures of that entry for this long (event killer_avoid; 1800000 is 30 minutes).
+    std::uint32_t KillerAvoidMs = 0;
+    // AoeCcProtect = 0 (default): 1 skips area-damage rows while a creature a party member holds with Polymorph, Sap or Banish stands within 12 yards of the target (event aoe_cc_protect).
+    bool AoeCcProtect = false;
+    std::uint32_t SoloPullManaPct = 0;
+    bool PullBuffGate = false;
+    std::uint32_t PullWaitMaxMs = 60000;
     // Wipe recovery (a scenario run with ScenarioWipeRecovery = 1; Karrz1's raid logic): after a wipe (everybody down, or nearly) the party holds, nobody pulls, until all have revived
     // and have WipeReadyPct health and mana (0 = off, 1 to 100, default 80) or WipeReadyMaxMs has passed (default 240000, 10000 to 1800000); the leader (tank) is freed first. After
     // WipeBackoffCount wipes at the same route segment (default 3, 0 = off) the run backs off: it waits WipeBackoffMs longer (default 90000, 0 to 900000) and the party is put back at a

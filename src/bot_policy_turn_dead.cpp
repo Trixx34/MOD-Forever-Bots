@@ -259,6 +259,18 @@ void BotPolicy::DeadRecord(DecideTick& tick, BotTurn& turn)
         std::uint32_t const killerEntry = blow ? blow->Entry : guessEntry;
         state.KillerRepeat = killerEntry != 0 && killerEntry == state.LastKillerEntry;
         state.LastKillerEntry = killerEntry;
+        if (_options.KillerAvoidMs != 0 && killerEntry != 0 && bot.group_leader_guid == 0 && !IsRouteActive(bot.guid))
+        {
+            for (auto it = state.KillerAvoidUntilMs.begin(); it != state.KillerAvoidUntilMs.end();)
+                it = nowMs >= it->second ? state.KillerAvoidUntilMs.erase(it) : std::next(it);
+            if (state.KillerAvoidUntilMs.size() < kKillerAvoidMax)
+            {
+                state.KillerAvoidUntilMs[killerEntry] = nowMs + _options.KillerAvoidMs;
+                if (_options.OnEvent)
+                    _options.OnEvent("killer_avoid: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id) + " entry=" +
+                                     std::to_string(killerEntry) + " avoid_ms=" + std::to_string(_options.KillerAvoidMs));
+            }
+        }
         LogEvent("died: bot=" + std::to_string(bot.guid) + " life=" + std::to_string(bot.life_state) + " map=" + std::to_string(bot.map_id) +
               " pos=" + std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) +
               " last_decision=" + (state.Last ? std::to_string(int(state.Last->Type)) : std::string("none")) +

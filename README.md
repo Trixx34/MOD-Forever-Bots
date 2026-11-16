@@ -94,6 +94,11 @@ line to the module's stderr. A config reload updates the ramp, the random picks 
 | `PullReadyManaPct` | 60 | Ready gate before a pull in a route party: a mana user below this mana percent rests (event `pull_hold: ... reason=low_mana`) instead of pulling or joining a pull while the leader is out of combat, and the route leader does not walk on to the next pack while a member is below `PullMinHpPct` health or this mana; 0 = off (0 to 100) |
 | `PullReadyMaxMs` | 90000 | The longest the ready gate holds (leader and members), so a party with no drink is not frozen (1000 to 600000) |
 | `DotPerTarget` | 0 | 1 = damage-over-time and debuff rows are tracked per (spell, target), not one slot per spell (see `doc/ai-plan-next.md`) |
+| `SoloPullManaPct` | 0 | The solo ready gate: a solo mana user (leveling or questing, not in a party or on a route) below this mana percent starts no fight; it sits and drinks up to this plus 20 (event `pull_wait ... reason=mana`); 0 = off (0 to 90) |
+| `PullBuffGate` | 0 | 1 = a solo bot, or the leader of a route party for each member, waits for the upkeep buffs its rotation casts out of combat before the next pull (`pull_wait` / `pull_hold` with `reason=buff`) |
+| `PullWaitMaxMs` | 60000 | The longest each of these two waits lasts; then `pull_wait_timeout` (1000 to 600000) |
+| `KillerAvoidMs` | 0 | 0 = off; else 10000 to 86400000: a solo bot does not pull the creature type that killed it for this long (`killer_avoid`) |
+| `AoeCcProtect` | 0 | 1 = area-damage rows wait while a Polymorph/Sap/Banish held creature is within 12 yards of the target (`aoe_cc_protect`) |
 | `WipeReadyPct` | 80 | Wipe recovery (scenario runs with `ScenarioWipeRecovery = 1`): after a wipe nobody pulls until every bot has revived, stands on the entry map and has this health and mana percent; the tank is freed 6 s before the members; 0 = off (0 to 100). Events `wipe_recovery: ...` |
 | `WipeReadyMaxMs` | 240000 | The longest the wipe hold lasts, so a ghost that never comes back does not stop the run (10000 to 1800000) |
 | `WipeBackoffCount` | 3 | After this many wipes at the same route segment the run backs off: it holds `WipeBackoffMs` longer, puts the party at a safe route point two points before the pack and sets the leader back to it; 0 = off (0 to 20) |

@@ -264,6 +264,9 @@ std::uint32_t ComboPointsGained(std::uint32_t spell);
 // A ranged bot below this share of its power walks to melee range and fights there, since its spells are spent.
 constexpr std::uint32_t kOutOfPowerPct = 15;
 constexpr float kMeleeApproachYards = 5.0f;
+constexpr std::uint64_t kBuffDueEveryMs = 1000;  // UpkeepBuffDue: a bot's buff check is kept this long (the route leader asks for every member every tick)
+constexpr float kAoeCcProtectYards = 12.0f;     // AoeCcProtect: an area row is held while a crowd-controlled creature is this close to the target
+constexpr std::size_t kKillerAvoidMax = 8;   // KillerAvoidMs: creature entries a bot avoids at once
 constexpr std::size_t kDotMemory = 64;       // DotPerTarget: effects remembered per bot before the expired ones are dropped
 constexpr std::uint32_t kRestBelowPct = 90;  // an idle bot below this health sits down to rest
 // Parties (M8). kGroup's spell_id (the core's ModuleBotActions): invite the bot named by target_guid, accept the bot's
@@ -926,6 +929,8 @@ struct BotPolicy::BotTurn
     std::span<NearbyUnit const> nearby{};                 // TurnTargetMemory
     std::uint64_t deadParty = 0;
     bool pullRest = false;                              // TurnTargeting: a hurt member of a route party (PullMinHpPct) that rests instead of fighting or following
+    bool pullWait = false;                              // TurnSoloReady: any of its waits (mana, buff) holds: no self pull
+    bool pullWaitMana = false;                          // TurnSoloReady: a solo mana user waits (sits and drinks) before it pulls (SoloPullManaPct)
     bool hurtRest = false;                              // TurnRevivedAndRoles: hurt and solo, out of combat: rests before it fights (kRecoverPullPct)
     bool lowHealth = false;                               // TurnRevivedAndRoles
     std::uint32_t classId = 0;
