@@ -696,6 +696,13 @@ void BotPolicy::ReadCastResult(BotState& state, BotSnapshot const& bot, std::uin
             {
                 state.Dots[spell] = Dot{ spell == kSliceAndDice ? 0 : cast->second, nowMs + duration }; // Slice and Dice: the buff is on the rogue, whoever it was cast at
                 state.BuffUntilMs[{ spell, cast->second }] = nowMs + duration;
+                if (_options.DotPerTarget)
+                {
+                    if (state.DotUntilMs.size() >= kDotMemory)
+                        for (auto it = state.DotUntilMs.begin(); it != state.DotUntilMs.end();)
+                            it = nowMs >= it->second ? state.DotUntilMs.erase(it) : std::next(it);
+                    state.DotUntilMs[{ spell, spell == kSliceAndDice ? 0 : cast->second }] = nowMs + duration;
+                }
             }
 
             if (std::uint32_t const gained = ComboPointsGained(spell); gained != 0)

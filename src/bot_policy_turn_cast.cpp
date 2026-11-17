@@ -1028,7 +1028,8 @@ BotPolicy::TurnFlow BotPolicy::TurnRotation(DecideTick& tick, BotTurn& turn)
         }
     }
 
-    bool const noAoe = party_planner::NoAoeNow(tick.PlanOf(partyLeader));
+    bool noAoe = party_planner::NoAoeNow(tick.PlanOf(partyLeader));
+    bool ccChecked = false;
     // Healer mana floor (HealerCombatManaPct, bug 11): a healer in a party fight does not spend its last mana on attacks; the heals (PartyHeal) are not rows and are not held.
     bool const manaFloor = HealerBelowManaFloor(bot, state, classId, partyLeader);
     for (rotation::Row const& row : RowsFor(classId, spec))
@@ -1043,8 +1044,20 @@ BotPolicy::TurnFlow BotPolicy::TurnRotation(DecideTick& tick, BotTurn& turn)
             continue; // a ranged attack of a hunter with no ammunition: refused by the core, so only the melee rows are used
         if (row.MaxLevel != 0 && bot.level > row.MaxLevel)
             continue; // a better spell has replaced it
-        if (noAoe && rotation::IsAoeRow(row))
-            continue; // the raid rules' noaoe fight: no area damage now
+        if (rotation::IsAoeRow(row))
+        {
+            // AoeCcProtect: no area damage while a creature a party member holds (Polymorph, Sap, Banish) is within kAoeCcProtectYards of the target; looked at once per turn, and
+            // only when an area row is reached.
+            if (!noAoe && _options.AoeCcProtect && !ccChecked)
+            {
+                ccChecked = true;
+                noAoe = CcHeldNearTarget(tick, turn);
+                if (noAoe && _options.OnEvent && pull_ready::LogDue(state.AoeCcGate, nowMs, 10000))
+                    _options.OnEvent("aoe_cc_protect: bot=" + std::to_string(bot.guid) + " spell=" + std::to_string(row.Spell) + " target=" + std::to_string(forever_module::UnitRefEntry(targetRef)));
+            }
+            if (noAoe)
+                continue; // the raid rules' noaoe fight, or a held creature next to the target: no area damage now
+        }
         // Not learned yet: below the level a trainer teaches it (the rotation file's level, else the built-in table). (A level of 0 is unknown.)
         if (bot.level != 0 && (row.MinLevel != 0 ? row.MinLevel : rotation::LearnLevel(row.Spell)) > bot.level)
             continue;
@@ -1070,10 +1083,17 @@ BotPolicy::TurnFlow BotPolicy::TurnRotation(DecideTick& tick, BotTurn& turn)
             (InterruptTaken(targetRef, nowMs) || !party_planner::MayInterrupt(_options.PartyPlanner, tick.PlanOf(partyLeader), bot.guid, targetRef, nowMs)))
             continue;
         // The effect is still up (on the target, or on the bot for a self buff): recasting only refreshes it.
+        if (_options.DotPerTarget)
+        {
+            // Per (spell, target): the effect on this target (0 for a self buff or Slice and Dice) is what counts, not the last one cast.
+            auto const known = state.DotUntilMs.find({ row.Spell, row.OnTarget && row.Spell != kSliceAndDice ? targetRef : 0 });
+            if (known != state.DotUntilMs.end() && nowMs < known->second)
+                continue;
+        }
         auto const dot = state.Dots.find(row.Spell);
         // Slice and Dice is cast at the enemy (its first effect needs one) but the buff sits on the rogue: one running buff covers every target.
         bool const sameTarget = dot != state.Dots.end() && dot->second.Target == (row.OnTarget && row.Spell != kSliceAndDice ? targetRef : 0);
-        if (sameTarget && nowMs < dot->second.UntilMs)
+        if (!_options.DotPerTarget && sameTarget && nowMs < dot->second.UntilMs)
             continue;
 
         // A spell with a cast time cannot start while the bot moves: stop first (the cast follows on the next tick). The stop is

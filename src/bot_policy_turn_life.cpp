@@ -361,7 +361,13 @@ void BotPolicy::TurnRevivedAndRoles(DecideTick& tick, BotTurn& turn)
         turn.hurtRest = false;
     }
     if (turn.hurtRest)
+    {
         turn.lowHealth = true;
+        if (_options.OnEvent && pull_ready::LogDue(state.SoloHpGate, nowMs))
+            _options.OnEvent("pull_wait: bot=" + std::to_string(bot.guid) + " reason=hp level=" + std::to_string(bot.level) + " hp_pct=" + std::to_string(HealthPct(bot, 100)) +
+                             " mana_pct=" + std::to_string(bot.max_power > 0 ? bot.power * 100 / bot.max_power : 100) + " wait_ms=" + std::to_string(nowMs - state.RecoverSinceMs));
+    }
+    TurnSoloReady(tick, turn);
     // A dungeon party's bot on the outside map (a wipe left it at the graveyard, a rescue teleport was refused in combat): it goes back
     // through the instance door and starts no fight on the way. The owner's rule of 2026-10-22: a bot of a dungeon party must not be
     // able to die outside the dungeon; it comes back as a ghost would and is revived in the dungeon it died in.

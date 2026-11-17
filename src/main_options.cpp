@@ -89,6 +89,12 @@ void PolicyFromSettings(PolicyOptions& policyOptions, BotSettings& settings)
     policyOptions.PullMinHpPct = settings.PullMinHpPct;
     policyOptions.PullReadyManaPct = settings.PullReadyManaPct;
     policyOptions.PullReadyMaxMs = settings.PullReadyMaxMs;
+    policyOptions.DotPerTarget = settings.DotPerTarget;
+    policyOptions.SoloPullManaPct = settings.SoloPullManaPct;
+    policyOptions.KillerAvoidMs = settings.KillerAvoidMs;
+    policyOptions.AoeCcProtect = settings.AoeCcProtect;
+    policyOptions.PullBuffGate = settings.PullBuffGate;
+    policyOptions.PullWaitMaxMs = settings.PullWaitMaxMs;
     policyOptions.WarderPartyHold = settings.WarderPartyHold;
     policyOptions.HealerLosMoveYards = settings.HealerLosMoveYards;
     policyOptions.Gathering = settings.Gathering;

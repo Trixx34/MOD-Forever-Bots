@@ -681,7 +681,7 @@ void BotPolicy::TurnRestAndConsume(DecideTick& tick, BotTurn& turn)
     for (NearbyUnit const& unit : nearby)
         if (hurtQuiet && IsLiveMob(unit) && rotation::DistanceYards(bot, unit) < kRecoverSafeYards)
             hurtQuiet = false;
-    bool const sitWanted = (idle || holdIdle || hurtQuiet) && (state.Sitting ? (stillHurt || manaLow || manaStillLow || manaResting) : (hurtEnough || healthLow || manaLow || manaResting)) &&
+    bool const sitWanted = (idle || holdIdle || hurtQuiet) && (state.Sitting ? (stillHurt || manaLow || manaStillLow || manaResting || turn.pullWaitMana) : (hurtEnough || healthLow || manaLow || manaResting || turn.pullWaitMana)) &&
                            nowMs >= state.RestRetryAtMs;
     if (sitWanted != state.Sitting)
     {

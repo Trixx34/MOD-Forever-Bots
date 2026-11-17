@@ -31,6 +31,7 @@
 #include <optional>
 #include "calm_walk.h"
 #include "wipe_hold.h"
+#include "pull_ready.h"
 #include "damage_events.h"
 #include "party_planner.h"
 #include "heal_plan.h"
@@ -369,6 +370,21 @@ struct PolicyOptions
     // PullReadyMaxMs, so a party without a drink is not frozen. 0 = off here (the tests); the module's settings default to 60.
     std::uint32_t PullReadyManaPct = 0;
     std::uint64_t PullReadyMaxMs = 90000;
+    // DotPerTarget: a damage-over-time or debuff row is tracked per (spell, target), not one slot per spell, so a bot that switches targets does not recast an effect that is still up
+    // on the first one when it returns, and does not skip the cast on a new target (bug 14). 0 = off here (the tests); the module's settings default to off.
+    bool DotPerTarget = false;
+    // AoeCcProtect: a party member's area-damage rows (Arcane Explosion, Blizzard, Thunder Clap...) are skipped while a creature a party member holds with Polymorph, Sap or Banish
+    // stands within kAoeCcProtectYards of the target, so the hold is not broken (P0.e of the bot AI plan). 0 = off here (the tests); the module's settings default to off.
+    bool AoeCcProtect = false;
+    // KillerAvoidMs: a solo bot that died to a creature leaves creatures of that entry alone for this long (it does not pull them; one already on it is fought as before), so a leveling
+    // bot does not walk back into what killed it (prod 2026-11-14: 81 and 82 deaths in 90 minutes). 0 = off here (the tests); the module's settings default to off.
+    std::uint64_t KillerAvoidMs = 0;
+    // The ready gate before a pull (bot_policy_pullready.cpp, doc/ai-plan-next.md). SoloPullManaPct: a solo mana user below this mana percent starts no fight, it sits and drinks up to
+    // this plus 20 (pull_wait reason=mana). PullBuffGate: a bot (solo, or the route leader for its party) that has an upkeep buff to cast waits for it (pull_wait / pull_hold reason=buff).
+    // Each wait lasts at most PullWaitMaxMs. 0 / false = off here (the tests); the module's settings default to off.
+    std::uint32_t SoloPullManaPct = 0;
+    bool PullBuffGate = false;
+    std::uint64_t PullWaitMaxMs = 60000;
     // WarderPartyHold: a party member with no target of its own does not follow its leader (the tank) into an Onyxian Warder's Fire Nova: while a live Warder stands within
     // the nova stand distance of the leader, the member holds where it is (outside it) and the tank pulls the Warder alone; the members then fight it from range as before.
     // 0 = off here (the tests); the module's settings default to on.
@@ -762,6 +778,15 @@ private:
         bool OnyxiaTankOnHer = false;                    // the raid's tank: its threat target is her now (read by the damage dealers' landing hold)
         std::map<std::pair<std::uint32_t, std::uint64_t>, std::uint64_t> BuffUntilMs; // (spell, recipient reference; 0 = the bot itself) -> when the buff runs out
         std::unordered_map<std::uint32_t, Dot> Dots;     // spell -> effect on a target, while it lasts
+        std::unordered_map<std::uint32_t, std::uint64_t> KillerAvoidUntilMs; // KillerAvoidMs: creature entry -> no pull of it before this
+        pull_ready::Gate AoeCcGate;                      // only its log time is used (aoe_cc_protect)
+        pull_ready::Gate SoloHpGate;                     // only its log time is used (pull_wait reason=hp)
+        pull_ready::Gate SoloManaGate;                   // TurnSoloReady: the solo mana wait
+        pull_ready::Gate SoloBuffGate;                   // TurnSoloReady: the solo buff wait
+        pull_ready::Gate RouteBuffGate;                  // the route leader's wait for a member's upkeep buff (bot_policy_turn_move.cpp)
+        std::uint64_t BuffDueCheckedMs = 0;              // UpkeepBuffDue: when it was last computed for this bot, and the answer
+        bool BuffDue = false;
+        std::map<std::pair<std::uint32_t, std::uint64_t>, std::uint64_t> DotUntilMs; // DotPerTarget: (spell, target) -> when the effect runs out (target 0: on the bot itself)
         std::optional<std::uint64_t> LastTestCastTick;
         std::uint64_t AutoShotTarget = 0;                // the unit Auto Shot was accepted on and is believed to be shooting (0 = not active)
         std::uint64_t SeenThreatTarget = 0;              // the threat target of the last tick, to see it go away
@@ -1252,6 +1277,10 @@ private:
     TurnFlow TurnRaidRules(DecideTick& tick, BotTurn& turn);
     TurnFlow TurnRaidSpacing(DecideTick& tick, BotTurn& turn);    // spread and avoid_enemy rows (bot_policy_raidrules.cpp)
     TurnFlow TurnRaidAuras(DecideTick& tick, BotTurn& turn);      // purge and mindcontrol rows (bot_policy_raidrules.cpp)
+    void TurnSoloReady(DecideTick& tick, BotTurn& turn);        // the solo ready gate: mana and upkeep buffs before a pull (bot_policy_pullready.cpp)
+    std::function<bool(std::uint64_t)> PullAvoidFn(BotTurn& turn);   // AvoidedFn plus the entries that killed this bot (KillerAvoidMs)
+    bool CcHeldNearTarget(DecideTick& tick, BotTurn& turn);           // AoeCcProtect: a held creature within kAoeCcProtectYards of the target
+    bool UpkeepBuffDue(forever_module::BotSnapshot const& who, BotState& state, std::uint64_t nowMs);
     TurnFlow TurnTankPickup(DecideTick& tick, BotTurn& turn);   // taunts the mobs that are on party members (bot_policy_turn_cast.cpp)
     TurnFlow TurnTaming(DecideTick& tick, BotTurn& turn);
     void TurnFightWatch(DecideTick& tick, BotTurn& turn);

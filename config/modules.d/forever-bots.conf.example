@@ -528,6 +528,15 @@ Module.forever-bots.TelemetrySummarySec = 60
 # PullReadyManaPct = 60   (ready gate before a pull: a mana user below this mana percent rests, pull_hold reason=low_mana, and the route leader does not walk on to the next pack while a
 #                          member is below PullMinHpPct health or this mana; 0 = off)
 # PullReadyMaxMs = 90000   (the longest the ready gate holds; 1000 to 600000)
+# DotPerTarget = 0   (1: damage-over-time and debuff rows are tracked per (spell, target) instead of one slot per spell, so a bot that switches targets neither recasts an effect that is
+#                     still up on the first one nor skips the cast on the new one; bug 14 of the bot AI plan; doc/ai-plan-next.md)
+# SoloPullManaPct = 0   (the solo ready gate: 1 to 90 = a solo mana user (leveling, questing: not in a party or on a route) below this mana percent starts no fight, it walks away from
+#                        a creature within 30 yards, sits and drinks up to this plus 20; events pull_wait reason=mana and pull_wait_timeout; 0 = off; doc/ai-plan-next.md)
+# PullBuffGate = 0   (1: a solo bot, or the leader of a route party for every member, waits for the upkeep buffs its rotation casts out of combat before the next pull (pull_wait / pull_hold
+#                     reason=buff); 0 = off)
+# PullWaitMaxMs = 60000   (the longest each of these two waits lasts, 1000 to 600000; the wait then gives up and logs pull_wait_timeout, and starts again only after the need was over once)
+# KillerAvoidMs = 0   (0 = off; else 10000..86400000 ms: a solo bot that died to a creature does not pull that creature type for this long, the leveling death loop; event killer_avoid)
+# AoeCcProtect = 0   (1 = a party's area-damage rows wait while a creature held by Polymorph, Sap or Banish stands within 12 yards of the target; event aoe_cc_protect)
 # WipeReadyPct = 80   (after a wipe nobody pulls until all have revived and have this health and mana percent; the tank goes first; wipe_recovery: events; needs ScenarioWipeRecovery = 1; 0 = off)
 # WipeReadyMaxMs = 240000   (the longest the wipe hold lasts; 10000 to 1800000)
 # WipeBackoffCount = 3   (this many wipes at one route segment: the party waits WipeBackoffMs longer and is put back two route points before the pack; 0 = off)
