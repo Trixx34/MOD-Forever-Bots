@@ -832,6 +832,24 @@ struct BotPolicy::DecideTick
     mutable std::unordered_set<std::uint64_t> fightingGroups;
     mutable bool fightingGroupsBuilt = false;
 
+    // The indexes in view.bots of the living members (life_state 0) of the group led by `groupLeaderRef`, in view order. Built once per tick: the party buff
+    // recipients were a scan of every bot for every party buff row of every idle bot (n squared at 800 bots).
+    std::vector<std::size_t> const& LiveGroupMembers(std::uint64_t groupLeaderRef) const
+    {
+        if (!liveGroupsBuilt)
+        {
+            liveGroupsBuilt = true;
+            for (std::size_t at = 0; at < view.bots.size(); ++at)
+                if (view.bots[at].group_leader_guid != 0 && view.bots[at].life_state == 0)
+                    liveGroups[view.bots[at].group_leader_guid].push_back(at);
+        }
+        static std::vector<std::size_t> const none;
+        auto const found = liveGroups.find(groupLeaderRef);
+        return found != liveGroups.end() ? found->second : none;
+    }
+    mutable std::unordered_map<std::uint64_t, std::vector<std::size_t>> liveGroups;
+    mutable bool liveGroupsBuilt = false;
+
     party_planner::Order const* PlanOf(std::uint64_t leaderGuid) const
     {
         if (!partyOrders)

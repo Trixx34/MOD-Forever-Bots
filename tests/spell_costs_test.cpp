@@ -85,6 +85,24 @@ void UnpricedSpellsHaveNoCost()
     CHECK(data.CostAtLevel(9200, 10));         // a rank that points at itself: the walk stops, the cost is the spell's own
 }
 
+void RepeatedAnswersComeFromTheMemoryAndFollowATableEdit()
+{
+    std::vector<std::string> warnings;
+    auto data = Parse(kFile, warnings);
+    for (int i = 0; i < 3; ++i)
+    {
+        auto const cost = data.CostAtLevel(5242, 12);
+        CHECK(cost && cost->Cost == 200);
+        CHECK(!data.CostAtLevel(9000, 10));      // an unpriced answer is remembered too
+    }
+    spell_cost::Entry extra;
+    extra.Cost = 7;
+    data.BySpell[777] = extra;                   // the table changed size: the memory is dropped
+    auto const added = data.CostAtLevel(777, 10);
+    CHECK(added && added->Cost == 7);
+    CHECK(data.CostAtLevel(5242, 60)->Cost == 300);
+}
+
 void MissingFileGivesAnEmptyTableAndAWarning()
 {
     std::vector<std::string> warnings;
@@ -101,6 +119,7 @@ int main()
     TheFirstPowerLineOfASpellWins();
     CostIsThatOfTheHighestRankTheBotCanKnow();
     UnpricedSpellsHaveNoCost();
+    RepeatedAnswersComeFromTheMemoryAndFollowATableEdit();
     MissingFileGivesAnEmptyTableAndAWarning();
     if (failures == 0)
         std::printf("spell_costs_test: all passed\n");

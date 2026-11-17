@@ -43,6 +43,13 @@ public:
     // What a bot of `level` pays for the spell whose first rank is `firstRank`: the cost of the highest rank it can know at that level (the core casts
     // the highest rank the bot knows). Nothing when the spell is not in the file or its cost is not a flat one.
     std::optional<Payment> CostAtLevel(std::uint32_t firstRank, std::uint32_t level) const;
+
+private:
+    // CostAtLevel walks a rank chain through hash lookups, for every buff row of every idle bot every tick (2% of the pump at 195 bots), and the answer only
+    // depends on (firstRank, level): it is remembered. Used from the decide thread only; dropped when BySpell changes size (a test that edits the table).
+    mutable std::unordered_map<std::uint64_t, std::optional<Payment>> _costAtLevel;
+    mutable std::size_t _costAtLevelFor = 0;
+    std::optional<Payment> CostAtLevelUncached(std::uint32_t firstRank, std::uint32_t level) const;
 };
 
 SpellCostData ParseSpellCosts(std::istream& in, std::vector<std::string>& warnings);
