@@ -391,6 +391,7 @@ void BotPolicy::TurnWander(DecideTick& tick, BotTurn& turn)
         if (arrived || blocked || nowMs - state.GatherWalkStartMs > kGatherWalkTimeoutMs)
         {
             state.GatherWalking = false;
+            state.GatherWalkNextMs = nowMs + _options.GatherWalkGapMs;
             state.GatherRetryAtMs[state.GatherWalkLine] = arrived ? nowMs : nowMs + kGatherNothingMs;
         }
         else

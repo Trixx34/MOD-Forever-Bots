@@ -31,9 +31,9 @@ std::vector<NodePoint> ParseNodeTable(std::string_view text, std::vector<std::st
             continue;
         auto const fail = [&](char const* why) { errors.push_back("line " + std::to_string(lineNumber) + ": " + why); };
         std::vector<std::string_view> const f = text_split::Split(line, ' ');
-        if (f.size() != 6)
+        if (f.size() < 6 || f.size() > 9)
         {
-            fail("expected skill map x y z entry");
+            fail("expected skill map x y z entry [requiredSkill [areaLevel [side]]]");
             continue;
         }
         NodePoint node;
@@ -49,12 +49,20 @@ std::vector<NodePoint> ParseNodeTable(std::string_view text, std::vector<std::st
             fail("position must be three numbers");
             continue;
         }
+        std::uint32_t side = 0;
+        if ((f.size() > 6 && !ParseUnsigned(f[6], node.RequiredSkill)) || (f.size() > 7 && !ParseUnsigned(f[7], node.AreaLevel)) ||
+            (f.size() > 8 && (!ParseUnsigned(f[8], side) || side > 2)))
+        {
+            fail("bad requiredSkill, areaLevel or side");
+            continue;
+        }
+        node.Side = std::uint8_t(side);
         nodes.push_back(node);
     }
     return nodes;
 }
 
-std::optional<std::size_t> NearestNode(std::vector<NodePoint> const& nodes, std::uint32_t skill, std::uint32_t map, float x, float y)
+std::optional<std::size_t> NearestNode(std::vector<NodePoint> const& nodes, std::uint32_t skill, std::uint32_t map, float x, float y, NodeFilter const& filter)
 {
     std::optional<std::size_t> best;
     float bestDistance = 0.0f;
@@ -62,6 +70,9 @@ std::optional<std::size_t> NearestNode(std::vector<NodePoint> const& nodes, std:
     {
         NodePoint const& node = nodes[i];
         if (node.Skill != skill || node.Map != map)
+            continue;
+        if (node.RequiredSkill > filter.SkillValue || (filter.Level != 0xFFFFFFFFu && node.AreaLevel > filter.Level + filter.LevelSlack) ||
+            (filter.Side != 0 && node.Side != 0 && node.Side != filter.Side))
             continue;
         float const distance = std::hypot(node.X - x, node.Y - y);
         if (!best || distance < bestDistance)

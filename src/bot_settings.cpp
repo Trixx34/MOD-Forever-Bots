@@ -1099,6 +1099,7 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     if (auto const it = config.find("CraftingFociFile"); it != config.end())
         settings.CraftingFociFile = it->second;
     ReadBool(config, "GatherWalk", settings.GatherWalk, warnings);
+    ReadKey(config, "GatherWalkGapSec", 0, 86400, settings.GatherWalkGapSec, warnings);
     if (auto const it = config.find("GatherNodesFile"); it != config.end())
         settings.GatherNodesFile = it->second;
     if (auto const it = config.find("DungeonFile"); it != config.end())
@@ -1205,6 +1206,7 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadBool(config, "AuctionGearSell", settings.Auction.GearSell, warnings);
     ReadKey(config, "AuctionGearHoldLevels", 0, 10, settings.Auction.GearHoldLevels, warnings);
     ReadBool(config, "AuctionGearExact", settings.Auction.GearExact, warnings);
+    ReadBool(config, "AuctionResolveNearby", settings.Auction.ResolveNearby, warnings);
     ReadKey(config, "AuctionRoundStep", 0, 1000000, settings.Auction.RoundStepCopper, warnings);
     ReadKey(config, "AuctionRoundMaxPct", 0, 10, settings.Auction.RoundMaxPct, warnings);
     ReadBool(config, "SellVendor", settings.Sell.Enabled, warnings);

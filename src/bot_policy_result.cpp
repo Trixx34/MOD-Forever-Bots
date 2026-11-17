@@ -416,9 +416,17 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
             // "nothing to gather within 30 yards" is the normal answer where the bot stands, and the module does not look for nodes: the pause doubles with every
             // answer in a row (90 s up to 48 minutes), and starts again after a gather that worked.
             // GatherWalk: nothing in reach, and the table has a node of this skill on the bot's map that is not too far: the bot walks to it (the idle logic does the walk).
-            if (bot.last_action_status == BotActionStatus::kRefused && _options.GatherWalk && _options.GatherNodes)
+            if (bot.last_action_status == BotActionStatus::kRefused && _options.GatherWalk && _options.GatherNodes && nowMs >= state.GatherWalkNextMs)
             {
-                std::optional<std::size_t> const node = gather::NearestNode(*_options.GatherNodes, kGatherLines[index], bot.map_id, bot.pos_x, bot.pos_y);
+                // Only nodes this bot can harvest (its skill value), in areas that suit its level and faction (optional columns of the node table).
+                gather::NodeFilter filter;
+                if (bot.profession_skill[0] == kGatherLines[index])
+                    filter.SkillValue = bot.profession_value[0];
+                else if (bot.profession_skill[1] == kGatherLines[index])
+                    filter.SkillValue = bot.profession_value[1];
+                filter.Level = bot.level;
+                filter.Side = _options.SideOf ? _options.SideOf(bot.guid) : std::uint8_t(0);
+                std::optional<std::size_t> const node = gather::NearestNode(*_options.GatherNodes, kGatherLines[index], bot.map_id, bot.pos_x, bot.pos_y, filter);
                 if (node && std::hypot(bot.pos_x - (*_options.GatherNodes)[*node].X, bot.pos_y - (*_options.GatherNodes)[*node].Y) <= kGatherWalkMaxYards)
                 {
                     state.GatherWalking = true;

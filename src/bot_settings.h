@@ -471,6 +471,8 @@ struct BotSettings
     // GatherNodesFile (data/gather_nodes.txt; an absolute path). Without the file the walk does nothing.
     bool GatherWalk = false;
     std::string GatherNodesFile;
+    // GatherWalkGapSec (0..86400, default 0 = none): after a walk to a node ends, no new walk starts for this long, so a gatherer goes back to grinding in between.
+    std::uint32_t GatherWalkGapSec = 0;
     // AvoidGroundEffects = 1 (off by default): a bot standing inside a harmful ground effect (SDK 0.19: the core must have Bot.Snapshot.GroundEffects = 1) walks out of it.
     // AvoidSpellsFile (absolute path, data/avoid_spells.txt): the Classic dungeons' spells that leave one; a spell in it counts as harmful even if the caster is not
     // known to be hostile. The dungeon files' bosses[].strategy.avoid_spells and avoid (fixed zones) add to it for their map.

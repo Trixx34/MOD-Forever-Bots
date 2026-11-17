@@ -233,6 +233,7 @@ struct PolicyOptions
     std::shared_ptr<std::vector<crafting::FocusPoint> const> Foci;
     // GatherWalk (off by default; with Gathering): a gatherer with no node in reach walks to the nearest node of its skill in GatherNodes (data/gather_nodes.txt).
     bool GatherWalk = false;
+    std::uint64_t GatherWalkGapMs = 0;   // after a walk ends, no new walk for this long (GatherWalkGapSec); 0 = none
     std::shared_ptr<std::vector<gather::NodePoint> const> GatherNodes;
     std::uint32_t RandomPct = 0;
     std::uint32_t PartyPercent = 100;
@@ -924,6 +925,7 @@ private:
         std::uint32_t GatherWalkLine = 0;                // the kGather line the walk is for (an index into kGatherLines)
         std::uint32_t GatherWalkIndex = 0;               // the node, an index into GatherNodes
         std::uint64_t GatherWalkStartMs = 0;
+        std::uint64_t GatherWalkNextMs = 0;              // no new gathering walk before this (GatherWalkGapMs)
         bool CraftWalking = false;                       // walking to an anvil, forge or fire because a recipe needs one (kNeedsFocus)
         std::uint32_t CraftWalkLine = 0;                 // the craft line whose recipes need it
         std::uint32_t CraftWalkIndex = 0;                // the object, an index into Foci
