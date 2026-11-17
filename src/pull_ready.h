@@ -29,6 +29,22 @@ inline bool ManaNeeded(std::uint32_t power, std::uint32_t maxPower, std::uint32_
     return std::uint64_t(power) * 100 < std::uint64_t(maxPower) * mark;
 }
 
+// SoloPullHpPct: the health percent below which a solo bot rests. `configured` 0 = the old fixed mark `fallback`, with no hysteresis; else the mark is `configured` and, while the bot
+// already rests, `configured` + kHpReleaseGapPct (at most 100), so it does not pull the moment it passes the mark.
+constexpr std::uint32_t kHpReleaseGapPct = 10;
+inline std::uint32_t SoloRestMarkPct(std::uint32_t configured, std::uint32_t fallback, bool resting)
+{
+    if (configured == 0)
+        return fallback;
+    return resting ? std::min<std::uint32_t>(100, configured + kHpReleaseGapPct) : configured;
+}
+
+// ResurrectBackoff: the wait after the n-th refusal in a row (0-based): 4, 8, 16, 32 s, then 60 s.
+inline std::uint64_t ResurrectBackoffMs(std::uint32_t refusalsSoFar)
+{
+    return refusalsSoFar >= 4 ? 60000ull : 4000ull << refusalsSoFar;
+}
+
 // One step of the wait. Returns whether the bot holds now. `needed` false ends the wait and clears the give-up. A wait that has run `maxMs` gives up (timedOut is set once, on that step).
 inline bool Hold(Gate& gate, bool needed, std::uint64_t nowMs, std::uint64_t maxMs, bool& timedOut)
 {

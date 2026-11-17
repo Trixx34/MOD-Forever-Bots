@@ -386,6 +386,11 @@ struct PolicyOptions
     std::uint32_t SoloPullManaPct = 0;
     bool PullBuffGate = false;
     std::uint64_t PullWaitMaxMs = 60000;
+    // Death fixes (doc/death-fixes.md): see the settings of the same names. 0 / false = off (the tests; the module's settings default to off).
+    std::uint32_t SoloPullHpPct = 0;
+    std::uint32_t PullMaxGroup = 0;
+    std::uint32_t PullMaxLevelAbove = 2;   // the tests and the default: the built-in kMaxLevelAbove
+    bool ResurrectBackoff = false;
     // WarderPartyHold: a party member with no target of its own does not follow its leader (the tank) into an Onyxian Warder's Fire Nova: while a live Warder stands within
     // the nova stand distance of the leader, the member holds where it is (outside it) and the tank pulls the Warder alone; the members then fight it from range as before.
     // 0 = off here (the tests); the module's settings default to on.

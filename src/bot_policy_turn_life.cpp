@@ -349,7 +349,7 @@ void BotPolicy::TurnRevivedAndRoles(DecideTick& tick, BotTurn& turn)
     // A solo bot out of combat that is hurt (a reclaim brings it up at 50% health) rests before it fights or walks to a quest giver, up to kRecoverHoldMs: it is
     // treated as low on health (no target, no quest, away from a creature that is near, then sits). Prod 2026-11-12: revived at 49%, a bot pulled at once and died
     // to the same creature again, 812 deaths in 90 minutes.
-    if (partyLeader == 0 && !routeOn && bot.in_combat == 0 && bot.threat_target_guid == 0 && bot.max_health > 0 && BelowPct(bot.health, bot.max_health, kRecoverPullPct))
+    if (partyLeader == 0 && !routeOn && bot.in_combat == 0 && bot.threat_target_guid == 0 && bot.max_health > 0 && BelowPct(bot.health, bot.max_health, pull_ready::SoloRestMarkPct(_options.SoloPullHpPct, kRecoverPullPct, state.RecoverSinceMs != 0)))
     {
         if (state.RecoverSinceMs == 0)
             state.RecoverSinceMs = nowMs;
@@ -368,6 +368,8 @@ void BotPolicy::TurnRevivedAndRoles(DecideTick& tick, BotTurn& turn)
                              " mana_pct=" + std::to_string(bot.max_power > 0 ? bot.power * 100 / bot.max_power : 100) + " wait_ms=" + std::to_string(nowMs - state.RecoverSinceMs));
     }
     TurnSoloReady(tick, turn);
+    if (turn.hurtRest && _options.SoloPullHpPct != 0)
+        turn.pullWait = true;   // SoloPullHpPct: no self-pull while it rests (the fixed 75 mark only keeps the quest walk and the target away)
     // A dungeon party's bot on the outside map (a wipe left it at the graveyard, a rescue teleport was refused in combat): it goes back
     // through the instance door and starts no fight on the way. The owner's rule of 2026-10-22: a bot of a dungeon party must not be
     // able to die outside the dungeon; it comes back as a ghost would and is revived in the dungeon it died in.

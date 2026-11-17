@@ -59,7 +59,7 @@ bool OnOtherLevel(BotSnapshot const& bot, NearbyUnit const& unit)
 NearbyUnit const* PullTarget(BotSnapshot const& bot, std::span<NearbyUnit const> units,
                             std::function<bool(std::uint64_t)> const& avoided, bool defending,
                             std::vector<std::uint32_t> const& onlyEntries, bool dungeon,
-                            std::function<bool(NearbyUnit const&)> const& leashed, std::size_t dungeonCap)
+                            std::function<bool(NearbyUnit const&)> const& leashed, std::size_t dungeonCap, std::size_t soloMaxGroup, std::uint32_t maxLevelAbove)
 {
     NearbyUnit const* best = nullptr;
     float bestHealth = 0.0f;
@@ -86,7 +86,7 @@ NearbyUnit const* PullTarget(BotSnapshot const& bot, std::span<NearbyUnit const>
         // standing still until it dies is worse. The same goes for the pack-size rule below.
         // In a dungeon (the route is active) elites, bosses and higher levels are the content: the party fights what it meets.
         if (!defending && !dungeon && bot.level != 0 &&
-            ((candidate.level != 0 && candidate.level > bot.level + kMaxLevelAbove) || candidate.elite))
+            ((candidate.level != 0 && candidate.level > bot.level + maxLevelAbove) || candidate.elite))
             continue;
         float const health = HealthShare(candidate);
         float const dist = rotation::DistanceYards(bot, candidate);
@@ -97,7 +97,7 @@ NearbyUnit const* PullTarget(BotSnapshot const& bot, std::span<NearbyUnit const>
         for (NearbyUnit const& other : units)
             if (IsLiveMob(other) && DistanceBetween(candidate, other) <= kPullRadius)
                 ++group;
-        if (!defending && group > (dungeon ? dungeonCap : kMaxPull))
+        if (!defending && group > (dungeon ? dungeonCap : soloMaxGroup != 0 ? soloMaxGroup : kMaxPull))
             continue;
 
         best = &candidate;

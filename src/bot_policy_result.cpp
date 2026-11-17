@@ -286,7 +286,12 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
     // Protocol 28: the answer to kResurrect spell_id 2 (take the spirit healer). Applied, still walking to it (kMoving) and a reclaim delay that is not over (kBusy, the
     // core's fallback on a map with no spirit healer) go on; any other answer (the key is off in the core, a hardcore realm, no corpse in reach) puts the ghost back on the old
     // hold and reclaim for kSpiritHealerRefusedMs. Read once per result.
-    if (bot.last_action_type == uint8_t(ActionType::kResurrect) && bot.last_action_spell == kSpiritHealerSpell)
+    // The core reports last_action_spell for kCastSpell only (ModuleMgr.cpp: result.Spell = ... kCastSpell ? action.spell_id : 0), so the spirit healer's answer never carried spell 2
+    // and fell into the generic branch below as "resurrect_accept ... out of range" (prod 2026-11-17: 99,670 of them in 2 h, no offer ever pending). ResurrectBackoff: a kResurrect
+    // answer while no offer is pending is the spirit healer's.
+    bool const spiritAnswer = bot.last_action_type == uint8_t(ActionType::kResurrect) &&
+                              (bot.last_action_spell == kSpiritHealerSpell || (_options.ResurrectBackoff && bot.resurrect_from == 0));
+    if (spiritAnswer)
     {
         if (bot.last_action_sequence != state.SpiritHealerSeenSeq)
         {
@@ -320,7 +325,15 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
             else
             {
                 logIt = state.AcceptRefusals == 0; // one line per run of refusals
-                if (++state.AcceptRefusals >= kAcceptRefusalsMax)
+                if (_options.ResurrectBackoff)
+                {
+                    std::uint64_t const wait = pull_ready::ResurrectBackoffMs(state.AcceptRefusals);
+                    ++state.AcceptRefusals;
+                    state.AcceptRetryMs = nowMs + wait;
+                    if (_options.OnEvent)
+                        _options.OnEvent("resurrect_backoff: bot=" + std::to_string(bot.guid) + " refusals=" + std::to_string(state.AcceptRefusals) + " wait_ms=" + std::to_string(wait));
+                }
+                else if (++state.AcceptRefusals >= kAcceptRefusalsMax)
                 {
                     state.AcceptIgnoreUntilMs = nowMs + kAcceptIgnoreMs;
                     state.AcceptIgnoreFrom = bot.resurrect_from; // a different resurrector is still answered

@@ -174,6 +174,7 @@ void BotPolicy::DeadRecord(DecideTick& tick, BotTurn& turn)
         state.ReleaseHeldLogged = false;
         state.LeaderGhostWaitLogged = false;
         state.AcceptRetryMs = 0;
+        state.AcceptRefusals = 0;
         state.AcceptedFrom = 0;
         state.ReclaimRetryMs = 0;
         state.SpiritHealerRetryMs = 0;
@@ -301,6 +302,9 @@ BotPolicy::TurnFlow BotPolicy::DeadAnswerResurrect(DecideTick& tick, BotTurn& tu
     // A resurrect offer is accepted at any time, whatever the bot was doing.
     if (bot.resurrect_from != 0 && !(nowMs < state.AcceptIgnoreUntilMs && bot.resurrect_from == state.AcceptIgnoreFrom))
     {
+        // ResurrectBackoff: while the wait after a refusal (out of range) runs, nothing is sent and the corpse run goes on.
+        if (_options.ResurrectBackoff && nowMs < state.AcceptRetryMs)
+            return TurnFlow::kNext;
         if (nowMs >= state.AcceptRetryMs)
         {
             BotAction accept;
@@ -1052,6 +1056,18 @@ void BotPolicy::DeadGhostRun(DecideTick& tick, BotTurn& turn)
             }
             // Protocol 28: a hostile that keeps standing at the corpse (or the same killer again) sends the ghost to the spirit healer, not to the reclaim. From
             // then on (SpiritHealerActive) it is asked again every few seconds wherever the ghost is, and no stop is sent: the core walks it to the healer.
+            if (_options.ResurrectBackoff && !state.SpiritHealerActive && nowMs >= state.SpiritHealerRefusedUntilMs && state.GhostSinceMs != 0 &&
+                SpiritHealerWanted(_options.SpiritHealerAfterMs, _options.SpiritHealerOnRepeat, nowMs, state.ReclaimDangerSinceMs, state.KillerRepeat,
+                                   state.DeathTimesMs[1], state.DeathTimesMs[2], state.SpiritHealerRefusedUntilMs) &&
+                (bot.map_id != state.GhostSpawnMap || DistanceTo(bot, state.GhostSpawn) > kGhostFallbackHealerYards))
+            {
+                // The core looks for a spirit healer within about 40 yards: from the corpse it answers "out of range". The ghost fallback puts the ghost back at the graveyard first
+                // and asks from there.
+                state.GhostFallbackActive = true;
+                LogEvent("ghost_fallback: bot=" + std::to_string(bot.guid) + " reason=spirit_healer_far map=" + std::to_string(bot.map_id) + " corpse_valid=" +
+                         std::to_string(bot.corpse_valid) + " ghost_s=" + std::to_string((nowMs - state.GhostSinceMs) / 1000));
+                return;
+            }
             if (state.SpiritHealerActive ||
                 SpiritHealerWanted(_options.SpiritHealerAfterMs, _options.SpiritHealerOnRepeat, nowMs, state.ReclaimDangerSinceMs, state.KillerRepeat,
                                    state.DeathTimesMs[1], state.DeathTimesMs[2], state.SpiritHealerRefusedUntilMs))
