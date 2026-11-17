@@ -491,6 +491,7 @@ constexpr std::uint64_t kVisitDwellMs = 20000;
 constexpr std::uint32_t kErrandTrainRefusalMax = 3; // train refusals in a row that end the errand as failed
 constexpr std::uint64_t kAvoidKeepMs = 3000;          // a walk out of a ground effect keeps its end point this long
 constexpr float kMountMinDistanceYards = 100.0f;   // a walk this long: mount up before it
+constexpr std::uint32_t kHearthstoneSpell = 8690;        // the Hearthstone cast: a bot casting it takes no new orders (the core's Bot.Hearth hop)
 constexpr float kMountDismountDistanceYards = 15.0f; // arrived or close: dismount
 // A quest walk that keeps the bot within kQuestWalkStuckYards for kQuestWalkStuckMs has no route to its giver (seen on the sim: 11
 // level 1 bots idle for hours, 110 to 8000 yards from the giver). With QuestTeleport the bot is sent there once; a refusal, or a second

@@ -1009,6 +1009,10 @@ void BotPolicy::TurnLootTaxiMount(DecideTick& tick, BotTurn& turn)
     if (IsResurrectSpell(bot.casting_spell) && bot.cast_remaining_ms != 0 && state.Last)
         wanted = *state.Last; // a resurrect cast is not broken by a new movement order
 
+    // A Hearthstone in its cast (the core's masked zone teleport, Bot.Hearth.Enabled) is not broken by a new order either: a walking bot would cancel the hop.
+    if (bot.casting_spell == kHearthstoneSpell && bot.cast_remaining_ms != 0)
+        wanted = state.Last ? *state.Last : Decision{};
+
     // Flight points (layout 17): a bot on a flight takes no walking orders; a long walk of a bot that is on its own is replaced by a walk to the nearest
     // flight master and a flight from it (taxi_policy.h). The core refuses a flight that would not bring the bot closer, and the bot then walks.
     bool fidgetWait = false;
