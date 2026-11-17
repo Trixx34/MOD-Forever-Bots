@@ -684,6 +684,17 @@ void ZgLeverSettings()
     CHECK(ParseBotSettings({ { "RegroupRallyMs", "1000" } }, w).RegroupRallyMs == 0 && !w.empty());
 }
 
+// FightHeightAvoidMs / FightStallDiag (fight_stalled, 2026-11-16): off by default; 0 or 3000..60000.
+void FightStallSettings()
+{
+    std::vector<std::string> w;
+    BotSettings const defaults = ParseBotSettings({}, w);
+    CHECK(defaults.FightHeightAvoidMs == 0 && !defaults.FightStallDiag && w.empty());
+    BotSettings const on = ParseBotSettings({ { "FightHeightAvoidMs", "8000" }, { "FightStallDiag", "1" } }, w);
+    CHECK(on.FightHeightAvoidMs == 8000 && on.FightStallDiag && w.empty());
+    CHECK(ParseBotSettings({ { "FightHeightAvoidMs", "100" } }, w).FightHeightAvoidMs == 0 && !w.empty());
+}
+
 // WalkDecideEvery (perf, 2026-11-15): default 2, 1 = off, 1..10; a value outside keeps the default with a warning.
 void WalkDecideEverySetting()
 {
@@ -866,6 +877,7 @@ int main()
     GhostTeleportHoldSettings();
     WalkDecideEverySetting();
     ZgLeverSettings();
+    FightStallSettings();
     RaidBossPositionsSetting();
     RaidPullSingleSettings();
     CombatDriftSettings();

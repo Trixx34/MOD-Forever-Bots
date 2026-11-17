@@ -1058,6 +1058,9 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadBool(config, "RaidFocusAvoidEnemy", settings.RaidFocusAvoidEnemy, warnings);
     ReadBool(config, "PullOnePack", settings.PullOnePack, warnings);
     ReadBool(config, "TankLooseSkipAvoidEnemy", settings.TankLooseSkipAvoidEnemy, warnings);
+    ReadBool(config, "FightStallDiag", settings.FightStallDiag, warnings);
+    if (config.count("FightHeightAvoidMs") != 0 && config.at("FightHeightAvoidMs") != "0")
+        ReadKey(config, "FightHeightAvoidMs", 3000, 60000, settings.FightHeightAvoidMs, warnings);
     ReadBool(config, "FlexRoles", settings.FlexRoles, warnings);
     ReadBool(config, "RaidBossPositions", settings.RaidBossPositions, warnings);
     ReadBool(config, "RaidPullSingle", settings.RaidPullSingle, warnings);

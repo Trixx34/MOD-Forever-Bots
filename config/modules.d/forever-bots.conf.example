@@ -607,6 +607,11 @@ Module.forever-bots.TelemetrySummarySec = 60
 # Module.forever-bots.PullOnePack = 0
 # Module.forever-bots.TankLooseSkipAvoidEnemy = 0
 # Module.forever-bots.RegroupRallyMs = 0
+# fight_stalled on map 2991 (prod 2026-11-16: targets 3-4 yards away with low health, no damage for 45 s; doc/fight-stalled.md). FightHeightAvoidMs (0 = off, else 3000..60000):
+# a melee bot whose target is in ground reach but 5+ yards above or below it (hovering or flying creature) avoids it after this long (fight_height_avoid).
+# FightStallDiag (0 = off): the fight_stalled event also carries class, power, moving, last action and status, dz and the 3D distance, to tell the causes apart.
+# Module.forever-bots.FightHeightAvoidMs = 0
+# Module.forever-bots.FightStallDiag = 0
 # WalkDecideEvery (default 2, 1 = off, 1..10; perf, docs/perf-bots-module-20261115.md): a solo bot that is only walking to a place the policy sent it to (out of combat, nothing
 # hostile near, no group, dungeon, errand or transport) takes its full decision turn on one world tick in this many. Anything that changes (a new result, a hostile, combat,
 # an invite, the end of the walk) ends the skipping at once.

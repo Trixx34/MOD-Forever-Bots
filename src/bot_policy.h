@@ -200,6 +200,11 @@ struct PolicyOptions
     // the healer role; a party with a warrior keeps him as tank. An explicit role or roster spec is never changed. A paladin or druid tank pulls fewer mobs (DungeonPullCap).
     bool FlexRoles = false;
     std::uint64_t RegroupRallyMs = 0;
+    // fight_stalled (map 2991, 2026-11-16: targets 3-4 yards away on the ground with low health for the whole stall). FightHeightAvoidMs (0 = off, else 3000..60000): a melee bot whose
+    // target is in ground range but at least kHeightUnreachableYards above or below it (a hovering or flying creature) for this long avoids it (fight_height_avoid) instead of swinging
+    // at air until the 45 s watchdog. FightStallDiag: the fight_stalled event also carries the height, the 3D distance, class, power, movement, the last action and its status.
+    std::uint64_t FightHeightAvoidMs = 0;
+    bool FightStallDiag = false;
     // WalkDecideEvery (1 = off; calm_walk.h): a solo bot that only walks to a place the policy sent it to, with nothing hostile near, takes its full turn on one tick in this many.
     std::uint32_t WalkDecideEvery = 1;
     // RaidBossPositions (default off): `tank_spot` and `flank` rows of the raid rule table act (MoveBossPosition): the boss's victim, a tank, holds it from the tank spot,
@@ -727,6 +732,8 @@ private:
         std::uint64_t PullPosLogMs = 0;
         std::uint64_t PullRestLogMs = 0;
         std::uint64_t WarderHoldLogMs = 0;                // last warder_hold event (at most one per 10 s)
+        std::uint64_t HeightSinceMs = 0;                  // since when the target is out of vertical reach while in ground range (FightHeightAvoidMs; 0 = not)
+        std::uint64_t HeightTarget = 0;                   // the target that timer is for
         std::uint64_t RallyLogMs = 0;                     // last regroup_rally event (RegroupRallyMs, at most one per 10 s)
         std::uint64_t TankLooseSkipLogMs = 0;             // last tank_loose_skip event (TankLooseSkipAvoidEnemy, at most one per 10 s)
         std::uint64_t PullReadyStartMs = 0;              // the route leader's ready gate (a member short of health or mana) began at this time (0 = not holding)

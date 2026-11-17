@@ -443,6 +443,7 @@ constexpr std::size_t kGrindPickAmong = 4;        // with randomness on, a bot t
 constexpr double kStandJitterYards = 6.0;         // with randomness on, a bot stands up to this far from the exact point of its spot
 constexpr std::uint32_t kAcceptRefusalsMax = 3;       // resurrect answers refused this often in a row: the offer is left alone for a while
 constexpr std::uint64_t kAcceptIgnoreMs = 60000;
+constexpr float kHeightUnreachableYards = 5.0f;     // FightHeightAvoidMs: a target this far above or below the bot is out of a melee swing whatever its ground distance
 constexpr std::uint64_t kFightStallMs = 45000;       // a fight in which neither side's health went down this long is given up (the telemetry calls 60 s "stuck")
 constexpr std::uint64_t kStallAvoidMs = 300000;      // a target the fight stalled against is left alone 5 minutes, 10, 20, then 40 at most
 constexpr std::uint32_t kMaxStallDoublings = 3;

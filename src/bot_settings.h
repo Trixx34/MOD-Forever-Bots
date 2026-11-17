@@ -473,6 +473,11 @@ struct BotSettings
     // Explicit roles and roster specs are unchanged. flex_roles.h; log event flex_roles.
     bool FlexRoles = false;
     std::uint32_t RegroupRallyMs = 0;
+    // fight_stalled (map 2991 start-zone creatures, 3-4 yards away on the ground, low health, no damage for the whole stall; the cause is believed to be a target in the air or
+    // below the ledge: the ground distance says in reach, the 3D distance does not). FightHeightAvoidMs (0 = off, else 3000..60000): a melee bot avoids such a target after this long
+    // (event fight_height_avoid). FightStallDiag (0 = off): the fight_stalled event also carries dz, 3D distance, class, power, moving, the last action and its status.
+    std::uint32_t FightHeightAvoidMs = 0;
+    bool FightStallDiag = false;
     // WalkDecideEvery (default 2, 1 = off, 1..10): a solo bot that is walking to a place the policy sent it to, out of combat with no hostile near, in no group, dungeon or
     // errand, takes its full decision turn on one tick in this many (calm_walk.h). Any change (a new result, a hostile, combat, an invite, the end of the walk) ends the calm
     // and the next tick is a full turn. At a world update of 500..1700 ms the delay is at most (N-1) ticks before a calm walker reacts to something that is not in the snapshot.

@@ -156,6 +156,8 @@ void PolicyFromSettings(PolicyOptions& policyOptions, BotSettings& settings)
     policyOptions.TankLooseSkipAvoidEnemy = settings.TankLooseSkipAvoidEnemy;
     policyOptions.FlexRoles = settings.FlexRoles;
     policyOptions.RegroupRallyMs = settings.RegroupRallyMs;
+    policyOptions.FightHeightAvoidMs = settings.FightHeightAvoidMs;
+    policyOptions.FightStallDiag = settings.FightStallDiag;
     policyOptions.WalkDecideEvery = settings.WalkDecideEvery;
     policyOptions.RaidBossPositions = settings.RaidBossPositions;
     policyOptions.RaidPullSingle = settings.RaidPullSingle;
