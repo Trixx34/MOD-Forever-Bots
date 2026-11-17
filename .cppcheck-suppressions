@@ -1,0 +1,6 @@
+# cppcheck project suppressions (scripts/cppcheck.sh). Format: id[:file-glob]. Prefer an inline "// cppcheck-suppress id" next to the code.
+# Headers of the system and the SDK build tree are never checked, only src/ and tests/.
+missingIncludeSystem
+unmatchedSuppression
+# noisy for this code base (shared-memory SDK structs, test fixtures)
+useStlAlgorithm:tests/*

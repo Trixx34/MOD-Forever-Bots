@@ -1,0 +1,152 @@
+# clang-tidy accepted findings: count<TAB>check<TAB>file<TAB>message (no line numbers). Rewrite with scripts/tidy.sh --update-baseline.
+1	performance-no-automatic-move	src/ambient_chat.cpp	constness of 'text' prevents automatic move
+1	readability-container-contains	src/ambient_chat.cpp	use 'contains' to check for membership
+1	bugprone-inc-dec-in-conditions	src/auction_policy.h	incrementing and referencing a variable in a complex condition can cause unintended side-effects due to C++'s order of evaluation, consider moving the modification outside of the condition to avoid misunderstandings
+1	performance-inefficient-string-concatenation	src/bot_brackets.cpp	string concatenation results in allocation of unnecessary temporary strings; consider using 'operator+=' or 'string::append()' instead
+1	modernize-use-emplace	src/bot_guilds.cpp	use emplace_back instead of push_back
+5	readability-container-contains	src/bot_guilds.cpp	use 'contains' to check for membership
+1	readability-use-anyofallof	src/bot_guilds.cpp	replace loop by 'std::ranges::all_of()'
+2	readability-use-anyofallof	src/bot_pick.cpp	replace loop by 'std::ranges::any_of()'
+15	readability-container-contains	src/bot_policy.cpp	use 'contains' to check for membership
+1	performance-unnecessary-value-param	src/bot_policy.h	the parameter 'options' of type 'PolicyOptions' is copied for each invocation but only used as a const reference; consider making it a const reference
+3	readability-container-contains	src/bot_policy_advisor.cpp	use 'contains' to check for membership
+1	modernize-use-emplace	src/bot_policy_chat.cpp	use emplace_back instead of push_back
+1	performance-inefficient-vector-operation	src/bot_policy_features.cpp	'push_back' is called inside a loop; consider pre-allocating the container capacity before the loop
+13	readability-container-contains	src/bot_policy_features.cpp	use 'contains' to check for membership
+1	readability-container-size-empty	src/bot_policy_features.cpp	the 'empty' method should be used to check for emptiness instead of 'size'
+3	readability-container-contains	src/bot_policy_guilds.cpp	use 'contains' to check for membership
+1	readability-use-anyofallof	src/bot_policy_guilds.cpp	replace loop by 'std::ranges::any_of()'
+1	readability-container-contains	src/bot_policy_heal_plan.cpp	use 'contains' to check for membership
+2	readability-container-contains	src/bot_policy_internal.h	use 'contains' to check for membership
+6	readability-container-contains	src/bot_policy_parties.cpp	use 'contains' to check for membership
+1	readability-use-anyofallof	src/bot_policy_spells.cpp	replace loop by 'std::ranges::any_of()'
+1	modernize-use-emplace	src/bot_policy_turn_cast.cpp	use emplace_back instead of push_back
+11	readability-container-contains	src/bot_policy_turn_cast.cpp	use 'contains' to check for membership
+1	readability-container-size-empty	src/bot_policy_turn_cast.cpp	the 'empty' method should be used to check for emptiness instead of 'size'
+6	readability-container-contains	src/bot_policy_turn_dead.cpp	use 'contains' to check for membership
+2	readability-use-anyofallof	src/bot_policy_turn_dead.cpp	replace loop by 'std::ranges::any_of()'
+4	readability-container-contains	src/bot_policy_turn_life.cpp	use 'contains' to check for membership
+1	performance-inefficient-vector-operation	src/bot_policy_turn_move.cpp	'push_back' is called inside a loop; consider pre-allocating the container capacity before the loop
+7	readability-container-contains	src/bot_policy_turn_move.cpp	use 'contains' to check for membership
+9	readability-container-contains	src/bot_policy_turn_target.cpp	use 'contains' to check for membership
+1	readability-use-anyofallof	src/bot_policy_turn_target.cpp	replace loop by 'std::ranges::any_of()'
+3	readability-container-contains	src/bot_policy_turn_town.cpp	use 'contains' to check for membership
+1	readability-use-anyofallof	src/bot_policy_units.cpp	replace loop by 'std::ranges::any_of()'
+3	readability-container-contains	src/bot_presence.cpp	use 'contains' to check for membership
+1	readability-container-contains	src/bot_roster.cpp	use 'contains' to check for membership
+1	readability-container-contains	src/bot_roster.h	use 'contains' to check for membership
+6	modernize-use-emplace	src/bot_settings.cpp	use emplace_back instead of push_back
+3	performance-inefficient-string-concatenation	src/bot_settings.cpp	string concatenation results in allocation of unnecessary temporary strings; consider using 'operator+=' or 'string::append()' instead
+4	readability-container-contains	src/bot_settings.cpp	use 'contains' to check for membership
+1	readability-container-contains	src/bot_telemetry.cpp	use 'contains' to check for membership
+1	modernize-pass-by-value	src/bot_telemetry.h	pass by value and use std::move
+1	performance-unnecessary-value-param	src/bot_telemetry.h	parameter 'options' of type 'Options' is passed by value and only copied once; consider moving it to avoid unnecessary copies
+1	readability-use-anyofallof	src/calm_walk.h	replace loop by 'std::ranges::all_of()'
+22	modernize-use-emplace	src/chat_commands.cpp	use emplace_back instead of push_back
+2	bugprone-inc-dec-in-conditions	src/combat_rotation.cpp	incrementing and referencing a variable in a complex condition can cause unintended side-effects due to C++'s order of evaluation, consider moving the modification outside of the condition to avoid misunderstandings
+1	modernize-use-emplace	src/combat_rotation.cpp	use emplace_back instead of push_back
+1	readability-container-contains	src/combat_rotation.cpp	use 'contains' to check for membership
+1	modernize-use-emplace	src/damage_events.cpp	use emplace_back instead of push_back
+1	performance-unnecessary-value-param	src/dungeon_data.cpp	the parameter 'text' of type 'std::string' (aka 'basic_string<char>') is copied for each invocation but only used as a const reference; consider making it a const reference
+1	readability-container-contains	src/dungeon_data.cpp	use 'contains' to check for membership
+2	readability-container-contains	src/dungeon_events.cpp	use 'contains' to check for membership
+1	performance-unnecessary-value-param	src/dungeon_files.cpp	the parameter 'extra' of type 'std::set<std::string>' (aka 'std::set<basic_string<char>>') is copied for each invocation but only used as a const reference; consider making it a const reference
+4	readability-container-contains	src/dungeon_files.cpp	use 'contains' to check for membership
+1	readability-use-anyofallof	src/dungeon_files.cpp	replace loop by 'std::ranges::all_of()'
+1	performance-inefficient-vector-operation	src/errand_policy.cpp	'push_back' is called inside a loop; consider pre-allocating the container capacity before the loop
+1	readability-container-contains	src/errand_policy.cpp	use 'contains' to check for membership
+1	readability-container-contains	src/errand_policy.h	use 'contains' to check for membership
+1	performance-inefficient-vector-operation	src/errand_trainers.cpp	'push_back' is called inside a loop; consider pre-allocating the container capacity before the loop
+1	modernize-loop-convert	src/grind_data.cpp	use range-based for loop instead
+1	readability-use-anyofallof	src/ground_avoid.cpp	replace loop by 'std::ranges::all_of()'
+1	readability-use-anyofallof	src/ground_avoid.cpp	replace loop by 'std::ranges::any_of()'
+1	readability-container-contains	src/ground_avoid.h	use 'contains' to check for membership
+1	performance-faster-string-find	src/heal_plan.cpp	'operator+=' called with a string literal consisting of a single character; consider using the more efficient overload accepting a character
+1	performance-inefficient-vector-operation	src/heal_plan.cpp	'push_back' is called inside a loop; consider pre-allocating the container capacity before the loop
+1	performance-prefer-single-char-overloads	src/heal_plan.cpp	'operator+=' called with a string literal consisting of a single character; consider using the more efficient overload accepting a character
+3	readability-container-contains	src/heal_plan.cpp	use 'contains' to check for membership
+1	readability-use-anyofallof	src/heal_plan.cpp	replace loop by 'std::ranges::any_of()'
+1	readability-use-anyofallof	src/heal_rank.h	replace loop by 'std::ranges::any_of()'
+1	performance-inefficient-vector-operation	src/level_dungeon.cpp	'push_back' is called inside a loop; consider pre-allocating the container capacity before the loop
+1	performance-use-std-move	src/main.cpp	'alts' could be moved here
+1	readability-container-contains	src/main_commands.cpp	use 'contains' to check for membership
+2	performance-unnecessary-copy-initialization	src/main_feeds.cpp	local copy 'queue' of the variable 'commands' of type 'std::shared_ptr<CommandQueue>' is never modified; consider avoiding the copy
+2	readability-container-contains	src/main_feeds.cpp	use 'contains' to check for membership
+1	readability-container-contains	src/main_internal.h	use 'contains' to check for membership
+1	performance-inefficient-vector-operation	src/main_pump.cpp	'emplace_back' is called inside a loop; consider pre-allocating the container capacity before the loop
+1	performance-move-const-arg	src/main_pump.cpp	passing result of std::move() as a const reference argument; no move will actually happen
+1	readability-container-contains	src/main_sales.cpp	use 'contains' to check for membership
+1	modernize-loop-convert	src/mount_plan.cpp	use range-based for loop instead
+8	readability-container-contains	src/party_planner.cpp	use 'contains' to check for membership
+1	readability-use-anyofallof	src/party_planner.cpp	replace loop by 'std::ranges::any_of()'
+1	readability-container-contains	src/quest_data.cpp	use 'contains' to check for membership
+2	readability-container-contains	src/quest_group.cpp	use 'contains' to check for membership
+4	readability-container-contains	src/quest_planner.cpp	use 'contains' to check for membership
+2	performance-inefficient-string-concatenation	src/raid_rules.cpp	string concatenation results in allocation of unnecessary temporary strings; consider using 'operator+=' or 'string::append()' instead
+7	readability-container-contains	src/raid_rules.cpp	use 'contains' to check for membership
+2	readability-use-anyofallof	src/raid_rules.cpp	replace loop by 'std::ranges::any_of()'
+1	readability-container-contains	src/realism.cpp	use 'contains' to check for membership
+1	readability-container-contains	src/reputation_plan.cpp	use 'contains' to check for membership
+1	readability-container-contains	src/scenario.cpp	use 'contains' to check for membership
+1	readability-use-anyofallof	src/scenario.cpp	replace loop by 'std::ranges::any_of()'
+1	performance-inefficient-vector-operation	src/sell_policy.cpp	'push_back' is called inside a loop; consider pre-allocating the container capacity before the loop
+1	performance-unnecessary-value-param	src/social_actions.cpp	the parameter 'done' of type 'Done' (aka 'std::function<void (const Outcome &)>') is copied for each invocation but only used as a const reference; consider making it a const reference
+2	modernize-use-emplace	src/trade_policy.cpp	use emplace_back instead of push_back
+2	readability-container-contains	src/trade_policy.cpp	use 'contains' to check for membership
+1	readability-container-contains	src/trade_policy.h	use 'contains' to check for membership
+1	performance-inefficient-vector-operation	src/world_events.cpp	'push_back' is called inside a loop; consider pre-allocating the container capacity before the loop
+2	readability-container-contains	src/world_events.cpp	use 'contains' to check for membership
+1	readability-container-contains	src/world_events.h	use 'contains' to check for membership
+2	readability-container-data-pointer	tests/auction_test.cpp	'data' should be used for accessing the data pointer instead of taking the address of the 0-th element
+2	readability-container-contains	tests/bot_guild_kinds_test.cpp	use 'contains' to check for membership
+3	readability-use-anyofallof	tests/chat_test.cpp	replace loop by 'std::ranges::any_of()'
+2	readability-container-contains	tests/dungeon_test.cpp	use 'contains' to check for membership
+1	readability-container-size-empty	tests/errand_test.cpp	the 'empty' method should be used to check for emptiness instead of 'size'
+1	readability-use-anyofallof	tests/errand_test.cpp	replace loop by 'std::ranges::any_of()'
+1	performance-inefficient-vector-operation	tests/flex_roles_test.cpp	'push_back' is called inside a loop; consider pre-allocating the container capacity before the loop
+1	readability-container-contains	tests/grind_test.cpp	use 'contains' to check for membership
+1	readability-use-anyofallof	tests/grind_test.cpp	replace loop by 'std::ranges::any_of()'
+3	readability-container-size-empty	tests/lfg_fill_test.cpp	the 'empty' method should be used to check for emptiness instead of 'size'
+1	readability-container-size-empty	tests/main_util_test.cpp	the 'empty' method should be used to check for emptiness instead of comparing to an empty object
+1	readability-use-anyofallof	tests/off_map_test.cpp	replace loop by 'std::ranges::any_of()'
+1	readability-use-anyofallof	tests/party_invite_test.cpp	replace loop by 'std::ranges::any_of()'
+1	performance-unnecessary-value-param	tests/party_planner_test.cpp	parameter 'spells' of type 'std::vector<std::uint32_t>' (aka 'std::vector<unsigned int>') is passed by value and only copied once; consider moving it to avoid unnecessary copies
+1	performance-use-std-move	tests/party_planner_test.cpp	'spells' could be moved here
+1	performance-unnecessary-value-param	tests/policy_test_01.cpp	parameter 'options' of type 'PolicyOptions' is passed by value and only copied once; consider moving it to avoid unnecessary copies
+1	readability-container-size-empty	tests/policy_test_01.cpp	the 'empty' method should be used to check for emptiness instead of 'size'
+1	readability-use-anyofallof	tests/policy_test_01.cpp	replace loop by 'std::ranges::any_of()'
+1	performance-unnecessary-copy-initialization	tests/policy_test_03.cpp	local copy 'options' of the variable 'base' of type 'PolicyOptions' is never modified; consider avoiding the copy
+1	readability-container-contains	tests/policy_test_03.cpp	use 'contains' to check for membership
+4	readability-use-anyofallof	tests/policy_test_04.cpp	replace loop by 'std::ranges::any_of()'
+1	readability-use-anyofallof	tests/policy_test_05.cpp	replace loop by 'std::ranges::any_of()'
+1	readability-use-anyofallof	tests/policy_test_06.cpp	replace loop by 'std::ranges::any_of()'
+1	readability-use-anyofallof	tests/policy_test_07.cpp	replace loop by 'std::ranges::any_of()'
+1	performance-unnecessary-value-param	tests/policy_test_09.cpp	parameter 'options' of type 'PolicyOptions' is passed by value and only copied once; consider moving it to avoid unnecessary copies
+2	readability-use-anyofallof	tests/policy_test_09.cpp	replace loop by 'std::ranges::any_of()'
+1	readability-use-anyofallof	tests/policy_test_10.cpp	replace loop by 'std::ranges::any_of()'
+2	readability-use-anyofallof	tests/policy_test_11.cpp	replace loop by 'std::ranges::any_of()'
+1	performance-inefficient-vector-operation	tests/policy_test_12.cpp	'push_back' is called inside a loop; consider pre-allocating the container capacity before the loop
+1	performance-use-std-move	tests/policy_test_12.cpp	'classes' could be moved here
+1	performance-use-std-move	tests/policy_test_12.cpp	'specOf' could be moved here
+1	performance-use-std-move	tests/policy_test_support.h	'classOf' could be moved here
+9	readability-use-anyofallof	tests/policy_test_support.h	replace loop by 'std::ranges::any_of()'
+1	performance-inefficient-vector-operation	tests/presence_test.cpp	'push_back' is called inside a loop; consider pre-allocating the container capacity before the loop
+4	readability-container-contains	tests/presence_test.cpp	use 'contains' to check for membership
+3	readability-container-contains	tests/quest_test.cpp	use 'contains' to check for membership
+5	readability-use-anyofallof	tests/quest_test.cpp	replace loop by 'std::ranges::any_of()'
+1	readability-use-anyofallof	tests/raid_test.cpp	replace loop by 'std::ranges::any_of()'
+1	performance-use-std-move	tests/reputation_plan_test.cpp	'e' could be moved here
+1	readability-container-contains	tests/reputation_plan_test.cpp	use 'contains' to check for membership
+1	readability-use-anyofallof	tests/reputation_test.cpp	replace loop by 'std::ranges::any_of()'
+3	readability-container-contains	tests/rotation_data_test.cpp	use 'contains' to check for membership
+3	readability-use-anyofallof	tests/rotation_data_test.cpp	replace loop by 'std::ranges::any_of()'
+1	readability-use-anyofallof	tests/scenario_test_04.cpp	replace loop by 'std::ranges::any_of()'
+1	performance-unnecessary-value-param	tests/scenario_test_support.h	parameter 'plan' of type 'ScenarioPlan' is passed by value and only copied once; consider moving it to avoid unnecessary copies
+1	readability-container-contains	tests/settings_test.cpp	use 'contains' to check for membership
+1	readability-use-anyofallof	tests/settings_test.cpp	replace loop by 'std::ranges::any_of()'
+1	readability-use-anyofallof	tests/tame_test.cpp	replace loop by 'std::ranges::any_of()'
+1	modernize-loop-convert	tests/telemetry_test.cpp	use range-based for loop instead
+1	performance-unnecessary-value-param	tests/telemetry_test.cpp	parameter 'options' of type 'BotTelemetry::Options' is passed by value and only copied once; consider moving it to avoid unnecessary copies
+1	readability-container-size-empty	tests/text_helpers_test.cpp	the 'empty' method should be used to check for emptiness instead of comparing to an empty object
+1	performance-unnecessary-value-param	tests/trade_ads_test.cpp	parameter 'options' of type 'PolicyOptions' is passed by value and only copied once; consider moving it to avoid unnecessary copies
+2	performance-inefficient-vector-operation	tests/trade_test.cpp	'push_back' is called inside a loop; consider pre-allocating the container capacity before the loop

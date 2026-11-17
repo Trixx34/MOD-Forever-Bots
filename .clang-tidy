@@ -1,0 +1,42 @@
+---
+# Performance-oriented clang-tidy profile (scripts/tidy.sh, docs/static-checks.md).
+# Goal: find copies in loops, by-value parameters, needless copies and repeated lookups in the bot pump
+# (hot path: ~800 bots per tick on prod). It is NOT a style check; style stays with clang-format and review.
+# Accepted findings live in .clang-tidy-baseline.txt: CI fails only on findings that are not in it.
+Checks: >
+  -*,
+  performance-*,
+  -performance-enum-size,
+  -performance-no-int-to-ptr,
+  -performance-avoid-endl,
+  bugprone-use-after-move,
+  bugprone-move-forwarding-reference,
+  bugprone-unused-return-value,
+  bugprone-string-constructor,
+  bugprone-suspicious-stringview-data-usage,
+  bugprone-inc-dec-in-conditions,
+  bugprone-unhandled-self-assignment,
+  readability-container-contains,
+  readability-container-size-empty,
+  readability-container-data-pointer,
+  readability-redundant-string-cstr,
+  readability-redundant-string-init,
+  readability-use-anyofallof,
+  modernize-use-emplace,
+  modernize-pass-by-value,
+  modernize-loop-convert
+# Why some are off: performance-enum-size (hundreds of enums, no win), performance-no-int-to-ptr (SDK shared-memory code),
+# performance-avoid-endl (logging paths only). Not enabled on purpose: bugprone-* in bulk, readability-* in bulk, modernize-* in bulk (noise).
+WarningsAsErrors: ''
+# Only look at our own headers: src/ and tests/ of this repo and the SDK headers under include/. System, protobuf and build-dir headers stay quiet.
+HeaderFilterRegex: '.*/(src|tests|include/forever)/.*'
+FormatStyle: none
+CheckOptions:
+  performance-unnecessary-value-param.AllowedTypes: 'std::function;std::string_view;std::span'
+  performance-for-range-copy.WarnOnAllAutoCopies: true
+  performance-inefficient-vector-operation.EnableProto: false
+  performance-move-const-arg.CheckTriviallyCopyableMove: false
+  performance-unnecessary-copy-initialization.AllowedTypes: ''
+  modernize-loop-convert.MinConfidence: reasonable
+  modernize-pass-by-value.IncludeStyle: llvm
+  readability-use-anyofallof.IgnoreMissingTypes: true
