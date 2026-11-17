@@ -158,6 +158,10 @@ struct BotSettings
     // their spells on level-up, so they do not need a trainer.
     std::uint32_t ServiceEverySec = 600;
     std::uint32_t TrainEverySec = 0;
+    // Hunter taming (config key TameDeadPetBackoffSec, 60..86400; 0 = off, the default). When Tame Beast is refused because a dead stored pet fills the pet slot and
+    // neither Call Pet nor Revive Pet works (Revive Pet not learned), the hunter stops the Tame / Call Pet / Revive Pet loop and waits this long, with a
+    // "tame_failed ... why=pet_dead_no_revive" event, instead of retrying every 20 seconds to 10 minutes. Off keeps the old loop.
+    std::uint32_t TameDeadPetBackoffSec = 0;
     // Parties (M8): PartySize bots per party (config key PartySize, 0 = no parties, at most 5) and PartyCount parties,
     // cut from the lowest-guid bots (config key PartyCount, 1..100).
     std::uint32_t PartySize = 0;

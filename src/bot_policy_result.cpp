@@ -624,6 +624,13 @@ void BotPolicy::ReadCastResult(BotState& state, BotSnapshot const& bot, std::uin
                 {
                     state.PetDead = false; // maybe it was alive after all, or there is no pet: Call Pet is tried again after the backoff
                     state.PetMissing = true;
+                    if (state.TamePetFirst && _options.TameDeadPetBackoffMs != 0)
+                    {
+                        // Tame Beast refused (a stored pet fills the slot), Call Pet refused (it is dead) and now Revive Pet refused: stop the loop.
+                        state.TameRetryAtMs = std::max(state.TameRetryAtMs, nowMs + _options.TameDeadPetBackoffMs);
+                        if (_options.OnEvent)
+                            _options.OnEvent("tame_failed: bot=" + std::to_string(bot.guid) + " target=" + std::to_string(state.TameTarget) + " why=pet_dead_no_revive");
+                    }
                     state.TamePetFirst = false; // neither Call Pet nor Revive Pet finds a stored pet: the refusal of Tame Beast had another cause
                     ++state.PetFailures;
                     std::uint64_t wait = kPetBackoffMs;
@@ -639,6 +646,13 @@ void BotPolicy::ReadCastResult(BotState& state, BotSnapshot const& bot, std::uin
                 break;
             case BotActionStatus::kNotKnown:
             case BotActionStatus::kUnknownSpell:
+                if (spell == kRevivePet && state.TamePetFirst && state.PetDead && _options.TameDeadPetBackoffMs != 0)
+                {
+                    // Revive Pet is not learned (about half the prod hunters never get it) and the pet is dead: Tame Beast will keep being refused.
+                    state.TameRetryAtMs = std::max(state.TameRetryAtMs, nowMs + _options.TameDeadPetBackoffMs);
+                    if (_options.OnEvent)
+                        _options.OnEvent("tame_failed: bot=" + std::to_string(bot.guid) + " target=" + std::to_string(state.TameTarget) + " why=pet_dead_no_revive");
+                }
                 state.TamePetFirst = false; // the spell is not learned: nothing to call or revive
                 break;
             default:

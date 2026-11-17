@@ -41,6 +41,9 @@ Module.forever-bots.TelemetrySummarySec = 60
 # The trainer check (M4) is off by default, since bots learn their spells on level-up. TrainEverySec (60..86400) turns it
 # on: the bot checks the trainer every that many seconds, and at once after a level-up, when a trainer is in range.
 #   Module.forever-bots.TrainEverySec = 600
+# Hunter taming: a hunter whose stored pet is dead and who does not know Revive Pet cannot tame (Tame Beast is refused while the dead pet is the current
+# pet). 0 = keep retrying (default); 60..86400 = stop that loop for this many seconds and log tame_failed why=pet_dead_no_revive.
+#   Module.forever-bots.TameDeadPetBackoffSec = 1800
 
 # Urgent repair (on by default; independent of AutoGearing and of ServiceEverySec): the routine visit above is only made by an idle bot, and a bot with
 # quest work is never idle, so leveling bots wore broken gear (prod 2026-11-14: 232 of 463 equipped pieces at durability 0). A bot with an equipped piece

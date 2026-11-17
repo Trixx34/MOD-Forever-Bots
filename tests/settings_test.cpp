@@ -293,6 +293,11 @@ void ServiceSettings()
     CHECK(s.ServiceEverySec == 300);
     CHECK(s.TrainEverySec == 0); // 30 is below the minimum: the default (off), with a warning
     CHECK(warnings.size() == 1);
+    warnings.clear();
+    CHECK(ParseBotSettings({}, warnings).TameDeadPetBackoffSec == 0); // off by default
+    CHECK(ParseBotSettings({ { "TameDeadPetBackoffSec", "1800" } }, warnings).TameDeadPetBackoffSec == 1800);
+    CHECK(ParseBotSettings({ { "TameDeadPetBackoffSec", "0" } }, warnings).TameDeadPetBackoffSec == 0);
+    CHECK(warnings.empty());
 }
 
 void TelemetryRotationSettings()
