@@ -4,11 +4,26 @@
 
 void BotPolicy::TurnReputation(DecideTick& tick, BotTurn& turn)
 {
-    if (!_options.Reputation.Enabled || !_options.ReputationFacts)
+    if (!_options.Reputation.Enabled)
         return;
     std::uint64_t const nowMs = tick.nowMs;
     BotSnapshot const& bot = turn.bot;
     BotState& state = turn.state;
+
+    // The planner: which faction and which quest or creature earns the bot reputation now. It is cheap when nothing is due and bounded by the budget when it plans.
+    if (_options.ReputationPlan.Enabled && _options.ReputationPlanData && bot.level >= _options.Reputation.MinLevel)
+    {
+        reputation::Facts planFacts = _options.ReputationFacts ? _options.ReputationFacts(bot) : reputation::Facts{};
+        planFacts.Level = bot.level;
+        if (planFacts.Side == 0 && _options.SideOf)
+            planFacts.Side = _options.SideOf(bot.guid);
+        reputation::Step const step = reputation::Advance(*_options.ReputationPlanData, _options.ReputationPlan, state.RepTrack, planFacts, bot.guid, nowMs);
+        if (step.Valid && step.Changed && _options.OnEvent)
+            _options.OnEvent("rep_plan: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " faction=" + std::to_string(step.Faction) +
+                             (step.Src->What == reputation::Source::kKill ? " kill=" : " quest=") + std::to_string(step.Src->Id) + " points=" + std::to_string(step.Src->Points));
+    }
+    if (!_options.ReputationFacts)
+        return;
     reputation::Settings const& settings = _options.Reputation;
 
     // A buy made earlier is judged once the core has counted again: less money or fewer free slots is a purchase; otherwise the vendor had nothing the bot

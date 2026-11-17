@@ -307,6 +307,28 @@ void LoadPolicyTables(PolicyOptions& policyOptions, BotSettings& settings)
         std::cerr << "forever-bots: reputation goals: " << policyOptions.ReputationGoals.size() << " from " << settings.ReputationGoalFile
                   << (in ? "" : " (not readable)") << "; no reputation facts from the core yet, so no visits happen (doc/reputation.md)\n";
     }
+    policyOptions.ReputationPlan = settings.ReputationPlan;
+    if (settings.Reputation.Enabled && settings.ReputationPlan.Enabled)
+    {
+        auto slurp = [](std::string const& path, bool& readable) {
+            std::ifstream in(path);
+            readable = static_cast<bool>(in);
+            std::ostringstream text;
+            text << in.rdbuf();
+            return text.str();
+        };
+        bool targetsOk = false, sourcesOk = false;
+        std::vector<std::string> planWarnings;
+        std::string const targetText = slurp(settings.ReputationTargetFile, targetsOk);
+        std::string const sourceText = slurp(settings.ReputationSourceFile, sourcesOk);
+        auto targets = reputation::ParseTargets(targetText, planWarnings);
+        auto sources = reputation::ParseSources(sourceText, planWarnings);
+        for (std::string const& warning : planWarnings)
+            std::cerr << "forever-bots: reputation plan: " << warning << "\n";
+        policyOptions.ReputationPlanData = std::make_shared<reputation::PlanData>(reputation::BuildPlanData(std::move(targets), std::move(sources)));
+        std::cerr << "forever-bots: reputation plan: " << policyOptions.ReputationPlanData->Targets.size() << " targets, " << policyOptions.ReputationPlanData->Sources.size()
+                  << " sources" << (targetsOk && sourcesOk ? "" : " (a file is not readable)") << "\n";
+    }
     policyOptions.PartySize = settings.PartySize;
     policyOptions.PartyCount = settings.PartyCount;
     policyOptions.PartyPercent = settings.PartyPercent;
