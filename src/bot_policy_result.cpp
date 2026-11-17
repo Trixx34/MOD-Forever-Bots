@@ -463,6 +463,35 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
 // Split from ReadResult (which has already taken the sequence): a spell with no id, or any other action type, is not read here.
 void BotPolicy::NoteMoveRefused(BotState& state, BotSnapshot const& bot, std::uint64_t nowMs)
 {
+    // Route filter: the walk to the grind spot or explore point that is refused while the bot stands at it (within RouteFilterArrivedYards) is an arrival, not a missing route
+    // (14 percent of the prod no_route events were these; three bots arriving at one spot used to block it for every bot). The place is marked reached and the walk ends as an arrival.
+    bool const filterOn = _options.RouteFilter.Enabled && state.LastMove.has_value() && state.LastMove->Target == 0;
+    bool const grindWalk = filterOn && state.Wandering && state.GrindSpotIndex != std::size_t(-1) && _options.Grind && state.GrindSpotIndex < _options.Grind->Spots.size() &&
+                           std::hypot(state.GrindTarget.X - state.LastMove->Dest.X, state.GrindTarget.Y - state.LastMove->Dest.Y) < 1.0f;
+    bool const exploreWalk = filterOn && !grindWalk && state.Wandering &&
+                             std::hypot(state.ExploreTarget.X - state.LastMove->Dest.X, state.ExploreTarget.Y - state.LastMove->Dest.Y) < 1.0f;
+    if (filterOn)
+        RouteFilterSync(state, bot);
+    if ((grindWalk || exploreWalk) &&
+        std::hypot(bot.pos_x - state.LastMove->Dest.X, bot.pos_y - state.LastMove->Dest.Y) < float(_options.RouteFilter.ArrivedYards))
+    {
+        if (grindWalk)
+            _routeMemory.Reached(bot.guid, route_filter::SpotKey(state.GrindSpotIndex),
+                                 route_filter::SpotStartKey(state.GrindSpotIndex, state.GrindFromX, state.GrindFromY, _options.RouteFilter.StartCellYards));
+        else
+            _routeMemory.Reached(bot.guid, route_filter::PointKey(bot.map_id, state.LastMove->Dest.X, state.LastMove->Dest.Y, _options.RouteFilter.CellYards));
+        state.Wandering = false;
+        state.IdleSinceMs = nowMs;
+        if (exploreWalk)
+        {
+            state.ExploreRefusals = 0;
+            state.ExploreScale = 1.0f;
+            state.ExploreFailStreak = 0;
+        }
+        if (_options.OnEvent)
+            _options.OnEvent("route_filter_arrived: bot=" + std::to_string(bot.guid) + " kind=" + (grindWalk ? "grind" : "explore") + " map=" + std::to_string(bot.map_id));
+        return;
+    }
     state.WalkBlockedAtMs = nowMs;
     // The same refused move must not be sent again every tick (it was 26 times a second for 220 bots): the place is blocked for a pause that
     // doubles with every refusal in a row, 5 s up to 2 minutes.
@@ -483,6 +512,20 @@ void BotPolicy::NoteMoveRefused(BotState& state, BotSnapshot const& bot, std::ui
             std::hypot(state.GrindTarget.X - state.LastMove->Dest.X, state.GrindTarget.Y - state.LastMove->Dest.Y) < 1.0f &&
             _grindBlocks.Report(state.GrindSpotIndex, bot.guid, nowMs) && _options.OnEvent)
             _options.OnEvent("grind_spot_blocked: spot=" + std::to_string(state.GrindSpotIndex) + " minutes=" + std::to_string(kGrindBlockMs / 60000));
+        // Route filter: the refused spot or explore cell is remembered for this bot, and for every bot once enough bots were refused there.
+        if (grindWalk)
+        {
+            if (_routeMemory.Refuse(bot.guid, route_filter::SpotKey(state.GrindSpotIndex), nowMs,
+                                    route_filter::SpotStartKey(state.GrindSpotIndex, state.GrindFromX, state.GrindFromY, _options.RouteFilter.StartCellYards)) && _options.OnEvent)
+                _options.OnEvent("route_filter_shared: kind=grind spot=" + std::to_string(state.GrindSpotIndex) + " map=" + std::to_string(bot.map_id));
+        }
+        else if (exploreWalk)
+        {
+            if (_routeMemory.Refuse(bot.guid, route_filter::PointKey(bot.map_id, state.LastMove->Dest.X, state.LastMove->Dest.Y, _options.RouteFilter.CellYards), nowMs) && _options.OnEvent)
+                _options.OnEvent("route_filter_shared: kind=explore map=" + std::to_string(bot.map_id) + " cell=" + std::to_string(int(state.LastMove->Dest.X)) + "," +
+                                 std::to_string(int(state.LastMove->Dest.Y)));
+            ++state.ExploreFailStreak;
+        }
     }
 
 }

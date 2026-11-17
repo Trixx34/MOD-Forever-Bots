@@ -244,6 +244,7 @@ void LoadPolicyTables(PolicyOptions& policyOptions, BotSettings& settings)
     policyOptions.PathJitter = settings.PathJitter;
     policyOptions.Personality = settings.Personality;
     policyOptions.PathVariety = settings.PathVariety;
+    policyOptions.RouteFilter = settings.RouteFilter;
     policyOptions.GuildMilestone = settings.GuildMilestone;
     policyOptions.CityInspect = settings.CityInspect;
     policyOptions.TransportRide = settings.TransportRide;

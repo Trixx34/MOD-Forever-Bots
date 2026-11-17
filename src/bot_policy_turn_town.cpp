@@ -433,8 +433,15 @@ void BotPolicy::TurnWander(DecideTick& tick, BotTurn& turn)
         {
             bool const arrived = DistanceTo(bot, state.GrindTarget) <= kHubReachYards;
             bool const timedOut = nowMs - state.WanderStartMs > kWanderTimeoutMs || (state.WalkBlockedAtMs != 0 && state.WalkBlockedAtMs >= state.WanderStartMs); // no route: the walk ends, not re-sent every tick
-            if (arrived || timedOut)
+            // Route filter: Wandering is shared with the explore walk, so a walk that began as exploring can be here with a stale GrindTarget; a refused spot is not walked to again.
+            bool const refusedSpot = _options.RouteFilter.Enabled && !arrived && state.GrindSpotIndex != std::size_t(-1) &&
+                                     _routeMemory.Blocked(bot.guid, route_filter::SpotKey(state.GrindSpotIndex), nowMs,
+                                                                                                    route_filter::SpotStartKey(state.GrindSpotIndex, state.GrindFromX, state.GrindFromY, _options.RouteFilter.StartCellYards));
+            if (arrived || timedOut || refusedSpot)
             {
+                if (arrived && _options.RouteFilter.Enabled && state.GrindSpotIndex != std::size_t(-1))
+                    _routeMemory.Reached(bot.guid, route_filter::SpotKey(state.GrindSpotIndex),
+                                         route_filter::SpotStartKey(state.GrindSpotIndex, state.GrindFromX, state.GrindFromY, _options.RouteFilter.StartCellYards)); // proven reachable
                 state.Wandering = false;
                 state.IdleSinceMs = nowMs;
             }
@@ -459,6 +466,8 @@ void BotPolicy::TurnWander(DecideTick& tick, BotTurn& turn)
                 GrindSpot const& spot = _options.Grind->Spots[spots[pick]];
                 state.GrindTarget = Point{ spot.X, spot.Y, spot.Z };
                 state.GrindSpotIndex = spots[pick];
+                state.GrindFromX = bot.pos_x;
+                state.GrindFromY = bot.pos_y;
                 NoteGrindPick(bot.guid, spots[pick]);
                 if (_options.RandomPct > 0)
                 {
@@ -556,13 +565,40 @@ void BotPolicy::TurnWander(DecideTick& tick, BotTurn& turn)
         // Starts a walk to a new random point; scale shortens it (a retry after a refused point). The point is at the bot's own height, so
         // the core often has no route to it (open ground the navmesh does not cover): a refused point is retried nearer, not after the idle pause.
         auto const startExploreWalk = [&](float scale) {
-            float const angle = float((bot.guid * 2654435761ull) % 628) * 0.01f + float(state.ExploreStep) * 2.399963f;
-            float radius = (50.0f + 25.0f * float(state.ExploreStep % 3)) * scale;
-            if (_options.RandomPct > 0)
-                radius = float(bot_random::Vary(std::uint64_t(radius), _options.RandomPct,
-                                                bot_random::Draw(_options.RandomSeed, bot.guid, bot_random::kSaltJitter, 0x200000000ull + state.ExploreStep)));
-            ++state.ExploreStep;
-            state.ExploreTarget = Point{ bot.pos_x + std::cos(angle) * radius, bot.pos_y + std::sin(angle) * radius, bot.pos_z };
+            // Route filter: up to ExploreTries candidates (the next directions of the same sequence) are looked at, and the first one whose cell the core did not just refuse
+            // (this bot, or enough bots) is taken. Off: one candidate, as before.
+            std::uint32_t const tries = _options.RouteFilter.Enabled ? _options.RouteFilter.ExploreTries : 1;
+            Point candidate{};
+            bool found = false;
+            if (_options.RouteFilter.Enabled)
+                RouteFilterSync(state, bot);
+            for (std::uint32_t attempt = 0; attempt < tries && !found; ++attempt)
+            {
+                float const angle = float((bot.guid * 2654435761ull) % 628) * 0.01f + float(state.ExploreStep) * 2.399963f;
+                float radius = (50.0f + 25.0f * float(state.ExploreStep % 3)) * scale;
+                if (_options.RandomPct > 0)
+                    radius = float(bot_random::Vary(std::uint64_t(radius), _options.RandomPct,
+                                                    bot_random::Draw(_options.RandomSeed, bot.guid, bot_random::kSaltJitter, 0x200000000ull + state.ExploreStep)));
+                ++state.ExploreStep;
+                candidate = Point{ bot.pos_x + std::cos(angle) * radius, bot.pos_y + std::sin(angle) * radius, bot.pos_z };
+                found = !_options.RouteFilter.Enabled ||
+                        !_routeMemory.Blocked(bot.guid, route_filter::PointKey(bot.map_id, candidate.X, candidate.Y, _options.RouteFilter.CellYards), nowMs);
+            }
+            if (!found)
+            {
+                // Every candidate is a place the core refused: no walk now (nothing is sent), the pause grows like after a refusal.
+                state.Wandering = false;
+                state.IdleSinceMs = nowMs;
+                ++state.ExploreFailStreak;
+                if (_options.OnEvent && nowMs - state.RouteFilterLoggedMs >= 60000)
+                {
+                    state.RouteFilterLoggedMs = nowMs;
+                    _options.OnEvent("route_filter_skip: bot=" + std::to_string(bot.guid) + " kind=explore map=" + std::to_string(bot.map_id) + " tries=" + std::to_string(tries) +
+                                     " streak=" + std::to_string(state.ExploreFailStreak));
+                }
+                return;
+            }
+            state.ExploreTarget = candidate;
             state.Wandering = true;
             state.WanderStartMs = nowMs;
             wanted = Decision{ ActionType::kMoveTo, 0, state.ExploreTarget };
@@ -586,6 +622,8 @@ void BotPolicy::TurnWander(DecideTick& tick, BotTurn& turn)
                 state.IdleSinceMs = nowMs; // the next walk starts after kExploreIdleMs
                 state.ExploreRefusals = 0;
                 state.ExploreScale = 1.0f;
+                if (arrived)
+                    state.ExploreFailStreak = 0;
                 if (state.ExploreStep % 8 == 0)
                     state.HubFailures = 0; // try the hubs again now and then
             }
@@ -596,7 +634,7 @@ void BotPolicy::TurnWander(DecideTick& tick, BotTurn& turn)
                 idle = false;
             }
         }
-        else if (nowMs - state.IdleSinceMs >= bot_random::Vary(kExploreIdleMs, std::min<std::uint32_t>(_options.RandomPct * 2, 90),
+        else if (nowMs - state.IdleSinceMs >= bot_random::Vary(route_filter::ExploreIdleMs(_options.RouteFilter, kExploreIdleMs, state.ExploreFailStreak), std::min<std::uint32_t>(_options.RandomPct * 2, 90),
                                                                bot_random::Draw(_options.RandomSeed, bot.guid, bot_random::kSaltIdle, 0x100000000ull + state.ExploreStep)))
         {
             state.ExploreRefusals = 0;

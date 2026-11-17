@@ -753,6 +753,16 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
         else
             warnings.push_back("Module.forever-bots.PathJitterYards: '" + it->second + "' is not a number from 0 to 5; using the default.");
     }
+    ReadBool(config, "RouteFilter", settings.RouteFilter.Enabled, warnings);
+    ReadKey(config, "RouteFilterTtlSec", 10, 3600, settings.RouteFilter.TtlSec, warnings);
+    ReadKey(config, "RouteFilterMaxTtlSec", 60, 86400, settings.RouteFilter.MaxTtlSec, warnings);
+    ReadKey(config, "RouteFilterCellYards", 2, 64, settings.RouteFilter.CellYards, warnings);
+    ReadKey(config, "RouteFilterSharedBots", 0, 20, settings.RouteFilter.SharedBots, warnings);
+    ReadKey(config, "RouteFilterStartCellYards", 0, 2000, settings.RouteFilter.StartCellYards, warnings);
+    ReadKey(config, "RouteFilterMaxEntries", 100, 100000, settings.RouteFilter.MaxEntries, warnings);
+    ReadKey(config, "RouteFilterArrivedYards", 2, 30, settings.RouteFilter.ArrivedYards, warnings);
+    ReadKey(config, "RouteFilterExploreTries", 1, 16, settings.RouteFilter.ExploreTries, warnings);
+    ReadKey(config, "RouteFilterExploreBackoffMaxSec", 0, 3600, settings.RouteFilter.ExploreBackoffMaxSec, warnings);
     ReadBool(config, "PathVariety", settings.PathVariety.Enabled, warnings);
     ReadKey(config, "PathZoneSpread", 0, 100, settings.PathVariety.ZoneSpread, warnings);
     ReadKey(config, "PathZoneSoftCap", 0, 500, settings.PathVariety.ZoneSoftCap, warnings);

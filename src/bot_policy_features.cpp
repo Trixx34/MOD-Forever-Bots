@@ -14,12 +14,38 @@ std::vector<std::size_t> BotPolicy::GrindSpotsForBot(BotState& state, BotSnapsho
             _options.OnEvent("grind_blocks_lifted: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id) +
                              " blocked=" + std::to_string(blocked.size()));
     }
+    // Route filter: a spot this bot (or enough bots) was refused at for "no route" is left out for a while; with none left the bot explores on foot and looks again.
+    if (_options.RouteFilter.Enabled && !spots.empty())
+    {
+        RouteFilterSync(state, bot);
+        std::size_t const before = spots.size();
+        std::erase_if(spots, [&](std::size_t i) { return _routeMemory.Blocked(bot.guid, route_filter::SpotKey(i), nowMs, route_filter::SpotStartKey(i, bot.pos_x, bot.pos_y, _options.RouteFilter.StartCellYards)); });
+        if (spots.size() != before && _options.OnEvent && nowMs - state.RouteFilterLoggedMs >= 60000)
+        {
+            state.RouteFilterLoggedMs = nowMs;
+            _options.OnEvent("route_filter_skip: bot=" + std::to_string(bot.guid) + " kind=grind level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id) +
+                             " skipped=" + std::to_string(before - spots.size()) + " left=" + std::to_string(spots.size()));
+        }
+    }
     if (_options.PathVariety.Enabled && _options.PathZones && spots.size() > 1)
         spots = PathVarySpots(state, bot, std::move(spots));
     if (spots.empty() && _options.OnEvent)
         _options.OnEvent("grind_none: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id) +
                          " blocked=" + std::to_string(blocked.size()));
     return spots;
+}
+
+void BotPolicy::RouteFilterSync(BotState& state, BotSnapshot const& bot)
+{
+    if (state.RouteFilterMap == bot.map_id && state.RouteFilterLevel == bot.level)
+        return;
+    if (state.RouteFilterMap != 0xFFFFFFFFu)
+    {
+        _routeMemory.ForgetBot(bot.guid);
+        state.ExploreFailStreak = 0;
+    }
+    state.RouteFilterMap = bot.map_id;
+    state.RouteFilterLevel = bot.level;
 }
 
 void BotPolicy::NoteGrindPick(std::uint64_t bot, std::size_t spot)

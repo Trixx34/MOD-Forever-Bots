@@ -301,6 +301,18 @@ Module.forever-bots.TelemetrySummarySec = 60
 # PathStartOffsetMaxSec = 120   (0..900: the first grind walk and the first vendor trip after login start up to this long later, per bot)
 # PathTripSpreadPct = 25        (0..60: the vendor interval varies per bot by +- this percent)
 # PathTrainDelayMaxSec = 60     (0..600: the trainer visit after a level-up waits up to this long, per bot)
+# RouteFilter = 0        (route filter, doc/route-filter.md: the grind and explore states do not choose a destination the core just refused as "no route". A refused grind spot or
+#                         explore cell is skipped by that bot for RouteFilterTtlSec (doubling on each repeat), by every bot once RouteFilterSharedBots different bots were refused there;
+#                         a refusal at the destination itself counts as an arrival, not a failure. A bot forgets its own refusals when its level or map changes. 0 = nothing changes)
+# RouteFilterTtlSec = 300           (10..3600: first lifetime of a refused spot or cell)
+# RouteFilterMaxTtlSec = 3600       (60..86400: longest lifetime after repeats)
+# RouteFilterCellYards = 8          (2..64: side of the square a refused explore point stands for)
+# RouteFilterSharedBots = 3         (0..20: different bots refused at one place before every bot skips it; 0 = never shared)
+# RouteFilterStartCellYards = 200   (0..2000: a grind spot is shared per start cell of this size, because a spot that fails from one region is often reachable from another; 0 = per spot)
+# RouteFilterMaxEntries = 4000      (100..100000: shared places kept)
+# RouteFilterArrivedYards = 8       (2..30: a refusal this close to the destination is an arrival)
+# RouteFilterExploreTries = 6       (1..16: explore directions looked at before the walk is skipped this time)
+# RouteFilterExploreBackoffMaxSec = 600   (0..3600: the pause between explore walks doubles every 3 refusals in a row up to this; 0 = no backoff)
 # Personality = 0        (each bot gets five stable traits from RandomSeed and its guid: pace, caution, sociability, session length, patience. They tune existing
 #                         behaviours a little so bots do not all act alike. Only a bot without a party or route, out of combat, is varied in its pulls; no survival rule,
 #                         level or elite guard, rotation, party, dungeon route or raid is changed. Every effect has its own strength; 0 switches that effect off)

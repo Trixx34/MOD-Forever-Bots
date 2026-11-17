@@ -784,6 +784,13 @@ void RealismSettings()
             BotSettings const pv1 = ParseBotSettings({ { "PathVariety", "1" }, { "PathZoneSoftCap", "9999" }, { "PathSpotMax", "0" }, { "PathQuestOrderWindow", "0" }, { "PathZoneFile", "data/grind_zones.txt" } }, w);
             CHECK(pv1.PathVariety.Enabled && pv1.PathVariety.ZoneSoftCap == 40 && pv1.PathVariety.SpotMax == 0 && pv1.PathVariety.QuestOrderWindow == 3 && pv1.PathZoneFile == "data/grind_zones.txt");
         }
+        {
+            BotSettings const rf0 = ParseBotSettings({}, w);
+            CHECK(!rf0.RouteFilter.Enabled && rf0.RouteFilter.TtlSec == 300 && rf0.RouteFilter.MaxTtlSec == 3600 && rf0.RouteFilter.CellYards == 8 && rf0.RouteFilter.SharedBots == 3 && rf0.RouteFilter.StartCellYards == 200 &&
+                  rf0.RouteFilter.MaxEntries == 4000 && rf0.RouteFilter.ArrivedYards == 8 && rf0.RouteFilter.ExploreTries == 6 && rf0.RouteFilter.ExploreBackoffMaxSec == 600);
+            BotSettings const rf1 = ParseBotSettings({ { "RouteFilter", "1" }, { "RouteFilterTtlSec", "60" }, { "RouteFilterSharedBots", "0" }, { "RouteFilterCellYards", "1" }, { "RouteFilterExploreBackoffMaxSec", "0" } }, w);
+            CHECK(rf1.RouteFilter.Enabled && rf1.RouteFilter.TtlSec == 60 && rf1.RouteFilter.SharedBots == 0 && rf1.RouteFilter.CellYards == 8 && rf1.RouteFilter.ExploreBackoffMaxSec == 0);
+        }
         BotSettings const pOff = ParseBotSettings({}, w);
         CHECK(!pOff.Personality.Enabled && pOff.Personality.RestStrength == 50 && pOff.Personality.ReactionMaxMs == 3000 && pOff.Personality.MistakeMaxPct == 5);
         BotSettings const pOn = ParseBotSettings({ { "Personality", "1" }, { "PersonalityRestStrength", "0" }, { "PersonalityReactionMaxMs", "500" }, { "PersonalityMistakeMaxPct", "99" } }, w);

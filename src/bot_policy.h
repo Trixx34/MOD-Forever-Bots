@@ -45,6 +45,7 @@
 #include "combat_rotation.h"
 #include "grind_data.h"
 #include "path_variety.h"
+#include "route_filter.h"
 #include "reputation_plan.h"
 #include "level_dungeon.h"
 #include "ground_avoid.h"
@@ -425,6 +426,8 @@ struct PolicyOptions
     // grind spot (built from the grind data and the PathZoneFile samples when the policy is made).
     path_variety::Settings PathVariety;
     std::shared_ptr<path_variety::ZoneIndex const> PathZones;
+    // Route filter (route_filter.h; off by default): the explore and grind states do not choose a destination the core just refused for "no route".
+    route_filter::Settings RouteFilter;
     std::function<std::uint8_t(std::uint64_t botGuid)> SideOf;
     // The faction for the bot parties (a party is one side): like SideOf, and it also knows the custom races. Unset, SideOf is used.
     std::function<std::uint8_t(std::uint64_t botGuid)> PartySideOf;
@@ -591,7 +594,7 @@ class BotPolicy
 {
 public:
     explicit BotPolicy(PolicyOptions options = {}) : _options(options), _questSets(MakeQuestSets(options)), _knownWorld(MakeKnownWorld(options)), _scenarioRoute(ScenarioRouteOf(options)),
-                                                     _whispers(options.WhisperCooldownMs, options.WhisperMaxPerMin) {}
+                                                     _whispers(options.WhisperCooldownMs, options.WhisperMaxPerMin) { _routeMemory.Configure(options.RouteFilter); }
 
     // Actions for the bots in `view`. nowMs is a monotonic clock in milliseconds (cooldowns, retries, fight time).
     // Decisions are sent only when they change; casts follow the rotation, the global cooldown and the retries.
@@ -963,6 +966,12 @@ private:
         bool Wandering = false;                          // walking to a hub
         std::uint64_t WanderStartMs = 0;                 // when this walk began; dropped after kWanderTimeoutMs
         Point GrindTarget;                               // the grind spot being walked to
+        float GrindFromX = 0.0f;                         // route filter: where the grind walk under way began (the shared key of a refusal)
+        float GrindFromY = 0.0f;
+        std::uint32_t ExploreFailStreak = 0;             // route filter: explore walks refused in a row (the pause before the next one grows), 0 after an arrival
+        std::uint32_t RouteFilterMap = 0xFFFFFFFFu;      // route filter: the map and level the bot's refused-place memory is for (a change drops it)
+        std::uint32_t RouteFilterLevel = 0;
+        std::uint64_t RouteFilterLoggedMs = 0;           // route filter: last skip line of this bot
         std::size_t GrindSpotIndex = std::size_t(-1);    // the grind spot being walked to (index), -1 when none; a no-route answer is reported against it
         // Path variety: the home zone key (0 = none yet), the level it was looked at, the draws made, the spot counted in the crowd, the one-time start offsets
         std::uint32_t PathZoneKey = 0;
@@ -1517,6 +1526,8 @@ private:
     off_map::KnownWorld _knownWorld;
     // The planner for this bot: its side (SideOf) and its band (level 60 or more is band 1).
     QuestPlanner const& QuestsFor(forever_module::BotSnapshot const& bot) const;
+    route_filter::Memory _routeMemory;               // route filter: refused spots and points, per bot and shared
+    void RouteFilterSync(BotState& state, forever_module::BotSnapshot const& bot);  // drops the bot's memory when its map or level changed
     GrindBlocklist _grindBlocks;                     // grind spots no bot can reach, shared by all bots
     // The single-dungeon route of the options, and the per-bot one when several dungeons run (SetScenarioRouteFor).
     static PolicyOptions::ScenarioRoute ScenarioRouteOf(PolicyOptions const& options);
