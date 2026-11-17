@@ -1472,6 +1472,7 @@ private:
         std::uint64_t UntilMs = 0;
     };
     std::map<std::pair<std::uint32_t, std::uint64_t>, BuffClaim> _buffClaims;
+    std::uint64_t _buffClaimsPruneAtMs = 0;   // the next time the expired claims are dropped (TurnUpkeepBuffs)
     realism::ZoneRate _passingBuffRate;   // passing-player buffs a minute per map
     realism::AfkZones _afkZones;          // bots staying at a hub, per map
     std::map<std::uint64_t, std::pair<std::uint64_t, std::uint64_t>> _tameClaims;   // beast reference -> (hunter, when its hold ends): one hunter per beast

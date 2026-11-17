@@ -89,6 +89,22 @@ SpellCostData LoadSpellCosts(std::string const& path, std::vector<std::string>& 
 
 std::optional<Payment> SpellCostData::CostAtLevel(std::uint32_t firstRank, std::uint32_t level) const
 {
+    if (_costAtLevelFor != BySpell.size())
+    {
+        _costAtLevel.clear();
+        _costAtLevelFor = BySpell.size();
+    }
+    std::uint64_t const key = (std::uint64_t(firstRank) << 32) | level;
+    if (auto const cached = _costAtLevel.find(key); cached != _costAtLevel.end())
+        return cached->second;
+    std::optional<Payment> const answer = CostAtLevelUncached(firstRank, level);
+    if (_costAtLevel.size() < 100000)
+        _costAtLevel.emplace(key, answer);
+    return answer;
+}
+
+std::optional<Payment> SpellCostData::CostAtLevelUncached(std::uint32_t firstRank, std::uint32_t level) const
+{
     auto const first = BySpell.find(firstRank);
     if (first == BySpell.end())
         return std::nullopt;

@@ -718,9 +718,15 @@ void BotPolicy::TurnUpkeepBuffs(DecideTick& tick, BotTurn& turn)
     {
         bool cast = false;
         // Claims that have run out are dropped; the map is bounded so a long run cannot grow it.
-        if (_buffClaims.size() > 256)
+        // At most once every kBuffClaimsPruneMs: every claim is checked against its own UntilMs where it is read, so when the walk happens changes nothing, and a
+        // walk per idle bot per tick over a map of live claims (they last the buff's duration) was 5% of the pump at 195 bots.
+        constexpr std::uint64_t kBuffClaimsPruneMs = 5000;
+        if (_buffClaims.size() > 256 && nowMs >= _buffClaimsPruneAtMs)
+        {
+            _buffClaimsPruneAtMs = nowMs + kBuffClaimsPruneMs;
             for (auto it = _buffClaims.begin(); it != _buffClaims.end();)
                 it = nowMs >= it->second.UntilMs ? _buffClaims.erase(it) : std::next(it);
+        }
         std::uint64_t const buffGroup = bot.group_leader_guid != 0 ? bot.group_leader_guid : bot.guid;
         rotation::Facts const buffFacts = rotation::FactsFor(bot, nearby, nullptr, 0);
         for (rotation::Row const& row : RowsFor(classId, spec))
@@ -752,11 +758,13 @@ void BotPolicy::TurnUpkeepBuffs(DecideTick& tick, BotTurn& turn)
             }
             // The recipients: the bot itself (reference 0), and for a party buff the members of its group that are alive and close.
             std::vector<std::pair<std::uint64_t, std::uint64_t>> recipients{ { 0, bot.guid } };   // (the cast's target reference, the member's guid)
-            if (row.Party)
-                for (BotSnapshot const& other : view.bots)
-                    if (other.guid != bot.guid && other.life_state == 0 && other.group_leader_guid != 0 && other.group_leader_guid == bot.group_leader_guid &&
-                        Distance2d(bot, other) <= kBuffRangeYards)
+            if (row.Party && bot.group_leader_guid != 0)
+                for (std::size_t const at : tick.LiveGroupMembers(bot.group_leader_guid))   // the living members of the bot's group, in view order
+                {
+                    BotSnapshot const& other = view.bots[at];
+                    if (other.guid != bot.guid && Distance2d(bot, other) <= kBuffRangeYards)
                         recipients.push_back({ PlayerRef(other.guid), other.guid });
+                }
             for (auto const& [recipient, recipientGuid] : recipients)
             {
                 // The party planner gave this member's buff to a closer caster: leave it (the claims below still guard a pair the plan does not cover).
