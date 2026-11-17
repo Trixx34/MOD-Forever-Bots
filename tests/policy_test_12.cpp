@@ -2,6 +2,7 @@
 // Policy tests, part 12: dynamic parties (DynamicParties, party_reason.h). The owner's rule (2026-11-14): a bot is in a party only while it makes sense
 // (the same quests, a group quest, a dungeon), it leaves for its errands, and it never groups with a bot on another map.
 #include "policy_test_support.h"
+#include "tame_beasts.h"
 #include "bot_policy_internal.h"
 #include "flex_roles.h"
 
@@ -240,6 +241,79 @@ void AFlexTankPullsFewerMobsThanAWarrior()
     CHECK(flex_roles::DungeonPullCap(11, kMaxDungeonPull) < kMaxDungeonPull);
 }
 
+// Hunter taming with a dead stored pet and no Revive Pet (prod 2026-11-17: tame_failed 814 of 817): the Tame / Call Pet / Revive Pet loop stops and waits
+// TameDeadPetBackoffMs, with one event, when the key is on; with it off the loop goes on as before.
+static std::vector<std::string> DeadPetRun(std::uint64_t backoffMs, bool& tamedAgain)
+{
+    auto beasts = std::make_shared<tame::TameBeasts>();
+    beasts->ByEntry[1] = tame::Beast{ 1, 1, 12 };
+    PolicyOptions options = AggressiveOptions();
+    options.ClassId = 3;
+    options.TameBeasts = beasts;
+    options.TameDeadPetBackoffMs = backoffMs;
+    std::vector<std::string> events;
+    options.OnEvent = [&](std::string const& line) { events.push_back(line); };
+    BotPolicy policy(options);
+    NearbyUnit beast = Unit(8, 7, 5.0f, false, 100);
+    beast.level = 8;
+    auto const build = [&](std::uint64_t tick)
+    {
+        WorldTickSnapshotView view = HunterView(tick, 14, { beast });
+        view.bots[0].pet_state = 0;
+        return view;
+    };
+    auto const result = [&](WorldTickSnapshotView& view, std::uint32_t spell, BotActionStatus status, std::uint64_t seq)
+    {
+        view.bots[0].last_action_sequence = seq;
+        view.bots[0].last_action_type = static_cast<std::uint8_t>(ActionType::kCastSpell);
+        view.bots[0].last_action_spell = spell;
+        view.bots[0].last_action_status = status;
+    };
+    std::uint64_t now = 1000;
+    std::uint64_t tick = 1;
+    std::uint64_t seq = 0;
+    auto step = [&](std::uint32_t spell, BotActionStatus status) -> std::vector<BotAction>
+    {
+        WorldTickSnapshotView view = build(++tick);
+        if (spell != 0)
+            result(view, spell, status, ++seq);
+        now += 3000;
+        return policy.Decide(view, now);
+    };
+    bool tamed = false;
+    for (int i = 0; i < 4 && !tamed; ++i)
+        tamed = HasCast(step(0, BotActionStatus::kApplied), 1515);
+    CHECK(tamed);
+    step(1515, BotActionStatus::kRefused);
+    now += 30000;
+    for (int i = 0; i < 3; ++i)
+        step(0, BotActionStatus::kApplied);
+    step(883, BotActionStatus::kRefused);
+    step(982, BotActionStatus::kNotKnown);
+    tamedAgain = false;
+    for (int i = 0; i < 8; ++i)
+    {
+        now += 3000;
+        tamedAgain = tamedAgain || HasCast(step(0, BotActionStatus::kApplied), 1515);
+    }
+    return events;
+}
+
+void ADeadPetWithoutRevivePetStopsTheTameLoopWhenKeyed()
+{
+    bool again = true;
+    auto const on = DeadPetRun(1800000, again);
+    bool seen = false;
+    for (std::string const& e : on)
+        seen = seen || e.find("why=pet_dead_no_revive") != std::string::npos;
+    CHECK(seen);
+    CHECK(!again);
+    bool offAgain = false;
+    auto const off = DeadPetRun(0, offAgain);
+    for (std::string const& e : off)
+        CHECK(e.find("why=pet_dead_no_revive") == std::string::npos);
+}
+
 } // namespace
 
 void RunPolicyTestsPart12()
@@ -258,4 +332,5 @@ void RunPolicyTestsPart12()
     AMemberOnAnErrandLeaves();
     AnAssignedRouteKeepsItsParty();
     OffKeepsTheStaticParties();
+    ADeadPetWithoutRevivePetStopsTheTameLoopWhenKeyed();
 }

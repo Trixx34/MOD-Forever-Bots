@@ -660,6 +660,10 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
         settings.TrainEverySec = 0; // explicitly off
     else
         ReadKey(config, "TrainEverySec", 60, 86400, settings.TrainEverySec, warnings);
+    if (auto const tame = config.find("TameDeadPetBackoffSec"); tame != config.end() && tame->second == "0")
+        settings.TameDeadPetBackoffSec = 0; // explicitly off
+    else
+        ReadKey(config, "TameDeadPetBackoffSec", 60, 86400, settings.TameDeadPetBackoffSec, warnings);
     ReadKey(config, "PartySize", 0, 5, settings.PartySize, warnings);
     ReadKey(config, "PartyCount", 1, 100, settings.PartyCount, warnings);
     ReadKey(config, "PartyPercent", 0, 100, settings.PartyPercent, warnings);

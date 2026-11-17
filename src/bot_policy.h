@@ -166,6 +166,7 @@ struct PolicyOptions
     // service off; the module turns them on from its settings.
     std::uint64_t ServiceEveryMs = 0;
     std::uint64_t TrainEveryMs = 0;
+    std::uint64_t TameDeadPetBackoffMs = 0; // 0 = off: after Tame Beast, Call Pet and Revive Pet all fail (a dead stored pet, Revive Pet not known) wait this long
     // Parties (M8). PartyCount parties of PartySize bots are cut from the lowest-guid bots, in guid order. Each party's
     // leader is its first tank (a bot with the tank role, from a prot spec in the roster), else its first warrior, else its lowest-guid bot. PartySize 0 turns parties off.
     std::uint32_t PartySize = 0;
