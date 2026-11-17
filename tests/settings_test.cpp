@@ -193,6 +193,8 @@ void SayAndSupplySettings()
     BotSettings const gear = ParseBotSettings({ { "AuctionGearSell", "0" }, { "AuctionGearHoldLevels", "4" } }, warnings);
     CHECK(!gear.Auction.GearSell && gear.Auction.GearHoldLevels == 4 && warnings.empty());
     // The exact rule from the core's item facts is off by default (the hold applies).
+    CHECK(off.GatherWalkGapSec == 0 && ParseBotSettings({ { "GatherWalkGapSec", "600" } }, warnings).GatherWalkGapSec == 600);
+    CHECK(!off.Auction.ResolveNearby && ParseBotSettings({ { "AuctionResolveNearby", "1" } }, warnings).Auction.ResolveNearby);
     CHECK(!off.Auction.GearExact && ParseBotSettings({ { "AuctionGearExact", "1" } }, warnings).Auction.GearExact && warnings.empty());
     CHECK(!off.Auction.Enabled && off.Auction.SellPctGreen == 300 && off.Auction.RunMinutes == 120 && off.Auction.EveryMs == 1800000);
     BotSettings const house = ParseBotSettings({ { "Auction", "1" }, { "AuctionSellPctGreen", "250" }, { "AuctionSellPctBlue", "350" }, { "AuctionSellPctEpic", "450" },

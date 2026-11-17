@@ -24,6 +24,10 @@ enum Quality : std::uint8_t { kPoor = 0, kCommon = 1, kUncommon = 2, kRare = 3, 
 struct Settings
 {
     bool Enabled = false;                       // config key Auction (off by default)
+    // Config key AuctionResolveNearby (off by default): the snapshot's auctioneer reference is built from the spawn id, but the core numbers a creature
+    // it spawns from its own per-map counter, so the core never finds that reference (every house call answers "auctioneer not found on the player's map").
+    // With this on, a bot in reach names the live auctioneer from its nearby units instead (ResolveNearby).
+    bool ResolveNearby = false;
     bool BuyEnabled = false;                    // config key AuctionBuy (off by default): a bot also buys upgrades; only with Enabled
     // Listing price as a percent of the vendor sell price, by quality (config keys AuctionSellPctGreen, AuctionSellPctBlue, AuctionSellPctEpic). The vendor price
     // is the floor the house cannot fall under: nobody pays less for it than a vendor does.
@@ -112,6 +116,20 @@ bool HasListable(Settings const& settings, std::vector<Candidate> const& items, 
 // kReachYards. The core's handler (Player::GetNPCIfCanInteractWith) allows the auctioneer's combat reach plus 4 yards, about 5.5.
 constexpr float kReachYards = 5.0f;
 bool InReach(bool auctioneerValid, float botX, float botY, float auctioneerX, float auctioneerY);
+
+// A unit near a bot, as ResolveNearby needs it (no SDK dependency).
+struct NearUnit
+{
+    std::uint64_t Ref = 0;
+    float X = 0.0f;
+    float Y = 0.0f;
+};
+
+// The reference of the live auctioneer for a bot that stands in reach of the one the snapshot names. `spotRef` is the snapshot's reference (unit type and
+// creature entry in the top 32 bits, the spawn id below); the live creature has the same type and entry, and stands at the spawn position (ax, ay). Returns
+// the nearest such unit within kResolveYards of the spawn position, or 0 when none is in the bot's nearby list (the caller then makes no house call).
+constexpr float kResolveYards = 8.0f;
+std::uint64_t ResolveNearby(std::uint64_t spotRef, float ax, float ay, std::vector<NearUnit> const& nearby);
 
 struct Listing
 {

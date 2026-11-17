@@ -538,6 +538,28 @@ void GearExactFollowsTheCoresFacts()
     CHECK(GearReady(exact, Gear(10, kUncommon, 500), 1));                  // not equipment: no hold
 }
 
+void ResolveNearbyNamesTheLiveAuctioneer()
+{
+    // spot reference: type 0x09 (creature), entry 8670, spawn id 12345: the live unit has the same type and entry and another counter
+    auto const ref = [](std::uint64_t type, std::uint64_t entry, std::uint64_t counter) { return (type << 56) | (entry << 32) | counter; };
+    std::uint64_t const spot = ref(9, 8670, 12345);
+    std::vector<auction::NearUnit> const near = {
+        { ref(9, 8671, 77), 100.0f, 100.0f },     // another auctioneer entry beside it
+        { ref(9, 8670, 4001), 103.0f, 100.0f },   // the live one, 3 yards from the spawn position
+        { ref(9, 8670, 4002), 140.0f, 100.0f },   // the same entry far away
+        { ref(8, 8670, 5), 100.0f, 100.0f },      // another unit type with the same number
+    };
+    CHECK(auction::ResolveNearby(spot, 100.0f, 100.0f, near) == ref(9, 8670, 4001));
+    CHECK(auction::ResolveNearby(spot, 100.0f, 100.0f, {}) == 0);
+    CHECK(auction::ResolveNearby(0, 100.0f, 100.0f, near) == 0);
+    // out of the 8 yard radius: no unit, so no call
+    CHECK(auction::ResolveNearby(spot, 200.0f, 200.0f, near) == 0);
+    // the nearest of two copies wins
+    std::vector<auction::NearUnit> const two = { { ref(9, 8670, 1), 106.0f, 100.0f }, { ref(9, 8670, 2), 101.0f, 100.0f } };
+    CHECK(auction::ResolveNearby(spot, 100.0f, 100.0f, two) == ref(9, 8670, 2));
+    CHECK(!auction::Settings{}.ResolveNearby);
+}
+
 int main()
 {
     GearExactFollowsTheCoresFacts();
@@ -564,6 +586,7 @@ int main()
     GoodsRespectTheEntryCapAndTheVisitLimit();
     ABotWithBagsVisitsWhenInReachWithSomethingToList();
     TheAuctioneerIsInReachWithinFiveYards();
+    ResolveNearbyNamesTheLiveAuctioneer();
     EquipmentIsListedAfterItsHold();
     if (failures == 0)
         std::printf("auction_test: all passed\n");

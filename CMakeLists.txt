@@ -410,6 +410,8 @@ if(Python3_Interpreter_FOUND)
     # The spec of rotations made into a rotation file by tools/make_rotations.py.
     add_test(NAME make_rotations COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/make_rotations_test.py ${CMAKE_CURRENT_SOURCE_DIR})
     # The world database tools: dump_to_sqlite.py and export_world_quests.py on a tiny made-up dump.
+    # The gather node generator (names to skill and required value, area level and side from the grind spots).
+    add_test(NAME gen_gather_nodes COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/gen_gather_nodes_test.py ${CMAKE_CURRENT_SOURCE_DIR})
     add_test(NAME world_data COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/world_data_test.py ${CMAKE_CURRENT_SOURCE_DIR})
     # The pre-raid quest lists and attunement chains made by tools/gen_prebis_quests.py (doc/pre-raid-progression.md).
     add_test(NAME gen_prebis_quests COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/gen_prebis_quests_test.py ${CMAKE_CURRENT_SOURCE_DIR})

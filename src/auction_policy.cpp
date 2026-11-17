@@ -131,6 +131,28 @@ bool HasListable(Settings const& settings, std::vector<Candidate> const& items, 
     return !PlanGoods(settings, Standing{}, ready).empty();
 }
 
+std::uint64_t ResolveNearby(std::uint64_t spotRef, float ax, float ay, std::vector<NearUnit> const& nearby)
+{
+    if (spotRef == 0)
+        return 0;
+    std::uint64_t best = 0;
+    float bestSq = kResolveYards * kResolveYards;
+    for (NearUnit const& unit : nearby)
+    {
+        if ((unit.Ref >> 32) != (spotRef >> 32))
+            continue;
+        float const dx = unit.X - ax;
+        float const dy = unit.Y - ay;
+        float const sq = dx * dx + dy * dy;
+        if (sq <= bestSq)
+        {
+            bestSq = sq;
+            best = unit.Ref;
+        }
+    }
+    return best;
+}
+
 bool InReach(bool auctioneerValid, float botX, float botY, float auctioneerX, float auctioneerY)
 {
     if (!auctioneerValid)

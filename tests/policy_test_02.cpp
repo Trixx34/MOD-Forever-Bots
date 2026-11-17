@@ -909,6 +909,45 @@ void AGatheringBotAsksForItsSkillAndBacksOffAfterARefusal()
     CHECK(GathersOf(off.Decide(skinner, 1000)).empty());
 }
 
+void AGathererWalksOnlyToNodesItsSkillAndLevelAllow()
+{
+    auto nodes = std::make_shared<std::vector<gather::NodePoint>>();
+    gather::NodePoint iron;       // needs 125
+    iron.Skill = 186; iron.Map = 0; iron.X = 300.0f; iron.RequiredSkill = 125; iron.AreaLevel = 1;
+    gather::NodePoint hard;       // an area far above the bot's level
+    hard.Skill = 186; hard.Map = 0; hard.X = 350.0f; hard.RequiredSkill = 1; hard.AreaLevel = 40;
+    gather::NodePoint copper;
+    copper.Skill = 186; copper.Map = 0; copper.X = 500.0f; copper.RequiredSkill = 1; copper.AreaLevel = 1;
+    nodes->push_back(iron);
+    nodes->push_back(hard);
+    nodes->push_back(copper);
+    PolicyOptions options = AggressiveOptions();
+    options.Gathering = true;
+    options.GatherWalk = true;
+    options.GatherNodes = nodes;
+    options.GatherWalkGapMs = 600000;
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = View(1, 0, {});
+    view.bots[0].level = 5;
+    view.bots[0].profession_skill[0] = 186; // Mining
+    view.bots[0].profession_value[0] = 10;
+    CHECK((GathersOf(policy.Decide(view, 1000)) == std::vector<std::uint32_t>{ 186 }));
+    view.bots[0].last_action_type = std::uint8_t(ActionType::kGather);
+    view.bots[0].last_action_status = BotActionStatus::kRefused;                            // nothing in reach
+    view.bots[0].last_action_sequence = 1;
+    policy.Decide(view, 3000);
+    CHECK(WalkTo(policy.Decide(view, 4000), kBot) == 500.0f);                               // the copper, not the iron (skill) nor the high area (level)
+    view.bots[0].pos_x = 495.0f;                                                            // arrived
+    view.bots[0].last_action_type = std::uint8_t(ActionType::kMoveTo);
+    view.bots[0].last_action_status = BotActionStatus::kApplied;
+    CHECK((GathersOf(policy.Decide(view, 20000)) == std::vector<std::uint32_t>{ 186 }));   // arrived: it asks again at once
+    view.bots[0].last_action_type = std::uint8_t(ActionType::kGather);
+    view.bots[0].last_action_status = BotActionStatus::kRefused;                            // the node is gone
+    view.bots[0].last_action_sequence = 2;
+    policy.Decide(view, 23000);
+    CHECK(WalkTo(policy.Decide(view, 24000), kBot) < 0.0f);                                 // within the gap no second walk starts
+}
+
 void NoHubsOnTheBotsMapMeansNoWalk()
 {
     BotPolicy policy = HubPolicy();
@@ -969,6 +1008,7 @@ void RunPolicyTestsPart2()
     ABlacksmithAsksForItsLineAndWalksToAnAnvilWhenTheRecipeNeedsOne();
     ANeedsFocusAnswerWithNoRouteOrNoTableEndsInAWait();
     AGatheringBotAsksForItsSkillAndBacksOffAfterARefusal();
+    AGathererWalksOnlyToNodesItsSkillAndLevelAllow();
     NoHubsOnTheBotsMapMeansNoWalk();
     AnythingSeenStopsTheWalk();
     HurtBotRestsInsteadOfWalking();

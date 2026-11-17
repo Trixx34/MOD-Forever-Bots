@@ -635,12 +635,22 @@ void main_detail::PumpTier2(forever_module::Tier2Session& session, std::atomic<b
                 auctionFedMs = nowMs();
                 std::vector<AuctionBot> list;
                 list.reserve(view.bots.size());
-                for (forever_module::BotSnapshot const& bot : view.bots)
+                for (std::size_t botIndex = 0; botIndex < view.bots.size(); ++botIndex)
                 {
+                    forever_module::BotSnapshot const& bot = view.bots[botIndex];
                     if ((extras.Alts && extras.Alts->Has(bot.guid)) || bot.group_role != 0)
                         continue;
-                    list.push_back({ bot.guid, bot.bag_free_slots, bot.auctioneer_guid, bot.life_state == 0 && bot.in_combat == 0, bot.copper, bot.level,
-                                     auction::InReach(bot.auctioneer_valid != 0, bot.pos_x, bot.pos_y, bot.auctioneer_x, bot.auctioneer_y) });
+                    bool const inReach = auction::InReach(bot.auctioneer_valid != 0, bot.pos_x, bot.pos_y, bot.auctioneer_x, bot.auctioneer_y);
+                    std::uint64_t auctioneer = bot.auctioneer_guid;
+                    if (settings.Auction.ResolveNearby && inReach)
+                    {
+                        // The core cannot find the snapshot's spawn-based reference: name the live auctioneer from the bot's nearby units (0 = none, no call is made).
+                        std::vector<auction::NearUnit> near;
+                        for (forever_module::NearbyUnit const& unit : view.NearbyOf(botIndex))
+                            near.push_back({ unit.guid, unit.pos_x, unit.pos_y });
+                        auctioneer = auction::ResolveNearby(bot.auctioneer_guid, bot.auctioneer_x, bot.auctioneer_y, near);
+                    }
+                    list.push_back({ bot.guid, bot.bag_free_slots, auctioneer, bot.life_state == 0 && bot.in_combat == 0, bot.copper, bot.level, inReach });
                 }
                 std::lock_guard<std::mutex> lock(extras.Auction->Lock);
                 extras.Auction->Bots.swap(list);
