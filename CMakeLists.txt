@@ -494,3 +494,8 @@ add_test(NAME transport_ride COMMAND transport_ride_test)
 add_executable(ai_next_test tests/ai_next_test.cpp)
 target_link_libraries(ai_next_test PRIVATE forever_bots_policy forever_bots_settings)
 add_test(NAME ai_next COMMAND ai_next_test)
+
+# Death fixes of 2026-11-17 (SoloPullHpPct, PullMaxGroup, ResurrectBackoff).
+add_executable(death_fixes_test tests/death_fixes_test.cpp)
+target_link_libraries(death_fixes_test PRIVATE forever_bots_policy forever_bots_settings)
+add_test(NAME death_fixes COMMAND death_fixes_test)

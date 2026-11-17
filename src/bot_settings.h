@@ -398,6 +398,14 @@ struct BotSettings
     std::uint32_t SoloPullManaPct = 0;
     bool PullBuffGate = false;
     std::uint32_t PullWaitMaxMs = 60000;
+    // Death fixes (2026-11-17, doc/death-fixes.md), all default off. SoloPullHpPct = 0 (0..95): a solo bot out of combat below this health percent starts no fight and rests up to this
+    // plus 10 (event pull_wait reason=hp); 0 = the fixed 75 percent mark without the hysteresis. PullMaxGroup = 0 (0..3): a solo bot does not pull a creature with more than this many
+    // hostiles (itself included) within 10 yards (1 = singles only); 0 = the built-in 3. ResurrectBackoff = 0: a refused resurrect answer waits 4, 8, 16, 32, 60 s (not three tries two
+    // seconds apart) and the corpse run goes on meanwhile (event resurrect_backoff).
+    std::uint32_t SoloPullHpPct = 0;
+    std::uint32_t PullMaxGroup = 0;
+    std::uint32_t PullMaxLevelAbove = 2;   // 0..2: a solo bot pulls no creature more than this many levels above it (2 = the built-in rule)
+    bool ResurrectBackoff = false;
     // Wipe recovery (a scenario run with ScenarioWipeRecovery = 1; Karrz1's raid logic): after a wipe (everybody down, or nearly) the party holds, nobody pulls, until all have revived
     // and have WipeReadyPct health and mana (0 = off, 1 to 100, default 80) or WipeReadyMaxMs has passed (default 240000, 10000 to 1800000); the leader (tank) is freed first. After
     // WipeBackoffCount wipes at the same route segment (default 3, 0 = off) the run backs off: it waits WipeBackoffMs longer (default 90000, 0 to 900000) and the party is put back at a

@@ -1015,6 +1015,10 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
         settings.KillerAvoidMs = 0;
     }
     ReadBool(config, "PullBuffGate", settings.PullBuffGate, warnings);
+    ReadKey(config, "SoloPullHpPct", 0, 95, settings.SoloPullHpPct, warnings);
+    ReadKey(config, "PullMaxGroup", 0, 3, settings.PullMaxGroup, warnings);
+    ReadKey(config, "PullMaxLevelAbove", 0, 2, settings.PullMaxLevelAbove, warnings);
+    ReadBool(config, "ResurrectBackoff", settings.ResurrectBackoff, warnings);
     ReadKey(config, "PullWaitMaxMs", 1000, 600000, settings.PullWaitMaxMs, warnings);
     ReadKey(config, "WipeReadyPct", 0, 100, settings.WipeReadyPct, warnings);
     ReadKey(config, "WipeReadyMaxMs", 10000, 1800000, settings.WipeReadyMaxMs, warnings);

@@ -100,6 +100,10 @@ line to the module's stderr. A config reload updates the ramp, the random picks 
 | `PullBuffGate` | 0 | 1 = a solo bot, or the leader of a route party for each member, waits for the upkeep buffs its rotation casts out of combat before the next pull (`pull_wait` / `pull_hold` with `reason=buff`) |
 | `PullWaitMaxMs` | 60000 | The longest each of these two waits lasts; then `pull_wait_timeout` (1000 to 600000) |
 | `KillerAvoidMs` | 0 | 0 = off; else 10000 to 86400000: a solo bot does not pull the creature type that killed it for this long (`killer_avoid`) |
+| `SoloPullHpPct` | 0 | 0 = off (the fixed 75 percent rest mark, no hysteresis); 1 to 95: a solo bot out of combat below this health percent starts no fight and rests up to this plus 10 (`pull_wait reason=hp`); see `doc/death-fixes.md` |
+| `PullMaxGroup` | 0 | 0 = off (the built-in 3); 1 to 3: a solo bot does not pull a creature with more than this many hostiles (itself included) within 10 yards; 1 = singles only |
+| `PullMaxLevelAbove` | 2 | 0 to 2: a solo bot pulls no creature more than this many levels above it (2 = the built-in rule; 1 for the sim) |
+| `ResurrectBackoff` | 0 | 1 = a refused resurrect answer (out of range) waits 4, 8, 16, 32, then 60 s, and the corpse run goes on meanwhile (`resurrect_backoff`) |
 | `AoeCcProtect` | 0 | 1 = area-damage rows wait while a Polymorph/Sap/Banish held creature is within 12 yards of the target (`aoe_cc_protect`) |
 | `WipeReadyPct` | 80 | Wipe recovery (scenario runs with `ScenarioWipeRecovery = 1`): after a wipe nobody pulls until every bot has revived, stands on the entry map and has this health and mana percent; the tank is freed 6 s before the members; 0 = off (0 to 100). Events `wipe_recovery: ...` |
 | `WipeReadyMaxMs` | 240000 | The longest the wipe hold lasts, so a ghost that never comes back does not stop the run (10000 to 1800000) |
