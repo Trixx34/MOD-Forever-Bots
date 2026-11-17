@@ -4,6 +4,7 @@
 #include "errand_trainers.h"
 #include "riding_training.h"
 
+#include <chrono>
 #include <cstdio>
 #include <fstream>
 #include <sstream>
@@ -158,7 +159,7 @@ void TheShippedFilesParseAndAgree()
     CHECK(rankErrors.empty() && ranks.size() == 2 && ranks[0].Skill == 75 && ranks[1].Skill == 150 && ranks[0].CostCopper < ranks[1].CostCopper);
     std::vector<std::string> trainerErrors;
     auto const trainers = errand::ParseTrainerTable(Slurp(dir + "/riding_trainers.txt"), trainerErrors);
-    CHECK(trainerErrors.empty() && trainers.size() == 7);
+    CHECK(trainerErrors.empty() && trainers.size() == 8);
     int alliance = 0, horde = 0;
     for (errand::Trainer const& t : trainers)
     {
@@ -166,7 +167,28 @@ void TheShippedFilesParseAndAgree()
         alliance += t.Side == errand::kAlliance;
         horde += t.Side == errand::kHorde;
     }
-    CHECK(alliance == 3 && horde == 4);
+    CHECK(alliance == 4 && horde == 4);
+}
+
+// Cost: a refused bot is planned on every errand pass (the scheduler's, not every world tick). 800 bots against the shipped tables must stay far below a millisecond.
+void PlanningCostForAProdSizedPopulation()
+{
+    std::string const dir = MODULE_DATA_DIR;
+    std::vector<std::string> errors;
+    auto const table = mounts::ParseTable(Slurp(dir + "/mount_vendors.txt"), errors);
+    auto const ranks = riding::ParseRanks(Slurp(dir + "/riding_ranks.txt"), errors);
+    constexpr int kBots = 800, kPasses = 50;
+    std::uint64_t sink = 0;
+    auto const start = std::chrono::steady_clock::now();
+    for (int pass = 0; pass < kPasses; ++pass)
+        for (int i = 0; i < kBots; ++i)
+        {
+            std::uint32_t const race = std::uint32_t(1 + i % 8), level = std::uint32_t(20 + i % 41);
+            sink += std::uint64_t(mounts::Decide(ranks, table, true, race, level, (i % 3) ? 75 : 0, std::uint64_t(i) * 5000, 5000, i % 2, float(i), float(-i)).What);
+        }
+    double const perBotNs = std::chrono::duration<double, std::nano>(std::chrono::steady_clock::now() - start).count() / (kBots * kPasses);
+    std::printf("mount_plan_test: Decide costs %.0f ns per bot (%.3f ms for %d bots; sink %llu)\n", perBotNs, perBotNs * kBots / 1e6, kBots, (unsigned long long)sink);
+    CHECK(perBotNs < 50000.0);
 }
 
 } // namespace
@@ -180,6 +202,7 @@ int main()
     SkillAfterTrainingPaysRanksInOrder();
     DecideTrainsThenBuysAndOnlyAfterARefusal();
     TheShippedFilesParseAndAgree();
+    PlanningCostForAProdSizedPopulation();
     if (failures == 0)
         std::printf("mount_plan_test: all checks passed\n");
     return failures == 0 ? 0 : 1;

@@ -1,13 +1,12 @@
-# Riding trainers for the riding errand (RidingTraining = 1 with Errands = 1), same format as errand_trainers.txt:
+# Riding trainers for the riding errand (RidingTraining = 1 with Errands = 1), made by tools/gen_mounts.py. Same format as errand_trainers.txt:
 # side|city|map|entry|skill|x y z|name|subname|profession|guid
 # skill 762 is the riding skill line. city is the nearest capital (only used to spread the bots and to name the trip in the journal): the trainers stand in
-# the race villages next to their mount vendors, not inside the capitals. Source (read only, forever-test, 2026-11-14): creature_trainer rows whose trainer
-# (ids 1003690, 1004732, 1004752, 1004753, 1004772, 1004773, 1007953; 195 for Undercity) teaches 33388 (Apprentice Riding, level 40, 900000 copper) and 33391
-# (Journeyman Riding, level 60, 9000000 copper); creature spawns for the positions. UNVERIFIED in game.
-1|Stormwind|0|4732|762|-9441.0 -1391.3 46.9|Randal Hunter|Riding Trainer|Riding|20081389
-1|Ironforge|0|4772|762|-5521.9 -1347.2 398.7|Ultham Ironhorn|Riding Trainer|Riding|20004150
-1|Darnassus|1|4753|762|10126.5 2528.9 1323.7|Jartsam|Riding Trainer|Riding|20046722
-2|Undercity|0|4773|762|2253.9 318.4 36.8|Velma Warnam|Riding Trainer|Riding|20033711
-2|Orgrimmar|1|4752|762|2151.4 -4654.1 50.1|Kildar|Riding Trainer|Riding|20004677
-2|Orgrimmar|1|7953|762|-852.6 -4885.3 22.1|Xar'Ti|Riding Trainer|Riding|20006402
+# the race villages next to their mount vendors, not inside the capitals.
 2|ThunderBluff|1|3690|762|-2275.7 -399.9 -9.3|Kar Stormsinger|Riding Trainer|Riding|20024787
+1|Stormwind|0|4732|762|-9441.0 -1391.2 46.9|Randal Hunter|Riding Trainer|Riding|20081389
+2|Orgrimmar|1|4752|762|2151.4 -4654.1 50.1|Kildar|Riding Trainer|Riding|20004677
+1|Darnassus|1|4753|762|10126.5 2528.8 1323.7|Jartsam|Riding Trainer|Riding|20046722
+1|Ironforge|0|4772|762|-5521.9 -1347.2 398.7|Ultham Ironhorn|Riding Trainer|Riding|20004150
+2|Undercity|0|4773|762|2253.9 318.4 36.8|Velma Warnam|Riding Trainer|Riding|20033711
+2|Orgrimmar|1|7953|762|-852.6 -4885.3 22.1|Xar'Ti|Riding Trainer|Riding|20006402
+1|Ironforge|0|7954|762|-5457.2 -618.5 394.2|Binjy Featherwhistle|Mechanostrider Pilot|Riding|20001724

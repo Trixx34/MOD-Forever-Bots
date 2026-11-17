@@ -1,11 +1,8 @@
-# Mount vendors for MountBuy (src/mount_plan.h). Two kinds of line:
+# Mount vendors for MountBuy (src/mount_plan.h), made by tools/gen_mounts.py from the world database. Two kinds of line:
 #   vendor|raceMask|map|entry|guid|x y z|name|subname
 #   item|vendorEntry|itemEntry|requiredLevel|ridingSkill|copper|name
 # raceMask: the race the vendor's mounts are for (1 Human, 2 Orc, 4 Dwarf, 8 Night Elf, 16 Undead, 32 Tauren, 64 Gnome, 128 Troll); a bot buys from a vendor of its own race.
 # ridingSkill: the riding skill the mount needs (75 Apprentice for a level 40 mount, 150 Journeyman for a level 60 mount).
-# Source (read only, forever-test, 2026-11-14): creature spawns of the vendors, npc_vendor rows (ExtendedCost 0) of mount items (item class 15, subclass 5) with
-# a buy price, item_sparse RequiredLevel/BuyPrice. The vendor race comes from the mount type (horse Human, ram Dwarf, mechanostrider Gnome, saber Night Elf,
-# wolf Orc, raptor Troll, undead horse Undead, kodo Tauren). Vendors with no creature spawn (43694, 216677) are left out. UNVERIFIED in game.
 vendor|1|0|384|20081393|-9455.4 -1385.3 47.2|Katie Hunter|Horse Breeder
 vendor|4|0|1261|20004152|-5537.0 -1323.7 399.2|Veron Amberstill|Ram Breeder
 vendor|1|0|1460|20009524|-3645.8 -744.1 9.9|Unger Statforth|Horse Breeder
@@ -62,6 +59,7 @@ item|3685|15293|60|150|2000000|Teal Kodo
 item|3685|18793|60|150|2000000|Great White Kodo
 item|3685|18794|60|150|2000000|Great Brown Kodo
 item|3685|18795|60|150|2000000|Great Gray Kodo
+item|3685|275993|40|75|200000|White Kodo
 item|4730|8629|40|75|200000|Reins of the Striped Nightsaber
 item|4730|8631|40|75|200000|Reins of the Striped Frostsaber
 item|4730|8632|40|75|200000|Reins of the Spotted Frostsaber
@@ -70,11 +68,14 @@ item|4730|12303|60|150|2000000|Reins of the Nightsaber
 item|4730|18766|60|150|2000000|Reins of the Swift Frostsaber
 item|4730|18767|60|150|2000000|Reins of the Swift Mistsaber
 item|4730|18902|60|150|2000000|Reins of the Swift Stormsaber
+item|4730|274706|40|75|200000|Reins of the Striped Dawnsaber
 item|4731|13331|40|75|200000|Red Skeletal Horse
 item|4731|13332|40|75|200000|Blue Skeletal Horse
 item|4731|13333|40|75|200000|Brown Skeletal Horse
 item|4731|13334|60|150|2000000|Green Skeletal Warhorse
 item|4731|18791|60|150|2000000|Purple Skeletal Warhorse
+item|4731|274799|60|150|2000000|Ochre Skeletal Warhorse
+item|4731|276063|40|75|200000|Black Skeletal Horse
 item|4885|2414|40|75|200000|Pinto Bridle
 item|4885|5655|40|75|200000|Chestnut Mare Bridle
 item|4885|5656|40|75|200000|Brown Horse Bridle

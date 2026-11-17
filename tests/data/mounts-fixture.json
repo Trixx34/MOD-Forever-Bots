@@ -1,0 +1,17 @@
+{
+ "vendors": [
+  {"entry":"1261","name":"Veron Amberstill","subname":"Ram Breeder","guid":"20004152","map":"0","x":"-5537.0","y":"-1323.7","z":"399.2","item":"5864","item_name":"Gray Ram","level":"40","copper":"200000"},
+  {"entry":"1261","name":"Veron Amberstill","subname":"Ram Breeder","guid":"20004152","map":"0","x":"-5537.0","y":"-1323.7","z":"399.2","item":"13328","item_name":"Black Ram","level":"60","copper":"2000000"},
+  {"entry":"4731","name":"Zachariah Post","subname":"Undead Horse Merchant","guid":"20028472","map":"0","x":"2250.4","y":"328.1","z":"36.9","item":"900001","item_name":"Test Skeletal Horse","level":"40","copper":"200000"},
+  {"entry":"777","name":"Odd Seller","subname":"Pet Merchant","guid":"1","map":"0","x":"0","y":"0","z":"0","item":"5","item_name":"Odd","level":"40","copper":"1"}
+ ],
+ "trainers": [
+  {"entry":"4772","name":"Ultham Ironhorn","subname":"Riding Trainer","faction":"55","guid":"20004150","map":"0","x":"-5521.9","y":"-1347.2","z":"398.7"},
+  {"entry":"4773","name":"Velma Warnam","subname":"Riding Trainer","faction":"68","guid":"20033711","map":"0","x":"2253.9","y":"318.4","z":"36.8"}
+ ],
+ "ranks": [
+  {"spell":"33391","level":"60","copper":"9000000","trainers":"7"},
+  {"spell":"33388","level":"40","copper":"900000","trainers":"7"}
+ ],
+ "names": []
+}
