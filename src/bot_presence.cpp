@@ -8,12 +8,13 @@ namespace presence {
 
 Scheduler::Scheduler(Settings const& settings, std::uint64_t seed) : _settings(settings), _rng(seed) {}
 
-std::uint64_t Scheduler::Minutes(std::uint32_t low, std::uint32_t high)
+std::uint64_t Scheduler::Minutes(std::uint32_t low, std::uint32_t high, std::uint32_t pct)
 {
     if (high < low)
         high = low;
     std::uniform_int_distribution<std::uint64_t> pick(std::uint64_t(low) * 60000, std::uint64_t(high) * 60000);
-    return pick(_rng);
+    std::uint64_t const drawn = pick(_rng);
+    return pct == 100 ? drawn : std::max<std::uint64_t>(60000, drawn * pct / 100);
 }
 
 std::uint32_t Scheduler::AllowedOnline(std::uint32_t secOfDay, std::uint32_t population) const
@@ -75,7 +76,7 @@ Decisions Scheduler::Tick(std::uint64_t nowMs, std::uint32_t secOfDay, std::vect
         entry.SeenMs = nowMs;
         if (added)
         {
-            std::uint64_t const session = Minutes(_settings.OnlineMinMin, _settings.OnlineMaxMin);
+            std::uint64_t const session = Minutes(_settings.OnlineMinMin, _settings.OnlineMaxMin, bot.SessionPct);
             std::uniform_int_distribution<std::uint64_t> part(session / 10, session);
             entry.DueMs = nowMs + part(_rng);
         }
@@ -84,7 +85,7 @@ Decisions Scheduler::Tick(std::uint64_t nowMs, std::uint32_t secOfDay, std::vect
             // Back in the world (a returning bot), or never left (an absence the module did not carry out): a fresh session.
             entry.Away = false;
             entry.Returning = false;
-            entry.DueMs = nowMs + Minutes(_settings.OnlineMinMin, _settings.OnlineMaxMin);
+            entry.DueMs = nowMs + Minutes(_settings.OnlineMinMin, _settings.OnlineMaxMin, bot.SessionPct);
         }
     }
     // A bot sent back that has not shown up in time is away again; one that vanished without being logged off is forgotten after a while.

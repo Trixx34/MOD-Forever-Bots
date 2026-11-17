@@ -536,7 +536,7 @@ void main_detail::PumpTier2(forever_module::Tier2Session& session, std::atomic<b
                 {
                     if ((extras.Alts && extras.Alts->Has(bot.guid)) || bot.group_role != 0)
                         continue;
-                    list.push_back({ bot.guid, policy.SafeToLogOut(bot), bot.level });
+                    list.push_back({ bot.guid, policy.SafeToLogOut(bot), bot.level, policy.SessionPctOf(bot.guid) });
                 }
                 std::lock_guard<std::mutex> lock(extras.Presence->Lock);
                 for (presence::Online const& online : list)

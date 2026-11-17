@@ -42,6 +42,7 @@ struct Online
     std::uint64_t Guid = 0;
     bool Idle = true;     // nothing that a log off would cut short: no fight, party, command, trade, walk to a vendor
     std::uint32_t Level = 0; // the bot's level (the brackets count it; 0 = unknown)
+    std::uint32_t SessionPct = 100; // this bot's session length in percent of the drawn one (Personality: its session trait; 100 = unchanged)
 };
 
 struct Decisions
@@ -83,7 +84,7 @@ private:
         std::uint64_t SeenMs = 0;   // when it was last in view; a bot gone for a long time that was never logged off is forgotten
     };
 
-    std::uint64_t Minutes(std::uint32_t low, std::uint32_t high);
+    std::uint64_t Minutes(std::uint32_t low, std::uint32_t high, std::uint32_t pct = 100);
 
     Settings _settings;
     std::mt19937_64 _rng;

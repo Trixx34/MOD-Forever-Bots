@@ -20,7 +20,12 @@ struct Settings
     std::uint32_t ReactionMaxMs = 3000;      // PersonalityReactionMaxMs (0..10000): the longest reaction delay before a pull (the slowest bot); 0 = none
     std::uint32_t CautionStrength = 50;      // PersonalityCautionStrength (0..100): how many bots are wary of the largest packs; 0 = none
     std::uint32_t MistakeMaxPct = 5;         // PersonalityMistakeMaxPct (0..30): the chance per pull of the least cautious bot to take another mob than the best one
-    std::uint32_t SocialStrength = 50;       // PersonalitySocialStrength (0..100): the town AFK chance and stay vary by up to +-100 percent at 100
+    std::uint32_t SocialStrength = 50;       // PersonalitySocialStrength (0..100): the town AFK chance and stay vary by up to +-100 percent at 100;
+                                             // also the greeting chances (MeetGreet, CityGreet) and how soon a guild invite is looked for
+    std::uint32_t SessionStrength = 50;      // PersonalitySessionStrength (0..100): with Presence on, the session length is scaled by up to +-60 percent at 100
+    std::uint32_t JitterMaxMs = 400;         // PersonalityJitterMaxMs (0..2000): the longest reaction delay on an interrupt window or a heal call (the slowest bot); 0 = none
+    std::uint32_t ForgetBuffPct = 3;         // PersonalityForgetBuffPct (0..30): the chance per upkeep buff, for the least cautious bot, to put it off for 30 to 120 s; 0 = none
+    bool Instances = false;                  // PersonalityInstances: the jitter and the forgotten buffs also apply in dungeons and raids (off: only in the open world)
 };
 
 // Each trait is 0..100, drawn once per bot (50 is the middle; a bot's traits never change).
@@ -37,6 +42,10 @@ constexpr std::uint32_t kRestFloorPct = 70;  // the rest threshold stays within 
 constexpr std::uint32_t kRestCeilPct = 98;
 constexpr std::uint32_t kMaxReactionMs = 10000;
 constexpr std::uint32_t kMaxPullSkips = 3;   // a wary bot skips at most this many packs in a row, then pulls: it never starves
+
+constexpr std::uint32_t kMaxJitterMs = 2000;
+constexpr std::uint64_t kForgetMinMs = 30000;   // a forgotten buff is put off for this long at least ...
+constexpr std::uint64_t kForgetMaxMs = 120000;  // ... and this long at most
 
 Traits TraitsFor(std::uint64_t seed, std::uint64_t bot);
 
@@ -61,5 +70,29 @@ std::uint32_t AfkChancePct(Settings const& settings, Traits const& traits, std::
 
 // The town AFK stay: `baseMs` scaled by the session trait (0 to twice at full strength). Off: baseMs.
 std::uint64_t AfkStayMs(Settings const& settings, Traits const& traits, std::uint64_t baseMs);
+
+// The greeting chance (MeetGreet, CityGreet): `basePct` scaled by sociability like the AFK chance (SocialStrength). Off: basePct.
+std::uint32_t GreetChancePct(Settings const& settings, Traits const& traits, std::uint32_t basePct);
+
+// How long a bot without a guild waits before it looks for a guild invite again: `baseMs` scaled by sociability, within [0.5, 1.5] of baseMs (sociable bots look sooner). Off: baseMs.
+std::uint64_t GuildPollMs(Settings const& settings, Traits const& traits, std::uint64_t baseMs);
+
+// The presence session length: `baseMs` scaled by the session trait, within [0.4, 1.6] of baseMs (SessionStrength). Off: baseMs.
+std::uint64_t SessionMs(Settings const& settings, Traits const& traits, std::uint64_t baseMs);
+
+// The same as a percent of the scheduler's draw (100 = unchanged), for presence::Online::SessionPct.
+std::uint32_t SessionPct(Settings const& settings, Traits const& traits);
+
+// Whether the imperfections (jitter, forgotten buffs) may apply here: always in the open world, in a dungeon or raid only with Instances.
+bool ImperfectionAllowed(Settings const& settings, bool instanced);
+
+// A reaction delay on an event (an interrupt window, a heal call; `counter` is one draw per event), within [0, JitterMaxMs * (100 - Pace) / 100]. Off, JitterMaxMs 0 or not allowed here: 0.
+std::uint64_t JitterMs(Settings const& settings, Traits const& traits, bool instanced, std::uint64_t seed, std::uint64_t bot, std::uint64_t counter);
+
+// Whether the bot forgets this upkeep buff for a while (`counter` is one draw per buff decision). The chance is ForgetBuffPct * (100 - Caution) / 100 percent, at most 30.
+bool ForgetsBuff(Settings const& settings, Traits const& traits, bool instanced, std::uint64_t seed, std::uint64_t bot, std::uint64_t counter);
+
+// How long a forgotten buff is put off: kForgetMinMs to kForgetMaxMs.
+std::uint64_t ForgetMs(std::uint64_t seed, std::uint64_t bot, std::uint64_t counter);
 
 } // namespace personality

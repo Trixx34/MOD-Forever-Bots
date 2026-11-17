@@ -775,6 +775,9 @@ void RealismSettings()
         CHECK(!pOff.Personality.Enabled && pOff.Personality.RestStrength == 50 && pOff.Personality.ReactionMaxMs == 3000 && pOff.Personality.MistakeMaxPct == 5);
         BotSettings const pOn = ParseBotSettings({ { "Personality", "1" }, { "PersonalityRestStrength", "0" }, { "PersonalityReactionMaxMs", "500" }, { "PersonalityMistakeMaxPct", "99" } }, w);
         CHECK(pOn.Personality.Enabled && pOn.Personality.RestStrength == 0 && pOn.Personality.ReactionMaxMs == 500 && pOn.Personality.MistakeMaxPct == 5);
+        CHECK(pOff.Personality.SessionStrength == 50 && pOff.Personality.JitterMaxMs == 400 && pOff.Personality.ForgetBuffPct == 3 && !pOff.Personality.Instances);
+        BotSettings const pNew = ParseBotSettings({ { "Personality", "1" }, { "PersonalitySessionStrength", "80" }, { "PersonalityJitterMaxMs", "99999" }, { "PersonalityForgetBuffPct", "99" }, { "PersonalityInstances", "1" } }, w);
+        CHECK(pNew.Personality.SessionStrength == 80 && pNew.Personality.JitterMaxMs == 400 && pNew.Personality.ForgetBuffPct == 3 && pNew.Personality.Instances);
     }
     CHECK(on.TownAfk.ZoneMax == 3 && on.PassingBuff.CooldownSec == 900);
     CHECK(on.ReadDelay.MaxSec >= on.ReadDelay.MinSec);   // an upside-down range is fixed

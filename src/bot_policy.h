@@ -645,6 +645,8 @@ public:
     // Presence (bot_presence.h): whether nothing a log off would cut short is going on for this bot: no fight, death, party or invite, chat order,
     // vendor walk or supply trip, and no walk to hand in a quest.
     bool SafeToLogOut(forever_module::BotSnapshot const& bot) const;
+    // Personality (personality.h): this bot's session length for the presence scheduler, in percent of the drawn one (100 when Personality is off).
+    std::uint32_t SessionPctOf(std::uint64_t guid) const;
 
     std::vector<std::string> ApplyChat(forever_module::WorldTickSnapshotView const& view, ChatContext const& chat, ChatCommand const& command,
                                        std::uint64_t nowMs, std::vector<ChatAck>* acks = nullptr);
@@ -1024,6 +1026,12 @@ private:
         std::uint32_t PullSkips = 0;                     // personality: packs a wary bot skipped in a row (capped at personality::kMaxPullSkips)
         std::uint64_t PullReactRef = 0;                  // personality: the mob the reaction delay runs for, until PullReactUntilMs
         std::uint64_t PullReactUntilMs = 0;
+        std::uint64_t InterruptReactRef = 0;             // personality: the cast the interrupt delay runs for, until InterruptReactUntilMs
+        std::uint64_t InterruptReactUntilMs = 0;
+        std::uint64_t HealReactRef = 0;                  // personality: the member the heal delay runs for, until HealReactUntilMs
+        std::uint64_t HealReactUntilMs = 0;
+        std::unordered_set<std::uint32_t> BuffForgetRolled; // personality: upkeep buffs whose forget roll was made and which are not cast yet
+        std::uint32_t PersonalityCounter = 0;            // personality: events that drew a jitter or a forget (the counter of those draws)
         taxi::Flight TaxiFlight;                         // the flight ordered and not ended yet (for the landing and timeout log lines)
         std::uint64_t NextPotionMs = 0;                  // no potion before this (the game shares one cooldown between potions)
         std::uint64_t TravelStartMs = 0;                 // when this walk began; it is dropped after kTravelTimeoutMs
@@ -1329,6 +1337,8 @@ private:
     bool HealerBelowManaFloor(forever_module::BotSnapshot const& bot, BotState const& state, std::uint32_t classId, std::uint64_t partyLeader) const;
     // What the steps ask about the bots of this tick.
     bool IsRouteActive(std::uint64_t guid) const;
+    // Personality: the bot is in a dungeon or raid (a route is active, its map has a dungeon route, or its group is larger than a party).
+    bool PersonalityInstanced(forever_module::BotSnapshot const& bot) const;
     std::uint64_t _calmSkips = 0;   // turns skipped by WalkDecideEvery since the policy was made
     calm_walk::Facts CalmFactsOf(BotState const& state, forever_module::BotSnapshot const& bot, std::uint64_t nowMs) const;
     std::set<std::uint32_t> const& KilledBossesOf(std::uint64_t guid) const;

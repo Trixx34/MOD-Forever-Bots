@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <map>
 #include <set>
 
 using namespace presence;
@@ -41,6 +42,7 @@ struct World
     Scheduler Sched;
     std::set<std::uint64_t> OnlineSet;
     std::set<std::uint64_t> Busy;
+    std::map<std::uint64_t, std::uint32_t> Pct;   // a bot's SessionPct (default 100)
     std::uint64_t Now = 0;
     std::uint32_t Sec = kEvening;
     std::uint32_t LogOffs = 0;
@@ -57,7 +59,7 @@ struct World
         Now += advanceMs;
         std::vector<Online> list;
         for (std::uint64_t guid : OnlineSet)
-            list.push_back({ guid, Busy.count(guid) == 0 });
+            list.push_back({ guid, Busy.count(guid) == 0, 0, Pct.count(guid) ? Pct[guid] : 100u });
         Decisions decisions = Sched.Tick(Now, Sec, list);
         for (std::uint64_t guid : decisions.LogOff)
             OnlineSet.erase(guid), ++LogOffs;
@@ -333,8 +335,35 @@ void TheSameSeedGivesTheSameRun()
 
 } // namespace
 
+// Personality: a bot's SessionPct scales the length of its sessions. With a fixed session of 100 minutes, bots at 50 percent are all gone within 50 minutes, bots
+// at 100 percent are not, and bots at 100 (the default, a Personality that is off) behave exactly as before.
+void SessionPctScalesTheSession()
+{
+    Settings settings = On();
+    settings.OnlineMinMin = settings.OnlineMaxMin = 100;
+    settings.OfflineMinMin = settings.OfflineMaxMin = 1000;
+    World world(settings, 40);
+    for (std::uint64_t guid = 1; guid <= 20; ++guid)
+        world.Pct[guid] = 50;
+    world.RunMinutes(51);
+    std::uint32_t shortLeft = 0, normalLeft = 0;
+    for (std::uint64_t guid : world.OnlineSet)
+        (guid <= 20 ? shortLeft : normalLeft)++;
+    CHECK(shortLeft == 0);
+    CHECK(normalLeft > 0);
+    // The same world without any SessionPct is the old behaviour: the same log offs as with every bot at 100.
+    World plain(settings, 40);
+    World hundred(settings, 40);
+    for (std::uint64_t guid = 1; guid <= 40; ++guid)
+        hundred.Pct[guid] = 100;
+    plain.RunMinutes(300);
+    hundred.RunMinutes(300);
+    CHECK(plain.LogOffs == hundred.LogOffs && plain.OnlineSet == hundred.OnlineSet);
+}
+
 int main()
 {
+    SessionPctScalesTheSession();
     NothingHappensUnlessEnabled();
     SessionsLastTheirTimeAndBotsComeBack();
     ABotIsNeverLoggedOffWhileBusy();
