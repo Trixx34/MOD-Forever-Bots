@@ -749,6 +749,24 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
         else
             warnings.push_back("Module.forever-bots.PathJitterYards: '" + it->second + "' is not a number from 0 to 5; using the default.");
     }
+    ReadBool(config, "PathVariety", settings.PathVariety.Enabled, warnings);
+    ReadKey(config, "PathZoneSpread", 0, 100, settings.PathVariety.ZoneSpread, warnings);
+    ReadKey(config, "PathZoneSoftCap", 0, 500, settings.PathVariety.ZoneSoftCap, warnings);
+    ReadKey(config, "PathZoneMaxWalkYards", 200, 6000, settings.PathVariety.ZoneMaxWalkYards, warnings);
+    ReadKey(config, "PathZoneReviewLevels", 1, 10, settings.PathVariety.ZoneReviewLevels, warnings);
+    ReadKey(config, "PathZoneMigratePct", 0, 100, settings.PathVariety.ZoneMigratePct, warnings);
+    ReadKey(config, "PathSpotMax", 0, 100, settings.PathVariety.SpotMax, warnings);
+    ReadKey(config, "PathCrowdYards", 0, 2000, settings.PathVariety.CrowdYards, warnings);
+    ReadKey(config, "PathSpotAffinityPct", 0, 90, settings.PathVariety.AffinityPct, warnings);
+    ReadKey(config, "PathSpotReachYards", 100, 4000, settings.PathVariety.SpotReachYards, warnings);
+    ReadKey(config, "PathQuestSkipMaxPct", 0, 60, settings.PathVariety.QuestSkipMaxPct, warnings);
+    ReadKey(config, "PathQuestOrderWindow", 1, 8, settings.PathVariety.QuestOrderWindow, warnings);
+    ReadKey(config, "PathStartOrderPct", 0, 60, settings.PathVariety.StartOrderPct, warnings);
+    ReadKey(config, "PathStartOffsetMaxSec", 0, 900, settings.PathVariety.StartOffsetMaxSec, warnings);
+    ReadKey(config, "PathTripSpreadPct", 0, 60, settings.PathVariety.TripSpreadPct, warnings);
+    ReadKey(config, "PathTrainDelayMaxSec", 0, 600, settings.PathVariety.TrainDelayMaxSec, warnings);
+    if (auto const it = config.find("PathZoneFile"); it != config.end())
+        settings.PathZoneFile = it->second;
     ReadBool(config, "Personality", settings.Personality.Enabled, warnings);
     ReadKey(config, "PersonalityRestStrength", 0, 100, settings.Personality.RestStrength, warnings);
     ReadKey(config, "PersonalityIdleStrength", 0, 100, settings.Personality.IdleStrength, warnings);

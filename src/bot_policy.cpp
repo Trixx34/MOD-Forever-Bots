@@ -1314,7 +1314,15 @@ std::uint64_t BotPolicy::WanderIdleFor(BotTurn& turn) const
     if (_options.RandomPct == 0)
         return traited(kWanderIdleMs);
     if (state.WanderIdleMs == 0)
+    {
         state.WanderIdleMs = traited(bot_random::Vary(kWanderIdleMs, std::min<std::uint32_t>(_options.RandomPct * 2, 90),
                                                       bot_random::Draw(_options.RandomSeed, bot.guid, bot_random::kSaltIdle, state.WanderCycles)));
+        // Path variety: the first walk after login starts a per-bot while later, so a restart does not send every bot off at once.
+        if (_options.PathVariety.Enabled && !state.PathOffsetSet)
+        {
+            state.PathOffsetSet = true;
+            state.WanderIdleMs += path_variety::StartOffsetMs(_options.PathVariety, _options.RandomSeed, bot.guid, 0);
+        }
+    }
     return state.WanderIdleMs;
 }

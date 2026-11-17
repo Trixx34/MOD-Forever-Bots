@@ -14,10 +14,92 @@ std::vector<std::size_t> BotPolicy::GrindSpotsForBot(BotState& state, BotSnapsho
             _options.OnEvent("grind_blocks_lifted: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id) +
                              " blocked=" + std::to_string(blocked.size()));
     }
+    if (_options.PathVariety.Enabled && _options.PathZones && spots.size() > 1)
+        spots = PathVarySpots(state, bot, std::move(spots));
     if (spots.empty() && _options.OnEvent)
         _options.OnEvent("grind_none: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id) +
                          " blocked=" + std::to_string(blocked.size()));
     return spots;
+}
+
+void BotPolicy::NoteGrindPick(std::uint64_t bot, std::size_t spot)
+{
+    if (_options.PathVariety.Enabled)
+        _pathSpots.Set(bot, std::uint64_t(spot) + 1);
+}
+
+// Path variety (path_variety.h): `spots` is the bot's level-fit list, nearest first. The bot has a home zone (chosen by a seeded draw weighted by fit, distance and the
+// zone's crowd, reviewed at level steps or when its zone is over the soft cap); the list is cut to the home zone and ordered by distance, taste and the crowd at each spot.
+std::vector<std::size_t> BotPolicy::PathVarySpots(BotState& state, BotSnapshot const& bot, std::vector<std::size_t> spots)
+{
+    path_variety::Settings const& cfg = _options.PathVariety;
+    auto const& zoneOf = _options.PathZones->OfSpot;
+    auto const& grind = _options.Grind->Spots;
+    if (spots.empty() || spots.back() >= zoneOf.size())
+        return spots;
+    auto const yards = [&](std::size_t i) { return std::hypot(grind[i].X - bot.pos_x, grind[i].Y - bot.pos_y); };
+
+    std::vector<std::size_t> home = spots;
+    if (cfg.ZoneSpread != 0)
+    {
+        std::vector<path_variety::ZoneOption> zones;
+        std::vector<std::vector<std::size_t>> members;
+        for (std::size_t const i : spots)
+        {
+            std::uint32_t const key = zoneOf[i];
+            std::size_t at = 0;
+            while (at < zones.size() && zones[at].Key != key)
+                ++at;
+            if (at == zones.size())
+            {
+                zones.push_back(path_variety::ZoneOption{ key, 0, 1e30f, _pathZones.Count(key) });
+                members.emplace_back();
+            }
+            ++zones[at].Fit;
+            zones[at].NearestYards = std::min(zones[at].NearestYards, yards(i));
+            members[at].push_back(i);
+        }
+        std::size_t homeAt = zones.size();
+        for (std::size_t i = 0; i < zones.size(); ++i)
+            if (zones[i].Key == state.PathZoneKey)
+                homeAt = i;
+        // The bot's own bot is counted in the zone it is at, so a zone of exactly the cap is not "over" because of the bot itself.
+        std::size_t const homeBots = homeAt < zones.size() ? zones[homeAt].Bots : 0;
+        bool const hasHome = state.PathZoneKey != 0;
+        if (path_variety::ShouldReview(cfg, hasHome, homeAt < zones.size() ? zones[homeAt].Fit : 0, bot.level, state.PathReviewLevel, homeBots, _options.RandomSeed, bot.guid,
+                                       state.PathCycle++) || !hasHome)
+        {
+            // A first look takes the zone the bot stands in as its current one, so most bots stay where they are unless that zone is crowded.
+            std::uint32_t current = state.PathZoneKey;
+            if (!hasHome)
+            {
+                std::size_t nearestAt = 0;
+                for (std::size_t i = 1; i < zones.size(); ++i)
+                    if (zones[i].NearestYards < zones[nearestAt].NearestYards)
+                        nearestAt = i;
+                current = zones[nearestAt].Key;
+            }
+            std::size_t const pick = path_variety::ChooseZone(cfg, zones, current, _options.RandomSeed, bot.guid, state.PathCycle++);
+            if (pick < zones.size())
+            {
+                bool const moved = state.PathZoneKey != 0 && zones[pick].Key != state.PathZoneKey;
+                state.PathZoneKey = zones[pick].Key;
+                state.PathReviewLevel = bot.level;
+                _pathZones.Set(bot.guid, state.PathZoneKey);
+                if (_options.OnEvent)
+                    _options.OnEvent("path_zone: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id) + " zone=" +
+                                     std::to_string(state.PathZoneKey) + " zones=" + std::to_string(zones.size()) + " crowd=" + std::to_string(zones[pick].Bots) +
+                                     (moved ? " moved=1" : " moved=0"));
+            }
+        }
+        for (std::size_t i = 0; i < zones.size(); ++i)
+            if (zones[i].Key == state.PathZoneKey)
+                home = members[i];
+    }
+    std::vector<path_variety::SpotOption> options;
+    for (std::size_t const i : home)
+        options.push_back(path_variety::SpotOption{ i, yards(i), _pathSpots.Count(std::uint64_t(i) + 1) - (_pathSpots.KeyOf(bot.guid) == std::uint64_t(i) + 1 ? 1 : 0) });
+    return path_variety::OrderSpots(cfg, std::move(options), _options.RandomSeed, bot.guid);
 }
 
 std::size_t BotPolicy::BeginTankLead(BotState& state, BotSnapshot const& bot, PolicyOptions::DungeonRoute const& dungeon)

@@ -237,6 +237,7 @@ void LoadPolicyTables(PolicyOptions& policyOptions, BotSettings& settings)
     policyOptions.WhisperMatrix = settings.WhisperMatrix;
     policyOptions.PathJitter = settings.PathJitter;
     policyOptions.Personality = settings.Personality;
+    policyOptions.PathVariety = settings.PathVariety;
     policyOptions.GuildMilestone = settings.GuildMilestone;
     policyOptions.CityInspect = settings.CityInspect;
     policyOptions.TransportRide = settings.TransportRide;
@@ -411,6 +412,16 @@ void LoadPolicyTables(PolicyOptions& policyOptions, BotSettings& settings)
         for (std::string const& warning : grindWarnings)
             std::cerr << "forever-bots: " << warning << "\n";
         std::cerr << "forever-bots: grind spots: " << grind->Spots.size() << " from " << settings.GrindFile << "\n";
+        if (settings.PathVariety.Enabled)
+        {
+            std::vector<path_variety::ZoneSample> samples;
+            if (!settings.PathZoneFile.empty())
+                samples = path_variety::LoadZoneSamples(settings.PathZoneFile, grindWarnings);
+            for (std::string const& warning : grindWarnings)
+                std::cerr << "forever-bots: " << warning << "\n";
+            policyOptions.PathZones = std::make_shared<path_variety::ZoneIndex>(path_variety::BuildZoneIndex(*grind, samples));
+            std::cerr << "forever-bots: path variety on, " << samples.size() << " zone sample(s)\n";
+        }
         policyOptions.Grind = std::move(grind);
     }
 }

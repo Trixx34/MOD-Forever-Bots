@@ -153,6 +153,13 @@ void BotPolicy::TurnShopping(DecideTick& tick, BotTurn& turn)
                                                                                                 : supply::Assess(_options.Supplies, supplyFacts);
     supply::Stop const supplyStop = supply::NextStop(supplyNeeds);
     bool const supplyDue = supplyStop != supply::Stop::None && nowMs >= state.NextSupplyMs && state.SupplyCheckAtMs == 0;
+    // Path variety: the first vendor trip after login is moved by a per-bot offset, later trips by a per-bot interval (the nearest vendor is where they all meet).
+    if (_options.PathVariety.Enabled && !state.PathServiceSet)
+    {
+        state.PathServiceSet = true;
+        if (state.NextServiceMs == 0)
+            state.NextServiceMs = nowMs + path_variety::StartOffsetMs(_options.PathVariety, _options.RandomSeed, bot.guid, 1);
+    }
     bool const serviceDue = _options.ServiceEveryMs != 0 && nowMs >= state.NextServiceMs;
     bool const shopping = ((idle || urgentService) && !state.ChatStay && (serviceDue || supplyDue)) || repairShopping;
     if (!shopping && state.Traveling)
@@ -226,7 +233,7 @@ void BotPolicy::TurnShopping(DecideTick& tick, BotTurn& turn)
                     state.NextSupplyMs = nowMs + supply::BackoffMs(_options.Supplies, ++state.SupplyFailures);
                 }
                 else
-                    state.NextServiceMs = nowMs + _options.ServiceEveryMs;
+                    state.NextServiceMs = nowMs + path_variety::TripIntervalMs(_options.PathVariety, _options.RandomSeed, bot.guid, _options.ServiceEveryMs);
             }
         }
         else if (leaderWaits)
@@ -322,7 +329,7 @@ void BotPolicy::TurnShopping(DecideTick& tick, BotTurn& turn)
             }
             actions.push_back(vendor);
             if (!supplyStopNow || serviceDue)
-                state.NextServiceMs = nowMs + _options.ServiceEveryMs;
+                state.NextServiceMs = nowMs + path_variety::TripIntervalMs(_options.PathVariety, _options.RandomSeed, bot.guid, _options.ServiceEveryMs);
         }
     }
 }
@@ -451,6 +458,7 @@ void BotPolicy::TurnWander(DecideTick& tick, BotTurn& turn)
                 GrindSpot const& spot = _options.Grind->Spots[spots[pick]];
                 state.GrindTarget = Point{ spot.X, spot.Y, spot.Z };
                 state.GrindSpotIndex = spots[pick];
+                NoteGrindPick(bot.guid, spots[pick]);
                 if (_options.RandomPct > 0)
                 {
                     double const angle = bot_random::Unit(bot_random::Draw(_options.RandomSeed, bot.guid, bot_random::kSaltJitter, std::uint64_t(state.WanderCycles) * 2)) * 6.283185307;
@@ -762,7 +770,17 @@ void BotPolicy::TurnTrainAndParty(DecideTick& tick, BotTurn& turn)
     auto const& leaderRef = turn.leaderRef;
     auto& idle = turn.idle;
 
-    bool const levelUp = bot.level != 0 && bot.level != state.LastTrainLevel;
+    bool levelUp = bot.level != 0 && bot.level != state.LastTrainLevel;
+    // Path variety: the trainer visit after a level-up waits a per-bot while, so bots that level together do not queue at the trainer.
+    if (levelUp && _options.PathVariety.Enabled)
+    {
+        if (state.PathTrainLevel != bot.level)
+        {
+            state.PathTrainLevel = bot.level;
+            state.PathTrainAtMs = nowMs + path_variety::TrainDelayMs(_options.PathVariety, _options.RandomSeed, bot.guid, bot.level);
+        }
+        levelUp = nowMs >= state.PathTrainAtMs;
+    }
     // A sitting bot (resting, or drinking) is not available for a trainer check, exactly as a walking bot is not: it stands first.
     if (idle && !state.Sitting && _options.TrainEveryMs != 0 && (levelUp || nowMs >= state.NextTrainMs) &&
         realism::ReadReady(_options.ReadDelay, state.TrainRead, kTrainReadKey, _options.RandomSeed, bot.guid, nowMs))

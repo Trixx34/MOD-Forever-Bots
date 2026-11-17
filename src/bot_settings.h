@@ -17,6 +17,7 @@
 #include "auction_policy.h"
 #include "bot_brackets.h"
 #include "bot_presence.h"
+#include "path_variety.h"
 #include "bot_ramp.h"
 #include "sell_policy.h"
 #include "supply_policy.h"
@@ -257,6 +258,8 @@ struct BotSettings
     whisper_matrix::Settings WhisperMatrix;
     std::string WhisperMatrixFile = "data/whisper_replies.txt";
     path_jitter::Settings PathJitter;
+    path_variety::Settings PathVariety;     // PathVariety and the Path* keys (path_variety.h)
+    std::string PathZoneFile;               // PathZoneFile: zone samples for the grind spots (path_variety.h); empty = coarse square regions
     personality::Settings Personality;      // Personality and the PersonalityRestStrength, ...IdleStrength, ...ReactionMaxMs, ...CautionStrength, ...MistakeMaxPct, ...SocialStrength keys (personality.h)
     guild_milestone::Settings GuildMilestone;
     std::string GuildMilestoneFile = "data/guild_milestones.txt";

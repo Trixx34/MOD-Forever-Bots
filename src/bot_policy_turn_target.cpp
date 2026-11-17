@@ -112,7 +112,7 @@ void BotPolicy::TurnQuestsAndHold(DecideTick& tick, BotTurn& turn)
     bool const questsAllowed = QuestsFor(bot).Enabled() && !partyMember && !stagingHold && !(IsRouteActive(bot.guid) && scenario.RouteMap != 0) /* a dungeon run: the leader walks the route, not to a quest giver */ && !lowHealth && bot.in_combat == 0 && !state.ChatStay && state.ChatFollow == 0 && nowMs >= state.QuestPausedUntilMs &&
                               !state.RepairTrip; // an urgent repair trip comes first: broken gear is repaired before the next quest fight
     if (questsAllowed)
-        questStep = QuestsFor(bot).Next(bot, state.Quest, nowMs, QuestBotInfo{ classId, _options.RaceOf ? _options.RaceOf(bot.guid) : 0u });
+        questStep = QuestsFor(bot).Next(bot, state.Quest, nowMs, QuestBotInfo{ classId, _options.RaceOf ? _options.RaceOf(bot.guid) : 0u, _options.PathVariety.Enabled ? &_options.PathVariety : nullptr, _options.RandomSeed, bot.guid });
     if (questsAllowed && questStep.Kind == QuestStepKind::WaitGroup)
     {
         state.QuestWaitQuest = questStep.Quest;
