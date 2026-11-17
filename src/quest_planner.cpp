@@ -59,7 +59,11 @@ QuestPlanner::QuestPlanner(std::shared_ptr<QuestData const> data, std::shared_pt
         if (list)
             for (QuestStartDef const& start : list->Starts)
                 for (QuestDef const& quest : start.Quests)
+                {
                     _index.try_emplace(quest.Id, &quest);
+                    if (quest.PrevQuest != 0)
+                        _prerequisites.insert(quest.PrevQuest);
+                }
 }
 
 QuestDef const* QuestPlanner::Lookup(std::uint32_t quest) const
@@ -253,7 +257,10 @@ QuestStep QuestPlanner::Next(BotSnapshot const& bot, QuestMemory& memory, std::u
         step.Kind = QuestStepKind::Hunt;
         if (!quest->Areas.empty())
         {
+            auto const known = memory.AreaIndex.find(quest->Id);
             std::size_t& index = memory.AreaIndex[quest->Id];
+            if (known == memory.AreaIndex.end() && info.Variety) // path variety: each bot starts at its own hunting area
+                index = path_variety::AreaStart(*info.Variety, info.Seed, info.Bot, quest->Id, quest->Areas.size());
             index %= quest->Areas.size();
             if (Distance2d(bot, quest->Areas[index]) <= kAreaReachYards)
                 index = (index + 1) % quest->Areas.size();
@@ -271,15 +278,33 @@ QuestStep QuestPlanner::Next(BotSnapshot const& bot, QuestMemory& memory, std::u
 
     auto const pick = [&](QuestStartDef const& start, bool needPrevDone) -> QuestDef const*
     {
+        // Path variety: among the first QuestOrderWindow eligible quests the bot takes the one its own order puts first, and leaves some free-standing quests alone.
+        QuestDef const* best = nullptr;
+        std::uint64_t bestKey = 0;
+        std::uint32_t seen = 0;
+        std::uint32_t const window = info.Variety ? std::max<std::uint32_t>(1, info.Variety->QuestOrderWindow) : 1;
         for (QuestDef const& quest : start.Quests)
         {
             if (Taken(memory, bot, quest.Id, nowMs) || !Eligible(quest, bot, info))
                 continue;
             bool const prevKnown = quest.PrevQuest == 0 || memory.Done.count(quest.PrevQuest) || InLog(bot, quest.PrevQuest);
-            if (needPrevDone == prevKnown)
+            if (needPrevDone != prevKnown)
+                continue;
+            if (!info.Variety)
                 return &quest;
+            // a quest that is the 'prev' of another is never skipped: a skipped chain head would leave the rest of the chain refused
+            if (!_prerequisites.count(quest.Id) && path_variety::SkipsQuest(*info.Variety, info.Seed, info.Bot, quest.Id))
+                continue;
+            std::uint64_t const key = path_variety::QuestOrderKey(*info.Variety, info.Seed, info.Bot, quest.Id);
+            if (!best || key < bestKey)
+            {
+                best = &quest;
+                bestKey = key;
+            }
+            if (++seen >= window)
+                break;
         }
-        return nullptr;
+        return best;
     };
 
     // The current start first (it keeps a bot working its zone), then the starts of its map by distance.
@@ -292,7 +317,7 @@ QuestStep QuestPlanner::Next(BotSnapshot const& bot, QuestMemory& memory, std::u
         QuestStartDef const& start = _data->Starts[i];
         if (!start.HasAnchor || start.Map != bot.map_id || (memory.StartIndex >= 0 && i == std::size_t(memory.StartIndex)))
             continue;
-        float const dist = Distance2d(bot, start.Anchor);
+        float dist = Distance2d(bot, start.Anchor);
         // A start made for the whole world (its quests carry levels) may be walked to from across its map, up to kWorldStartRadiusYards: a
         // farther giver is on another continent with no route (seen on the sim). A starter-zone start only from nearby.
         bool world = false;
@@ -304,7 +329,8 @@ QuestStep QuestPlanner::Next(BotSnapshot const& bot, QuestMemory& memory, std::u
         auto const blocked = memory.NoRouteUntilMs.find(i);
         if (blocked != memory.NoRouteUntilMs.end() && blocked->second > nowMs)
             continue;
-        byDistance.emplace_back(dist, i);
+        // Path variety: the ranking of the starts is wobbled per bot (the reach test above used the true distance).
+        byDistance.emplace_back(info.Variety ? path_variety::StartDistance(*info.Variety, info.Seed, info.Bot, i, dist) : dist, i);
     }
     std::sort(byDistance.begin(), byDistance.end());
     for (auto const& entry : byDistance)

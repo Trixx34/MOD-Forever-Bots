@@ -778,6 +778,12 @@ void RealismSettings()
     CHECK(on.Fidget.Enabled && on.ReadDelay.Enabled && on.PassingBuff.Enabled && on.TownAfk.Enabled && on.Auction.RoundStepCopper == 10000);
     {
         std::vector<std::string> w;
+        {
+            BotSettings const pv0 = ParseBotSettings({}, w);
+            CHECK(!pv0.PathVariety.Enabled && pv0.PathZoneFile.empty() && pv0.PathVariety.ZoneSoftCap == 40 && pv0.PathVariety.SpotMax == 6 && pv0.PathVariety.QuestOrderWindow == 3);
+            BotSettings const pv1 = ParseBotSettings({ { "PathVariety", "1" }, { "PathZoneSoftCap", "9999" }, { "PathSpotMax", "0" }, { "PathQuestOrderWindow", "0" }, { "PathZoneFile", "data/grind_zones.txt" } }, w);
+            CHECK(pv1.PathVariety.Enabled && pv1.PathVariety.ZoneSoftCap == 40 && pv1.PathVariety.SpotMax == 0 && pv1.PathVariety.QuestOrderWindow == 3 && pv1.PathZoneFile == "data/grind_zones.txt");
+        }
         BotSettings const pOff = ParseBotSettings({}, w);
         CHECK(!pOff.Personality.Enabled && pOff.Personality.RestStrength == 50 && pOff.Personality.ReactionMaxMs == 3000 && pOff.Personality.MistakeMaxPct == 5);
         BotSettings const pOn = ParseBotSettings({ { "Personality", "1" }, { "PersonalityRestStrength", "0" }, { "PersonalityReactionMaxMs", "500" }, { "PersonalityMistakeMaxPct", "99" } }, w);

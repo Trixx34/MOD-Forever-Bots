@@ -281,6 +281,26 @@ Module.forever-bots.TelemetrySummarySec = 60
 # PathJitter = 0         (an out-of-combat walking move target is offset by up to PathJitterYards in a random direction; never within 2 yards of a point
 #                         the route data marks as not walkable (blocked grind spots), never across a required route waypoint, never in a dungeon or party route)
 # PathJitterYards = 1.0  (0..5)
+# PathVariety = 0        (path variety, doc/path-variety.md: bots of one race and class stop sharing one leveling path. Needs GrindFile. Everything is a stable draw from RandomSeed and the
+#                         bot's guid; a bot keeps its variation across restarts. Never touches survival rules, rotations, parties or routes. Each key below can be set to 0 to switch its lever off)
+# PathZoneFile = "data/grind_zones.txt"   (zone samples: which zone each grind spot is in; without it spots fall into 1500 yard square regions of their map)
+# PathZoneSpread = 50    (0..100: 0 = no home zone; else the share of a zone's weight that follows distance. A bot has a home zone among the zones that hold spots for its level,
+#                         on its own map and side, chosen by a seeded weighted draw; it looks again every PathZoneReviewLevels levels, when the zone has no spot for its level, or
+#                         (PathZoneMigratePct per spot pick) when the zone holds more than PathZoneSoftCap bots. No teleport: a move is a walk, one bot at a time)
+# PathZoneSoftCap = 40   (0..500: bots per zone after which the zone's weight falls as 1 / (1 + (bots / cap)^2); 0 = no cap)
+# PathZoneMaxWalkYards = 2500   (200..6000: a zone farther from the bot than this is not chosen while another is in reach)
+# PathZoneReviewLevels = 3      (1..10)
+# PathZoneMigratePct = 10       (0..100)
+# PathSpotMax = 6        (0..100: bots at one grind spot; a full spot is skipped while another in reach is free; 0 = no limit)
+# PathCrowdYards = 150   (0..2000: each bot already at a spot counts as this many yards of extra walk)
+# PathSpotAffinityPct = 30      (0..90: a stable per-bot taste for each spot, +- this percent of the distance)
+# PathSpotReachYards = 700      (100..4000: a spot more than this beyond the nearest is not used; bounds the extra walk, so the leveling pace holds)
+# PathQuestSkipMaxPct = 25      (0..60: the chance that the least quest-minded bot leaves a free-standing quest (no other quest needs it) to grind; 0 = off)
+# PathQuestOrderWindow = 3      (1..8: the next quest is taken among this many eligible ones in a per-bot order; 1 = file order)
+# PathStartOrderPct = 25        (0..60: the ranking of nearby quest starts is wobbled per bot by +- this percent of the distance)
+# PathStartOffsetMaxSec = 120   (0..900: the first grind walk and the first vendor trip after login start up to this long later, per bot)
+# PathTripSpreadPct = 25        (0..60: the vendor interval varies per bot by +- this percent)
+# PathTrainDelayMaxSec = 60     (0..600: the trainer visit after a level-up waits up to this long, per bot)
 # Personality = 0        (each bot gets five stable traits from RandomSeed and its guid: pace, caution, sociability, session length, patience. They tune existing
 #                         behaviours a little so bots do not all act alike. Only a bot without a party or route, out of combat, is varied in its pulls; no survival rule,
 #                         level or elite guard, rotation, party, dungeon route or raid is changed. Every effect has its own strength; 0 switches that effect off)

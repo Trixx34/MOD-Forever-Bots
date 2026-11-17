@@ -17,6 +17,7 @@
 #pragma once
 
 #include "quest_data.h"
+#include "path_variety.h"
 #include "forever_module/tier2_session.h"
 
 #include <cstdint>
@@ -87,6 +88,10 @@ struct QuestBotInfo
 {
     std::uint32_t ClassId = 0;
     std::uint32_t Race = 0;
+    // Path variety (off when Variety is null): the bot's guid and the run's seed key a per-bot quest order, skips, area start and start ranking.
+    path_variety::Settings const* Variety = nullptr;
+    std::uint64_t Seed = 0;
+    std::uint64_t Bot = 0;
 };
 
 constexpr float kQuestReachYards = 4.0f;                // the core allows 5 yards for talking to an NPC
@@ -175,5 +180,6 @@ private:
     QuestPlannerOptions _options;
     std::shared_ptr<QuestData const> _data;
     std::shared_ptr<QuestData const> _alsoKnown; // kept alive for the pointers in _index
+    std::set<std::uint32_t> _prerequisites;          // quests that are the 'prev' of another one (path variety never skips them)
     std::map<std::uint32_t, QuestDef const*> _index; // quest id -> its first definition (in `data`, else in `alsoKnown`); the lists are immutable
 };

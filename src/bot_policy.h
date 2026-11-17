@@ -44,6 +44,7 @@
 #include "chat_reply.h"
 #include "combat_rotation.h"
 #include "grind_data.h"
+#include "path_variety.h"
 #include "reputation_plan.h"
 #include "level_dungeon.h"
 #include "ground_avoid.h"
@@ -420,6 +421,10 @@ struct PolicyOptions
     // Grind spots (leveling): the places an idle bot walks to for its level, instead of its map's hubs. SideOf gives a bot's faction (1 Alliance,
     // 2 Horde, 0 unknown).
     std::shared_ptr<GrindData const> Grind;
+    // Path variety (path_variety.h; off by default): per-bot home zone, spot crowding, quest order, start offsets and trip spread. `PathZones` gives the zone of each
+    // grind spot (built from the grind data and the PathZoneFile samples when the policy is made).
+    path_variety::Settings PathVariety;
+    std::shared_ptr<path_variety::ZoneIndex const> PathZones;
     std::function<std::uint8_t(std::uint64_t botGuid)> SideOf;
     // The faction for the bot parties (a party is one side): like SideOf, and it also knows the custom races. Unset, SideOf is used.
     std::function<std::uint8_t(std::uint64_t botGuid)> PartySideOf;
@@ -959,6 +964,14 @@ private:
         std::uint64_t WanderStartMs = 0;                 // when this walk began; dropped after kWanderTimeoutMs
         Point GrindTarget;                               // the grind spot being walked to
         std::size_t GrindSpotIndex = std::size_t(-1);    // the grind spot being walked to (index), -1 when none; a no-route answer is reported against it
+        // Path variety: the home zone key (0 = none yet), the level it was looked at, the draws made, the spot counted in the crowd, the one-time start offsets
+        std::uint32_t PathZoneKey = 0;
+        std::uint32_t PathReviewLevel = 0;
+        std::uint32_t PathCycle = 0;
+        bool PathServiceSet = false;                     // the first vendor trip was moved by the login offset
+        bool PathOffsetSet = false;                      // the login offsets (first grind walk, first vendor trip) were set
+        std::uint32_t PathTrainLevel = 0;                // the level whose trainer visit is being delayed
+        std::uint64_t PathTrainAtMs = 0;                 // not before this
         std::vector<std::size_t> GrindVisited;           // the last spots visited (indexes), so the bot moves on instead of going back and forth
         std::size_t NextHub = 0;                         // index of the hub to walk to next, on the bot's map
         Point WalkAnchor;                                // where the bot stood when its quest walk was last seen moving
@@ -1523,6 +1536,11 @@ private:
 
     // The grind spots for a bot's level. Blocked spots are left out unless that leaves none: then they are used again. None at all is logged as grind_none.
     std::vector<std::size_t> GrindSpotsForBot(BotState& state, forever_module::BotSnapshot const& bot, std::uint64_t nowMs);
+    // Path variety: the bot walks to this spot (it is counted at the spot until its next pick), or leaves the crowds (nullptr state use: Clear).
+    void NoteGrindPick(std::uint64_t bot, std::size_t spot);
+    std::vector<std::size_t> PathVarySpots(BotState& state, forever_module::BotSnapshot const& bot, std::vector<std::size_t> spots);
+    path_variety::Crowd _pathSpots;   // bots by the grind spot they were last sent to
+    path_variety::Crowd _pathZones;   // bots by home zone
 
     // Level dungeons and LFG (level_dungeon.h), once per Decide before the per-bot loop: starts a run for a party that is due, walks the pending ones into the dungeon,
     // ends the finished ones. A run is: teleport the party to the dungeon's entry, "tank lead" from there, teleport back when the route is walked, the time is up
