@@ -1344,9 +1344,13 @@ std::string FormatScenarioResult(ScenarioResult const& result)
 
 forever_module::WorldTickSnapshotView SubsetView(forever_module::WorldTickSnapshotView const& view, std::function<bool(std::uint64_t)> const& keep)
 {
-    forever_module::WorldTickSnapshotView out = view;
-    out.bots.clear();
-    out.nearby.clear();
+    // Not "out = view" then clear(): that copied every bot and every nearby slot of the whole view once per party (20 to 40 parties, every tick, 40 percent of
+    // the pump's CPU on the sim, 2026-11-17 profile). Copy the small members only, and the kept bots and their slots.
+    forever_module::WorldTickSnapshotView out;
+    out.tick_number = view.tick_number;
+    out.max_nearby_units = view.max_nearby_units;
+    out.party_views = view.party_views;
+    out.party_members = view.party_members;
     for (std::size_t i = 0; i < view.bots.size(); ++i)
     {
         if (!keep(view.bots[i].guid))

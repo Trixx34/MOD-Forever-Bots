@@ -51,6 +51,8 @@ void ASubsetViewKeepsTheNearbyUnitsOfItsBots()
     CHECK(part.bots.size() == 2);
     CHECK(part.NearbyOf(0).size() == 1 && part.NearbyOf(0)[0].guid == 110);
     CHECK(part.NearbyOf(1).size() == 2 && part.NearbyOf(1)[0].guid == 120 && part.NearbyOf(1)[1].guid == 121);
+    CHECK(part.tick_number == 1 && part.max_nearby_units == 2 && part.nearby.size() == 4);
+    CHECK(SubsetView(view, [](std::uint64_t) { return false; }).bots.empty());
 }
 
 void TwoPartiesRunTheirRoutesApartFromEachOther()
