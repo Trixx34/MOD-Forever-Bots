@@ -112,6 +112,19 @@ void MemberFollowsItsLeaderUntilClose()
     CHECK(!HasAction(PartyPolicy(5).Decide(view, 0), 11, ActionType::kFollow));
 }
 
+// A bot that is casting its Hearthstone (the core's masked zone teleport) gets no new movement order until the cast is over.
+void AHearthstoneCastIsNotBrokenByAFollowOrder()
+{
+    WorldTickSnapshotView view = PartyView({ 10, 11, 12, 13, 14 });
+    view.bots[1].pos_x = 30.0f;                // bot 11, far from the leader: it would follow
+    view.bots[1].casting_spell = 8690;
+    view.bots[1].cast_remaining_ms = 7000;
+    CHECK(!HasAction(PartyPolicy(5).Decide(view, 0), 11, ActionType::kFollow));
+    view.bots[1].cast_remaining_ms = 0;        // the cast is over
+    view.bots[1].casting_spell = 0;
+    CHECK(HasAction(PartyPolicy(5).Decide(view, 0), 11, ActionType::kFollow, PlayerOf(12)));
+}
+
 // 0.45.3: a leader on another map (the Stockade leader's ghost released to Stormwind, 2026-11-07 22:20) is not followed: the core's follow walked the members
 // towards the leader's coordinates on the other map, out of the prison and off the route.
 void MemberDoesNotFollowALeaderOnAnotherMap()
@@ -1044,5 +1057,6 @@ void RunPolicyTestsPart2()
     CcDoesNotHoldACreatureTypeItHasNoSpellFor();
     CcNeverHoldsTheKillPriorityTarget();
     CcTacticOffMeansNoHold();
+    AHearthstoneCastIsNotBrokenByAFollowOrder();
     NoPartyActionsInCombat();
 }
