@@ -676,6 +676,19 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadKey(config, "OffMapSeconds", 10, 3600, settings.OffMapSeconds, warnings);
     ReadKey(config, "OffMapCooldownSec", 60, 86400, settings.OffMapCooldownSec, warnings);
     ReadKey(config, "OffMapMarginYards", 100, 5000, settings.OffMapMarginYards, warnings);
+    ReadBool(config, "LevelSafeWalks", settings.LevelSafeWalks, warnings);
+    ReadBool(config, "LevelSafeGraveyard", settings.LevelSafeGraveyard, warnings);
+    ReadBool(config, "LevelSafeEscape", settings.LevelSafeEscape, warnings);
+    ReadKey(config, "LevelSafeMarginLevels", 1, 30, settings.LevelSafeMarginLevels, warnings);
+    ReadKey(config, "LevelSafeEscapeMarginLevels", 1, 40, settings.LevelSafeEscapeMarginLevels, warnings);
+    ReadKey(config, "LevelSafeRadiusYards", 50, 1000, settings.LevelSafeRadiusYards, warnings);
+    ReadKey(config, "LevelSafeEscapeCooldownSec", 60, 86400, settings.LevelSafeEscapeCooldownSec, warnings);
+    ReadBool(config, "BelowMapRecover", settings.BelowMapRecover, warnings);
+    ReadKey(config, "BelowMapDropYards", 20, 1000, settings.BelowMapDropYards, warnings);
+    ReadKey(config, "BelowMapStormCount", 0, 100, settings.BelowMapStormCount, warnings);
+    ReadKey(config, "BelowMapCooldownSec", 60, 86400, settings.BelowMapCooldownSec, warnings);
+    ReadBool(config, "LogRefusedReason", settings.LogRefusedReason, warnings);
+    ReadKey(config, "DeathsTopEveryMin", 0, 1440, settings.DeathsTopEveryMin, warnings);
     ReadBool(config, "ChatCommands", settings.ChatCommands, warnings);
     ReadBool(config, "ChatOrders", settings.ChatOrders, warnings);
     ReadBool(config, "ChatControl", settings.ChatControl, warnings);
@@ -1209,6 +1222,8 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
         settings.Auction.EveryMs = std::uint64_t(everySec) * 1000;
     }
     ReadKey(config, "AhBatchIntervalHours", 0, 168, settings.Auction.BatchIntervalHours, warnings);
+    ReadBool(config, "AuctionWalk3D", settings.Auction.Walk3D, warnings);
+    ReadBool(config, "AuctionLogReach", settings.Auction.LogReach, warnings);
     ReadKey(config, "AuctionBuyMaxPct", 1, 100, settings.Auction.BuyMaxPct, warnings);
     ReadKey(config, "AuctionBrowsePerVisit", 1, 20, settings.Auction.BrowsePerVisit, warnings);
     ReadKey(config, "AuctionCallsPerTick", 1, 50, settings.Auction.MaxCallsPerTick, warnings);

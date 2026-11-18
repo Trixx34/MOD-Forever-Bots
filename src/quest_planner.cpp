@@ -409,6 +409,26 @@ void QuestPlanner::NoteNoRoute(QuestMemory& memory, std::uint64_t nowMs, BotSnap
     }
 }
 
+void QuestPlanner::NoteLevelUnsafe(QuestMemory& memory, std::uint32_t quest, QuestStepKind kind, std::uint64_t nowMs) const
+{
+    if (quest == 0)
+        return;
+    memory.WalkingToStart = false;
+    if (kind == QuestStepKind::Hunt)
+    {
+        QuestDef const* def = Lookup(quest);
+        std::size_t const areas = def ? def->Areas.size() : 0;
+        std::uint32_t& skipped = memory.LevelUnsafeAreas[quest];
+        if (areas > 1 && ++skipped < areas)
+        {
+            ++memory.AreaIndex[quest];
+            return;
+        }
+    }
+    memory.LevelUnsafeAreas.erase(quest);
+    memory.BlockedUntilMs[quest] = nowMs + kLevelUnsafeBlockMs;
+}
+
 void QuestPlanner::NoteWalkStuck(QuestMemory& memory, std::uint32_t quest, std::uint64_t nowMs) const
 {
     if (quest != 0)

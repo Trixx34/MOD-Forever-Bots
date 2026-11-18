@@ -346,6 +346,7 @@ void BotPolicy::TurnRevivedAndRoles(DecideTick& tick, BotTurn& turn)
     turn.routeOn = IsRouteActive(bot.guid) || (partyLeader != 0 && tankLed.count(partyLeader) != 0);   // the dungeon party rules apply to this bot
     auto const& routeOn = turn.routeOn;
     DeathAreaEscape(tick, turn);
+    LevelUnsafeEscape(tick, turn); // LevelSafeEscape (bot_policy_level_safe.cpp)
     // A solo bot out of combat that is hurt (a reclaim brings it up at 50% health) rests before it fights or walks to a quest giver, up to kRecoverHoldMs: it is
     // treated as low on health (no target, no quest, away from a creature that is near, then sits). Prod 2026-11-12: revived at 49%, a bot pulled at once and died
     // to the same creature again, 812 deaths in 90 minutes.

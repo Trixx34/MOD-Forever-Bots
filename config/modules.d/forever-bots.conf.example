@@ -124,6 +124,36 @@ Module.forever-bots.TelemetrySummarySec = 60
 # OffMapCooldownSec = 600   (60 to 86400)
 # OffMapMarginYards = 500   (100 to 5000)
 
+# Level-safe places (doc/level-safe.md). The level of a place is the lowest minimum level of the grind spots (GrindFile) within LevelSafeRadiusYards
+# (two spots at least; fewer = unknown, never judged). A place is too high for a bot when that is above its level plus LevelSafeMarginLevels (a walk to a
+# quest giver or hunting area) or plus LevelSafeEscapeMarginLevels (a hand-in walk, the escape, the graveyard). LevelSafeWalks drops a quest walk to or
+# through such a place (quest_walk_blocked reason=level_unsafe; the quest is left alone 30 minutes, a hunt tries its next area first). LevelSafeGraveyard:
+# a ghost whose corpse or graveyard lies too high is taken to the nearest graveyard seen (where ghosts appeared) that fits its level and asks the spirit
+# healer there (level_safe_yard, ghost_fallback reason=level_unsafe). LevelSafeEscape: a solo bot out of combat standing in such a place is teleported to a
+# grind spot for its level (level_unsafe_escape; the core refuses a teleport in combat: a fighting bot is logged with result=in_combat, and if it dies the
+# graveyard rule takes it out). The escape and the graveyard teleport need Bot.Actions.Teleport = 1 in the core, as OffMapRecover.
+# LevelSafeWalks = 1
+# LevelSafeGraveyard = 1
+# LevelSafeEscape = 1
+# LevelSafeMarginLevels = 5   (1 to 30)
+# LevelSafeEscapeMarginLevels = 10   (1 to 40; never below LevelSafeMarginLevels)
+# LevelSafeRadiusYards = 250   (50 to 1000)
+# LevelSafeEscapeCooldownSec = 600   (60 to 86400)
+
+# Below-map recovery (off by default; the sim first). A living bot whose nearest known place within 60 yards lies more than BelowMapDropYards above it for
+# 20 s, or that got BelowMapStormCount no-route answers for walks under 100 yards within 5 minutes (0 = that sign off), is teleported to the nearest known
+# place, at most once per BelowMapCooldownSec. Log: below_map_recover reason=z_below|no_route_storm. Needs Bot.Actions.Teleport = 1 in the core.
+# BelowMapRecover = 0
+# BelowMapDropYards = 60   (20 to 1000)
+# BelowMapStormCount = 8   (0 to 100)
+# BelowMapCooldownSec = 600   (60 to 86400)
+
+# Logging only. LogRefusedReason: the "<action> not done: <status>" lines (gather, craft, vendor, ...) end with reason=N, the ActionResult reason code the
+# core gave (0 = none; the core classifies quest accepts, other actions mostly give 0). DeathsTopEveryMin: every this many minutes the line
+# "forever-bots: deaths_top: window_min= deaths= bots_online= bots_died= median= median_died= top10= top10_pct= top=guid:n,..." (0 = off).
+# LogRefusedReason = 1
+# DeathsTopEveryMin = 60   (0 to 1440)
+
 # Auto gear. 1 = the core dresses every bot for its class and level when it first appears and after it gains AutoGearEveryLevels levels
 # (best usable item per slot, uncommon quality at most; Bot.AutoGear.MaxQuality in the core's config). Off by default. With it off, a
 # player in a party can type .autogear to dress the bots that player leads.
@@ -437,6 +467,10 @@ Module.forever-bots.TelemetrySummarySec = 60
 # AuctionResolveNearby = 0      (off by default; 1 = a bot in reach names the live auctioneer from its nearby units. The snapshot's auctioneer reference is
 #                               built from the spawn id, which the core's creature guids do not use, so without this every house call is refused with
 #                               "auctioneer not found on the player's map". Switch on together with Auction; test on the sim first)
+# AuctionWalk3D = 0             (off by default, the sim first; 1 = the reach to the auctioneer is measured in 3D, 4.5 yards, not 5 yards in 2D: the listing
+#                               visit waits for it and the auction errand walks the bot to the auctioneer until it is in it. doc/level-safe.md)
+# AuctionLogReach = 1           (logging only: event auction_reach check=failed_3d when the 2D check passes and the 3D one does not, and the refusal lines
+#                               end with dist2d= dist3d= bot_z= auctioneer_z=)
 # Auction = 0
 # AuctionSellPctGreen = 300     (green items: listed at this percent of the vendor price, 100..2000)
 # AuctionSellPctBlue = 400      (blue items, 100..2000)

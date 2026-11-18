@@ -113,6 +113,8 @@ void BotPolicy::TurnQuestsAndHold(DecideTick& tick, BotTurn& turn)
                               !state.RepairTrip; // an urgent repair trip comes first: broken gear is repaired before the next quest fight
     if (questsAllowed)
         questStep = QuestsFor(bot).Next(bot, state.Quest, nowMs, QuestBotInfo{ classId, _options.RaceOf ? _options.RaceOf(bot.guid) : 0u, _options.PathVariety.Enabled ? &_options.PathVariety : nullptr, _options.RandomSeed, bot.guid });
+    if (questsAllowed)
+        LevelSafeQuestWalk(tick, turn); // LevelSafeWalks: a walk to or through a place far above the bot is dropped (bot_policy_level_safe.cpp)
     if (questsAllowed && questStep.Kind == QuestStepKind::WaitGroup)
     {
         state.QuestWaitQuest = questStep.Quest;

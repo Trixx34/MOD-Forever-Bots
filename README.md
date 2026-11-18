@@ -104,6 +104,12 @@ line to the module's stderr. A config reload updates the ramp, the random picks 
 | `PullMaxGroup` | 0 | 0 = off (the built-in 3); 1 to 3: a solo bot does not pull a creature with more than this many hostiles (itself included) within 10 yards; 1 = singles only |
 | `PullMaxLevelAbove` | 2 | 0 to 2: a solo bot pulls no creature more than this many levels above it (2 = the built-in rule; 1 for the sim) |
 | `ResurrectBackoff` | 0 | 1 = a refused resurrect answer (out of range) waits 4, 8, 16, 32, then 60 s, and the corpse run goes on meanwhile (`resurrect_backoff`) |
+| `LevelSafeWalks` | 1 | A quest walk to or through a place far above the bot (grind spot levels; `LevelSafeMarginLevels` 5, hand-ins `LevelSafeEscapeMarginLevels` 10) is dropped (`quest_walk_blocked reason=level_unsafe`); see `doc/level-safe.md` |
+| `LevelSafeGraveyard` | 1 | A ghost whose corpse or graveyard lies far above it is revived by the spirit healer of the nearest seen graveyard that fits its level (`level_safe_yard`) |
+| `LevelSafeEscape` | 1 | A solo bot out of combat in a place far above it is teleported to a grind spot for its level, once per `LevelSafeEscapeCooldownSec` 600 (`level_unsafe_escape`); also `LevelSafeRadiusYards` 250 |
+| `BelowMapRecover` | 0 | A bot far below the known places around it (`BelowMapDropYards` 60) or with a storm of short no-route walks (`BelowMapStormCount` 8) is teleported to the nearest known place, once per `BelowMapCooldownSec` 600 (`below_map_recover`) |
+| `AuctionWalk3D` / `AuctionLogReach` | 0 / 1 | The auctioneer reach in 3D (4.5 yards) and a walk to it before listing / log the failed reach check with both heights (logging only) |
+| `LogRefusedReason` / `DeathsTopEveryMin` | 1 / 60 | Logging only: `reason=N` on the `not done` lines; the hourly `deaths_top` line (0 = off) |
 | `AoeCcProtect` | 0 | 1 = area-damage rows wait while a Polymorph/Sap/Banish held creature is within 12 yards of the target (`aoe_cc_protect`) |
 | `WipeReadyPct` | 80 | Wipe recovery (scenario runs with `ScenarioWipeRecovery = 1`): after a wipe nobody pulls until every bot has revived, stands on the entry map and has this health and mana percent; the tank is freed 6 s before the members; 0 = off (0 to 100). Events `wipe_recovery: ...` |
 | `WipeReadyMaxMs` | 240000 | The longest the wipe hold lasts, so a ghost that never comes back does not stop the run (10000 to 1800000) |

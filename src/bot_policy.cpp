@@ -162,7 +162,7 @@ std::array<QuestPlanner, 6> BotPolicy::MakeQuestSets(PolicyOptions const& option
 off_map::KnownWorld BotPolicy::MakeKnownWorld(PolicyOptions const& options)
 {
     off_map::KnownWorld world;
-    if (!options.OffMap.Enabled)
+    if (!options.OffMap.Enabled && !options.BelowMap.Enabled)
         return world;
     // The same list can be shared by several (side, band) slots: each is added once.
     std::set<QuestData const*> seen;
@@ -192,6 +192,31 @@ off_map::KnownWorld BotPolicy::MakeKnownWorld(PolicyOptions const& options)
         for (Point const& hub : hubs)
             world.Add({ map, hub.X, hub.Y, hub.Z, 0 });
     return world;
+}
+
+level_safe::LevelMap BotPolicy::MakeLevelMap(PolicyOptions const& options)
+{
+    level_safe::LevelMap levels;
+    bool const used = options.LevelSafe.Walks || options.LevelSafe.Graveyard || options.LevelSafe.Escape;
+    if (used && options.Grind)
+        levels.Build(*options.Grind, options.LevelSafe.RadiusYards);
+    return levels;
+}
+
+std::optional<std::string> BotPolicy::TakeDeathsTopLine(std::uint64_t nowMs)
+{
+    if (_options.DeathsTopEveryMs == 0)
+        return std::nullopt;
+    if (_deathsTopAtMs == 0)
+    {
+        _deathsTopAtMs = nowMs;
+        return std::nullopt;
+    }
+    if (nowMs - _deathsTopAtMs < _options.DeathsTopEveryMs)
+        return std::nullopt;
+    std::uint64_t const window = nowMs - _deathsTopAtMs;
+    _deathsTopAtMs = nowMs;
+    return _deathTally.TakeLine(_botsInView, window);
 }
 
 QuestPlanner const& BotPolicy::QuestsFor(BotSnapshot const& bot) const
@@ -847,6 +872,7 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
 {
     std::vector<BotAction> actions;
     std::unordered_set<std::uint64_t> present;
+    _botsInView = view.bots.size();
     // Parties (M8): the lowest-guid bots, in guid order, cut into parties of PartySize. Computed once per tick.
     std::unordered_map<std::uint64_t, std::size_t> indexOf; // bot guid -> index in view.bots
     indexOf.reserve(view.bots.size());
@@ -1018,6 +1044,8 @@ void BotPolicy::DecideBot(DecideTick& tick, std::size_t i)
     if (TurnDead(tick, turn) == TurnFlow::kSkip)
         return;
     if (TurnOffMap(tick, turn) == TurnFlow::kSkip)
+        return;
+    if (TurnBelowMap(tick, turn) == TurnFlow::kSkip)
         return;
     TurnRevivedAndRoles(tick, turn);
     TurnTransport(tick, turn);

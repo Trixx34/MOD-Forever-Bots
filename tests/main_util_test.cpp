@@ -102,8 +102,23 @@ static void LootFacts()
     CHECK(!FromLootWindow(event));
 }
 
+// LogRefusedReason: the "not done" line carries the reason of the result whose sequence is the last action's.
+static void RefusedReason()
+{
+    forever_module::BotSnapshot bot{};
+    bot.last_action_sequence = 7;
+    CHECK(RefusedReasonField(bot, false).empty());
+    CHECK(RefusedReasonField(bot, true) == " reason=0");   // no result of that sequence
+    bot.results[0].sequence = 6;
+    bot.results[0].reason = 3;
+    bot.results[1].sequence = 7;
+    bot.results[1].reason = 11;
+    CHECK(RefusedReasonField(bot, true) == " reason=11");
+}
+
 int main()
 {
+    RefusedReason();
     LootFacts();
     Names();
     Routes();

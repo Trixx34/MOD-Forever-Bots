@@ -28,6 +28,12 @@ struct Settings
     // it spawns from its own per-map counter, so the core never finds that reference (every house call answers "auctioneer not found on the player's map").
     // With this on, a bot in reach names the live auctioneer from its nearby units instead (ResolveNearby).
     bool ResolveNearby = false;
+    // Config key AuctionWalk3D (off by default; the sim first): the reach to the auctioneer is measured in 3D (kReach3dYards) instead of 5 yards in 2D, for the
+    // listing visit (main_feeds.cpp) and the auction errand, which walks the bot to the auctioneer until it is in that reach (a bot under the Ironforge house
+    // at z=19 with the auctioneers at z=505 was "in reach" in 2D and every call was refused).
+    bool Walk3D = false;
+    // Config key AuctionLogReach (on by default, logging only): a refused house call logs the bot's 2D and 3D distance to the auctioneer and both heights.
+    bool LogReach = true;
     bool BuyEnabled = false;                    // config key AuctionBuy (off by default): a bot also buys upgrades; only with Enabled
     // Listing price as a percent of the vendor sell price, by quality (config keys AuctionSellPctGreen, AuctionSellPctBlue, AuctionSellPctEpic). The vendor price
     // is the floor the house cannot fall under: nobody pays less for it than a vendor does.
@@ -116,6 +122,11 @@ bool HasListable(Settings const& settings, std::vector<Candidate> const& items, 
 // kReachYards. The core's handler (Player::GetNPCIfCanInteractWith) allows the auctioneer's combat reach plus 4 yards, about 5.5.
 constexpr float kReachYards = 5.0f;
 bool InReach(bool auctioneerValid, float botX, float botY, float auctioneerX, float auctioneerY);
+// AuctionWalk3D: the same in 3D, at most kReach3dYards (the core measures in 3D; a bot below or above the house floor is not in reach, whatever the 2D distance).
+constexpr float kReach3dYards = 4.5f;
+bool InReach3D(bool auctioneerValid, float botX, float botY, float botZ, float auctioneerX, float auctioneerY, float auctioneerZ);
+// AuctionLogReach: " dist2d=D dist3d=E bot_z=Z auctioneer_z=A" (one decimal), for the refusal lines.
+std::string ReachFields(float botX, float botY, float botZ, float auctioneerX, float auctioneerY, float auctioneerZ);
 
 // A unit near a bot, as ResolveNearby needs it (no SDK dependency).
 struct NearUnit

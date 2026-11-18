@@ -81,6 +81,7 @@ struct QuestMemory
     std::set<std::uint32_t> RefusedHandIns;             // quests whose hand-in was refused since the last vendor visit
     std::map<std::uint32_t, std::uint32_t> RetryAtLevel;   // quest -> not tried before the bot has this level (refused: level too low)
     std::map<std::uint32_t, std::size_t> RetryAfterDone;   // quest -> not tried before more quests are done than this (refused: a prerequisite missing)
+    std::map<std::uint32_t, std::uint32_t> LevelUnsafeAreas; // quest -> hunting areas skipped in a row as too high for the bot (LevelSafeWalks)
 };
 
 // Who the bot is, for the quests' race and class limits. 0 = unknown (no limit applied).
@@ -113,6 +114,7 @@ constexpr std::uint64_t kBlockLogFullMs = 120000;               // the quest log
 constexpr std::uint64_t kBlockBagsFullMs = 60000;               // the bags are full (a vendor visit empties them): a short wait
 constexpr std::uint64_t kBlockSkillOrReputationMs = 3600000;    // a skill or reputation is short: an hour
 constexpr std::uint64_t kWalkStuckBlockMs = 900000;          // a quest whose walk is stuck (no route to its ender or hunting ground) is left alone this long
+constexpr std::uint64_t kLevelUnsafeBlockMs = 1800000;       // a quest whose walk goes to or through a place far above the bot (LevelSafeWalks) is left alone this long
 constexpr float kWorldStartRadiusYards = 2000.0f;      // a world start (its quests carry levels) is walked to from up to this far (see kStartRadiusYards)
 constexpr std::uint64_t kNoRouteBlockMs = 1800000;     // a start whose giver the core found no route to is left alone for this long
 constexpr std::uint32_t kGreyQuestMargin = 7;          // a bot this many levels above a quest's level skips it (little experience)
@@ -168,6 +170,10 @@ public:
     void NoteNoRoute(QuestMemory& memory, std::uint64_t nowMs, forever_module::BotSnapshot const* bot = nullptr) const;
     // The walk to a quest in the log (its ender, or its hunting ground) got nowhere for a long time: the quest is left alone for kWalkStuckBlockMs.
     void NoteWalkStuck(QuestMemory& memory, std::uint32_t quest, std::uint64_t nowMs) const;
+    // LevelSafeWalks (level_safe.h): the step's walk goes to or through a place far above the bot's level. A hunt moves on to the quest's next hunting area
+    // while it has one not tried yet; otherwise the quest (a giver, an ender, or every hunting area) is left alone for kLevelUnsafeBlockMs and the planner
+    // gives another step (another quest, another start) on the next call.
+    void NoteLevelUnsafe(QuestMemory& memory, std::uint32_t quest, QuestStepKind kind, std::uint64_t nowMs) const;
 
 private:
     int FindStart(forever_module::BotSnapshot const& bot) const;

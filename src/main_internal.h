@@ -108,6 +108,9 @@ constexpr std::size_t kSellItemsPerBot = 200;       // looted white items kept p
 constexpr float kSellReachYards = 4.0f;             // a bot this close to its vendor can sell to it (the core allows 5)
 
 char const* ActionTypeName(forever_module::ActionType type);
+// LogRefusedReason: " reason=N" for a "not done" line, the ActionResult reason the core gave for the bot's last action (its entry of the result ring with the
+// last action's sequence; 0 = none given or none found). Empty when `on` is false.
+std::string RefusedReasonField(forever_module::BotSnapshot const& bot, bool on);
 
 // Milliseconds on a monotonic clock, for the policy's cooldowns, the fight timer and the ramp.
 std::uint64_t nowMs();
@@ -255,7 +258,9 @@ struct AuctionBot
     bool Idle = false;
     std::uint64_t Copper = 0;   // for the budget of a purchase (AuctionBuy)
     std::uint32_t Level = 0;
-    bool InReach = false;       // in reach of the auctioneer (auction::InReach): the core refuses a listing, a browse or a buyout from farther
+    bool InReach = false;       // in reach of the auctioneer (auction::InReach, or InReach3D with AuctionWalk3D): the core refuses a listing, a browse or a buyout from farther
+    float X = 0.0f, Y = 0.0f, Z = 0.0f;                         // the bot's place when fed (AuctionLogReach: the refusal lines)
+    float AuctioneerX = 0.0f, AuctioneerY = 0.0f, AuctioneerZ = 0.0f;
 };
 
 struct AuctionFeed

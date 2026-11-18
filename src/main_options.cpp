@@ -381,6 +381,19 @@ void LoadPolicyTables(PolicyOptions& policyOptions, BotSettings& settings)
     policyOptions.OffMap.OffForMs = std::uint64_t(settings.OffMapSeconds) * 1000;
     policyOptions.OffMap.CooldownMs = std::uint64_t(settings.OffMapCooldownSec) * 1000;
     policyOptions.OffMap.MarginYards = float(settings.OffMapMarginYards);
+    policyOptions.LevelSafe.Walks = settings.LevelSafeWalks;
+    policyOptions.LevelSafe.Graveyard = settings.LevelSafeGraveyard;
+    policyOptions.LevelSafe.Escape = settings.LevelSafeEscape;
+    policyOptions.LevelSafe.MarginLevels = settings.LevelSafeMarginLevels;
+    policyOptions.LevelSafe.EscapeMarginLevels = settings.LevelSafeEscapeMarginLevels;
+    policyOptions.LevelSafe.RadiusYards = float(settings.LevelSafeRadiusYards);
+    policyOptions.LevelSafe.EscapeCooldownMs = std::uint64_t(settings.LevelSafeEscapeCooldownSec) * 1000;
+    policyOptions.BelowMap.Enabled = settings.BelowMapRecover;
+    policyOptions.BelowMap.DropYards = float(settings.BelowMapDropYards);
+    policyOptions.BelowMap.StormCount = settings.BelowMapStormCount;
+    policyOptions.BelowMap.CooldownMs = std::uint64_t(settings.BelowMapCooldownSec) * 1000;
+    policyOptions.AuctionWalk3D = settings.Auction.Enabled && settings.Auction.Walk3D;
+    policyOptions.DeathsTopEveryMs = std::uint64_t(settings.DeathsTopEveryMin) * 60000;
     policyOptions.QuestGroups = settings.QuestGroups;
     policyOptions.DynamicParties = settings.DynamicParties;
     if (!settings.TameBeastFile.empty())

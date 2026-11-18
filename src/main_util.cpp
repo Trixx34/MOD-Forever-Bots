@@ -19,6 +19,20 @@ std::string BesideTheModule(std::string const& path)
     return path;
 }
 
+std::string RefusedReasonField(forever_module::BotSnapshot const& bot, bool on)
+{
+    if (!on)
+        return std::string();
+    std::uint32_t reason = 0;
+    for (auto const& result : bot.results)
+        if (result.sequence != 0 && result.sequence == bot.last_action_sequence)
+        {
+            reason = result.reason;
+            break;
+        }
+    return " reason=" + std::to_string(reason);
+}
+
 char const* ActionTypeName(forever_module::ActionType type)
 {
     switch (type)

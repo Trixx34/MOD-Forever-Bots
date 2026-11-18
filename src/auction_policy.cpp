@@ -3,6 +3,8 @@
 #include "ah_batch.h"
 
 #include <algorithm>
+#include <cmath>
+#include <cstdio>
 #include <string>
 
 namespace auction {
@@ -160,6 +162,27 @@ bool InReach(bool auctioneerValid, float botX, float botY, float auctioneerX, fl
     float const dx = botX - auctioneerX;
     float const dy = botY - auctioneerY;
     return dx * dx + dy * dy <= kReachYards * kReachYards;
+}
+
+bool InReach3D(bool auctioneerValid, float botX, float botY, float botZ, float auctioneerX, float auctioneerY, float auctioneerZ)
+{
+    if (!auctioneerValid)
+        return false;
+    float const dx = botX - auctioneerX;
+    float const dy = botY - auctioneerY;
+    float const dz = botZ - auctioneerZ;
+    return dx * dx + dy * dy + dz * dz <= kReach3dYards * kReach3dYards;
+}
+
+std::string ReachFields(float botX, float botY, float botZ, float auctioneerX, float auctioneerY, float auctioneerZ)
+{
+    float const dx = botX - auctioneerX;
+    float const dy = botY - auctioneerY;
+    float const dz = botZ - auctioneerZ;
+    char buffer[128];
+    std::snprintf(buffer, sizeof(buffer), " dist2d=%.1f dist3d=%.1f bot_z=%.1f auctioneer_z=%.1f", std::sqrt(dx * dx + dy * dy), std::sqrt(dx * dx + dy * dy + dz * dz),
+                  botZ, auctioneerZ);
+    return buffer;
 }
 
 std::vector<Listing> PlanListings(Settings const& settings, Bags const&, Standing const& standing, std::vector<Candidate> const& items)

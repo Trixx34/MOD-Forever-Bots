@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // BotPolicy::Decide, a bot's turn: where it moves (flee, kite, fight, follow, the dungeon route, quests, goto) and whether it is idle (the steps DecideBot runs in order; bot_policy.cpp).
 #include "bot_policy_internal.h"
+#include "auction_policy.h"
 
 void BotPolicy::TurnMoveChoice(DecideTick& tick, BotTurn& turn)
 {
@@ -1703,7 +1704,11 @@ void BotPolicy::TurnIdle(DecideTick& tick, BotTurn& turn)
     {
         ErrandOrder const& order = *state.Errand;
         float const dist = bot.map_id == order.Map ? std::hypot(bot.pos_x - order.Dest.X, bot.pos_y - order.Dest.Y) : 1e9f;
-        if (dist <= kTrainReachYards && order.Auction)
+        // AuctionWalk3D: at the house only within the 3D reach of the auctioneer (the core's own measure); until then the bot walks to it.
+        bool const walk3d = order.Auction && _options.AuctionWalk3D;
+        bool const auctionArrived = order.Auction && (walk3d ? bot.map_id == order.Map && auction::InReach3D(true, bot.pos_x, bot.pos_y, bot.pos_z, order.Dest.X, order.Dest.Y, order.Dest.Z)
+                                                             : dist <= kTrainReachYards);
+        if (auctionArrived)
         {
             // At the Auction House: the bot stands in reach for kAuctionDwellMs, so the listing visit (main_feeds.cpp, its own 10 s timer) finds it
             // there, then the errand is done.
@@ -1745,7 +1750,7 @@ void BotPolicy::TurnIdle(DecideTick& tick, BotTurn& turn)
             }
             wanted = Decision{};
         }
-        else if (!order.Vendor && dist <= kTrainReachYards)
+        else if (!order.Vendor && !walk3d && dist <= kTrainReachYards)
         {
             if (bot.in_combat == 0 && bot.life_state == 0 && nowMs >= state.ErrandTrainSentMs &&
                 realism::ReadReady(_options.ReadDelay, state.TrainRead, kTrainReadKey, _options.RandomSeed, bot.guid, nowMs))

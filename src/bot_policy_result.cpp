@@ -162,7 +162,12 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
     {
         state.NoRouteSequence = bot.last_action_sequence;
         if (noRoute)
+        {
             NoteMoveRefused(state, bot, nowMs);
+            // Below-map recovery (BelowMapRecover): short walks refused again and again are a sign of a bot under the ground.
+            if (state.LastMove && state.LastMove->Target == 0)
+                below_map::NoteNoRoute(_options.BelowMap, state.BelowMap, std::hypot(bot.pos_x - state.LastMove->Dest.X, bot.pos_y - state.LastMove->Dest.Y), nowMs);
+        }
         state.QuestTeleportSent = false;
         QuestsFor(bot).NoteNoRoute(state.Quest, nowMs, &bot);
         if (teleportRefused && _options.OnEvent)

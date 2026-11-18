@@ -88,6 +88,8 @@
 #include "realism.h"
 #include "taxi_policy.h"
 #include "off_map.h"
+#include "level_safe.h"
+#include "below_map.h"
 
 #include <array>
 #include <cstdint>
@@ -253,6 +255,18 @@ struct PolicyOptions
     // Off-map recovery (off_map.h; config OffMapRecover, OffMapSeconds, OffMapCooldownSec, OffMapMarginYards): a living bot far outside the known places of
     // its map (quest givers and anchors, grind spots, hubs) for OffForMs is teleported to the nearest one of its faction. Needs Bot.Actions.Teleport in the core.
     off_map::Options OffMap;
+    // Level-safe places (level_safe.h, doc/level-safe.md; config LevelSafeWalks, LevelSafeGraveyard, LevelSafeEscape, LevelSafeMarginLevels, LevelSafeRadiusYards):
+    // a quest walk to or through a place far above the bot's level is dropped, a ghost is revived at a graveyard that fits its level, and a solo bot standing
+    // in such a place is moved to a grind spot for its level. All off here (the tests); the module settings default them on.
+    level_safe::Options LevelSafe;
+    // Below-map recovery (below_map.h; config BelowMapRecover, default off): a bot far below the known places around it, or with a storm of no-route answers
+    // for short walks, is teleported to the nearest known place. Needs Bot.Actions.Teleport in the core.
+    below_map::Options BelowMap;
+    // AuctionWalk3D (config, default off): the auction errand counts the bot as arrived only within kAuctionReach3dYards in 3D (not 5 yards in 2D) and walks
+    // it to the auctioneer until then; the listing visit (main_feeds.cpp) uses the same 3D reach.
+    bool AuctionWalk3D = false;
+    // DeathsTopEveryMs (config DeathsTopEveryMin, default 60; 0 = off): how often the `deaths_top` line (level_safe::DeathTally) is due; TakeDeathsTopLine.
+    std::uint64_t DeathsTopEveryMs = 0;
     // Group quests (config QuestGroups, off by default; quest_group.h): quests marked 'group <n>' are taken, and the bot waits for a party of n.
     quest_group::Settings QuestGroups;
     // Dynamic parties (config DynamicParties, PartyJoinYards, PartyKeepYards, PartyRejoinSec, PartyErrandEveryMinutes, PartyErrandBreakMinutes; party_reason.h):
@@ -590,7 +604,7 @@ char const* ActionStatusName(forever_module::BotActionStatus status);
 class BotPolicy
 {
 public:
-    explicit BotPolicy(PolicyOptions options = {}) : _options(options), _questSets(MakeQuestSets(options)), _knownWorld(MakeKnownWorld(options)), _scenarioRoute(ScenarioRouteOf(options)),
+    explicit BotPolicy(PolicyOptions options = {}) : _options(options), _questSets(MakeQuestSets(options)), _knownWorld(MakeKnownWorld(options)), _levelMap(MakeLevelMap(options)), _scenarioRoute(ScenarioRouteOf(options)),
                                                      _whispers(options.WhisperCooldownMs, options.WhisperMaxPerMin) {}
 
     // Actions for the bots in `view`. nowMs is a monotonic clock in milliseconds (cooldowns, retries, fight time).
@@ -606,6 +620,11 @@ public:
     // The bot's scenario party is not inside yet (Waiting to Entering): it holds at the staging place, with no quest, grind walk or pull of its own.
     // Turns skipped for calm walkers (WalkDecideEvery) since the policy was made; the pump reports it once a minute.
     std::uint64_t CalmSkippedTurns() const { return _calmSkips; }
+    // The `deaths_top` line (DeathsTopEveryMs, level_safe::DeathTally) when it is due, without the "forever-bots: " prefix; nothing otherwise or when off.
+    // The first call only starts the clock. The counts start again after each line.
+    std::optional<std::string> TakeDeathsTopLine(std::uint64_t nowMs);
+    // The graveyards seen so far (level_safe::Graveyards), for the tests.
+    std::size_t GraveyardsKnown() const { return _graveyards.Size(); }
     void SetStagingHoldFor(std::function<bool(std::uint64_t)> fn) { _stagingHoldFn = std::move(fn); }
     // Wipe recovery (the scenario director, scenario.cpp): after a wipe the members hold (rest, no pull) while Hold; the route leader holds until LeaderFree (it goes first,
     // the tank gets to the pack before the members); after a backoff RewindTo is the route point the leader is set back to once per Epoch.
@@ -979,6 +998,14 @@ private:
         bool WalkAnchored = false;                       // a quest walk is being watched: WalkAnchor and WalkStillSinceMs are live.
                                                         // A flag, not WalkStillSinceMs == 0, because 0 is a legal timestamp.
         off_map::Watch OffMap;                           // off-map recovery (TurnOffMap)
+        below_map::Watch BelowMap;                       // below-map recovery (TurnBelowMap)
+        // Level-safe places (level_safe.h): the quest walk last judged (quest, destination, level) and its verdict, so a walk is checked once, not every tick.
+        std::uint32_t LevelSafeQuest = 0;
+        Point LevelSafeDest;
+        std::uint32_t LevelSafeLevel = 0;
+        bool LevelSafeBlocked = false;
+        std::uint64_t LevelEscapeRetryMs = 0;            // the next level_unsafe_escape not before this
+        std::uint64_t LevelEscapeLoggedMs = 0;           // the last level_unsafe_escape result=in_combat line
         bool QuestTeleportSent = false;                  // one teleport already sent for this stuck walk; a second stuck drops the start
         bool Traveling = false;                          // walking to the vendor for a visit
         // Reputation goals (reputation.h).
@@ -1212,6 +1239,12 @@ private:
         std::uint64_t RunFailedAtMs = 0;
         bool GhostFallbackActive = false;                // the ghost is on the spirit healer fallback
         std::uint64_t GhostFallbackTeleportMs = 0;       // the last teleport back to the graveyard of the fallback
+        // LevelSafeGraveyard: the graveyard the fallback takes the ghost to instead of where it appeared (its corpse or that graveyard lies too high for it).
+        bool LevelSafeYardSet = false;
+        bool LevelSafeCorpseHigh = false;                // the corpse lies too high: the ghost takes the spirit healer at LevelSafeYard, no corpse run
+        bool LevelSafeJudged = false;                    // this death was judged (once per death)
+        std::uint32_t LevelSafeYardMap = 0;
+        Point LevelSafeYard;
         std::uint64_t GhostStuckLoggedMs = 0;            // the last ghost_stuck line
         std::uint64_t LevelGapLoggedFor = 0;             // engage_skipped: the target last logged
         std::uint64_t NoSpellLoggedFor = 0;              // caster_no_spell_melee: the target last logged
@@ -1300,6 +1333,12 @@ private:
     bool DeadGhostFallback(DecideTick& tick, BotTurn& turn);
     // The death area escape (DeathAreaCount): an alive bot out of combat inside the area it avoids is moved to a grind spot for its level away from it.
     void DeathAreaEscape(DecideTick& tick, BotTurn& turn);
+    // Level-safe places (level_safe.h, bot_policy_turn_life.cpp): the escape of a solo bot standing in a place far above its level, the check of a quest walk,
+    // and the choice of a level-fitting graveyard for a ghost.
+    void LevelUnsafeEscape(DecideTick& tick, BotTurn& turn);
+    void LevelSafeQuestWalk(DecideTick& tick, BotTurn& turn);
+    void LevelSafeGhost(DecideTick& tick, BotTurn& turn);
+    TurnFlow TurnBelowMap(DecideTick& tick, BotTurn& turn);  // below-map recovery (below_map.h, bot_policy_turn_life.cpp)
     void LogEvent(std::string const& text) const;
     void TurnRevivedAndRoles(DecideTick& tick, BotTurn& turn);
     void TurnTransport(DecideTick& tick, BotTurn& turn); // TransportRide (bot_policy_turn_life.cpp)
@@ -1515,6 +1554,13 @@ private:
     // The places of each map the module knows (quest anchors, givers and enders, grind spots, hubs), for the off-map check (TurnOffMap).
     static off_map::KnownWorld MakeKnownWorld(PolicyOptions const& options);
     off_map::KnownWorld _knownWorld;
+    // Level-safe places: the level of each place (from the grind spots), the graveyards seen, and the deaths counted for the deaths_top line.
+    static level_safe::LevelMap MakeLevelMap(PolicyOptions const& options);
+    level_safe::LevelMap _levelMap;
+    level_safe::Graveyards _graveyards;
+    level_safe::DeathTally _deathTally;
+    std::uint64_t _deathsTopAtMs = 0;
+    std::size_t _botsInView = 0;
     // The planner for this bot: its side (SideOf) and its band (level 60 or more is band 1).
     QuestPlanner const& QuestsFor(forever_module::BotSnapshot const& bot) const;
     GrindBlocklist _grindBlocks;                     // grind spots no bot can reach, shared by all bots

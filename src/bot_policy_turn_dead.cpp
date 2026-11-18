@@ -87,9 +87,13 @@ bool BotPolicy::DeadGhostFallback(DecideTick& tick, BotTurn& turn)
     if (bot.life_state != 2)
         return false;
     bool const instanceParty = IsRouteActive(bot.guid) || (turn.deadParty != 0 && tick.tankLed.count(turn.deadParty) != 0);
+    if (!instanceParty)
+        LevelSafeGhost(tick, turn);
     char const* reason = nullptr;
     if (state.GhostFallbackActive)
         reason = "active";
+    else if (!instanceParty && state.LevelSafeYardSet && state.LevelSafeCorpseHigh)
+        reason = "level_unsafe";
     else if (_options.GhostFallbackMs != 0 && state.RunFailed && nowMs - state.RunFailedAtMs >= _options.GhostFallbackMs)
         reason = state.RunFailedNoCorpse ? "no_corpse" : "run_failed";
     else if (!instanceParty && _options.GhostMaxMs != 0 && state.GhostSinceMs != 0 && nowMs - state.GhostSinceMs >= _options.GhostMaxMs)
@@ -124,8 +128,11 @@ bool BotPolicy::DeadGhostFallback(DecideTick& tick, BotTurn& turn)
         LogEvent(std::string("ghost_fallback: bot=") + std::to_string(bot.guid) + " reason=" + reason + " map=" + std::to_string(bot.map_id) + " corpse_valid=" +
                  std::to_string(bot.corpse_valid) + " ghost_s=" + std::to_string(state.GhostSinceMs != 0 ? (nowMs - state.GhostSinceMs) / 1000 : 0));
     }
-    // Back to the graveyard first when the ghost walked (or was put) away from it.
-    if (state.GhostSinceMs != 0 && (bot.map_id != state.GhostSpawnMap || DistanceTo(bot, state.GhostSpawn) > kGhostFallbackHealerYards))
+    // Back to the graveyard first when the ghost walked (or was put) away from it. LevelSafeGraveyard: to the graveyard that fits its level instead, when the one it
+    // appeared at (or its corpse) lies far above it.
+    std::uint32_t const yardMap = state.LevelSafeYardSet ? state.LevelSafeYardMap : state.GhostSpawnMap;
+    Point const yard = state.LevelSafeYardSet ? state.LevelSafeYard : state.GhostSpawn;
+    if (state.GhostSinceMs != 0 && (bot.map_id != yardMap || DistanceTo(bot, yard) > kGhostFallbackHealerYards))
     {
         if (nowMs >= state.GhostFallbackTeleportMs && GhostTeleportSlot(nowMs))
         {
@@ -133,12 +140,13 @@ bool BotPolicy::DeadGhostFallback(DecideTick& tick, BotTurn& turn)
             BotAction back;
             back.bot_guid = bot.guid;
             back.type = ActionType::kTeleport;
-            back.spell_id = state.GhostSpawnMap;
-            back.dest_x = state.GhostSpawn.X;
-            back.dest_y = state.GhostSpawn.Y;
-            back.dest_z = state.GhostSpawn.Z;
+            back.spell_id = yardMap;
+            back.dest_x = yard.X;
+            back.dest_y = yard.Y;
+            back.dest_z = yard.Z;
             actions.push_back(back);
-            LogEvent("ghost_fallback_teleport: bot=" + std::to_string(bot.guid) + " map=" + std::to_string(state.GhostSpawnMap));
+            LogEvent("ghost_fallback_teleport: bot=" + std::to_string(bot.guid) + " map=" + std::to_string(yardMap) +
+                     (state.LevelSafeYardSet ? " graveyard=level_safe to=" + std::to_string(int(yard.X)) + "," + std::to_string(int(yard.Y)) : std::string()));
             return true;
         }
         // The teleport is not due yet (or was refused): the spirit healer is asked from here, the core walks to one within its reach or falls back to the reclaim.
@@ -197,6 +205,10 @@ void BotPolicy::DeadRecord(DecideTick& tick, BotTurn& turn)
         state.RunFailedAtMs = 0;
         state.GhostFallbackActive = false;
         state.GhostFallbackTeleportMs = 0;
+        state.LevelSafeYardSet = false;
+        state.LevelSafeCorpseHigh = false;
+        state.LevelSafeJudged = false;
+        _deathTally.Note(bot.guid);
         state.DeathHistoryMs.push_back(nowMs);
         // The death area: DeathAreaCount deaths within DeathAreaWindowMs and DeathAreaYards of this one (this one counted) make the bot avoid the area. Not for a bot of a
         // dungeon party: there the route is the content and the dungeon ghost rules apply.
@@ -284,6 +296,10 @@ void BotPolicy::DeadRecord(DecideTick& tick, BotTurn& turn)
         state.GhostSinceMs = nowMs;
         state.GhostSpawnMap = bot.map_id;
         state.GhostSpawn = Point{ bot.pos_x, bot.pos_y, bot.pos_z };
+        // LevelSafeGraveyard: a ghost seen to rise from its corpse stands at the graveyard the core chose; it is remembered for the level-safe choice (a ghost
+        // first seen as a ghost, after a module restart, may stand anywhere and is not).
+        if (_options.LevelSafe.Graveyard && was == 1)
+            _graveyards.Note(bot.map_id, bot.pos_x, bot.pos_y, bot.pos_z, _options.SideOf ? _options.SideOf(bot.guid) : 0);
         state.RunStarted = false;
         state.Inside = false;
         state.Last.reset();

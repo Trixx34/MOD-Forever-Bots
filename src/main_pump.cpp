@@ -42,6 +42,7 @@ void main_detail::PumpTier2(forever_module::Tier2Session& session, std::atomic<b
     // Last action sequence seen per bot, so each result is reported once.
     std::unordered_map<std::uint64_t, std::uint32_t> seenSequence;
     std::unordered_map<std::uint64_t, std::uint64_t> serviceNoticeMs; // bot -> when a service refusal was last logged
+    std::unordered_map<std::uint64_t, std::uint64_t> auctionReachLoggedMs; // bot -> when its auction_reach line was last written (AuctionLogReach)
     std::unordered_set<std::uint32_t> unknownSpellsReported; // spell ids the core does not know, reported once each
     // Ambient chat (AmbientChat, off by default): the line pool is read once here; a missing or empty file turns it off.
     std::optional<ambient::Speaker> ambientSpeaker;
@@ -154,7 +155,7 @@ void main_detail::PumpTier2(forever_module::Tier2Session& session, std::atomic<b
                 }
                 std::cerr << "forever-bots: bot " << bot.guid << " " << ActionTypeName(static_cast<forever_module::ActionType>(bot.last_action_type))
                           << (bot.last_action_spell ? " spell " + std::to_string(bot.last_action_spell) : std::string())
-                          << " not done: " << ActionStatusName(bot.last_action_status) << "\n";
+                          << " not done: " << ActionStatusName(bot.last_action_status) << RefusedReasonField(bot, settings.LogRefusedReason) << "\n";
             }
         }
 
@@ -408,6 +409,9 @@ void main_detail::PumpTier2(forever_module::Tier2Session& session, std::atomic<b
                 }
             }
             std::vector<forever_module::BotAction> actions = policy.Decide(view, nowMs());
+            // DeathsTopEveryMin: deaths, the median per bot and the share of the worst ten bots, once per period.
+            if (std::optional<std::string> const deathsTop = policy.TakeDeathsTopLine(nowMs()))
+                std::cerr << "forever-bots: " << *deathsTop << "\n";
             // Talent respecs (TalentRespec): one kRespecTalents per bot, spec in spell_id and role in dest_x; the core does the reset and the spend.
             for (BotPolicy::TalentOrder const& order : policy.TakeRespecOrders())
             {
@@ -640,7 +644,23 @@ void main_detail::PumpTier2(forever_module::Tier2Session& session, std::atomic<b
                     forever_module::BotSnapshot const& bot = view.bots[botIndex];
                     if ((extras.Alts && extras.Alts->Has(bot.guid)) || bot.group_role != 0)
                         continue;
-                    bool const inReach = auction::InReach(bot.auctioneer_valid != 0, bot.pos_x, bot.pos_y, bot.auctioneer_x, bot.auctioneer_y);
+                    bool const inReach2d = auction::InReach(bot.auctioneer_valid != 0, bot.pos_x, bot.pos_y, bot.auctioneer_x, bot.auctioneer_y);
+                    bool const inReach3d = auction::InReach3D(bot.auctioneer_valid != 0, bot.pos_x, bot.pos_y, bot.pos_z, bot.auctioneer_x, bot.auctioneer_y,
+                                                              bot.auctioneer_z);
+                    bool const inReach = settings.Auction.Walk3D ? inReach3d : inReach2d;
+                    // AuctionLogReach: the 2D check passes but the bot is not within the 3D reach (below or above the house floor, or a stale place): said once
+                    // per bot every ten minutes, with both heights.
+                    if (settings.Auction.Enabled && settings.Auction.LogReach && inReach2d && !inReach3d)
+                    {
+                        std::uint64_t const now = nowMs();
+                        auto const last = auctionReachLoggedMs.find(bot.guid);
+                        if (last == auctionReachLoggedMs.end() || now - last->second >= kServiceNoticeMs)
+                        {
+                            auctionReachLoggedMs[bot.guid] = now;
+                            std::cerr << "forever-bots: event auction_reach: bot=" << bot.guid << " check=failed_3d walk3d=" << (settings.Auction.Walk3D ? 1 : 0)
+                                      << auction::ReachFields(bot.pos_x, bot.pos_y, bot.pos_z, bot.auctioneer_x, bot.auctioneer_y, bot.auctioneer_z) << "\n";
+                        }
+                    }
                     std::uint64_t auctioneer = bot.auctioneer_guid;
                     if (settings.Auction.ResolveNearby && inReach)
                     {
@@ -650,7 +670,8 @@ void main_detail::PumpTier2(forever_module::Tier2Session& session, std::atomic<b
                             near.push_back({ unit.guid, unit.pos_x, unit.pos_y });
                         auctioneer = auction::ResolveNearby(bot.auctioneer_guid, bot.auctioneer_x, bot.auctioneer_y, near);
                     }
-                    list.push_back({ bot.guid, bot.bag_free_slots, auctioneer, bot.life_state == 0 && bot.in_combat == 0, bot.copper, bot.level, inReach });
+                    list.push_back({ bot.guid, bot.bag_free_slots, auctioneer, bot.life_state == 0 && bot.in_combat == 0, bot.copper, bot.level, inReach, bot.pos_x, bot.pos_y, bot.pos_z,
+                                    bot.auctioneer_x, bot.auctioneer_y, bot.auctioneer_z });
                 }
                 std::lock_guard<std::mutex> lock(extras.Auction->Lock);
                 extras.Auction->Bots.swap(list);

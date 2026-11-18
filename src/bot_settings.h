@@ -193,6 +193,32 @@ struct BotSettings
     std::uint32_t OffMapSeconds = 60;
     std::uint32_t OffMapCooldownSec = 600;
     std::uint32_t OffMapMarginYards = 500;
+    // Level-safe places (2026-11-18, level_safe.h, doc/level-safe.md). The level of a place is the lowest minimum level of the grind spots within
+    // LevelSafeRadiusYards (default 250, 50..1000; two spots at least, else unknown and never judged); a place is too high for a bot when that is above its level
+    // plus LevelSafeMarginLevels (default 5, 1..30) for a walk to a quest giver or hunting area, plus LevelSafeEscapeMarginLevels (default 10, 1..40, never below
+    // the other) for a hand-in walk, the escape and the graveyard.
+    // LevelSafeWalks (default 1): a quest walk to or through such a place is dropped (event quest_walk_blocked reason=level_unsafe). LevelSafeGraveyard
+    // (default 1): a ghost whose corpse or graveyard lies too high is revived by the spirit healer of the nearest graveyard seen that fits its level (event
+    // level_safe_yard). LevelSafeEscape (default 1): a solo bot out of combat standing in such a place is teleported to a grind spot for its level, at most once
+    // per LevelSafeEscapeCooldownSec (default 600, 60..86400; event level_unsafe_escape; needs Bot.Actions.Teleport, as OffMapRecover).
+    bool LevelSafeWalks = true;
+    bool LevelSafeGraveyard = true;
+    bool LevelSafeEscape = true;
+    std::uint32_t LevelSafeMarginLevels = 5;
+    std::uint32_t LevelSafeEscapeMarginLevels = 10;
+    std::uint32_t LevelSafeRadiusYards = 250;
+    std::uint32_t LevelSafeEscapeCooldownSec = 600;
+    // Below-map recovery (below_map.h): BelowMapRecover (default 0) teleports a living bot to the nearest known place when the nearest known place within 60 yards
+    // lies more than BelowMapDropYards (default 60, 20..1000) above it for 20 s, or after BelowMapStormCount (default 8, 0 = that sign off, 0..100) no-route
+    // answers for walks under 100 yards within 5 minutes; at most once per BelowMapCooldownSec (default 600, 60..86400). Event below_map_recover.
+    bool BelowMapRecover = false;
+    std::uint32_t BelowMapDropYards = 60;
+    std::uint32_t BelowMapStormCount = 8;
+    std::uint32_t BelowMapCooldownSec = 600;
+    // LogRefusedReason (default 1, logging only): the "<action> not done: <status>" lines carry the ActionResult reason code the core gave (reason=N, 0 = none).
+    bool LogRefusedReason = true;
+    // DeathsTopEveryMin (default 60, 0 = off, 0..1440; logging only): the `forever-bots: deaths_top:` line (deaths, median per bot, share of the worst ten).
+    std::uint32_t DeathsTopEveryMin = 60;
     // Grind spots (config key GrindFile, see grind_data.h): the places idle bots walk to for their level. Empty turns it off (hubs are used).
     std::string GrindFile;
     // Rotations (config key RotationFile, see combat_rotation.h): fight rows and upkeep buffs per class from a file. Empty = the built-in rotations.
