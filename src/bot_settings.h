@@ -383,6 +383,14 @@ struct BotSettings
     // default), at most LevelDungeonRuns times per dungeon (1..5, default 2). LfgCommand: "LFG <dungeon>" in the General or Trade channel brings free bots to the speaker.
     bool LevelDungeons = true;
     std::uint32_t LevelDungeonRuns = 2;
+    // Level dungeon rules (doc/dungeons.md), all off by default. LevelDungeonEarlyLevels (0..20): due from this many levels below the dungeon's max level, never below its
+    // min level. LevelDungeonSides ("rfc:horde,hot:alliance"): a party of the other side is never sent there. LevelDungeonFileDuration: the run cap is the file's
+    // run.duration_sec instead of 45 minutes. LevelDungeonNeedRoles: a party goes only with a tank and a healer. LevelDungeonLog: level_dungeon_due / level_dungeon_skip lines.
+    std::uint32_t LevelDungeonEarlyLevels = 0;
+    std::map<std::string, std::uint8_t> LevelDungeonSides;
+    bool LevelDungeonFileDuration = false;
+    bool LevelDungeonNeedRoles = false;
+    bool LevelDungeonLog = false;
     bool LfgCommand = true;
     // LfgFill = 1 (default 0): a human's party that lacks a tank or a healer is offered free bots, which whisper their role to the leader (lfg_fill.h).
     bool LfgFill = false;

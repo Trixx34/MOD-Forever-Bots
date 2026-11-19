@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "bot_policy_internal.h"
+#include <cctype>
 
 std::vector<std::size_t> BotPolicy::GrindSpotsForBot(BotState& state, BotSnapshot const& bot, std::uint64_t nowMs)
 {
@@ -135,7 +136,7 @@ constexpr std::uint32_t kLevelDungeonMinMembers = 3;      // a bot party smaller
 constexpr std::uint64_t kLevelHoldMs = 4000;              // after a teleport order a bot takes no other order for this long
 constexpr std::uint64_t kLevelEnterRetryMs = 8000;        // the teleport into the dungeon is sent again to a bot that is not there yet
 constexpr std::uint64_t kLevelEnterTimeoutMs = 40000;     // the party is not in by then: the attempt is given up (and counted)
-constexpr std::uint64_t kLevelRunMaxMs = 45 * 60 * 1000;  // a run that is not over by then is ended (an attempt that did not clear it)
+constexpr std::uint64_t kLevelRunMaxMs = 45 * 60 * 1000;  // a run that is not over by then is ended (an attempt that did not clear it); see LevelDungeonFileDuration
 constexpr std::uint64_t kLfgJoinWaitMs = 60000;           // LFG: how long the speaker has to invite the bots that were brought
 constexpr std::uint64_t kLfgOrderMaxMs = 10 * 60 * 1000;  // LFG: an order nobody finished is dropped after this
 
@@ -153,13 +154,53 @@ KnownDungeons KnownDungeonsOf(PolicyOptions const& options)
     {
         if (route.Id.empty() || route.Route.empty() || !route.HasEntry)
             continue;
-        known.List.push_back(level_dungeon::Dungeon{ route.Id, route.Name, route.MinLevel, route.MaxLevel, map });
+        level_dungeon::Dungeon dungeon{ route.Id, route.Name, route.MinLevel, route.MaxLevel, map };
+        dungeon.DurationSec = route.DurationSec;
+        if (!options.LevelDungeonSides.empty())
+        {
+            std::string id = route.Id;
+            std::transform(id.begin(), id.end(), id.begin(), [](unsigned char c) { return char(std::tolower(c)); });
+            if (auto const side = options.LevelDungeonSides.find(id); side != options.LevelDungeonSides.end())
+                dungeon.Side = side->second;
+        }
+        known.List.push_back(std::move(dungeon));
         known.Routes.push_back(&route);
     }
     return known;
 }
 
+level_dungeon::DueRules DueRulesOf(PolicyOptions const& options, std::uint8_t partySide)
+{
+    level_dungeon::DueRules rules;
+    rules.EarlyLevels = options.LevelDungeonEarlyLevels;
+    rules.PartySide = partySide;
+    return rules;
+}
+
 } // namespace
+
+level_dungeon::Role BotPolicy::LevelRoleOf(std::uint64_t guid) const
+{
+    if (auto const state = _bots.find(guid); state != _bots.end())
+    {
+        switch (state->second.Role_)
+        {
+            case BotState::Role::Tank: return level_dungeon::Role::Tank;
+            case BotState::Role::Healer: return level_dungeon::Role::Healer;
+            case BotState::Role::Dps: return level_dungeon::Role::Dps;
+            default: break;
+        }
+    }
+    std::uint32_t const classId = ClassFor(_options, guid);
+    return classId == 0 ? level_dungeon::Role::Dps : level_dungeon::RoleOfClass(classId);
+}
+
+std::uint8_t BotPolicy::LevelPartySide(std::uint64_t leaderGuid) const
+{
+    if (_options.PartySideOf)
+        return _options.PartySideOf(leaderGuid);
+    return _options.SideOf ? _options.SideOf(leaderGuid) : std::uint8_t(0);
+}
 
 void BotPolicy::DriveLevelDungeons(WorldTickSnapshotView const& view, std::unordered_map<std::uint64_t, std::size_t> const& indexOf,
                                    std::unordered_map<std::uint64_t, std::vector<std::uint64_t>> const& membersOf, std::uint64_t nowMs,
@@ -195,6 +236,21 @@ void BotPolicy::DriveLevelDungeons(WorldTickSnapshotView const& view, std::unord
     if (_options.LevelDungeons)
     {
         KnownDungeons const known = KnownDungeonsOf(_options);
+        // LevelDungeonLog: the decision for a party not in a run, logged when it changes (not every tick).
+        auto const decide = [&](std::uint64_t leaderGuid, std::string const& text)
+        {
+            if (!_options.LevelDungeonLog)
+                return;
+            std::string& last = _levelLastDecision[leaderGuid];
+            if (last == text)
+                return;
+            last = text;
+            event(text);
+        };
+        auto const skip = [&](std::uint64_t leaderGuid, std::uint32_t level, char const* reason)
+        {
+            decide(leaderGuid, "level_dungeon_skip: leader=" + std::to_string(leaderGuid) + " level=" + std::to_string(level) + " reason=" + reason);
+        };
         for (auto const& partyEntry : membersOf)
         {
             std::uint64_t const leaderGuid = partyEntry.first;
@@ -206,11 +262,44 @@ void BotPolicy::DriveLevelDungeons(WorldTickSnapshotView const& view, std::unord
             if (run == _levelRuns.end())
             {
                 // Not in a run: due? Never in combat, never while a member is dead or away, never inside a dungeon, never while the tank leads on a chat order.
-                if (known.List.empty() || members.empty() || members.size() + 1 < kLevelDungeonMinMembers || leader->life_state != 0 || leader->in_combat != 0 ||
-                    leader->group_role != 2 || _options.DungeonsByMap.count(leader->map_id) != 0 || StateOf(leaderGuid).TankLead)
+                // The level band is checked first (on the lowest level of the members found), so LevelDungeonLog reports "not ready" only for a party that is due by level;
+                // the go / no-go is the same as checking readiness first (DueWhy has no side effects).
+                if (known.List.empty())
                     continue;
                 std::uint32_t level = leader->level;
-                bool ready = level != 0;
+                for (std::uint64_t member : members)
+                    if (BotSnapshot const* const other = snapshotOf(member); other && other->level != 0)
+                        level = std::min(level, other->level);
+                std::uint8_t const side = LevelPartySide(leaderGuid);
+                level_dungeon::DueResult dueResult;
+                {
+                    level_dungeon::Book const empty;
+                    auto const seen = _levelBooks.find(leaderGuid);
+                    dueResult = level_dungeon::DueWhy(known.List, level, seen == _levelBooks.end() ? empty : seen->second, _options.LevelDungeonRuns,
+                                                      DueRulesOf(_options, side));
+                }
+                int const due = dueResult.Index;
+                if (level == 0 || due < 0)
+                {
+                    skip(leaderGuid, level, level_dungeon::SkipName(dueResult.Why));
+                    continue;
+                }
+                if (members.empty() || members.size() + 1 < kLevelDungeonMinMembers)
+                {
+                    skip(leaderGuid, level, "too_few");
+                    continue;
+                }
+                if (leader->group_role != 2)
+                {
+                    skip(leaderGuid, level, "not_grouped");
+                    continue;
+                }
+                if (leader->life_state != 0 || leader->in_combat != 0 || _options.DungeonsByMap.count(leader->map_id) != 0 || StateOf(leaderGuid).TankLead)
+                {
+                    skip(leaderGuid, level, "leader_busy");
+                    continue;
+                }
+                bool ready = true;
                 std::vector<BotSnapshot const*> party{ leader };
                 for (std::uint64_t member : members)
                 {
@@ -221,16 +310,29 @@ void BotPolicy::DriveLevelDungeons(WorldTickSnapshotView const& view, std::unord
                         ready = false;
                         break;
                     }
-                    level = std::min(level, other->level);
                     party.push_back(other);
                 }
                 if (!ready)
+                {
+                    skip(leaderGuid, level, "member_not_ready");
                     continue;
+                }
+                if (_options.LevelDungeonNeedRoles)
+                {
+                    std::vector<level_dungeon::Role> roles;
+                    for (BotSnapshot const* member : party)
+                        roles.push_back(LevelRoleOf(member->guid));
+                    if (!level_dungeon::HasTankAndHealer(roles))
+                    {
+                        skip(leaderGuid, level, "no_tank_healer");
+                        continue;
+                    }
+                }
                 level_dungeon::Book& book = _levelBooks[leaderGuid];
-                int const due = level_dungeon::Due(known.List, level, book, _options.LevelDungeonRuns);
-                if (due < 0)
-                    continue;
                 PolicyOptions::DungeonRoute const& dungeon = *known.Routes[std::size_t(due)];
+                decide(leaderGuid, "level_dungeon_due: leader=" + std::to_string(leaderGuid) + " dungeon=" + dungeon.Id + " level=" + std::to_string(level) +
+                                   " band=" + std::to_string(dungeon.MinLevel) + "-" + std::to_string(dungeon.MaxLevel) + " early=" + (dueResult.Early ? "1" : "0") +
+                                   " side=" + std::to_string(side) + " members=" + std::to_string(party.size()));
                 level_dungeon::NoteStarted(book, dungeon.Id, level);
                 LevelDungeonRun started;
                 started.Map = known.List[std::size_t(due)].MapId;
@@ -240,9 +342,11 @@ void BotPolicy::DriveLevelDungeons(WorldTickSnapshotView const& view, std::unord
                 started.OriginMap = leader->map_id;
                 started.Origin = Point{ leader->pos_x, leader->pos_y, leader->pos_z };
                 started.PartyLevel = level;
+                started.CapMs = level_dungeon::RunCapMs(dungeon.DurationSec, _options.LevelDungeonFileDuration, kLevelRunMaxMs);
                 for (BotSnapshot const* member : party)
                     teleport(*member, started.Map, dungeon.Entry);
                 _levelRuns[leaderGuid] = started;
+                _levelLastDecision.erase(leaderGuid);   // after the run, the next decision is logged again
                 event("level_dungeon_start: leader=" + std::to_string(leaderGuid) + " dungeon=" + dungeon.Id + " level=" + std::to_string(level) +
                       " run=" + std::to_string(book.Dungeons[dungeon.Id].Runs) + " members=" + std::to_string(party.size()));
                 continue;
@@ -302,7 +406,7 @@ void BotPolicy::DriveLevelDungeons(WorldTickSnapshotView const& view, std::unord
             // Running: over when the route is walked (cleared), the lead was ended (stop, lead off, left the map) or the time is up.
             bool const cleared = leaderState.TankLead && leaderState.RouteIndex >= route->second.Route.size();
             bool const ended = !leaderState.TankLead || leader->map_id != current.Map;
-            bool const late = nowMs - current.StartMs > kLevelRunMaxMs;
+            bool const late = nowMs - current.StartMs > (current.CapMs != 0 ? current.CapMs : kLevelRunMaxMs);
             if (cleared || ended || late)
             {
                 if (cleared)
@@ -328,6 +432,9 @@ void BotPolicy::DriveLevelDungeons(WorldTickSnapshotView const& view, std::unord
             else
                 ++run;
         }
+        // The last logged decision of a party that is gone is forgotten.
+        for (auto last = _levelLastDecision.begin(); last != _levelLastDecision.end();)
+            last = membersOf.count(last->first) == 0 ? _levelLastDecision.erase(last) : std::next(last);
     }
 
     // ---- LFG: the group of the speaker goes into the dungeon once the asked bots have joined ----
@@ -403,21 +510,7 @@ void BotPolicy::DriveLfgFill(WorldTickSnapshotView const& view, std::unordered_m
     };
     auto const isOurBot = [&indexOf](std::uint64_t ref) { return ref != 0 && indexOf.count(ref & forever_module::kUnitRefCounterMask) != 0; };
     // A bot's role: the one a chat order gave it, else its class (an unknown class counts as a damage dealer).
-    auto const roleOf = [this](std::uint64_t guid) -> level_dungeon::Role
-    {
-        if (auto const state = _bots.find(guid); state != _bots.end())
-        {
-            switch (state->second.Role_)
-            {
-                case BotState::Role::Tank: return level_dungeon::Role::Tank;
-                case BotState::Role::Healer: return level_dungeon::Role::Healer;
-                case BotState::Role::Dps: return level_dungeon::Role::Dps;
-                default: break;
-            }
-        }
-        std::uint32_t const classId = ClassFor(_options, guid);
-        return classId == 0 ? level_dungeon::Role::Dps : level_dungeon::RoleOfClass(classId);
-    };
+    auto const roleOf = [this](std::uint64_t guid) -> level_dungeon::Role { return LevelRoleOf(guid); };
     auto const sideOf = [this](std::uint64_t guid) -> std::uint8_t
     {
         if (_options.PartySideOf)
@@ -782,5 +875,6 @@ bool BotPolicy::LevelDungeonDue(std::uint64_t leaderGuid, std::uint32_t partyLev
         return false;
     level_dungeon::Book const empty;
     auto const book = _levelBooks.find(leaderGuid);
-    return level_dungeon::Due(known.List, partyLevel, book == _levelBooks.end() ? empty : book->second, _options.LevelDungeonRuns) >= 0;
+    return level_dungeon::Due(known.List, partyLevel, book == _levelBooks.end() ? empty : book->second, _options.LevelDungeonRuns,
+                              DueRulesOf(_options, LevelPartySide(leaderGuid))) >= 0;
 }

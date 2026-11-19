@@ -127,6 +127,23 @@ The run reuses "tank lead": the party is teleported to the dungeon's `entry`, th
 walked (cleared), the lead is ended or 45 minutes are over, the living members are teleported back to where the party was. The counters live in memory (lost on a module
 restart). Log lines: `level_dungeon_start`, `level_dungeon_in`, `level_dungeon_end` (result `cleared`, `ended`, `timeout`, `not_entered`).
 
+Nothing is due unless a dungeon is loaded: `DungeonFile`, `DungeonDataDir` or `DungeonDir` must name something that exists (`forever-bots: tank lead knows N dungeon(s)` at
+start). With the shipped files and the default schedule, nothing is due before level 18 (hot and rfc, 13-18).
+
+### Level dungeon rules (2026-11-19, all off by default)
+
+Each key below is off by default, which keeps the schedule above exactly as it was.
+
+| key | default | effect |
+|---|---|---|
+| `LevelDungeonEarlyLevels` | 0 | 0..20. A dungeon is due from `max level - N` (never below its min level) up to `max level + 2`. With 3: rfc and hot (13-18) from 15, rol (15-20) from 17, dm (18-23) from 20, wc (15-25) from 22. The lowest max level still goes first; once per level and `LevelDungeonRuns` still hold. |
+| `LevelDungeonSides` | empty | `<id>:alliance|horde|any,...`. A party (its side from the race, as the party cut uses) is never sent to a dungeon of the other side, and a party of unknown side is never sent to a sided one. The shipped dungeon JSON files have **no side field**, which is why this is a key. Suggested: `rfc:horde,rol:horde,hot:alliance,stockade:alliance` (the dungeons inside a capital); `dm:alliance,wc:horde` also split the contested-zone ones. Without it, at 18 every party, Horde or Alliance, goes to `hot` first (lower id). |
+| `LevelDungeonFileDuration` | 0 | 1: the run cap is the dungeon file's `run.duration_sec` instead of the fixed 45 minutes; a dungeon without one keeps 45 minutes. Note: most shipped files say 1800 s (30 min; gnomer, onyxia and zg 3600 s), so this **shortens** most runs. |
+| `LevelDungeonNeedRoles` | 0 | 1: a party goes only with at least one tank and one healer. A bot's role is its FlexRoles or chat role, else its class (warrior tanks; priest, paladin, shaman, druid heal). Without `FlexRoles`, only a warrior counts as a tank. |
+| `LevelDungeonLog` | 0 | 1: each party not in a run logs its decision once per change (not every tick): `level_dungeon_due: leader= dungeon= level= band= early= side= members=` and `level_dungeon_skip: leader= level= reason=`. The level band is checked first: `no_dungeon`, `wrong_side`, `cleared`, `runs_used`, `same_level` (the closest reason of the dungeons in band). Only a party due by level can then get `too_few`, `not_grouped` (no core group led by the bot leader yet), `leader_busy` (combat, dead, in a dungeon, a chat lead), `member_not_ready` (a member dead, in combat, in flight, away or not in the core group) or `no_tank_healer`. `level` is the lowest level of the members found. |
+
+`LevelDungeonEarlyLevels` and `LevelDungeonSides` also apply to the dynamic-party check "the party is due for a level dungeon" (`DynamicParties`).
+
 **LFG** (`LfgCommand`, default `1`): a player types `LFG <dungeon>` (the key, `rfc`, or a word of the name, `ragefire`, case-insensitive; General or Trade channel, party chat or
 a whisper to a bot also work) and gets one whisper back, e.g. `LFG rfc: group of 3, filling tank, dps x2. Invite the bots next to you.` An unknown dungeon is answered with the known
 keys. The missing roles of the group (up to 5; tank = warrior, healer = priest/paladin/shaman/druid, dps = hunter/rogue/mage/warlock) are taken from the free bots of the

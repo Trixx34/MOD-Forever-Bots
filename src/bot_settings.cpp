@@ -3,6 +3,7 @@
 
 #include "bot_guilds.h"
 #include "bot_pick.h"
+#include "level_dungeon.h"
 #include "text_number.h"
 
 #include <cstdlib>
@@ -985,6 +986,17 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadBool(config, "LevelDungeons", settings.LevelDungeons, warnings);
     ReadKey(config, "LevelDungeonRuns", 0, 1000, settings.LevelDungeonRuns, warnings);
     settings.LevelDungeonRuns = std::clamp<std::uint32_t>(settings.LevelDungeonRuns, 1, 5);
+    ReadKey(config, "LevelDungeonEarlyLevels", 0, 20, settings.LevelDungeonEarlyLevels, warnings);
+    if (auto const it = config.find("LevelDungeonSides"); it != config.end())
+    {
+        std::vector<std::string> sideWarnings;
+        settings.LevelDungeonSides = level_dungeon::ParseSides(it->second, sideWarnings);
+        for (std::string const& warning : sideWarnings)
+            warnings.push_back("Module.forever-bots." + warning + ".");
+    }
+    ReadBool(config, "LevelDungeonFileDuration", settings.LevelDungeonFileDuration, warnings);
+    ReadBool(config, "LevelDungeonNeedRoles", settings.LevelDungeonNeedRoles, warnings);
+    ReadBool(config, "LevelDungeonLog", settings.LevelDungeonLog, warnings);
     ReadBool(config, "LfgCommand", settings.LfgCommand, warnings);
     ReadBool(config, "LfgFill", settings.LfgFill, warnings);
     ReadBool(config, "DungeonReviveOutOfCombat", settings.DungeonReviveOutOfCombat, warnings);

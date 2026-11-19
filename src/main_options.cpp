@@ -38,6 +38,11 @@ void PolicyFromSettings(PolicyOptions& policyOptions, BotSettings& settings)
     policyOptions.DungeonTeleport = settings.DungeonTeleport;
     policyOptions.LevelDungeons = settings.LevelDungeons && settings.Scenarios.empty();   // a scenario run drives its own parties
     policyOptions.LevelDungeonRuns = settings.LevelDungeonRuns;
+    policyOptions.LevelDungeonEarlyLevels = settings.LevelDungeonEarlyLevels;
+    policyOptions.LevelDungeonSides = settings.LevelDungeonSides;
+    policyOptions.LevelDungeonFileDuration = settings.LevelDungeonFileDuration;
+    policyOptions.LevelDungeonNeedRoles = settings.LevelDungeonNeedRoles;
+    policyOptions.LevelDungeonLog = settings.LevelDungeonLog;
     policyOptions.LfgFill = settings.LfgFill;
     policyOptions.Duels = settings.Duels;
     policyOptions.Battlegrounds = settings.Battlegrounds;

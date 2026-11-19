@@ -2,6 +2,8 @@
 // Unit tests for the level-dungeon schedule and the LFG planning (level_dungeon.h). No core needed.
 #include "level_dungeon.h"
 
+#include <string>
+
 #include <cstdio>
 
 using namespace level_dungeon;
@@ -141,10 +143,102 @@ void ClassesFillRoles()
     CHECK(RoleOfClass(9) == Role::Dps);
 }
 
+void EarlyLevelsZeroKeepsTheOldSchedule()
+{
+    auto const dungeons = Dungeons();
+    Book book;
+    for (std::uint32_t level = 1; level <= 40; ++level)
+        CHECK(Due(dungeons, level, book, 2, DueRules{}) == Due(dungeons, level, book, 2));
+    CHECK(FirstDueLevel(dungeons[0], 0) == 18);
+}
+
+void EarlyLevelsOpenTheBandBelowTheMax()
+{
+    auto const dungeons = Dungeons();
+    Book book;
+    DueRules rules;
+    rules.EarlyLevels = 3;
+    CHECK(FirstDueLevel(dungeons[0], 3) == 15);
+    CHECK(Due(dungeons, 14, book, 2, rules) == -1);
+    DueResult const at15 = DueWhy(dungeons, 15, book, 2, rules);
+    CHECK(at15.Index == 0 && at15.Early && at15.Why == Skip::None);   // rfc from 15
+    CHECK(Due(dungeons, 18, book, 2, rules) == 0);
+    CHECK(!DueWhy(dungeons, 18, book, 2, rules).Early);
+    CHECK(Due(dungeons, 20, book, 2, rules) == 0);                    // the grace above the max is unchanged
+    // Never below the min level, however early.
+    rules.EarlyLevels = 20;
+    CHECK(FirstDueLevel(dungeons[0], 20) == 13);
+    CHECK(Due(dungeons, 12, book, 2, rules) == -1);
+    CHECK(Due(dungeons, 13, book, 2, rules) == 0);
+    // Once per level still holds.
+    rules.EarlyLevels = 3;
+    NoteStarted(book, "rfc", 15);
+    DueResult const again = DueWhy(dungeons, 15, book, 2, rules);
+    CHECK(again.Index == -1 && again.Why == Skip::SameLevel);
+    CHECK(Due(dungeons, 16, book, 2, rules) == 0);
+}
+
+void SidesKeepAPartyOutOfTheOtherSidesDungeon()
+{
+    std::vector<Dungeon> dungeons = { { "hot", "Hall of Thanes", 13, 18, 3065 }, { "rfc", "Ragefire Chasm", 13, 18, 389 } };
+    Book book;
+    CHECK(Due(dungeons, 18, book, 2) == 0);           // no sides: hot first by id, for both sides
+    dungeons[0].Side = 1;                              // hot: Alliance
+    dungeons[1].Side = 2;                              // rfc: Horde
+    DueRules horde;
+    horde.PartySide = 2;
+    DueRules alliance;
+    alliance.PartySide = 1;
+    CHECK(Due(dungeons, 18, book, 2, horde) == 1);
+    CHECK(Due(dungeons, 18, book, 2, alliance) == 0);
+    DueRules unknown;                                  // side unknown: no sided dungeon
+    DueResult const none = DueWhy(dungeons, 18, book, 2, unknown);
+    CHECK(none.Index == -1 && none.Why == Skip::WrongSide);
+    // A cleared own-side dungeon is reported as cleared (the closer reason), not as wrong_side.
+    NoteStarted(book, "rfc", 18);
+    NoteCleared(book, "rfc");
+    CHECK(DueWhy(dungeons, 19, book, 2, horde).Why == Skip::Cleared);
+    CHECK(std::string(SkipName(Skip::WrongSide)) == "wrong_side" && std::string(SkipName(Skip::NoDungeon)) == "no_dungeon");
+}
+
+void ParsesTheSideList()
+{
+    std::vector<std::string> warnings;
+    auto const sides = ParseSides(" RFC:horde, hot:Alliance ,dm:1,wc:h,sfk:any,bad,zz:mars,", warnings);
+    CHECK(sides.size() == 5);
+    CHECK(sides.at("rfc") == 2 && sides.at("hot") == 1 && sides.at("dm") == 1 && sides.at("wc") == 2 && sides.at("sfk") == 0);
+    CHECK(warnings.size() == 2);                       // "bad" and "zz:mars"
+    warnings.clear();
+    CHECK(ParseSides("", warnings).empty() && warnings.empty());
+}
+
+void RunCapFromTheFile()
+{
+    constexpr std::uint64_t k45 = 45 * 60 * 1000;
+    CHECK(RunCapMs(1800, false, k45) == k45);          // key off: 45 minutes
+    CHECK(RunCapMs(1800, true, k45) == 1800000);       // key on: the file's duration_sec
+    CHECK(RunCapMs(0, true, k45) == k45);              // no duration in the file: 45 minutes
+}
+
+void TankAndHealerCheck()
+{
+    CHECK(HasTankAndHealer({ Role::Tank, Role::Healer, Role::Dps }));
+    CHECK(!HasTankAndHealer({ Role::Tank, Role::Dps, Role::Dps }));
+    CHECK(!HasTankAndHealer({ Role::Healer, Role::Healer, Role::Dps }));
+    CHECK(!HasTankAndHealer({}));
+    CHECK(HasTankAndHealer({ RoleOfClass(1), RoleOfClass(5), RoleOfClass(8) }));   // warrior, priest, mage
+}
+
 } // namespace
 
 int main()
 {
+    EarlyLevelsZeroKeepsTheOldSchedule();
+    EarlyLevelsOpenTheBandBelowTheMax();
+    SidesKeepAPartyOutOfTheOtherSidesDungeon();
+    ParsesTheSideList();
+    RunCapFromTheFile();
+    TankAndHealerCheck();
     DueOnlyAtTheMaxLevel();
     LowestMaxLevelFirstWhenSeveralAreDue();
     SecondAttemptWaitsForTheNextLevelAndStopsAtTheLimit();

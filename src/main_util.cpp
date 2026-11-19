@@ -100,6 +100,7 @@ std::map<std::uint32_t, PolicyOptions::DungeonRoute> DungeonRoutes(std::vector<D
         route.Name = dungeon.Name;
         route.MinLevel = dungeon.MinLevel;
         route.MaxLevel = dungeon.MaxLevel;
+        route.DurationSec = dungeon.DurationSec;   // run.duration_sec: the level-run cap with LevelDungeonFileDuration
         // The instance entrance (the dungeon file's entry: map x y z), where a ghost of the party is revived.
         route.HasEntry = true;
         route.Entry = { dungeon.Entry[1], dungeon.Entry[2], dungeon.Entry[3] };

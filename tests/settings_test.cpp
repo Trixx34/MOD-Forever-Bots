@@ -133,6 +133,17 @@ void LevelDungeonSettings()
     CHECK(!set.LevelDungeons && set.LevelDungeonRuns == 4 && !set.LfgCommand && warnings.empty());
     CHECK(ParseBotSettings({ { "LevelDungeonRuns", "0" } }, warnings).LevelDungeonRuns == 1);
     CHECK(ParseBotSettings({ { "LevelDungeonRuns", "99" } }, warnings).LevelDungeonRuns == 5);
+    // The level dungeon rules: all off by default (today's schedule), each read from its key.
+    CHECK(defaults.LevelDungeonEarlyLevels == 0 && defaults.LevelDungeonSides.empty() && !defaults.LevelDungeonFileDuration && !defaults.LevelDungeonNeedRoles &&
+          !defaults.LevelDungeonLog);
+    warnings.clear();
+    BotSettings const rules = ParseBotSettings({ { "LevelDungeonEarlyLevels", "3" }, { "LevelDungeonSides", "rfc:horde,hot:alliance" },
+                                                 { "LevelDungeonFileDuration", "1" }, { "LevelDungeonNeedRoles", "1" }, { "LevelDungeonLog", "1" } }, warnings);
+    CHECK(rules.LevelDungeonEarlyLevels == 3 && rules.LevelDungeonSides.size() == 2 && rules.LevelDungeonSides.at("rfc") == 2 &&
+          rules.LevelDungeonSides.at("hot") == 1 && rules.LevelDungeonFileDuration && rules.LevelDungeonNeedRoles && rules.LevelDungeonLog && warnings.empty());
+    CHECK(ParseBotSettings({ { "LevelDungeonEarlyLevels", "99" } }, warnings).LevelDungeonEarlyLevels == 0 && !warnings.empty());   // out of 0..20: kept at 0
+    warnings.clear();
+    CHECK(ParseBotSettings({ { "LevelDungeonSides", "rfc:mars" } }, warnings).LevelDungeonSides.empty() && warnings.size() == 1);
 }
 
 // Urgent repair (repair_policy.h): on by default, with or without AutoGearing; bounded keys.

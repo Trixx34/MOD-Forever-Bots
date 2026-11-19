@@ -314,6 +314,200 @@ void ADeadPetWithoutRevivePetStopsTheTameLoopWhenKeyed()
         CHECK(e.find("why=pet_dead_no_revive") == std::string::npos);
 }
 
+// ---- Level dungeons (DriveLevelDungeons): the early, side, roles, file-duration and decision-log keys ----
+
+constexpr std::uint32_t kRfcMap = 389;
+
+// A formed party of three on map 0 led by warrior 12 (core group: 12 leads, 10 and 11 follow), all at `level`. Classes: 12 warrior, 10 `class10`, 11 mage.
+struct LevelParty
+{
+    PolicyOptions Options;
+    WorldTickSnapshotView View;
+    std::vector<std::string> Events;
+};
+
+void MakeLevelParty(LevelParty& party, std::uint32_t level, std::uint32_t class10 = 5, std::uint8_t side = 2)
+{
+    PolicyOptions& options = party.Options;
+    options = AggressiveOptions();
+    options.PartySize = 3;
+    options.PartyCount = 1;
+    options.WanderWhenIdle = false;
+    options.LevelDungeons = true;
+    options.ClassOf = [class10](std::uint64_t guid) { return guid == 12 ? 1u : guid == 10 ? class10 : 8u; };
+    options.PartySideOf = [side](std::uint64_t) { return side; };
+    options.OnEvent = [events = &party.Events](std::string const& text) { events->push_back(text); };
+    PolicyOptions::DungeonRoute rfc;
+    rfc.Id = "rfc";
+    rfc.Name = "Ragefire Chasm";
+    rfc.MinLevel = 13;
+    rfc.MaxLevel = 18;
+    rfc.HasEntry = true;
+    rfc.Entry = Point{ 1.0f, 2.0f, 3.0f };
+    rfc.Route = { Point{ 500.0f, 500.0f, 0.0f }, Point{ 900.0f, 900.0f, 0.0f } };   // far from the entry: the lead does not reach the end in the test
+    rfc.DurationSec = 60;
+    options.DungeonsByMap[kRfcMap] = rfc;
+    party.View = PartyView({ 10, 11, 12 }, options.ClassOf);
+    for (BotSnapshot& bot : party.View.bots)
+    {
+        bot.level = level;
+        bot.group_role = bot.guid == 12 ? 2 : 1;
+        bot.group_leader_guid = PlayerOf(12);
+        bot.group_size = 3;
+    }
+}
+
+bool TeleportsInto(std::vector<BotAction> const& actions, std::uint64_t bot, std::uint32_t map)
+{
+    for (BotAction const& action : actions)
+        if (action.bot_guid == bot && action.type == ActionType::kTeleport && action.spell_id == map)
+            return true;
+    return false;
+}
+
+std::size_t CountEvents(std::vector<std::string> const& events, std::string const& prefix)
+{
+    std::size_t count = 0;
+    for (std::string const& e : events)
+        count += e.rfind(prefix, 0) == 0 ? 1 : 0;
+    return count;
+}
+
+bool HasEvent(std::vector<std::string> const& events, std::string const& part)
+{
+    for (std::string const& e : events)
+        if (e.find(part) != std::string::npos)
+            return true;
+    return false;
+}
+
+void LevelDungeonDefaultsGoOnlyAtTheMaxLevel()
+{
+    LevelParty early;
+    MakeLevelParty(early, 15);
+    BotPolicy policy(early.Options);
+    CHECK(!TeleportsInto(policy.Decide(early.View, 1000), 12, kRfcMap));   // 15 is below rfc's max (18): not due by default
+    CHECK(CountEvents(early.Events, "level_dungeon_") == 0);              // no decision log by default
+
+    LevelParty atMax;
+    MakeLevelParty(atMax, 18);
+    BotPolicy policy18(atMax.Options);
+    auto const actions = policy18.Decide(atMax.View, 1000);
+    CHECK(TeleportsInto(actions, 12, kRfcMap) && TeleportsInto(actions, 10, kRfcMap) && TeleportsInto(actions, 11, kRfcMap));
+    CHECK(CountEvents(atMax.Events, "level_dungeon_start") == 1);
+    CHECK(CountEvents(atMax.Events, "level_dungeon_due") == 0);
+}
+
+void LevelDungeonEarlyLevelsSendsBelowTheMax()
+{
+    LevelParty party;
+    MakeLevelParty(party, 15);
+    party.Options.LevelDungeonEarlyLevels = 3;   // due from 18 - 3 = 15
+    party.Options.LevelDungeonLog = true;
+    BotPolicy policy(party.Options);
+    CHECK(TeleportsInto(policy.Decide(party.View, 1000), 12, kRfcMap));
+    CHECK(HasEvent(party.Events, "level_dungeon_due: leader=12 dungeon=rfc level=15 band=13-18 early=1"));
+
+    LevelParty low;
+    MakeLevelParty(low, 14);
+    low.Options.LevelDungeonEarlyLevels = 3;
+    low.Options.LevelDungeonLog = true;
+    BotPolicy lowPolicy(low.Options);
+    CHECK(!TeleportsInto(lowPolicy.Decide(low.View, 1000), 12, kRfcMap));   // 14 is below 15
+    CHECK(HasEvent(low.Events, "level_dungeon_skip: leader=12 level=14 reason=no_dungeon"));
+}
+
+void LevelDungeonSidesKeepAPartyOutOfTheOtherSidesDungeon()
+{
+    LevelParty alliance;
+    MakeLevelParty(alliance, 18, 5, 1);
+    alliance.Options.LevelDungeonSides = { { "rfc", 2 } };   // Ragefire is Horde only
+    alliance.Options.LevelDungeonLog = true;
+    BotPolicy policy(alliance.Options);
+    CHECK(!TeleportsInto(policy.Decide(alliance.View, 1000), 12, kRfcMap));
+    CHECK(HasEvent(alliance.Events, "reason=wrong_side"));
+
+    LevelParty horde;
+    MakeLevelParty(horde, 18, 5, 2);
+    horde.Options.LevelDungeonSides = { { "rfc", 2 } };
+    BotPolicy hordePolicy(horde.Options);
+    CHECK(TeleportsInto(hordePolicy.Decide(horde.View, 1000), 12, kRfcMap));
+}
+
+void LevelDungeonNeedRolesWantsATankAndAHealer()
+{
+    LevelParty noHealer;
+    MakeLevelParty(noHealer, 18, 4);   // warrior, rogue, mage
+    noHealer.Options.LevelDungeonNeedRoles = true;
+    noHealer.Options.LevelDungeonLog = true;
+    BotPolicy policy(noHealer.Options);
+    CHECK(!TeleportsInto(policy.Decide(noHealer.View, 1000), 12, kRfcMap));
+    CHECK(HasEvent(noHealer.Events, "reason=no_tank_healer"));
+    // The skip is logged once, not every tick.
+    policy.Decide(noHealer.View, 2000);
+    policy.Decide(noHealer.View, 3000);
+    CHECK(CountEvents(noHealer.Events, "level_dungeon_skip") == 1);
+
+    LevelParty keyOff;
+    MakeLevelParty(keyOff, 18, 4);
+    BotPolicy offPolicy(keyOff.Options);
+    CHECK(TeleportsInto(offPolicy.Decide(keyOff.View, 1000), 12, kRfcMap));   // the key off: the old behaviour, no role check
+
+    LevelParty withPriest;
+    MakeLevelParty(withPriest, 18, 5);
+    withPriest.Options.LevelDungeonNeedRoles = true;
+    BotPolicy priestPolicy(withPriest.Options);
+    CHECK(TeleportsInto(priestPolicy.Decide(withPriest.View, 1000), 12, kRfcMap));
+}
+
+// A party due by level but with the leader in combat logs leader_busy once, then goes when the fight is over; each change is a new line.
+void LevelDungeonLogNamesWhyADuePartyWaits()
+{
+    LevelParty party;
+    MakeLevelParty(party, 18);
+    party.Options.LevelDungeonLog = true;
+    BotPolicy policy(party.Options);
+    party.View.bots[2].in_combat = 1;   // leader 12
+    CHECK(!TeleportsInto(policy.Decide(party.View, 1000), 12, kRfcMap));
+    policy.Decide(party.View, 1100);
+    CHECK(CountEvents(party.Events, "level_dungeon_skip: leader=12 level=18 reason=leader_busy") == 1);
+    party.View.bots[2].in_combat = 0;
+    party.View.bots[0].life_state = 1;  // member 10 dead
+    CHECK(!TeleportsInto(policy.Decide(party.View, 1200), 12, kRfcMap));
+    CHECK(HasEvent(party.Events, "reason=member_not_ready"));
+    party.View.bots[0].life_state = 0;
+    CHECK(TeleportsInto(policy.Decide(party.View, 1300), 12, kRfcMap));
+    CHECK(CountEvents(party.Events, "level_dungeon_due") == 1 && CountEvents(party.Events, "level_dungeon_start") == 1);
+}
+
+// Runs the party into rfc and keeps it there; returns whether the run ended as a timeout by `checkAtMs`.
+bool LevelRunTimedOut(bool fileDuration, std::uint64_t checkAtMs)
+{
+    LevelParty party;
+    MakeLevelParty(party, 18);
+    party.Options.LevelDungeonFileDuration = fileDuration;
+    BotPolicy policy(party.Options);
+    CHECK(TeleportsInto(policy.Decide(party.View, 1000), 12, kRfcMap));
+    for (BotSnapshot& bot : party.View.bots)
+    {
+        bot.map_id = kRfcMap;
+        bot.pos_x = 1.0f;
+        bot.pos_y = 2.0f;
+        bot.pos_z = 3.0f;
+    }
+    policy.Decide(party.View, 2000);                       // in: the run starts now
+    CHECK(HasEvent(party.Events, "level_dungeon_in"));
+    policy.Decide(party.View, checkAtMs);
+    return HasEvent(party.Events, "result=timeout");
+}
+
+void LevelDungeonFileDurationCapsTheRun()
+{
+    CHECK(LevelRunTimedOut(true, 2000 + 61 * 1000));       // the file's 60 s
+    CHECK(!LevelRunTimedOut(false, 2000 + 61 * 1000));     // the fixed 45 minutes
+    CHECK(LevelRunTimedOut(false, 2000 + 46 * 60 * 1000));
+}
+
 } // namespace
 
 void RunPolicyTestsPart12()
@@ -333,4 +527,10 @@ void RunPolicyTestsPart12()
     AnAssignedRouteKeepsItsParty();
     OffKeepsTheStaticParties();
     ADeadPetWithoutRevivePetStopsTheTameLoopWhenKeyed();
+    LevelDungeonDefaultsGoOnlyAtTheMaxLevel();
+    LevelDungeonEarlyLevelsSendsBelowTheMax();
+    LevelDungeonSidesKeepAPartyOutOfTheOtherSidesDungeon();
+    LevelDungeonNeedRolesWantsATankAndAHealer();
+    LevelDungeonFileDurationCapsTheRun();
+    LevelDungeonLogNamesWhyADuePartyWaits();
 }

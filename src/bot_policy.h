@@ -327,6 +327,8 @@ struct PolicyOptions
         std::string Name;
         std::uint32_t MinLevel = 1;
         std::uint32_t MaxLevel = 60;
+        // The dungeon file's run.duration_sec (0 = not known): the level-run time cap when LevelDungeonFileDuration is on.
+        std::uint32_t DurationSec = 0;
     };
     std::map<std::uint32_t, DungeonRoute> DungeonsByMap;
     // Level dungeons (config LevelDungeons, LevelDungeonRuns): a bot party that is levelling goes into each dungeon of DungeonsByMap when its level reaches the dungeon's max
@@ -334,6 +336,17 @@ struct PolicyOptions
     // tests); the module turns it on by its config default.
     bool LevelDungeons = false;
     std::uint32_t LevelDungeonRuns = 2;
+    // Level dungeon rules (doc/dungeons.md), all off by default (the schedule above):
+    // LevelDungeonEarlyLevels: a dungeon is due from this many levels below its max level (never below its min level); 0 = from the max level only.
+    std::uint32_t LevelDungeonEarlyLevels = 0;
+    // LevelDungeonSides: dungeon id (lower case) -> 1 Alliance only, 2 Horde only; a party of the other side (PartySideOf, else SideOf) is never sent there. Empty = no filter.
+    std::map<std::string, std::uint8_t> LevelDungeonSides;
+    // LevelDungeonFileDuration: the run time cap is the dungeon file's run.duration_sec instead of the fixed 45 minutes (a file without it keeps 45 minutes).
+    bool LevelDungeonFileDuration = false;
+    // LevelDungeonNeedRoles: a party is sent only with at least one tank and one healer (the FlexRoles / chat role of a bot, else its class: level_dungeon::RoleOfClass).
+    bool LevelDungeonNeedRoles = false;
+    // LevelDungeonLog: log every decision of a party not in a run, once per change: level_dungeon_due and level_dungeon_skip (reason=...).
+    bool LevelDungeonLog = false;
     // LFG fill (config LfgFill, lfg_fill.h): a human's party short of a tank or a healer gets a free bot sent next to it, which whispers its offer to the leader.
     // Off by default. Needs PartySize and a level for the party.
     bool LfgFill = false;
@@ -1683,9 +1696,15 @@ private:
         std::uint32_t OriginMap = 0;      // where the party was, to go back there
         Point Origin;
         std::uint32_t PartyLevel = 0;
+        std::uint64_t CapMs = 0;          // the run's time cap (kLevelRunMaxMs, or the file's duration_sec with LevelDungeonFileDuration); 0 = kLevelRunMaxMs
     };
     std::map<std::uint64_t, level_dungeon::Book> _levelBooks;   // party leader bot -> what the party has run (kept in memory only)
     std::map<std::uint64_t, LevelDungeonRun> _levelRuns;               // party leader bot -> its run in progress
+    std::map<std::uint64_t, std::string> _levelLastDecision;           // LevelDungeonLog: party leader bot -> the last decision logged (logged again only on a change)
+    // A bot's role for the level dungeons and LFG: the one a chat order or FlexRoles gave it, else its class (an unknown class counts as a damage dealer).
+    level_dungeon::Role LevelRoleOf(std::uint64_t guid) const;
+    // The side of a bot party (PartySideOf, else SideOf; 0 unknown).
+    std::uint8_t LevelPartySide(std::uint64_t leaderGuid) const;
     // LFG: the speaker's order, waiting for the bots it asked for to join its group (the speaker invites them), then for the group to enter the dungeon.
     struct LfgOrder
     {

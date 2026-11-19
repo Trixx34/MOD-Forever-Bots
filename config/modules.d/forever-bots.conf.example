@@ -856,6 +856,17 @@ Module.forever-bots.TelemetrySummarySec = 60
 # Level dungeons and LFG: a levelling bot party runs each dungeon of the dungeon file when its level reaches the dungeon's max level.
 # LevelDungeons = 1                  # on by default
 # LevelDungeonRuns = 2               # (1..5) most runs of one dungeon per party
+# Level dungeon rules (doc/dungeons.md), all off by default; the defaults keep the schedule above unchanged.
+# LevelDungeonEarlyLevels = 0        # (0..20) due from this many levels below the dungeon's max level (never below its min level); 0 = only from the max level.
+#                                    #   3: rfc/hot (13-18) from 15, rol (15-20) from 17, dm (18-23) from 20
+# LevelDungeonSides =                # "<id>:alliance|horde|any,..." a party of the other side is never sent there (the dungeon files have no side field).
+#                                    #   Suggested (dungeons inside a capital): rfc:horde,rol:horde,hot:alliance,stockade:alliance; add dm:alliance,wc:horde to also split
+#                                    #   the contested-zone dungeons by the side of their region; a dungeon not listed is open to both sides
+# LevelDungeonFileDuration = 0       # 1: the run time cap is the dungeon file's run.duration_sec (1800 s in most shipped files) instead of the fixed 45 minutes
+# LevelDungeonNeedRoles = 0          # 1: a party goes only with a tank and a healer (FlexRoles / chat role, else class: warrior tanks; priest, paladin, shaman, druid heal)
+# LevelDungeonLog = 0                # 1: log each party decision once per change: level_dungeon_due (dungeon, level, band, early, side) and level_dungeon_skip reason=
+#                                    #   no_dungeon, wrong_side, cleared, runs_used, same_level (by level), then, for a party due by level: too_few, not_grouped,
+#                                    #   leader_busy, member_not_ready, no_tank_healer
 # LfgCommand = 1                     # on by default: "LFG <dungeon>" in the General or Trade channel brings free bots to the speaker
 
 # Crafting = 1                       # on by default: a bot with nothing to fight makes bandages from its cloth and cooks its meat (raises First Aid and Cooking); 0 turns it off
