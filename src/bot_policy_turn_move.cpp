@@ -1595,6 +1595,19 @@ void BotPolicy::MoveForQuestOrGoto(DecideTick& tick, BotTurn& turn)
             wanted = Decision{ ActionType::kStop, 0 };
             break;
         }
+        case QuestStepKind::Hop:
+        {
+            // A Skyborne exit quest at the dock: the teleport to the other map (the quest says to board the skycutter; bots do not ride transports). The
+            // core refuses it unless Bot.Actions.Teleport is on; the refusal (or no move within kHopWaitMs) blocks the quest (skyborne_hop_refused).
+            wanted = Decision{ ActionType::kTeleport, 0, Point{ questStep.Dest.X, questStep.Dest.Y, questStep.Dest.Z }, questStep.Map };
+            state.Last.reset(); // sent even when the last order was the same teleport (a retry after a block)
+            QuestsFor(bot).NoteHopSent(state.Quest, questStep.Quest, questStep.Map, nowMs);
+            LogEvent("skyborne_hop_start: bot=" + std::to_string(bot.guid) + " quest=" + std::to_string(questStep.Quest) + " level=" + std::to_string(bot.level) +
+                     " from=" + std::to_string(bot.map_id) + ":" + std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) + " to=" +
+                     std::to_string(questStep.Map) + ":" + std::to_string(int(questStep.Dest.X)) + "," + std::to_string(int(questStep.Dest.Y)) + "," +
+                     std::to_string(int(questStep.Dest.Z)) + " bag_free=" + std::to_string(bot.bag_free_slots));
+            break;
+        }
         case QuestStepKind::WaitGroup:
             // Waiting for a party: stand where the bot is (the leader of the party invites the partners; DriveQuestGroups).
             wanted = Decision{ ActionType::kStop, 0 };

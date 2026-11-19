@@ -109,6 +109,9 @@ void ChatSettings()
     CHECK(!off.QuestGroups.Enabled && off.QuestGroups.WaitMs == 600000 && off.QuestGroups.RangeYards == 150.0f); // group quests are off by default
     BotSettings const groups = ParseBotSettings({ { "QuestGroups", "1" }, { "QuestGroupWaitMinutes", "5" }, { "QuestGroupRangeYards", "80" }, { "QuestGroupGuildHelpers", "0" } }, warnings);
     CHECK(groups.QuestGroups.Enabled && groups.QuestGroups.WaitMs == 300000 && groups.QuestGroups.RangeYards == 80.0f && !groups.QuestGroups.GuildHelpers && warnings.empty());
+    CHECK(!off.SkyborneExitQuests && !off.SkyborneExitMakeRoom); // the Skyborne exit quests are off by default
+    BotSettings const exits = ParseBotSettings({ { "SkyborneExitQuests", "1" }, { "SkyborneExitMakeRoom", "1" } }, warnings);
+    CHECK(exits.SkyborneExitQuests && exits.SkyborneExitMakeRoom && warnings.empty());
 }
 
 void QuestListSettings()

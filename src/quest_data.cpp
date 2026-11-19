@@ -132,6 +132,43 @@ QuestData ParseQuestData(std::istream& in, std::vector<std::string>& warnings)
             else
                 drop("startfrom needs <quest> item|object <entry>, for a quest defined above");
         }
+        else if (keyword == "hop")
+        {
+            std::uint32_t id = 0;
+            std::uint32_t map = 0;
+            QuestPoint point;
+            QuestDef* quest = nullptr;
+            if (!start.HasAnchor)
+                drop("hop needs the start's anchor above it (the map the hop starts from)");
+            else if (line >> id >> map && (quest = FindQuest(start, id)) && ReadPoint(line, point) && map != start.Map)
+            {
+                std::string word;
+                QuestPoint dock;
+                bool hasDock = false;
+                bool ok = true;
+                if (line >> word)
+                {
+                    ok = word == "dock" && ReadPoint(line, dock);
+                    hasDock = ok;
+                    std::string extra;
+                    if (ok && line >> extra)
+                        ok = false;
+                }
+                if (ok)
+                {
+                    quest->HasHop = true;
+                    quest->HopFrom = start.Map;
+                    quest->HopMap = map;
+                    quest->Hop = point;
+                    quest->HasDock = hasDock;
+                    quest->Dock = dock;
+                }
+                else
+                    drop("hop takes only an optional 'dock <x> <y> <z>' after the point");
+            }
+            else
+                drop("hop needs <quest> <map> <x> <y> <z>, for a quest defined above, to another map than the start's");
+        }
         else if (keyword == "req")
         {
             std::uint32_t id = 0;

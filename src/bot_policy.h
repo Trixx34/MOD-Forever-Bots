@@ -263,6 +263,14 @@ struct PolicyOptions
     // the teleport unless Bot.Actions.Teleport is on, and retrying it held level-1 bots in walk_to. With this off, that start is
     // dropped the same way a no-route move is, and the bot grinds. A refused teleport drops the start either way.
     bool QuestTeleport = false;
+    // Skyborne exit quests (config SkyborneExitQuests, off by default; quest_planner.h, doc/world-quests.md): a quest with a 'hop' record (94946 to Dalaran,
+    // 95349 to Mulgore) is taken on map 2991; with it in the log the bot walks to the dock (or giver) and is teleported to the other map (kTeleport, needs
+    // Bot.Actions.Teleport in the core; a refusal blocks the quest). Events skyborne_hop_start, skyborne_hop_done, skyborne_hop_refused.
+    bool SkyborneExitQuests = false;
+    // SkyborneExitMakeRoom (off by default, used with SkyborneExitQuests): a bot on map 2991 with no free bag slot that is about to take an exit quest (or the
+    // quest before it, 93089 or 93090), or whose accept of one was refused for bags (reason 9) or with no free slot (reason 10 with bag_free=0), visits a vendor
+    // first (the urgent vendor errand of a refused hand-in), at most once per kExitRoomEveryMs. Event skyborne_make_room.
+    bool SkyborneExitMakeRoom = false;
     // Off-map recovery (off_map.h; config OffMapRecover, OffMapSeconds, OffMapCooldownSec, OffMapMarginYards): a living bot far outside the known places of
     // its map (quest givers and anchors, grind spots, hubs) for OffForMs is teleported to the nearest one of its faction. Needs Bot.Actions.Teleport in the core.
     off_map::Options OffMap;
@@ -911,6 +919,7 @@ private:
         std::uint64_t ManaRestSinceMs = 0;               // when the current rest for mana began (0 = not resting for mana)
         std::uint64_t ManaRestBlockedUntilMs = 0;        // a rest that ran its full time without refilling the mana is not started again before this
         bool ServiceUrgent = false;                      // a quest hand-in was refused (bags full): go to a vendor now, even with quest work to do
+        std::uint64_t ExitRoomNextMs = 0;                // SkyborneExitMakeRoom: no other make-room vendor visit before this
         float DiagX = 0.0f, DiagY = 0.0f;                // where the bot was at the last stuck check
         std::uint64_t DiagAtMs = 0;                      // when the stuck check last ran
         std::uint32_t QuestWaitQuest = 0;                // the group quest the planner is waiting a party for (WaitGroup step), 0 = none

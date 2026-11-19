@@ -4356,7 +4356,7 @@ quest 98362 giver 8020.0 -2678.7 524.5 ender -1039.4 -281.6 159.1
 req 98362 level 20 prev 98739 races 32 classes 1024
 reward 98362
 
-start W2991_3_1   # 4 quests, levels 9-11
+start W2991_3_1   # 5 quests, levels 9-13
 anchor 2991 1997.6 940.9 660.1
 quest 93735 giver 1997.6 940.9 660.1 ender 2249.6 945.7 672.7
 req 93735 level 9 prev 92700
@@ -4372,6 +4372,11 @@ hunt 93740 0 10 252664,252665,252762,252763,252764,252765,252767,253195,253511,2
 area 93740 2425.7 840.0 681.1
 area 93740 2469.3 785.3 663.1
 area 93740 2377.3 588.9 704.1
+# Skyborne exit (2026-11-19, sim world DB; config SkyborneExitQuests): 95349 The Earthen Ring, ender in Mulgore on map 1 (the hop point is the ender).
+# The follow-up 95350 (Mulgore to Orgrimmar) is in the W1 starts already.
+quest 95349 giver 1997.6 940.9 660.1 ender -658.0 426.6 187.2
+req 95349 level 13 minlevel 7 prev 93090
+hop 95349 1 -658.0 426.6 187.2
 
 start W2991_3_2   # 3 quests, levels 10-10
 anchor 2991 1759.9 1381.1 656.5

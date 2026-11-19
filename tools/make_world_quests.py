@@ -19,6 +19,11 @@ whose anchor is the average position of its givers. Inside a start the quests ar
 With --side and givers.tsv, quests whose creature givers all belong to the other side are skipped too (the race masks are 0 on many quests).
 Skipped: quests with a type other than kill or item (exploration, talk, use object, escort ...), quests for a group (suggestedGroup > 1; kept with --groups), quests on
 maps outside --maps, quests with no giver or ender on one map, and quests whose objectives name no creature with a known spawn.
+
+Cross-map quests (--hop-pairs, default 2991:0,2991:1): a quest whose giver is on the first map of a pair and whose ender is only on the second map is kept, with
+the ender's coordinates on that map and a 'hop <quest> <map> <x> <y> <z>' record (the hop point is the ender's spawn). These are the Skyborne exit quests (94946
+to Dalaran, 95349 to Mulgore); the planner uses them only with the config key SkyborneExitQuests. Use --side: the planner skips the race mask for race ids above 32,
+so the side files are what keeps an Alliance exit quest away from Horde bots. Empty --hop-pairs keeps today's output.
 """
 import argparse
 import math
@@ -86,9 +91,15 @@ def main():
     parser.add_argument("--side", choices=["alliance", "horde"], help="keep only quests the side's races may take (a quest open to every race stays in both lists)")
     parser.add_argument("--groups", action="store_true", help="keep quests for a group (suggestedGroup > 1) and mark them 'group <n>' in their req record; the planner takes them "
                         "only with the config key QuestGroups on (use it for the level 60 lists)")
+    parser.add_argument("--hop-pairs", default="2991:0,2991:1",
+                        help="from:to map pairs whose cross-map quests are kept with a 'hop' record (empty: none); only 2991 to 0 or 1 is used by the planner")
     parser.add_argument("--explain", help="write one line per skipped quest (quest, level, reason, detail) to this file, and print a breakdown of the reasons")
     args = parser.parse_args()
     maps = {int(m) for m in args.maps.split(",") if m}
+    hop_pairs = set()
+    for pair in (p for p in args.hop_pairs.split(",") if p):
+        source, _, target = pair.partition(":")
+        hop_pairs.add((int(source), int(target)))
     d = args.directory.rstrip("/\\")
 
     quests = {}
@@ -173,6 +184,11 @@ def main():
             skip(qid, "no giver", "no creature giver spawn" if not starts_elsewhere else f"giver only on maps {sorted(set(starts_elsewhere))}")
             continue
         ender = next(((m, x, y, z) for m, x, y, z in npcs[qid]["end"] if m == giver[0]), None)
+        hop = None
+        if not ender:
+            # A cross-map quest of an allowed pair (the Skyborne exit): the ender on the other map, reached by a hop to its spawn.
+            ender = next(((m, x, y, z) for m, x, y, z in npcs[qid]["end"] if (giver[0], m) in hop_pairs), None)
+            hop = ender
         if not ender and hostile_npcs[qid]["end"] and not [e for e in npcs[qid]["end"]]:
             skip(qid, "ender hostile to the side", f"{hostile_npcs[qid]['end']} ender spawn(s), all of the {other} side")
             continue
@@ -180,7 +196,7 @@ def main():
             skip(qid, "no ender on the giver's map", f"enders on maps {sorted({m for m, *_ in npcs[qid]['end']})}")
             continue
         if reward:
-            built[qid] = dict(info=info, giver=giver, ender=ender, hunts=[], areas=[], reward=True)
+            built[qid] = dict(info=info, giver=giver, ender=ender, hunts=[], areas=[], reward=True, hop=hop)
             continue
         objs = sorted(objectives.get(qid, []))
         if any(kind not in (0, 1) for _, kind, _, _ in objs):
@@ -216,7 +232,7 @@ def main():
                 picked.append(a)
             if len(picked) >= args.areas:
                 break
-        built[qid] = dict(info=info, giver=giver, ender=ender, hunts=hunts, areas=picked, reward=False)
+        built[qid] = dict(info=info, giver=giver, ender=ender, hunts=hunts, areas=picked, reward=False, hop=hop)
 
     # Starts: cells of givers per map.
     cells = defaultdict(list)
@@ -255,6 +271,9 @@ def main():
             if info["group"] > 1 and args.groups and not q["reward"]:
                 req += f" group {info['group']}"
             out.append(req)
+            if q["hop"]:
+                hm, hx, hy, hz = q["hop"]
+                out.append(f"hop {qid} {hm} {hx:.2f} {hy:.2f} {hz:.2f}")
             if q["reward"]:
                 out.append(f"reward {qid}")
             for position, amount, creatures in q["hunts"]:

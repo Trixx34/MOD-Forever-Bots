@@ -189,3 +189,39 @@ another map. What the module could do itself, and what stops it, checked against
 | Boss-kill step (Drakkisath, Rend and the like) | the dungeon runner knows boss deaths (`dungeon_events`) | a link from a quest objective to a dungeon run: the quest's creature kill objective in the log is progress enough, but the bot has to be in the dungeon party for it |
 
 Nothing of this was invented in code. The first change to ask of the core is the kQuest operation 5 (object or item start); the second the bag-count snapshot field.
+(2026-11-19: the hop exists now for the Skyborne exit quests only, map 2991 to 0 or 1; see the next section. The attunement's hops are still not done.)
+
+## Skyborne exit quests: the `hop` record (2026-11-19, config SkyborneExitQuests, off by default)
+
+Map 2991 has no hostile creature above level 12, so Skyborne bots (races 95 and 96) stall there at about level 17-18. The way off the island is a quest:
+94946 The Magical City of Dalaran (Alliance, prev 93089, ender in Dalaran on map 0) and 95349 The Earthen Ring (Horde, prev 93090, ender in Mulgore on map 1).
+The game moves the player with the skycutter transports; bots do not ride transports, so the module teleports them. The owner's rule stands: Skyborne bots leave
+map 2991 only through these quests, never by a hop for zone spread.
+
+Data (`src/quest_data.h`): `hop <quest> <map> <x> <y> <z> [dock <x> <y> <z>]` after the quest's `quest` line, in a start on the map the hop leaves from. The
+quest's `ender` coordinates are then on `<map>`. Only the pairs 2991 to 0 and 2991 to 1 are used (`HopAllowed` in `quest_planner.h`); a quest with another pair,
+or any `hop` quest while the key is off, is unknown to the planner. The lines are in `data/world_quests_alliance.txt` (94946, start `W2991_3_1`) and
+`data/world_quests_horde.txt` (95349, start `W2991_3_1`) only: the planner skips the race mask for race ids above 32, so the side files keep each faction to its
+own quest. They are not in `world_quests.txt` (no side split) nor in the 60 lists. No `dock` is given: the dock objects (`C60FX_Skyborn_ShipTranslocation` at
+1893,483 / 1848,569 / 1938,897 / 1907,930) have no known z, so the bot hops at the quest giver, who stands next to the dock.
+`tools/make_world_quests.py --hop-pairs 2991:0,2991:1` (the default) keeps such quests and writes the `hop` line from the ender's spawn (the Alliance line in
+the data uses `spell_target_position` 1278902, the Dalaran arrival, instead). The data files were not regenerated; only these lines were added.
+
+Planner, with the quest in the log and the bot on map 2991 (before every other step): walk to the dock or giver (within 8 yards), then the **Hop** step sends
+`kTeleport` (map, x, y, z). The bot waits; on the other map the quest is handed in as any other (the ender stands at the landing point) and the next quests of that
+map follow (95350 to Orgrimmar is in the Horde file; 94947 "Take the Skyborne Portal to Stormwind" is not in the data, objective type 14). A refused teleport
+(`Bot.Actions.Teleport = 0`, combat ...) or no move within 20 seconds blocks the quest for an hour, then six hours, then for good; the bot grinds meanwhile.
+The exit chain (the hop quests and 93089/93090) is taken even when grey (a level 21 Skyborne must still be able to leave). LevelSafeWalks does not drop the
+dock walk or the hand-in after the hop. The off-map recovery puts the ender under the hop's map. After the hop the bot works the starts and grind spots of the
+new map only (both are chosen per map), so nothing in the module sends it back to 2991; a core hearthstone (`Bot.Hearth.*`) could.
+
+Full bags (config SkyborneExitMakeRoom, off by default, needs SkyborneExitQuests): prod 2026-11-19 logged `quest_refused quest=93089 bag_free=0 reason=10`.
+Reason 10 is `ActionReason::kNoGiver` (no giver in reach), not bags full (9); the bags were full anyway. With the key a bot on 2991 with no free slot visits a
+vendor before the accept of an exit-chain quest, and after such an accept is refused with reason 9 or with no free slot (the quest's block is lifted after the
+visit). It uses the urgent vendor errand of a refused hand-in, at most once per 10 minutes.
+
+Events: `skyborne_hop_start: bot= quest= level= from=map:x,y to=map:x,y,z bag_free=`, `skyborne_hop_done: bot= level= map= pos=`,
+`skyborne_hop_refused: bot= [quest=] level= map= reason=teleport_refused|no_move ...`, `skyborne_make_room: bot= quest= level= reason= bag_free=`.
+
+Unverified: whether the core's teleport works for these points (the arrival points are on the ground, not on the ships), whether a bot can meet 94947's
+objective, and whether the prod world database matches the sim's for these quests and spawns.

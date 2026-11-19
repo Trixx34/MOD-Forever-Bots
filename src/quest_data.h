@@ -21,6 +21,11 @@
 //                                      level (a bot well above it skips the quest), the quest that must be handed in before it (tried later, not
 //                                      refused), and the races and classes that may take it as bit masks (bit n-1 for race or class id n; 0 = any), and
 //                                      'group <n>': the quest is meant for a party of n (the planner takes it only with config QuestGroups on)
+//   hop <quest> <map> <x> <y> <z> [dock <x> <y> <z>]
+//                                      the quest's ender is on another map (<map>): once the quest is in the log and the bot is still on the start's map, the bot
+//                                      walks to the dock point (without one: the quest's giver), is teleported to (<map>, x, y, z) and then hands the quest in at
+//                                      its ender, whose coordinates are on <map>. Only the Skyborne exit quests use it (map 2991 to 0 or 1, config
+//                                      SkyborneExitQuests, doc/world-quests.md); the planner ignores the quest when the key is off or the pair is another one
 #pragma once
 
 #include <cstdint>
@@ -58,6 +63,12 @@ struct QuestDef
     std::uint32_t StartItem = 0;              // the quest starts from this quest-starting item (startfrom <quest> item): operation 5, no walk
     std::uint32_t StartObject = 0;            // the quest starts from the game object of this entry (startfrom <quest> object): operation 5 at the giver point
     bool Reward = false;                      // a class quest: completed with its reward, no objectives
+    bool HasHop = false;                      // hop record: the ender is on HopMap, reached by a teleport from the start's map (HopFrom)
+    std::uint32_t HopFrom = 0;                // the map of the start the quest belongs to (where the hop starts)
+    std::uint32_t HopMap = 0;                 // the map the ender is on
+    QuestPoint Hop;                           // where the teleport puts the bot on HopMap
+    bool HasDock = false;                     // a dock point on HopFrom to walk to before the teleport (without one: the giver)
+    QuestPoint Dock;
 };
 
 struct QuestStartDef

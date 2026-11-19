@@ -111,10 +111,35 @@ void BotPolicy::TurnQuestsAndHold(DecideTick& tick, BotTurn& turn)
     auto& routeBusy = turn.routeBusy;
     bool const questsAllowed = QuestsFor(bot).Enabled() && !partyMember && !stagingHold && !(IsRouteActive(bot.guid) && scenario.RouteMap != 0) /* a dungeon run: the leader walks the route, not to a quest giver */ && !lowHealth && bot.in_combat == 0 && !state.ChatStay && state.ChatFollow == 0 && nowMs >= state.QuestPausedUntilMs &&
                               !state.RepairTrip; // an urgent repair trip comes first: broken gear is repaired before the next quest fight
+    // Skyborne exit quests: a hop teleport that was sent has landed (the bot is on the other map) or went unanswered (blocked like a refusal).
+    switch (QuestsFor(bot).CheckHop(bot, state.Quest, nowMs))
+    {
+        case HopCheck::Done:
+            LogEvent("skyborne_hop_done: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id) + " pos=" +
+                     std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) + "," + std::to_string(int(bot.pos_z)));
+            break;
+        case HopCheck::NoMove:
+            LogEvent("skyborne_hop_refused: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id) +
+                     " reason=no_move wait_ms=" + std::to_string(kHopWaitMs));
+            break;
+        case HopCheck::None:
+            break;
+    }
     if (questsAllowed)
         questStep = QuestsFor(bot).Next(bot, state.Quest, nowMs, QuestBotInfo{ classId, _options.RaceOf ? _options.RaceOf(bot.guid) : 0u, _options.PathVariety.Enabled ? &_options.PathVariety : nullptr, _options.RandomSeed, bot.guid });
     if (questsAllowed)
         LevelSafeQuestWalk(tick, turn); // LevelSafeWalks: a walk to or through a place far above the bot is dropped (bot_policy_level_safe.cpp)
+    // SkyborneExitMakeRoom: full bags before the accept of an exit quest (or the quest before it): the vendor first (the urgent errand of a refused hand-in).
+    if (questsAllowed && _options.SkyborneExitMakeRoom && bot.map_id == kSkyborneMap && bot.bag_free_slots == 0 && nowMs >= state.ExitRoomNextMs &&
+        (questStep.Kind == QuestStepKind::Accept || (questStep.Kind == QuestStepKind::WalkTo && questStep.StartGiver)) && QuestsFor(bot).ExitChain(questStep.Quest))
+    {
+        state.ExitRoomNextMs = nowMs + kExitRoomEveryMs;
+        state.ServiceUrgent = true;
+        state.NextServiceMs = 0;
+        LogEvent("skyborne_make_room: bot=" + std::to_string(bot.guid) + " quest=" + std::to_string(questStep.Quest) + " level=" + std::to_string(bot.level) +
+                 " reason=bags_full bag_free=0");
+        questStep = {};
+    }
     if (questsAllowed && questStep.Kind == QuestStepKind::WaitGroup)
     {
         state.QuestWaitQuest = questStep.Quest;
@@ -126,7 +151,7 @@ void BotPolicy::TurnQuestsAndHold(DecideTick& tick, BotTurn& turn)
     if (_options.OnEvent && nowMs - state.QuestDiagAtMs >= 300000)
     {
         state.QuestDiagAtMs = nowMs;
-        static constexpr char const* kinds[] = { "none", "walk_to", "accept", "hand_in", "hunt", "abandon", "reward", "wait", "wait_group" };
+        static constexpr char const* kinds[] = { "none", "walk_to", "accept", "hand_in", "hunt", "abandon", "reward", "wait", "wait_group", "hop" };
         _options.OnEvent("quest_state: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id) +
                          " allowed=" + std::to_string(questsAllowed) + " enabled=" + std::to_string(QuestsFor(bot).Enabled()) +
                          " party=" + std::to_string(partyMember) + " low_health=" + std::to_string(lowHealth) + " in_combat=" + std::to_string(bot.in_combat) +

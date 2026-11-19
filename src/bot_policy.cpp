@@ -153,7 +153,7 @@ std::array<QuestPlanner, 6> BotPolicy::MakeQuestSets(PolicyOptions const& option
     // The level 60 planner also knows the leveling list, so a bot that turns 60 can still hand in or abandon the quests in its log.
     auto const planner = [&](std::size_t side, std::size_t band)
     {
-        QuestPlannerOptions const planning{ options.QuestGroups.Enabled, options.QuestGroups.WaitMs };
+        QuestPlannerOptions const planning{ options.QuestGroups.Enabled, options.QuestGroups.WaitMs, options.SkyborneExitQuests };
         return band == 0 ? QuestPlanner(data(side, 0), nullptr, planning) : QuestPlanner(data(side, 1), data(side, 0), planning);
     };
     return { planner(0, 0), planner(0, 1), planner(1, 0), planner(1, 1), planner(2, 0), planner(2, 1) };
@@ -174,11 +174,14 @@ off_map::KnownWorld BotPolicy::MakeKnownWorld(PolicyOptions const& options)
         {
             if (start.HasAnchor)
                 world.Add({ start.Map, start.Anchor.X, start.Anchor.Y, start.Anchor.Z, side });
-            // A quest with no giver or ender point (an item start) has (0, 0) there: not a place.
+            // A quest with no giver or ender point (an item start) has (0, 0) there: not a place. A hop quest's ender is on the hop's map.
             for (QuestDef const& quest : start.Quests)
-                for (QuestPoint const& point : { quest.Giver, quest.Ender })
-                    if (point.X != 0.0f || point.Y != 0.0f)
-                        world.Add({ start.Map, point.X, point.Y, point.Z, side });
+            {
+                if (quest.Giver.X != 0.0f || quest.Giver.Y != 0.0f)
+                    world.Add({ start.Map, quest.Giver.X, quest.Giver.Y, quest.Giver.Z, side });
+                if (quest.Ender.X != 0.0f || quest.Ender.Y != 0.0f)
+                    world.Add({ quest.HasHop ? quest.HopMap : start.Map, quest.Ender.X, quest.Ender.Y, quest.Ender.Z, side });
+            }
         }
     };
     addQuests(options.Quests, 0);

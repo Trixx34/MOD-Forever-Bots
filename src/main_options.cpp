@@ -377,6 +377,8 @@ void LoadPolicyTables(PolicyOptions& policyOptions, BotSettings& settings)
         }
     }
     policyOptions.QuestTeleport = settings.QuestTeleport;
+    policyOptions.SkyborneExitQuests = settings.SkyborneExitQuests;
+    policyOptions.SkyborneExitMakeRoom = settings.SkyborneExitQuests && settings.SkyborneExitMakeRoom;
     policyOptions.OffMap.Enabled = settings.OffMapRecover;
     policyOptions.OffMap.OffForMs = std::uint64_t(settings.OffMapSeconds) * 1000;
     policyOptions.OffMap.CooldownMs = std::uint64_t(settings.OffMapCooldownSec) * 1000;

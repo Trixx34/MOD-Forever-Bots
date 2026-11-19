@@ -84,6 +84,8 @@ void BotPolicy::LevelSafeQuestWalk(DecideTick& tick, BotTurn& turn)
     QuestStep& step = turn.questStep;
     if (!_options.LevelSafe.Walks || _levelMap.Empty() || bot.level == 0 || (step.Kind != QuestStepKind::WalkTo && step.Kind != QuestStepKind::Hunt))
         return;
+    if (step.HopLeg)
+        return; // a Skyborne exit step (the dock walk, the hand-in at the landing point): the only way off map 2991, never dropped here
     Point const dest{ step.Dest.X, step.Dest.Y, step.Dest.Z };
     bool const same = state.LevelSafeQuest == step.Quest && state.LevelSafeLevel == bot.level &&
                       std::hypot(state.LevelSafeDest.X - dest.X, state.LevelSafeDest.Y - dest.Y) < 1.0f;

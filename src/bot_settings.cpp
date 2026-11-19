@@ -672,6 +672,8 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadBool(config, "AutoGearing", settings.AutoGearing, warnings);
     ReadBool(config, "TalentRespec", settings.TalentRespec, warnings);
     ReadBool(config, "QuestTeleport", settings.QuestTeleport, warnings);
+    ReadBool(config, "SkyborneExitQuests", settings.SkyborneExitQuests, warnings);
+    ReadBool(config, "SkyborneExitMakeRoom", settings.SkyborneExitMakeRoom, warnings);
     ReadBool(config, "OffMapRecover", settings.OffMapRecover, warnings);
     ReadKey(config, "OffMapSeconds", 10, 3600, settings.OffMapSeconds, warnings);
     ReadKey(config, "OffMapCooldownSec", 60, 86400, settings.OffMapCooldownSec, warnings);

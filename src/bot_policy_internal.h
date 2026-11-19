@@ -161,6 +161,7 @@ constexpr std::uint64_t kMountFailMaxMs = 3600000;
 constexpr std::uint64_t kQuestWindowMs = 300000;        // quest refusals are counted over five minutes
 constexpr std::uint32_t kQuestRefusalsPause = 4;        // this many in a window: no quest actions for kQuestPauseMs
 constexpr std::uint64_t kQuestPauseMs = 600000;
+constexpr std::uint64_t kExitRoomEveryMs = 600000;      // SkyborneExitMakeRoom: at most one make-room vendor visit per bot in this time
 constexpr std::uint64_t kBuffFailBaseMs = 5000;         // an upkeep buff (or a spell not known) that keeps failing: 5 s, doubling to kSpellFailMaxMs
 constexpr std::uint64_t kSpellFailMaxMs = 600000;
 constexpr std::uint32_t kGatherFailDoublings = 5;       // nothing to gather near the bot, again: 90 s, 3, 6, 12, 24, 48 minutes at most

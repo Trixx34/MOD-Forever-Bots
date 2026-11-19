@@ -186,6 +186,11 @@ struct BotSettings
     // QuestTeleport (0 or 1, off by default): a quest walk that has not moved for two minutes teleports to the giver. Needs
     // Bot.Actions.Teleport = 1 in the core. Off, that start is dropped and the bot grinds instead of retrying a refused teleport.
     bool QuestTeleport = false;
+    // SkyborneExitQuests (0 or 1, off by default): Skyborne bots on map 2991 take the exit quests ('hop' records: 94946 to Dalaran, 95349 to Mulgore), walk to
+    // the dock and are teleported to map 0 or 1 to hand them in. Needs Bot.Actions.Teleport = 1 in the core; a refused teleport blocks the quest (event).
+    // SkyborneExitMakeRoom (0 or 1, off by default): such a bot with full bags visits a vendor before it takes an exit quest (or 93089/93090).
+    bool SkyborneExitQuests = false;
+    bool SkyborneExitMakeRoom = false;
     // Off-map recovery (off_map.h): OffMapRecover (0 or 1, default 1) teleports a living bot that stood more than OffMapMarginYards (default 500, 100..5000)
     // outside the known places of its map (quest givers and anchors, grind spots, hubs) for OffMapSeconds (default 60, 10..3600) to the nearest known place of
     // its faction, at most once per OffMapCooldownSec (default 600, 60..86400). Needs Bot.Actions.Teleport = 1 in the core (refused otherwise, and logged).

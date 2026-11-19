@@ -14,6 +14,9 @@
 // done is tried after the others. A bot takes new quests while its log has room (kMaxAcceptedQuests).
 // A quest with no progress for kStuckMs is abandoned and left alone for kBlockAfterAbandonMs. A refused accept is blocked for
 // kBlockAfterAcceptRefusalMs; a refused hand-in for kBlockAfterRefusalMs, growing with each refusal.
+// Skyborne exit quests (config SkyborneExitQuests, off by default; quest_data.h 'hop'): a quest whose ender is on another map, in the log of a bot still on the
+// start's map (2991), comes first: walk to the dock (or the giver), then a Hop step (kTeleport to the hop point); on the other map the quest is handed in as any.
+// Only map 2991 to map 0 or 1 (kSkyborneMap, HopAllowed). A refused or silent teleport blocks the quest (an hour, six hours, then for good).
 #pragma once
 
 #include "quest_data.h"
@@ -37,6 +40,7 @@ enum class QuestStepKind
     Reward,    // send the reward for Quest: a class quest completed with its reward, no objectives, from anywhere (no walk)
     Wait,      // stand still: an action was just sent and the log has not caught up
     WaitGroup, // a group quest in the log (Quest, GroupSize): wait for the party (the policy looks for partners); the wait times out into an abandon (config QuestGroups)
+    Hop,       // a Skyborne exit quest in the log, the bot at the dock: teleport to Dest on Map (config SkyborneExitQuests)
 };
 
 struct QuestStep
@@ -49,6 +53,8 @@ struct QuestStep
     std::uint32_t StartEntry = 0; // Accept: the quest starts from an item or a game object (kQuestStartFrom): the object's entry, 0 for an item
     bool StartFrom = false;       // Accept: send operation kQuestStartFrom instead of kQuestAccept
     bool StartGiver = false; // the walk is to the giver of a quest start on the bot's map (not a turn-in or a hunt)
+    std::uint32_t Map = 0;   // Hop: the map of Dest
+    bool HopLeg = false;     // a step of a Skyborne exit quest (the walk to the dock, the hop, the hand-in after it): LevelSafeWalks does not drop it
 };
 
 // What the planner remembers about one bot.
@@ -82,6 +88,10 @@ struct QuestMemory
     std::map<std::uint32_t, std::uint32_t> RetryAtLevel;   // quest -> not tried before the bot has this level (refused: level too low)
     std::map<std::uint32_t, std::size_t> RetryAfterDone;   // quest -> not tried before more quests are done than this (refused: a prerequisite missing)
     std::map<std::uint32_t, std::uint32_t> LevelUnsafeAreas; // quest -> hunting areas skipped in a row as too high for the bot (LevelSafeWalks)
+    std::uint32_t HopPending = 0;                       // Skyborne exit: the quest whose hop teleport was sent; the bot on HopPendingMap makes it done
+    std::uint32_t HopPendingMap = 0;
+    std::uint64_t HopSentMs = 0;
+    std::map<std::uint32_t, std::uint32_t> HopRefusals; // quest -> hops refused (or silent): the block grows with it
 };
 
 // Who the bot is, for the quests' race and class limits. 0 = unknown (no limit applied).
@@ -121,6 +131,14 @@ constexpr std::uint32_t kGreyQuestMargin = 7;          // a bot this many levels
 constexpr std::uint32_t kRedQuestMargin = 4;           // a quest this many levels above the bot is left for later
 constexpr std::uint32_t kMaxAcceptedQuests = 5;        // no new quest while the log holds this many
 constexpr float kStartRadiusYards = 1500.0f;            // a bot farther than this from every anchor of its map has no start
+// Skyborne exit quests (SkyborneExitQuests).
+constexpr std::uint32_t kSkyborneMap = 2991;             // the Skyborne start map: the only map a hop leaves from
+constexpr float kHopDockYards = 8.0f;                    // the hop is sent this near the dock (or giver) point
+constexpr std::uint64_t kHopWaitMs = 20000;              // a hop sent and the bot still on its map after this: the core did not move it (counted as refused)
+constexpr std::uint64_t kHopRefusedBlockMs = 3600000;    // the first refused hop: an hour; the second kBlockAfterAcceptRefusal3Ms; the third and later for good
+constexpr std::uint32_t kHopRefusalsForGood = 3;
+// The map pairs a hop may join: 2991 to Eastern Kingdoms (0) or Kalimdor (1). No other hop, and never for zone spread.
+constexpr bool HopAllowed(std::uint32_t from, std::uint32_t to) { return from == kSkyborneMap && (to == 0 || to == 1); }
 
 // kQuest's spell_id: (operation << 24) | quest id.
 constexpr std::uint32_t kQuestAccept = 1;
@@ -135,6 +153,15 @@ struct QuestPlannerOptions
 {
     bool GroupQuests = false;
     std::uint64_t GroupWaitMs = 600000;     // the wait for a party ends here: the quest is abandoned and left alone for kBlockAfterAbandonMs
+    bool SkyborneExitQuests = false;        // config SkyborneExitQuests: quests with a 'hop' record are taken and hopped; off, they are unknown to the planner
+};
+
+// What CheckHop saw about a hop that was sent.
+enum class HopCheck
+{
+    None,     // no hop pending, or still waiting for the core
+    Done,     // the bot is on the hop's map
+    NoMove,   // the bot is still on its map after kHopWaitMs: counted as refused (the quest is blocked)
 };
 
 class QuestPlanner
@@ -175,6 +202,18 @@ public:
     // gives another step (another quest, another start) on the next call.
     void NoteLevelUnsafe(QuestMemory& memory, std::uint32_t quest, QuestStepKind kind, std::uint64_t nowMs) const;
 
+    // Skyborne exit quests (SkyborneExitQuests). The policy sent the hop teleport of `quest` to `map`.
+    void NoteHopSent(QuestMemory& memory, std::uint32_t quest, std::uint32_t map, std::uint64_t nowMs) const;
+    // The core refused the hop teleport (Bot.Actions.Teleport off, in combat, ...): the quest is blocked, kHopRefusedBlockMs, then six hours, then for good.
+    // Returns the number of refusals of that quest so far (0 when no hop was pending).
+    std::uint32_t NoteHopRefused(QuestMemory& memory, std::uint64_t nowMs) const;
+    // Whether the pending hop has landed (the bot is on its map) or has gone unanswered too long (then it is refused as by NoteHopRefused).
+    HopCheck CheckHop(forever_module::BotSnapshot const& bot, QuestMemory& memory, std::uint64_t nowMs) const;
+    // A quest of the Skyborne exit: one with an allowed hop, or the 'prev' of one (93089, 93090). False when SkyborneExitQuests is off.
+    bool ExitChain(std::uint32_t quest) const;
+    // The accept of `quest` needs room in the bags (SkyborneExitMakeRoom): the vendor visit that follows lifts its block (as for a refused hand-in).
+    void NoteNeedsRoom(QuestMemory& memory, std::uint32_t quest) const;
+
 private:
     int FindStart(forever_module::BotSnapshot const& bot) const;
     // Whether the bot may take the quest now (everything but the log, done and blocked checks).
@@ -187,5 +226,6 @@ private:
     std::shared_ptr<QuestData const> _data;
     std::shared_ptr<QuestData const> _alsoKnown; // kept alive for the pointers in _index
     std::set<std::uint32_t> _prerequisites;          // quests that are the 'prev' of another one (path variety never skips them)
+    std::set<std::uint32_t> _exitChain;              // SkyborneExitQuests: the hop quests and their 'prev' quests
     std::map<std::uint32_t, QuestDef const*> _index; // quest id -> its first definition (in `data`, else in `alsoKnown`); the lists are immutable
 };

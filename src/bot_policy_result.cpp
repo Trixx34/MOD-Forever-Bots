@@ -174,7 +174,18 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
                 below_map::NoteNoRoute(_options.BelowMap, state.BelowMap, std::hypot(bot.pos_x - state.LastMove->Dest.X, bot.pos_y - state.LastMove->Dest.Y), nowMs);
         }
         state.QuestTeleportSent = false;
-        QuestsFor(bot).NoteNoRoute(state.Quest, nowMs, &bot);
+        if (teleportRefused && state.Quest.HopPending != 0)
+        {
+            // The hop of a Skyborne exit quest: the quest is blocked (an hour, six hours, then for good), not retried every tick.
+            std::uint32_t const quest = state.Quest.HopPending;
+            std::uint32_t const times = QuestsFor(bot).NoteHopRefused(state.Quest, nowMs);
+            if (_options.OnEvent)
+                _options.OnEvent("skyborne_hop_refused: bot=" + std::to_string(bot.guid) + " quest=" + std::to_string(quest) + " level=" + std::to_string(bot.level) +
+                                 " map=" + std::to_string(bot.map_id) + " reason=teleport_refused status=" + ActionStatusName(bot.last_action_status) +
+                                 " refusals=" + std::to_string(times) + (times >= kHopRefusalsForGood ? " blocked=for_good" : ""));
+        }
+        else
+            QuestsFor(bot).NoteNoRoute(state.Quest, nowMs, &bot);
         if (teleportRefused && _options.OnEvent)
             _options.OnEvent("quest_walk_blocked: bot=" + std::to_string(bot.guid) + " reason=teleport_refused status=" +
                              ActionStatusName(bot.last_action_status));
@@ -221,12 +232,28 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
             if (_options.OnEvent)
                 _options.OnEvent("quest_paused: bot=" + std::to_string(bot.guid) + " reason=refused_run minutes=" + std::to_string(kQuestPauseMs / 60000));
         }
+        // SkyborneExitMakeRoom: an accept of an exit quest (or the quest before it) refused for full bags, or with no free slot at all (prod 2026-11-19: 93089
+        // refused with bag_free=0 reason=10): a vendor visit first, and the quest is tried again after it.
+        std::uint32_t const refusedQuest = state.Quest.LastActionQuest;
+        bool const accept = state.Quest.PendingHandIn != refusedQuest && !state.Quest.LastActionAbandon;
+        bool const needsRoom = _options.SkyborneExitMakeRoom && accept && bot.map_id == kSkyborneMap && QuestsFor(bot).ExitChain(refusedQuest) &&
+                               (reason == std::uint32_t(forever_module::ActionReason::kBagsFull) || bot.bag_free_slots == 0) && nowMs >= state.ExitRoomNextMs;
         if (QuestsFor(bot).NoteRefused(state.Quest, nowMs, reason, bot.level))
         {
             // A hand-in the core refused: the reward did not fit in the bags. A bot with quest work is never idle, so the vendor visit that
             // empties the bags (sell, equip) is not left to the idle bot's turn.
             state.ServiceUrgent = true;
             state.NextServiceMs = 0;
+        }
+        else if (needsRoom)
+        {
+            state.ExitRoomNextMs = nowMs + kExitRoomEveryMs;
+            state.ServiceUrgent = true;
+            state.NextServiceMs = 0;
+            QuestsFor(bot).NoteNeedsRoom(state.Quest, refusedQuest);
+            if (_options.OnEvent)
+                _options.OnEvent("skyborne_make_room: bot=" + std::to_string(bot.guid) + " quest=" + std::to_string(refusedQuest) + " level=" + std::to_string(bot.level) +
+                                 " reason=refused_" + std::to_string(reason) + " bag_free=" + std::to_string(bot.bag_free_slots));
         }
         return;
     }

@@ -156,6 +156,28 @@ with tempfile.TemporaryDirectory() as tmp:
         got = [line for line in result.stdout.splitlines() if line.startswith("quest ")]
         check(len(got) == len(expect) and all(g.startswith(e) for g, e in zip(sorted(got), sorted(expect))), side_name + " list: " + repr(got))
 
+    # Cross-map quests (--hop-pairs): a quest on map 2991 whose ender is on map 0 is kept with a hop record; the same on another pair is not; an empty
+    # --hop-pairs drops it as before.
+    hop = os.path.join(tmp, "hop")
+    os.makedirs(hop)
+    side = hop
+    put("quests.tsv", [(94946, 13, 7, 0, 0, 93089, 0), (93089, 13, 0, 0, 0, 0, 0), (500, 13, 0, 0, 0, 0, 0)])
+    put("objectives.tsv", [])
+    put("npcs.tsv", [(94946, "start", 252475, 2991, 1991.9, 525.0, 658.0), (94946, "end", 259084, 0, 449.0, 439.0, 111.3),
+                     (93089, "start", 1, 2991, 2118.8, 550.3, 735.3), (93089, "end", 252475, 2991, 1991.9, 525.0, 658.0),
+                     (500, "start", 2, 0, 10.0, 10.0, 1.0), (500, "end", 3, 1, 20.0, 20.0, 1.0)])
+    put("targets.tsv", [])
+    put("drops.tsv", [])
+    result = run(os.path.join(TOOLS, "make_world_quests.py"), hop, "--maps", "0,1,2991")
+    check(result.returncode == 0, "make_world_quests hop failed: " + result.stderr)
+    lines_out = result.stdout.splitlines()
+    check("quest 94946 giver 1991.9 525.0 658.0 ender 449.0 439.0 111.3" in lines_out, "hop quest kept with the ender on map 0: " + repr(lines_out))
+    check("hop 94946 0 449.00 439.00 111.30" in lines_out, "hop record: " + repr(lines_out))
+    check(not any(line.startswith("quest 500 ") for line in lines_out), "a 0 -> 1 cross-map quest is not kept")
+    check(not any(line.startswith("hop 93089") for line in lines_out), "a same-map quest has no hop")
+    result = run(os.path.join(TOOLS, "make_world_quests.py"), hop, "--maps", "0,1,2991", "--hop-pairs", "")
+    check(not any(line.startswith(("quest 94946 ", "hop ")) for line in result.stdout.splitlines()), "empty --hop-pairs keeps the old output")
+
 if failures == 0:
     print("world_data_test: all passed")
 sys.exit(1 if failures else 0)

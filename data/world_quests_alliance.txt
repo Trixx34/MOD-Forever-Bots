@@ -4479,7 +4479,7 @@ anchor 1 10758.4 2208.9 1331.6
 quest 938 giver 10758.4 2208.9 1331.6 ender 10665.1 1863.6 1324.5
 req 938 level 12
 
-start W2991_3_1   # 3 quests, levels 10-12
+start W2991_3_1   # 4 quests, levels 10-13
 anchor 2991 1991.8 532.8 658.3
 quest 99260 giver 1991.8 548.5 658.8 ender 1991.9 525.0 658.0
 req 99260 level 10 prev 92850 races 2973060173
@@ -4491,6 +4491,11 @@ area 92834 2458.2 510.4 711.8
 area 92834 2467.9 609.3 688.4
 quest 92860 giver 1991.9 525.0 658.0 ender 2113.6 550.1 735.3
 req 92860 level 12 prev 92840 races 2973060173
+# Skyborne exit (2026-11-19, sim world DB; config SkyborneExitQuests): 94946 The Magical City of Dalaran, ender Denaaris Stargale 259084 in Dalaran on map 0.
+# The hop point is spell_target_position 1278902 (the Dalaran arrival). The follow-up 94947 (Skyborne portal to Stormwind, objective type 14) is not in the data.
+quest 94946 giver 1991.9 525.0 658.0 ender 449.0 439.0 111.3
+req 94946 level 13 minlevel 7 prev 93089
+hop 94946 0 448.96 439.35 111.33
 
 start W2991_3_3   # 4 quests, levels 9-9
 anchor 2991 1917.5 1633.4 649.6

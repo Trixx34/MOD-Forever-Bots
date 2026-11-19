@@ -49,6 +49,18 @@ QuestStep WalkOrAct(BotSnapshot const& bot, QuestMemory const& memory, QuestPoin
     return step;
 }
 
+// A hop the planner may use: SkyborneExitQuests on and an allowed map pair (2991 to 0 or 1). A quest with any other hop is unknown to the planner.
+bool HopUsable(QuestDef const& quest, QuestPlannerOptions const& options)
+{
+    return quest.HasHop && options.SkyborneExitQuests && HopAllowed(quest.HopFrom, quest.HopMap);
+}
+
+// A quest with a hop that may not be used: left out entirely (today's behaviour, when such quests were not in the data at all).
+bool HopHidden(QuestDef const& quest, QuestPlannerOptions const& options)
+{
+    return quest.HasHop && !HopUsable(quest, options);
+}
+
 } // namespace
 
 QuestPlanner::QuestPlanner(std::shared_ptr<QuestData const> data, std::shared_ptr<QuestData const> alsoKnown, QuestPlannerOptions options)
@@ -63,6 +75,12 @@ QuestPlanner::QuestPlanner(std::shared_ptr<QuestData const> data, std::shared_pt
                     _index.try_emplace(quest.Id, &quest);
                     if (quest.PrevQuest != 0)
                         _prerequisites.insert(quest.PrevQuest);
+                    if (HopUsable(quest, _options))
+                    {
+                        _exitChain.insert(quest.Id);
+                        if (quest.PrevQuest != 0)
+                            _exitChain.insert(quest.PrevQuest);
+                    }
                 }
 }
 
@@ -95,12 +113,15 @@ bool QuestPlanner::Eligible(QuestDef const& quest, BotSnapshot const& bot, Quest
 {
     if (quest.Group > 1 && !_options.GroupQuests)
         return false; // a quest for a party: only with QuestGroups on
+    if (HopHidden(quest, _options))
+        return false; // a hop quest with SkyborneExitQuests off (or a pair other than 2991 to 0 or 1)
     std::uint32_t const level = bot.level;
     if (level != 0)
     {
         if (quest.MinLevel != 0 && level < quest.MinLevel)
             return false;
-        if (quest.QuestLevel != 0 && level > quest.QuestLevel + kGreyQuestMargin)
+        // The Skyborne exit chain is the only way off map 2991: it is taken however grey it is (a level 21 Skyborne must still be able to leave).
+        if (quest.QuestLevel != 0 && level > quest.QuestLevel + kGreyQuestMargin && !_exitChain.count(quest.Id))
             return false; // grey: little experience left in it
         if (quest.QuestLevel != 0 && quest.QuestLevel > level + kRedQuestMargin)
             return false; // too hard for now
@@ -154,7 +175,7 @@ QuestStep QuestPlanner::Next(BotSnapshot const& bot, QuestMemory& memory, std::u
     // The quests in the log that the data knows, whichever start they belong to.
     std::vector<QuestDef const*> logged;
     for (std::size_t i = 0; i < bot.quest_count && i < forever_module::kMaxQuestLog; ++i)
-        if (QuestDef const* def = Lookup(bot.quests[i].quest_id))
+        if (QuestDef const* def = Lookup(bot.quests[i].quest_id); def && !HopHidden(*def, _options))
             logged.push_back(def);
 
     // Progress bookkeeping for the stuck rule: the total of a quest's objective counts, and since when it has been that.
@@ -186,18 +207,58 @@ QuestStep QuestPlanner::Next(BotSnapshot const& bot, QuestMemory& memory, std::u
         return step;
     };
 
-    // 1. A complete quest: hand it in.
+    // 0. A Skyborne exit quest in the log while the bot is still on the start's map (2991): walk to the dock (or the giver), then hop to the other map.
+    // It comes before everything else: its ender is not on this map, and the bot has nothing left to do here. A blocked one (refused hops) is left in the
+    // log and the bot goes on as before (grinds).
+    auto const awayFromEnder = [&](QuestDef const& quest) { return quest.HasHop && bot.map_id != quest.HopMap; };
+    for (QuestDef const* quest : logged)
+    {
+        if (!quest->HasHop || bot.map_id != quest->HopFrom || Blocked(memory, quest->Id, nowMs))
+            continue;
+        memory.Progress[quest->Id].SinceMs = nowMs; // the way to the hop is not being stuck (the stuck rule would abandon the quest)
+        QuestStep step;
+        step.Quest = quest->Id;
+        step.HopLeg = true;
+        if (memory.HopPending == quest->Id)
+        {
+            step.Kind = QuestStepKind::Wait; // the teleport is on its way (CheckHop)
+            return step;
+        }
+        QuestPoint const dock = quest->HasDock ? quest->Dock : quest->Giver;
+        float const reach = memory.NearEnough.count(quest->Id) ? kQuestNearTryYards : kHopDockYards;
+        if (Distance2d(bot, dock) > reach)
+        {
+            step.Kind = QuestStepKind::WalkTo;
+            step.Dest = dock;
+            return walking(step);
+        }
+        if (nowMs < memory.NextActionMs)
+        {
+            step.Kind = QuestStepKind::Wait;
+            return step;
+        }
+        step.Kind = QuestStepKind::Hop;
+        step.Dest = quest->Hop;
+        step.Map = quest->HopMap;
+        return step;
+    }
+
+    // 1. A complete quest: hand it in. (A hop quest only on the map of its ender.)
     for (QuestDef const* quest : logged)
     {
         QuestEntry const* entry = InLog(bot, quest->Id);
-        if (entry->status == 2 && !Blocked(memory, quest->Id, nowMs))
-            return walking(WalkOrAct(bot, memory, quest->Ender, QuestStepKind::HandIn, quest->Id, nowMs));
+        if (entry->status == 2 && !Blocked(memory, quest->Id, nowMs) && !awayFromEnder(*quest))
+        {
+            QuestStep step = WalkOrAct(bot, memory, quest->Ender, QuestStepKind::HandIn, quest->Id, nowMs);
+            step.HopLeg = quest->HasHop; // the hand-in right after the hop: the ender stands at the landing point
+            return walking(step);
+        }
     }
 
     // 1b. A class quest in the log: complete it with its reward and no objectives, wherever the bot is (the GM command `.quest reward`).
     for (QuestDef const* quest : logged)
     {
-        if (!quest->Reward || Blocked(memory, quest->Id, nowMs))
+        if (!quest->Reward || Blocked(memory, quest->Id, nowMs) || awayFromEnder(*quest))
             continue;
         QuestStep step;
         step.Quest = quest->Id;
@@ -210,7 +271,7 @@ QuestStep QuestPlanner::Next(BotSnapshot const& bot, QuestMemory& memory, std::u
     for (QuestDef const* quest : logged)
     {
         QuestEntry const* entry = InLog(bot, quest->Id);
-        if (entry->status != 1)
+        if (entry->status != 1 || awayFromEnder(*quest))
             continue;
         if (quest->Group > 1 && _options.GroupQuests && !Blocked(memory, quest->Id, nowMs))
         {
@@ -427,6 +488,55 @@ void QuestPlanner::NoteLevelUnsafe(QuestMemory& memory, std::uint32_t quest, Que
     }
     memory.LevelUnsafeAreas.erase(quest);
     memory.BlockedUntilMs[quest] = nowMs + kLevelUnsafeBlockMs;
+}
+
+void QuestPlanner::NoteHopSent(QuestMemory& memory, std::uint32_t quest, std::uint32_t map, std::uint64_t nowMs) const
+{
+    memory.HopPending = quest;
+    memory.HopPendingMap = map;
+    memory.HopSentMs = nowMs;
+    memory.NextActionMs = nowMs + kQuestActionGapMs;
+}
+
+std::uint32_t QuestPlanner::NoteHopRefused(QuestMemory& memory, std::uint64_t nowMs) const
+{
+    if (memory.HopPending == 0)
+        return 0;
+    std::uint32_t const quest = memory.HopPending;
+    memory.HopPending = 0;
+    memory.HopPendingMap = 0;
+    std::uint32_t const times = ++memory.HopRefusals[quest];
+    std::uint64_t const block = times >= kHopRefusalsForGood ? kBlockNeverMs : times == 2 ? kBlockAfterAcceptRefusal3Ms : kHopRefusedBlockMs;
+    memory.BlockedUntilMs[quest] = nowMs + block;
+    return times;
+}
+
+HopCheck QuestPlanner::CheckHop(BotSnapshot const& bot, QuestMemory& memory, std::uint64_t nowMs) const
+{
+    if (memory.HopPending == 0)
+        return HopCheck::None;
+    if (bot.map_id == memory.HopPendingMap)
+    {
+        memory.HopRefusals.erase(memory.HopPending);
+        memory.HopPending = 0;
+        memory.HopPendingMap = 0;
+        return HopCheck::Done;
+    }
+    if (nowMs - memory.HopSentMs < kHopWaitMs)
+        return HopCheck::None;
+    NoteHopRefused(memory, nowMs);
+    return HopCheck::NoMove;
+}
+
+bool QuestPlanner::ExitChain(std::uint32_t quest) const
+{
+    return quest != 0 && _exitChain.count(quest) != 0;
+}
+
+void QuestPlanner::NoteNeedsRoom(QuestMemory& memory, std::uint32_t quest) const
+{
+    if (quest != 0)
+        memory.RefusedHandIns.insert(quest); // NoteServiced lifts the block of these after the vendor visit
 }
 
 void QuestPlanner::NoteWalkStuck(QuestMemory& memory, std::uint32_t quest, std::uint64_t nowMs) const
