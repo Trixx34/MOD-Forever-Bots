@@ -789,8 +789,10 @@ void main_detail::PumpTier2(forever_module::Tier2Session& session, std::atomic<b
         if (now - reportedAt >= kPumpReportMs && ticks > 0)
         {
             std::cerr << "forever-bots: pump: " << lastBotCount << " bots, decide avg " << decideTotalUs / ticks << " us, max "
-                      << decideMaxUs << " us over " << ticks << " ticks, " << ActionsPerTick(actionsTotal, ticks) << " actions per tick, " << policy.CalmSkippedTurns() << " calm-walk turns skipped in all\n";
-            // ArmSplit: per arm, the bots in view (average per tick) and the time of their own turns (DecideBot; the shared steps are in the line above).
+                      << decideMaxUs << " us over " << ticks << " ticks, " << ActionsPerTick(actionsTotal, ticks) << " actions per tick, " << policy.CalmSkippedTurns() << " calm-walk turns skipped in all"
+                      << (policy.ArmSplitOn() ? std::string() : policy.TakeSchedulerLine()) << "\n";
+            // ArmSplit: per arm, the bots in view (average per tick) and the time of their own turns (DecideBot; the shared steps are in the line above),
+            // then that arm's DecideScheduler tail (" sched=on ...", empty when the arm's scheduler is off).
             if (policy.ArmSplitOn())
             {
                 std::array<BotPolicy::ArmTiming, 2> const arms = policy.TakeArmTiming();
@@ -799,7 +801,7 @@ void main_detail::PumpTier2(forever_module::Tier2Session& session, std::atomic<b
                     BotPolicy::ArmTiming const& t = arms[arm];
                     std::cerr << "forever-bots: pump_arm: arm=" << ab_split::ArmLetter(ab_split::Arm(arm)) << " bots=" << (t.Ticks ? t.BotTurns / t.Ticks : 0)
                               << " turn_avg_us=" << (t.Ticks ? t.TurnUs / t.Ticks : 0) << " per_bot_us=" << (t.BotTurns ? double(t.TurnUs) / double(t.BotTurns) : 0.0)
-                              << " ticks=" << t.Ticks << "\n";
+                              << " ticks=" << t.Ticks << policy.TakeSchedulerLine(arm) << "\n";
                 }
             }
             reportedAt = now;

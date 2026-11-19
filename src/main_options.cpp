@@ -176,6 +176,11 @@ void PolicyFromSettings(PolicyOptions& policyOptions, BotSettings& settings)
     policyOptions.FightHeightAvoidMs = settings.FightHeightAvoidMs;
     policyOptions.FightStallDiag = settings.FightStallDiag;
     policyOptions.WalkDecideEvery = settings.WalkDecideEvery;
+    policyOptions.DecideScheduler.Enabled = settings.DecideScheduler;
+    policyOptions.DecideScheduler.BudgetUs = settings.DecideBudgetUs;
+    policyOptions.DecideScheduler.TierWalk = settings.DecideTierWalk;
+    policyOptions.DecideScheduler.TierIdle = settings.DecideTierIdle;
+    policyOptions.DecideScheduler.MaxSkipTicks = settings.DecideMaxSkipTicks;
     policyOptions.RaidBossPositions = settings.RaidBossPositions;
     policyOptions.RaidPullSingle = settings.RaidPullSingle;
     policyOptions.RaidGhostFightHoldMaxMs = settings.RaidGhostFightHoldMaxMs;

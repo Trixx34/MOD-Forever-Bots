@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include "bot_policy_internal.h"
 #include "text_case.h"
@@ -1016,8 +1017,39 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
     // recovery (both can `continue` before any other logic runs), then dead-bot handling, then (while alive) party
     // role/routing/follow, targeting and pulling, crowd control, pet taming, loot/fight-watchdog bookkeeping, and the
     // economy/social actions (crafting, vendor, chat orders) further below.
-    for (std::size_t i = 0; i < view.bots.size(); ++i)
-        DecideBot(tick, i);
+    // DecideScheduler per arm (ArmSplit): arm A's scheduler runs over the arm A bots, arm B's (arm B's keys) over the arm B bots, A first. With both
+    // off (or no split and arm A's off) every bot runs every tick in view order, as before.
+    bool const schedulerOn = _optionsA.DecideScheduler.Enabled || (_optionsB && _optionsB->DecideScheduler.Enabled);
+    if (!schedulerOn)
+    {
+        for (std::size_t i = 0; i < view.bots.size(); ++i)
+            DecideBot(tick, i);
+    }
+    else
+    {
+        // DecideScheduler (decide_scheduler.h): the bots that must run take their turn first, in view order, then the due bots of the slower tiers within the
+        // time budget. A bot that does not run this tick is still present (its state is kept).
+        std::function<std::uint64_t()> clock = _optionsA.DecideClockUs;
+        if (!clock)
+            clock = [] {
+                return std::uint64_t(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count());
+            };
+        std::array<std::vector<std::size_t>, 2> armIndex;   // view index of each bot, per arm
+        for (std::size_t i = 0; i < view.bots.size(); ++i)
+            armIndex[std::size_t(ab_split::ArmOf(_optionsB != nullptr, view.bots[i].guid))].push_back(i);
+        for (std::size_t arm = 0; arm < 2; ++arm)
+        {
+            std::vector<std::size_t> const& index = armIndex[arm];
+            if (index.empty())
+                continue;
+            std::vector<decide_scheduler::BotFacts> facts;
+            facts.reserve(index.size());
+            for (std::size_t i : index)
+                facts.push_back(SchedulerFactsOf(view.bots[i], view.NearbyOf(i), nowMs));
+            _scheduler[arm].Tick(
+                facts, [&](std::size_t k) { DecideBot(tick, index[k]); }, [&](std::size_t k) { tick.present.insert(view.bots[index[k]].guid); }, clock);
+        }
+    }
 
     for (auto it = _bots.begin(); it != _bots.end();)
         it = present.count(it->first) ? std::next(it) : _bots.erase(it);
@@ -1152,6 +1184,48 @@ void BotPolicy::DecideBot(DecideTick& tick, std::size_t i)
     TurnCraftGather(tick, turn);
     if (TurnRotation(tick, turn) == TurnFlow::kSkip)
         return;
+}
+
+// DecideScheduler: the facts that pick the bot's tier, and the reactions that make it run at once (decide_scheduler.h). Conservative: anything the policy
+// drives tick by tick (a fight, a party, a dungeon, a cast, a transport, ground effects, a forced heal, a hostile within kSchedulerHostileYards) is kEvery.
+decide_scheduler::BotFacts BotPolicy::SchedulerFactsOf(BotSnapshot const& bot, std::span<NearbyUnit const> nearby, std::uint64_t nowMs) const
+{
+    constexpr float kSchedulerHostileYards = 30.0f;
+    decide_scheduler::BotFacts facts;
+    facts.Guid = bot.guid;
+    facts.LifeState = bot.life_state;
+    facts.Moving = bot.moving != 0;
+    facts.Questing = bot.quest_count != 0;
+    facts.ActionSequence = bot.last_action_sequence;
+    facts.LastRefused = bot.last_action_status != BotActionStatus::kNone && bot.last_action_status != BotActionStatus::kApplied;
+    auto const found = _bots.find(bot.guid);
+    BotState const* state = found == _bots.end() ? nullptr : &found->second;
+
+    facts.InCombat = bot.in_combat != 0 || bot.threat_target_guid != 0 || (state && state->InFight);
+    facts.Party = bot.group_role != 0 || bot.group_leader_guid != 0 || (state && (state->TankLead || state->ChatFollow != 0));
+    facts.Dungeon = _optionsA.DungeonsByMap.find(bot.map_id) != _optionsA.DungeonsByMap.end() || IsRouteActive(bot.guid) || (_stagingHoldFn && _stagingHoldFn(bot.guid)) ||
+                    bot.group_size > 5 || (state && nowMs < state->LevelHoldUntilMs);
+    bool const atCorpse = bot.life_state == 2 && bot.corpse_valid != 0 && bot.corpse_map == bot.map_id &&
+                          DistanceTo(bot, Point{ bot.corpse_x, bot.corpse_y, bot.corpse_z }) <= kReclaimYards + 5.0f;
+    facts.GhostReviving = atCorpse || bot.resurrect_from != 0;
+    facts.Busy = bot.casting_spell != 0 || bot.transport_guid != 0 || bot.ground_effect_count != 0 || bot.telegraph_count != 0 || bot.pet_state == 2 ||
+                 (state && (state->ForcedHeal != 0 || state->LosRepositionTarget != 0));
+    for (NearbyUnit const& unit : nearby)
+        if (unit.is_hostile && unit.health != 0 && rotation::DistanceYards(bot, unit) <= kSchedulerHostileYards)
+        {
+            facts.HostileNear = true;
+            break;
+        }
+    facts.Resting = state && state->Sitting;
+    // An order the policy drives with timers (errand, visit, supply, repair or travel trip) is calm work: the walk tier even when the bot stands.
+    facts.Questing = facts.Questing || (state && (state->Errand.has_value() || state->Visit.has_value() || state->SupplyTrip || state->RepairTrip || state->Traveling));
+
+    // Pending reactions: the core or a player waits for an answer, or the module asked for something.
+    bool const restDone = state && state->Sitting && bot.health >= bot.max_health && (bot.power_type != 0 || bot.power >= bot.max_power);
+    facts.PendingReaction = bot.group_invite_from != 0 || bot.resurrect_from != 0 || restDone ||
+                            (state && (!state->FoughtAtMs.empty() || state->GearRequested || state->BagGearRequested || state->GuildLeaveRequested ||
+                                       state->DuelChallenger != 0 || state->GiftRecipient != 0));
+    return facts;
 }
 
 // What calm_walk::IsCalm needs of the policy's own state: a walk ordered, and nothing the policy drives by its own timers.

@@ -582,6 +582,15 @@ struct BotSettings
     // errand, takes its full decision turn on one tick in this many (calm_walk.h). Any change (a new result, a hostile, combat, an invite, the end of the walk) ends the calm
     // and the next tick is a full turn. At a world update of 500..1700 ms the delay is at most (N-1) ticks before a calm walker reacts to something that is not in the snapshot.
     std::uint32_t WalkDecideEvery = 2;
+    // DecideScheduler (default OFF; doc/decide-scheduler.md, decide_scheduler.h): per-bot decide tiers. Combat, party, dungeon, a ghost at its corpse, a cast, a transport or a
+    // hostile within 30 yd: every tick. Walking or calm questing: one tick in DecideTierWalk (1..10). Resting, idle, dead, corpse run: one tick in DecideTierIdle (1..20). A pending
+    // reaction (death, resurrect, loot, invite, trade, a new action result or refusal, the end of a walk) runs the bot at once. DecideBudgetUs (0 = off, else 500..200000): the
+    // optional turns of a tick stop when the tick has used this many microseconds; the rest carry over. DecideMaxSkipTicks (1..60): no bot waits longer than this.
+    bool DecideScheduler = false;
+    std::uint32_t DecideBudgetUs = 0;
+    std::uint32_t DecideTierWalk = 3;
+    std::uint32_t DecideTierIdle = 6;
+    std::uint32_t DecideMaxSkipTicks = 12;
     // RaidBossPositions (default OFF; Onyxia fix 1, doc/raid-rules.md "Boss positions"): the `tank_spot` and `flank` rows act. The tank the boss attacks holds it from the
     // tank spot (so the boss faces the way the row sets), the other members that fight it stand on its flanks, none in its front or rear cone. Without rows nothing changes.
     bool RaidBossPositions = false;

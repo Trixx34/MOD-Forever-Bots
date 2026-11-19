@@ -737,6 +737,16 @@ Module.forever-bots.TelemetrySummarySec = 60
 # hostile near, no group, dungeon, errand or transport) takes its full decision turn on one world tick in this many. Anything that changes (a new result, a hostile, combat,
 # an invite, the end of the walk) ends the skipping at once.
 # Module.forever-bots.WalkDecideEvery = 2
+# DecideScheduler (default 0 = off; perf, doc/decide-scheduler.md): per-bot decide tiers. Combat, party, dungeon, a ghost at its corpse, a cast, a transport or a hostile within
+# 30 yd: every tick. Walking or calm questing: one tick in DecideTierWalk (1..10, default 3). Resting, idle, dead, corpse run: one tick in DecideTierIdle (1..20, default 6).
+# Death, a resurrect offer, loot, an invite, a trade or gear request, a new action result (a refusal too) or the end of a walk runs the bot at once. DecideBudgetUs (0 = off,
+# else 500..200000): the optional turns of a tick stop once the tick has used this many microseconds, the rest are carried over to the next tick. DecideMaxSkipTicks
+# (1..60, default 12): no bot waits more ticks than this. The pump line gets "sched=on ... tiers=every:S/R,walk:S/R,idle:S/R skipped= deferred= overruns= max_turn_us=".
+# Module.forever-bots.DecideScheduler = 0
+# Module.forever-bots.DecideBudgetUs = 0
+# Module.forever-bots.DecideTierWalk = 3
+# Module.forever-bots.DecideTierIdle = 6
+# Module.forever-bots.DecideMaxSkipTicks = 12
 # FlexRoles (default 0 = off; doc/flex-roles.md): when a party is formed with no warrior, a paladin (first) or a druid takes the tank role (the prot / feral_tank rows, leads and pulls),
 # and one priest, shaman, druid or paladin the healer role; a warrior stays tank. Explicit roles and roster specs are never changed. A paladin or druid tank pulls at most 3 mobs
 # (a warrior 4). Event `flex_roles`.

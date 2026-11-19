@@ -1143,6 +1143,12 @@ BotSettings ParseOneConfig(std::unordered_map<std::string, std::string> const& c
     if (config.count("RaidGhostFightHoldMaxMs") != 0 && config.at("RaidGhostFightHoldMaxMs") != "0")
         ReadKey(config, "RaidGhostFightHoldMaxMs", 10000, 3600000, settings.RaidGhostFightHoldMaxMs, warnings);
     ReadKey(config, "WalkDecideEvery", 1, 10, settings.WalkDecideEvery, warnings);
+    ReadBool(config, "DecideScheduler", settings.DecideScheduler, warnings);
+    if (config.count("DecideBudgetUs") != 0 && config.at("DecideBudgetUs") != "0")
+        ReadKey(config, "DecideBudgetUs", 500, 200000, settings.DecideBudgetUs, warnings);
+    ReadKey(config, "DecideTierWalk", 1, 10, settings.DecideTierWalk, warnings);
+    ReadKey(config, "DecideTierIdle", 1, 20, settings.DecideTierIdle, warnings);
+    ReadKey(config, "DecideMaxSkipTicks", 1, 60, settings.DecideMaxSkipTicks, warnings);
     if (config.count("RegroupRallyMs") != 0 && config.at("RegroupRallyMs") != "0")
         ReadKey(config, "RegroupRallyMs", 5000, 600000, settings.RegroupRallyMs, warnings);
     if (auto const it = config.find("AvoidSpellsFile"); it != config.end())

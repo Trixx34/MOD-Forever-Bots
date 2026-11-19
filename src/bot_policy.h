@@ -33,6 +33,7 @@
 #include <utility>
 #include "ab_split.h"
 #include "calm_walk.h"
+#include "decide_scheduler.h"
 #include "wipe_hold.h"
 #include "pull_ready.h"
 #include "damage_events.h"
@@ -228,6 +229,11 @@ struct PolicyOptions
     bool FightStallDiag = false;
     // WalkDecideEvery (1 = off; calm_walk.h): a solo bot that only walks to a place the policy sent it to, with nothing hostile near, takes its full turn on one tick in this many.
     std::uint32_t WalkDecideEvery = 1;
+    // DecideScheduler (default off; decide_scheduler.h, doc/decide-scheduler.md): per-bot tiers (combat, party, dungeon, reviving ghost every tick; walking or calm questing one tick
+    // in TierWalk; resting, idle, dead, corpse run one tick in TierIdle), a per-tick time budget with carry-over and a starvation cap. Off = every bot every tick, as before.
+    decide_scheduler::Settings DecideScheduler;
+    // The scheduler's microsecond clock (tests); empty = std::chrono::steady_clock.
+    std::function<std::uint64_t()> DecideClockUs;
     // RaidBossPositions (default off): `tank_spot` and `flank` rows of the raid rule table act (MoveBossPosition): the boss's victim, a tank, holds it from the tank spot,
     // everyone else that fights it stands on its flanks, out of its front and rear cones; a tank on a frontal telegraph holds.
     bool RaidBossPositions = false;
@@ -647,7 +653,10 @@ class BotPolicy
 {
 public:
     explicit BotPolicy(PolicyOptions options = {}) : _optionsA(options), _questSets(MakeQuestSets(options)), _knownWorld(MakeKnownWorld(options)), _levelMap(MakeLevelMap(options)), _scenarioRoute(ScenarioRouteOf(options)),
-                                                     _whispers(options.WhisperCooldownMs, options.WhisperMaxPerMin) {}
+                                                     _whispers(options.WhisperCooldownMs, options.WhisperMaxPerMin)
+    {
+        _scheduler[0] = decide_scheduler::Scheduler(_optionsA.DecideScheduler);
+    }
 
     // Actions for the bots in `view`. nowMs is a monotonic clock in milliseconds (cooldowns, retries, fight time).
     // Decisions are sent only when they change; casts follow the rotation, the global cooldown and the retries.
@@ -662,6 +671,18 @@ public:
     // The bot's scenario party is not inside yet (Waiting to Entering): it holds at the staging place, with no quest, grind walk or pull of its own.
     // Turns skipped for calm walkers (WalkDecideEvery) since the policy was made; the pump reports it once a minute.
     std::uint64_t CalmSkippedTurns() const { return _calmSkips; }
+    // DecideScheduler counts since the last call (the pump line), then zero; and the formatted tail of the pump line (empty when the scheduler is off).
+    // ArmSplit: one scheduler per arm (arm B's from SetArmB, with arm B's DecideScheduler keys), each over its own arm's bots; `arm` 0 = A, 1 = B.
+    // Without the split there is only arm A's, over every bot.
+    decide_scheduler::Stats TakeSchedulerStats(std::size_t arm = 0) { return _scheduler[arm & 1u].TakeStats(); }
+    std::string TakeSchedulerLine(std::size_t arm = 0)
+    {
+        decide_scheduler::Scheduler& scheduler = _scheduler[arm & 1u];
+        decide_scheduler::Stats const stats = scheduler.TakeStats();
+        return decide_scheduler::FormatStats(scheduler.Options(), stats);
+    }
+    // Ticks since the bot last took its full turn under the scheduler of its arm (-1 unknown or off). For the tests.
+    int SchedulerWaitedOf(std::uint64_t guid) const { return _scheduler[std::size_t(ab_split::ArmOf(_optionsB != nullptr, guid))].WaitedOf(guid); }
     // The `deaths_top` line (DeathsTopEveryMs, level_safe::DeathTally) when it is due, without the "forever-bots: " prefix; nothing otherwise or when off.
     // It ends with the counts of the period (2026-11-19): " level_safe_lines=W level_safe_held=H below_map_recover=R below_map_skip=reason:n,...|none".
     // The first call only starts the clock. The counts start again after each line.
@@ -688,7 +709,12 @@ public:
     // ArmSplit (doc/sim-ab.md): the bots of arm B (odd guid, ab_split::ArmOf) take their own turn (DecideBot) with these options, the arm A bots and every
     // shared step (parties, guilds, level dungeons, chat) with the constructor's. The tables the constructor derives (quest sets, known world, level map) stay
     // arm A's. Call before the first Decide; the deaths_top and per-arm timing lines then come per arm as well.
-    void SetArmB(PolicyOptions options) { _optionsB = std::make_shared<PolicyOptions>(std::move(options)); }
+    // Arm B's DecideScheduler keys make arm B's own scheduler (over the arm B bots only).
+    void SetArmB(PolicyOptions options)
+    {
+        _optionsB = std::make_shared<PolicyOptions>(std::move(options));
+        _scheduler[1] = decide_scheduler::Scheduler(_optionsB->DecideScheduler);
+    }
     bool ArmSplitOn() const { return _optionsB != nullptr; }
     // The per-arm lines due with the last TakeDeathsTopLine ("deaths_top: arm=A window_min=..."), empty without ArmSplit. Taken once.
     std::vector<std::string> TakeArmDeathsTopLines() { return std::exchange(_armDeathsTop, {}); }
@@ -1500,6 +1526,9 @@ private:
     bool PersonalityInstanced(forever_module::BotSnapshot const& bot) const;
     std::uint64_t _calmSkips = 0;   // turns skipped by WalkDecideEvery since the policy was made
     calm_walk::Facts CalmFactsOf(BotState const& state, forever_module::BotSnapshot const& bot, std::uint64_t nowMs) const;
+    // DecideScheduler: the tier and reaction facts of one bot for this tick (snapshot plus the policy's own state).
+    decide_scheduler::BotFacts SchedulerFactsOf(forever_module::BotSnapshot const& bot, std::span<forever_module::NearbyUnit const> nearby, std::uint64_t nowMs) const;
+    std::array<decide_scheduler::Scheduler, 2> _scheduler;   // per arm (index ab_split::Arm); [1] only with ArmSplit
     std::set<std::uint32_t> const& KilledBossesOf(std::uint64_t guid) const;
     bool IsRezzer(forever_module::BotSnapshot const& member) const;
     bool PartyFighting(DecideTick const& tick, std::uint64_t leaderGuid) const;

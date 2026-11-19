@@ -727,6 +727,23 @@ void WalkDecideEverySetting()
     CHECK(ParseBotSettings({ { "WalkDecideEvery", "11" } }, w).WalkDecideEvery == 2 && w.size() == 2);
 }
 
+// DecideScheduler (perf, 2026-11-19): off by default; budget 0 = off or 500..200000; tiers 1..10 and 1..20; cap 1..60; a value outside keeps the default with a warning.
+void DecideSchedulerSettings()
+{
+    std::vector<std::string> w;
+    BotSettings const def = ParseBotSettings({}, w);
+    CHECK(!def.DecideScheduler && def.DecideBudgetUs == 0 && def.DecideTierWalk == 3 && def.DecideTierIdle == 6 && def.DecideMaxSkipTicks == 12 && w.empty());
+    BotSettings const on = ParseBotSettings({ { "DecideScheduler", "1" }, { "DecideBudgetUs", "12000" }, { "DecideTierWalk", "2" }, { "DecideTierIdle", "8" },
+                                              { "DecideMaxSkipTicks", "20" } }, w);
+    CHECK(on.DecideScheduler && on.DecideBudgetUs == 12000 && on.DecideTierWalk == 2 && on.DecideTierIdle == 8 && on.DecideMaxSkipTicks == 20 && w.empty());
+    CHECK(ParseBotSettings({ { "DecideBudgetUs", "0" } }, w).DecideBudgetUs == 0 && w.empty());
+    CHECK(ParseBotSettings({ { "DecideBudgetUs", "100" } }, w).DecideBudgetUs == 0 && w.size() == 1);
+    CHECK(ParseBotSettings({ { "DecideTierWalk", "11" } }, w).DecideTierWalk == 3 && w.size() == 2);
+    CHECK(ParseBotSettings({ { "DecideTierIdle", "0" } }, w).DecideTierIdle == 6 && w.size() == 3);
+    CHECK(ParseBotSettings({ { "DecideMaxSkipTicks", "61" } }, w).DecideMaxSkipTicks == 12 && w.size() == 4);
+    CHECK(!ParseBotSettings({ { "DecideScheduler", "yes" } }, w).DecideScheduler && w.size() == 5);
+}
+
 // RaidBossPositions (Onyxia fix 1): off by default, on with 1.
 void RaidBossPositionsSetting()
 {
@@ -906,6 +923,7 @@ int main()
     PullHoldBudgetSettings();
     GhostTeleportHoldSettings();
     WalkDecideEverySetting();
+    DecideSchedulerSettings();
     ZgLeverSettings();
     FightStallSettings();
     RaidBossPositionsSetting();
