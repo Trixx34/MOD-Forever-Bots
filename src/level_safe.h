@@ -46,6 +46,28 @@ struct Options
     float StepYards = 100.0f;         // a walk is checked every this many yards along the straight line, and at its end
     float SkipNearYards = 300.0f;     // the first part of a walk (where the bot stands now) is not checked, at least RadiusYards + 50: a bot in a high place may walk out
     std::uint64_t EscapeCooldownMs = 600000; // no second escape for the same bot before this
+    // LevelSafeLogThrottleSec (default 60, 0 = every line): a level-safe event line repeats for the same bot, quest and reason at most once per this. Only the
+    // line: the block itself stays (arm C, 2026-11-19: bot 225 logged quest_walk_blocked reason=level_unsafe 4,655 times, the planner gives the step again
+    // each turn and each is dropped again).
+    std::uint64_t LogThrottleMs = 60000;
+};
+
+// The per bot, quest and reason throttle of the level-safe event lines (Options::LogThrottleMs). Counts the lines written and held back, for the hourly line.
+class LogThrottle
+{
+public:
+    // True when the line for (bot, quest, reason) is due now (and marks it written); false when held back (counted). periodMs 0: always due.
+    bool Due(std::uint64_t bot, std::uint32_t quest, std::string const& reason, std::uint64_t nowMs, std::uint64_t periodMs);
+    // " level_safe_lines=W level_safe_held=H" (the counts since the last call), then they start again.
+    std::string TakeFields();
+    std::uint64_t Held() const { return _held; }
+    std::size_t Size() const { return _last.size(); }
+
+private:
+    static constexpr std::size_t kPruneAt = 4096;   // bounded: older entries than the period are dropped when this many are kept
+    std::map<std::tuple<std::uint64_t, std::uint32_t, std::string>, std::uint64_t> _last;
+    std::uint64_t _written = 0;
+    std::uint64_t _held = 0;
 };
 
 // The lowest creature level of the places of each map, from the grind spots.
@@ -110,6 +132,8 @@ public:
                         std::function<bool(Yard const&)> const& skip = {}) const;
     // DeathLoopBreaker without level data: the graveyard on `map` nearest to (x, y) that a bot of `side` may use and `skip` does not refuse. Null when none.
     Yard const* Nearest(std::uint32_t map, float x, float y, std::uint8_t side, std::function<bool(Yard const&)> const& skip = {}) const;
+    // The graveyard on `map` nearest to (x, y), any side and level (the auction stand point's ground reference). Null when none is known.
+    Yard const* Nearest(std::uint32_t map, float x, float y) const;
     std::size_t Size() const;
 
 private:

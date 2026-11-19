@@ -647,18 +647,28 @@ void main_detail::PumpTier2(forever_module::Tier2Session& session, std::atomic<b
                     bool const inReach2d = auction::InReach(bot.auctioneer_valid != 0, bot.pos_x, bot.pos_y, bot.auctioneer_x, bot.auctioneer_y);
                     bool const inReach3d = auction::InReach3D(bot.auctioneer_valid != 0, bot.pos_x, bot.pos_y, bot.pos_z, bot.auctioneer_x, bot.auctioneer_y,
                                                               bot.auctioneer_z);
-                    bool const inReach = settings.Auction.Walk3D ? inReach3d : inReach2d;
-                    // AuctionLogReach: the 2D check passes but the bot is not within the 3D reach (below or above the house floor, or a stale place): said once
-                    // per bot every ten minutes, with both heights.
-                    if (settings.Auction.Enabled && settings.Auction.LogReach && inReach2d && !inReach3d)
+                    // AuctionWalk3D, the z-aware stand point (auction::JudgeStandZ): the auctioneer's stored z against the vendors and banker near it; a z off by more
+                    // than 60 yards is bad data (no listing there), otherwise the 3D reach counts. Judged only for a bot at the house (in 2D reach).
+                    auction::StandJudgement judgement;
+                    if (inReach2d || inReach3d)
+                        judgement = auction::JudgeStandZ(bot.auctioneer_x, bot.auctioneer_y, bot.auctioneer_z, std::nullopt, auction::SnapshotRefs(bot));
+                    bool const inReach = settings.Auction.Walk3D ? auction::InReachJudged(judgement.Verdict, bot.auctioneer_valid != 0, bot.pos_x, bot.pos_y, bot.pos_z,
+                                                                                           bot.auctioneer_x, bot.auctioneer_y, bot.auctioneer_z)
+                                                                 : inReach2d;
+                    // AuctionLogReach: a bot at the house (2D reach) is said once per bot every ten minutes with the result (check=ok_3d|failed_3d|skip_bad_z|ignore_z),
+                    // both heights and the reference's (ref_z=none when no vendor or banker stands within 200 yards of the auctioneer).
+                    if (settings.Auction.Enabled && settings.Auction.LogReach && inReach2d)
                     {
                         std::uint64_t const now = nowMs();
                         auto const last = auctionReachLoggedMs.find(bot.guid);
                         if (last == auctionReachLoggedMs.end() || now - last->second >= kServiceNoticeMs)
                         {
                             auctionReachLoggedMs[bot.guid] = now;
-                            std::cerr << "forever-bots: event auction_reach: bot=" << bot.guid << " check=failed_3d walk3d=" << (settings.Auction.Walk3D ? 1 : 0)
-                                      << auction::ReachFields(bot.pos_x, bot.pos_y, bot.pos_z, bot.auctioneer_x, bot.auctioneer_y, bot.auctioneer_z) << "\n";
+                            std::cerr << "forever-bots: event auction_reach: bot=" << bot.guid << " check=" << auction::ReachCheckName(judgement.Verdict, inReach3d)
+                                      << " walk3d=" << (settings.Auction.Walk3D ? 1 : 0)
+                                      << auction::ReachFields(bot.pos_x, bot.pos_y, bot.pos_z, bot.auctioneer_x, bot.auctioneer_y, bot.auctioneer_z)
+                                      << " ref_z=" << (judgement.RefKnown ? std::to_string(int(judgement.RefZ)) : std::string("none")) << " in_reach=" << (inReach ? 1 : 0)
+                                      << "\n";
                         }
                     }
                     std::uint64_t auctioneer = bot.auctioneer_guid;

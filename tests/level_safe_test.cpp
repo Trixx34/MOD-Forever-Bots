@@ -103,6 +103,7 @@ void BelowTheMapIsSeenByHeightOrByAStorm()
 {
     below_map::Options options;
     options.Enabled = true;
+    options.BelowChecks = 1;   // the time alone here; the count of checks in a row (2026-11-19) is tested in arm_c_fixes_test.cpp
     below_map::Watch watch;
     below_map::Facts facts;
     facts.HasGround = true;
@@ -335,7 +336,13 @@ void BelowTheMapThePolicyTeleportsUp()
     WorldTickSnapshotView under = Alive(20.0f, 6);
     under.bots[0].pos_z = 19.0f;
     CHECK(!TeleportOf(policy.Decide(under, 1000), kBot));
-    std::optional<BotAction> const up = TeleportOf(policy.Decide(under, 22000), kBot);
+    // Looked at every 2 s (CheckEveryMs); the drop holds 20 s and five looks: up at 21 s.
+    std::optional<BotAction> up;
+    for (std::uint64_t now = 2000; now <= 22000 && !up; now += 1000)
+    {
+        up = TeleportOf(policy.Decide(under, now), kBot);
+        CHECK(!up || now == 21000);
+    }
     CHECK(up.has_value() && up->dest_z == 505.0f && up->dest_x == 0.0f);
     CHECK(Logged(events, "below_map_recover: bot=42 reason=z_below map=0 pos=20,0,19 ground_z=505 to=0,0,505"));
     options.BelowMap.Enabled = false;

@@ -2,6 +2,7 @@
 #include "off_map.h"
 
 #include <algorithm>
+#include <cmath>
 #include <limits>
 
 namespace off_map
@@ -65,6 +66,26 @@ Place const* KnownWorld::Home(std::uint32_t map, float x, float y, std::uint8_t 
         }
     }
     return best;
+}
+
+KnownWorld::Around KnownWorld::Near(std::uint32_t map, float x, float y, float z, float radius) const
+{
+    Around around;
+    auto const it = _maps.find(map);
+    if (it == _maps.end())
+        return around;
+    float const radiusSq = radius * radius;
+    for (Place const& place : it->second.Places)
+    {
+        float const dx = place.X - x;
+        float const dy = place.Y - y;
+        if (dx * dx + dy * dy > radiusSq)
+            continue;
+        if (!around.Lowest || place.Z < around.Lowest->Z)
+            around.Lowest = &place;
+        around.NearestDz = std::min(around.NearestDz, std::fabs(place.Z - z));
+    }
+    return around;
 }
 
 Verdict Check(Options const& options, KnownWorld const& world, Watch& watch, Facts const& facts, std::uint64_t nowMs)

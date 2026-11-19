@@ -10,7 +10,12 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
     // A long walk the core found no full route for is chained while it makes progress (NotePartialLeg); a walk that was applied ends the chain.
     bool const moveNoRoute = bot.last_action_type == uint8_t(ActionType::kMoveTo) && bot.last_action_status == BotActionStatus::kNoRoute;
     if (bot.last_action_type == uint8_t(ActionType::kMoveTo) && bot.last_action_status == BotActionStatus::kApplied)
+    {
         state.PartialActive = false;
+        // Below-map recovery (BelowMapRecover): the core applies a walk only with a full navmesh route from where the bot stands, so the bot was on walkable
+        // ground at this height (below_map.h, on_path).
+        below_map::NoteRouted(_options.BelowMap, state.BelowMap, bot.pos_z, nowMs);
+    }
     bool const chained = moveNoRoute && NotePartialLeg(state, bot, nowMs);
 
     // A LoS recovery walk whose navmesh route failed cannot clear the wall; leave that target

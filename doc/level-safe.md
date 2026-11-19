@@ -29,12 +29,13 @@ Graveyards: the module has no graveyard table either. Every place where a ghost 
 | `LevelSafeEscapeMarginLevels` | 10 | 1 to 40. |
 | `LevelSafeRadiusYards` | 250 | 50 to 1000. |
 | `LevelSafeEscapeCooldownSec` | 600 | 60 to 86400. |
-| `BelowMapRecover` | 0 | A living bot whose nearest known place (quest givers and anchors, grind spots, hubs) within 60 yards lies more than `BelowMapDropYards` above it for 20 s, or with `BelowMapStormCount` no-route answers for walks of 6 to 100 yards within 5 minutes, is teleported to the nearest known place (z_below: that place; storm: the nearest place of its side), at most once per `BelowMapCooldownSec`. Event `below_map_recover reason=z_below|no_route_storm`. |
+| `LevelSafeLogThrottleSec` | 60 | 0 to 3600; logging only (2026-11-19). `quest_walk_blocked reason=level_unsafe`, `level_unsafe_escape result=no_spot` and `level_safe_yard result=none_known` repeat for the same bot, quest and reason at most once per this; 0 = every line. The block itself is unchanged. The `deaths_top` line ends with `level_safe_lines=` (written) and `level_safe_held=` (held back) for the period. |
+| `BelowMapRecover` | 0 | A living bot below every known place (quest givers and anchors, grind spots, hubs) within 60 yards by more than `BelowMapDropYards` (the lowest of them is the ground) for 20 s and five looks in a row (one look every 2 s), or with `BelowMapStormCount` no-route answers for walks of 6 to 100 yards within 5 minutes, is teleported up (z_below: that lowest place; storm: the nearest place of its side), at most once per `BelowMapCooldownSec`. Event `below_map_recover reason=z_below|no_route_storm`. Skipped (2026-11-19, see below): `below_map_skip reason=on_transport|swimming|on_path|near_ground`. |
 | `BelowMapDropYards` | 60 | 20 to 1000. |
 | `BelowMapStormCount` | 8 | 0 to 100; 0 = the storm sign off. |
 | `BelowMapCooldownSec` | 600 | 60 to 86400. |
-| `AuctionWalk3D` | 0 | The reach to the auctioneer is 4.5 yards in 3D, not 5 in 2D: the listing visit waits for it, the auction errand counts the bot as arrived only then and walks it to the auctioneer until then. |
-| `AuctionLogReach` | 1 | Logging only: `event auction_reach: bot= check=failed_3d walk3d= dist2d= dist3d= bot_z= auctioneer_z=` (once per bot every 10 minutes) when the 2D check passes and the 3D one does not; the `list_refused` and `buy_failed` lines end with the same fields. |
+| `AuctionWalk3D` | 0 | The reach to the auctioneer is 4.5 yards in 3D, not 5 in 2D: the listing visit waits for it, the auction errand counts the bot as arrived only then and walks it to the auctioneer until then. The z-aware stand point (2026-11-19, below): the walk goes to the live auctioneer's own x, y, z; an auctioneer whose stored z lies more than 60 yards from its vendors, banker or graveyard is skipped. |
+| `AuctionLogReach` | 1 | Logging only: `event auction_reach: bot= check=ok_3d|failed_3d|skip_bad_z|ignore_z walk3d= dist2d= dist3d= bot_z= auctioneer_z= ref_z= in_reach=` once per bot every 10 minutes for a bot in 2D reach of the auctioneer (before 2026-11-19 only `check=failed_3d`); the errand walk writes the same line with `where=errand` (no `in_reach=`); the `list_refused` and `buy_failed` lines end with the dist/z fields. |
 | `LogRefusedReason` | 1 | Logging only: the `bot N <action> not done: <status>` lines (gather, craft, vendor, train, ...) end with `reason=N`, the ActionResult reason the core put in the result ring for that action (0 = none; the core classifies quest accepts, most other refusals give 0, so the text reason stays in the core log). |
 | `DeathsTopEveryMin` | 60 | Logging only; 0 = off. `forever-bots: deaths_top: window_min= deaths= bots_online= bots_died= median= median_died= top10= top10_pct= top=guid:n,...` from the policy's own death count (`median` counts the bots in view that did not die as 0). |
 
@@ -46,6 +47,30 @@ Defaults: the level-safe keys are the fix and default on; the below-map teleport
 - A graveyard is only known once a ghost was seen there. Right after a restart the first deaths in a high place keep today's behaviour (`level_safe_yard ... result=none_known`).
 - The walk check uses the straight line from the bot to the destination, not the core's path.
 - Grind spots are creature spawns: a quest point among guards or elites can count as high (about 3% of quest points at margin 5 for a bot at the quest's level).
+
+## Arm C fixes (2026-11-19, branch `fix/arm-c-small-20261119`)
+
+Arm C (400 bots, 7.9 h, `BelowMapRecover 1`, `AuctionWalk3D 1`) showed three small faults. Tests: `tests/arm_c_fixes_test.cpp` (with the arm C positions).
+
+**Level-safe line spam.** Bot 225 logged `quest_walk_blocked reason=level_unsafe` 4,655 times (half of all 9,266): the planner gives the same step every turn and it is dropped every turn. The drop and `NoteLevelUnsafe` stay; only the line is throttled per bot, quest and reason (`LevelSafeLogThrottleSec` 60). Why the planner hands the same step out again (bot 225: a hand-in or a hunt area that the 30-minute block does not cover?) is not answered here.
+
+**Auction reach fails on height.** All 194 `auction_reach` lines were `check=failed_3d`, by height: 2D 3.7 yards, 3D 14.2 (bot_z -43.1, auctioneer_z -56.8: another floor of the house), and 2D 1.9 with bot_z 7.4 against auctioneer_z 505.2. The second is most likely not bad data: Ironforge lies at about z 500 (the 11-18 sim saw the same house with a bot at z 19), so that bot stood under the city (a below-map case); the check below keeps such an auctioneer when its vendors stand at its height. With `AuctionWalk3D`:
+
+- the errand walks to the snapshot's live auctioneer (its own x, y, z) when it stands within 30 yards of the errand's spot (the spot was taken when the errand started, from farther away);
+- the stored z is judged first (`auction::JudgeStandZ`): more than 60 yards from the nearest reference within 200 yards of the auctioneer (the snapshot's vendor, food vendor, goods vendor, banker; the errand also a graveyard seen) is bad data: no listing, the errand fails (`errand_failed reason=auctioneer_bad_z`). With a ground height at the auctioneer's x, y, a z 40 yards or more off it would fall back to the 2D reach (`ignore_z`); the module has no such query today (`kProbePoint` exists in the core but has no sender, and a probe would take the walk's place as the last action the snapshot reports), so that branch is not reached and the z is only checked against the references;
+- a bot in 2D reach but not in 3D reach for 60 s ends the errand (`errand_failed reason=auction_reach_3d`) instead of standing there;
+- `auction_reach` is written once per bot per 10 minutes with the result (`ok_3d`, `failed_3d`, `skip_bad_z`).
+
+**Below-map false positives.** `below_map_recover` fired 5,148 times on 376 of 400 bots (max 33 per bot; z_below 3,881: map 0 1,877, map 1 915, map 2991 1,094; no_route_storm 1,267). The ground it compared with was the z of the single nearest known place within 60 yards (a quest giver or ender, a start anchor, a grind spot made from creature spawns, a hub), at any height: a giver on a tower, a tree platform or a mesa, a grind spot on a hill above a valley, a place on another floor of a city. It was never a height query under the bot. Sample: map 1 pos 10329,848,1133 against 1326 (Teldrassil; not known whether that bot was really under the ground or on a lower level); map 2991 pos 4126,1953,976 with ground 980 was a storm recovery, the bot at the place's own height. Now:
+
+- the ground is the lowest known place within 60 yards, not the nearest;
+- the drop must hold for 20 s and five looks in a row (one look every 2 s; the scan of the map's places no longer runs every tick);
+- skipped, not acted on: on a transport (`on_transport`), swimming (`swimming`), a walk the core applied in the last 60 s with the bot not 20 yards lower since and not falling (`on_path`: the core applies a `kMoveTo` only with a full navmesh route from where the bot stands), and for the storm a known place within 15 yards of the bot's height or a walk applied after the storm began (`near_ground`, `on_path`). A flight, combat, death or a held bot stay blocked as before;
+- `below_map_skip: bot= reason= sign=z_below|no_route_storm map= pos= ground_z= movement_flags=` at most once per bot per 10 minutes, and the same count per reason in the `deaths_top` line (`below_map_recover=N below_map_skip=reason:n,...`); recoveries stay at most once per bot per 10 minutes (`BelowMapCooldownSec`).
+
+Limits: on a map with no navmesh the core applies every walk (a straight line), so `on_path` excuses every bot there; a bot that fell and was never given a walk since is still judged by the known places only. Suggestion for the sim (not a code default): `BelowMapDropYards = 100` for the next run with `BelowMapRecover = 1`; the default stays 60 and `BelowMapRecover` stays 0 on prod.
+
+What the next sim run should count: `below_map_recover` per hour and per bot (was 5,148 on 376 bots) against `below_map_skip` by reason (deaths_top line and the event), and for each recovery whether the bot's `no_route` count fell after it; `auction_reach` by `check=` (was 194 `failed_3d`) and `errand_failed reason=auctioneer_bad_z|auction_reach_3d`, `listed` lines per hour; `quest_walk_blocked reason=level_unsafe` lines (was 9,266) against `level_safe_held=`, and bot 225's pattern (same quest every turn?).
 
 ## What the sim read-out should measure
 

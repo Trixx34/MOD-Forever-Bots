@@ -185,6 +185,60 @@ std::string ReachFields(float botX, float botY, float botZ, float auctioneerX, f
     return buffer;
 }
 
+StandJudgement JudgeStandZ(float auctioneerX, float auctioneerY, float auctioneerZ, std::optional<float> groundZ, std::vector<RefPoint> const& refs)
+{
+    StandJudgement judgement;
+    float bestSq = kStandRefNearYards * kStandRefNearYards;
+    for (RefPoint const& ref : refs)
+    {
+        float const dx = ref.X - auctioneerX;
+        float const dy = ref.Y - auctioneerY;
+        float const sq = dx * dx + dy * dy;
+        if (sq <= bestSq)
+        {
+            bestSq = sq;
+            judgement.RefKnown = true;
+            judgement.RefZ = ref.Z;
+        }
+    }
+    if (judgement.RefKnown && std::fabs(auctioneerZ - judgement.RefZ) > kStandRefMaxDz)
+        judgement.Verdict = StandZ::kSkip;
+    else if (groundZ && std::fabs(auctioneerZ - *groundZ) >= kStandGroundMaxDz)
+        judgement.Verdict = StandZ::kIgnoreZ;
+    return judgement;
+}
+
+char const* StandZName(StandZ verdict)
+{
+    switch (verdict)
+    {
+        case StandZ::kUse3D: return "use_3d";
+        case StandZ::kIgnoreZ: return "ignore_z";
+        case StandZ::kSkip: return "skip_bad_z";
+    }
+    return "?";
+}
+
+bool InReachJudged(StandZ verdict, bool auctioneerValid, float botX, float botY, float botZ, float auctioneerX, float auctioneerY, float auctioneerZ)
+{
+    switch (verdict)
+    {
+        case StandZ::kUse3D: return InReach3D(auctioneerValid, botX, botY, botZ, auctioneerX, auctioneerY, auctioneerZ);
+        case StandZ::kIgnoreZ: return InReach(auctioneerValid, botX, botY, auctioneerX, auctioneerY);
+        case StandZ::kSkip: return false;
+    }
+    return false;
+}
+
+char const* ReachCheckName(StandZ verdict, bool inReach3d)
+{
+    if (verdict == StandZ::kSkip)
+        return "skip_bad_z";
+    if (verdict == StandZ::kIgnoreZ)
+        return "ignore_z";
+    return inReach3d ? "ok_3d" : "failed_3d";
+}
+
 std::vector<Listing> PlanListings(Settings const& settings, Bags const&, Standing const& standing, std::vector<Candidate> const& items)
 {
     std::vector<Listing> plan;

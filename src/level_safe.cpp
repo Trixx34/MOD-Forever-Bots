@@ -154,6 +154,25 @@ Graveyards::Yard const* Graveyards::Nearest(std::uint32_t map, float x, float y,
     return best;
 }
 
+Graveyards::Yard const* Graveyards::Nearest(std::uint32_t map, float x, float y) const
+{
+    auto const found = _maps.find(map);
+    if (found == _maps.end())
+        return nullptr;
+    Yard const* best = nullptr;
+    float bestDist = 0.0f;
+    for (Yard const& yard : found->second)
+    {
+        float const dist = std::hypot(yard.X - x, yard.Y - y);
+        if (!best || dist < bestDist)
+        {
+            best = &yard;
+            bestDist = dist;
+        }
+    }
+    return best;
+}
+
 std::size_t Graveyards::Size() const
 {
     std::size_t total = 0;
@@ -201,6 +220,35 @@ std::string DeathTally::TakeLine(std::size_t online, std::uint64_t windowMs)
     _deaths.clear();
     _total = 0;
     return line;
+}
+
+bool LogThrottle::Due(std::uint64_t bot, std::uint32_t quest, std::string const& reason, std::uint64_t nowMs, std::uint64_t periodMs)
+{
+    if (periodMs == 0)
+    {
+        ++_written;
+        return true;
+    }
+    if (_last.size() >= kPruneAt)
+        std::erase_if(_last, [&](auto const& entry) { return nowMs - entry.second >= periodMs; });
+    auto const key = std::make_tuple(bot, quest, reason);
+    auto const found = _last.find(key);
+    if (found != _last.end() && nowMs - found->second < periodMs)
+    {
+        ++_held;
+        return false;
+    }
+    _last[key] = nowMs;
+    ++_written;
+    return true;
+}
+
+std::string LogThrottle::TakeFields()
+{
+    std::string const fields = " level_safe_lines=" + std::to_string(_written) + " level_safe_held=" + std::to_string(_held);
+    _written = 0;
+    _held = 0;
+    return fields;
 }
 
 } // namespace level_safe

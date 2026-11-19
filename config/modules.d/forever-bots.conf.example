@@ -139,6 +139,10 @@ Module.forever-bots.TelemetrySummarySec = 60
 # LevelSafeEscapeMarginLevels = 10   (1 to 40; never below LevelSafeMarginLevels)
 # LevelSafeRadiusYards = 250   (50 to 1000)
 # LevelSafeEscapeCooldownSec = 600   (60 to 86400)
+# LevelSafeLogThrottleSec: logging only. A level-safe line (quest_walk_blocked reason=level_unsafe, level_unsafe_escape result=no_spot, level_safe_yard
+# result=none_known) repeats for the same bot, quest and reason at most once per this many seconds; the block itself stays (0 = every line). The deaths_top
+# line counts them: level_safe_lines= (written) level_safe_held= (held back).
+# LevelSafeLogThrottleSec = 60   (0 to 3600)
 
 # Death loop breaker (off by default; the sim first). A solo bot that died 3 times to the same creature entry within 150 yards and 30 minutes (the Raven Hill
 # loop: a level 8 bot revived at the graveyard beside a level 24 Skeletal Horror, killed again within 5 s) gives up its corpse (no corpse run, no reclaim) and is
@@ -149,9 +153,13 @@ Module.forever-bots.TelemetrySummarySec = 60
 # stage=detect|yard_unsafe|yard|own_yard|wait|wait_over|yard_held|escape|revived_away|in_combat|no_spot. Needs Bot.Actions.Teleport = 1 in the core.
 # DeathLoopBreaker = 0
 
-# Below-map recovery (off by default; the sim first). A living bot whose nearest known place within 60 yards lies more than BelowMapDropYards above it for
-# 20 s, or that got BelowMapStormCount no-route answers for walks under 100 yards within 5 minutes (0 = that sign off), is teleported to the nearest known
-# place, at most once per BelowMapCooldownSec. Log: below_map_recover reason=z_below|no_route_storm. Needs Bot.Actions.Teleport = 1 in the core.
+# Below-map recovery (off by default; the sim first). A living bot below every known place within 60 yards by more than BelowMapDropYards (the lowest of
+# them is the ground) for 20 s and five looks in a row (one every 2 s), or that got BelowMapStormCount no-route answers for walks under 100 yards within
+# 5 minutes (0 = that sign off), is teleported to that place (storm: the nearest known place of its side), at most once per BelowMapCooldownSec. Not acted
+# on (below_map_skip reason=on_transport|swimming|on_path|near_ground, once per bot per 10 minutes, counted in the deaths_top line): a bot on a transport or
+# swimming, one whose walk the core applied in the last 60 s with no drop of 20 yards since (and not falling), and a storm beside a known place at the
+# bot's own height. Log: below_map_recover reason=z_below|no_route_storm. Needs Bot.Actions.Teleport = 1 in the core. The sim may try BelowMapDropYards 100
+# (doc/level-safe.md); the default stays 60.
 # BelowMapRecover = 0
 # BelowMapDropYards = 60   (20 to 1000)
 # BelowMapStormCount = 8   (0 to 100)
@@ -478,7 +486,11 @@ Module.forever-bots.TelemetrySummarySec = 60
 #                               "auctioneer not found on the player's map". Switch on together with Auction; test on the sim first)
 # AuctionWalk3D = 0             (off by default, the sim first; 1 = the reach to the auctioneer is measured in 3D, 4.5 yards, not 5 yards in 2D: the listing
 #                               visit waits for it and the auction errand walks the bot to the auctioneer until it is in it. doc/level-safe.md)
-# AuctionLogReach = 1           (logging only: event auction_reach check=failed_3d when the 2D check passes and the 3D one does not, and the refusal lines
+#                               z-aware stand point (2026-11-19): the walk goes to the live auctioneer's own x, y, z; a stored z more than 60 yards from
+#                               the nearest vendor, banker or graveyard within 200 yards of it is bad data (no errand, errand_failed reason=auctioneer_bad_z,
+#                               no listing); a bot in 2D reach but not in 3D for 60 s ends the errand (reason=auction_reach_3d)
+# AuctionLogReach = 1           (logging only: event auction_reach check=ok_3d|failed_3d|skip_bad_z|ignore_z for a bot in 2D reach of the auctioneer,
+#                               once per bot every 10 minutes, with ref_z= and in_reach=; the errand walk logs the same with where=errand; the refusal lines
 #                               end with dist2d= dist3d= bot_z= auctioneer_z=)
 # Auction = 0
 # AuctionSellPctGreen = 300     (green items: listed at this percent of the vendor price, 100..2000)

@@ -90,6 +90,7 @@
 #include "off_map.h"
 #include "level_safe.h"
 #include "below_map.h"
+#include "auction_policy.h"
 
 #include <array>
 #include <cstdint>
@@ -637,6 +638,7 @@ public:
     // Turns skipped for calm walkers (WalkDecideEvery) since the policy was made; the pump reports it once a minute.
     std::uint64_t CalmSkippedTurns() const { return _calmSkips; }
     // The `deaths_top` line (DeathsTopEveryMs, level_safe::DeathTally) when it is due, without the "forever-bots: " prefix; nothing otherwise or when off.
+    // It ends with the counts of the period (2026-11-19): " level_safe_lines=W level_safe_held=H below_map_recover=R below_map_skip=reason:n,...|none".
     // The first call only starts the clock. The counts start again after each line.
     std::optional<std::string> TakeDeathsTopLine(std::uint64_t nowMs);
     // The graveyards seen so far (level_safe::Graveyards), for the tests.
@@ -1214,6 +1216,11 @@ private:
         std::optional<ErrandOrder> Errand;               // the town errand this bot is on (none = not on one)
         std::uint64_t ErrandTrainSentMs = 0;             // the next train order of the errand (0 = send now)
         std::uint64_t ErrandArrivedMs = 0;               // an auction errand: when the bot came in reach of the auctioneer (0 = not yet)
+        // AuctionWalk3D (2026-11-19): when the bot first stood in 2D reach of the auctioneer without the 3D reach on this errand (0 = not), and the last
+        // auction_reach line of the errand walk (once per bot per 10 minutes).
+        std::uint64_t ErrandNear2dMs = 0;
+        std::uint64_t AuctionReachLoggedMs = 0;
+        bool AuctionReachLogged = false;
         std::uint32_t ErrandRefusals = 0;                // train refusals in a row
         ErrandOutcome ErrandResult = ErrandOutcome::kNone; // the errand's end, until the module takes it
         std::optional<BuyRequest> ErrandBuy;             // a mount purchase waiting for the Run() thread
@@ -1375,6 +1382,9 @@ private:
     bool YardUnsafe(std::uint32_t map, float x, float y, std::uint32_t level, std::uint64_t nowMs) const;
     void MarkYardUnsafe(std::uint32_t map, float x, float y, std::uint32_t level, std::uint64_t nowMs);
     TurnFlow TurnBelowMap(DecideTick& tick, BotTurn& turn);  // below-map recovery (below_map.h, bot_policy_turn_life.cpp)
+    // AuctionWalk3D: the errand walk's `auction_reach: bot= check=<check> where=errand ...` line, at most once per bot per kAuctionReachLogMs.
+    void AuctionReachLine(BotState& state, forever_module::BotSnapshot const& bot, char const* check, Point const& dest, auction::StandJudgement const& judged,
+                          std::uint64_t nowMs);
     void LogEvent(std::string const& text) const;
     void TurnRevivedAndRoles(DecideTick& tick, BotTurn& turn);
     void TurnTransport(DecideTick& tick, BotTurn& turn); // TransportRide (bot_policy_turn_life.cpp)
@@ -1606,6 +1616,10 @@ private:
     level_safe::DeathTally _deathTally;
     std::uint64_t _deathsTopAtMs = 0;
     std::size_t _botsInView = 0;
+    // Arm C fixes (2026-11-19): the level-safe line throttle (LevelSafeLogThrottleSec) and the below-map counts, both in the hourly deaths_top line.
+    level_safe::LogThrottle _levelSafeLog;
+    std::map<std::string, std::uint64_t> _belowMapSkips;   // below_map_skip reason -> lines (once per bot per 10 min)
+    std::uint64_t _belowMapRecovers = 0;
     // The planner for this bot: its side (SideOf) and its band (level 60 or more is band 1).
     QuestPlanner const& QuestsFor(forever_module::BotSnapshot const& bot) const;
     GrindBlocklist _grindBlocks;                     // grind spots no bot can reach, shared by all bots

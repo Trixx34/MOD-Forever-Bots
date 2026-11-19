@@ -509,3 +509,7 @@ add_test(NAME death_fixes COMMAND death_fixes_test)
 add_executable(level_safe_test tests/level_safe_test.cpp)
 target_link_libraries(level_safe_test PRIVATE forever_bots_policy forever_bots_settings)
 add_test(NAME level_safe COMMAND level_safe_test)
+
+add_executable(arm_c_fixes_test tests/arm_c_fixes_test.cpp)
+target_link_libraries(arm_c_fixes_test PRIVATE forever_bots_policy forever_bots_settings)
+add_test(NAME arm_c_fixes COMMAND arm_c_fixes_test)

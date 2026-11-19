@@ -1700,15 +1700,61 @@ void BotPolicy::TurnIdle(DecideTick& tick, BotTurn& turn)
 
     // A town errand (errand_trainers.h): walk to the trainer, then train once in reach. Only for a bot free to walk, as the vendor visit is. The
     // walk is a kMoveTo, so the taxi rules below apply to it as to any walk.
-    if (state.Errand && !hasTarget && !enemyNear && wanted.Type == ActionType::kStop && questStep.Kind == QuestStepKind::None && !routeBusy)
+    bool const errandTurn = state.Errand && !hasTarget && !enemyNear && wanted.Type == ActionType::kStop && questStep.Kind == QuestStepKind::None && !routeBusy;
+    // AuctionWalk3D, the z-aware stand point (2026-11-19, auction::JudgeStandZ): the walk goes to the auctioneer's own (x, y, z), the snapshot's live one when
+    // it is the one the errand names; its z is judged against the vendors, banker and graveyard near it first. Bad data (more than 60 yards off): the
+    // errand fails (errand_failed reason=auctioneer_bad_z), no walk to a place the bot cannot reach.
+    auction::StandZ standZ = auction::StandZ::kUse3D;
+    auction::StandJudgement standJudged;
+    if (errandTurn && state.Errand->Auction && _options.AuctionWalk3D && bot.map_id == state.Errand->Map)
+    {
+        Point& dest = state.Errand->Dest;
+        if (bot.auctioneer_valid != 0 && std::hypot(bot.auctioneer_x - dest.X, bot.auctioneer_y - dest.Y) <= kAuctionStandLiveYards)
+            dest = Point{ bot.auctioneer_x, bot.auctioneer_y, bot.auctioneer_z };
+        std::vector<auction::RefPoint> refs = auction::SnapshotRefs(bot);
+        if (level_safe::Graveyards::Yard const* yard = _graveyards.Nearest(bot.map_id, dest.X, dest.Y))
+            refs.push_back({ yard->X, yard->Y, yard->Z });
+        standJudged = auction::JudgeStandZ(dest.X, dest.Y, dest.Z, std::nullopt, refs);
+        standZ = standJudged.Verdict;
+        if (standZ == auction::StandZ::kSkip)
+        {
+            AuctionReachLine(state, bot, "skip_bad_z", dest, standJudged, nowMs);
+            state.ErrandResult = ErrandOutcome::kFailed;
+            state.Errand.reset();
+            state.ErrandNear2dMs = 0;
+            if (_options.OnEvent)
+                _options.OnEvent("errand_failed: bot=" + std::to_string(bot.guid) + " reason=auctioneer_bad_z");
+        }
+    }
+    if (errandTurn && state.Errand)
     {
         ErrandOrder const& order = *state.Errand;
         float const dist = bot.map_id == order.Map ? std::hypot(bot.pos_x - order.Dest.X, bot.pos_y - order.Dest.Y) : 1e9f;
-        // AuctionWalk3D: at the house only within the 3D reach of the auctioneer (the core's own measure); until then the bot walks to it.
+        // AuctionWalk3D: at the house only within the 3D reach of the auctioneer (the core's own measure); until then the bot walks to it. A z judged not
+        // trustworthy (kIgnoreZ) falls back to the 2D reach.
         bool const walk3d = order.Auction && _options.AuctionWalk3D;
-        bool const auctionArrived = order.Auction && (walk3d ? bot.map_id == order.Map && auction::InReach3D(true, bot.pos_x, bot.pos_y, bot.pos_z, order.Dest.X, order.Dest.Y, order.Dest.Z)
+        bool const auctionArrived = order.Auction && (walk3d ? bot.map_id == order.Map && auction::InReachJudged(standZ, true, bot.pos_x, bot.pos_y, bot.pos_z, order.Dest.X,
+                                                                                                                 order.Dest.Y, order.Dest.Z)
                                                              : dist <= kTrainReachYards);
-        if (auctionArrived)
+        if (walk3d && auctionArrived && state.ErrandArrivedMs == 0)
+            AuctionReachLine(state, bot, standZ == auction::StandZ::kIgnoreZ ? "ignore_z" : "ok_3d", order.Dest, standJudged, nowMs);
+        // In 2D reach but not in 3D (another floor, under the house) for kAuctionNear2dMaxMs: the walk does not get there; the errand fails, with a line.
+        bool const near2dOnly = walk3d && !auctionArrived && dist <= auction::kReachYards;
+        if (!near2dOnly)
+            state.ErrandNear2dMs = 0;
+        else if (state.ErrandNear2dMs == 0)
+            state.ErrandNear2dMs = std::max<std::uint64_t>(nowMs, 1);
+        if (near2dOnly && nowMs - state.ErrandNear2dMs >= kAuctionNear2dMaxMs)
+        {
+            AuctionReachLine(state, bot, "failed_3d", order.Dest, standJudged, nowMs);
+            state.ErrandResult = ErrandOutcome::kFailed;
+            state.Errand.reset();
+            state.ErrandNear2dMs = 0;
+            if (_options.OnEvent)
+                _options.OnEvent("errand_failed: bot=" + std::to_string(bot.guid) + " reason=auction_reach_3d");
+            wanted = Decision{};
+        }
+        else if (auctionArrived)
         {
             // At the Auction House: the bot stands in reach for kAuctionDwellMs, so the listing visit (main_feeds.cpp, its own 10 s timer) finds it
             // there, then the errand is done.

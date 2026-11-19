@@ -6,6 +6,7 @@
 namespace
 {
 constexpr std::uint64_t kLevelEscapeCheckMs = 5000; // LevelSafeEscape: a bot in a fitting place is looked at again after this
+constexpr std::uint32_t kMoveFlagFalling = 1u << 2;  // BotSnapshot::movement_flags bit 2 (layout 24; bits 0 and 3 are in transport_ride.h)
 }
 
 // LevelSafeEscape (level_safe.h): a solo bot, alive and out of combat, standing in a place far above its level (the lowest creature level of the grind spots
@@ -68,7 +69,8 @@ void BotPolicy::LevelUnsafeEscape(DecideTick& tick, BotTurn& turn)
                  std::to_string(int(spot.Y)) + " spot_levels=" + std::to_string(spot.MinLevel) + "-" + std::to_string(spot.MaxLevel));
         return;
     }
-    LogEvent("level_unsafe_escape: bot=" + std::to_string(bot.guid) + where + " result=no_spot");
+    if (_levelSafeLog.Due(bot.guid, 0, "no_spot", nowMs, _options.LevelSafe.LogThrottleMs))
+        LogEvent("level_unsafe_escape: bot=" + std::to_string(bot.guid) + where + " result=no_spot");
 }
 
 // LevelSafeWalks (level_safe.h): a quest walk (to a giver, an ender or a hunting area) whose end, or a point of its straight line past the first
@@ -103,7 +105,9 @@ void BotPolicy::LevelSafeQuestWalk(DecideTick& tick, BotTurn& turn)
     if (!hit)
         return;
     QuestsFor(bot).NoteLevelUnsafe(state.Quest, step.Quest, step.Kind, tick.nowMs);
-    LogEvent("quest_walk_blocked: bot=" + std::to_string(bot.guid) + " map=" + std::to_string(bot.map_id) + " quest=" + std::to_string(step.Quest) +
+    // LevelSafeLogThrottleSec: the block stays every time, the line at most once per period for this bot, quest and reason (held back lines are counted).
+    if (_levelSafeLog.Due(bot.guid, step.Quest, "level_unsafe", tick.nowMs, o.LogThrottleMs))
+        LogEvent("quest_walk_blocked: bot=" + std::to_string(bot.guid) + " map=" + std::to_string(bot.map_id) + " quest=" + std::to_string(step.Quest) +
              " reason=level_unsafe kind=" + (step.Kind == QuestStepKind::Hunt ? "hunt" : step.StartGiver ? "giver" : "hand_in") + " level=" +
              std::to_string(bot.level) + " margin=" + std::to_string(margin) + " place_min=" + std::to_string(hit->PlaceMin) + " at=" + std::to_string(int(hit->X)) + "," + std::to_string(int(hit->Y)) +
              " dest=" + std::to_string(int(dest.X)) + "," + std::to_string(int(dest.Y)) + " dist=" +
@@ -152,7 +156,9 @@ void BotPolicy::LevelSafeGhost(DecideTick& tick, BotTurn& turn)
                                                                    { return _options.DeathLoopBreaker && YardUnsafe(candidate.Map, candidate.X, candidate.Y, level, nowMs); });
     if (!yard)
     {
-        LogEvent(line + " result=none_known known=" + std::to_string(_graveyards.Size()));
+        // Once per death already; a bot dying again and again where no fitting graveyard is known repeats it, so it is throttled as the other lines.
+        if (_levelSafeLog.Due(bot.guid, 0, "yard_none_known", tick.nowMs, _options.LevelSafe.LogThrottleMs))
+            LogEvent(line + " result=none_known known=" + std::to_string(_graveyards.Size()));
         return;
     }
     state.LevelSafeYardSet = true;
@@ -172,20 +178,43 @@ BotPolicy::TurnFlow BotPolicy::TurnBelowMap(DecideTick& tick, BotTurn& turn)
     BotSnapshot const& bot = turn.bot;
     BotState& state = turn.state;
     std::uint64_t const nowMs = tick.nowMs;
+    // Looked at every CheckEveryMs, not every tick (the near places are a scan of the map's list); the drop must hold for BelowChecks looks in a row.
+    if (nowMs < state.BelowMap.NextCheckMs)
+        return TurnFlow::kNext;
+    state.BelowMap.NextCheckMs = nowMs + _options.BelowMap.CheckEveryMs;
     below_map::Facts facts;
     facts.Alive = bot.life_state == 0;
     facts.InCombat = bot.in_combat != 0;
-    facts.Travelling = bot.in_flight != 0 || bot.transport_guid != 0 || (bot.movement_flags & 8u) != 0;
+    facts.Travelling = bot.in_flight != 0;
+    facts.OnTransport = bot.transport_guid != 0 || (bot.movement_flags & transport_ride::kFlagOnTransport) != 0;
+    facts.Swimming = (bot.movement_flags & transport_ride::kFlagSwimming) != 0;
+    facts.Falling = (bot.movement_flags & kMoveFlagFalling) != 0;
     facts.Held = turn.stagingHold || IsRouteActive(bot.guid) || state.TankLead || tick.tankLed.count(bot.guid) != 0 || (_tamingFn && _tamingFn(bot.guid));
     facts.Z = bot.pos_z;
-    off_map::Place const* ground = _knownWorld.Home(bot.map_id, bot.pos_x, bot.pos_y, 0);
-    if (ground && std::hypot(ground->X - bot.pos_x, ground->Y - bot.pos_y) <= _options.BelowMap.NearYards)
+    // The ground: the lowest known place within NearYards (any side), not the nearest one; a giver on a tower beside a lower place is not the ground.
+    off_map::KnownWorld::Around const around = _knownWorld.Near(bot.map_id, bot.pos_x, bot.pos_y, bot.pos_z, _options.BelowMap.NearYards);
+    off_map::Place const* ground = around.Lowest;
+    if (ground)
     {
         facts.HasGround = true;
         facts.GroundZ = ground->Z;
+        facts.NearestDz = around.NearestDz;
     }
     below_map::Verdict const verdict = below_map::Check(_options.BelowMap, state.BelowMap, facts, nowMs);
-    if (verdict != below_map::Verdict::kSendBelow && verdict != below_map::Verdict::kSendStorm)
+    std::string const where = " map=" + std::to_string(bot.map_id) + " pos=" + std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) + "," +
+                              std::to_string(int(bot.pos_z)) + " ground_z=" + (facts.HasGround ? std::to_string(int(facts.GroundZ)) : std::string("none"));
+    if (below_map::IsSkip(verdict))
+    {
+        // below_map_skip: at most once per bot every SkipLogMs (10 min), and counted then (the hourly line), so the count compares with below_map_recover.
+        if (below_map::SkipLogDue(_options.BelowMap, state.BelowMap, nowMs))
+        {
+            ++_belowMapSkips[below_map::VerdictName(verdict)];
+            LogEvent("below_map_skip: bot=" + std::to_string(bot.guid) + " reason=" + below_map::VerdictName(verdict) + " sign=" +
+                     (state.BelowMap.LastSkipBelow ? "z_below" : "no_route_storm") + where + " movement_flags=" + std::to_string(bot.movement_flags));
+        }
+        return TurnFlow::kNext;
+    }
+    if (!below_map::IsSend(verdict))
         return TurnFlow::kNext;
     // z_below: back up to that place. A storm: the nearest place of its side.
     std::uint8_t const side = _options.PartySideOf ? _options.PartySideOf(bot.guid) : (_options.SideOf ? _options.SideOf(bot.guid) : 0);
@@ -203,9 +232,22 @@ BotPolicy::TurnFlow BotPolicy::TurnBelowMap(DecideTick& tick, BotTurn& turn)
     state.Last.reset();
     state.GotoActive = false;
     state.LevelHoldUntilMs = nowMs + kOffMapHoldMs;
-    LogEvent("below_map_recover: bot=" + std::to_string(bot.guid) + " reason=" + below_map::VerdictName(verdict) + " map=" + std::to_string(bot.map_id) + " pos=" +
-             std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) + "," + std::to_string(int(bot.pos_z)) + " ground_z=" +
-             (facts.HasGround ? std::to_string(int(facts.GroundZ)) : std::string("none")) + " to=" + std::to_string(int(to->X)) + "," + std::to_string(int(to->Y)) + "," +
-             std::to_string(int(to->Z)));
+    ++_belowMapRecovers;
+    LogEvent("below_map_recover: bot=" + std::to_string(bot.guid) + " reason=" + below_map::VerdictName(verdict) + where + " to=" + std::to_string(int(to->X)) + "," +
+             std::to_string(int(to->Y)) + "," + std::to_string(int(to->Z)) + " movement_flags=" + std::to_string(bot.movement_flags));
     return TurnFlow::kSkip;
+}
+
+// AuctionWalk3D, the z-aware stand point (auction::JudgeStandZ): the errand walk's result, at most once per bot per kAuctionReachLogMs, in the same form as the
+// listing feed's auction_reach line (main_pump.cpp) with where=errand.
+void BotPolicy::AuctionReachLine(BotState& state, BotSnapshot const& bot, char const* check, Point const& dest, auction::StandJudgement const& judged,
+                                 std::uint64_t nowMs)
+{
+    if (state.AuctionReachLogged && nowMs - state.AuctionReachLoggedMs < kAuctionReachLogMs)
+        return;
+    state.AuctionReachLogged = true;
+    state.AuctionReachLoggedMs = nowMs;
+    LogEvent("auction_reach: bot=" + std::to_string(bot.guid) + " check=" + check + " where=errand walk3d=1" +
+             auction::ReachFields(bot.pos_x, bot.pos_y, bot.pos_z, dest.X, dest.Y, dest.Z) + " ref_z=" +
+             (judged.RefKnown ? std::to_string(int(judged.RefZ)) : std::string("none")));
 }

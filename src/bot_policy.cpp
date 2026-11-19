@@ -216,7 +216,20 @@ std::optional<std::string> BotPolicy::TakeDeathsTopLine(std::uint64_t nowMs)
         return std::nullopt;
     std::uint64_t const window = nowMs - _deathsTopAtMs;
     _deathsTopAtMs = nowMs;
-    return _deathTally.TakeLine(_botsInView, window);
+    // The counts of the period after the deaths: the level-safe lines written and held back (LevelSafeLogThrottleSec), the below-map recoveries and skips.
+    std::string line = _deathTally.TakeLine(_botsInView, window) + _levelSafeLog.TakeFields() + " below_map_recover=" + std::to_string(_belowMapRecovers) +
+                       " below_map_skip=";
+    if (_belowMapSkips.empty())
+        line += "none";
+    bool first = true;
+    for (auto const& [reason, count] : _belowMapSkips)
+    {
+        line += (first ? "" : ",") + reason + ":" + std::to_string(count);
+        first = false;
+    }
+    _belowMapRecovers = 0;
+    _belowMapSkips.clear();
+    return line;
 }
 
 QuestPlanner const& BotPolicy::QuestsFor(BotSnapshot const& bot) const
@@ -315,6 +328,7 @@ void BotPolicy::StartErrand(std::uint64_t botGuid, ErrandOrder const& order)
     state.Errand = order;
     state.ErrandTrainSentMs = 0;
     state.ErrandArrivedMs = 0;
+    state.ErrandNear2dMs = 0;
     state.ErrandRefusals = 0;
     state.ErrandResult = ErrandOutcome::kNone;
     state.ErrandBuy.reset();

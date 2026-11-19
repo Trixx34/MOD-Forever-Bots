@@ -128,6 +128,55 @@ bool InReach3D(bool auctioneerValid, float botX, float botY, float botZ, float a
 // AuctionLogReach: " dist2d=D dist3d=E bot_z=Z auctioneer_z=A" (one decimal), for the refusal lines.
 std::string ReachFields(float botX, float botY, float botZ, float auctioneerX, float auctioneerY, float auctioneerZ);
 
+// AuctionWalk3D, the z-aware stand point (arm C, 2026-11-19): 194 auction_reach lines, all check=failed_3d, failed on height, not distance: 2D 3.7 yards
+// but 3D 14.2 (bot_z -43.1, auctioneer_z -56.8: another floor of the house), and 2D 1.9 with bot_z 7.4 against auctioneer_z 505.2. Before the auctioneer's
+// stored height is trusted as the walk target and the 3D reach, it is judged:
+//   - kSkip: the stored z lies more than kStandRefMaxDz from the ground of the nearest reference near the auctioneer (a vendor, food or goods vendor or
+//     banker of the snapshot, a graveyard seen; within kStandRefNearYards in 2D): bad data, the auctioneer is not used (no errand, no listing);
+//   - kIgnoreZ: a ground height at the auctioneer's (x, y) is known and the stored z lies kStandGroundMaxDz or more from it: the z is not trusted and the
+//     2D reach counts, as without AuctionWalk3D;
+//   - kUse3D: otherwise: the walk goes to the auctioneer's own (x, y, z) and the bot is in reach within kReach3dYards in 3D.
+// The module has no ground height query of its own (the core's kProbePoint has no sender in the module yet, and a probe action would take the place of the
+// walk's result in the snapshot): the callers pass no ground height, so kIgnoreZ is not reached today and the z is checked only against the references.
+// No reference near the auctioneer: nothing to compare with, kUse3D.
+constexpr float kStandGroundMaxDz = 40.0f;
+constexpr float kStandRefMaxDz = 60.0f;
+constexpr float kStandRefNearYards = 200.0f;
+enum class StandZ : std::uint8_t { kUse3D, kIgnoreZ, kSkip };
+struct RefPoint
+{
+    float X = 0.0f;
+    float Y = 0.0f;
+    float Z = 0.0f;
+};
+struct StandJudgement
+{
+    StandZ Verdict = StandZ::kUse3D;
+    bool RefKnown = false;   // a reference lies within kStandRefNearYards of the auctioneer; RefZ is the nearest one's z
+    float RefZ = 0.0f;
+};
+StandJudgement JudgeStandZ(float auctioneerX, float auctioneerY, float auctioneerZ, std::optional<float> groundZ, std::vector<RefPoint> const& refs);
+char const* StandZName(StandZ verdict);   // "use_3d", "ignore_z", "skip_bad_z"
+// The reach with the judgement: kUse3D in 3D (InReach3D), kIgnoreZ in 2D (InReach), kSkip never.
+bool InReachJudged(StandZ verdict, bool auctioneerValid, float botX, float botY, float botZ, float auctioneerX, float auctioneerY, float auctioneerZ);
+// The auction_reach line's check= value for a bot in 2D reach: "skip_bad_z", "ignore_z" (the 2D reach counts), "ok_3d" or "failed_3d".
+char const* ReachCheckName(StandZ verdict, bool inReach3d);
+// The references of a bot snapshot (a template, so this file needs no SDK header): its nearest vendor, food vendor, goods vendor and banker, when valid.
+template <typename Snapshot>
+std::vector<RefPoint> SnapshotRefs(Snapshot const& bot)
+{
+    std::vector<RefPoint> refs;
+    if (bot.vendor_valid != 0)
+        refs.push_back({ bot.vendor_x, bot.vendor_y, bot.vendor_z });
+    if (bot.food_vendor_valid != 0)
+        refs.push_back({ bot.food_vendor_x, bot.food_vendor_y, bot.food_vendor_z });
+    if (bot.goods_vendor_valid != 0)
+        refs.push_back({ bot.goods_vendor_x, bot.goods_vendor_y, bot.goods_vendor_z });
+    if (bot.banker_valid != 0)
+        refs.push_back({ bot.banker_x, bot.banker_y, bot.banker_z });
+    return refs;
+}
+
 // A unit near a bot, as ResolveNearby needs it (no SDK dependency).
 struct NearUnit
 {

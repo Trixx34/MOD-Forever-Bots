@@ -208,6 +208,10 @@ struct BotSettings
     std::uint32_t LevelSafeEscapeMarginLevels = 10;
     std::uint32_t LevelSafeRadiusYards = 250;
     std::uint32_t LevelSafeEscapeCooldownSec = 600;
+    // LevelSafeLogThrottleSec (default 60, 0 = every line, 0..3600; logging only): a level-safe event line (quest_walk_blocked reason=level_unsafe,
+    // level_unsafe_escape result=no_spot, level_safe_yard result=none_known) repeats for the same bot, quest and reason at most once per this; the block itself
+    // stays. The hourly deaths_top line counts the lines written and held back (level_safe_lines=, level_safe_held=).
+    std::uint32_t LevelSafeLogThrottleSec = 60;
     // DeathLoopBreaker (default 0; bot_policy_death_loop.cpp, doc/level-safe.md): a solo bot that died 3 times to the same creature entry within 150 yards and 30 minutes
     // gives up its corpse, is moved as a ghost to another graveyard of its map (one that fits its level, else the nearest one 400 yards off the loop; never one with a live
     // hostile 3 levels above it beside the ghost) and revives there; the loop's graveyard is unsafe for that level for 2 hours (LevelSafeGraveyard skips it). No such

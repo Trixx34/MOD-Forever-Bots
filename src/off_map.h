@@ -43,6 +43,14 @@ public:
     bool Outside(std::uint32_t map, float x, float y, float margin) const;
     // The nearest place of the map that a bot of `side` may use (Side 0 or `side`; side 0 takes any). Null when the map has none.
     Place const* Home(std::uint32_t map, float x, float y, std::uint8_t side) const;
+    // The places of any side within `radius` (2D) of (x, y): the lowest of them (null when none) and the smallest height difference to `z` (below-map
+    // recovery: the lowest near place stands for the ground, so a giver on a tower or a tree platform beside a lower place does not count as the ground).
+    struct Around
+    {
+        Place const* Lowest = nullptr;
+        float NearestDz = 1e9f;
+    };
+    Around Near(std::uint32_t map, float x, float y, float z, float radius) const;
     std::size_t PlacesOn(std::uint32_t map) const;
 
 private:

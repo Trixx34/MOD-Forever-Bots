@@ -388,6 +388,7 @@ void LoadPolicyTables(PolicyOptions& policyOptions, BotSettings& settings)
     policyOptions.LevelSafe.EscapeMarginLevels = settings.LevelSafeEscapeMarginLevels;
     policyOptions.LevelSafe.RadiusYards = float(settings.LevelSafeRadiusYards);
     policyOptions.LevelSafe.EscapeCooldownMs = std::uint64_t(settings.LevelSafeEscapeCooldownSec) * 1000;
+    policyOptions.LevelSafe.LogThrottleMs = std::uint64_t(settings.LevelSafeLogThrottleSec) * 1000;
     policyOptions.DeathLoopBreaker = settings.DeathLoopBreaker;
     policyOptions.BelowMap.Enabled = settings.BelowMapRecover;
     policyOptions.BelowMap.DropYards = float(settings.BelowMapDropYards);
