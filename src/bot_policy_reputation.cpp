@@ -4,27 +4,27 @@
 
 void BotPolicy::TurnReputation(DecideTick& tick, BotTurn& turn)
 {
-    if (!_options.Reputation.Enabled)
+    if (!Opt().Reputation.Enabled)
         return;
     std::uint64_t const nowMs = tick.nowMs;
     BotSnapshot const& bot = turn.bot;
     BotState& state = turn.state;
 
     // The planner: which faction and which quest or creature earns the bot reputation now. It is cheap when nothing is due and bounded by the budget when it plans.
-    if (_options.ReputationPlan.Enabled && _options.ReputationPlanData && bot.level >= _options.Reputation.MinLevel)
+    if (Opt().ReputationPlan.Enabled && Opt().ReputationPlanData && bot.level >= Opt().Reputation.MinLevel)
     {
-        reputation::Facts planFacts = _options.ReputationFacts ? _options.ReputationFacts(bot) : reputation::Facts{};
+        reputation::Facts planFacts = Opt().ReputationFacts ? Opt().ReputationFacts(bot) : reputation::Facts{};
         planFacts.Level = bot.level;
-        if (planFacts.Side == 0 && _options.SideOf)
-            planFacts.Side = _options.SideOf(bot.guid);
-        reputation::Step const step = reputation::Advance(*_options.ReputationPlanData, _options.ReputationPlan, state.RepTrack, planFacts, bot.guid, nowMs);
-        if (step.Valid && step.Changed && _options.OnEvent)
-            _options.OnEvent("rep_plan: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " faction=" + std::to_string(step.Faction) +
+        if (planFacts.Side == 0 && Opt().SideOf)
+            planFacts.Side = Opt().SideOf(bot.guid);
+        reputation::Step const step = reputation::Advance(*Opt().ReputationPlanData, Opt().ReputationPlan, state.RepTrack, planFacts, bot.guid, nowMs);
+        if (step.Valid && step.Changed && Opt().OnEvent)
+            Opt().OnEvent("rep_plan: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " faction=" + std::to_string(step.Faction) +
                              (step.Src->What == reputation::Source::kKill ? " kill=" : " quest=") + std::to_string(step.Src->Id) + " points=" + std::to_string(step.Src->Points));
     }
-    if (!_options.ReputationFacts)
+    if (!Opt().ReputationFacts)
         return;
-    reputation::Settings const& settings = _options.Reputation;
+    reputation::Settings const& settings = Opt().Reputation;
 
     // A buy made earlier is judged once the core has counted again: less money or fewer free slots is a purchase; otherwise the vendor had nothing the bot
     // could use (the rank, the money or the gear score said no) and the next visit waits longer.
@@ -33,8 +33,8 @@ void BotPolicy::TurnReputation(DecideTick& tick, BotTurn& turn)
         state.RepCheckAtMs = 0;
         bool const bought = bot.copper < state.RepCopperBefore || bot.bag_free_slots < state.RepSlotsBefore;
         reputation::NoteResult(settings, state.RepBook, nowMs, bought);
-        if (_options.OnEvent)
-            _options.OnEvent(std::string(bought ? "rep_buy_done" : "rep_buy_failed") + ": bot=" + std::to_string(bot.guid) + " faction=" +
+        if (Opt().OnEvent)
+            Opt().OnEvent(std::string(bought ? "rep_buy_done" : "rep_buy_failed") + ": bot=" + std::to_string(bot.guid) + " faction=" +
                              std::to_string(state.RepGoal) + " copper=" + std::to_string(bot.copper) + " failures=" + std::to_string(state.RepBook.Failures));
     }
 
@@ -47,22 +47,22 @@ void BotPolicy::TurnReputation(DecideTick& tick, BotTurn& turn)
         return;
     }
 
-    reputation::Facts facts = _options.ReputationFacts(bot);
+    reputation::Facts facts = Opt().ReputationFacts(bot);
     facts.Level = bot.level;
     facts.Copper = bot.copper;
     facts.FreeSlots = bot.bag_free_slots;
-    if (facts.Side == 0 && _options.SideOf)
-        facts.Side = _options.SideOf(bot.guid);
+    if (facts.Side == 0 && Opt().SideOf)
+        facts.Side = Opt().SideOf(bot.guid);
 
-    if (auto const goal = reputation::ChooseGoal(_options.ReputationGoals, facts, bot.guid, state.RepGoal))
+    if (auto const goal = reputation::ChooseGoal(Opt().ReputationGoals, facts, bot.guid, state.RepGoal))
     {
-        std::uint32_t const faction = _options.ReputationGoals[*goal].Faction;
+        std::uint32_t const faction = Opt().ReputationGoals[*goal].Faction;
         if (faction != state.RepGoal)
         {
             state.RepGoal = faction;
-            if (_options.OnEvent)
-                _options.OnEvent("rep_goal: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " faction=" + std::to_string(faction) +
-                                 " name=" + _options.ReputationGoals[*goal].Name);
+            if (Opt().OnEvent)
+                Opt().OnEvent("rep_goal: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " faction=" + std::to_string(faction) +
+                                 " name=" + Opt().ReputationGoals[*goal].Name);
         }
     }
     else
@@ -92,8 +92,8 @@ void BotPolicy::TurnReputation(DecideTick& tick, BotTurn& turn)
         // The walk never got there: a visit that bought nothing.
         state.RepTrip = false;
         reputation::NoteResult(settings, state.RepBook, nowMs, false);
-        if (_options.OnEvent)
-            _options.OnEvent("rep_buy_failed: bot=" + std::to_string(bot.guid) + " reason=walk_timeout failures=" + std::to_string(state.RepBook.Failures));
+        if (Opt().OnEvent)
+            Opt().OnEvent("rep_buy_failed: bot=" + std::to_string(bot.guid) + " reason=walk_timeout failures=" + std::to_string(state.RepBook.Failures));
         return;
     }
 
@@ -109,7 +109,7 @@ void BotPolicy::TurnReputation(DecideTick& tick, BotTurn& turn)
     state.RepCopperBefore = bot.copper;
     state.RepSlotsBefore = bot.bag_free_slots;
     turn.idle = false;
-    if (_options.OnEvent)
-        _options.OnEvent("rep_buy: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " faction=" + std::to_string(state.RepGoal) +
+    if (Opt().OnEvent)
+        Opt().OnEvent("rep_buy: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " faction=" + std::to_string(state.RepGoal) +
                          " copper=" + std::to_string(bot.copper));
 }

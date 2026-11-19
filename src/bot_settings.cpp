@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "bot_settings.h"
 
+#include "ab_split.h"
+
 #include "bot_guilds.h"
 #include "bot_pick.h"
 #include "level_dungeon.h"
@@ -618,7 +620,11 @@ std::uint32_t EffectiveMaxBots(std::uint32_t configured, std::uint32_t grantedMa
     return std::min(configured, grantedMaxBots);
 }
 
-BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const& config, std::vector<std::string>& warnings)
+namespace
+{
+
+// The settings of one config (ParseBotSettings adds arm B's).
+BotSettings ParseOneConfig(std::unordered_map<std::string, std::string> const& config, std::vector<std::string>& warnings)
 {
     BotSettings settings;
     ReadKey(config, "MaxBots", 1, kMaxBotsCeiling, settings.MaxBots, warnings);
@@ -1361,5 +1367,37 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
         settings.QuestFileHorde60 = it->second;
     if (auto const it = config.find("AttunementFile"); it != config.end())
         settings.AttunementFile = it->second;
+    ReadBool(config, "ArmSplit", settings.ArmSplit, warnings);
+    if (auto const it = config.find("ArmBOverrides"); it != config.end())
+        settings.ArmBOverrides = it->second;
+    if (auto const it = config.find("TraceBots"); it != config.end())
+        settings.TraceBots = ab_split::ParseGuidList(it->second, warnings);
+    if (auto const it = config.find("TraceDir"); it != config.end())
+        settings.TraceDir = it->second;
+    ReadKey(config, "TraceMaxMB", 1, 1024, settings.TraceMaxMB, warnings);
+    return settings;
+}
+
+} // namespace
+
+BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const& config, std::vector<std::string>& warnings)
+{
+    BotSettings settings = ParseOneConfig(config, warnings);
+    if (!settings.ArmSplit)
+        return settings;
+    if (!settings.Scenarios.empty())
+    {
+        warnings.push_back("Module.forever-bots.ArmSplit: a scenario run drives its own parties; the split is off.");
+        settings.ArmSplit = false;
+        return settings;
+    }
+    // Arm B: the same config with its overrides; its warnings only where they differ from arm A's (the shared keys warn once).
+    std::vector<std::string> armBWarnings;
+    std::unordered_map<std::string, std::string> armConfig = ab_split::ArmBConfig(config, warnings, &settings.ArmBApplied);
+    armConfig["ArmSplit"] = "0";
+    settings.ArmB = std::make_shared<BotSettings>(ParseOneConfig(armConfig, armBWarnings));
+    for (std::string const& warning : armBWarnings)
+        if (std::find(warnings.begin(), warnings.end(), warning) == warnings.end())
+            warnings.push_back("arm B: " + warning);
     return settings;
 }

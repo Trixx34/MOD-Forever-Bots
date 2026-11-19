@@ -50,9 +50,9 @@ void BotPolicy::TurnShopping(DecideTick& tick, BotTurn& turn)
         bool const improved = supply::Improved(state.SupplyAsked, state.SupplyBefore, supplyFacts);
         state.SupplyFailures = improved ? 0 : state.SupplyFailures + 1;
         if (!improved)
-            state.NextSupplyMs = nowMs + supply::BackoffMs(_options.Supplies, state.SupplyFailures);
-        if (_options.OnEvent)
-            _options.OnEvent(std::string(improved ? "supply_trip_done" : "supply_trip_failed") + ": bot=" + std::to_string(bot.guid) +
+            state.NextSupplyMs = nowMs + supply::BackoffMs(Opt().Supplies, state.SupplyFailures);
+        if (Opt().OnEvent)
+            Opt().OnEvent(std::string(improved ? "supply_trip_done" : "supply_trip_failed") + ": bot=" + std::to_string(bot.guid) +
                              " ammo=" + std::to_string(supplyFacts.AmmoCount) + " food=" + std::to_string(supplyFacts.FoodCount) +
                              " drink=" + std::to_string(supplyFacts.DrinkCount) + " hpot=" + std::to_string(supplyFacts.HealthPotions) +
                              " mpot=" + std::to_string(supplyFacts.ManaPotions) + " bandage=" + std::to_string(supplyFacts.Bandages) +
@@ -83,32 +83,32 @@ void BotPolicy::TurnShopping(DecideTick& tick, BotTurn& turn)
         std::uint32_t const after = lowestOf(state.RepairForGuid);
         bool const improved = repair::Improved(state.RepairBeforePct, after);
         state.RepairFailures = improved ? 0 : state.RepairFailures + 1;
-        state.NextRepairMs = nowMs + (improved ? _options.Repair.RetryMs : repair::BackoffMs(_options.Repair, state.RepairFailures));
-        if (_options.OnEvent)
-            _options.OnEvent(std::string(improved ? "repair_done" : "repair_failed") + ": bot=" + std::to_string(bot.guid) + " for=" +
+        state.NextRepairMs = nowMs + (improved ? Opt().Repair.RetryMs : repair::BackoffMs(Opt().Repair, state.RepairFailures));
+        if (Opt().OnEvent)
+            Opt().OnEvent(std::string(improved ? "repair_done" : "repair_failed") + ": bot=" + std::to_string(bot.guid) + " for=" +
                              std::to_string(state.RepairForGuid) + " before=" + std::to_string(state.RepairBeforePct) + " after=" + std::to_string(after) +
                              " copper=" + std::to_string(bot.copper) + " failures=" + std::to_string(state.RepairFailures));
         state.RepairForGuid = 0;
     }
-    if (state.RepairTrip && nowMs - state.RepairTripStartMs > _options.Repair.TripMaxMs)
+    if (state.RepairTrip && nowMs - state.RepairTripStartMs > Opt().Repair.TripMaxMs)
     {
         // Fights, deaths or a long road kept it from the repairman: given up, and the next trip waits.
         state.RepairTrip = false;
         state.Traveling = false;
         state.RepairForGuid = 0;
-        state.NextRepairMs = nowMs + repair::BackoffMs(_options.Repair, ++state.RepairFailures);
-        if (_options.OnEvent)
-            _options.OnEvent("repair_failed: bot=" + std::to_string(bot.guid) + " reason=trip_timeout failures=" + std::to_string(state.RepairFailures));
+        state.NextRepairMs = nowMs + repair::BackoffMs(Opt().Repair, ++state.RepairFailures);
+        if (Opt().OnEvent)
+            Opt().OnEvent("repair_failed: bot=" + std::to_string(bot.guid) + " reason=trip_timeout failures=" + std::to_string(state.RepairFailures));
     }
     repair::Facts const ownRepair = repairFactsOf(bot, state);
-    repair::Why repairWhy = repair::Needed(_options.Repair, ownRepair);
+    repair::Why repairWhy = repair::Needed(Opt().Repair, ownRepair);
     if (repairWhy != repair::Why::AfterDeath && repairWhy != repair::Why::Broken)
         state.RepairAfterDeath = false; // revived with gear good enough: nothing to do for that death
     bool const repairFree = !hasTarget && bot.in_combat == 0 && !lowHealth && !state.InFight && !state.ChatStay && state.ChatFollow == 0 &&
                             !turn.stagingHold && !turn.dungeonHold && !turn.returningToDungeon;
     bool const repairReady = nowMs >= state.NextRepairMs && state.RepairCheckAtMs == 0;
     std::uint64_t repairFor = 0;
-    if (repairWhy == repair::Why::None && turn.partyLeaderBot && _options.Repair.Enabled)
+    if (repairWhy == repair::Why::None && turn.partyLeaderBot && Opt().Repair.Enabled)
     {
         // A member's broken gear: the leader takes the party to the repairman (a member never walks off on its own).
         auto const members = tick.membersOf.find(bot.guid);
@@ -122,7 +122,7 @@ void BotPolicy::TurnShopping(DecideTick& tick, BotTurn& turn)
                 BotSnapshot const& other = tick.view.bots[at->second];
                 if (other.life_state != 0 || nowMs < memberState->second.NextRepairMs || memberState->second.RepairCheckAtMs != 0)
                     continue;
-                repair::Why const why = repair::Needed(_options.Repair, repairFactsOf(other, memberState->second));
+                repair::Why const why = repair::Needed(Opt().Repair, repairFactsOf(other, memberState->second));
                 if (why != repair::Why::None && bot.repair_valid != 0)
                 {
                     repairWhy = why;
@@ -138,8 +138,8 @@ void BotPolicy::TurnShopping(DecideTick& tick, BotTurn& turn)
         state.RepairForGuid = repairFor;
         if (auto const member = _bots.find(repairFor); repairFor != 0 && member != _bots.end())
             state.RepairMemberVisitsAtStart = member->second.RepairVisits;
-        if (_options.OnEvent)
-            _options.OnEvent("repair_trip: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " why=" + repair::WhyName(repairWhy) +
+        if (Opt().OnEvent)
+            Opt().OnEvent("repair_trip: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " why=" + repair::WhyName(repairWhy) +
                              " for=" + std::to_string(repairFor) + " lowest=" + std::to_string(lowestOf(repairFor)) + " copper=" + std::to_string(bot.copper) +
                              " dist=" + std::to_string(int(DistanceTo(bot, Point{ bot.repair_x, bot.repair_y, bot.repair_z }))));
     }
@@ -150,17 +150,17 @@ void BotPolicy::TurnShopping(DecideTick& tick, BotTurn& turn)
 
     // A party member follows its leader, and a bot held by a chat order stays where it was told: neither goes shopping.
     supply::Needs const supplyNeeds = (partyMember || state.ChatStay || state.ChatFollow != 0) ? supply::Needs{}
-                                                                                                : supply::Assess(_options.Supplies, supplyFacts);
+                                                                                                : supply::Assess(Opt().Supplies, supplyFacts);
     supply::Stop const supplyStop = supply::NextStop(supplyNeeds);
     bool const supplyDue = supplyStop != supply::Stop::None && nowMs >= state.NextSupplyMs && state.SupplyCheckAtMs == 0;
     // Path variety: the first vendor trip after login is moved by a per-bot offset, later trips by a per-bot interval (the nearest vendor is where they all meet).
-    if (_options.PathVariety.Enabled && !state.PathServiceSet)
+    if (Opt().PathVariety.Enabled && !state.PathServiceSet)
     {
         state.PathServiceSet = true;
         if (state.NextServiceMs == 0)
-            state.NextServiceMs = nowMs + path_variety::StartOffsetMs(_options.PathVariety, _options.RandomSeed, bot.guid, 1);
+            state.NextServiceMs = nowMs + path_variety::StartOffsetMs(Opt().PathVariety, Opt().RandomSeed, bot.guid, 1);
     }
-    bool const serviceDue = _options.ServiceEveryMs != 0 && nowMs >= state.NextServiceMs;
+    bool const serviceDue = Opt().ServiceEveryMs != 0 && nowMs >= state.NextServiceMs;
     bool const shopping = ((idle || urgentService) && !state.ChatStay && (serviceDue || supplyDue)) || repairShopping;
     if (!shopping && state.Traveling)
         state.Traveling = false; // a walk to a vendor cut short (a fight, an order) starts its timer again next time
@@ -222,18 +222,18 @@ void BotPolicy::TurnShopping(DecideTick& tick, BotTurn& turn)
                     state.RepairTrip = false;
                     state.SupplyTrip = false;
                     state.RepairForGuid = 0;
-                    state.NextRepairMs = nowMs + repair::BackoffMs(_options.Repair, ++state.RepairFailures);
-                    if (_options.OnEvent)
-                        _options.OnEvent("repair_failed: bot=" + std::to_string(bot.guid) + " reason=walk_timeout failures=" + std::to_string(state.RepairFailures));
+                    state.NextRepairMs = nowMs + repair::BackoffMs(Opt().Repair, ++state.RepairFailures);
+                    if (Opt().OnEvent)
+                        Opt().OnEvent("repair_failed: bot=" + std::to_string(bot.guid) + " reason=walk_timeout failures=" + std::to_string(state.RepairFailures));
                 }
                 else if (state.SupplyTrip)
                 {
                     // The walk never got there: a trip that bought nothing.
                     state.SupplyTrip = false;
-                    state.NextSupplyMs = nowMs + supply::BackoffMs(_options.Supplies, ++state.SupplyFailures);
+                    state.NextSupplyMs = nowMs + supply::BackoffMs(Opt().Supplies, ++state.SupplyFailures);
                 }
                 else
-                    state.NextServiceMs = nowMs + path_variety::TripIntervalMs(_options.PathVariety, _options.RandomSeed, bot.guid, _options.ServiceEveryMs);
+                    state.NextServiceMs = nowMs + path_variety::TripIntervalMs(Opt().PathVariety, Opt().RandomSeed, bot.guid, Opt().ServiceEveryMs);
             }
         }
         else if (leaderWaits)
@@ -265,7 +265,7 @@ void BotPolicy::TurnShopping(DecideTick& tick, BotTurn& turn)
             if (bot.bag_free_slots <= kBagsLowSlots)
                 vendor.spell_id |= kServiceSellJunk;
             // Protocol 27 (config VendorSellGear): also the bag gear the worn gear outclasses, judged with the stat list of the bot's spec.
-            if (_options.VendorSellGear)
+            if (Opt().VendorSellGear)
                 vendor.spell_id |= kServiceSellGear | (rotation::GearProfileFor(turn.classId, turn.spec) << kServiceGearProfileShift);
             // Layout 13: the NPC's guid, not just its position. An older core leaves it 0 and the core resolves the
             // nearest vendor of the map instead.
@@ -274,29 +274,29 @@ void BotPolicy::TurnShopping(DecideTick& tick, BotTurn& turn)
             {
                 // An urgent repair visit: the core sells the grey items (and, short of money, the white junk) before it repairs, from what the sale
                 // brought in. The visit is judged a few seconds later (the lowest piece better than before), the bot's own gear or the member's.
-                if (repair::SellJunkFirst(_options.Repair, ownRepair))
+                if (repair::SellJunkFirst(Opt().Repair, ownRepair))
                     vendor.spell_id |= kServiceSellJunk;
                 std::uint64_t const judged = memberRepair ? 0 : state.RepairForGuid;
-                if (memberRepair || repair::Needed(_options.Repair, ownRepair) != repair::Why::None || judged != 0)
+                if (memberRepair || repair::Needed(Opt().Repair, ownRepair) != repair::Why::None || judged != 0)
                 {
                     state.RepairCheckAtMs = nowMs + kRepairJudgeAfterMs;
                     state.RepairBeforePct = lowestOf(judged);
                     state.RepairForGuid = judged;
                 }
                 else
-                    state.NextRepairMs = nowMs + _options.Repair.RetryMs;
+                    state.NextRepairMs = nowMs + Opt().Repair.RetryMs;
                 state.RepairTrip = false;
                 state.RepairAfterDeath = false;
                 ++state.RepairVisits;
-                if (_options.OnEvent)
-                    _options.OnEvent("repair_visit: bot=" + std::to_string(bot.guid) + " for=" + std::to_string(judged) + " lowest=" +
+                if (Opt().OnEvent)
+                    Opt().OnEvent("repair_visit: bot=" + std::to_string(bot.guid) + " for=" + std::to_string(judged) + " lowest=" +
                                      std::to_string(lowestOf(judged)) + " copper=" + std::to_string(bot.copper) +
                                      " sell_junk=" + std::to_string((vendor.spell_id & kServiceSellJunk) != 0 ? 1 : 0));
             }
             if (supplyStopNow)
             {
                 // Layout 15: buy what is short. The core picks the items from this vendor's stock and buys up to the counts given here.
-                supply::Request const request = supply::RequestFor(_options.Supplies, supplyNeeds);
+                supply::Request const request = supply::RequestFor(Opt().Supplies, supplyNeeds);
                 vendor.target_guid = ammoStop ? bot.ammo_vendor_guid : goodsStop ? bot.goods_vendor_guid
                                    : reagentStop ? bot.reagent_vendor_guid : bot.food_vendor_guid;
                 if (request.Ammo != 0)
@@ -316,12 +316,12 @@ void BotPolicy::TurnShopping(DecideTick& tick, BotTurn& turn)
                 vendor.dest_x = float(request.Ammo);
                 vendor.dest_y = float(request.Food);
                 vendor.dest_z = float(request.Drink);
-                state.NextSupplyMs = nowMs + _options.Supplies.TripEveryMs;
+                state.NextSupplyMs = nowMs + Opt().Supplies.TripEveryMs;
                 state.SupplyCheckAtMs = nowMs + kSupplyJudgeAfterMs;
                 state.SupplyAsked = supplyNeeds;
                 state.SupplyBefore = supplyFacts;
-                if (_options.OnEvent)
-                    _options.OnEvent("supply_trip: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " ammo=" +
+                if (Opt().OnEvent)
+                    Opt().OnEvent("supply_trip: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " ammo=" +
                                      std::to_string(supplyFacts.AmmoCount) + " food=" + std::to_string(supplyFacts.FoodCount) + " drink=" +
                                      std::to_string(supplyFacts.DrinkCount) + " hpot=" + std::to_string(supplyFacts.HealthPotions) + " mpot=" +
                                      std::to_string(supplyFacts.ManaPotions) + " bandage=" + std::to_string(supplyFacts.Bandages) +
@@ -329,7 +329,7 @@ void BotPolicy::TurnShopping(DecideTick& tick, BotTurn& turn)
             }
             actions.push_back(vendor);
             if (!supplyStopNow || serviceDue)
-                state.NextServiceMs = nowMs + path_variety::TripIntervalMs(_options.PathVariety, _options.RandomSeed, bot.guid, _options.ServiceEveryMs);
+                state.NextServiceMs = nowMs + path_variety::TripIntervalMs(Opt().PathVariety, Opt().RandomSeed, bot.guid, Opt().ServiceEveryMs);
         }
     }
 }
@@ -383,22 +383,22 @@ void BotPolicy::TurnWander(DecideTick& tick, BotTurn& turn)
         state.ManaRestSinceMs = 0;
     turn.healthy = !manaResting && (bot.max_health == 0 || std::uint64_t(bot.health) * 100 >= std::uint64_t(bot.max_health) * state.RestPct);
     auto const& healthy = turn.healthy;
-    auto const hubs = _options.HubsByMap.find(bot.map_id);
-    turn.grindMode = _options.Grind && !_options.Grind->Spots.empty() && bot.level != 0;
+    auto const hubs = Opt().HubsByMap.find(bot.map_id);
+    turn.grindMode = Opt().Grind && !Opt().Grind->Spots.empty() && bot.level != 0;
     auto const& grindMode = turn.grindMode;
     // Walking to the anvil, forge or fire a recipe needs (SDK 0.18, after kNeedsFocus): nothing in view and healthy, the bot goes there; arrived, it asks the core again; a walk
     // with no route, or too long, is over and the skill waits half an hour.
     // Walking to a gathering node (GatherWalk, after the core answered that nothing is in reach): healthy and idle, the bot goes there; within reach of it, the
     // next kGather asks for the node. A walk with no route, or too long, is over and that line waits a minute and a half.
-    if (state.GatherWalking && _options.GatherNodes && state.GatherWalkIndex < _options.GatherNodes->size() && idle && healthy)
+    if (state.GatherWalking && Opt().GatherNodes && state.GatherWalkIndex < Opt().GatherNodes->size() && idle && healthy)
     {
-        gather::NodePoint const& node = (*_options.GatherNodes)[state.GatherWalkIndex];
+        gather::NodePoint const& node = (*Opt().GatherNodes)[state.GatherWalkIndex];
         bool const arrived = node.Map == bot.map_id && std::hypot(node.X - bot.pos_x, node.Y - bot.pos_y) <= kGatherReachYards;
         bool const blocked = state.WalkBlockedAtMs != 0 && state.WalkBlockedAtMs >= state.GatherWalkStartMs;
         if (arrived || blocked || nowMs - state.GatherWalkStartMs > kGatherWalkTimeoutMs)
         {
             state.GatherWalking = false;
-            state.GatherWalkNextMs = nowMs + _options.GatherWalkGapMs;
+            state.GatherWalkNextMs = nowMs + Opt().GatherWalkGapMs;
             state.GatherRetryAtMs[state.GatherWalkLine] = arrived ? nowMs : nowMs + kGatherNothingMs;
         }
         else
@@ -408,9 +408,9 @@ void BotPolicy::TurnWander(DecideTick& tick, BotTurn& turn)
             idle = false;
         }
     }
-    if (state.CraftWalking && _options.Foci && state.CraftWalkIndex < _options.Foci->size() && idle && healthy)
+    if (state.CraftWalking && Opt().Foci && state.CraftWalkIndex < Opt().Foci->size() && idle && healthy)
     {
-        crafting::FocusPoint const& point = (*_options.Foci)[state.CraftWalkIndex];
+        crafting::FocusPoint const& point = (*Opt().Foci)[state.CraftWalkIndex];
         bool const arrived = crafting::InReach(point, bot.map_id, bot.pos_x, bot.pos_y);
         bool const blocked = state.WalkBlockedAtMs != 0 && state.WalkBlockedAtMs >= state.CraftWalkStartMs;
         if (arrived || blocked || nowMs - state.CraftWalkStartMs > kCraftWalkTimeoutMs)
@@ -425,7 +425,7 @@ void BotPolicy::TurnWander(DecideTick& tick, BotTurn& turn)
             idle = false;
         }
     }
-    else if (idle && healthy && _options.WanderWhenIdle && grindMode && nowMs >= state.GrindRetryAtMs && (!partyMember || turn.leaderAwaySolo) && !stagingHold && !state.ChatStay && state.ChatFollow == 0)
+    else if (idle && healthy && Opt().WanderWhenIdle && grindMode && nowMs >= state.GrindRetryAtMs && (!partyMember || turn.leaderAwaySolo) && !stagingHold && !state.ChatStay && state.ChatFollow == 0)
     {
         // Leveling: after a quiet spell the bot walks to a grind spot that suits its level (nearest first, not the ones it just left), and
         // stays to fight what lives there until it sees nothing for a while again.
@@ -453,17 +453,17 @@ void BotPolicy::TurnWander(DecideTick& tick, BotTurn& turn)
                 // Not always the nearest spot: with randomness on the bot takes one of the nearest few, and stands somewhere around it, not on the
                 // spot's exact point, so the bots of a level do not pile up on one place.
                 std::size_t pick = 0;
-                if (_options.RandomPct > 0 && spots.size() > 1)
-                    pick = bot_random::Below(bot_random::Draw(_options.RandomSeed, bot.guid, bot_random::kSaltGrindPick, state.WanderCycles),
+                if (Opt().RandomPct > 0 && spots.size() > 1)
+                    pick = bot_random::Below(bot_random::Draw(Opt().RandomSeed, bot.guid, bot_random::kSaltGrindPick, state.WanderCycles),
                                              std::uint32_t(std::min<std::size_t>(spots.size(), kGrindPickAmong)));
-                GrindSpot const& spot = _options.Grind->Spots[spots[pick]];
+                GrindSpot const& spot = Opt().Grind->Spots[spots[pick]];
                 state.GrindTarget = Point{ spot.X, spot.Y, spot.Z };
                 state.GrindSpotIndex = spots[pick];
                 NoteGrindPick(bot.guid, spots[pick]);
-                if (_options.RandomPct > 0)
+                if (Opt().RandomPct > 0)
                 {
-                    double const angle = bot_random::Unit(bot_random::Draw(_options.RandomSeed, bot.guid, bot_random::kSaltJitter, std::uint64_t(state.WanderCycles) * 2)) * 6.283185307;
-                    double const radius = kStandJitterYards * std::sqrt(bot_random::Unit(bot_random::Draw(_options.RandomSeed, bot.guid, bot_random::kSaltJitter, std::uint64_t(state.WanderCycles) * 2 + 1)));
+                    double const angle = bot_random::Unit(bot_random::Draw(Opt().RandomSeed, bot.guid, bot_random::kSaltJitter, std::uint64_t(state.WanderCycles) * 2)) * 6.283185307;
+                    double const radius = kStandJitterYards * std::sqrt(bot_random::Unit(bot_random::Draw(Opt().RandomSeed, bot.guid, bot_random::kSaltJitter, std::uint64_t(state.WanderCycles) * 2 + 1)));
                     state.GrindTarget.X += float(std::cos(angle) * radius);
                     state.GrindTarget.Y += float(std::sin(angle) * radius);
                 }
@@ -477,8 +477,8 @@ void BotPolicy::TurnWander(DecideTick& tick, BotTurn& turn)
                 wanted = Decision{ ActionType::kMoveTo, 0, state.GrindTarget };
                 moveWhy = "state.GrindTarget";
                 idle = false;
-                if (_options.OnEvent)
-                    _options.OnEvent("grind_spot: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id) +
+                if (Opt().OnEvent)
+                    Opt().OnEvent("grind_spot: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id) +
                                      " spot=" + std::to_string(spots[pick]) + " levels=" + std::to_string(spot.MinLevel) + "-" + std::to_string(spot.MaxLevel));
             }
             else
@@ -491,7 +491,7 @@ void BotPolicy::TurnWander(DecideTick& tick, BotTurn& turn)
             }
         }
     }
-    else if (idle && healthy && _options.WanderWhenIdle && (!partyMember || turn.leaderAwaySolo) && !state.ChatStay && state.ChatFollow == 0 && hubs != _options.HubsByMap.end() && !hubs->second.empty() &&
+    else if (idle && healthy && Opt().WanderWhenIdle && (!partyMember || turn.leaderAwaySolo) && !state.ChatStay && state.ChatFollow == 0 && hubs != Opt().HubsByMap.end() && !hubs->second.empty() &&
              state.HubFailures < kHubFailuresMax)
     {
         std::vector<Point> const& list = hubs->second;
@@ -512,19 +512,19 @@ void BotPolicy::TurnWander(DecideTick& tick, BotTurn& turn)
                 // Town AFK: now and then a bot that reached a hub stays for 5 to 20 minutes (it stands; no new order is sent), unless the map already has its quota of
                 // staying bots. The stay only holds back the next walk; any fight or order ends it.
                 // Personality (off by default): sociability scales the chance, the session trait the length.
-                personality::Traits const traits = personality::TraitsFor(_options.RandomSeed, bot.guid);
-                realism::AfkSettings afk = _options.TownAfk;
-                afk.ChancePct = personality::AfkChancePct(_options.Personality, traits, afk.ChancePct);
-                if (arrived && _options.TownAfk.Enabled && bot.in_combat == 0 && !turn.enemyNear &&
-                    realism::AfkRoll(afk, _options.RandomSeed, bot.guid, state.AfkCounter))
+                personality::Traits const traits = personality::TraitsFor(Opt().RandomSeed, bot.guid);
+                realism::AfkSettings afk = Opt().TownAfk;
+                afk.ChancePct = personality::AfkChancePct(Opt().Personality, traits, afk.ChancePct);
+                if (arrived && Opt().TownAfk.Enabled && bot.in_combat == 0 && !turn.enemyNear &&
+                    realism::AfkRoll(afk, Opt().RandomSeed, bot.guid, state.AfkCounter))
                 {
-                    std::uint64_t const stay = personality::AfkStayMs(_options.Personality, traits,
-                                                                      realism::AfkDurationMs(_options.TownAfk, _options.RandomSeed, bot.guid, state.AfkCounter));
-                    if (_afkZones.TryStart(bot.map_id, bot.guid, nowMs, nowMs + stay, _options.TownAfk.ZoneMax))
+                    std::uint64_t const stay = personality::AfkStayMs(Opt().Personality, traits,
+                                                                      realism::AfkDurationMs(Opt().TownAfk, Opt().RandomSeed, bot.guid, state.AfkCounter));
+                    if (_afkZones.TryStart(bot.map_id, bot.guid, nowMs, nowMs + stay, Opt().TownAfk.ZoneMax))
                     {
                         state.AfkUntilMs = nowMs + stay;
-                        if (_options.OnEvent)
-                            _options.OnEvent("town_afk: bot=" + std::to_string(bot.guid) + " map=" + std::to_string(bot.map_id) + " minutes=" + std::to_string(stay / 60000));
+                        if (Opt().OnEvent)
+                            Opt().OnEvent("town_afk: bot=" + std::to_string(bot.guid) + " map=" + std::to_string(bot.map_id) + " minutes=" + std::to_string(stay / 60000));
                     }
                 }
                 ++state.AfkCounter;
@@ -551,16 +551,16 @@ void BotPolicy::TurnWander(DecideTick& tick, BotTurn& turn)
     // Exploring on foot: a bot with no grind spot and no hub it can reach (a map with neither, or hubs it never got to) would stand where it
     // began and never meet a creature, as 45 bots did for eight hours in the soak. After a short quiet it takes a walk of 50 to 100 yards in a
     // turning direction, and after a few walks tries its hubs again.
-    else if (idle && healthy && _options.WanderWhenIdle && (!grindMode || nowMs < state.GrindRetryAtMs) && (!partyMember || turn.leaderAwaySolo) && !state.ChatStay && state.ChatFollow == 0)
+    else if (idle && healthy && Opt().WanderWhenIdle && (!grindMode || nowMs < state.GrindRetryAtMs) && (!partyMember || turn.leaderAwaySolo) && !state.ChatStay && state.ChatFollow == 0)
     {
         // Starts a walk to a new random point; scale shortens it (a retry after a refused point). The point is at the bot's own height, so
         // the core often has no route to it (open ground the navmesh does not cover): a refused point is retried nearer, not after the idle pause.
         auto const startExploreWalk = [&](float scale) {
             float const angle = float((bot.guid * 2654435761ull) % 628) * 0.01f + float(state.ExploreStep) * 2.399963f;
             float radius = (50.0f + 25.0f * float(state.ExploreStep % 3)) * scale;
-            if (_options.RandomPct > 0)
-                radius = float(bot_random::Vary(std::uint64_t(radius), _options.RandomPct,
-                                                bot_random::Draw(_options.RandomSeed, bot.guid, bot_random::kSaltJitter, 0x200000000ull + state.ExploreStep)));
+            if (Opt().RandomPct > 0)
+                radius = float(bot_random::Vary(std::uint64_t(radius), Opt().RandomPct,
+                                                bot_random::Draw(Opt().RandomSeed, bot.guid, bot_random::kSaltJitter, 0x200000000ull + state.ExploreStep)));
             ++state.ExploreStep;
             state.ExploreTarget = Point{ bot.pos_x + std::cos(angle) * radius, bot.pos_y + std::sin(angle) * radius, bot.pos_z };
             state.Wandering = true;
@@ -596,8 +596,8 @@ void BotPolicy::TurnWander(DecideTick& tick, BotTurn& turn)
                 idle = false;
             }
         }
-        else if (nowMs - state.IdleSinceMs >= bot_random::Vary(kExploreIdleMs, std::min<std::uint32_t>(_options.RandomPct * 2, 90),
-                                                               bot_random::Draw(_options.RandomSeed, bot.guid, bot_random::kSaltIdle, 0x100000000ull + state.ExploreStep)))
+        else if (nowMs - state.IdleSinceMs >= bot_random::Vary(kExploreIdleMs, std::min<std::uint32_t>(Opt().RandomPct * 2, 90),
+                                                               bot_random::Draw(Opt().RandomSeed, bot.guid, bot_random::kSaltIdle, 0x100000000ull + state.ExploreStep)))
         {
             state.ExploreRefusals = 0;
             state.ExploreScale = 1.0f;
@@ -629,7 +629,7 @@ void BotPolicy::TurnRestAndConsume(DecideTick& tick, BotTurn& turn)
 
     // A bot that stood on the same spot for a whole check interval, not fighting, says why in one event line (stuck_idle). The 73 Undead bots
     // of the soak did this for eight hours and nothing in the logs said what held them; this line shows which condition did.
-    if (_options.OnEvent && nowMs - state.DiagAtMs >= kStuckCheckMs)
+    if (Opt().OnEvent && nowMs - state.DiagAtMs >= kStuckCheckMs)
     {
         float const moved = std::hypot(bot.pos_x - state.DiagX, bot.pos_y - state.DiagY);
         if (state.DiagAtMs != 0 && moved < 5.0f && bot.in_combat == 0 && !state.Sitting)
@@ -638,7 +638,7 @@ void BotPolicy::TurnRestAndConsume(DecideTick& tick, BotTurn& turn)
             for (NearbyUnit const& unit : nearby)
                 if (IsLiveMob(unit))
                     ++hostiles;
-            _options.OnEvent("stuck_idle: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id) +
+            Opt().OnEvent("stuck_idle: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id) +
                              " idle=" + std::to_string(idle) + " hasTarget=" + std::to_string(hasTarget) + " enemyNear=" + std::to_string(enemyNear) +
                              " wanted=" + std::to_string(int(wanted.Type)) + " quest=" + std::to_string(int(questStep.Kind)) + " route=" + std::to_string(routeBusy) +
                              " healthy=" + std::to_string(healthy) + " mana=" + std::to_string(manaResting) + " grind=" + std::to_string(grindMode) +
@@ -676,12 +676,12 @@ void BotPolicy::TurnRestAndConsume(DecideTick& tick, BotTurn& turn)
     bool const dungeonDrink = holdIdle && manaUser && IsRouteActive(bot.guid) &&
                               BelowPct(bot.power, bot.max_power, profile.DrinkBelowPct);
     bool const manaLow = holdIdle && manaUser &&
-                         BelowPct(bot.power, bot.max_power, (state.Sitting ? kPartyReadySitHealthPct : (_options.TacticRest ? profile.ReadyPowerPct : kPartyReadyPowerOldPct)));
+                         BelowPct(bot.power, bot.max_power, (state.Sitting ? kPartyReadySitHealthPct : (Opt().TacticRest ? profile.ReadyPowerPct : kPartyReadyPowerOldPct)));
     // The Rest tactic: the party waits for every member to reach the pull share (90 %), so a member below it sits to get there (it only sat below its own rest share).
-    bool const healthLow = holdIdle && _options.TacticRest && bot.max_health > 0 &&
+    bool const healthLow = holdIdle && Opt().TacticRest && bot.max_health > 0 &&
                            BelowPct(bot.health, bot.max_health, profile.ReadyHealthPct);
     // A dungeon mana user drinks up to the dungeon drink cap; others use the normal manaLow threshold.
-    bool const drinkCap = dungeonDrink ? profile.DrinkUpToPct : (state.Sitting ? kPartyReadySitHealthPct : (_options.TacticRest ? profile.ReadyPowerPct : kPartyReadyPowerOldPct));
+    bool const drinkCap = dungeonDrink ? profile.DrinkUpToPct : (state.Sitting ? kPartyReadySitHealthPct : (Opt().TacticRest ? profile.ReadyPowerPct : kPartyReadyPowerOldPct));
     bool const manaStillLow = state.Sitting && dungeonDrink &&
                               BelowPct(bot.power, bot.max_power, drinkCap);
     // A hurt solo bot (kRecoverPullPct, or under the disengage mark) with no live creature close sits to recover even with one in view: `idle` needs nothing the bot would pull
@@ -704,26 +704,26 @@ void BotPolicy::TurnRestAndConsume(DecideTick& tick, BotTurn& turn)
 
     // Eat or drink while resting (layout 15): a bot sat down because it is hurt or low on mana uses food or drink it carries, which restores
     // far faster than sitting alone. Not while moving or fighting, and not again until the last piece has done its work.
-    if (_options.Supplies.Enabled && state.Sitting && sitWanted && bot.moving == 0 && bot.in_combat == 0 && nowMs >= state.NextConsumeMs)
+    if (Opt().Supplies.Enabled && state.Sitting && sitWanted && bot.moving == 0 && bot.in_combat == 0 && nowMs >= state.NextConsumeMs)
     {
         std::uint32_t const healthPct = HealthPct(bot, 100);
         std::uint32_t const manaPct = manaUser ? PowerPct(bot, 100) : 100;
         // A party held for itself (a dungeon pull hold or regroup) eats and drinks up to the marks the hold waits for (kPartyReadyHealthPct, kPartyReadyPowerPct), not
         // only below the normal 70 % / 40 %: the Deadmines runs sat between the two for minutes on sitting regeneration alone (health stuck at 74 %, mana 0 to 40 % in 20 min).
-        supply::Settings consumeSettings = _options.Supplies;
+        supply::Settings consumeSettings = Opt().Supplies;
         if (holdIdle)
         {
             // the marks the hold waits for: the profile's, or the older, lower ones with the Rest tactic off (TurnQuestsAndHold)
-            consumeSettings.EatBelowHealthPct = std::max<std::uint32_t>(consumeSettings.EatBelowHealthPct, (_options.TacticRest ? profile.ReadyHealthPct : kPartyReadyHealthOldPct) - 1);
-            consumeSettings.DrinkBelowManaPct = std::max<std::uint32_t>(consumeSettings.DrinkBelowManaPct, (_options.TacticRest ? profile.ReadyPowerPct : kPartyReadyPowerOldPct) - 1);
+            consumeSettings.EatBelowHealthPct = std::max<std::uint32_t>(consumeSettings.EatBelowHealthPct, (Opt().TacticRest ? profile.ReadyHealthPct : kPartyReadyHealthOldPct) - 1);
+            consumeSettings.DrinkBelowManaPct = std::max<std::uint32_t>(consumeSettings.DrinkBelowManaPct, (Opt().TacticRest ? profile.ReadyPowerPct : kPartyReadyPowerOldPct) - 1);
         }
         std::uint32_t what = supply::ConsumeNow(consumeSettings, supplyFacts, healthPct, manaPct);
         if (what == 0)
-            what = supply::BandageNow(_options.Supplies, supplyFacts, healthPct); // layout 16: no food to eat, so a bandage
-        if (holdIdle && _options.OnEvent && nowMs - state.ConsumeLoggedMs >= kConsumeLogMs)
+            what = supply::BandageNow(Opt().Supplies, supplyFacts, healthPct); // layout 16: no food to eat, so a bandage
+        if (holdIdle && Opt().OnEvent && nowMs - state.ConsumeLoggedMs >= kConsumeLogMs)
         {
             state.ConsumeLoggedMs = nowMs; // 0.44.8: what a held, sitting bot has and does (the 0.44.7 runs gave no sign that the food and drink were used)
-            _options.OnEvent("consume_check: bot=" + std::to_string(bot.guid) + " hp=" + std::to_string(healthPct) + " pw=" + std::to_string(manaPct) +
+            Opt().OnEvent("consume_check: bot=" + std::to_string(bot.guid) + " hp=" + std::to_string(healthPct) + " pw=" + std::to_string(manaPct) +
                              " mana_user=" + std::to_string(manaUser ? 1 : 0) + " food=" + std::to_string(supplyFacts.FoodCount) + " drink=" + std::to_string(supplyFacts.DrinkCount) +
                              " what=" + std::to_string(what));
         }
@@ -734,24 +734,24 @@ void BotPolicy::TurnRestAndConsume(DecideTick& tick, BotTurn& turn)
             eat.type = ActionType::kConsume;
             eat.spell_id = what;
             actions.push_back(eat);
-            state.NextConsumeMs = nowMs + (what == 5 ? _options.Supplies.BandageEveryMs : _options.Supplies.ConsumeEveryMs);
+            state.NextConsumeMs = nowMs + (what == 5 ? Opt().Supplies.BandageEveryMs : Opt().Supplies.ConsumeEveryMs);
         }
     }
 
     // Potions (layout 16): a bot in a fight that is badly hurt, or a mana user nearly out of mana, drinks one. It costs no global cooldown and
     // no standing still, so it goes alongside whatever the bot does; the game's shared potion cooldown is why it is not asked for sooner.
-    if (_options.Supplies.Enabled && _options.Supplies.Potions && bot.in_combat != 0 && nowMs >= state.NextPotionMs)
+    if (Opt().Supplies.Enabled && Opt().Supplies.Potions && bot.in_combat != 0 && nowMs >= state.NextPotionMs)
     {
         std::uint32_t const healthPct = HealthPct(bot, 100);
         std::uint32_t const manaPct = manaUser ? PowerPct(bot, 100) : 100;
-        if (std::uint32_t const which = supply::PotionNow(_options.Supplies, supplyFacts, healthPct, manaPct))
+        if (std::uint32_t const which = supply::PotionNow(Opt().Supplies, supplyFacts, healthPct, manaPct))
         {
             BotAction potion;
             potion.bot_guid = bot.guid;
             potion.type = ActionType::kConsume;
             potion.spell_id = which;
             actions.push_back(potion);
-            state.NextPotionMs = nowMs + _options.Supplies.PotionEveryMs;
+            state.NextPotionMs = nowMs + Opt().Supplies.PotionEveryMs;
         }
     }
 }
@@ -773,18 +773,18 @@ void BotPolicy::TurnTrainAndParty(DecideTick& tick, BotTurn& turn)
 
     bool levelUp = bot.level != 0 && bot.level != state.LastTrainLevel;
     // Path variety: the trainer visit after a level-up waits a per-bot while, so bots that level together do not queue at the trainer.
-    if (levelUp && _options.PathVariety.Enabled)
+    if (levelUp && Opt().PathVariety.Enabled)
     {
         if (state.PathTrainLevel != bot.level)
         {
             state.PathTrainLevel = bot.level;
-            state.PathTrainAtMs = nowMs + path_variety::TrainDelayMs(_options.PathVariety, _options.RandomSeed, bot.guid, bot.level);
+            state.PathTrainAtMs = nowMs + path_variety::TrainDelayMs(Opt().PathVariety, Opt().RandomSeed, bot.guid, bot.level);
         }
         levelUp = nowMs >= state.PathTrainAtMs;
     }
     // A sitting bot (resting, or drinking) is not available for a trainer check, exactly as a walking bot is not: it stands first.
-    if (idle && !state.Sitting && _options.TrainEveryMs != 0 && (levelUp || nowMs >= state.NextTrainMs) &&
-        realism::ReadReady(_options.ReadDelay, state.TrainRead, kTrainReadKey, _options.RandomSeed, bot.guid, nowMs))
+    if (idle && !state.Sitting && Opt().TrainEveryMs != 0 && (levelUp || nowMs >= state.NextTrainMs) &&
+        realism::ReadReady(Opt().ReadDelay, state.TrainRead, kTrainReadKey, Opt().RandomSeed, bot.guid, nowMs))
     {
         realism::Close(state.TrainRead);
         BotAction train;
@@ -792,7 +792,7 @@ void BotPolicy::TurnTrainAndParty(DecideTick& tick, BotTurn& turn)
         train.type = ActionType::kTrain;
         actions.push_back(train);
         state.LastTrainLevel = bot.level;
-        state.NextTrainMs = nowMs + _options.TrainEveryMs;
+        state.NextTrainMs = nowMs + Opt().TrainEveryMs;
     }
 
     // A player's party invite is accepted (AcceptInvites, from the chat command switch): the player then commands the bot in chat. An invite
@@ -800,10 +800,10 @@ void BotPolicy::TurnTrainAndParty(DecideTick& tick, BotTurn& turn)
     // invite", and a leader even tried to accept the party it leads).
     // With WhisperReplies a busy bot (dead, in a fight, in a dungeon, travelling) does not accept: it whispers the inviter why (once per
     // player and bot, the limiter), and the invite times out in the core.
-    if (_options.AcceptInvites && bot.group_invite_from != 0 && !tick.IsOurBot(bot.group_invite_from) && nowMs >= state.InviteAcceptAtMs &&
+    if (Opt().AcceptInvites && bot.group_invite_from != 0 && !tick.IsOurBot(bot.group_invite_from) && nowMs >= state.InviteAcceptAtMs &&
         forever_module::UnitRefType(bot.group_invite_from) == kPlayerType)
     {
-        BusyKind const busy = _options.WhisperReplies ? BusyOf(bot) : BusyKind::None;
+        BusyKind const busy = Opt().WhisperReplies ? BusyOf(bot) : BusyKind::None;
         if (busy != BusyKind::None)
         {
             std::uint64_t const player = bot.group_invite_from & forever_module::kUnitRefCounterMask;
@@ -826,7 +826,7 @@ void BotPolicy::TurnTrainAndParty(DecideTick& tick, BotTurn& turn)
     // member again only after kInviteRetryMs, longer after kInviteFreeTries invites that did not lead to a join (InviteRetryWaitMs, up to
     // kInviteRetryMaxMs). A member accepts its leader's invite, and leaves a party that is not its leader's. Each is sent once; a refused one
     // is retried after kPartyRetryMs.
-    if (_options.PartySize != 0 && bot.in_combat == 0 && nowMs >= state.PartyRetryAtMs)
+    if (Opt().PartySize != 0 && bot.in_combat == 0 && nowMs >= state.PartyRetryAtMs)
     {
         if (partyLeaderBot)
         {
@@ -871,8 +871,8 @@ void BotPolicy::TurnTrainAndParty(DecideTick& tick, BotTurn& turn)
                 invite.target_guid = PlayerRef(member);
                 actions.push_back(invite);
                 std::uint32_t const sent = state.NoteInvite(member, nowMs);
-                if (sent > kInviteFreeTries && _options.OnEvent)
-                    _options.OnEvent("party_invite_backoff: leader=" + std::to_string(bot.guid) + " bot=" + std::to_string(member) + " invites=" +
+                if (sent > kInviteFreeTries && Opt().OnEvent)
+                    Opt().OnEvent("party_invite_backoff: leader=" + std::to_string(bot.guid) + " bot=" + std::to_string(member) + " invites=" +
                                      std::to_string(sent) + " next_ms=" + std::to_string(InviteRetryWaitMs(sent)));
             }
             // 40-man raid support (doc 108): this leader's roster is a raid (PolicyOptions::Raid). ConvertToRaid works at
@@ -882,7 +882,7 @@ void BotPolicy::TurnTrainAndParty(DecideTick& tick, BotTurn& turn)
             // (group_leader_guid already this leader's) is then put in the subgroup its position in the roster implies --
             // 5 per subgroup, leader first -- so an 8x5 roster (ScenarioRoster order) lands one tank/healer/dps group per
             // subgroup, the same split a 5-man scenario's roster gives a single party.
-            if (_options.Raid)
+            if (Opt().Raid)
             {
                 if (!foreign && nowMs >= state.RaidConvertRetryAtMs)
                 {
@@ -941,7 +941,7 @@ void BotPolicy::TurnTrainAndParty(DecideTick& tick, BotTurn& turn)
                 state.PartyRetryAtMs = nowMs + kPartyRetryMs;
             }
         }
-        else if (partyLeader == 0 && bot.group_role != 0 && tick.IsOurBot(bot.group_leader_guid) && !(_options.IsAlt && _options.IsAlt(bot.guid)))
+        else if (partyLeader == 0 && bot.group_role != 0 && tick.IsOurBot(bot.group_leader_guid) && !(Opt().IsAlt && Opt().IsAlt(bot.guid)))
         {
             // Not one of the bots chosen for the parties (PartyPercent), but still in a bot party left from an earlier run: it leaves, and plays on
             // its own. A bot in a human's party, and a player's alt, are not touched.
@@ -1016,7 +1016,7 @@ void BotPolicy::TurnLootTaxiMount(DecideTick& tick, BotTurn& turn)
     // Flight points (layout 17): a bot on a flight takes no walking orders; a long walk of a bot that is on its own is replaced by a walk to the nearest
     // flight master and a flight from it (taxi_policy.h). The core refuses a flight that would not bring the bot closer, and the bot then walks.
     bool fidgetWait = false;
-    if (_options.Taxi.Enabled && wanted.Type == ActionType::kMoveTo && !partyMember && !partyLeaderBot)
+    if (Opt().Taxi.Enabled && wanted.Type == ActionType::kMoveTo && !partyMember && !partyLeaderBot)
     {
         taxi::Facts facts;
         facts.X = bot.pos_x;
@@ -1027,7 +1027,7 @@ void BotPolicy::TurnLootTaxiMount(DecideTick& tick, BotTurn& turn)
         facts.MasterValid = bot.taxi_master_valid != 0;
         facts.MasterX = bot.taxi_master_x;
         facts.MasterY = bot.taxi_master_y;
-        switch (taxi::Decide(_options.Taxi, facts, wanted.Dest.X, wanted.Dest.Y, nowMs, state.TaxiBlockedUntilMs, state.TaxiWaitUntilMs))
+        switch (taxi::Decide(Opt().Taxi, facts, wanted.Dest.X, wanted.Dest.Y, nowMs, state.TaxiBlockedUntilMs, state.TaxiWaitUntilMs))
         {
             case taxi::Move::Walk:
                 break;
@@ -1045,19 +1045,19 @@ void BotPolicy::TurnLootTaxiMount(DecideTick& tick, BotTurn& turn)
                 fly.dest_y = wanted.Dest.Y;
                 fly.dest_z = wanted.Dest.Z;
                 actions.push_back(fly);
-                state.TaxiWaitUntilMs = nowMs + _options.Taxi.WaitMs;
+                state.TaxiWaitUntilMs = nowMs + Opt().Taxi.WaitMs;
                 state.FidgetState = realism::FidgetState{};
                 state.TaxiFlight = taxi::Flight{ nowMs, 0, wanted.Dest.X, wanted.Dest.Y, bot.taxi_master_guid };
-                if (_options.TaxiPlaces)
-                    state.TaxiFlight.Place = taxi::PlaceName(*_options.TaxiPlaces, bot.map_id, wanted.Dest.X, wanted.Dest.Y);
-                if (_options.OnEvent)
-                    _options.OnEvent(taxi::OrderLine(bot.guid, bot.level, bot.map_id, int(std::hypot(bot.pos_x - wanted.Dest.X, bot.pos_y - wanted.Dest.Y)),
+                if (Opt().TaxiPlaces)
+                    state.TaxiFlight.Place = taxi::PlaceName(*Opt().TaxiPlaces, bot.map_id, wanted.Dest.X, wanted.Dest.Y);
+                if (Opt().OnEvent)
+                    Opt().OnEvent(taxi::OrderLine(bot.guid, bot.level, bot.map_id, int(std::hypot(bot.pos_x - wanted.Dest.X, bot.pos_y - wanted.Dest.Y)),
                                                      state.TaxiFlight));
                 [[fallthrough]];
             }
             case taxi::Move::Wait:
                 // Idle fidgeting (IdleFidget, off by default): decided at the end of this step, once the mount step has had its say.
-                if (_options.Fidget.Enabled && state.TaxiFlight.OrderedMs != 0 && nowMs >= state.TaxiFlight.OrderedMs + _options.Fidget.AfterOrderMs &&
+                if (Opt().Fidget.Enabled && state.TaxiFlight.OrderedMs != 0 && nowMs >= state.TaxiFlight.OrderedMs + Opt().Fidget.AfterOrderMs &&
                     bot.in_flight == 0)
                     fidgetWait = true;
                 if (state.Last)
@@ -1082,7 +1082,7 @@ void BotPolicy::TurnLootTaxiMount(DecideTick& tick, BotTurn& turn)
     // Mount for long travel, dismount when the walk is short, combat starts, or the bot arrives.
     if (bot.in_combat == 0 && bot.life_state == 0 && bot.casting_spell == 0 && nowMs >= state.MountRetryMs)
     {
-        if (wanted.Type == ActionType::kMoveTo && !state.Mounted && bot.level >= _options.MountMinLevel)
+        if (wanted.Type == ActionType::kMoveTo && !state.Mounted && bot.level >= Opt().MountMinLevel)
         {
             float const destDist = DistanceTo(bot, wanted.Dest);
             if (destDist > kMountMinDistanceYards)
@@ -1129,7 +1129,7 @@ void BotPolicy::TurnLootTaxiMount(DecideTick& tick, BotTurn& turn)
             hostileNear = hostileNear || (unit.is_hostile && unit.health != 0);
         if (!hostileNear)
         {
-            realism::Fidget const fidget = realism::NextFidget(_options.Fidget, state.FidgetState, _options.RandomSeed, bot.guid, nowMs);
+            realism::Fidget const fidget = realism::NextFidget(Opt().Fidget, state.FidgetState, Opt().RandomSeed, bot.guid, nowMs);
             if (fidget == realism::Fidget::Stand)
             {
                 BotAction stand;
@@ -1198,30 +1198,30 @@ void BotPolicy::TurnSendMove(DecideTick& tick, BotTurn& turn)
     }
 
     // PathJitter: a plain walk (not a kite, a flee or a dungeon route) ends a little to one side of the target. Out of combat only.
-    if (_options.PathJitter.Enabled && wanted.Type == ActionType::kMoveTo && bot.in_combat == 0 && !turn.hasTarget && !turn.enemyNear && partyLeader == 0 &&
-        scenario.RouteMap == 0 && !turn.routeBusy && !turn.dungeonHold && !state.TankLead && _options.DungeonsByMap.count(bot.map_id) == 0 &&
+    if (Opt().PathJitter.Enabled && wanted.Type == ActionType::kMoveTo && bot.in_combat == 0 && !turn.hasTarget && !turn.enemyNear && partyLeader == 0 &&
+        scenario.RouteMap == 0 && !turn.routeBusy && !turn.dungeonHold && !state.TankLead && Opt().DungeonsByMap.count(bot.map_id) == 0 &&
         !kiteEntry && kiteRetry < 0 && !turn.healLosPoint && DistanceTo(bot, wanted.Dest) > 4.0f)
     {
         std::vector<path_jitter::Pt> unwalkable;
-        if (_options.Grind)
+        if (Opt().Grind)
             for (std::size_t const spot : _grindBlocks.Blocked(nowMs))
-                if (spot < _options.Grind->Spots.size() && _options.Grind->Spots[spot].Map == bot.map_id)
-                    unwalkable.push_back({ _options.Grind->Spots[spot].X, _options.Grind->Spots[spot].Y });
+                if (spot < Opt().Grind->Spots.size() && Opt().Grind->Spots[spot].Map == bot.map_id)
+                    unwalkable.push_back({ Opt().Grind->Spots[spot].X, Opt().Grind->Spots[spot].Y });
         path_jitter::Facts facts;
         facts.Walking = true;
         facts.Unwalkable = &unwalkable;
         facts.From = { bot.pos_x, bot.pos_y };
-        path_jitter::Pt const moved = path_jitter::Apply(_options.PathJitter, facts, { wanted.Dest.X, wanted.Dest.Y }, _options.RandomSeed, bot.guid);
+        path_jitter::Pt const moved = path_jitter::Apply(Opt().PathJitter, facts, { wanted.Dest.X, wanted.Dest.Y }, Opt().RandomSeed, bot.guid);
         wanted.Dest.X = moved.X;
         wanted.Dest.Y = moved.Y;
     }
 
-    if (_options.OnEvent && scenario.RouteMap != 0 && partyLeader != 0 && (wanted.Type == ActionType::kMoveTo || (wanted.Type == ActionType::kFollow && partyLeaderBot)) &&
+    if (Opt().OnEvent && scenario.RouteMap != 0 && partyLeader != 0 && (wanted.Type == ActionType::kMoveTo || (wanted.Type == ActionType::kFollow && partyLeaderBot)) &&
         nowMs - state.MoveWhyLoggedMs >= 5000 && (wanted.Type == ActionType::kFollow || std::hypot(wanted.Dest.X - state.MoveWhyDest.X, wanted.Dest.Y - state.MoveWhyDest.Y) > 8.0f))
     {
         state.MoveWhyLoggedMs = nowMs;
         state.MoveWhyDest = wanted.Dest;
-        _options.OnEvent("move_why: bot=" + std::to_string(bot.guid) + " why=" + (*moveWhy ? moveWhy : "other") + " type=" + std::to_string(int(wanted.Type)) + " target=" + std::to_string(wanted.Target) + " to=" + std::to_string(int(wanted.Dest.X)) + "," +
+        Opt().OnEvent("move_why: bot=" + std::to_string(bot.guid) + " why=" + (*moveWhy ? moveWhy : "other") + " type=" + std::to_string(int(wanted.Type)) + " target=" + std::to_string(wanted.Target) + " to=" + std::to_string(int(wanted.Dest.X)) + "," +
                          std::to_string(int(wanted.Dest.Y)) + "," + std::to_string(int(wanted.Dest.Z)) + " from=" + std::to_string(int(bot.pos_x)) + "," +
                          std::to_string(int(bot.pos_y)) + "," + std::to_string(int(bot.pos_z)) + " leader=" + (partyLeaderBot ? "1" : "0") + " combat=" + std::to_string(bot.in_combat) +
                          " kite_retry=" + std::to_string(kiteRetry) + " kite_entry=" + (kiteEntry ? "1" : "0") +

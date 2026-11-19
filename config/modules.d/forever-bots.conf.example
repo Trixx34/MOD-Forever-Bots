@@ -179,6 +179,19 @@ Module.forever-bots.TelemetrySummarySec = 60
 # LogRefusedReason = 1
 # DeathsTopEveryMin = 60   (0 to 1440)
 
+# Sim measuring (doc/sim-ab.md). ArmSplit = 1 runs two configs in one run: odd bot guids are arm B and take their own turn with the config plus
+# ArmBOverrides ("Key=Value,Key=Value") and any Arm.B.<Key> key (the key wins over the list); even guids are arm A (the config as written). Every event
+# line naming a bot gets " arm=A|B"; deaths_top and pump_arm come per arm. Off on test and prod. Keys read outside the bot's own turn (MaxBots, Bots*,
+# Telemetry*, Presence*, Auction*, Errand*, WorldEvents*, AmbientChat*, scenarios, the party/guild/dungeon drivers, the quest sets) stay arm A's for both.
+# TraceBots: bot guids whose every event, action, action result and state (with the hostiles within 40 yards) go to TraceDir/bot-<guid>.trace, never to
+# the journal; at most TraceMaxMB per bot (rotated at half, one old file kept). TraceDir empty = no trace.
+# ArmSplit = 0
+# ArmBOverrides = ""                 # e.g. "PathVariety=1,LevelSafeWalks=0"
+# Arm.B.PathVariety = 1              # one key at a time, same effect as the list
+# TraceBots = ""                     # e.g. "235,66"
+# TraceDir = ""                      # e.g. "/var/log/forever-sim/bot-trace"
+# TraceMaxMB = 20                    # (1..1024)
+
 # Auto gear. 1 = the core dresses every bot for its class and level when it first appears and after it gains AutoGearEveryLevels levels
 # (best usable item per slot, uncommon quality at most; Bot.AutoGear.MaxQuality in the core's config). Off by default. With it off, a
 # player in a party can type .autogear to dress the bots that player leads.

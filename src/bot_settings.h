@@ -3,6 +3,9 @@
 // prefix removed; see modules.d/forever-bots.conf.example). Pure logic, unit-tested in tests/settings_test.cpp.
 #pragma once
 
+#include <memory>
+#include <unordered_set>
+
 #include "battlegrounds.h"
 #include "repair_policy.h"
 #include "quest_group.h"
@@ -234,6 +237,20 @@ struct BotSettings
     bool LogRefusedReason = true;
     // DeathsTopEveryMin (default 60, 0 = off, 0..1440; logging only): the `forever-bots: deaths_top:` line (deaths, median per bot, share of the worst ten).
     std::uint32_t DeathsTopEveryMin = 60;
+    // ArmSplit (default 0 = off, 0..1; sim measuring, doc/sim-ab.md): two configs in one run. The bots with an odd guid are arm B: their own turn uses the config
+    // with ArmBOverrides ("Key=Value,Key=Value", default empty) and the Arm.B.<Key> keys applied; the even guids are arm A (the config as written). Every event
+    // line naming a bot gets " arm=A|B", and the deaths_top and pump lines come per arm too. Ignored (warning) while a scenario runs. ArmB is arm B's settings
+    // (null when off) and ArmBApplied the overrides as "Key=new (A: old)".
+    bool ArmSplit = false;
+    std::string ArmBOverrides;
+    std::shared_ptr<BotSettings> ArmB;
+    std::vector<std::string> ArmBApplied;
+    // TraceBots (default empty; a comma list of bot guids): every event, action, action result and a state line with the hostiles near (on change and every 5 s)
+    // of these bots go to TraceDir/bot-<guid>.trace (TraceDir default "", which turns tracing off; a missing folder is made), at most TraceMaxMB per bot
+    // (default 20, 1..1024: rotated at half of it, one old file kept). Nothing of it goes to the journal.
+    std::unordered_set<std::uint64_t> TraceBots;
+    std::string TraceDir;
+    std::uint32_t TraceMaxMB = 20;
     // Grind spots (config key GrindFile, see grind_data.h): the places idle bots walk to for their level. Empty turns it off (hubs are used).
     std::string GrindFile;
     // Rotations (config key RotationFile, see combat_rotation.h): fight rows and upkeep buffs per class from a file. Empty = the built-in rotations.

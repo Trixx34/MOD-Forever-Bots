@@ -277,12 +277,17 @@ int main(int argc, char** argv)
         });
 
     // The policy's class lookup: a bot's own class, or the configured class (0 = none) for a bot the table does not know.
+    // ArmSplit tags the event lines of every thread from here on; TraceBots opens its files.
+    ab_split::SetTagging(settings.ArmSplit && settings.ArmB != nullptr);
+    std::shared_ptr<bot_trace::Tracer> const trace = MakeTracer(settings);
     PolicyOptions policyOptions;
     PolicyFromSettings(policyOptions, settings);
     std::vector<dungeon_events::Event> const allEvents = LoadDungeons(policyOptions, settings, dungeonBox);
     LoadPolicyTables(policyOptions, settings);
-    ConnectPolicyLookups(policyOptions, settings, races, classes, run, alts);
+    ConnectPolicyLookups(policyOptions, settings, races, classes, run, alts, trace);
     PumpExtras extras;
+    extras.ArmB = ArmBOptions(policyOptions, settings, races, classes, run, alts, trace);
+    extras.Trace = trace;
     extras.Dungeons = dungeonBox;
     extras.Commands = commands;
     extras.Alts = alts;

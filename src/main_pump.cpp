@@ -6,6 +6,8 @@ void main_detail::PumpTier2(forever_module::Tier2Session& session, std::atomic<b
                          std::string const& telemetryPath, BotSettings const& settings, PumpExtras extras)
 {
     BotPolicy policy(options);
+    if (extras.ArmB)
+        policy.SetArmB(*extras.ArmB);   // ArmSplit: the odd guids take their turn with arm B's options
     std::uint64_t dungeonGeneration = extras.Dungeons ? extras.Dungeons->Generation.load() : 0;
     // One director per party of the scenario (ScenarioParties): the bots, in guid order, are cut into parties of the roster's size, the same cut the policy makes, and a
     // director sees only its own party's bots. With several parties each result and log line carries the party number ("dm#2").
@@ -155,7 +157,8 @@ void main_detail::PumpTier2(forever_module::Tier2Session& session, std::atomic<b
                 }
                 std::cerr << "forever-bots: bot " << bot.guid << " " << ActionTypeName(static_cast<forever_module::ActionType>(bot.last_action_type))
                           << (bot.last_action_spell ? " spell " + std::to_string(bot.last_action_spell) : std::string())
-                          << " not done: " << ActionStatusName(bot.last_action_status) << RefusedReasonField(bot, settings.LogRefusedReason) << "\n";
+                          << " not done: " << ActionStatusName(bot.last_action_status) << RefusedReasonField(bot, settings.LogRefusedReason)
+                          << ab_split::ArmField(bot.guid) << "\n";
             }
         }
 
@@ -409,9 +412,14 @@ void main_detail::PumpTier2(forever_module::Tier2Session& session, std::atomic<b
                 }
             }
             std::vector<forever_module::BotAction> actions = policy.Decide(view, nowMs());
-            // DeathsTopEveryMin: deaths, the median per bot and the share of the worst ten bots, once per period.
+            // TraceBots: the traced bots' results, decided actions and state (with the hostiles near) of this tick, to their own files.
+            if (extras.Trace)
+                extras.Trace->Observe(view, actions, nowMs());
+            // DeathsTopEveryMin: deaths, the median per bot and the share of the worst ten bots, once per period (and per arm with ArmSplit).
             if (std::optional<std::string> const deathsTop = policy.TakeDeathsTopLine(nowMs()))
                 std::cerr << "forever-bots: " << *deathsTop << "\n";
+            for (std::string const& armLine : policy.TakeArmDeathsTopLines())
+                std::cerr << "forever-bots: " << armLine << "\n";
             // Talent respecs (TalentRespec): one kRespecTalents per bot, spec in spell_id and role in dest_x; the core does the reset and the spend.
             for (BotPolicy::TalentOrder const& order : policy.TakeRespecOrders())
             {
@@ -668,7 +676,7 @@ void main_detail::PumpTier2(forever_module::Tier2Session& session, std::atomic<b
                                       << " walk3d=" << (settings.Auction.Walk3D ? 1 : 0)
                                       << auction::ReachFields(bot.pos_x, bot.pos_y, bot.pos_z, bot.auctioneer_x, bot.auctioneer_y, bot.auctioneer_z)
                                       << " ref_z=" << (judgement.RefKnown ? std::to_string(int(judgement.RefZ)) : std::string("none")) << " in_reach=" << (inReach ? 1 : 0)
-                                      << "\n";
+                                      << ab_split::ArmField(bot.guid) << "\n";
                         }
                     }
                     std::uint64_t auctioneer = bot.auctioneer_guid;
@@ -782,6 +790,18 @@ void main_detail::PumpTier2(forever_module::Tier2Session& session, std::atomic<b
         {
             std::cerr << "forever-bots: pump: " << lastBotCount << " bots, decide avg " << decideTotalUs / ticks << " us, max "
                       << decideMaxUs << " us over " << ticks << " ticks, " << ActionsPerTick(actionsTotal, ticks) << " actions per tick, " << policy.CalmSkippedTurns() << " calm-walk turns skipped in all\n";
+            // ArmSplit: per arm, the bots in view (average per tick) and the time of their own turns (DecideBot; the shared steps are in the line above).
+            if (policy.ArmSplitOn())
+            {
+                std::array<BotPolicy::ArmTiming, 2> const arms = policy.TakeArmTiming();
+                for (std::size_t arm = 0; arm < 2; ++arm)
+                {
+                    BotPolicy::ArmTiming const& t = arms[arm];
+                    std::cerr << "forever-bots: pump_arm: arm=" << ab_split::ArmLetter(ab_split::Arm(arm)) << " bots=" << (t.Ticks ? t.BotTurns / t.Ticks : 0)
+                              << " turn_avg_us=" << (t.Ticks ? t.TurnUs / t.Ticks : 0) << " per_bot_us=" << (t.BotTurns ? double(t.TurnUs) / double(t.BotTurns) : 0.0)
+                              << " ticks=" << t.Ticks << "\n";
+                }
+            }
             reportedAt = now;
             ticks = 0;
             decideTotalUs = 0;

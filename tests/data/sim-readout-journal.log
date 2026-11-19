@@ -1,0 +1,29 @@
+2026-11-19T11:59:00+0100 forever-test forever-sim[1]: forever-bots: event died: bot=66 life=1 map=0 pos=-10606,294 last_decision=1 killer_entry=202 in_combat=0 level=8 killer_spell=0 arm=A
+2026-11-19T12:00:30+0100 forever-test forever-sim[1]: forever-bots: event grind_spot: bot=66 level=8 map=0 spot=67 levels=5-8 arm=A
+2026-11-19T12:01:00+0100 forever-test forever-sim[1]: forever-bots: pump_arm: arm=A bots=60 turn_avg_us=900 per_bot_us=15.0 ticks=600
+2026-11-19T12:01:00+0100 forever-test forever-sim[1]: forever-bots: pump_arm: arm=B bots=60 turn_avg_us=960 per_bot_us=16.0 ticks=600
+2026-11-19T12:10:00+0100 forever-test forever-sim[1]: forever-bots: event died: bot=66 life=1 map=0 pos=-10606,294 last_decision=1 killer_entry=202 in_combat=0 level=8 killer_spell=0 killer_src=event overkill=13 hit_amount=54 hit_hp_pct=22 last_hits=0:54 arm=A
+2026-11-19T12:10:30+0100 forever-test forever-sim[1]: forever-bots: event died: bot=66 life=1 map=0 pos=-10650,250 last_decision=1 killer_entry=202 in_combat=0 level=8 killer_spell=0 killer_src=event overkill=1 hit_amount=57 hit_hp_pct=30 last_hits=0:57 arm=A
+2026-11-19T12:15:00+0100 forever-test forever-sim[1]: forever-bots: event no_route: bot=66 move pos=1,2,3 arm=A
+2026-11-19T12:16:00+0100 forever-test forever-sim[1]: forever-bots: event quest_walk_blocked: bot=66 quest=123 reason=level_unsafe arm=A
+2026-11-19T12:17:00+0100 forever-test forever-sim[1]: forever-bots: event below_map_recover: bot=66 reason=z_below map=0 arm=A
+2026-11-19T12:20:00+0100 forever-test forever-sim[1]: forever-bots: event died: bot=235 life=1 map=2991 pos=2927,1543 last_decision=1 killer_entry=251707 in_combat=0 level=9 killer_spell=0 arm=B
+2026-11-19T12:21:00+0100 forever-test forever-sim[1]: forever-bots: event level_safe_yard: bot=235 level=9 map=2991 graveyard=1,2 reason=corpse_high arm=B
+2026-11-19T12:22:00+0100 forever-test forever-sim[1]: forever-bots: event death_loop_escape: bot=235 level=9 map=2991 from=1,2 spot=220 arm=B
+2026-11-19T12:30:00+0100 forever-test forever-sim[1]: forever-bots: pump: 120 bots, decide avg 7850 us, max 33452 us over 2722 ticks, 9.1 actions per tick, 1006721 calm-walk turns skipped in all
+2026-11-19T13:00:00+0100 forever-test forever-sim[1]: forever-bots: deaths_top: window_min=60 deaths=3 bots_online=120 bots_died=2 median=0.0 median_died=1.5 top10=3 top10_pct=100.0 top=66:2,235:1 level_safe_lines=1 level_safe_held=0 below_map_recover=1 below_map_skip=none
+2026-11-19T13:00:00+0100 forever-test forever-sim[1]: forever-bots: deaths_top: arm=A window_min=60 deaths=2 bots_online=60 bots_died=1 median=0.0 median_died=2.0 top10=2 top10_pct=100.0 top=66:2
+2026-11-19T13:00:00+0100 forever-test forever-sim[1]: forever-bots: deaths_top: arm=B window_min=60 deaths=1 bots_online=60 bots_died=1 median=0.0 median_died=1.0 top10=1 top10_pct=100.0 top=235:1
+2026-11-19T13:01:00+0100 forever-test forever-sim[1]: forever-bots: pump_arm: arm=A bots=120 turn_avg_us=1900 per_bot_us=15.8 ticks=600
+2026-11-19T13:01:00+0100 forever-test forever-sim[1]: forever-bots: pump_arm: arm=B bots=120 turn_avg_us=2000 per_bot_us=16.6 ticks=600
+Nov 19 13:05:00 forever-test forever-sim[1]: forever-bots: event died: bot=43 life=1 map=1 pos=10,20 last_decision=4 killer_entry=3245 in_combat=0 killer_spell=0 killer_src=event
+2026-11-19T13:06:00+0100 forever-test forever-sim[1]: forever-bots: event died: bot=66 life=1 map=0 pos=-10620,260 last_decision=1 killer_entry=202 in_combat=1 level=9 killer_spell=0 arm=A
+2026-11-19T13:15:00+0100 forever-test forever-sim[1]: forever-bots: event no_route: bot=235 move pos=1,2,3 arm=B
+2026-11-19T13:15:30+0100 forever-test forever-sim[1]: forever-bots: event no_route: bot=235 move pos=1,2,4 arm=B
+2026-11-19T13:20:00+0100 forever-test forever-sim[1]: forever-bots: bot 66 move_to not done: no route reason=0 arm=A
+2026-11-19T13:30:00+0100 forever-test forever-sim[1]: forever-bots: event level_up: bot=66 level=10 from=9 map=0 arm=A
+2026-11-19T13:30:00+0100 forever-test forever-sim[1]: forever-bots: pump: 120 bots, decide avg 11214 us, max 46948 us over 1000 ticks, 27.7 actions per tick, 28294024 calm-walk turns skipped in all
+2026-11-19T13:40:00+0100 forever-test forever-sim[1]: forever-bots: event level_up: bot=235 level=10 from=9 map=2991 arm=B
+2026-11-19T13:50:00+0100 forever-test forever-sim[1]: forever-bots: could not publish actions: error writing the queue
+2026-11-19T13:55:00+0100 forever-test kernel: some other line without the module
+2026-11-19T14:30:00+0100 forever-test forever-sim[1]: forever-bots: event died: bot=66 life=1 map=0 pos=-10606,294 last_decision=1 killer_entry=202 in_combat=0 level=10 killer_spell=0 arm=A

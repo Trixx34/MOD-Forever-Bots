@@ -23,16 +23,16 @@ BotPolicy::TurnFlow BotPolicy::TurnBegin(DecideTick& tick, BotTurn& turn)
         return TurnFlow::kSkip;
     if (state.TaxiFlight.OrderedMs != 0)
     {
-        taxi::Progress const progress = taxi::Track(state.TaxiFlight, bot.in_flight != 0, nowMs, _options.Taxi.WaitMs);
+        taxi::Progress const progress = taxi::Track(state.TaxiFlight, bot.in_flight != 0, nowMs, Opt().Taxi.WaitMs);
         if (progress != taxi::Progress::None)
         {
-            if (_options.OnEvent)
-                _options.OnEvent(progress == taxi::Progress::Landed ? taxi::LandedLine(bot.guid, bot.map_id, bot.pos_x, bot.pos_y, state.TaxiFlight, nowMs)
+            if (Opt().OnEvent)
+                Opt().OnEvent(progress == taxi::Progress::Landed ? taxi::LandedLine(bot.guid, bot.map_id, bot.pos_x, bot.pos_y, state.TaxiFlight, nowMs)
                                                                     : taxi::TimeoutLine(bot.guid, bot.map_id, progress, state.TaxiFlight, nowMs));
             state.TaxiFlight = taxi::Flight{};
         }
     }
-    if (state.LosRepositionTarget != 0 && bot.life_state == 0 && ClassFor(_options, bot.guid) == 5 && state.ForcedHeal == 0)
+    if (state.LosRepositionTarget != 0 && bot.life_state == 0 && ClassFor(Opt(), bot.guid) == 5 && state.ForcedHeal == 0)
     {
         // LoS recovery must run before ordinary policy branches can continue early. Do not
         // reposition instead of an active heal: leave recovery pending if a party member is
@@ -44,7 +44,7 @@ BotPolicy::TurnFlow BotPolicy::TurnBegin(DecideTick& tick, BotTurn& turn)
                 if (leaderOf.count(member.guid) && leaderOf.at(member.guid) == recoveryParty &&
                     member.life_state == 0 && member.max_health != 0)
                 {
-                    std::uint32_t const threshold = member.guid == recoveryParty ? _options.DungeonTankHealBelowPct : _options.DungeonHealBelowPct;
+                    std::uint32_t const threshold = member.guid == recoveryParty ? Opt().DungeonTankHealBelowPct : Opt().DungeonHealBelowPct;
                     if (std::uint64_t(member.health) * 100 / member.max_health < threshold)
                         needsHeal = true;
                 }
@@ -90,7 +90,7 @@ BotPolicy::TurnFlow BotPolicy::TurnBegin(DecideTick& tick, BotTurn& turn)
                             dx /= distance;
                             dy /= distance;
                         }
-                        float const moveYards = float(_options.HealerLosMoveYards);
+                        float const moveYards = float(Opt().HealerLosMoveYards);
                         Point const dest{ losTarget->pos_x + dx * moveYards,
                                           losTarget->pos_y + dy * moveYards,
                                           losTarget->pos_z };
@@ -103,8 +103,8 @@ BotPolicy::TurnFlow BotPolicy::TurnBegin(DecideTick& tick, BotTurn& turn)
                         actions.push_back(move);
                         state.Last = Decision{ ActionType::kMoveTo, state.LosRepositionTarget, dest };
                         state.LastMove = state.Last;
-                        if (_options.OnEvent)
-                            _options.OnEvent("healer_dps_los: healer=" + std::to_string(bot.guid) +
+                        if (Opt().OnEvent)
+                            Opt().OnEvent("healer_dps_los: healer=" + std::to_string(bot.guid) +
                                              " moving_to=" + std::to_string(int(dest.X)) + "," +
                                              std::to_string(int(dest.Y)) + " target=" +
                                              std::to_string(state.LosRepositionTarget));
@@ -122,19 +122,19 @@ BotPolicy::TurnFlow BotPolicy::TurnBegin(DecideTick& tick, BotTurn& turn)
         state.RestPct = kRestBelowPct;
         state.LeaderYards = kFollowLeaderYards;
         // The first craft of each skill comes some seconds after the bot appears, not for all the bots at once.
-        if (_options.RandomPct > 0)
+        if (Opt().RandomPct > 0)
             for (std::size_t skill = 0; skill < kCraftLineCount; ++skill)
-                state.CraftRetryAtMs[skill] = nowMs + bot_random::Below(bot_random::Draw(_options.RandomSeed, bot.guid, bot_random::kSaltIdle, 0x300000000ull + skill), 60000);
-        if (_options.RandomPct > 0)
+                state.CraftRetryAtMs[skill] = nowMs + bot_random::Below(bot_random::Draw(Opt().RandomSeed, bot.guid, bot_random::kSaltIdle, 0x300000000ull + skill), 60000);
+        if (Opt().RandomPct > 0)
         {
-            state.RestPct = std::clamp<std::uint32_t>(std::uint32_t(bot_random::Vary(kRestBelowPct, std::max(1u, _options.RandomPct / 3),
-                                                                                     bot_random::Draw(_options.RandomSeed, bot.guid, bot_random::kSaltRest, 0))), 70, 98);
-            state.LeaderYards = float(bot_random::Vary(std::uint64_t(kFollowLeaderYards * 10.0f), _options.RandomPct,
-                                                       bot_random::Draw(_options.RandomSeed, bot.guid, bot_random::kSaltRest, 1))) / 10.0f;
+            state.RestPct = std::clamp<std::uint32_t>(std::uint32_t(bot_random::Vary(kRestBelowPct, std::max(1u, Opt().RandomPct / 3),
+                                                                                     bot_random::Draw(Opt().RandomSeed, bot.guid, bot_random::kSaltRest, 0))), 70, 98);
+            state.LeaderYards = float(bot_random::Vary(std::uint64_t(kFollowLeaderYards * 10.0f), Opt().RandomPct,
+                                                       bot_random::Draw(Opt().RandomSeed, bot.guid, bot_random::kSaltRest, 1))) / 10.0f;
         }
         // Personality (off by default): the caution trait moves the rest threshold a few points, within 70..98.
-        if (_options.Personality.Enabled)
-            state.RestPct = personality::RestPct(_options.Personality, personality::TraitsFor(_options.RandomSeed, bot.guid), state.RestPct);
+        if (Opt().Personality.Enabled)
+            state.RestPct = personality::RestPct(Opt().Personality, personality::TraitsFor(Opt().RandomSeed, bot.guid), state.RestPct);
     }
     if (state.OrderAction)
     {
@@ -160,9 +160,9 @@ BotPolicy::TurnFlow BotPolicy::TurnGroundEffects(DecideTick& tick, BotTurn& turn
     // more than the heal). The walk's end point is kept for kAvoidKeepMs so that it does not shift every tick (a move would be sent anew each time). Not for a bot on a
     // flight, dead, or with no effect in view. A spell is harmful when its caster is hostile to the bot (the snapshot's flag), or when it is in the avoid table or the
     // dungeon's list (AvoidSpells of the route).
-    if (_options.AvoidGroundEffects && bot.life_state == 0 && bot.in_flight == 0)
+    if (Opt().AvoidGroundEffects && bot.life_state == 0 && bot.in_flight == 0)
     {
-        std::vector<ground_avoid::Circle> const circles = HazardCircles(_options, bot);
+        std::vector<ground_avoid::Circle> const circles = HazardCircles(Opt(), bot);
         bool walking = false;
         if (!circles.empty())
         {
@@ -175,10 +175,10 @@ BotPolicy::TurnFlow BotPolicy::TurnGroundEffects(DecideTick& tick, BotTurn& turn
                 state.AvoidDest = *escape;
                 state.AvoidSetMs = nowMs;
                 walking = true;
-                if (_options.OnEvent && nowMs - state.AvoidLoggedMs >= 10000)
+                if (Opt().OnEvent && nowMs - state.AvoidLoggedMs >= 10000)
                 {
                     state.AvoidLoggedMs = nowMs;
-                    _options.OnEvent("avoid_effect: bot=" + std::to_string(bot.guid) + " map=" + std::to_string(bot.map_id) + " pos=" + std::to_string(int(bot.pos_x)) + "," +
+                    Opt().OnEvent("avoid_effect: bot=" + std::to_string(bot.guid) + " map=" + std::to_string(bot.map_id) + " pos=" + std::to_string(int(bot.pos_x)) + "," +
                                      std::to_string(int(bot.pos_y)) + " effects=" + std::to_string(circles.size()) + " to=" + std::to_string(int(escape->X)) + "," +
                                      std::to_string(int(escape->Y)));
                 }
@@ -260,8 +260,8 @@ void BotPolicy::TurnRevivedAndRoles(DecideTick& tick, BotTurn& turn)
     // Alive again after being down: the movement orders are sent afresh, and how it happened is logged.
     if (state.Life != 0)
     {
-        if (_options.OnEvent)
-            _options.OnEvent("revived: bot=" + std::to_string(bot.guid) + " how=" + (state.AcceptedFrom != 0 ? "resurrect" : state.Reclaimed ? "reclaim" : "unknown") +
+        if (Opt().OnEvent)
+            Opt().OnEvent("revived: bot=" + std::to_string(bot.guid) + " how=" + (state.AcceptedFrom != 0 ? "resurrect" : state.Reclaimed ? "reclaim" : "unknown") +
                              " down_ms=" + std::to_string(nowMs - state.DeathMs) + " health_pct=" +
                              std::to_string(HealthPct(bot, 0)));
         state.Life = 0;
@@ -275,7 +275,7 @@ void BotPolicy::TurnRevivedAndRoles(DecideTick& tick, BotTurn& turn)
         // grind spot with something strong on it; 470 of 942 deaths in 55 minutes on the sim, 17 bots dying every few seconds). The third death within
         // kDeathLoopMs, or the second one to the same creature entry within it, puts the bot at the nearest grind spot for its level that is not near its corpse.
         // DeathLoopBreaker: a death the breaker took is moved by DeathLoopBreakEscape (below), not here.
-        bool const loopBroken = _options.DeathLoopBreaker && state.LoopBreak;
+        bool const loopBroken = Opt().DeathLoopBreaker && state.LoopBreak;
         if (loopBroken)
         {
             state.LoopBreak = false;
@@ -283,14 +283,14 @@ void BotPolicy::TurnRevivedAndRoles(DecideTick& tick, BotTurn& turn)
             state.LoopBreakEscapeRetryMs = 0;
             state.LoopBreakLoggedMs = 0;
         }
-        if (!loopBroken && !stagingHold && _options.Grind && !_options.Grind->Spots.empty() && bot.level != 0 && nowMs >= state.EscapeUntilMs &&
+        if (!loopBroken && !stagingHold && Opt().Grind && !Opt().Grind->Spots.empty() && bot.level != 0 && nowMs >= state.EscapeUntilMs &&
             ((state.DeathTimesMs[0] != 0 && nowMs - state.DeathTimesMs[0] <= kDeathLoopMs) ||
              (state.KillerRepeat && state.DeathTimesMs[1] != 0 && nowMs - state.DeathTimesMs[1] <= kDeathLoopMs)))
         {
             std::vector<std::size_t> const spots = GrindSpotsForBot(state, bot, nowMs);
             for (std::size_t const index : spots)
             {
-                GrindSpot const& spot = _options.Grind->Spots[index];
+                GrindSpot const& spot = Opt().Grind->Spots[index];
                 if (std::hypot(spot.X - bot.pos_x, spot.Y - bot.pos_y) < kDeathLoopAwayYards)
                     continue;
                 BotAction away;
@@ -306,8 +306,8 @@ void BotPolicy::TurnRevivedAndRoles(DecideTick& tick, BotTurn& turn)
                 state.GrindVisited.push_back(index);
                 if (state.GrindVisited.size() > kGrindMemory)
                     state.GrindVisited.erase(state.GrindVisited.begin());
-                if (_options.OnEvent)
-                    _options.OnEvent("death_loop_escape: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id) +
+                if (Opt().OnEvent)
+                    Opt().OnEvent("death_loop_escape: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id) +
                                      " from=" + std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) + " spot=" + std::to_string(index));
                 break;
             }
@@ -319,13 +319,13 @@ void BotPolicy::TurnRevivedAndRoles(DecideTick& tick, BotTurn& turn)
 
     // ==== Party role, dungeon routing and follow logic (alive bots) ====
     // The bot's class: its own (from the class table) or the configured one. Ranged classes approach to range.
-    turn.classId = ClassFor(_options, bot.guid);
+    turn.classId = ClassFor(Opt(), bot.guid);
     auto const& classId = turn.classId;
     // A spec in the roster sets the role of a bot that has none: a tank spec tanks, a healer spec heals, a damage spec does not heal on its own (a shadow priest).
-    if (!state.SpecRoleApplied && state.Role_ == BotState::Role::Auto && _options.SpecOf)
+    if (!state.SpecRoleApplied && state.Role_ == BotState::Role::Auto && Opt().SpecOf)
     {
         state.SpecRoleApplied = true;
-        if (std::string const rosterSpec = _options.SpecOf(bot.guid); !rosterSpec.empty())
+        if (std::string const rosterSpec = Opt().SpecOf(bot.guid); !rosterSpec.empty())
             if (std::uint32_t const role = rotation::SpecRole(classId, rosterSpec))
                 state.Role_ = role == 1 ? BotState::Role::Tank : role == 2 ? BotState::Role::Healer : BotState::Role::Dps;
     }
@@ -343,10 +343,10 @@ void BotPolicy::TurnRevivedAndRoles(DecideTick& tick, BotTurn& turn)
     // The off-tank: the party's first warrior member after its leader (in guid order, the roster's second warrior; the raid roster's first entries are its
     // warriors). With an Onyxian Warder it does not kite: it picks up a Warder that hits another member, and holds one while the leader is dead.
     turn.offTank = false;
-    if (turn.partyMember && ClassFor(_options, bot.guid) == kWarriorClass)
+    if (turn.partyMember && ClassFor(Opt(), bot.guid) == kWarriorClass)
         if (auto const members = tick.membersOf.find(partyLeader); members != tick.membersOf.end())
             for (std::uint64_t member : members->second)
-                if (ClassFor(_options, member) == kWarriorClass)
+                if (ClassFor(Opt(), member) == kWarriorClass)
                 {
                     turn.offTank = member == bot.guid;
                     break;
@@ -360,7 +360,7 @@ void BotPolicy::TurnRevivedAndRoles(DecideTick& tick, BotTurn& turn)
     // A solo bot out of combat that is hurt (a reclaim brings it up at 50% health) rests before it fights or walks to a quest giver, up to kRecoverHoldMs: it is
     // treated as low on health (no target, no quest, away from a creature that is near, then sits). Prod 2026-11-12: revived at 49%, a bot pulled at once and died
     // to the same creature again, 812 deaths in 90 minutes.
-    if (partyLeader == 0 && !routeOn && bot.in_combat == 0 && bot.threat_target_guid == 0 && bot.max_health > 0 && BelowPct(bot.health, bot.max_health, pull_ready::SoloRestMarkPct(_options.SoloPullHpPct, kRecoverPullPct, state.RecoverSinceMs != 0)))
+    if (partyLeader == 0 && !routeOn && bot.in_combat == 0 && bot.threat_target_guid == 0 && bot.max_health > 0 && BelowPct(bot.health, bot.max_health, pull_ready::SoloRestMarkPct(Opt().SoloPullHpPct, kRecoverPullPct, state.RecoverSinceMs != 0)))
     {
         if (state.RecoverSinceMs == 0)
             state.RecoverSinceMs = nowMs;
@@ -374,12 +374,12 @@ void BotPolicy::TurnRevivedAndRoles(DecideTick& tick, BotTurn& turn)
     if (turn.hurtRest)
     {
         turn.lowHealth = true;
-        if (_options.OnEvent && pull_ready::LogDue(state.SoloHpGate, nowMs))
-            _options.OnEvent("pull_wait: bot=" + std::to_string(bot.guid) + " reason=hp level=" + std::to_string(bot.level) + " hp_pct=" + std::to_string(HealthPct(bot, 100)) +
+        if (Opt().OnEvent && pull_ready::LogDue(state.SoloHpGate, nowMs))
+            Opt().OnEvent("pull_wait: bot=" + std::to_string(bot.guid) + " reason=hp level=" + std::to_string(bot.level) + " hp_pct=" + std::to_string(HealthPct(bot, 100)) +
                              " mana_pct=" + std::to_string(bot.max_power > 0 ? bot.power * 100 / bot.max_power : 100) + " wait_ms=" + std::to_string(nowMs - state.RecoverSinceMs));
     }
     TurnSoloReady(tick, turn);
-    if (turn.hurtRest && _options.SoloPullHpPct != 0)
+    if (turn.hurtRest && Opt().SoloPullHpPct != 0)
         turn.pullWait = true;   // SoloPullHpPct: no self-pull while it rests (the fixed 75 mark only keeps the quest walk and the target away)
     // A dungeon party's bot on the outside map (a wipe left it at the graveyard, a rescue teleport was refused in combat): it goes back
     // through the instance door and starts no fight on the way. The owner's rule of 2026-10-22: a bot of a dungeon party must not be
@@ -421,9 +421,9 @@ void BotPolicy::TurnRevivedAndRoles(DecideTick& tick, BotTurn& turn)
         followRef = atLeader ? 0 : leaderRef;
     // A leader revived at the instance entrance rests there before it goes back to its party (leader_recover_wait, below): the members deep in the dungeon stay where they are,
     // they do not walk back through the packs to it.
-    if (followRef != 0 && routeOn && _options.DungeonTeleport && leaderSnap && leaderSnap->life_state == 0)
-        if (auto const dungeon = _options.DungeonsByMap.find(bot.map_id);
-            dungeon != _options.DungeonsByMap.end() && dungeon->second.HasEntry && DistanceTo(*leaderSnap, dungeon->second.Entry) <= kEntryYards &&
+    if (followRef != 0 && routeOn && Opt().DungeonTeleport && leaderSnap && leaderSnap->life_state == 0)
+        if (auto const dungeon = Opt().DungeonsByMap.find(bot.map_id);
+            dungeon != Opt().DungeonsByMap.end() && dungeon->second.HasEntry && DistanceTo(*leaderSnap, dungeon->second.Entry) <= kEntryYards &&
             DistanceTo(bot, dungeon->second.Entry) > kLostLeaderYards)
             followRef = 0;
     if (state.ChatFollow != 0)
@@ -456,8 +456,8 @@ void BotPolicy::TurnRevivedAndRoles(DecideTick& tick, BotTurn& turn)
     auto const& deadWaitKind = turn.deadWaitKind;
     if (partyLeaderBot && deadWaitKind != state.DeadWaitKind)
     {
-        if (_options.OnEvent)
-            _options.OnEvent(std::string("party_wait: leader=") + std::to_string(bot.guid) + " for=" +
+        if (Opt().OnEvent)
+            Opt().OnEvent(std::string("party_wait: leader=") + std::to_string(bot.guid) + " for=" +
                              (deadWaitKind == 1 ? "rez" : deadWaitKind == 2 ? "ghost" : "none") + " waited_ms=" +
                              std::to_string(state.DeadWaitKind != 0 ? nowMs - state.DeadWaitSinceMs : 0));
         if (state.DeadWaitKind == 0)
@@ -478,14 +478,14 @@ void BotPolicy::TurnTalentsAndGear(DecideTick& tick, BotTurn& turn)
     // Talent order: the core spends the bot's points by the profile for its (class, role). Once at level 10 or more, again at each level and
     // when the role changes; out of combat. What Auto means is the same as in the rest of the policy: a warrior in a party tanks, a class
     // with a heal spell heals unless told dps, the rest deal damage. (No respec: a role change after points were spent only affects new points.)
-    if (bot.level >= 10 && bot.in_combat == 0 && nowMs >= state.TalentRetryMs && !(_options.IsAlt && _options.IsAlt(bot.guid)))
+    if (bot.level >= 10 && bot.in_combat == 0 && nowMs >= state.TalentRetryMs && !(Opt().IsAlt && Opt().IsAlt(bot.guid)))
     {
         std::uint32_t const role = state.Role_ == BotState::Role::Tank ? 1u : state.Role_ == BotState::Role::Healer ? 2u
                                    : state.Role_ == BotState::Role::Dps ? 3u
-                                   : (classId == kWarriorClass && _options.PartySize != 0) ? 1u : HealSpellFor(classId, bot.level) != 0 ? 2u : 3u;
+                                   : (classId == kWarriorClass && Opt().PartySize != 0) ? 1u : HealSpellFor(classId, bot.level) != 0 ? 2u : 3u;
         // The spec (roster field race:class:spec, else the default of the class and role) picks the (class, spec) profile first in the core.
         std::uint32_t const spec = static_cast<std::uint32_t>(forever_module::TalentSpecFromKey(classId, SpecFor(bot.guid, classId)));
-        RespecInputs const respec{ _options.TalentRespec, bot.level, bot.life_state == 0, bot.in_combat != 0, state.TalentLevel != 0,
+        RespecInputs const respec{ Opt().TalentRespec, bot.level, bot.life_state == 0, bot.in_combat != 0, state.TalentLevel != 0,
                                    state.TalentRole, state.TalentSpec, role, spec, nowMs, state.RespecNotBeforeMs };
         if (RespecDue(respec))
         {
@@ -511,8 +511,8 @@ void BotPolicy::TurnTalentsAndGear(DecideTick& tick, BotTurn& turn)
     // Auto gear: out of combat, once when the bot first appears (if AutoGearing) and after it has gained some levels, or when asked.
     if (bot.in_combat == 0 && nowMs >= state.GearRetryMs)
     {
-        bool const alt = _options.IsAlt && _options.IsAlt(bot.guid);
-        bool const due = !alt && _options.AutoGearing && (state.GearedAtLevel == 0 || bot.level >= state.GearedAtLevel + _options.AutoGearEveryLevels);
+        bool const alt = Opt().IsAlt && Opt().IsAlt(bot.guid);
+        bool const due = !alt && Opt().AutoGearing && (state.GearedAtLevel == 0 || bot.level >= state.GearedAtLevel + Opt().AutoGearEveryLevels);
         if (due || (state.GearRequested && !alt))
         {
             BotAction gear;
@@ -522,7 +522,7 @@ void BotPolicy::TurnTalentsAndGear(DecideTick& tick, BotTurn& turn)
             // the old `classId == kWarriorClass` check never set this for a protection paladin or a feral tank druid).
             // bits 2-4: the gear stat profile (ModuleBotActions.cpp's PreferredStats), from the bot's resolved spec.
             bool const tankRole = state.Role_ == BotState::Role::Tank ||
-                                  (state.Role_ == BotState::Role::Auto && classId == kWarriorClass && _options.PartySize != 0);
+                                  (state.Role_ == BotState::Role::Auto && classId == kWarriorClass && Opt().PartySize != 0);
             gear.spell_id = (tankRole ? 1u : 0u) | (rotation::GearProfileFor(classId, spec) << 2);
             actions.push_back(gear);
             state.GearedAtLevel = bot.level != 0 ? bot.level : 1;
@@ -551,7 +551,7 @@ void BotPolicy::TurnTalentsAndGear(DecideTick& tick, BotTurn& turn)
 // rides while the leader does not is ordered off (spell 2). A passenger takes no world-coordinate move (turn.transportHold, see DecideBot and TurnSendMove).
 void BotPolicy::TurnTransport(DecideTick& tick, BotTurn& turn)
 {
-    if (!_options.TransportRide.Enabled)
+    if (!Opt().TransportRide.Enabled)
         return;
     BotSnapshot const& bot = turn.bot;
     BotState& state = turn.state;
@@ -588,12 +588,12 @@ void BotPolicy::TurnTransport(DecideTick& tick, BotTurn& turn)
     if (riding != state.TransportRiding)
     {
         state.TransportRiding = riding;
-        if (_options.OnEvent)
-            _options.OnEvent(std::string(riding ? "transport_board" : "transport_leave") + ": bot=" + std::to_string(bot.guid) + " map=" + std::to_string(bot.map_id) +
+        if (Opt().OnEvent)
+            Opt().OnEvent(std::string(riding ? "transport_board" : "transport_leave") + ": bot=" + std::to_string(bot.guid) + " map=" + std::to_string(bot.map_id) +
                              " transport=" + std::to_string(bot.transport_guid));
     }
 
-    transport_ride::Order const order = transport_ride::Decide(_options.TransportRide, facts);
+    transport_ride::Order const order = transport_ride::Decide(Opt().TransportRide, facts);
     if (riding)
         turn.transportHold = true;
     if (order == transport_ride::Order::kNone || !transport_ride::Due(nowMs, state.TransportNextMs))
@@ -604,7 +604,7 @@ void BotPolicy::TurnTransport(DecideTick& tick, BotTurn& turn)
     action.type = ActionType::kTransport;
     action.spell_id = order == transport_ride::Order::kJoin ? transport_ride::kJoinSpell : transport_ride::kLeaveSpell;
     tick.actions.push_back(action);
-    state.TransportNextMs = transport_ride::NextAfter(_options.TransportRide, nowMs, false);
+    state.TransportNextMs = transport_ride::NextAfter(Opt().TransportRide, nowMs, false);
     if (order == transport_ride::Order::kJoin)
         turn.transportHold = true; // the snapshot still shows the old place: no walk this turn that the boarding would undo
 }
@@ -614,7 +614,7 @@ void BotPolicy::TurnTransport(DecideTick& tick, BotTurn& turn)
 // ReadResult (teleport_refused) and tried again after OffMap.CooldownMs.
 BotPolicy::TurnFlow BotPolicy::TurnOffMap(DecideTick& tick, BotTurn& turn)
 {
-    if (!_options.OffMap.Enabled)
+    if (!Opt().OffMap.Enabled)
         return TurnFlow::kNext;
     BotSnapshot const& bot = turn.bot;
     BotState& state = turn.state;
@@ -627,7 +627,7 @@ BotPolicy::TurnFlow BotPolicy::TurnOffMap(DecideTick& tick, BotTurn& turn)
     facts.InCombat = bot.in_combat != 0;
     facts.Travelling = bot.in_flight != 0 || bot.transport_guid != 0 || (bot.movement_flags & 8u) != 0;
     facts.Held = turn.stagingHold || IsRouteActive(bot.guid) || state.TankLead || tick.tankLed.count(bot.guid) != 0 || (_tamingFn && _tamingFn(bot.guid));
-    off_map::Verdict const verdict = off_map::Check(_options.OffMap, _knownWorld, state.OffMap, facts, nowMs);
+    off_map::Verdict const verdict = off_map::Check(Opt().OffMap, _knownWorld, state.OffMap, facts, nowMs);
     if (verdict == off_map::Verdict::kWaiting && !state.OffMap.Logged)
     {
         state.OffMap.Logged = true;
@@ -636,7 +636,7 @@ BotPolicy::TurnFlow BotPolicy::TurnOffMap(DecideTick& tick, BotTurn& turn)
     }
     if (verdict != off_map::Verdict::kSend)
         return TurnFlow::kNext;
-    std::uint8_t const side = _options.PartySideOf ? _options.PartySideOf(bot.guid) : (_options.SideOf ? _options.SideOf(bot.guid) : 0);
+    std::uint8_t const side = Opt().PartySideOf ? Opt().PartySideOf(bot.guid) : (Opt().SideOf ? Opt().SideOf(bot.guid) : 0);
     off_map::Place const* home = _knownWorld.Home(bot.map_id, bot.pos_x, bot.pos_y, side);
     if (!home)
         return TurnFlow::kNext;
@@ -665,20 +665,20 @@ void BotPolicy::DeathAreaEscape(DecideTick& tick, BotTurn& turn)
     std::uint64_t const nowMs = tick.nowMs;
     BotSnapshot const& bot = turn.bot;
     BotState& state = turn.state;
-    if (_options.DeathAreaCount == 0 || nowMs >= state.AvoidAreaUntilMs || state.AvoidAreaMap != bot.map_id || bot.life_state != 0 || bot.in_combat != 0 ||
+    if (Opt().DeathAreaCount == 0 || nowMs >= state.AvoidAreaUntilMs || state.AvoidAreaMap != bot.map_id || bot.life_state != 0 || bot.in_combat != 0 ||
         turn.partyLeader != 0 || turn.routeOn || turn.stagingHold || nowMs < state.AreaEscapeRetryMs)
         return;
-    if (std::hypot(bot.pos_x - state.AvoidAreaX, bot.pos_y - state.AvoidAreaY) > float(_options.DeathAreaYards))
+    if (std::hypot(bot.pos_x - state.AvoidAreaX, bot.pos_y - state.AvoidAreaY) > float(Opt().DeathAreaYards))
         return;
     state.AreaEscapeRetryMs = nowMs + kDeathAreaEscapeRetryMs;
-    if (!_options.Grind || _options.Grind->Spots.empty() || bot.level == 0)
+    if (!Opt().Grind || Opt().Grind->Spots.empty() || bot.level == 0)
     {
         LogEvent("death_area_escape: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id) + " result=no_grind_data");
         return;
     }
     for (std::size_t const index : GrindSpotsForBot(state, bot, nowMs))
     {
-        GrindSpot const& spot = _options.Grind->Spots[index];
+        GrindSpot const& spot = Opt().Grind->Spots[index];
         if (std::hypot(spot.X - state.AvoidAreaX, spot.Y - state.AvoidAreaY) < kDeathLoopAwayYards)
             continue;
         BotAction away;

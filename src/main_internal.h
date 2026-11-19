@@ -32,6 +32,8 @@
 #include "advisor_send.h"
 #include "text_case.h"
 #include "party_cut.h"
+#include "ab_split.h"
+#include "bot_trace.h"
 
 #include "forever_module/module_client.h"
 #include "forever_module/tier2_session.h"
@@ -443,6 +445,8 @@ struct PumpExtras
     std::shared_ptr<ErrandFeed> Errand;       // set when Errands is on
     std::shared_ptr<VisitFeed> Visit;         // set when WorldEvents is on
     std::shared_ptr<AltRegistry> Alts;
+    std::shared_ptr<PolicyOptions> ArmB;          // ArmSplit: arm B's options (null when off), handed to the policy (BotPolicy::SetArmB)
+    std::shared_ptr<bot_trace::Tracer> Trace;     // TraceBots: the per-bot trace files (null when off)
     // The scenario's dungeons, in order (one for the single form, several for Scenario = "dm:10,rfc:10"): each with its plan, its number of parallel parties (each
     // with its own director) and the route, events, kill priority and portal its parties use.
     struct ScenarioDungeon
@@ -486,7 +490,12 @@ void PolicyFromSettings(PolicyOptions& policyOptions, BotSettings& settings);
 std::vector<dungeon_events::Event> LoadDungeons(PolicyOptions& policyOptions, BotSettings& settings, std::shared_ptr<DungeonReloadBox> const& dungeonBox);
 void LoadPolicyTables(PolicyOptions& policyOptions, BotSettings& settings);
 void ConnectPolicyLookups(PolicyOptions& policyOptions, BotSettings& settings, pick::ClassTable& races, pick::ClassTable& classes, RunContext& run,
-                          std::shared_ptr<AltRegistry> const& alts);
+                          std::shared_ptr<AltRegistry> const& alts, std::shared_ptr<bot_trace::Tracer> const& trace = nullptr);
+// ArmSplit: arm B's options, built like arm A's from settings.ArmB (null when the split is off); the tables read from the same files are shared with arm A.
+std::shared_ptr<PolicyOptions> ArmBOptions(PolicyOptions const& armA, BotSettings& settings, pick::ClassTable& races, pick::ClassTable& classes, RunContext& run,
+                                           std::shared_ptr<AltRegistry> const& alts, std::shared_ptr<bot_trace::Tracer> const& trace);
+// TraceBots: the tracer (null when TraceBots or TraceDir is empty).
+std::shared_ptr<bot_trace::Tracer> MakeTracer(BotSettings const& settings);
 void SetUpScenario(PolicyOptions& policyOptions, PumpExtras& extras, BotSettings& settings, std::vector<dungeon_events::Event> const& allEvents);
 void SetUpPresence(forever_module::ModuleClient& client, RunContext& run, BotSettings& settings, PumpExtras& extras, std::shared_ptr<trade::TradeBook> const& trades);
 void SetUpLootBooks(forever_module::ModuleClient& client, RunContext& run, BotSettings& settings, std::shared_ptr<AuctionBook> const& book,

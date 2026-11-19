@@ -9,14 +9,14 @@ BotPolicy::TurnFlow BotPolicy::TurnTelegraphEscape(DecideTick& tick, BotTurn& tu
     std::uint64_t const nowMs = tick.nowMs;
     BotSnapshot const& bot = turn.bot;
     BotState& state = turn.state;
-    if (!_options.TelegraphEscape || !_options.RaidRules || bot.life_state != 0 || bot.in_flight != 0 || bot.telegraph_count == 0 || !_options.RaidRules->Find(bot.map_id))
+    if (!Opt().TelegraphEscape || !Opt().RaidRules || bot.life_state != 0 || bot.in_flight != 0 || bot.telegraph_count == 0 || !Opt().RaidRules->Find(bot.map_id))
     {
         state.TelegraphSetMs = 0;
         return TurnFlow::kNext;
     }
-    raid_rules::Table const& rules = *_options.RaidRules;
-    std::uint32_t const classId = ClassFor(_options, bot.guid);
-    bool const tank = state.Role_ == BotState::Role::Tank || (state.Role_ == BotState::Role::Auto && classId == kWarriorClass && _options.PartySize != 0);
+    raid_rules::Table const& rules = *Opt().RaidRules;
+    std::uint32_t const classId = ClassFor(Opt(), bot.guid);
+    bool const tank = state.Role_ == BotState::Role::Tank || (state.Role_ == BotState::Role::Auto && classId == kWarriorClass && Opt().PartySize != 0);
     bool const midCast = bot.casting_spell != 0 && bot.cast_remaining_ms != 0;
 
     forever_module::Telegraph const* chosen = nullptr;
@@ -26,9 +26,9 @@ BotPolicy::TurnFlow BotPolicy::TurnTelegraphEscape(DecideTick& tick, BotTurn& tu
         bool const frontal = rules.IsFrontalAny(bot.map_id, telegraph->spell_id);
         if (tank && !lethal && !frontal)
             continue;   // the tank holds the boss where it is
-        if (tank && !lethal && frontal && _options.RaidBossPositions && rules.HasTankSpot(bot.map_id))
+        if (tank && !lethal && frontal && Opt().RaidBossPositions && rules.HasTankSpot(bot.map_id))
             continue;   // RaidBossPositions: the tank holds the boss facing away from the raid; stepping out would turn the next breath onto the flanks
-        if (midCast && !lethal && !_options.TelegraphEscapeCasters)
+        if (midCast && !lethal && !Opt().TelegraphEscapeCasters)
             continue;   // a healer or caster finishes the cast unless the hit would kill
         chosen = telegraph;
         break;
@@ -50,10 +50,10 @@ BotPolicy::TurnFlow BotPolicy::TurnTelegraphEscape(DecideTick& tick, BotTurn& tu
         party_view::Point const out = party_view::EscapeFrom(*chosen, bot.pos_x, bot.pos_y, ground_avoid::kExitMarginYards);
         state.TelegraphDest = ground_avoid::Point2{ out.X, out.Y };
         state.TelegraphSetMs = nowMs;
-        if (_options.OnEvent && nowMs - state.TelegraphLoggedMs >= 10000)
+        if (Opt().OnEvent && nowMs - state.TelegraphLoggedMs >= 10000)
         {
             state.TelegraphLoggedMs = nowMs;
-            _options.OnEvent("telegraph_escape: bot=" + std::to_string(bot.guid) + " map=" + std::to_string(bot.map_id) + " spell=" + std::to_string(chosen->spell_id) +
+            Opt().OnEvent("telegraph_escape: bot=" + std::to_string(bot.guid) + " map=" + std::to_string(bot.map_id) + " spell=" + std::to_string(chosen->spell_id) +
                              " to=" + std::to_string(int(out.X)) + "," + std::to_string(int(out.Y)));
         }
     }

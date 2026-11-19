@@ -28,7 +28,10 @@
 // when it has none of its own. Party actions are sent only out of combat.
 #pragma once
 
+#include <chrono>
 #include <optional>
+#include <utility>
+#include "ab_split.h"
 #include "calm_walk.h"
 #include "wipe_hold.h"
 #include "pull_ready.h"
@@ -98,6 +101,7 @@
 #include <map>
 #include <memory>
 #include <set>
+#include <chrono>
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -642,7 +646,7 @@ char const* ActionStatusName(forever_module::BotActionStatus status);
 class BotPolicy
 {
 public:
-    explicit BotPolicy(PolicyOptions options = {}) : _options(options), _questSets(MakeQuestSets(options)), _knownWorld(MakeKnownWorld(options)), _levelMap(MakeLevelMap(options)), _scenarioRoute(ScenarioRouteOf(options)),
+    explicit BotPolicy(PolicyOptions options = {}) : _optionsA(options), _questSets(MakeQuestSets(options)), _knownWorld(MakeKnownWorld(options)), _levelMap(MakeLevelMap(options)), _scenarioRoute(ScenarioRouteOf(options)),
                                                      _whispers(options.WhisperCooldownMs, options.WhisperMaxPerMin) {}
 
     // Actions for the bots in `view`. nowMs is a monotonic clock in milliseconds (cooldowns, retries, fight time).
@@ -675,7 +679,27 @@ public:
     void SetScenarioRouteFor(std::function<PolicyOptions::ScenarioRoute const*(std::uint64_t)> fn) { _scenarioRouteFn = std::move(fn); }
     // The dungeons "tank lead" knows (routes, boss points, events), replaced between two Decide calls when the dungeon files are reloaded. A tank that is
     // running a dungeon keeps the route it started with: its event runner has its own copy.
-    void SetDungeons(std::map<std::uint32_t, PolicyOptions::DungeonRoute> dungeons) { _options.DungeonsByMap = std::move(dungeons); }
+    void SetDungeons(std::map<std::uint32_t, PolicyOptions::DungeonRoute> dungeons)
+    {
+        if (_optionsB)
+            _optionsB->DungeonsByMap = dungeons;
+        _optionsA.DungeonsByMap = std::move(dungeons);
+    }
+    // ArmSplit (doc/sim-ab.md): the bots of arm B (odd guid, ab_split::ArmOf) take their own turn (DecideBot) with these options, the arm A bots and every
+    // shared step (parties, guilds, level dungeons, chat) with the constructor's. The tables the constructor derives (quest sets, known world, level map) stay
+    // arm A's. Call before the first Decide; the deaths_top and per-arm timing lines then come per arm as well.
+    void SetArmB(PolicyOptions options) { _optionsB = std::make_shared<PolicyOptions>(std::move(options)); }
+    bool ArmSplitOn() const { return _optionsB != nullptr; }
+    // The per-arm lines due with the last TakeDeathsTopLine ("deaths_top: arm=A window_min=..."), empty without ArmSplit. Taken once.
+    std::vector<std::string> TakeArmDeathsTopLines() { return std::exchange(_armDeathsTop, {}); }
+    // Per arm since the last call: the bots in view (summed over ticks), the ticks, and the time spent in their own turns (DecideBot), in microseconds.
+    struct ArmTiming
+    {
+        std::uint64_t BotTurns = 0;
+        std::uint64_t Ticks = 0;
+        std::uint64_t TurnUs = 0;
+    };
+    std::array<ArmTiming, 2> TakeArmTiming() { return std::exchange(_armTiming, {}); }
     // The creature entries of the bosses seen dead so far (the scenario director's), for the route's boss points.
     void SetKilledBosses(std::set<std::uint32_t> const& entries) { _killedBosses = entries; }
 
@@ -1262,6 +1286,7 @@ private:
         std::uint64_t GhostFightHoldSinceMs = 0;         // GhostHoldPartyFightMaxMs: this death's ghost was first held for its party's fight (0 = not yet)
         std::uint64_t DeathTimesMs[3] = { 0, 0, 0 };     // when this bot last died (newest last): two deaths close together mean it dies where it stands up (DeathLoopMs)
         std::uint32_t LastKillerEntry = 0;               // the entry of the creature that killed the bot last (0 = none seen)
+        std::uint32_t SeenLevel = 0;                     // the level of the last turn, for the level_up line (0 = no turn yet)
         bool KillerRepeat = false;                       // the last death was to the same creature entry as the one before: a death loop one death sooner
         party_reason::Memory PartyMemory;                // dynamic parties: this bot as a member of its world party (in or out, why, the rejoin wait, the next errand break)
         party_reason::Memory PartyLeadMemory;            // dynamic parties: this bot as a leader (its own errand break)
@@ -1325,10 +1350,10 @@ private:
     void PartialChainTick(BotState& state, forever_module::BotSnapshot const& bot, std::uint64_t nowMs); // sends the next leg of a chained walk, or gives the walk up when a leg went nowhere
     void NoteMoveRefused(BotState& state, forever_module::BotSnapshot const& bot, std::uint64_t nowMs); // the bookkeeping of a refused walk: pause, refused places, quest start blocked
 
-    // Parties (M8): cuts the bots of `view` into parties of _options.PartySize (one faction each, the lowest-guid
+    // Parties (M8): cuts the bots of `view` into parties of Opt().PartySize (one faction each, the lowest-guid
     // bots first), picks each party's leader (a set tank role, else a warrior with no role set), and fills
     // `leaderOf` (every partied bot's leader) and `membersOf` (a leader's other members). Pulled out of Decide
-    // because it is a self-contained computation over `view` and _options with no side effects beyond its two
+    // because it is a self-contained computation over `view` and Opt() with no side effects beyond its two
     // out-parameters — unlike the rest of Decide, which threads per-tick fight state through the whole function.
     // The party planner (party_planner.h): one plan per party leader, from the members' merged view. Called by Decide with the planner on.
     void PlanParties(forever_module::WorldTickSnapshotView const& view, std::unordered_map<std::uint64_t, std::size_t> const& indexOf,
@@ -1349,7 +1374,7 @@ private:
                            std::unordered_map<std::uint64_t, std::vector<std::uint64_t>>& membersOf, std::uint64_t nowMs);
     // Whether the party led by `leaderGuid` is due for a level dungeon at `partyLevel` (LevelDungeons; bot_policy_features.cpp).
     bool LevelDungeonDue(std::uint64_t leaderGuid, std::uint32_t partyLevel);
-    std::unordered_map<std::uint32_t, std::uint32_t> _questGroupSize;   // quest id -> its 'group <n>' (n >= 2), from _options.Quests (dynamic parties)
+    std::unordered_map<std::uint32_t, std::uint32_t> _questGroupSize;   // quest id -> its 'group <n>' (n >= 2), from Opt().Quests (dynamic parties)
     bool _questGroupSizeBuilt = false;
 
     // Decide, one bot at a time: DecideBot runs the steps of a bot's turn in order (bot_policy.cpp; the steps are in bot_policy_turn_*.cpp). DecideTick
@@ -1502,7 +1527,7 @@ private:
     BotState& StateOf(std::uint64_t botGuid)
     {
         auto const [at, created] = _bots.try_emplace(botGuid);
-        if (created && _options.AggressiveStart)
+        if (created && Opt().AggressiveStart)
             at->second.Stance_ = BotState::Stance::Aggressive;
         return at->second;
     }
@@ -1615,7 +1640,15 @@ private:
     void UpdateHealPlan(std::uint64_t leaderGuid, std::vector<party_planner::Member> const& members);
     void PruneHealPlans(std::unordered_map<std::uint64_t, std::vector<std::uint64_t>> const& membersOf);
     std::unordered_map<std::uint64_t, party_planner::Order> _partyOrders; // party leader guid -> its plan (Phase 2)
-    PolicyOptions _options;
+    // The options of the bot whose turn it is: arm B's inside an arm B bot's DecideBot (ArmSplit), arm A's (the constructor's) everywhere else.
+    PolicyOptions const& Opt() const { return _armBTurn ? *_optionsB : _optionsA; }
+    PolicyOptions _optionsA;
+    std::shared_ptr<PolicyOptions> _optionsB;            // ArmSplit: arm B's options (SetArmB); null when the split is off
+    bool _armBTurn = false;                              // an arm B bot's turn is running (DecideBot)
+    std::array<level_safe::DeathTally, 2> _armDeathTally;   // ArmSplit: the deaths per arm, for the per-arm deaths_top lines
+    std::array<std::size_t, 2> _armBotsInView{};
+    std::vector<std::string> _armDeathsTop;
+    std::array<ArmTiming, 2> _armTiming{};
     // One planner per (side, band): index side * 2 + band.
     static std::array<QuestPlanner, 6> MakeQuestSets(PolicyOptions const& options);
     std::array<QuestPlanner, 6> _questSets;

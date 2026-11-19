@@ -456,7 +456,7 @@ void LoadPolicyTables(PolicyOptions& policyOptions, BotSettings& settings)
 
 // The policy's lookups into the module's tables (race, side, class, spec, alts) and its event log.
 void ConnectPolicyLookups(PolicyOptions& policyOptions, BotSettings& settings, pick::ClassTable& races, pick::ClassTable& classes, RunContext& run,
-                          std::shared_ptr<AltRegistry> const& alts)
+                          std::shared_ptr<AltRegistry> const& alts, std::shared_ptr<bot_trace::Tracer> const& trace)
 {
     policyOptions.RaceOf = [&races](std::uint64_t botGuid) { return races.Get(botGuid); };
     policyOptions.SideOf = [&races](std::uint64_t botGuid) { return SideOfRace(races.Get(botGuid)); };
@@ -478,8 +478,73 @@ void ConnectPolicyLookups(PolicyOptions& policyOptions, BotSettings& settings, p
     policyOptions.WhisperCooldownMs = settings.WhisperCooldownMs;
     policyOptions.WhisperMaxPerMin = settings.WhisperMaxPerMin;
     policyOptions.IsAlt = [alts](std::uint64_t guid) { return alts->Has(guid); };
-    policyOptions.OnEvent = [](std::string const& line) { std::cerr << "forever-bots: event " << line << "\n"; };
+    // The one event log of the policy: " arm=A|B" when ArmSplit is on (ab_split::Tag), and a traced bot's line also to its trace file (TraceBots).
+    policyOptions.OnEvent = [trace](std::string const& line)
+    {
+        std::cerr << "forever-bots: event " << ab_split::Tag(line) << "\n";
+        if (trace)
+            trace->Event(line);
+    };
     policyOptions.AutoGearEveryLevels = settings.AutoGearEveryLevels;
+}
+
+std::shared_ptr<PolicyOptions> ArmBOptions(PolicyOptions const& armA, BotSettings& settings, pick::ClassTable& races, pick::ClassTable& classes, RunContext& run,
+                                           std::shared_ptr<AltRegistry> const& alts, std::shared_ptr<bot_trace::Tracer> const& trace)
+{
+    if (!settings.ArmSplit || !settings.ArmB)
+        return nullptr;
+    BotSettings& b = *settings.ArmB;
+    std::string applied;
+    for (std::string const& item : settings.ArmBApplied)
+        applied += (applied.empty() ? "" : ", ") + item;
+    std::cerr << "forever-bots: arm split on: even guids are arm A, odd guids arm B; arm B overrides: " << (applied.empty() ? std::string("none (an A=B run)") : applied)
+              << "; the table lines up to 'arm B ready' are arm B's\n";
+    auto out = std::make_shared<PolicyOptions>();
+    PolicyFromSettings(*out, b);
+    out->DungeonsByMap = armA.DungeonsByMap;   // the dungeon files are the process's (reloaded for both arms, BotPolicy::SetDungeons)
+    LoadPolicyTables(*out, b);
+    ConnectPolicyLookups(*out, b, races, classes, run, alts, trace);
+    // The same file read twice is one table: arm B uses arm A's copy (the sim's RAM).
+    if (b.QuestFile == settings.QuestFile && b.AttunementFile == settings.AttunementFile)
+        out->Quests = armA.Quests;
+    if (b.QuestFileAlliance == settings.QuestFileAlliance && b.QuestFileHorde == settings.QuestFileHorde && b.QuestFileAlliance60 == settings.QuestFileAlliance60 &&
+        b.QuestFileHorde60 == settings.QuestFileHorde60)
+        for (std::size_t i = 0; i < 3; ++i)
+            for (std::size_t j = 0; j < 2; ++j)
+                out->QuestLists[i][j] = armA.QuestLists[i][j];
+    if (b.GrindFile == settings.GrindFile)
+    {
+        out->Grind = armA.Grind;
+        if (b.PathVariety.Enabled && settings.PathVariety.Enabled && b.PathZoneFile == settings.PathZoneFile)
+            out->PathZones = armA.PathZones;
+    }
+    if (b.RotationFile == settings.RotationFile)
+        out->Rotations = armA.Rotations;
+    if (b.SpellCostFile == settings.SpellCostFile)
+        out->SpellCosts = armA.SpellCosts;
+    if (b.TameBeastFile == settings.TameBeastFile)
+        out->TameBeasts = armA.TameBeasts;
+    std::cerr << "forever-bots: arm B ready\n";
+    return out;
+}
+
+std::shared_ptr<bot_trace::Tracer> MakeTracer(BotSettings const& settings)
+{
+    if (settings.TraceBots.empty())
+        return nullptr;
+    if (settings.TraceDir.empty())
+    {
+        std::cerr << "forever-bots: TraceBots is set but TraceDir is empty; no trace\n";
+        return nullptr;
+    }
+    bot_trace::Options options;
+    options.Bots = settings.TraceBots;
+    options.Dir = settings.TraceDir;
+    options.MaxBytesPerBot = std::uint64_t(settings.TraceMaxMB) * 1024 * 1024;
+    auto tracer = std::make_shared<bot_trace::Tracer>(std::move(options));
+    std::cerr << "forever-bots: tracing " << settings.TraceBots.size() << " bot(s) to " << settings.TraceDir << "/bot-<guid>.trace, at most " << settings.TraceMaxMB
+              << " MB each\n";
+    return tracer;
 }
 
 // A scenario: the policy options it overrides, and each dungeon's plan and route for the pump.

@@ -20,11 +20,11 @@ void BotPolicy::LevelUnsafeEscape(DecideTick& tick, BotTurn& turn)
     std::uint64_t const nowMs = tick.nowMs;
     BotSnapshot const& bot = turn.bot;
     BotState& state = turn.state;
-    if (!_options.LevelSafe.Escape || _levelMap.Empty() || bot.level == 0 || bot.life_state != 0 || turn.partyLeader != 0 || tick.membersOf.count(bot.guid) != 0 || turn.routeOn ||
+    if (!Opt().LevelSafe.Escape || _levelMap.Empty() || bot.level == 0 || bot.life_state != 0 || turn.partyLeader != 0 || tick.membersOf.count(bot.guid) != 0 || turn.routeOn ||
         turn.stagingHold || state.TankLead || state.ChatStay || state.ChatFollow != 0 || bot.in_flight != 0 || bot.transport_guid != 0 ||
-        nowMs < state.LevelEscapeRetryMs || nowMs < state.EscapeUntilMs || !_options.Grind || _options.Grind->Spots.empty())
+        nowMs < state.LevelEscapeRetryMs || nowMs < state.EscapeUntilMs || !Opt().Grind || Opt().Grind->Spots.empty())
         return;
-    std::uint32_t const margin = std::max(_options.LevelSafe.EscapeMarginLevels, _options.LevelSafe.MarginLevels);
+    std::uint32_t const margin = std::max(Opt().LevelSafe.EscapeMarginLevels, Opt().LevelSafe.MarginLevels);
     std::uint32_t const placeMin = _levelMap.PlaceMin(bot.map_id, bot.pos_x, bot.pos_y);
     if (placeMin == 0 || placeMin <= bot.level + margin)
     {
@@ -42,12 +42,12 @@ void BotPolicy::LevelUnsafeEscape(DecideTick& tick, BotTurn& turn)
         }
         return;
     }
-    state.LevelEscapeRetryMs = nowMs + _options.LevelSafe.EscapeCooldownMs;
+    state.LevelEscapeRetryMs = nowMs + Opt().LevelSafe.EscapeCooldownMs;
     for (std::size_t const index : GrindSpotsForBot(state, bot, nowMs))
     {
-        GrindSpot const& spot = _options.Grind->Spots[index];
+        GrindSpot const& spot = Opt().Grind->Spots[index];
         // The spot's own range fits the bot; the place around it must not be too high either (a low spot inside a high zone), by the walk margin.
-        if (_levelMap.TooHigh(spot.Map, spot.X, spot.Y, bot.level, _options.LevelSafe.MarginLevels))
+        if (_levelMap.TooHigh(spot.Map, spot.X, spot.Y, bot.level, Opt().LevelSafe.MarginLevels))
             continue;
         BotAction away;
         away.bot_guid = bot.guid;
@@ -69,7 +69,7 @@ void BotPolicy::LevelUnsafeEscape(DecideTick& tick, BotTurn& turn)
                  std::to_string(int(spot.Y)) + " spot_levels=" + std::to_string(spot.MinLevel) + "-" + std::to_string(spot.MaxLevel));
         return;
     }
-    if (_levelSafeLog.Due(bot.guid, 0, "no_spot", nowMs, _options.LevelSafe.LogThrottleMs))
+    if (_levelSafeLog.Due(bot.guid, 0, "no_spot", nowMs, Opt().LevelSafe.LogThrottleMs))
         LogEvent("level_unsafe_escape: bot=" + std::to_string(bot.guid) + where + " result=no_spot");
 }
 
@@ -82,7 +82,7 @@ void BotPolicy::LevelSafeQuestWalk(DecideTick& tick, BotTurn& turn)
     BotSnapshot const& bot = turn.bot;
     BotState& state = turn.state;
     QuestStep& step = turn.questStep;
-    if (!_options.LevelSafe.Walks || _levelMap.Empty() || bot.level == 0 || (step.Kind != QuestStepKind::WalkTo && step.Kind != QuestStepKind::Hunt))
+    if (!Opt().LevelSafe.Walks || _levelMap.Empty() || bot.level == 0 || (step.Kind != QuestStepKind::WalkTo && step.Kind != QuestStepKind::Hunt))
         return;
     if (step.HopLeg)
         return; // a Skyborne exit step (the dock walk, the hand-in at the landing point): the only way off map 2991, never dropped here
@@ -94,7 +94,7 @@ void BotPolicy::LevelSafeQuestWalk(DecideTick& tick, BotTurn& turn)
     state.LevelSafeQuest = step.Quest;
     state.LevelSafeDest = dest;
     state.LevelSafeLevel = bot.level;
-    level_safe::Options const& o = _options.LevelSafe;
+    level_safe::Options const& o = Opt().LevelSafe;
     // The part of the walk still inside the bot's own place is not judged (a bot in a high place may walk out): at least the radius plus 50 yards.
     float const skipNear = std::max(o.SkipNearYards, o.RadiusYards + 50.0f);
     // A hand-in walk (to the ender of a quest in the log) takes the wide margin, as the escape does: the bot has done the quest, and its ender often stands in a
@@ -125,19 +125,19 @@ void BotPolicy::LevelSafeGhost(DecideTick& tick, BotTurn& turn)
 {
     BotSnapshot const& bot = turn.bot;
     BotState& state = turn.state;
-    if (!_options.LevelSafe.Graveyard || state.LevelSafeJudged || _levelMap.Empty() || bot.level == 0 || bot.life_state != 2 || state.GhostSinceMs == 0)
+    if (!Opt().LevelSafe.Graveyard || state.LevelSafeJudged || _levelMap.Empty() || bot.level == 0 || bot.life_state != 2 || state.GhostSinceMs == 0)
         return;
     // The corpse may show a tick after the ghost: judged when it is there, or after a few seconds without it.
     if (bot.corpse_valid == 0 && tick.nowMs - state.GhostSinceMs < 5000)
         return;
     state.LevelSafeJudged = true;
-    std::uint32_t const margin = _options.LevelSafe.MarginLevels;                                        // a graveyard fits by the narrow margin
-    std::uint32_t const wide = std::max(_options.LevelSafe.EscapeMarginLevels, margin);                  // the corpse and the graveyard are too high by the wide one
+    std::uint32_t const margin = Opt().LevelSafe.MarginLevels;                                        // a graveyard fits by the narrow margin
+    std::uint32_t const wide = std::max(Opt().LevelSafe.EscapeMarginLevels, margin);                  // the corpse and the graveyard are too high by the wide one
     bool const corpseHere = bot.corpse_valid != 0 && bot.corpse_map == state.GhostSpawnMap;
     std::uint32_t const yardMin = _levelMap.PlaceMin(state.GhostSpawnMap, state.GhostSpawn.X, state.GhostSpawn.Y);
     std::uint32_t const corpseMin = corpseHere ? _levelMap.PlaceMin(bot.corpse_map, bot.corpse_x, bot.corpse_y) : 0;
     // DeathLoopBreaker: a graveyard where a loop was broken is too high for this level for two hours, whatever its place minimum says.
-    bool const yardUnsafe = _options.DeathLoopBreaker && YardUnsafe(state.GhostSpawnMap, state.GhostSpawn.X, state.GhostSpawn.Y, bot.level, tick.nowMs);
+    bool const yardUnsafe = Opt().DeathLoopBreaker && YardUnsafe(state.GhostSpawnMap, state.GhostSpawn.X, state.GhostSpawn.Y, bot.level, tick.nowMs);
     bool const yardHigh = (yardMin != 0 && yardMin > bot.level + wide) || yardUnsafe;
     // ... and a corpse beside such a graveyard is given up as one too high is (the killer stands there).
     bool const corpseHigh = (corpseMin != 0 && corpseMin > bot.level + wide) ||
@@ -146,7 +146,7 @@ void BotPolicy::LevelSafeGhost(DecideTick& tick, BotTurn& turn)
         return;
     float const nearX = corpseHere ? bot.corpse_x : state.GhostSpawn.X;
     float const nearY = corpseHere ? bot.corpse_y : state.GhostSpawn.Y;
-    std::uint8_t const side = _options.SideOf ? _options.SideOf(bot.guid) : 0;
+    std::uint8_t const side = Opt().SideOf ? Opt().SideOf(bot.guid) : 0;
     std::string const line = "level_safe_yard: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(state.GhostSpawnMap) +
                              " graveyard=" + std::to_string(int(state.GhostSpawn.X)) + "," + std::to_string(int(state.GhostSpawn.Y)) + " graveyard_min=" +
                              std::to_string(yardMin) + " corpse_min=" + std::to_string(corpseMin) + " reason=" +
@@ -155,11 +155,11 @@ void BotPolicy::LevelSafeGhost(DecideTick& tick, BotTurn& turn)
     std::uint32_t const level = bot.level;
     level_safe::Graveyards::Yard const* yard = _graveyards.Fitting(_levelMap, state.GhostSpawnMap, nearX, nearY, bot.level, margin, side,
                                                                    [&](level_safe::Graveyards::Yard const& candidate)
-                                                                   { return _options.DeathLoopBreaker && YardUnsafe(candidate.Map, candidate.X, candidate.Y, level, nowMs); });
+                                                                   { return Opt().DeathLoopBreaker && YardUnsafe(candidate.Map, candidate.X, candidate.Y, level, nowMs); });
     if (!yard)
     {
         // Once per death already; a bot dying again and again where no fitting graveyard is known repeats it, so it is throttled as the other lines.
-        if (_levelSafeLog.Due(bot.guid, 0, "yard_none_known", tick.nowMs, _options.LevelSafe.LogThrottleMs))
+        if (_levelSafeLog.Due(bot.guid, 0, "yard_none_known", tick.nowMs, Opt().LevelSafe.LogThrottleMs))
             LogEvent(line + " result=none_known known=" + std::to_string(_graveyards.Size()));
         return;
     }
@@ -175,7 +175,7 @@ void BotPolicy::LevelSafeGhost(DecideTick& tick, BotTurn& turn)
 // teleported to the nearest known place (the off-map recovery's kTeleport), at most once per BelowMap.CooldownMs.
 BotPolicy::TurnFlow BotPolicy::TurnBelowMap(DecideTick& tick, BotTurn& turn)
 {
-    if (!_options.BelowMap.Enabled)
+    if (!Opt().BelowMap.Enabled)
         return TurnFlow::kNext;
     BotSnapshot const& bot = turn.bot;
     BotState& state = turn.state;
@@ -183,7 +183,7 @@ BotPolicy::TurnFlow BotPolicy::TurnBelowMap(DecideTick& tick, BotTurn& turn)
     // Looked at every CheckEveryMs, not every tick (the near places are a scan of the map's list); the drop must hold for BelowChecks looks in a row.
     if (nowMs < state.BelowMap.NextCheckMs)
         return TurnFlow::kNext;
-    state.BelowMap.NextCheckMs = nowMs + _options.BelowMap.CheckEveryMs;
+    state.BelowMap.NextCheckMs = nowMs + Opt().BelowMap.CheckEveryMs;
     below_map::Facts facts;
     facts.Alive = bot.life_state == 0;
     facts.InCombat = bot.in_combat != 0;
@@ -194,7 +194,7 @@ BotPolicy::TurnFlow BotPolicy::TurnBelowMap(DecideTick& tick, BotTurn& turn)
     facts.Held = turn.stagingHold || IsRouteActive(bot.guid) || state.TankLead || tick.tankLed.count(bot.guid) != 0 || (_tamingFn && _tamingFn(bot.guid));
     facts.Z = bot.pos_z;
     // The ground: the lowest known place within NearYards (any side), not the nearest one; a giver on a tower beside a lower place is not the ground.
-    off_map::KnownWorld::Around const around = _knownWorld.Near(bot.map_id, bot.pos_x, bot.pos_y, bot.pos_z, _options.BelowMap.NearYards);
+    off_map::KnownWorld::Around const around = _knownWorld.Near(bot.map_id, bot.pos_x, bot.pos_y, bot.pos_z, Opt().BelowMap.NearYards);
     off_map::Place const* ground = around.Lowest;
     if (ground)
     {
@@ -202,13 +202,13 @@ BotPolicy::TurnFlow BotPolicy::TurnBelowMap(DecideTick& tick, BotTurn& turn)
         facts.GroundZ = ground->Z;
         facts.NearestDz = around.NearestDz;
     }
-    below_map::Verdict const verdict = below_map::Check(_options.BelowMap, state.BelowMap, facts, nowMs);
+    below_map::Verdict const verdict = below_map::Check(Opt().BelowMap, state.BelowMap, facts, nowMs);
     std::string const where = " map=" + std::to_string(bot.map_id) + " pos=" + std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) + "," +
                               std::to_string(int(bot.pos_z)) + " ground_z=" + (facts.HasGround ? std::to_string(int(facts.GroundZ)) : std::string("none"));
     if (below_map::IsSkip(verdict))
     {
         // below_map_skip: at most once per bot every SkipLogMs (10 min), and counted then (the hourly line), so the count compares with below_map_recover.
-        if (below_map::SkipLogDue(_options.BelowMap, state.BelowMap, nowMs))
+        if (below_map::SkipLogDue(Opt().BelowMap, state.BelowMap, nowMs))
         {
             ++_belowMapSkips[below_map::VerdictName(verdict)];
             LogEvent("below_map_skip: bot=" + std::to_string(bot.guid) + " reason=" + below_map::VerdictName(verdict) + " sign=" +
@@ -219,7 +219,7 @@ BotPolicy::TurnFlow BotPolicy::TurnBelowMap(DecideTick& tick, BotTurn& turn)
     if (!below_map::IsSend(verdict))
         return TurnFlow::kNext;
     // z_below: back up to that place. A storm: the nearest place of its side.
-    std::uint8_t const side = _options.PartySideOf ? _options.PartySideOf(bot.guid) : (_options.SideOf ? _options.SideOf(bot.guid) : 0);
+    std::uint8_t const side = Opt().PartySideOf ? Opt().PartySideOf(bot.guid) : (Opt().SideOf ? Opt().SideOf(bot.guid) : 0);
     off_map::Place const* to = verdict == below_map::Verdict::kSendBelow ? ground : _knownWorld.Home(bot.map_id, bot.pos_x, bot.pos_y, side);
     if (!to)
         return TurnFlow::kNext;

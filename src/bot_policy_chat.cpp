@@ -21,7 +21,7 @@ std::vector<std::string> BotPolicy::ApplyChat(WorldTickSnapshotView const& view,
         // Only the bots of the speaker's own group obey, and a whisper reaches only the bot it names.
         if (bot.group_leader_guid != issuerRef || (chat.Recipient != 0 && bot.guid != chat.Recipient))
             continue;
-        std::uint32_t const classId = ClassFor(_options, bot.guid);
+        std::uint32_t const classId = ClassFor(Opt(), bot.guid);
         if (!command.Selector.Matches(classId))
             continue;
         ++matched;
@@ -67,8 +67,8 @@ std::vector<std::string> BotPolicy::ApplyChat(WorldTickSnapshotView const& view,
             case ChatVerb::Lead:
             {
                 // Only in a dungeon the module has a route for, and only for a bot that is in the speaker's group (the loop above) and so can lead it.
-                auto const dungeon = _options.DungeonsByMap.find(bot.map_id);
-                if (dungeon == _options.DungeonsByMap.end() || dungeon->second.Route.empty())
+                auto const dungeon = Opt().DungeonsByMap.find(bot.map_id);
+                if (dungeon == Opt().DungeonsByMap.end() || dungeon->second.Route.empty())
                 {
                     refuse("not in a dungeon with a known route");
                     break;

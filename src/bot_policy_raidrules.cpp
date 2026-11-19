@@ -63,17 +63,17 @@ BotPolicy::TurnFlow BotPolicy::TurnRaidSpacing(DecideTick& tick, BotTurn& turn)
 {
     BotSnapshot const& bot = turn.bot;
     BotState& state = turn.state;
-    if (!_options.RaidRules || (!_options.RaidSpread && !_options.RaidAvoidEnemy))
+    if (!Opt().RaidRules || (!Opt().RaidSpread && !Opt().RaidAvoidEnemy))
         return TurnFlow::kNext;
-    raid_rules::Table const& rules = *_options.RaidRules;
+    raid_rules::Table const& rules = *Opt().RaidRules;
     if (bot.life_state != 0 || bot.in_flight != 0 || !rules.Find(bot.map_id))
     {
         state.SpacingSetMs = 0;
         return TurnFlow::kNext;
     }
     std::uint64_t const nowMs = tick.nowMs;
-    std::uint32_t const classId = ClassFor(_options, bot.guid);
-    bool const tank = state.Role_ == BotState::Role::Tank || (state.Role_ == BotState::Role::Auto && classId == kWarriorClass && _options.PartySize != 0);
+    std::uint32_t const classId = ClassFor(Opt(), bot.guid);
+    bool const tank = state.Role_ == BotState::Role::Tank || (state.Role_ == BotState::Role::Auto && classId == kWarriorClass && Opt().PartySize != 0);
     bool const midCast = bot.casting_spell != 0 && bot.cast_remaining_ms != 0;
 
     // A walk already begun keeps its end point for a few seconds, so the next snapshot does not stop the bot at the edge.
@@ -86,9 +86,9 @@ BotPolicy::TurnFlow BotPolicy::TurnRaidSpacing(DecideTick& tick, BotTurn& turn)
     // damage dealer ignores the circle of the one unit it fights (it is the one that kills it, TurnTargeting).
     bool const healer = state.Role_ != BotState::Role::Dps && state.Role_ != BotState::Role::Tank && HealSpellFor(classId, bot.level) != 0;
     std::uint8_t kind = tank ? raid_rules::kWhoTanks : SpreadKindOf(classId, healer);
-    if ((kind == raid_rules::kWhoMelee && !_options.RaidAvoidEnemyMelee) || (kind == raid_rules::kWhoTanks && !_options.RaidAvoidEnemyTank))
+    if ((kind == raid_rules::kWhoMelee && !Opt().RaidAvoidEnemyMelee) || (kind == raid_rules::kWhoTanks && !Opt().RaidAvoidEnemyTank))
         kind = 0;
-    if (_options.RaidAvoidEnemy && kind != 0 && rules.HasAvoidEnemy(bot.map_id))
+    if (Opt().RaidAvoidEnemy && kind != 0 && rules.HasAvoidEnemy(bot.map_id))
     {
         std::vector<ground_avoid::Circle> circles;
         bool anyCasting = false;
@@ -97,7 +97,7 @@ BotPolicy::TurnFlow BotPolicy::TurnRaidSpacing(DecideTick& tick, BotTurn& turn)
         {
             if (!unit.is_hostile || unit.health == 0 || !IsLiveMob(unit))
                 continue;
-            if (_options.RaidFocusAvoidEnemy && kind == raid_rules::kWhoRanged && unit.guid == bot.threat_target_guid)
+            if (Opt().RaidFocusAvoidEnemy && kind == raid_rules::kWhoRanged && unit.guid == bot.threat_target_guid)
                 continue;
             for (raid_rules::EnemyZone const& zone : rules.AvoidEnemyFor(bot.map_id, forever_module::UnitRefEntry(unit.guid)))
                 // avoid_enemy_aura: no circle once a bot targeting the unit sees a complete aura list without the aura (unknown keeps the circle)
@@ -116,10 +116,10 @@ BotPolicy::TurnFlow BotPolicy::TurnRaidSpacing(DecideTick& tick, BotTurn& turn)
                     state.SpacingDest = *out;
                     state.SpacingSetMs = nowMs;
                     walking = true;
-                    if (_options.OnEvent && nowMs - state.SpacingLoggedMs >= 10000)
+                    if (Opt().OnEvent && nowMs - state.SpacingLoggedMs >= 10000)
                     {
                         state.SpacingLoggedMs = nowMs;
-                        _options.OnEvent("raid_avoid_enemy: bot=" + std::to_string(bot.guid) + " map=" + std::to_string(bot.map_id) + " entry=" + std::to_string(entry) +
+                        Opt().OnEvent("raid_avoid_enemy: bot=" + std::to_string(bot.guid) + " map=" + std::to_string(bot.map_id) + " entry=" + std::to_string(entry) +
                                          " to=" + std::to_string(int(out->X)) + "," + std::to_string(int(out->Y)));
                     }
                 }
@@ -129,17 +129,17 @@ BotPolicy::TurnFlow BotPolicy::TurnRaidSpacing(DecideTick& tick, BotTurn& turn)
     auto const led = tick.leaderOf.find(bot.guid);      // turn.partyLeader is filled by a later step
     std::uint64_t const leader = led == tick.leaderOf.end() ? 0 : led->second;
     // spread: the party plan names a point for a member that stands too close to another of its group; at most one nudge per kSpreadCooldownMs, never mid-cast.
-    if (!walking && _options.RaidSpread && !tank && leader != 0 && bot.in_combat != 0 && !midCast && nowMs >= state.SpacingNextMs)
+    if (!walking && Opt().RaidSpread && !tank && leader != 0 && bot.in_combat != 0 && !midCast && nowMs >= state.SpacingNextMs)
         if (party_planner::SpreadAssignment const* const nudge = party_planner::SpreadFor(tick.PlanOf(leader), bot.guid))
         {
             state.SpacingDest = ground_avoid::Point2{ nudge->X, nudge->Y };
             state.SpacingSetMs = nowMs;
             state.SpacingNextMs = nowMs + kSpreadCooldownMs;
             walking = true;
-            if (_options.OnEvent && nowMs - state.SpacingLoggedMs >= 5000)
+            if (Opt().OnEvent && nowMs - state.SpacingLoggedMs >= 5000)
             {
                 state.SpacingLoggedMs = nowMs;
-                _options.OnEvent("raid_spread: bot=" + std::to_string(bot.guid) + " map=" + std::to_string(bot.map_id) +
+                Opt().OnEvent("raid_spread: bot=" + std::to_string(bot.guid) + " map=" + std::to_string(bot.map_id) +
                                  " to=" + std::to_string(int(nudge->X)) + "," + std::to_string(int(nudge->Y)));
             }
         }
@@ -169,7 +169,7 @@ BotPolicy::TurnFlow BotPolicy::TurnRaidSpacing(DecideTick& tick, BotTurn& turn)
 // planned mage polymorphs it. purge: the planned priest or shaman removes the listed buff from the enemy. Each is one instant cast; both need the party plan.
 BotPolicy::TurnFlow BotPolicy::TurnRaidAuras(DecideTick& tick, BotTurn& turn)
 {
-    if (!_options.RaidRules || (!_options.RaidMindControl && !_options.RaidPurge) || turn.partyLeader == 0)
+    if (!Opt().RaidRules || (!Opt().RaidMindControl && !Opt().RaidPurge) || turn.partyLeader == 0)
         return TurnFlow::kNext;
     party_planner::Order const* const plan = tick.PlanOf(turn.partyLeader);
     if (plan == nullptr)
@@ -177,15 +177,15 @@ BotPolicy::TurnFlow BotPolicy::TurnRaidAuras(DecideTick& tick, BotTurn& turn)
     std::uint64_t const nowMs = tick.nowMs;
     BotSnapshot const& bot = turn.bot;
     BotState& state = turn.state;
-    if (_options.RaidMindControl)
+    if (Opt().RaidMindControl)
         for (std::uint64_t const member : plan->Controlled)
             if (member != bot.guid)
                 state.AvoidUntilMs[PlayerRef(member)] = nowMs + kControlAvoidMs;
     if (bot.life_state != 0 || nowMs < state.NextCastMs || IsCasting(bot))
         return TurnFlow::kNext;
 
-    if (_options.RaidMindControl)
-        if (party_planner::ControlAssignment const* const job = party_planner::ControlFor(_options.PartyPlanner, plan, bot.guid, nowMs))
+    if (Opt().RaidMindControl)
+        if (party_planner::ControlAssignment const* const job = party_planner::ControlFor(Opt().PartyPlanner, plan, bot.guid, nowMs))
         {
             auto const retry = state.RetryAtMs.find(job->Spell);
             auto const victim = tick.indexOf.find(job->Target);
@@ -203,15 +203,15 @@ BotPolicy::TurnFlow BotPolicy::TurnRaidAuras(DecideTick& tick, BotTurn& turn)
                     state.CastTarget[job->Spell] = hold.target_guid;
                     state.RetryAtMs[job->Spell] = nowMs + kControlRetryMs;
                     state.NextCastMs = nowMs + kGlobalCooldownMs;
-                    if (_options.OnEvent)
-                        _options.OnEvent("raid_mindcontrol: bot=" + std::to_string(bot.guid) + " spell=" + std::to_string(job->Spell) + " target=" + std::to_string(member.guid));
+                    if (Opt().OnEvent)
+                        Opt().OnEvent("raid_mindcontrol: bot=" + std::to_string(bot.guid) + " spell=" + std::to_string(job->Spell) + " target=" + std::to_string(member.guid));
                     return TurnFlow::kSkip;
                 }
             }
         }
 
-    if (_options.RaidPurge)
-        if (party_planner::PurgeAssignment const* const job = party_planner::PurgeFor(_options.PartyPlanner, plan, bot.guid, nowMs))
+    if (Opt().RaidPurge)
+        if (party_planner::PurgeAssignment const* const job = party_planner::PurgeFor(Opt().PartyPlanner, plan, bot.guid, nowMs))
         {
             auto const retry = state.RetryAtMs.find(job->Spell);
             NearbyUnit const* const enemy = FindLiveMob(turn.nearby, job->Target);
@@ -227,8 +227,8 @@ BotPolicy::TurnFlow BotPolicy::TurnRaidAuras(DecideTick& tick, BotTurn& turn)
                 state.CastTarget[job->Spell] = enemy->guid;
                 state.RetryAtMs[job->Spell] = nowMs + kDispelRetryMs;   // the aura is still listed for a tick or two after the cast
                 state.NextCastMs = nowMs + kGlobalCooldownMs;
-                if (_options.OnEvent)
-                    _options.OnEvent("raid_purge: bot=" + std::to_string(bot.guid) + " spell=" + std::to_string(job->Spell) + " entry=" +
+                if (Opt().OnEvent)
+                    Opt().OnEvent("raid_purge: bot=" + std::to_string(bot.guid) + " spell=" + std::to_string(job->Spell) + " entry=" +
                                      std::to_string(forever_module::UnitRefEntry(enemy->guid)) + " aura=" + std::to_string(job->Aura));
                 return TurnFlow::kSkip;
             }

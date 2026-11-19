@@ -4,28 +4,28 @@
 
 std::vector<std::size_t> BotPolicy::GrindSpotsForBot(BotState& state, BotSnapshot const& bot, std::uint64_t nowMs)
 {
-    std::uint8_t const side = _options.SideOf ? _options.SideOf(bot.guid) : std::uint8_t(0);
+    std::uint8_t const side = Opt().SideOf ? Opt().SideOf(bot.guid) : std::uint8_t(0);
     std::vector<std::size_t> const blocked = _grindBlocks.Blocked(nowMs);
-    std::vector<std::size_t> spots = GrindSpotsFor(*_options.Grind, bot.map_id, bot.level, side, bot.pos_x, bot.pos_y, state.GrindVisited, blocked);
+    std::vector<std::size_t> spots = GrindSpotsFor(*Opt().Grind, bot.map_id, bot.level, side, bot.pos_x, bot.pos_y, state.GrindVisited, blocked);
     // A block keeps a spot out only while another one is left for the level: with none left, the blocked spots are used again rather than leaving the bot idle.
     if (spots.empty() && !blocked.empty())
     {
-        spots = GrindSpotsFor(*_options.Grind, bot.map_id, bot.level, side, bot.pos_x, bot.pos_y, state.GrindVisited, {});
-        if (!spots.empty() && _options.OnEvent)
-            _options.OnEvent("grind_blocks_lifted: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id) +
+        spots = GrindSpotsFor(*Opt().Grind, bot.map_id, bot.level, side, bot.pos_x, bot.pos_y, state.GrindVisited, {});
+        if (!spots.empty() && Opt().OnEvent)
+            Opt().OnEvent("grind_blocks_lifted: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id) +
                              " blocked=" + std::to_string(blocked.size()));
     }
-    if (_options.PathVariety.Enabled && _options.PathZones && spots.size() > 1)
+    if (Opt().PathVariety.Enabled && Opt().PathZones && spots.size() > 1)
         spots = PathVarySpots(state, bot, std::move(spots));
-    if (spots.empty() && _options.OnEvent)
-        _options.OnEvent("grind_none: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id) +
+    if (spots.empty() && Opt().OnEvent)
+        Opt().OnEvent("grind_none: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id) +
                          " blocked=" + std::to_string(blocked.size()));
     return spots;
 }
 
 void BotPolicy::NoteGrindPick(std::uint64_t bot, std::size_t spot)
 {
-    if (_options.PathVariety.Enabled)
+    if (Opt().PathVariety.Enabled)
         _pathSpots.Set(bot, std::uint64_t(spot) + 1);
 }
 
@@ -33,9 +33,9 @@ void BotPolicy::NoteGrindPick(std::uint64_t bot, std::size_t spot)
 // zone's crowd, reviewed at level steps or when its zone is over the soft cap); the list is cut to the home zone and ordered by distance, taste and the crowd at each spot.
 std::vector<std::size_t> BotPolicy::PathVarySpots(BotState& state, BotSnapshot const& bot, std::vector<std::size_t> spots)
 {
-    path_variety::Settings const& cfg = _options.PathVariety;
-    auto const& zoneOf = _options.PathZones->OfSpot;
-    auto const& grind = _options.Grind->Spots;
+    path_variety::Settings const& cfg = Opt().PathVariety;
+    auto const& zoneOf = Opt().PathZones->OfSpot;
+    auto const& grind = Opt().Grind->Spots;
     if (spots.empty() || spots.back() >= zoneOf.size())
         return spots;
     auto const yards = [&](std::size_t i) { return std::hypot(grind[i].X - bot.pos_x, grind[i].Y - bot.pos_y); };
@@ -67,7 +67,7 @@ std::vector<std::size_t> BotPolicy::PathVarySpots(BotState& state, BotSnapshot c
         // The bot's own bot is counted in the zone it is at, so a zone of exactly the cap is not "over" because of the bot itself.
         std::size_t const homeBots = homeAt < zones.size() ? zones[homeAt].Bots : 0;
         bool const hasHome = state.PathZoneKey != 0;
-        if (path_variety::ShouldReview(cfg, hasHome, homeAt < zones.size() ? zones[homeAt].Fit : 0, bot.level, state.PathReviewLevel, homeBots, _options.RandomSeed, bot.guid,
+        if (path_variety::ShouldReview(cfg, hasHome, homeAt < zones.size() ? zones[homeAt].Fit : 0, bot.level, state.PathReviewLevel, homeBots, Opt().RandomSeed, bot.guid,
                                        state.PathCycle++) || !hasHome)
         {
             // A first look takes the zone the bot stands in as its current one, so most bots stay where they are unless that zone is crowded.
@@ -80,15 +80,15 @@ std::vector<std::size_t> BotPolicy::PathVarySpots(BotState& state, BotSnapshot c
                         nearestAt = i;
                 current = zones[nearestAt].Key;
             }
-            std::size_t const pick = path_variety::ChooseZone(cfg, zones, current, _options.RandomSeed, bot.guid, state.PathCycle++);
+            std::size_t const pick = path_variety::ChooseZone(cfg, zones, current, Opt().RandomSeed, bot.guid, state.PathCycle++);
             if (pick < zones.size())
             {
                 bool const moved = state.PathZoneKey != 0 && zones[pick].Key != state.PathZoneKey;
                 state.PathZoneKey = zones[pick].Key;
                 state.PathReviewLevel = bot.level;
                 _pathZones.Set(bot.guid, state.PathZoneKey);
-                if (_options.OnEvent)
-                    _options.OnEvent("path_zone: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id) + " zone=" +
+                if (Opt().OnEvent)
+                    Opt().OnEvent("path_zone: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id) + " zone=" +
                                      std::to_string(state.PathZoneKey) + " zones=" + std::to_string(zones.size()) + " crowd=" + std::to_string(zones[pick].Bots) +
                                      (moved ? " moved=1" : " moved=0"));
             }
@@ -100,7 +100,7 @@ std::vector<std::size_t> BotPolicy::PathVarySpots(BotState& state, BotSnapshot c
     std::vector<path_variety::SpotOption> options;
     for (std::size_t const i : home)
         options.push_back(path_variety::SpotOption{ i, yards(i), _pathSpots.Count(std::uint64_t(i) + 1) - (_pathSpots.KeyOf(bot.guid) == std::uint64_t(i) + 1 ? 1 : 0) });
-    return path_variety::OrderSpots(cfg, std::move(options), _options.RandomSeed, bot.guid);
+    return path_variety::OrderSpots(cfg, std::move(options), Opt().RandomSeed, bot.guid);
 }
 
 std::size_t BotPolicy::BeginTankLead(BotState& state, BotSnapshot const& bot, PolicyOptions::DungeonRoute const& dungeon)
@@ -191,15 +191,15 @@ level_dungeon::Role BotPolicy::LevelRoleOf(std::uint64_t guid) const
             default: break;
         }
     }
-    std::uint32_t const classId = ClassFor(_options, guid);
+    std::uint32_t const classId = ClassFor(Opt(), guid);
     return classId == 0 ? level_dungeon::Role::Dps : level_dungeon::RoleOfClass(classId);
 }
 
 std::uint8_t BotPolicy::LevelPartySide(std::uint64_t leaderGuid) const
 {
-    if (_options.PartySideOf)
-        return _options.PartySideOf(leaderGuid);
-    return _options.SideOf ? _options.SideOf(leaderGuid) : std::uint8_t(0);
+    if (Opt().PartySideOf)
+        return Opt().PartySideOf(leaderGuid);
+    return Opt().SideOf ? Opt().SideOf(leaderGuid) : std::uint8_t(0);
 }
 
 void BotPolicy::DriveLevelDungeons(WorldTickSnapshotView const& view, std::unordered_map<std::uint64_t, std::size_t> const& indexOf,
@@ -208,8 +208,8 @@ void BotPolicy::DriveLevelDungeons(WorldTickSnapshotView const& view, std::unord
 {
     auto const event = [&](std::string const& text)
     {
-        if (_options.OnEvent)
-            _options.OnEvent(text);
+        if (Opt().OnEvent)
+            Opt().OnEvent(text);
     };
     auto const teleport = [&](BotSnapshot const& bot, std::uint32_t map, Point const& to)
     {
@@ -233,13 +233,13 @@ void BotPolicy::DriveLevelDungeons(WorldTickSnapshotView const& view, std::unord
     };
 
     // ---- Level dungeons: one run per bot party ----
-    if (_options.LevelDungeons)
+    if (Opt().LevelDungeons)
     {
-        KnownDungeons const known = KnownDungeonsOf(_options);
+        KnownDungeons const known = KnownDungeonsOf(Opt());
         // LevelDungeonLog: the decision for a party not in a run, logged when it changes (not every tick).
         auto const decide = [&](std::uint64_t leaderGuid, std::string const& text)
         {
-            if (!_options.LevelDungeonLog)
+            if (!Opt().LevelDungeonLog)
                 return;
             std::string& last = _levelLastDecision[leaderGuid];
             if (last == text)
@@ -275,8 +275,8 @@ void BotPolicy::DriveLevelDungeons(WorldTickSnapshotView const& view, std::unord
                 {
                     level_dungeon::Book const empty;
                     auto const seen = _levelBooks.find(leaderGuid);
-                    dueResult = level_dungeon::DueWhy(known.List, level, seen == _levelBooks.end() ? empty : seen->second, _options.LevelDungeonRuns,
-                                                      DueRulesOf(_options, side));
+                    dueResult = level_dungeon::DueWhy(known.List, level, seen == _levelBooks.end() ? empty : seen->second, Opt().LevelDungeonRuns,
+                                                      DueRulesOf(Opt(), side));
                 }
                 int const due = dueResult.Index;
                 if (level == 0 || due < 0)
@@ -294,7 +294,7 @@ void BotPolicy::DriveLevelDungeons(WorldTickSnapshotView const& view, std::unord
                     skip(leaderGuid, level, "not_grouped");
                     continue;
                 }
-                if (leader->life_state != 0 || leader->in_combat != 0 || _options.DungeonsByMap.count(leader->map_id) != 0 || StateOf(leaderGuid).TankLead)
+                if (leader->life_state != 0 || leader->in_combat != 0 || Opt().DungeonsByMap.count(leader->map_id) != 0 || StateOf(leaderGuid).TankLead)
                 {
                     skip(leaderGuid, level, "leader_busy");
                     continue;
@@ -305,7 +305,7 @@ void BotPolicy::DriveLevelDungeons(WorldTickSnapshotView const& view, std::unord
                 {
                     BotSnapshot const* const other = snapshotOf(member);
                     if (!other || other->life_state != 0 || other->in_combat != 0 || other->in_flight != 0 || other->level == 0 ||
-                        other->group_leader_guid != PlayerRef(leaderGuid) || _options.DungeonsByMap.count(other->map_id) != 0)
+                        other->group_leader_guid != PlayerRef(leaderGuid) || Opt().DungeonsByMap.count(other->map_id) != 0)
                     {
                         ready = false;
                         break;
@@ -317,7 +317,7 @@ void BotPolicy::DriveLevelDungeons(WorldTickSnapshotView const& view, std::unord
                     skip(leaderGuid, level, "member_not_ready");
                     continue;
                 }
-                if (_options.LevelDungeonNeedRoles)
+                if (Opt().LevelDungeonNeedRoles)
                 {
                     std::vector<level_dungeon::Role> roles;
                     for (BotSnapshot const* member : party)
@@ -342,7 +342,7 @@ void BotPolicy::DriveLevelDungeons(WorldTickSnapshotView const& view, std::unord
                 started.OriginMap = leader->map_id;
                 started.Origin = Point{ leader->pos_x, leader->pos_y, leader->pos_z };
                 started.PartyLevel = level;
-                started.CapMs = level_dungeon::RunCapMs(dungeon.DurationSec, _options.LevelDungeonFileDuration, kLevelRunMaxMs);
+                started.CapMs = level_dungeon::RunCapMs(dungeon.DurationSec, Opt().LevelDungeonFileDuration, kLevelRunMaxMs);
                 for (BotSnapshot const* member : party)
                     teleport(*member, started.Map, dungeon.Entry);
                 _levelRuns[leaderGuid] = started;
@@ -354,7 +354,7 @@ void BotPolicy::DriveLevelDungeons(WorldTickSnapshotView const& view, std::unord
 
             // In a run.
             LevelDungeonRun& current = run->second;
-            auto const route = _options.DungeonsByMap.find(current.Map);
+            auto const route = Opt().DungeonsByMap.find(current.Map);
             BotState& leaderState = StateOf(leaderGuid);
             auto const sendHome = [&]()
             {
@@ -364,7 +364,7 @@ void BotPolicy::DriveLevelDungeons(WorldTickSnapshotView const& view, std::unord
                     if (BotSnapshot const* other = snapshotOf(member); other && other->life_state == 0 && other->map_id == current.Map)
                         teleport(*other, current.OriginMap, current.Origin);
             };
-            if (route == _options.DungeonsByMap.end())
+            if (route == Opt().DungeonsByMap.end())
             {
                 leaderState.TankLead = false;
                 leaderState.LevelRun = false;
@@ -445,8 +445,8 @@ void BotPolicy::DriveLevelDungeons(WorldTickSnapshotView const& view, std::unord
             if (bot.group_leader_guid == order->first)
                 group.push_back(&bot);
         LfgOrder& lfg = order->second;
-        auto const route = _options.DungeonsByMap.find(lfg.Map);
-        bool drop = route == _options.DungeonsByMap.end() || nowMs - lfg.StartMs > kLfgOrderMaxMs;
+        auto const route = Opt().DungeonsByMap.find(lfg.Map);
+        bool drop = route == Opt().DungeonsByMap.end() || nowMs - lfg.StartMs > kLfgOrderMaxMs;
         if (!drop && !lfg.Entered)
         {
             std::size_t joined = 0;
@@ -475,7 +475,7 @@ void BotPolicy::DriveLevelDungeons(WorldTickSnapshotView const& view, std::unord
                 BotState& state = StateOf(bot->guid);
                 if (bot->map_id != lfg.Map || bot->life_state != 0 || state.TankLead)
                     continue;
-                if (state.Role_ == BotState::Role::Tank || (state.Role_ == BotState::Role::Auto && ClassFor(_options, bot->guid) == kWarriorClass))
+                if (state.Role_ == BotState::Role::Tank || (state.Role_ == BotState::Role::Auto && ClassFor(Opt(), bot->guid) == kWarriorClass))
                 {
                     state.ChatFollow = 0;
                     state.ChatStay = false;
@@ -505,17 +505,17 @@ void BotPolicy::DriveLfgFill(WorldTickSnapshotView const& view, std::unordered_m
 {
     auto const event = [&](std::string const& text)
     {
-        if (_options.OnEvent)
-            _options.OnEvent(text);
+        if (Opt().OnEvent)
+            Opt().OnEvent(text);
     };
     auto const isOurBot = [&indexOf](std::uint64_t ref) { return ref != 0 && indexOf.count(ref & forever_module::kUnitRefCounterMask) != 0; };
     // A bot's role: the one a chat order gave it, else its class (an unknown class counts as a damage dealer).
     auto const roleOf = [this](std::uint64_t guid) -> level_dungeon::Role { return LevelRoleOf(guid); };
     auto const sideOf = [this](std::uint64_t guid) -> std::uint8_t
     {
-        if (_options.PartySideOf)
-            return _options.PartySideOf(guid);
-        return _options.SideOf ? _options.SideOf(guid) : std::uint8_t(0);
+        if (Opt().PartySideOf)
+            return Opt().PartySideOf(guid);
+        return Opt().SideOf ? Opt().SideOf(guid) : std::uint8_t(0);
     };
     // A bot a levelling order or an LFG order has, or a bot with a chat order or a dungeon run, is not free.
     auto const busy = [this, nowMs](std::uint64_t guid) -> bool
@@ -545,7 +545,7 @@ void BotPolicy::DriveLfgFill(WorldTickSnapshotView const& view, std::unordered_m
         std::uint32_t partyLevel = 0, tanks = 0, healers = 0;
         for (BotSnapshot const* member : members)
         {
-            if (member->life_state != 0 || member->in_combat != 0 || _options.DungeonsByMap.count(member->map_id) != 0)
+            if (member->life_state != 0 || member->in_combat != 0 || Opt().DungeonsByMap.count(member->map_id) != 0)
             {
                 calm = false;
                 break;
@@ -568,7 +568,7 @@ void BotPolicy::DriveLfgFill(WorldTickSnapshotView const& view, std::unordered_m
         {
             if (bot.group_role != 0 || bot.group_invite_from != 0 || bot.life_state != 0 || bot.in_combat != 0 || bot.in_flight != 0 || bot.level == 0)
                 continue;
-            if ((_options.IsAlt && _options.IsAlt(bot.guid)) || _options.DungeonsByMap.count(bot.map_id) != 0 || busy(bot.guid) || summoned.count(bot.guid) != 0)
+            if ((Opt().IsAlt && Opt().IsAlt(bot.guid)) || Opt().DungeonsByMap.count(bot.map_id) != 0 || busy(bot.guid) || summoned.count(bot.guid) != 0)
                 continue;
             if (sideOf(bot.guid) != sideOf(members.front()->guid))
                 continue;
@@ -616,7 +616,7 @@ void BotPolicy::DriveLfgFill(WorldTickSnapshotView const& view, std::unordered_m
 
 std::vector<std::string> BotPolicy::ApplyLfg(WorldTickSnapshotView const& view, ChatContext const& chat, ChatCommand const& command, std::uint64_t nowMs)
 {
-    KnownDungeons const known = KnownDungeonsOf(_options);
+    KnownDungeons const known = KnownDungeonsOf(Opt());
     if (known.List.empty())
         return { "LFG: no dungeon is known to the module." };
     int const found = level_dungeon::FindDungeon(known.List, command.Arg);
@@ -633,7 +633,7 @@ std::vector<std::string> BotPolicy::ApplyLfg(WorldTickSnapshotView const& view, 
             continue;
         ++members;
         groupSize = std::max(groupSize, bot.group_size);
-        level_dungeon::Role const role = level_dungeon::RoleOfClass(ClassFor(_options, bot.guid));
+        level_dungeon::Role const role = level_dungeon::RoleOfClass(ClassFor(Opt(), bot.guid));
         tanks += role == level_dungeon::Role::Tank ? 1 : 0;
         healers += role == level_dungeon::Role::Healer ? 1 : 0;
     }
@@ -652,8 +652,8 @@ std::vector<std::string> BotPolicy::ApplyLfg(WorldTickSnapshotView const& view, 
     for (BotSnapshot const& bot : view.bots)
     {
         if (bot.group_role != 0 || bot.group_leader_guid != 0 || bot.group_invite_from != 0 || bot.life_state != 0 || bot.in_combat != 0 || bot.in_flight != 0 ||
-            bot.level < dungeon.MinLevel || bot.level > dungeon.MaxLevel || leaderOf.count(bot.guid) != 0 || _options.DungeonsByMap.count(bot.map_id) != 0 ||
-            (_options.IsAlt && _options.IsAlt(bot.guid)))
+            bot.level < dungeon.MinLevel || bot.level > dungeon.MaxLevel || leaderOf.count(bot.guid) != 0 || Opt().DungeonsByMap.count(bot.map_id) != 0 ||
+            (Opt().IsAlt && Opt().IsAlt(bot.guid)))
             continue;
         freeBots.push_back(&bot);
     }
@@ -676,7 +676,7 @@ std::vector<std::string> BotPolicy::ApplyLfg(WorldTickSnapshotView const& view, 
     std::uint32_t index = 0;
     for (level_dungeon::Role role : wanted)
     {
-        auto pick = std::find_if(freeBots.begin(), freeBots.end(), [&](BotSnapshot const* bot) { return level_dungeon::RoleOfClass(ClassFor(_options, bot->guid)) == role; });
+        auto pick = std::find_if(freeBots.begin(), freeBots.end(), [&](BotSnapshot const* bot) { return level_dungeon::RoleOfClass(ClassFor(Opt(), bot->guid)) == role; });
         if (pick == freeBots.end())
         {
             unfilled.push_back(role);
@@ -724,7 +724,7 @@ role_profile::Profile BotPolicy::ProfileOfBot(std::uint64_t guid) const
             default: break;
         }
     }
-    return role_profile::ProfileFor(ClassFor(_options, guid), role);
+    return role_profile::ProfileFor(ClassFor(Opt(), guid), role);
 }
 
 void BotPolicy::DriveQuestGroups(WorldTickSnapshotView const& view, std::unordered_map<std::uint64_t, std::size_t> const& indexOf,
@@ -735,8 +735,8 @@ void BotPolicy::DriveQuestGroups(WorldTickSnapshotView const& view, std::unorder
     constexpr std::uint64_t kWaitFreshMs = 5000; // the planner's "waiting for a party" is this fresh or it is over
     auto const event = [&](std::string const& text)
     {
-        if (_options.OnEvent)
-            _options.OnEvent(text);
+        if (Opt().OnEvent)
+            Opt().OnEvent(text);
     };
     auto const leave = [&](BotSnapshot const& bot)
     {
@@ -808,7 +808,7 @@ void BotPolicy::DriveQuestGroups(WorldTickSnapshotView const& view, std::unorder
         c.Free = bot.life_state == 0 && bot.in_combat == 0 && bot.group_role == 0 && bot.group_invite_from == 0 && !rostered && !IsRouteActive(bot.guid) && calm;
         candidates.push_back(std::move(c));
     }
-    for (quest_group::Invite const& invite : quest_group::PlanInvites(_options.QuestGroups, candidates))
+    for (quest_group::Invite const& invite : quest_group::PlanInvites(Opt().QuestGroups, candidates))
     {
         BotState& leaderState = StateOf(invite.Leader);
         _questGroupLeaders[invite.Leader] = invite.Quest;
@@ -868,13 +868,13 @@ void BotPolicy::DriveQuestGroups(WorldTickSnapshotView const& view, std::unorder
 
 bool BotPolicy::LevelDungeonDue(std::uint64_t leaderGuid, std::uint32_t partyLevel)
 {
-    if (!_options.LevelDungeons || partyLevel == 0)
+    if (!Opt().LevelDungeons || partyLevel == 0)
         return false;
-    KnownDungeons const known = KnownDungeonsOf(_options);
+    KnownDungeons const known = KnownDungeonsOf(Opt());
     if (known.List.empty())
         return false;
     level_dungeon::Book const empty;
     auto const book = _levelBooks.find(leaderGuid);
-    return level_dungeon::Due(known.List, partyLevel, book == _levelBooks.end() ? empty : book->second, _options.LevelDungeonRuns,
-                              DueRulesOf(_options, LevelPartySide(leaderGuid))) >= 0;
+    return level_dungeon::Due(known.List, partyLevel, book == _levelBooks.end() ? empty : book->second, Opt().LevelDungeonRuns,
+                              DueRulesOf(Opt(), LevelPartySide(leaderGuid))) >= 0;
 }

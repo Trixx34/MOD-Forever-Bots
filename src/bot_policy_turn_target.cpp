@@ -41,7 +41,7 @@ void BotPolicy::PullSingleWatch(DecideTick& tick, BotTurn& turn)
     std::uint64_t const nowMs = tick.nowMs;
     turn.pullSingleHold = false;
     turn.pullSinglePairs = false;
-    if (!_options.RaidPullSingle || !_options.RaidRules || !_options.RaidRules->HasPullSingle(bot.map_id) || !turn.routeOn || !turn.partyLeaderBot || bot.in_combat != 0 ||
+    if (!Opt().RaidPullSingle || !Opt().RaidRules || !Opt().RaidRules->HasPullSingle(bot.map_id) || !turn.routeOn || !turn.partyLeaderBot || bot.in_combat != 0 ||
         PartyFighting(tick, bot.guid))
     {
         state.PullSingleSinceMs = 0;
@@ -53,7 +53,7 @@ void BotPolicy::PullSingleWatch(DecideTick& tick, BotTurn& turn)
     {
         if (!IsLiveMob(unit))
             continue;
-        float const yards = _options.RaidRules->PullSingleYards(bot.map_id, forever_module::UnitRefEntry(unit.guid));
+        float const yards = Opt().RaidRules->PullSingleYards(bot.map_id, forever_module::UnitRefEntry(unit.guid));
         if (yards <= 0.0f || std::hypot(unit.pos_x - bot.pos_x, unit.pos_y - bot.pos_y) > yards + kPullSingleApproachYards)
             continue;
         if (NearbyUnit const* partner = PullSinglePartner(turn.nearby, unit, yards))
@@ -75,10 +75,10 @@ void BotPolicy::PullSingleWatch(DecideTick& tick, BotTurn& turn)
     bool const capped = heldMs >= kPullSingleHoldMaxMs;
     turn.pullSingleHold = !capped;
     turn.pullSinglePairs = !capped;
-    if (_options.OnEvent && (state.PullSingleLogMs == 0 || nowMs - state.PullSingleLogMs >= kPullSingleLogMs))
+    if (Opt().OnEvent && (state.PullSingleLogMs == 0 || nowMs - state.PullSingleLogMs >= kPullSingleLogMs))
     {
         state.PullSingleLogMs = nowMs;
-        _options.OnEvent(std::string("pull_single_hold: bot=") + std::to_string(bot.guid) + " entry=" + std::to_string(forever_module::UnitRefEntry(first->guid)) +
+        Opt().OnEvent(std::string("pull_single_hold: bot=") + std::to_string(bot.guid) + " entry=" + std::to_string(forever_module::UnitRefEntry(first->guid)) +
                          " apart=" + std::to_string(int(std::hypot(first->pos_x - second->pos_x, first->pos_y - second->pos_y))) +
                          " yards=" + std::to_string(int(std::hypot(first->pos_x - bot.pos_x, first->pos_y - bot.pos_y))) + " held_ms=" + std::to_string(heldMs) +
                          (capped ? " reason=cap" : " reason=pair"));
@@ -126,11 +126,11 @@ void BotPolicy::TurnQuestsAndHold(DecideTick& tick, BotTurn& turn)
             break;
     }
     if (questsAllowed)
-        questStep = QuestsFor(bot).Next(bot, state.Quest, nowMs, QuestBotInfo{ classId, _options.RaceOf ? _options.RaceOf(bot.guid) : 0u, _options.PathVariety.Enabled ? &_options.PathVariety : nullptr, _options.RandomSeed, bot.guid });
+        questStep = QuestsFor(bot).Next(bot, state.Quest, nowMs, QuestBotInfo{ classId, Opt().RaceOf ? Opt().RaceOf(bot.guid) : 0u, Opt().PathVariety.Enabled ? &Opt().PathVariety : nullptr, Opt().RandomSeed, bot.guid });
     if (questsAllowed)
         LevelSafeQuestWalk(tick, turn); // LevelSafeWalks: a walk to or through a place far above the bot is dropped (bot_policy_level_safe.cpp)
     // SkyborneExitMakeRoom: full bags before the accept of an exit quest (or the quest before it): the vendor first (the urgent errand of a refused hand-in).
-    if (questsAllowed && _options.SkyborneExitMakeRoom && bot.map_id == kSkyborneMap && bot.bag_free_slots == 0 && nowMs >= state.ExitRoomNextMs &&
+    if (questsAllowed && Opt().SkyborneExitMakeRoom && bot.map_id == kSkyborneMap && bot.bag_free_slots == 0 && nowMs >= state.ExitRoomNextMs &&
         (questStep.Kind == QuestStepKind::Accept || (questStep.Kind == QuestStepKind::WalkTo && questStep.StartGiver)) && QuestsFor(bot).ExitChain(questStep.Quest))
     {
         state.ExitRoomNextMs = nowMs + kExitRoomEveryMs;
@@ -148,11 +148,11 @@ void BotPolicy::TurnQuestsAndHold(DecideTick& tick, BotTurn& turn)
     }
     // Every five minutes, what the quest planner is doing for this bot and what keeps it from doing more (the events are the only record,
     // since a planner that takes no quest logs nothing otherwise).
-    if (_options.OnEvent && nowMs - state.QuestDiagAtMs >= 300000)
+    if (Opt().OnEvent && nowMs - state.QuestDiagAtMs >= 300000)
     {
         state.QuestDiagAtMs = nowMs;
         static constexpr char const* kinds[] = { "none", "walk_to", "accept", "hand_in", "hunt", "abandon", "reward", "wait", "wait_group", "hop" };
-        _options.OnEvent("quest_state: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id) +
+        Opt().OnEvent("quest_state: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id) +
                          " allowed=" + std::to_string(questsAllowed) + " enabled=" + std::to_string(QuestsFor(bot).Enabled()) +
                          " party=" + std::to_string(partyMember) + " low_health=" + std::to_string(lowHealth) + " in_combat=" + std::to_string(bot.in_combat) +
                          " chat_stay=" + std::to_string(state.ChatStay) + " chat_follow=" + std::to_string(state.ChatFollow != 0) +
@@ -186,8 +186,8 @@ void BotPolicy::TurnQuestsAndHold(DecideTick& tick, BotTurn& turn)
     {
         if (state.HoldSinceMs != 0)
         {
-            if (_options.OnEvent)
-                _options.OnEvent("pull hold ended: leader=" + std::to_string(bot.guid) + " waited_ms=" +
+            if (Opt().OnEvent)
+                Opt().OnEvent("pull hold ended: leader=" + std::to_string(bot.guid) + " waited_ms=" +
                                  std::to_string(state.HoldLastNotReadyMs > state.HoldSinceMs ? state.HoldLastNotReadyMs - state.HoldSinceMs : 0) + " by=fight");
             state.HoldSinceMs = 0;
             state.HoldBaseMs = 0;
@@ -205,13 +205,13 @@ void BotPolicy::TurnQuestsAndHold(DecideTick& tick, BotTurn& turn)
             {
                 if (member.life_state != 0)
                     return;
-                if (member.max_health > 0 && BelowPct(member.health, member.max_health, (_options.TacticRest ? ProfileOfBot(member.guid).ReadyHealthPct : kPartyReadyHealthOldPct)))
+                if (member.max_health > 0 && BelowPct(member.health, member.max_health, (Opt().TacticRest ? ProfileOfBot(member.guid).ReadyHealthPct : kPartyReadyHealthOldPct)))
                 {
                     ready = false;
                     not_ready_reason = "health bot=" + std::to_string(member.guid) + " pct=" + std::to_string(std::uint64_t(member.health) * 100 / member.max_health);
                 }
                 else if (member.power_type == 0 && member.max_power > 0 &&
-                         BelowPct(member.power, member.max_power, (_options.TacticRest ? ProfileOfBot(member.guid).ReadyPowerPct : kPartyReadyPowerOldPct)))
+                         BelowPct(member.power, member.max_power, (Opt().TacticRest ? ProfileOfBot(member.guid).ReadyPowerPct : kPartyReadyPowerOldPct)))
                 {
                     ready = false;
                     not_ready_reason = "mana bot=" + std::to_string(member.guid) + " pct=" + std::to_string(std::uint64_t(member.power) * 100 / member.max_power);
@@ -244,8 +244,8 @@ void BotPolicy::TurnQuestsAndHold(DecideTick& tick, BotTurn& turn)
                 if (nowMs - since->second >= kRegroupStuckMs && state.RegroupStuck.insert(member).second)
                 {
                     ++state.RegroupStuckCount;
-                    if (_options.OnEvent)
-                        _options.OnEvent("regroup_stuck: leader=" + std::to_string(bot.guid) + " bot=" + std::to_string(member) + " yards=" +
+                    if (Opt().OnEvent)
+                        Opt().OnEvent("regroup_stuck: leader=" + std::to_string(bot.guid) + " bot=" + std::to_string(member) + " yards=" +
                                          std::to_string(int(Distance2d(bot, view.bots[at->second]))) + " in_combat=" + std::to_string(view.bots[at->second].in_combat) +
                                          " waited_ms=" + std::to_string(nowMs - since->second));
                 }
@@ -278,8 +278,8 @@ void BotPolicy::TurnQuestsAndHold(DecideTick& tick, BotTurn& turn)
             // that is a ghost one moment and not the next) must not restart the wait each time, or it never ends (the soak's Deadmines run waited for 40 minutes).
             if (ready && state.HoldSinceMs != 0 && nowMs - state.HoldLastNotReadyMs >= kPullHoldClearMs)
             {
-                if (_options.OnEvent)
-                    _options.OnEvent("pull hold ended: leader=" + std::to_string(bot.guid) + " waited_ms=" + std::to_string(nowMs - state.HoldSinceMs));
+                if (Opt().OnEvent)
+                    Opt().OnEvent("pull hold ended: leader=" + std::to_string(bot.guid) + " waited_ms=" + std::to_string(nowMs - state.HoldSinceMs));
                 state.HoldSinceMs = 0;
             }
             // A regroup starts when a member is dead or out of range, and ends once nobody is dead or out of range and the party is ready again (the pull
@@ -288,13 +288,13 @@ void BotPolicy::TurnQuestsAndHold(DecideTick& tick, BotTurn& turn)
             {
                 state.RegroupSinceMs = nowMs;
                 state.RegroupStuckCount = 0;
-                if (_options.OnEvent)
-                    _options.OnEvent("regroup_start: leader=" + std::to_string(bot.guid) + " reason=" + (deadWaitKind != 0 ? "dead_member" : "member_far") +
+                if (Opt().OnEvent)
+                    Opt().OnEvent("regroup_start: leader=" + std::to_string(bot.guid) + " reason=" + (deadWaitKind != 0 ? "dead_member" : "member_far") +
                                      " far=" + std::to_string(farMembers));
             }
             // 0.44.5: while a regroup lasts, one line per kRegroupLogMs with every member's place, so the log shows why followers trail the leader
             // (where they stand, whether they move, fight or are stuck), not just that they do. Read-only: it changes nothing the policy does.
-            if (state.RegroupSinceMs != 0 && _options.OnEvent && (state.RegroupLastLogMs == 0 || nowMs - state.RegroupLastLogMs >= kRegroupLogMs))
+            if (state.RegroupSinceMs != 0 && Opt().OnEvent && (state.RegroupLastLogMs == 0 || nowMs - state.RegroupLastLogMs >= kRegroupLogMs))
             {
                 state.RegroupLastLogMs = nowMs;
                 std::string line = "regroup_members: leader=" + std::to_string(bot.guid) + " why=" + (ready ? "far_or_dead" : not_ready_reason) + " t_ms=" +
@@ -315,12 +315,12 @@ void BotPolicy::TurnQuestsAndHold(DecideTick& tick, BotTurn& turn)
                             std::to_string(PowerPct(m, 0)) + " mv=" + std::to_string(m.moving) + " fight=" +
                             std::to_string(m.in_combat) + " stuck=" + std::to_string(state.RegroupStuck.count(member) != 0);
                 }
-                _options.OnEvent(line);
+                Opt().OnEvent(line);
             }
             if (ready && state.RegroupSinceMs != 0 && state.HoldSinceMs == 0 && farMembers == 0 && deadWaitKind == 0)
             {
-                if (_options.OnEvent)
-                    _options.OnEvent("regroup_done: leader=" + std::to_string(bot.guid) + " waited_ms=" + std::to_string(nowMs - state.RegroupSinceMs) +
+                if (Opt().OnEvent)
+                    Opt().OnEvent("regroup_done: leader=" + std::to_string(bot.guid) + " waited_ms=" + std::to_string(nowMs - state.RegroupSinceMs) +
                                      " stuck=" + std::to_string(state.RegroupStuckCount));
                 state.RegroupSinceMs = 0;
                 state.RegroupLastLogMs = 0;
@@ -332,8 +332,8 @@ void BotPolicy::TurnQuestsAndHold(DecideTick& tick, BotTurn& turn)
                 {
                     state.HoldSinceMs = nowMs;
                     state.HoldProgressMs = nowMs;
-                    if (_options.OnEvent)
-                        _options.OnEvent("pull hold started: leader=" + std::to_string(bot.guid) + " reason=" + not_ready_reason);
+                    if (Opt().OnEvent)
+                        Opt().OnEvent("pull hold started: leader=" + std::to_string(bot.guid) + " reason=" + not_ready_reason);
                 }
                 state.HoldLastNotReadyMs = nowMs;
             }
@@ -346,8 +346,8 @@ void BotPolicy::TurnQuestsAndHold(DecideTick& tick, BotTurn& turn)
                 if (state.TankRestSinceMs == 0)
                 {
                     state.TankRestSinceMs = nowMs;
-                    if (_options.OnEvent)
-                        _options.OnEvent("tank_rest: leader=" + std::to_string(bot.guid) + " hp_pct=" + std::to_string(HealthPct(bot, 0)));
+                    if (Opt().OnEvent)
+                        Opt().OnEvent("tank_rest: leader=" + std::to_string(bot.guid) + " hp_pct=" + std::to_string(HealthPct(bot, 0)));
                 }
                 if (nowMs - state.TankRestSinceMs < kPullHoldAbsMaxMs)
                     dungeonHold = true;
@@ -356,17 +356,17 @@ void BotPolicy::TurnQuestsAndHold(DecideTick& tick, BotTurn& turn)
                 state.TankRestSinceMs = 0;
             // The run's hold budget (PullHoldBudgetSec, 0 = none): the time the pull holds (party and tank rest) really held counts against it; once it is used up
             // the leader pulls on whatever the party's state.
-            if (dungeonHold && _options.PullHoldBudgetMs != 0)
+            if (dungeonHold && Opt().PullHoldBudgetMs != 0)
             {
                 if (state.HoldBudgetLastMs != 0 && nowMs > state.HoldBudgetLastMs && nowMs - state.HoldBudgetLastMs <= kHoldBudgetMaxGapMs)
                     state.HoldBudgetUsedMs += nowMs - state.HoldBudgetLastMs;
                 state.HoldBudgetLastMs = nowMs;
-                if (state.HoldBudgetUsedMs >= _options.PullHoldBudgetMs)
+                if (state.HoldBudgetUsedMs >= Opt().PullHoldBudgetMs)
                 {
                     dungeonHold = false;
-                    if (!state.HoldBudgetLogged && _options.OnEvent)
-                        _options.OnEvent("hold_budget_spent: leader=" + std::to_string(bot.guid) + " used_ms=" + std::to_string(state.HoldBudgetUsedMs) + " budget_ms=" +
-                                         std::to_string(_options.PullHoldBudgetMs));
+                    if (!state.HoldBudgetLogged && Opt().OnEvent)
+                        Opt().OnEvent("hold_budget_spent: leader=" + std::to_string(bot.guid) + " used_ms=" + std::to_string(state.HoldBudgetUsedMs) + " budget_ms=" +
+                                         std::to_string(Opt().PullHoldBudgetMs));
                     state.HoldBudgetLogged = true;
                 }
             }
@@ -411,8 +411,8 @@ void BotPolicy::TurnTargeting(DecideTick& tick, BotTurn& turn)
         // A dead Onyxian Warder in the leader's view (the core keeps creature corpses in the nearby list): logged once per Warder, the kill measure of the raid runs.
         for (NearbyUnit const& unit : turn.nearby)
             if (unit.health == 0 && unit.max_health != 0 && forever_module::UnitRefType(unit.guid) == 8 &&
-                forever_module::UnitRefEntry(unit.guid) == kOnyxianWarderEntry && state.WardersSeenDead.insert(unit.guid).second && _options.OnEvent)
-                _options.OnEvent("warder_dead: leader=" + std::to_string(bot.guid) + " warder=" + std::to_string(unit.guid) + " at=" +
+                forever_module::UnitRefEntry(unit.guid) == kOnyxianWarderEntry && state.WardersSeenDead.insert(unit.guid).second && Opt().OnEvent)
+                Opt().OnEvent("warder_dead: leader=" + std::to_string(bot.guid) + " warder=" + std::to_string(unit.guid) + " at=" +
                                  std::to_string(int(unit.pos_x)) + "," + std::to_string(int(unit.pos_y)) + " leader_in_combat=" + std::to_string(bot.in_combat));
         if (bot.in_combat == 0)
         {
@@ -437,8 +437,8 @@ void BotPolicy::TurnTargeting(DecideTick& tick, BotTurn& turn)
                     state.OnyxiaPhase = phase;
                     if (phase == 3 && state.OnyxiaLandedMs == 0)
                         state.OnyxiaLandedMs = nowMs;
-                    if (_options.OnEvent)
-                        _options.OnEvent("onyxia_phase: phase=" + std::to_string(phase) + " pct=" +
+                    if (Opt().OnEvent)
+                        Opt().OnEvent("onyxia_phase: phase=" + std::to_string(phase) + " pct=" +
                             std::to_string(static_cast<int>(100.0f * static_cast<float>(unit.health) / static_cast<float>(unit.max_health))));
                 }
                 break;
@@ -513,8 +513,8 @@ void BotPolicy::TurnTargeting(DecideTick& tick, BotTurn& turn)
             if (state.OffTankTarget != pickUp)
             {
                 state.OffTankTarget = pickUp;
-                if (_options.OnEvent)
-                    _options.OnEvent("offtank_pickup: bot=" + std::to_string(bot.guid) + " warder=" + std::to_string(pickUp) + " yards=" + std::to_string(int(pickYards)) +
+                if (Opt().OnEvent)
+                    Opt().OnEvent("offtank_pickup: bot=" + std::to_string(bot.guid) + " warder=" + std::to_string(pickUp) + " yards=" + std::to_string(int(pickYards)) +
                                      " leader_up=" + std::to_string(leaderUp ? 1 : 0));
             }
             if (bot.threat_target_guid != pickUp && pickYards <= kOffTankTauntYards && nowMs >= state.OffTankTauntAtMs && nowMs >= state.NextCastMs && !IsCasting(bot))
@@ -536,7 +536,7 @@ void BotPolicy::TurnTargeting(DecideTick& tick, BotTurn& turn)
     // killed them). It ends when the tank is in combat, the leader is dead or has no target, or PullTankHoldMs have passed since the hold began on that target. A target
     // within PullMemberRangeYards of the member needs no walk and is not held.
     bool pullHeld = false;
-    if (_options.PullTankFirst && routeOn && partyMember && leaderSnap && leaderSnap->life_state == 0 && leaderSnap->threat_target_guid != 0 &&
+    if (Opt().PullTankFirst && routeOn && partyMember && leaderSnap && leaderSnap->life_state == 0 && leaderSnap->threat_target_guid != 0 &&
         leaderSnap->in_combat == 0 && bot.in_combat == 0)
     {
         std::uint64_t const leaderTarget = leaderSnap->threat_target_guid;
@@ -547,15 +547,15 @@ void BotPolicy::TurnTargeting(DecideTick& tick, BotTurn& turn)
         }
         NearbyUnit const* near = FindLiveMob(nearby, leaderTarget);
         // A target with a raid rules `pullpos` row is pulled by the tank from its position: no member is excused from the hold for standing near it.
-        bool const positioned = _options.RaidRules &&
-                                (near ? _options.RaidRules->PullPositionOf(bot.map_id, forever_module::UnitRefEntry(leaderTarget), near->pos_x, near->pos_y)
-                                      : _options.RaidRules->PullPositionOf(bot.map_id, forever_module::UnitRefEntry(leaderTarget))).has_value();
-        bool const noWalk = !positioned && near && std::hypot(near->pos_x - bot.pos_x, near->pos_y - bot.pos_y) <= float(_options.PullMemberRangeYards);
-        pullHeld = nowMs - state.PullHoldSinceMs < _options.PullTankHoldMs && !noWalk;
-        if (pullHeld && _options.OnEvent && (state.PullHoldLogMs == 0 || nowMs - state.PullHoldLogMs >= 10000))
+        bool const positioned = Opt().RaidRules &&
+                                (near ? Opt().RaidRules->PullPositionOf(bot.map_id, forever_module::UnitRefEntry(leaderTarget), near->pos_x, near->pos_y)
+                                      : Opt().RaidRules->PullPositionOf(bot.map_id, forever_module::UnitRefEntry(leaderTarget))).has_value();
+        bool const noWalk = !positioned && near && std::hypot(near->pos_x - bot.pos_x, near->pos_y - bot.pos_y) <= float(Opt().PullMemberRangeYards);
+        pullHeld = nowMs - state.PullHoldSinceMs < Opt().PullTankHoldMs && !noWalk;
+        if (pullHeld && Opt().OnEvent && (state.PullHoldLogMs == 0 || nowMs - state.PullHoldLogMs >= 10000))
         {
             state.PullHoldLogMs = nowMs;
-            _options.OnEvent("pull_hold: bot=" + std::to_string(bot.guid) + " reason=tank_first tank=" + std::to_string(leaderSnap->guid) + " target=" +
+            Opt().OnEvent("pull_hold: bot=" + std::to_string(bot.guid) + " reason=tank_first tank=" + std::to_string(leaderSnap->guid) + " target=" +
                              std::to_string(forever_module::UnitRefEntry(leaderTarget)) + " held_ms=" + std::to_string(nowMs - state.PullHoldSinceMs));
         }
     }
@@ -577,7 +577,7 @@ void BotPolicy::TurnTargeting(DecideTick& tick, BotTurn& turn)
             // Focus fire (the dungeon's kill priority): a damage dealer fights the best-ranked live hostile of the tank's pack, not just the tank's own target: the casters
             // and healers of the pack first (the dungeon file's kill_priority), then any unit that is casting right now, then the weakest.
             bool const canInterrupt = classId == 2 || classId == 4 || classId == 7 || classId == 8; // paladin, rogue, shaman, mage: an interrupt row in the rotation
-            bool const interruptNow = _options.TacticInterrupt && canInterrupt;
+            bool const interruptNow = Opt().TacticInterrupt && canInterrupt;
             // Deadmines Foundry (Gilnid): a Goblin Engineer (622) casts Summon Remote-Controlled Golem (3605), an add that is immune to most
             // abilities and despawns only when its summoner dies (Wowhead's Deadmines guide: "kill the GOBLIN first"). The snapshot does not
             // say which spell a nearby unit is casting (NearbyUnit::casting is a bool), so this cannot be limited to that one cast; instead,
@@ -624,11 +624,11 @@ void BotPolicy::TurnTargeting(DecideTick& tick, BotTurn& turn)
             // interrupt reaches past it for one that is still free, instead of every capable bot piling onto the one cast.
             auto const interruptable = [interruptNow, nowMs, this, &tick, &bot, partyLeader](NearbyUnit const& unit)
             { return interruptNow && unit.casting != 0 && !InterruptTaken(unit.guid, nowMs) && (!tick.PlanOf(partyLeader) || party_planner::IsAssignedInterrupt(tick.PlanOf(partyLeader), bot.guid, unit.guid)); };
-            if (routeOn && HealSpellFor(classId, bot.level) == 0 && ((_options.TacticFocus && !scenario.KillPriority.empty()) || interruptNow || golemNearby || voidwalkerNearby || summonNearby))
+            if (routeOn && HealSpellFor(classId, bot.level) == 0 && ((Opt().TacticFocus && !scenario.KillPriority.empty()) || interruptNow || golemNearby || voidwalkerNearby || summonNearby))
             {
                 auto const rankOf = [this, &scenario](NearbyUnit const& unit)
                 {
-                    if (!_options.TacticFocus)
+                    if (!Opt().TacticFocus)
                         return std::uint32_t(1000);
                     auto const at = scenario.KillPriority.find(forever_module::UnitRefEntry(unit.guid));
                     return at == scenario.KillPriority.end() ? std::uint32_t(1000) : at->second;
@@ -664,13 +664,13 @@ void BotPolicy::TurnTargeting(DecideTick& tick, BotTurn& turn)
                 };
                 // The map's leash (raid rules `leash`) also holds for the focus pick: a unit nobody fights yet and that stands off the party's route is not reached for
                 // (the 2026-11-13 ZG run: the pack beside the ramp was taken up one unit at a time as the "best" of the tank's pack).
-                std::uint32_t const mapLeash = _options.RaidRules ? _options.RaidRules->PullLeash(bot.map_id) : 0u;
+                std::uint32_t const mapLeash = Opt().RaidRules ? Opt().RaidRules->PullLeash(bot.map_id) : 0u;
                 auto const unengagedOffLeash = [&](NearbyUnit const& unit)
                 {
-                    if (_options.PullOnePack && engaged.count(unit.guid) == 0 && unit.victim_ref == 0)
+                    if (Opt().PullOnePack && engaged.count(unit.guid) == 0 && unit.victim_ref == 0)
                         return true;   // PullOnePack: a unit that fights nobody is not reached for
-                    if (_options.RaidPullSingle && _options.RaidRules && engaged.count(unit.guid) == 0 && unit.victim_ref == 0 &&
-                        _options.RaidRules->PullSingleYards(bot.map_id, forever_module::UnitRefEntry(unit.guid)) > 0.0f)
+                    if (Opt().RaidPullSingle && Opt().RaidRules && engaged.count(unit.guid) == 0 && unit.victim_ref == 0 &&
+                        Opt().RaidRules->PullSingleYards(bot.map_id, forever_module::UnitRefEntry(unit.guid)) > 0.0f)
                         return true;   // RaidPullSingle: a Warder that fights nobody is not reached for by the pack focus either
                     return mapLeash != 0 && engaged.count(unit.guid) == 0 && OffPartyLeash(tick, partyLeader, bot.map_id, unit.pos_x, unit.pos_y, mapLeash, true, false);
                 };
@@ -684,11 +684,11 @@ void BotPolicy::TurnTargeting(DecideTick& tick, BotTurn& turn)
                 if (best != assist)
                 {
                     targetRef = best->guid;
-                    if (state.FocusLoggedFor != best->guid && _options.OnEvent)
+                    if (state.FocusLoggedFor != best->guid && Opt().OnEvent)
                     {
                         bool const engineerUnderGolemPressure = golemNearby && forever_module::UnitRefEntry(best->guid) == kGoblinEngineerEntry;
                         state.FocusLoggedFor = best->guid;
-                        _options.OnEvent(std::string(interruptable(*best) ? "interrupt_target: bot=" : engineerUnderGolemPressure ? "golem_engineer: bot=" : "focus: bot=") + std::to_string(bot.guid) + " entry=" + std::to_string(forever_module::UnitRefEntry(best->guid)) + " instead_of=" +
+                        Opt().OnEvent(std::string(interruptable(*best) ? "interrupt_target: bot=" : engineerUnderGolemPressure ? "golem_engineer: bot=" : "focus: bot=") + std::to_string(bot.guid) + " entry=" + std::to_string(forever_module::UnitRefEntry(best->guid)) + " instead_of=" +
                                          std::to_string(forever_module::UnitRefEntry(assist->guid)) + (best->casting != 0 ? " casting" : ""));
                     }
                 }
@@ -697,14 +697,14 @@ void BotPolicy::TurnTargeting(DecideTick& tick, BotTurn& turn)
     }
     // RaidFocusAvoidEnemy (ZG lever, default off): a ranged damage dealer takes the nearest fighting hostile of an avoid_enemy entry (the Gurubashi Axe Thrower 11350)
     // within kFocusAvoidEnemyYards first (over its own target and the pack focus), wherever it stands relative to the tank's pack; it ignores that unit's circle (TurnRaidSpacing), the others keep theirs.
-    if (_options.RaidFocusAvoidEnemy && routeOn && partyMember && !pullHeld && state.ForcedTarget == 0 && (bot.in_combat != 0 || groupFighting) && _options.RaidRules && _options.RaidRules->HasAvoidEnemy(bot.map_id) &&
+    if (Opt().RaidFocusAvoidEnemy && routeOn && partyMember && !pullHeld && state.ForcedTarget == 0 && (bot.in_combat != 0 || groupFighting) && Opt().RaidRules && Opt().RaidRules->HasAvoidEnemy(bot.map_id) &&
         SpreadKindOf(classId, false) == raid_rules::kWhoRanged && (state.Role_ == BotState::Role::Dps || HealSpellFor(classId, bot.level) == 0))
     {
         NearbyUnit const* thrower = nullptr;
         float bestDist = kFocusAvoidEnemyYards;
         for (NearbyUnit const& unit : nearby)
             if (unit.is_hostile && unit.health != 0 && IsLiveMob(unit) && unit.victim_ref != 0 && !turn.Avoided(unit.guid) &&
-                !_options.RaidRules->AvoidEnemyFor(bot.map_id, forever_module::UnitRefEntry(unit.guid)).empty())
+                !Opt().RaidRules->AvoidEnemyFor(bot.map_id, forever_module::UnitRefEntry(unit.guid)).empty())
                 if (float const dist = std::hypot(unit.pos_x - bot.pos_x, unit.pos_y - bot.pos_y); dist <= bestDist)
                 {
                     bestDist = dist;
@@ -713,10 +713,10 @@ void BotPolicy::TurnTargeting(DecideTick& tick, BotTurn& turn)
         if (thrower != nullptr)
         {
             targetRef = thrower->guid;
-            if (state.FocusLoggedFor != thrower->guid && _options.OnEvent)
+            if (state.FocusLoggedFor != thrower->guid && Opt().OnEvent)
             {
                 state.FocusLoggedFor = thrower->guid;
-                _options.OnEvent("focus_avoid_enemy: bot=" + std::to_string(bot.guid) + " entry=" + std::to_string(forever_module::UnitRefEntry(thrower->guid)) +
+                Opt().OnEvent("focus_avoid_enemy: bot=" + std::to_string(bot.guid) + " entry=" + std::to_string(forever_module::UnitRefEntry(thrower->guid)) +
                                  " dist=" + std::to_string(int(bestDist)));
             }
         }
@@ -732,23 +732,23 @@ void BotPolicy::TurnTargeting(DecideTick& tick, BotTurn& turn)
         bool const attacked = mine && mine->victim_ref != 0;   // it fights somebody already: the party defends
         // The ready gate before a pull: hurt (PullMinHpPct), or a mana user short of mana (PullReadyManaPct) while the leader is not fighting, or the director's wipe hold (after a
         // wipe nobody pulls until the party has revived and rested; the director ends it).
-        bool const hpLow = _options.PullMinHpPct != 0 && bot.max_health > 0 && BelowPct(bot.health, bot.max_health, _options.PullMinHpPct) && !attacked;
-        bool const manaLow = _options.PullReadyManaPct != 0 && bot.power_type == 0 && bot.max_power > 0 && BelowPct(bot.power, bot.max_power, _options.PullReadyManaPct) &&
+        bool const hpLow = Opt().PullMinHpPct != 0 && bot.max_health > 0 && BelowPct(bot.health, bot.max_health, Opt().PullMinHpPct) && !attacked;
+        bool const manaLow = Opt().PullReadyManaPct != 0 && bot.power_type == 0 && bot.max_power > 0 && BelowPct(bot.power, bot.max_power, Opt().PullReadyManaPct) &&
                              !attacked && leaderSnap->in_combat == 0;
         bool const wipeHold = !attacked && WipeHoldOf(bot.guid).Hold;
         if (hpLow || manaLow || wipeHold)
         {
             if (state.PullRestSinceMs == 0)
                 state.PullRestSinceMs = nowMs;
-            std::uint64_t const cap = wipeHold ? ~0ull : hpLow ? _options.PullRestMaxMs : _options.PullReadyMaxMs;
+            std::uint64_t const cap = wipeHold ? ~0ull : hpLow ? Opt().PullRestMaxMs : Opt().PullReadyMaxMs;
             if (nowMs - state.PullRestSinceMs < cap)
             {
                 turn.pullRest = true;
-                if (_options.OnEvent && (state.PullRestLogMs == 0 || nowMs - state.PullRestLogMs >= 10000))
+                if (Opt().OnEvent && (state.PullRestLogMs == 0 || nowMs - state.PullRestLogMs >= 10000))
                 {
                     state.PullRestLogMs = nowMs;
                     char const* const reason = wipeHold ? "wipe_hold" : hpLow ? "low_hp" : "low_mana";
-                    _options.OnEvent("pull_hold: bot=" + std::to_string(bot.guid) + " reason=" + reason + " hp_pct=" + std::to_string(HealthPct(bot, 0)) + " mana_pct=" +
+                    Opt().OnEvent("pull_hold: bot=" + std::to_string(bot.guid) + " reason=" + reason + " hp_pct=" + std::to_string(HealthPct(bot, 0)) + " mana_pct=" +
                                      std::to_string(bot.max_power > 0 ? bot.power * 100 / bot.max_power : 100) + " rest_ms=" + std::to_string(nowMs - state.PullRestSinceMs));
                 }
                 targetRef = 0;
@@ -757,14 +757,14 @@ void BotPolicy::TurnTargeting(DecideTick& tick, BotTurn& turn)
         }
         else
             state.PullRestSinceMs = 0;
-        if (!turn.pullRest && _options.PullTankFirst && targetRef != 0 && leaderSnap->life_state == 0 && leaderSnap->in_combat == 0 && targetRef != leaderSnap->threat_target_guid &&
+        if (!turn.pullRest && Opt().PullTankFirst && targetRef != 0 && leaderSnap->life_state == 0 && leaderSnap->in_combat == 0 && targetRef != leaderSnap->threat_target_guid &&
             targetRef != state.ForcedTarget && !attacked &&
-            !(mine && std::hypot(mine->pos_x - bot.pos_x, mine->pos_y - bot.pos_y) <= float(_options.PullMemberRangeYards)))
+            !(mine && std::hypot(mine->pos_x - bot.pos_x, mine->pos_y - bot.pos_y) <= float(Opt().PullMemberRangeYards)))
         {
-            if (_options.OnEvent && (state.PullHoldLogMs == 0 || nowMs - state.PullHoldLogMs >= 10000))
+            if (Opt().OnEvent && (state.PullHoldLogMs == 0 || nowMs - state.PullHoldLogMs >= 10000))
             {
                 state.PullHoldLogMs = nowMs;
-                _options.OnEvent("pull_hold: bot=" + std::to_string(bot.guid) + " reason=own_target tank=" + std::to_string(leaderSnap->guid) + " target=" +
+                Opt().OnEvent("pull_hold: bot=" + std::to_string(bot.guid) + " reason=own_target tank=" + std::to_string(leaderSnap->guid) + " target=" +
                                  std::to_string(forever_module::UnitRefEntry(targetRef)));
             }
             targetRef = 0;
@@ -778,17 +778,17 @@ void BotPolicy::TurnTargeting(DecideTick& tick, BotTurn& turn)
     // level, nor (solo) with an elite, rare elite or boss, whichever way the target came (its own last target, the focus, a party leader's target). PullTarget already
     // leaves such creatures alone for the bot's own pulls; these paths did not (prod 2026-11-14: bot 641, level 5, died 590 times to a level 50 creature). A chat pull
     // order (ForcedTarget) is the owner's and is kept, and so is the bot's own threat target (the core's: it is fighting it). In combat the bot defends itself as before.
-    if (targetRef != 0 && bot.in_combat == 0 && !routeOn && targetRef != state.ForcedTarget && targetRef != bot.threat_target_guid && (_options.EngageMaxLevelAbove != 0 || !_options.EngageEliteSolo))
+    if (targetRef != 0 && bot.in_combat == 0 && !routeOn && targetRef != state.ForcedTarget && targetRef != bot.threat_target_guid && (Opt().EngageMaxLevelAbove != 0 || !Opt().EngageEliteSolo))
     {
         NearbyUnit const* unit = FindLiveMob(nearby, targetRef);
         if (!unit && partyMember)
             unit = FindLiveMob(tick.LeaderNearby(partyLeader, bot.map_id), targetRef);
-        if (unit && unit->victim_ref == 0 && EngageTooStrong(bot, *unit, _options.EngageMaxLevelAbove, bot.group_leader_guid == 0 && partyLeader == 0, _options.EngageEliteSolo))
+        if (unit && unit->victim_ref == 0 && EngageTooStrong(bot, *unit, Opt().EngageMaxLevelAbove, bot.group_leader_guid == 0 && partyLeader == 0, Opt().EngageEliteSolo))
         {
-            if (_options.OnEvent && state.LevelGapLoggedFor != targetRef)
+            if (Opt().OnEvent && state.LevelGapLoggedFor != targetRef)
             {
                 state.LevelGapLoggedFor = targetRef;
-                _options.OnEvent("engage_skipped: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " target_entry=" +
+                Opt().OnEvent("engage_skipped: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " target_entry=" +
                                  std::to_string(forever_module::UnitRefEntry(targetRef)) + " target_level=" + std::to_string(unit->level) +
                                  " elite=" + std::to_string(unit->elite != 0 || unit->creature_rank != 0 ? 1 : 0));
             }
@@ -822,11 +822,11 @@ BotPolicy::TurnFlow BotPolicy::TurnCrowdControl(DecideTick& tick, BotTurn& turn)
     // (below); only the GCD that sends the hold, and later its refresh a little before it would run out (kCcRefreshBeforeMs), is
     // spent on it. A pack with no match for any cc-capable class present (no learned spell, or no pack member of a type it
     // affects) does nothing, same as a fight with nothing to interrupt.
-    if (_options.TacticCc && routeOn && partyMember && leaderSnap && leaderSnap->threat_target_guid != 0 && nowMs >= state.NextCastMs && !IsCasting(bot))
+    if (Opt().TacticCc && routeOn && partyMember && leaderSnap && leaderSnap->threat_target_guid != 0 && nowMs >= state.NextCastMs && !IsCasting(bot))
     {
         std::uint32_t const ccSpell = CcSpellForClass(classId);
         std::uint32_t const ccLearn = ccSpell != 0 ? CcLearnLevel(ccSpell) : 0;
-        if (ccSpell != 0 && (bot.level == 0 || bot.level >= ccLearn) && CanPay(_options.SpellCosts.get(), ccSpell, bot))
+        if (ccSpell != 0 && (bot.level == 0 || bot.level >= ccLearn) && CanPay(Opt().SpellCosts.get(), ccSpell, bot))
         {
             auto const retry = state.RetryAtMs.find(ccSpell);
             if (retry == state.RetryAtMs.end() || nowMs >= retry->second)
@@ -903,8 +903,8 @@ BotPolicy::TurnFlow BotPolicy::TurnCrowdControl(DecideTick& tick, BotTurn& turn)
                     actions.push_back(cc);
                     state.CastTarget[ccSpell] = candidate->guid;
                     state.NextCastMs = nowMs + kGlobalCooldownMs;
-                    if (_options.OnEvent && mine == state.Dots.end())
-                        _options.OnEvent("cc_target: bot=" + std::to_string(bot.guid) + " spell=" + std::to_string(ccSpell) + " entry=" +
+                    if (Opt().OnEvent && mine == state.Dots.end())
+                        Opt().OnEvent("cc_target: bot=" + std::to_string(bot.guid) + " spell=" + std::to_string(ccSpell) + " entry=" +
                                          std::to_string(forever_module::UnitRefEntry(candidate->guid)));
                     return TurnFlow::kSkip;
                 }
@@ -946,8 +946,8 @@ BotPolicy::TurnFlow BotPolicy::TurnOnyxiaCasts(DecideTick& tick, BotTurn& turn)
         actions.push_back(rage);
         state.OnyxiaBerserkerAtMs = nowMs + kOnyxiaBerserkerCdMs;
         state.NextCastMs = nowMs + kGlobalCooldownMs;
-        if (_options.OnEvent)
-            _options.OnEvent("onyxia_rage: bot=" + std::to_string(bot.guid));
+        if (Opt().OnEvent)
+            Opt().OnEvent("onyxia_rage: bot=" + std::to_string(bot.guid));
         return TurnFlow::kSkip;
     }
 
@@ -971,8 +971,8 @@ BotPolicy::TurnFlow BotPolicy::TurnOnyxiaCasts(DecideTick& tick, BotTurn& turn)
             state.CastTarget[kTauntSpell] = boss->guid;
             state.OnyxiaTauntAtMs = nowMs + kOnyxiaTauntCdMs;
             state.NextCastMs = nowMs + kGlobalCooldownMs;
-            if (_options.OnEvent)
-                _options.OnEvent("onyxia_taunt: bot=" + std::to_string(bot.guid));
+            if (Opt().OnEvent)
+                Opt().OnEvent("onyxia_taunt: bot=" + std::to_string(bot.guid));
             return TurnFlow::kSkip;
         }
     }
@@ -1016,9 +1016,9 @@ BotPolicy::TurnFlow BotPolicy::TurnTaming(DecideTick& tick, BotTurn& turn)
             }
         }
     }
-    bool const tameNow = classId == kHunterClass && _options.TameBeasts && !_options.TameBeasts->ByEntry.empty() && bot.life_state == 0 && (bot.group_role == 0 || tamingPhase) &&
+    bool const tameNow = classId == kHunterClass && Opt().TameBeasts && !Opt().TameBeasts->ByEntry.empty() && bot.life_state == 0 && (bot.group_role == 0 || tamingPhase) &&
                          (bot.level == 0 || bot.level >= kTameMinLevel) && bot.in_combat == 0 && PetOf(bot) == PetKnown::kNone &&
-                         (state.TameUntilMs != 0 || (nowMs >= state.TameRetryAtMs && tame::PickTameTarget(bot, nearby, *_options.TameBeasts, kTameSearchYards, tameTaken) != nullptr));
+                         (state.TameUntilMs != 0 || (nowMs >= state.TameRetryAtMs && tame::PickTameTarget(bot, nearby, *Opt().TameBeasts, kTameSearchYards, tameTaken) != nullptr));
     // The combat-drift leash of a dungeon party (DungeonPullLeashYards, DungeonChaseLeashYards; PullTarget's `leashed`): the leader out of a fight pulls only along the
     // leg of the route it walks; a bot in a fight picks nothing that is off both that leg and its leader. The 2026-11-07 sim: the leaders' pulls were a median 66-72
     // yards off the route in Shadowfang Keep, the Stockade and Razorfen Kraul (10-20 in the Deadmines, Wailing Caverns, Ragefire Chasm), the route index frozen.
@@ -1026,13 +1026,13 @@ BotPolicy::TurnFlow BotPolicy::TurnTaming(DecideTick& tick, BotTurn& turn)
     std::function<bool(NearbyUnit const&)> leashed;
     std::uint64_t const leashParty = turn.partyLeader;
     bool const leaderPull = turn.partyLeaderBot && bot.in_combat == 0;
-    std::uint32_t const leashYards = !routeOn || leashParty == 0 ? 0u : leaderPull ? _options.DungeonPullLeashYards : _options.DungeonChaseLeashYards;
+    std::uint32_t const leashYards = !routeOn || leashParty == 0 ? 0u : leaderPull ? Opt().DungeonPullLeashYards : Opt().DungeonChaseLeashYards;
     if (leashYards != 0)
         leashed = [this, &tick, leashParty, leashYards, leaderPull, mapId = bot.map_id](NearbyUnit const& unit)
         { return OffPartyLeash(tick, leashParty, mapId, unit.pos_x, unit.pos_y, leashYards, !leaderPull, true); };
     // PullOnePack (ZG lever, default off): while the bot or its party fights, a hostile that fights nobody (victim_ref 0: a second pack, or the rest of one still in its
     // spot) is not picked; the party finishes what it fights first.
-    if (_options.PullOnePack && routeOn && leashParty != 0 && (bot.in_combat != 0 || PartyFighting(tick, leashParty)))
+    if (Opt().PullOnePack && routeOn && leashParty != 0 && (bot.in_combat != 0 || PartyFighting(tick, leashParty)))
     {
         std::function<bool(NearbyUnit const&)> const outer = leashed;
         leashed = [outer](NearbyUnit const& unit) { return unit.victim_ref == 0 || (outer && outer(unit)); };
@@ -1040,7 +1040,7 @@ BotPolicy::TurnFlow BotPolicy::TurnTaming(DecideTick& tick, BotTurn& turn)
     // RaidPullSingle (Onyxia fix 3, default off): a creature of a `pull_single` entry (Onyxian Warder) is taken one at a time. In a fight (the bot's or its party's) one that
     // fights nobody is not picked (a second Warder patrolling past); out of a fight the leader does not pull one that has a second one of its entry within the row's yards,
     // until the hold is over its cap (PullSingleWatch). Other creatures are not touched.
-    if (_options.RaidPullSingle && routeOn && leashParty != 0 && _options.RaidRules && _options.RaidRules->HasPullSingle(bot.map_id))
+    if (Opt().RaidPullSingle && routeOn && leashParty != 0 && Opt().RaidRules && Opt().RaidRules->HasPullSingle(bot.map_id))
     {
         bool const fighting = bot.in_combat != 0 || PartyFighting(tick, leashParty);
         bool const skipPairs = leaderPull && turn.pullSinglePairs;
@@ -1048,7 +1048,7 @@ BotPolicy::TurnFlow BotPolicy::TurnTaming(DecideTick& tick, BotTurn& turn)
         {
             std::function<bool(NearbyUnit const&)> const outer = leashed;
             std::span<NearbyUnit const> const units = nearby;
-            leashed = [outer, units, fighting, skipPairs, rules = _options.RaidRules.get(), mapId = bot.map_id](NearbyUnit const& unit)
+            leashed = [outer, units, fighting, skipPairs, rules = Opt().RaidRules.get(), mapId = bot.map_id](NearbyUnit const& unit)
             {
                 float const yards = rules->PullSingleYards(mapId, forever_module::UnitRefEntry(unit.guid));
                 if (yards > 0.0f && ((fighting && unit.victim_ref == 0) || (!fighting && skipPairs && PullSinglePartner(units, unit, yards) != nullptr)))
@@ -1073,19 +1073,19 @@ BotPolicy::TurnFlow BotPolicy::TurnTaming(DecideTick& tick, BotTurn& turn)
     }
     else if (NearbyUnit const* hostile = (dungeonHold || noSelfPull || tameNow || turn.pullWait || (stagingHold && bot.in_combat == 0)) ? nullptr
                  : PullTarget(bot, nearby, PullAvoidFn(turn), bot.in_combat != 0, huntEntries, routeOn, leashed, DungeonPullCapOf(partyLeader != 0 ? partyLeader : bot.guid),
-                          (!routeOn && partyLeader == 0 && bot.group_leader_guid == 0) ? _options.PullMaxGroup : 0,
-                          (!routeOn && partyLeader == 0 && bot.group_leader_guid == 0) ? _options.PullMaxLevelAbove : kMaxLevelAbove))
+                          (!routeOn && partyLeader == 0 && bot.group_leader_guid == 0) ? Opt().PullMaxGroup : 0,
+                          (!routeOn && partyLeader == 0 && bot.group_leader_guid == 0) ? Opt().PullMaxLevelAbove : kMaxLevelAbove))
     {
         targetUnit = hostile;
         targetRef = hostile->guid;
         // Personality (off by default): a solo bot out of combat on no route varies this pull a little: a short reaction pause, a wary bot leaving the largest packs
         // (at most kMaxPullSkips in a row), and now and then a small mistake, another mob than the best one. Every PullTarget guard still holds for the other mob; the
         // bot's own pack cap applies to it. Party, route, forced and in-combat pulls are never touched.
-        if (_options.Personality.Enabled && bot.in_combat == 0 && !routeOn && !partyMember && partyLeader == 0 && bot.group_leader_guid == 0 && targetRef != state.ForcedTarget)
+        if (Opt().Personality.Enabled && bot.in_combat == 0 && !routeOn && !partyMember && partyLeader == 0 && bot.group_leader_guid == 0 && targetRef != state.ForcedTarget)
         {
-            personality::Traits const traits = personality::TraitsFor(_options.RandomSeed, bot.guid);
+            personality::Traits const traits = personality::TraitsFor(Opt().RandomSeed, bot.guid);
             std::uint64_t const counter = hostile->guid + std::uint64_t(state.PullCounter) * 0x9E3779B1ull;
-            if (personality::MakesMistake(_options.Personality, traits, _options.RandomSeed, bot.guid, counter))
+            if (personality::MakesMistake(Opt().Personality, traits, Opt().RandomSeed, bot.guid, counter))
             {
                 std::uint64_t const first = hostile->guid;
                 auto const avoidedFn = turn.AvoidedFn();
@@ -1093,27 +1093,27 @@ BotPolicy::TurnFlow BotPolicy::TurnTaming(DecideTick& tick, BotTurn& turn)
                 {
                     targetUnit = other;
                     targetRef = other->guid;
-                    if (_options.OnEvent)
-                        _options.OnEvent("personality_mistake: bot=" + std::to_string(bot.guid) + " instead_of=" + std::to_string(first) + " took=" + std::to_string(targetRef));
+                    if (Opt().OnEvent)
+                        Opt().OnEvent("personality_mistake: bot=" + std::to_string(bot.guid) + " instead_of=" + std::to_string(first) + " took=" + std::to_string(targetRef));
                 }
             }
             std::size_t group = 0;
             for (NearbyUnit const& other : nearby)
                 if (IsLiveMob(other) && DistanceBetween(*targetUnit, other) <= kPullRadius)
                     ++group;
-            if (group > personality::PackCap(_options.Personality, traits, kMaxPull) && state.PullSkips < personality::kMaxPullSkips)
+            if (group > personality::PackCap(Opt().Personality, traits, kMaxPull) && state.PullSkips < personality::kMaxPullSkips)
             {
                 ++state.PullSkips;
                 state.AvoidUntilMs[targetRef] = nowMs + kPersonalitySkipMs;
                 targetRef = 0;
                 targetUnit = nullptr;
             }
-            else if (_options.Personality.ReactionMaxMs != 0)
+            else if (Opt().Personality.ReactionMaxMs != 0)
             {
                 if (state.PullReactRef != targetRef)
                 {
                     state.PullReactRef = targetRef;
-                    state.PullReactUntilMs = nowMs + personality::ReactionDelayMs(_options.Personality, traits, _options.RandomSeed, bot.guid, counter);
+                    state.PullReactUntilMs = nowMs + personality::ReactionDelayMs(Opt().Personality, traits, Opt().RandomSeed, bot.guid, counter);
                 }
                 if (nowMs < state.PullReactUntilMs)
                 {
@@ -1145,7 +1145,7 @@ BotPolicy::TurnFlow BotPolicy::TurnTaming(DecideTick& tick, BotTurn& turn)
     }
     // DPS threat discipline (plan section 3.3, layout 24 threat fields): a damage dealer of a party whose threat on its target nears the top holds its attacks until the
     // tank is ahead again, and uses its class's threat drop when it has the target's attention. Not the tank, a healer, or a solo bot.
-    if (_options.ThreatHold && partyMember && targetRef != 0)
+    if (Opt().ThreatHold && partyMember && targetRef != 0)
     {
         bool const dps = state.Role_ == BotState::Role::Dps ||
                          (state.Role_ == BotState::Role::Auto && classId != kWarriorClass && HealSpellFor(classId, bot.level) == 0);
@@ -1155,26 +1155,26 @@ BotPolicy::TurnFlow BotPolicy::TurnTaming(DecideTick& tick, BotTurn& turn)
         {
             std::uint32_t const pct = targetUnit->bot_threat_pct; // 255: the bot is on top
             bool const hasAggro = targetUnit->victim_ref == PlayerRef(bot.guid);
-            bool const nearDeath = targetUnit->max_health != 0 && std::uint64_t(targetUnit->health) * 100 < std::uint64_t(targetUnit->max_health) * _options.ThreatNearDeathPct;
+            bool const nearDeath = targetUnit->max_health != 0 && std::uint64_t(targetUnit->health) * 100 < std::uint64_t(targetUnit->max_health) * Opt().ThreatNearDeathPct;
             if (state.ThreatHoldRef == 0)
             {
-                if (nowMs >= state.ThreatGraceUntilMs && pct >= _options.ThreatHoldPct && !hasAggro && !nearDeath)
+                if (nowMs >= state.ThreatGraceUntilMs && pct >= Opt().ThreatHoldPct && !hasAggro && !nearDeath)
                 {
                     state.ThreatHoldRef = targetRef;
                     state.ThreatHoldSinceMs = nowMs;
-                    if (_options.OnEvent)
-                        _options.OnEvent("threat_hold: bot=" + std::to_string(bot.guid) + " target=" + std::to_string(targetRef) + " pct=" + std::to_string(pct));
+                    if (Opt().OnEvent)
+                        Opt().OnEvent("threat_hold: bot=" + std::to_string(bot.guid) + " target=" + std::to_string(targetRef) + " pct=" + std::to_string(pct));
                 }
             }
-            else if (pct <= _options.ThreatReleasePct || hasAggro || nearDeath)
+            else if (pct <= Opt().ThreatReleasePct || hasAggro || nearDeath)
                 state.ThreatHoldRef = 0;
-            else if (nowMs - state.ThreatHoldSinceMs >= _options.ThreatHoldMaxMs)
+            else if (nowMs - state.ThreatHoldSinceMs >= Opt().ThreatHoldMaxMs)
             {
                 state.ThreatHoldRef = 0;
-                state.ThreatGraceUntilMs = nowMs + _options.ThreatHoldMaxMs;
+                state.ThreatGraceUntilMs = nowMs + Opt().ThreatHoldMaxMs;
             }
             // The drop ability: on top of the list (100% and above) or the target's attention is on the bot.
-            if (_options.ThreatDropAbilities && (hasAggro || pct >= 100) && !nearDeath && nowMs >= state.ThreatDropAtMs && nowMs >= state.NextCastMs && !IsCasting(bot))
+            if (Opt().ThreatDropAbilities && (hasAggro || pct >= 100) && !nearDeath && nowMs >= state.ThreatDropAtMs && nowMs >= state.NextCastMs && !IsCasting(bot))
             {
                 bool onTarget = false;
                 std::uint32_t const spell = ThreatDropSpellFor(classId, bot.level, onTarget);
@@ -1182,7 +1182,7 @@ BotPolicy::TurnFlow BotPolicy::TurnTaming(DecideTick& tick, BotTurn& turn)
                 for (forever_module::SpellCooldown const& cooldown : bot.spell_cooldowns)
                     cooling = cooling || (cooldown.spell_id == spell && cooldown.remaining_ms != 0);
                 auto const retry = state.RetryAtMs.find(spell);
-                if (spell != 0 && !cooling && (retry == state.RetryAtMs.end() || nowMs >= retry->second) && CanPay(_options.SpellCosts.get(), spell, bot))
+                if (spell != 0 && !cooling && (retry == state.RetryAtMs.end() || nowMs >= retry->second) && CanPay(Opt().SpellCosts.get(), spell, bot))
                 {
                     BotAction drop;
                     drop.bot_guid = bot.guid;
@@ -1193,8 +1193,8 @@ BotPolicy::TurnFlow BotPolicy::TurnTaming(DecideTick& tick, BotTurn& turn)
                     state.CastTarget[spell] = drop.target_guid;
                     state.NextCastMs = nowMs + kGlobalCooldownMs;
                     state.ThreatDropAtMs = nowMs + kThreatDropRetryMs;
-                    if (_options.OnEvent)
-                        _options.OnEvent("threat_drop: bot=" + std::to_string(bot.guid) + " spell=" + std::to_string(spell) + " pct=" + std::to_string(pct));
+                    if (Opt().OnEvent)
+                        Opt().OnEvent("threat_drop: bot=" + std::to_string(bot.guid) + " spell=" + std::to_string(spell) + " pct=" + std::to_string(pct));
                 }
             }
             if (state.ThreatHoldRef != 0)
@@ -1211,7 +1211,7 @@ BotPolicy::TurnFlow BotPolicy::TurnTaming(DecideTick& tick, BotTurn& turn)
 
     // Taming (Tame Beast). A hunter with no pet, not in a party, out of combat: walk to the nearest beast of data/tame_beasts.txt its level allows, cast Tame Beast on it and
     // hold still for the channel. The snapshot's pet_state tells whether it worked (the core creates the pet when the channel ends). Not for a hunter that fights or runs a route.
-    if (classId == kHunterClass && _options.TameBeasts && !_options.TameBeasts->ByEntry.empty() && bot.life_state == 0 && (bot.group_role == 0 || tamingPhase) &&
+    if (classId == kHunterClass && Opt().TameBeasts && !Opt().TameBeasts->ByEntry.empty() && bot.life_state == 0 && (bot.group_role == 0 || tamingPhase) &&
         (bot.level == 0 || bot.level >= kTameMinLevel))
     {
         if (state.TameUntilMs != 0)
@@ -1228,8 +1228,8 @@ BotPolicy::TurnFlow BotPolicy::TurnTaming(DecideTick& tick, BotTurn& turn)
                 state.TameFailures = 0;
                 state.TamePetFirst = false;
                 _tameClaims.erase(state.TameTarget);
-                if (_options.OnEvent)
-                    _options.OnEvent("tame_done: bot=" + std::to_string(bot.guid) + " target=" + std::to_string(state.TameTarget));
+                if (Opt().OnEvent)
+                    Opt().OnEvent("tame_done: bot=" + std::to_string(bot.guid) + " target=" + std::to_string(state.TameTarget));
             }
             else if (hurtInCombat || refusedNow || nowMs >= state.TameUntilMs)
             {
@@ -1242,8 +1242,8 @@ BotPolicy::TurnFlow BotPolicy::TurnTaming(DecideTick& tick, BotTurn& turn)
                     // Not learned (the sim's hunters never had Tame Beast: 8 casts, 8 "spell not known"): not the stored-pet refusal, so no Call Pet / Revive Pet round; wait long.
                     state.TameFailures = 0;
                     state.TameRetryAtMs = nowMs + kTameNotKnownMs;
-                    if (_options.OnEvent)
-                        _options.OnEvent("tame_failed: bot=" + std::to_string(bot.guid) + " target=" + std::to_string(state.TameTarget) + " why=not_known");
+                    if (Opt().OnEvent)
+                        Opt().OnEvent("tame_failed: bot=" + std::to_string(bot.guid) + " target=" + std::to_string(state.TameTarget) + " why=not_known");
                 }
                 else if (refusedNow)
                 {
@@ -1263,8 +1263,8 @@ BotPolicy::TurnFlow BotPolicy::TurnTaming(DecideTick& tick, BotTurn& turn)
                     state.TameRetryAtMs = nowMs + (state.TameFailures >= kTameMaxFailures ? kTameGiveUpMs : kTameRetryMs);
                     if (state.TameFailures >= kTameMaxFailures)
                         state.TameFailures = 0;
-                    if (_options.OnEvent)
-                        _options.OnEvent("tame_failed: bot=" + std::to_string(bot.guid) + " target=" + std::to_string(state.TameTarget) +
+                    if (Opt().OnEvent)
+                        Opt().OnEvent("tame_failed: bot=" + std::to_string(bot.guid) + " target=" + std::to_string(state.TameTarget) +
                                          (hurtInCombat ? " why=combat" : refusedNow ? " why=refused" : " why=no_pet"));
                 }
             }
@@ -1294,7 +1294,7 @@ BotPolicy::TurnFlow BotPolicy::TurnTaming(DecideTick& tick, BotTurn& turn)
         if (state.TameUntilMs == 0 && !state.TamePetFirst && !hasTarget && bot.in_combat == 0 && !IsCasting(bot) && !state.Sitting && nowMs >= state.NextCastMs && nowMs >= state.TameRetryAtMs &&
             PetOf(bot) == PetKnown::kNone && !(state.RetryAtMs.count(kTameBeast) && nowMs < state.RetryAtMs[kTameBeast]))
         {
-            NearbyUnit const* beast = tame::PickTameTarget(bot, nearby, *_options.TameBeasts, kTameSearchYards, tameTaken);
+            NearbyUnit const* beast = tame::PickTameTarget(bot, nearby, *Opt().TameBeasts, kTameSearchYards, tameTaken);
             if (!beast)
                 state.TameRetryAtMs = nowMs + kTameRetryMs / 2; // nothing to tame in view: look again soon
             else if (rotation::DistanceYards(bot, *beast) > kTameCastYards)
@@ -1335,8 +1335,8 @@ BotPolicy::TurnFlow BotPolicy::TurnTaming(DecideTick& tick, BotTurn& turn)
                 state.TameCastAtMs = nowMs;
                 state.TameUntilMs = nowMs + kTameHoldMs;
                 _tameClaims[beast->guid] = { bot.guid, nowMs + kTameHoldMs };
-                if (_options.OnEvent)
-                    _options.OnEvent("tame: bot=" + std::to_string(bot.guid) + " target=" + std::to_string(beast->guid) + " level=" + std::to_string(beast->level) +
+                if (Opt().OnEvent)
+                    Opt().OnEvent("tame: bot=" + std::to_string(bot.guid) + " target=" + std::to_string(beast->guid) + " level=" + std::to_string(beast->level) +
                                      " dist=" + std::to_string(int(rotation::DistanceYards(bot, *beast))));
                 return TurnFlow::kSkip;
             }
@@ -1413,10 +1413,10 @@ void BotPolicy::TurnFightWatch(DecideTick& tick, BotTurn& turn)
         if (nowMs - state.StallSinceMs > kFightStallMs)
         {
             AvoidStalledUnit(state.AvoidUntilMs, state.StallCount, targetRef, nowMs);
-            if (_options.OnEvent)
-                _options.OnEvent("fight_stalled: bot=" + std::to_string(bot.guid) + " target_entry=" + std::to_string(forever_module::UnitRefEntry(targetRef)) +
+            if (Opt().OnEvent)
+                Opt().OnEvent("fight_stalled: bot=" + std::to_string(bot.guid) + " target_entry=" + std::to_string(forever_module::UnitRefEntry(targetRef)) +
                                  " target_hp=" + (targetUnit ? std::to_string(targetUnit->health) : std::string("unseen")) +
-                                 " distance=" + std::to_string(int(distance)) + (_options.FightStallDiag ? StallDiagFields(bot, turn.classId, targetUnit) : std::string()));
+                                 " distance=" + std::to_string(int(distance)) + (Opt().FightStallDiag ? StallDiagFields(bot, turn.classId, targetUnit) : std::string()));
             state.StallTarget = 0;
             // Given up for good this tick too: the bot must not keep attacking it until the next one.
             targetRef = 0;
@@ -1450,8 +1450,8 @@ void BotPolicy::TurnMoveSetup(DecideTick& tick, BotTurn& turn)
     auto& kiteEntry = turn.kiteEntry;   // the entry to retreat toward (AoeKitePoint)
     if (partyMember)
     {
-        auto const dungeon = _options.DungeonsByMap.find(bot.map_id);
-        if (dungeon != _options.DungeonsByMap.end() && dungeon->second.HasEntry)
+        auto const dungeon = Opt().DungeonsByMap.find(bot.map_id);
+        if (dungeon != Opt().DungeonsByMap.end() && dungeon->second.HasEntry)
             kiteEntry = dungeon->second.Entry;
         else if (bot.map_id == kOnyxiaMap)
             kiteEntry = Point{ kOnyxiaEntryX, kOnyxiaEntryY, kOnyxiaEntryZ };
@@ -1482,7 +1482,7 @@ void BotPolicy::TurnMoveSetup(DecideTick& tick, BotTurn& turn)
                         aoeWarder = &unit;
                     }
                 }
-            if (aoeWarder && _options.OnEvent && nearestWarder < kAoeStandYards + 6.0f &&
+            if (aoeWarder && Opt().OnEvent && nearestWarder < kAoeStandYards + 6.0f &&
                 (state.WarderUnseenLogMs == 0 || nowMs >= state.WarderUnseenLogMs + 30000))
             {
                 // What fills the bot's own list instead (the diagnostic for LeaderNearby): players, hostile creatures, other creatures (pets, totems).
@@ -1490,7 +1490,7 @@ void BotPolicy::TurnMoveSetup(DecideTick& tick, BotTurn& turn)
                 int players = 0, hostile = 0, others = 0;
                 for (NearbyUnit const& unit : nearby)
                     (forever_module::UnitRefType(unit.guid) == 2 ? players : unit.is_hostile ? hostile : others) += 1;
-                _options.OnEvent("warder_unseen: bot=" + std::to_string(bot.guid) + " dist=" + std::to_string(int(nearestWarder)) + " own_nearby=" +
+                Opt().OnEvent("warder_unseen: bot=" + std::to_string(bot.guid) + " dist=" + std::to_string(int(nearestWarder)) + " own_nearby=" +
                                  std::to_string(nearby.size()) + " players=" + std::to_string(players) + " hostile=" + std::to_string(hostile) +
                                  " other_creatures=" + std::to_string(others));
             }
@@ -1512,7 +1512,7 @@ void BotPolicy::TurnMoveSetup(DecideTick& tick, BotTurn& turn)
                         break;
                     tx /= length;
                     ty /= length;
-                    float const step = float(_options.HealerLosMoveYards);
+                    float const step = float(Opt().HealerLosMoveYards);
                     float const tries[3][2] = { { tx, ty }, { -ty, tx }, { ty, -tx } };
                     for (auto const& direction : tries)
                     {

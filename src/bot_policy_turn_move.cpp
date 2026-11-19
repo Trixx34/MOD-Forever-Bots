@@ -25,12 +25,12 @@ void BotPolicy::TurnMoveChoice(DecideTick& tick, BotTurn& turn)
     auto& kiteEntry = turn.kiteEntry;
 
     // Diagnostics, one line per bot per 5 s while an Onyxian Warder is near: which branch below the bot takes (flee, kite, heal_los, or the rest).
-    bool const warderLog = static_cast<bool>(_options.OnEvent) && partyMember && aoeWarder != nullptr && nowMs >= state.WarderLogMs + 5000 &&
+    bool const warderLog = static_cast<bool>(Opt().OnEvent) && partyMember && aoeWarder != nullptr && nowMs >= state.WarderLogMs + 5000 &&
                            std::hypot(bot.pos_x - aoeWarder->pos_x, bot.pos_y - aoeWarder->pos_y) < kAoeStandYards + 6.0f;
     if (warderLog)
     {
         state.WarderLogMs = nowMs;
-        _options.OnEvent("warder_near: bot=" + std::to_string(bot.guid) + " dist=" +
+        Opt().OnEvent("warder_near: bot=" + std::to_string(bot.guid) + " dist=" +
                          std::to_string(int(std::hypot(bot.pos_x - aoeWarder->pos_x, bot.pos_y - aoeWarder->pos_y))) +
                          " low_health=" + std::to_string(lowHealth ? 1 : 0) + " route_on=" + std::to_string(routeOn ? 1 : 0) +
                          " party_leader=" + std::to_string(partyLeader) + " in_combat=" + std::to_string(bot.in_combat));
@@ -78,7 +78,7 @@ void BotPolicy::TurnMoveChoice(DecideTick& tick, BotTurn& turn)
         // round, and with none left the bot stands and works from where it is.
         // A kite point that a hazard covers (a ground effect the bot would walk into) is given up for the next one too.
         wanted = Decision{ ActionType::kStop, 0 };
-        std::vector<ground_avoid::Circle> const hazards = HazardCircles(_options, bot);
+        std::vector<ground_avoid::Circle> const hazards = HazardCircles(Opt(), bot);
         bool kiteFound = false;
         for (int retry = 0; retry < 6; ++retry)
         {
@@ -94,13 +94,13 @@ void BotPolicy::TurnMoveChoice(DecideTick& tick, BotTurn& turn)
                 kiteRetry = retry;
                 kiteFound = true;
                 if (warderLog)
-                    _options.OnEvent("kite: bot=" + std::to_string(bot.guid) + " retry=" + std::to_string(retry) + " to=" +
+                    Opt().OnEvent("kite: bot=" + std::to_string(bot.guid) + " retry=" + std::to_string(retry) + " to=" +
                                      std::to_string(int(kite.X)) + "," + std::to_string(int(kite.Y)));
                 break;
             }
         }
         if (!kiteFound && warderLog)
-            _options.OnEvent("kite_none: bot=" + std::to_string(bot.guid) + " all 6 points blocked (no route, refused or hazard)");
+            Opt().OnEvent("kite_none: bot=" + std::to_string(bot.guid) + " all 6 points blocked (no route, refused or hazard)");
     }
     else if (partyMember && bot.in_combat != 0 && nowMs < state.HealLosUntilMs && state.HealLosTarget != 0 && healLosPoint)
     {
@@ -145,10 +145,10 @@ void BotPolicy::MoveToTarget(DecideTick& tick, BotTurn& turn)
     // Raid rules `pullpos`: the tank (the route leader) pulls a creature of a listed entry from the stated position. Out of combat it walks there first (at most
     // kPullPosWalkMs); once the pull has landed it goes back to the position and holds there kPullPosHoldMs while the pack is still on its way, so the pack comes to
     // the tank instead of the tank walking into the pack's throw range. The other members wait (TurnTargeting's tank-first hold).
-    if (turn.partyLeaderBot && turn.routeOn && targetUnit && _options.RaidRules)
+    if (turn.partyLeaderBot && turn.routeOn && targetUnit && Opt().RaidRules)
     {
         if (std::optional<raid_rules::PullPosition> const pos =
-                _options.RaidRules->PullPositionOf(bot.map_id, forever_module::UnitRefEntry(targetRef), targetUnit->pos_x, targetUnit->pos_y))
+                Opt().RaidRules->PullPositionOf(bot.map_id, forever_module::UnitRefEntry(targetRef), targetUnit->pos_x, targetUnit->pos_y))
         {
             if (state.PullPosRef != targetRef)
             {
@@ -162,10 +162,10 @@ void BotPolicy::MoveToTarget(DecideTick& tick, BotTurn& turn)
             {
                 wanted = Decision{ ActionType::kMoveTo, 0, Point{ pos->X, pos->Y, pos->Z } };
                 moveWhy = why;
-                if (_options.OnEvent && (state.PullPosLogMs == 0 || nowMs - state.PullPosLogMs >= 5000))
+                if (Opt().OnEvent && (state.PullPosLogMs == 0 || nowMs - state.PullPosLogMs >= 5000))
                 {
                     state.PullPosLogMs = nowMs;
-                    _options.OnEvent(std::string("pull_position: bot=") + std::to_string(bot.guid) + " why=" + why + " target_entry=" + std::to_string(forever_module::UnitRefEntry(targetRef)) +
+                    Opt().OnEvent(std::string("pull_position: bot=") + std::to_string(bot.guid) + " why=" + why + " target_entry=" + std::to_string(forever_module::UnitRefEntry(targetRef)) +
                                      " at=" + std::to_string(int(pos->X)) + "," + std::to_string(int(pos->Y)) + " yards=" + std::to_string(int(atPos)));
                 }
             };
@@ -205,8 +205,8 @@ void BotPolicy::MoveToTarget(DecideTick& tick, BotTurn& turn)
         state.FightStartMs = nowMs;
         // The review's instrumentation (2026-10-22): the party's state at the start of a fight, so a run says
         // whether the pulls happen with the party healthy and with mana, and where they are.
-        if (_options.OnEvent)
-            _options.OnEvent("pull: bot=" + std::to_string(bot.guid) + " map=" + std::to_string(bot.map_id) +
+        if (Opt().OnEvent)
+            Opt().OnEvent("pull: bot=" + std::to_string(bot.guid) + " map=" + std::to_string(bot.map_id) +
                   " pos=" + std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) +
                   " hp=" + std::to_string(bot.health) + "/" + std::to_string(bot.max_health) +
                   " power=" + std::to_string(bot.power) + "/" + std::to_string(bot.max_power) +
@@ -225,8 +225,8 @@ void BotPolicy::MoveToTarget(DecideTick& tick, BotTurn& turn)
                 if (IsLiveMob(unit) && std::find(entries.begin(), entries.end(), forever_module::UnitRefEntry(unit.guid)) != entries.end() &&
                     state.AvoidUntilMs.find(unit.guid) == state.AvoidUntilMs.end())
                     AvoidStalledUnit(state.AvoidUntilMs, state.StallCount, unit.guid, nowMs);
-            if (_options.OnEvent)
-                _options.OnEvent("pull_unreachable: bot=" + std::to_string(bot.guid) + " pulls=" + std::to_string(state.PullChurnCount) + " targets=" +
+            if (Opt().OnEvent)
+                Opt().OnEvent("pull_unreachable: bot=" + std::to_string(bot.guid) + " pulls=" + std::to_string(state.PullChurnCount) + " targets=" +
                                  std::to_string(state.PullChurnTargets.size()) + " first_entry=" + std::to_string(entries.empty() ? 0u : entries.front()) +
                                  " at=" + std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) + "," + std::to_string(int(bot.pos_z)));
             state.PullChurnCount = 0;
@@ -280,7 +280,7 @@ void BotPolicy::MoveToTarget(DecideTick& tick, BotTurn& turn)
     // known" from the core) closes to melee and auto-attacks. It used to stand at its 25-yard stand-off casting nothing, the fight watchdog gave the target up
     // (kStallAvoidMs, 5 to 40 minutes), and soon every creature around was avoided: the 2026-11-14 sim's level 1 shamans (Lightning Bolt's row starts at rank 2,
     // level 8) and druids (Wrath's at rank 2, level 6; Starsurge and Sunfire are runes) stood idle beside live creatures for the whole run.
-    if (_options.CasterMeleeWithoutSpell && !healerSupport && approach > kMeleeApproachYards + 0.5f && classId != kHunterClass)
+    if (Opt().CasterMeleeWithoutSpell && !healerSupport && approach > kMeleeApproachYards + 0.5f && classId != kHunterClass)
     {
         bool castable = false;
         for (rotation::Row const& row : RowsFor(classId, spec))
@@ -299,10 +299,10 @@ void BotPolicy::MoveToTarget(DecideTick& tick, BotTurn& turn)
         if (!castable)
         {
             approach = kMeleeApproachYards;
-            if (_options.OnEvent && targetRef != 0 && state.NoSpellLoggedFor != targetRef)
+            if (Opt().OnEvent && targetRef != 0 && state.NoSpellLoggedFor != targetRef)
             {
                 state.NoSpellLoggedFor = targetRef;
-                _options.OnEvent("caster_no_spell_melee: bot=" + std::to_string(bot.guid) + " class=" + std::to_string(classId) + " spec=" + spec + " level=" +
+                Opt().OnEvent("caster_no_spell_melee: bot=" + std::to_string(bot.guid) + " class=" + std::to_string(classId) + " spec=" + spec + " level=" +
                                  std::to_string(bot.level));
             }
         }
@@ -329,20 +329,20 @@ void BotPolicy::MoveToTarget(DecideTick& tick, BotTurn& turn)
     }
     // FightHeightAvoidMs (default off): a melee bot (not a healer) whose target is within the ground approach range but out of vertical reach (a hovering or flying creature, or one on a
     // ledge) swings at air; neither side does damage and the 45 s watchdog ends it. After the key's time the target is avoided and the bot takes another. Not a raid boss.
-    if (_options.FightHeightAvoidMs != 0 && targetUnit && !healerSupport && approach <= kMeleeApproachYards + 0.5f && distance <= approach &&
+    if (Opt().FightHeightAvoidMs != 0 && targetUnit && !healerSupport && approach <= kMeleeApproachYards + 0.5f && distance <= approach &&
         std::fabs(targetUnit->pos_z - bot.pos_z) >= kHeightUnreachableYards &&
-        !(_options.RaidRules && _options.RaidRules->IsBoss(bot.map_id, forever_module::UnitRefEntry(targetUnit->guid))))
+        !(Opt().RaidRules && Opt().RaidRules->IsBoss(bot.map_id, forever_module::UnitRefEntry(targetUnit->guid))))
     {
         if (state.HeightTarget != targetRef || state.HeightSinceMs == 0)
         {
             state.HeightTarget = targetRef;
             state.HeightSinceMs = nowMs;
         }
-        else if (nowMs - state.HeightSinceMs >= _options.FightHeightAvoidMs)
+        else if (nowMs - state.HeightSinceMs >= Opt().FightHeightAvoidMs)
         {
             AvoidUnit(state.AvoidUntilMs, state.AvoidCount, targetRef, nowMs);
-            if (_options.OnEvent)
-                _options.OnEvent("fight_height_avoid: bot=" + std::to_string(bot.guid) + " target_entry=" + std::to_string(forever_module::UnitRefEntry(targetRef)) +
+            if (Opt().OnEvent)
+                Opt().OnEvent("fight_height_avoid: bot=" + std::to_string(bot.guid) + " target_entry=" + std::to_string(forever_module::UnitRefEntry(targetRef)) +
                                  " ground=" + std::to_string(int(distance)) + " dz=" + std::to_string(int(targetUnit->pos_z - bot.pos_z)) +
                                  " held_ms=" + std::to_string(nowMs - state.HeightSinceMs));
             state.HeightSinceMs = 0;
@@ -376,7 +376,7 @@ void BotPolicy::MoveToTarget(DecideTick& tick, BotTurn& turn)
         if (bossBandKite && distance < band.Min)
         {
             // Back to the middle of the band, on a point no hazard covers; with none the bot holds where it is.
-            std::optional<Point> const stand = BandStandPoint(bot, *targetUnit, band.Mid(), HazardCircles(_options, bot));
+            std::optional<Point> const stand = BandStandPoint(bot, *targetUnit, band.Mid(), HazardCircles(Opt(), bot));
             if (stand)
             {
                 wanted = Decision{ ActionType::kMoveTo, 0, *stand };
@@ -399,7 +399,7 @@ void BotPolicy::MoveToTarget(DecideTick& tick, BotTurn& turn)
                 if (aoeTarget)
                 {
                     // The bot's own bearing, as in the branch above; a point a hazard covers is passed over for the next retry, and with none clear the bot holds.
-                    std::vector<ground_avoid::Circle> const hazards = HazardCircles(_options, bot);
+                    std::vector<ground_avoid::Circle> const hazards = HazardCircles(Opt(), bot);
                     bool found = false;
                     for (int retry = 0; retry < 6 && !found; ++retry)
                     {
@@ -433,7 +433,7 @@ void BotPolicy::MoveToTarget(DecideTick& tick, BotTurn& turn)
     {
         // Walking to a target that never gets in range (behind a wall, or unreachable) is given up after a while:
         // the target is avoided, and the bot picks another one next tick.
-        if (targetUnit && turn.routeOn && OffPartyLeash(tick, partyLeader, bot.map_id, targetUnit->pos_x, targetUnit->pos_y, _options.DungeonChaseLeashYards, true, false))
+        if (targetUnit && turn.routeOn && OffPartyLeash(tick, partyLeader, bot.map_id, targetUnit->pos_x, targetUnit->pos_y, Opt().DungeonChaseLeashYards, true, false))
         {
             // DungeonChaseLeashYards: the target is off the party's leash (far from the leg of the route and from the leader: it fled, or it is the next pack). The bot
             // does not walk after it: a member goes back to its leader, the leader stands, and either fights it when it comes back. It is avoided (the bot turns to another
@@ -442,16 +442,16 @@ void BotPolicy::MoveToTarget(DecideTick& tick, BotTurn& turn)
             bool otherInLeash = false;
             for (NearbyUnit const& unit : turn.nearby)
                 otherInLeash = otherInLeash || (unit.guid != targetRef && IsLiveMob(unit) && !turn.Avoided(unit.guid) &&
-                                                !OffPartyLeash(tick, partyLeader, bot.map_id, unit.pos_x, unit.pos_y, _options.DungeonChaseLeashYards, true, false));
+                                                !OffPartyLeash(tick, partyLeader, bot.map_id, unit.pos_x, unit.pos_y, Opt().DungeonChaseLeashYards, true, false));
             if (otherInLeash)
                 AvoidUnit(state.AvoidUntilMs, state.AvoidCount, targetRef, nowMs);
             wanted = partyMember && turn.leaderSnap && turn.leaderSnap->life_state == 0 && Distance2d(bot, *turn.leaderSnap) > kFollowLeaderYards
                          ? Decision{ ActionType::kFollow, turn.leaderRef }
                          : Decision{ ActionType::kStop, 0 };
-            if (_options.OnEvent && (state.ChaseLeashLoggedMs == 0 || nowMs - state.ChaseLeashLoggedMs >= 5000))
+            if (Opt().OnEvent && (state.ChaseLeashLoggedMs == 0 || nowMs - state.ChaseLeashLoggedMs >= 5000))
             {
                 state.ChaseLeashLoggedMs = nowMs;
-                _options.OnEvent("chase_leash: bot=" + std::to_string(bot.guid) + " target_entry=" + std::to_string(forever_module::UnitRefEntry(targetRef)) +
+                Opt().OnEvent("chase_leash: bot=" + std::to_string(bot.guid) + " target_entry=" + std::to_string(forever_module::UnitRefEntry(targetRef)) +
                                  " distance=" + std::to_string(int(distance)) + RouteYardsField(turn));
             }
         }
@@ -460,10 +460,10 @@ void BotPolicy::MoveToTarget(DecideTick& tick, BotTurn& turn)
             state.Approaching = false;
             AvoidUnit(state.AvoidUntilMs, state.AvoidCount, targetRef, nowMs);
             wanted = Decision{ ActionType::kStop, 0 };
-            if (_options.OnEvent && nowMs - state.MoveWhyLoggedMs >= 5000)
+            if (Opt().OnEvent && nowMs - state.MoveWhyLoggedMs >= 5000)
             {
                 state.MoveWhyLoggedMs = nowMs;
-                _options.OnEvent("chase_dropped: bot=" + std::to_string(bot.guid) + " distance=" + std::to_string(int(distance)) + " at=" + std::to_string(int(bot.pos_x)) + "," +
+                Opt().OnEvent("chase_dropped: bot=" + std::to_string(bot.guid) + " distance=" + std::to_string(int(distance)) + " at=" + std::to_string(int(bot.pos_x)) + "," +
                                  std::to_string(int(bot.pos_y)) + "," + std::to_string(int(bot.pos_z)));
             }
         }
@@ -501,11 +501,11 @@ bool BotPolicy::MoveBossPosition(DecideTick& tick, BotTurn& turn, float bandMid,
     BotSnapshot const& bot = turn.bot;
     BotState& state = turn.state;
     NearbyUnit const* boss = turn.targetUnit;
-    if (!_options.RaidBossPositions || !_options.RaidRules || boss == nullptr || turn.partyLeader == 0 || !boss->is_hostile || boss->health == 0)
+    if (!Opt().RaidBossPositions || !Opt().RaidRules || boss == nullptr || turn.partyLeader == 0 || !boss->is_hostile || boss->health == 0)
         return false;
     std::uint32_t const entry = forever_module::UnitRefEntry(boss->guid);
-    std::optional<raid_rules::TankSpot> const spot = _options.RaidRules->TankSpotOf(bot.map_id, entry);
-    std::optional<raid_rules::FlankRule> const flank = _options.RaidRules->FlankOf(bot.map_id, entry);
+    std::optional<raid_rules::TankSpot> const spot = Opt().RaidRules->TankSpotOf(bot.map_id, entry);
+    std::optional<raid_rules::FlankRule> const flank = Opt().RaidRules->FlankOf(bot.map_id, entry);
     if (!spot && !flank)
         return false;
     if (std::fabs(boss->pos_z - bot.pos_z) > kBossAirYards)
@@ -515,14 +515,14 @@ bool BotPolicy::MoveBossPosition(DecideTick& tick, BotTurn& turn, float bandMid,
         return false;
     auto const log = [&](std::uint64_t& lastMs, std::string const& line)
     {
-        if (_options.OnEvent && (lastMs == 0 || nowMs - lastMs >= 5000))
+        if (Opt().OnEvent && (lastMs == 0 || nowMs - lastMs >= 5000))
         {
             lastMs = nowMs;
-            _options.OnEvent(line);
+            Opt().OnEvent(line);
         }
     };
     std::uint32_t const classId = turn.classId;
-    bool const tank = state.Role_ == BotState::Role::Tank || (state.Role_ == BotState::Role::Auto && classId == kWarriorClass && _options.PartySize != 0);
+    bool const tank = state.Role_ == BotState::Role::Tank || (state.Role_ == BotState::Role::Auto && classId == kWarriorClass && Opt().PartySize != 0);
     bool const victim = boss->victim_ref != 0 && boss->victim_ref == PlayerRef(bot.guid);
     if (victim)
     {
@@ -563,7 +563,7 @@ bool BotPolicy::MoveBossPosition(DecideTick& tick, BotTurn& turn, float bandMid,
     if (!raid_rules::InBossCone(*flank, rel, std::min(dist, bandMax), kFlankConeMarginDeg))
         return false;
     int const side = std::fabs(rel) < 1.0f || std::fabs(rel) > 179.0f ? ((bot.guid & 1) != 0 ? 1 : -1) : (rel > 0.0f ? 1 : -1);
-    std::vector<ground_avoid::Circle> const hazards = HazardCircles(_options, bot);
+    std::vector<ground_avoid::Circle> const hazards = HazardCircles(Opt(), bot);
     unsigned const first = static_cast<unsigned>(bot.guid % kFlankSlots);
     for (int const s : { side, -side })
         for (unsigned k = 0; k < kFlankSlots; ++k)
@@ -620,30 +620,30 @@ void BotPolicy::MoveWithoutTarget(DecideTick& tick, BotTurn& turn)
     // WarderPartyHold: a member that follows the tank does not walk into an Onyxian Warder's Fire Nova with it (2026-11-13: members followed the tank to 0-6 yards of a Warder,
     // every kite point was then refused, and the nova killed them). While a live Warder stands within the stand distance of the leader the member stays outside it; a member
     // already inside is the kite branch's (TurnMoveChoice).
-    if (_options.WarderPartyHold && partyMember && turn.aoeWarder != nullptr && leaderSnap && leaderSnap->life_state == 0 && leaderSnap->map_id == bot.map_id && wanted.Type == ActionType::kFollow &&
+    if (Opt().WarderPartyHold && partyMember && turn.aoeWarder != nullptr && leaderSnap && leaderSnap->life_state == 0 && leaderSnap->map_id == bot.map_id && wanted.Type == ActionType::kFollow &&
         std::hypot(leaderSnap->pos_x - turn.aoeWarder->pos_x, leaderSnap->pos_y - turn.aoeWarder->pos_y) < kAoeStandYards)
     {
         wanted = Decision{ ActionType::kStop, 0 };
         turn.moveWhy = "warder_hold";
-        if (_options.OnEvent && (state.WarderHoldLogMs == 0 || nowMs - state.WarderHoldLogMs >= 10000))
+        if (Opt().OnEvent && (state.WarderHoldLogMs == 0 || nowMs - state.WarderHoldLogMs >= 10000))
         {
             state.WarderHoldLogMs = nowMs;
-            _options.OnEvent("warder_hold: bot=" + std::to_string(bot.guid) + " leader=" + std::to_string(leaderSnap->guid) + " dist=" +
+            Opt().OnEvent("warder_hold: bot=" + std::to_string(bot.guid) + " leader=" + std::to_string(leaderSnap->guid) + " dist=" +
                              std::to_string(int(std::hypot(bot.pos_x - turn.aoeWarder->pos_x, bot.pos_y - turn.aoeWarder->pos_y))));
         }
     }
     // RegroupRallyMs (ZG lever, default off): a member its leader flagged stuck walks to the leader's spot (the rally point: the leader holds there while it waits,
     // RouteReadiness) instead of standing or following from afar, until it is back or the rally time is over. Not in a fight, not a ghost.
-    if (_options.RegroupRallyMs != 0 && routeOn && partyMember && leaderSnap && bot.life_state == 0 && bot.in_combat == 0 && leaderSnap->life_state == 0 &&
+    if (Opt().RegroupRallyMs != 0 && routeOn && partyMember && leaderSnap && bot.life_state == 0 && bot.in_combat == 0 && leaderSnap->life_state == 0 &&
         leaderSnap->map_id == bot.map_id)
         if (auto const leaderState = _bots.find(turn.partyLeader); leaderState != _bots.end() && RallyWaitsFor(leaderState->second, bot.guid, nowMs))
         {
             wanted = Decision{ ActionType::kMoveTo, 0, Point{ leaderSnap->pos_x, leaderSnap->pos_y, leaderSnap->pos_z } };
             turn.moveWhy = "regroup_rally";
-            if (_options.OnEvent && (state.RallyLogMs == 0 || nowMs - state.RallyLogMs >= 10000))
+            if (Opt().OnEvent && (state.RallyLogMs == 0 || nowMs - state.RallyLogMs >= 10000))
             {
                 state.RallyLogMs = nowMs;
-                _options.OnEvent("regroup_rally: bot=" + std::to_string(bot.guid) + " leader=" + std::to_string(leaderSnap->guid) + " yards=" +
+                Opt().OnEvent("regroup_rally: bot=" + std::to_string(bot.guid) + " leader=" + std::to_string(leaderSnap->guid) + " yards=" +
                                  std::to_string(int(Distance2d(bot, *leaderSnap))) + " to=" + std::to_string(int(leaderSnap->pos_x)) + "," + std::to_string(int(leaderSnap->pos_y)));
             }
         }
@@ -652,11 +652,11 @@ void BotPolicy::MoveWithoutTarget(DecideTick& tick, BotTurn& turn)
     // A leader just revived at the instance entrance is not followed there: it comes back to the party (leader_recover, in the route below).
     bool leaderAtEntry = false;
     if (leaderSnap)
-        if (auto const dungeon = _options.DungeonsByMap.find(bot.map_id); dungeon != _options.DungeonsByMap.end() && dungeon->second.HasEntry)
+        if (auto const dungeon = Opt().DungeonsByMap.find(bot.map_id); dungeon != Opt().DungeonsByMap.end() && dungeon->second.HasEntry)
             leaderAtEntry = DistanceTo(*leaderSnap, dungeon->second.Entry) <= kEntryYards && DistanceTo(bot, dungeon->second.Entry) > kLostLeaderYards;
     // Only on the leader's map: the teleport keeps the bot's map, so a member outside (gnomer#1 2026-11-07 16:29, at the portal on map 0) was sent to the leader's
     // instance coordinates on the outside map. A member outside is put at the entry by the scenario (member re-enter, scenario.cpp).
-    if (_options.DungeonTeleport && routeOn && partyMember && leaderSnap && bot.life_state == 0 && bot.in_combat == 0 && leaderSnap->life_state == 0 && !leaderAtEntry &&
+    if (Opt().DungeonTeleport && routeOn && partyMember && leaderSnap && bot.life_state == 0 && bot.in_combat == 0 && leaderSnap->life_state == 0 && !leaderAtEntry &&
         leaderSnap->map_id == bot.map_id)
     {
         bool const lost = Distance2d(bot, *leaderSnap) > kLostLeaderYards || std::fabs(bot.pos_z - leaderSnap->pos_z) > kLostLeaderHeight;
@@ -666,8 +666,8 @@ void BotPolicy::MoveWithoutTarget(DecideTick& tick, BotTurn& turn)
             state.LostSinceMs = nowMs;
         else if (nowMs - state.LostSinceMs >= kLostLeaderMs && nowMs >= state.NextRecoverMs)
         {
-            if (_options.OnEvent)
-                _options.OnEvent("member_recover: bot=" + std::to_string(bot.guid) + " leader=" + std::to_string(leaderSnap->guid) + " from=" + std::to_string(int(bot.pos_x)) + "," +
+            if (Opt().OnEvent)
+                Opt().OnEvent("member_recover: bot=" + std::to_string(bot.guid) + " leader=" + std::to_string(leaderSnap->guid) + " from=" + std::to_string(int(bot.pos_x)) + "," +
                                  std::to_string(int(bot.pos_y)) + "," + std::to_string(int(bot.pos_z)) + " leader_at=" + std::to_string(int(leaderSnap->pos_x)) + "," +
                                  std::to_string(int(leaderSnap->pos_y)) + "," + std::to_string(int(leaderSnap->pos_z)));
             wanted = Decision{ ActionType::kTeleport, 0, Point{ leaderSnap->pos_x - 3.0f, leaderSnap->pos_y, leaderSnap->pos_z }, bot.map_id };
@@ -692,7 +692,7 @@ void BotPolicy::MoveWithoutTarget(DecideTick& tick, BotTurn& turn)
         }
         else if (state.TankLead)
         {
-            if (auto const dungeon = _options.DungeonsByMap.find(bot.map_id); dungeon != _options.DungeonsByMap.end())
+            if (auto const dungeon = Opt().DungeonsByMap.find(bot.map_id); dungeon != Opt().DungeonsByMap.end())
             {
                 routePoints = &dungeon->second.Route;
                 routeBoss = &dungeon->second.BossAt;
@@ -816,14 +816,14 @@ void BotPolicy::RouteReadiness(DecideTick& tick, BotTurn& turn, RouteLeg& route)
     }
     route.manaReady = !manaLowInParty || nowMs - state.RouteManaProgressMs >= kRouteManaMaxMs || nowMs - state.RouteManaStartMs >= kRouteManaAbsMaxMs;
     // PartyMana: a member that said it is low on mana holds the walk too (never in combat, and never longer than PartyManaHoldSec).
-    if (_options.PartyMana.Enabled && route.manaReady)
-        if (auto const mana = _partyMana.find(bot.guid); mana != _partyMana.end() && mana->second.Holding(_options.PartyMana, bot.in_combat != 0, nowMs))
+    if (Opt().PartyMana.Enabled && route.manaReady)
+        if (auto const mana = _partyMana.find(bot.guid); mana != _partyMana.end() && mana->second.Holding(Opt().PartyMana, bot.in_combat != 0, nowMs))
             route.manaReady = false;
     bool const& manaReady = route.manaReady;
     // The ready gate before the next pull, and the wipe recovery's hold and rewind (scenario.cpp).
     route.pullReady = true;
     {
-        PolicyOptions const& o = _options;
+        PolicyOptions const& o = Opt();
         WipeHold const wipe = WipeHoldOf(bot.guid);
         if (wipe.RewindTo && wipe.Epoch != state.WipeEpochSeen)
         {
@@ -895,12 +895,12 @@ void BotPolicy::RouteReadiness(DecideTick& tick, BotTurn& turn, RouteLeg& route)
         }
     }
     // GroupEtiquette: do not pull on while the healer or tank is not ready or a member is a straggler (capped; group_etiquette.h). The leader says "ready?" when the wait ends.
-    if (_options.GroupEtiquette.Enabled && route.pullReady && bot.in_combat == 0 && bot.group_size <= 5)   // a five-man party; raids (ZG, Onyxia) keep their own readiness
+    if (Opt().GroupEtiquette.Enabled && route.pullReady && bot.in_combat == 0 && bot.group_size <= 5)   // a five-man party; raids (ZG, Onyxia) keep their own readiness
     {
         std::vector<group_etiquette::Member> party;
         auto const add = [&](BotSnapshot const& member)
         {
-            std::uint32_t const classId = ClassFor(_options, member.guid);
+            std::uint32_t const classId = ClassFor(Opt(), member.guid);
             role_profile::PlayedRole played = role_profile::PlayedRole::Auto;
             if (auto const st = _bots.find(member.guid); st != _bots.end())
                 played = st->second.Role_ == BotState::Role::Tank ? role_profile::PlayedRole::Tank : st->second.Role_ == BotState::Role::Healer ? role_profile::PlayedRole::Healer :
@@ -920,13 +920,13 @@ void BotPolicy::RouteReadiness(DecideTick& tick, BotTurn& turn, RouteLeg& route)
         add(bot);
         tick.ForEachPartyMember(bot.guid, add);
         bool ended = false;
-        if (_etiquetteWait[bot.guid].Holding(_options.GroupEtiquette, party, false, nowMs, &ended))
+        if (_etiquetteWait[bot.guid].Holding(Opt().GroupEtiquette, party, false, nowMs, &ended))
         {
             route.pullReady = false;
-            if (_options.OnEvent && (state.PullReadyLogMs == 0 || nowMs - state.PullReadyLogMs >= 10000))
+            if (Opt().OnEvent && (state.PullReadyLogMs == 0 || nowMs - state.PullReadyLogMs >= 10000))
             {
                 state.PullReadyLogMs = nowMs;
-                _options.OnEvent("pull_hold: bot=" + std::to_string(bot.guid) + " reason=etiquette_" + group_etiquette::HoldName(group_etiquette::Evaluate(_options.GroupEtiquette, party)) +
+                Opt().OnEvent("pull_hold: bot=" + std::to_string(bot.guid) + " reason=etiquette_" + group_etiquette::HoldName(group_etiquette::Evaluate(Opt().GroupEtiquette, party)) +
                                  " point=" + std::to_string(state.RouteIndex));
             }
         }
@@ -942,13 +942,13 @@ void BotPolicy::RouteReadiness(DecideTick& tick, BotTurn& turn, RouteLeg& route)
     bool const bossHere = (*routeBoss).count(state.RouteIndex) != 0 && !killedNow.count((*routeBoss).at(state.RouteIndex));
     if (state.RouteNoRoute >= kRouteNoRouteSkip && bossHere)
     {
-        if (state.RouteNoRoute == kRouteNoRouteSkip && _options.OnEvent)
-            _options.OnEvent("route_blocked: bot=" + std::to_string(bot.guid) + " point=" + std::to_string(state.RouteIndex) + "/" + std::to_string(routePoints->size()) +
+        if (state.RouteNoRoute == kRouteNoRouteSkip && Opt().OnEvent)
+            Opt().OnEvent("route_blocked: bot=" + std::to_string(bot.guid) + " point=" + std::to_string(state.RouteIndex) + "/" + std::to_string(routePoints->size()) +
                              " boss=" + std::to_string((*routeBoss).at(state.RouteIndex)) + " reason=no_route map=" + std::to_string(bot.map_id) +
                              " from=" + std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) + "," + std::to_string(int(bot.pos_z)));
         state.RouteNoRoute = kRouteNoRouteSkip + 1; // logged once
     }
-    else if (state.RouteNoRoute >= kRouteNoRouteSkip && _options.DungeonTeleport && state.RouteRecoveredAt != state.RouteIndex)
+    else if (state.RouteNoRoute >= kRouteNoRouteSkip && Opt().DungeonTeleport && state.RouteRecoveredAt != state.RouteIndex)
     {
         // Off the mesh, on another level, or cut off: put the leader back on the route (the point before, or the first point) once; the same point failing again
         // after that is skipped (or blocks, for a boss).
@@ -965,14 +965,14 @@ void BotPolicy::RouteReadiness(DecideTick& tick, BotTurn& turn, RouteLeg& route)
                     best = d;
                     back = i;
                 }
-            if (_options.OnEvent)
-                _options.OnEvent("route_rewind: bot=" + std::to_string(bot.guid) + " from=" + std::to_string(state.RouteIndex) + " to=" + std::to_string(back));
+            if (Opt().OnEvent)
+                Opt().OnEvent("route_rewind: bot=" + std::to_string(bot.guid) + " from=" + std::to_string(state.RouteIndex) + " to=" + std::to_string(back));
             state.RouteIndex = back;
         }
         state.RouteRecoveredAt = far ? std::size_t(-1) : state.RouteIndex;   // a far leader is rewound again if it needs it
         state.RouteNoRoute = 0;
-        if (_options.OnEvent)
-            _options.OnEvent("route_recover: bot=" + std::to_string(bot.guid) + " point=" + std::to_string(state.RouteIndex) + "/" + std::to_string(routePoints->size()) +
+        if (Opt().OnEvent)
+            Opt().OnEvent("route_recover: bot=" + std::to_string(bot.guid) + " point=" + std::to_string(state.RouteIndex) + "/" + std::to_string(routePoints->size()) +
                              " from=" + std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) + "," + std::to_string(int(bot.pos_z)) + " to_point=" +
                              std::to_string(back));
         wanted = Decision{ ActionType::kTeleport, 0, (*routePoints)[back], bot.map_id };
@@ -982,10 +982,10 @@ void BotPolicy::RouteReadiness(DecideTick& tick, BotTurn& turn, RouteLeg& route)
     }
     else if (state.RouteNoRoute >= kRouteNoRouteSkip)
     {
-        if (_options.OnEvent)
+        if (Opt().OnEvent)
         {
             Point const& given = (*routePoints)[state.RouteIndex];
-            _options.OnEvent("route_skip: bot=" + std::to_string(bot.guid) + " point=" + std::to_string(state.RouteIndex) + "/" + std::to_string(routePoints->size()) +
+            Opt().OnEvent("route_skip: bot=" + std::to_string(bot.guid) + " point=" + std::to_string(state.RouteIndex) + "/" + std::to_string(routePoints->size()) +
                              " reason=no_route map=" + std::to_string(bot.map_id) + " from=" + std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) + "," +
                              std::to_string(int(bot.pos_z)) + " to=" + std::to_string(int(given.X)) + "," + std::to_string(int(given.Y)) + "," + std::to_string(int(given.Z)) +
                              " mounted=" + std::to_string(state.Mounted));
@@ -1017,9 +1017,9 @@ void BotPolicy::RouteLeaderRecover(DecideTick& tick, BotTurn& turn, RouteLeg& ro
     // 49 % health: 275 of the 568 deaths in the 2026-11-08 sim that had a pull by the same bot in the 90 s before began with a pull at 40-59 %): a tank that cannot get there (no food,
     // a slow regeneration) goes in all the same after that.
     bool atEntry = false;
-    if (!recovering && _options.DungeonTeleport && bot.life_state == 0 && bot.in_combat == 0)
-        if (auto const dungeon = _options.DungeonsByMap.find(bot.map_id);
-            dungeon != _options.DungeonsByMap.end() && dungeon->second.HasEntry && DistanceTo(bot, dungeon->second.Entry) <= kEntryYards)
+    if (!recovering && Opt().DungeonTeleport && bot.life_state == 0 && bot.in_combat == 0)
+        if (auto const dungeon = Opt().DungeonsByMap.find(bot.map_id);
+            dungeon != Opt().DungeonsByMap.end() && dungeon->second.HasEntry && DistanceTo(bot, dungeon->second.Entry) <= kEntryYards)
             atEntry = true;
     if (!atEntry)
         state.LeaderRecoverWaitSinceMs = 0;
@@ -1031,7 +1031,7 @@ void BotPolicy::RouteLeaderRecover(DecideTick& tick, BotTurn& turn, RouteLeg& ro
         state.AtEntrySinceMs = nowMs;
     bool const fightingMemberOk = atEntry && state.AtEntrySinceMs != 0 && nowMs - state.AtEntrySinceMs >= kLeaderRecoverCombatMs;
     if (!recovering && atEntry && nowMs >= state.NextRecoverMs)
-        if (auto const dungeon = _options.DungeonsByMap.find(bot.map_id); dungeon != _options.DungeonsByMap.end())
+        if (auto const dungeon = Opt().DungeonsByMap.find(bot.map_id); dungeon != Opt().DungeonsByMap.end())
             for (std::uint64_t member : membersOf[bot.guid])
             {
                 auto const at = indexOf.find(member);
@@ -1052,16 +1052,16 @@ void BotPolicy::RouteLeaderRecover(DecideTick& tick, BotTurn& turn, RouteLeg& ro
                     if (state.LeaderRecoverWaitSinceMs == 0)
                     {
                         state.LeaderRecoverWaitSinceMs = nowMs;
-                        if (_options.OnEvent)
-                            _options.OnEvent("leader_recover_wait: bot=" + std::to_string(bot.guid) + " member=" + std::to_string(other.guid) + " hp_pct=" +
+                        if (Opt().OnEvent)
+                            Opt().OnEvent("leader_recover_wait: bot=" + std::to_string(bot.guid) + " member=" + std::to_string(other.guid) + " hp_pct=" +
                                              std::to_string(HealthPct(bot, 100)));
                     }
                     if (nowMs - state.LeaderRecoverWaitSinceMs < kLeaderRecoverMaxWaitMs)
                         break; // rests at the entrance first
                 }
                 state.LeaderRecoverWaitSinceMs = 0;
-                if (_options.OnEvent)
-                    _options.OnEvent("leader_recover: bot=" + std::to_string(bot.guid) + " member=" + std::to_string(other.guid) + " from=" + std::to_string(int(bot.pos_x)) +
+                if (Opt().OnEvent)
+                    Opt().OnEvent("leader_recover: bot=" + std::to_string(bot.guid) + " member=" + std::to_string(other.guid) + " from=" + std::to_string(int(bot.pos_x)) +
                                      "," + std::to_string(int(bot.pos_y)) + "," + std::to_string(int(bot.pos_z)) + " member_at=" + std::to_string(int(other.pos_x)) + "," +
                                      std::to_string(int(other.pos_y)) + "," + std::to_string(int(other.pos_z)) + " point=" + std::to_string(state.RouteIndex));
                 wanted = Decision{ ActionType::kTeleport, 0, Point{ other.pos_x - 3.0f, other.pos_y, other.pos_z }, bot.map_id };
@@ -1107,8 +1107,8 @@ void BotPolicy::RouteEvents(DecideTick& tick, BotTurn& turn, RouteLeg& route)
         facts.KilledBosses = &killedNow;
         dungeon_events::Command const command = state.Events->Next(facts, nowMs);
         for (std::string const& line : state.Events->TakeLog())
-            if (_options.OnEvent)
-                _options.OnEvent(line + " bot=" + std::to_string(bot.guid));
+            if (Opt().OnEvent)
+                Opt().OnEvent(line + " bot=" + std::to_string(bot.guid));
         switch (command.Do)
         {
             case dungeon_events::Command::What::Nothing:
@@ -1174,7 +1174,7 @@ void BotPolicy::RouteEvents(DecideTick& tick, BotTurn& turn, RouteLeg& route)
                 break;
             }
             case dungeon_events::Command::What::Teleport:
-                if (_options.DungeonTeleport)
+                if (Opt().DungeonTeleport)
                 {
                     wanted = Decision{ ActionType::kTeleport, 0, Point{ command.X, command.Y, command.Z }, bot.map_id };
                     if (command.Party)
@@ -1202,8 +1202,8 @@ void BotPolicy::RouteEvents(DecideTick& tick, BotTurn& turn, RouteLeg& route)
                             jump.dest_z = command.Z;
                             actions.push_back(jump);
                         }
-                        if (_options.OnEvent)
-                            _options.OnEvent("event_party_teleport: bot=" + std::to_string(bot.guid) + " members=" + std::to_string(movers.size()) + " to=" + std::to_string(int(command.X)) +
+                        if (Opt().OnEvent)
+                            Opt().OnEvent("event_party_teleport: bot=" + std::to_string(bot.guid) + " members=" + std::to_string(movers.size()) + " to=" + std::to_string(int(command.X)) +
                                              "," + std::to_string(int(command.Y)) + "," + std::to_string(int(command.Z)));
                     }
                     // The route goes on from where the teleport puts the leader: the route point nearest to the destination, from the current one on (a bridge to a boss
@@ -1235,8 +1235,8 @@ void BotPolicy::RouteEvents(DecideTick& tick, BotTurn& turn, RouteLeg& route)
                         }
                         if (snapDistance <= kRoutePointReachYards && snap != state.RouteIndex)
                         {
-                            if (_options.OnEvent)
-                                _options.OnEvent("route_teleport_snap: bot=" + std::to_string(bot.guid) + " from=" + std::to_string(state.RouteIndex) + " to=" + std::to_string(snap));
+                            if (Opt().OnEvent)
+                                Opt().OnEvent("route_teleport_snap: bot=" + std::to_string(bot.guid) + " from=" + std::to_string(state.RouteIndex) + " to=" + std::to_string(snap));
                             state.RouteIndex = snap;
                             state.RouteNoRoute = 0;
                             state.RouteBossSinceMs = 0;
@@ -1287,8 +1287,8 @@ void BotPolicy::RouteWalkOn(DecideTick& tick, BotTurn& turn, RouteLeg& route)
            DistanceTo(bot, (*routePoints)[state.RouteIndex + 1]) <= kRouteSkipAheadYards &&
            std::fabs(bot.pos_z - (*routePoints)[state.RouteIndex + 1].Z) <= kRouteSkipMaxZYards)
     {
-        if (_options.OnEvent)
-            _options.OnEvent("route_passed: bot=" + std::to_string(bot.guid) + " point=" + std::to_string(state.RouteIndex) + "/" + std::to_string(routePoints->size()) +
+        if (Opt().OnEvent)
+            Opt().OnEvent("route_passed: bot=" + std::to_string(bot.guid) + " point=" + std::to_string(state.RouteIndex) + "/" + std::to_string(routePoints->size()) +
                              " from=" + std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) + "," + std::to_string(int(bot.pos_z)));
         ++state.RouteIndex;
         state.RouteNoRoute = 0;
@@ -1310,8 +1310,8 @@ void BotPolicy::RouteWalkOn(DecideTick& tick, BotTurn& turn, RouteLeg& route)
                     state.RouteBossSinceMs = nowMs;
                 if (nowMs - state.RouteBossSinceMs >= kBossHoldMs || (state.RouteSweeping && nowMs - state.RouteSweepSinceMs >= kBossSweepMaxMs))
                 {
-                    if (_options.OnEvent)
-                        _options.OnEvent("boss_missed: bot=" + std::to_string(bot.guid) + " point=" + std::to_string(state.RouteIndex) + " boss=" + std::to_string(boss->second));
+                    if (Opt().OnEvent)
+                        Opt().OnEvent("boss_missed: bot=" + std::to_string(bot.guid) + " point=" + std::to_string(state.RouteIndex) + " boss=" + std::to_string(boss->second));
                     hold = false;
                 }
             }
@@ -1350,14 +1350,14 @@ void BotPolicy::RouteWalkOn(DecideTick& tick, BotTurn& turn, RouteLeg& route)
             ++state.RouteNoRoute;
             state.RouteStallSinceMs = nowMs;
             state.Last.reset();
-            if (_options.OnEvent)
-                _options.OnEvent("route_stall: bot=" + std::to_string(bot.guid) + " point=" + std::to_string(state.RouteIndex) + "/" + std::to_string(routePoints->size()) +
+            if (Opt().OnEvent)
+                Opt().OnEvent("route_stall: bot=" + std::to_string(bot.guid) + " point=" + std::to_string(state.RouteIndex) + "/" + std::to_string(routePoints->size()) +
                                  " pos=" + std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) + "," + std::to_string(int(bot.pos_z)) + " to=" +
                                  std::to_string(int(waypoint->X)) + "," + std::to_string(int(waypoint->Y)) + "," + std::to_string(int(waypoint->Z)) +
                                  " refusals=" + std::to_string(state.RouteNoRoute));
         }
         // The leader's walk, at most every 5 s: which point it goes to, from where, and how many of its members are within the waiting distance.
-        if (_options.OnEvent && nowMs - state.RouteWalkLoggedMs >= 5000)
+        if (Opt().OnEvent && nowMs - state.RouteWalkLoggedMs >= 5000)
         {
             state.RouteWalkLoggedMs = nowMs;
             std::uint32_t near = 0, all = 0;
@@ -1369,7 +1369,7 @@ void BotPolicy::RouteWalkOn(DecideTick& tick, BotTurn& turn, RouteLeg& route)
                     near += Distance2d(bot, member) <= kRouteWaitYards;
                 }
             });
-            _options.OnEvent("route_walk: bot=" + std::to_string(bot.guid) + " point=" + std::to_string(state.RouteIndex) + "/" + std::to_string(routePoints->size()) +
+            Opt().OnEvent("route_walk: bot=" + std::to_string(bot.guid) + " point=" + std::to_string(state.RouteIndex) + "/" + std::to_string(routePoints->size()) +
                              " to=" + std::to_string(int(waypoint->X)) + "," + std::to_string(int(waypoint->Y)) + "," + std::to_string(int(waypoint->Z)) + " from=" +
                              std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) + "," + std::to_string(int(bot.pos_z)) + " members_near=" +
                              std::to_string(near) + "/" + std::to_string(all) + " combat=" + std::to_string(bot.in_combat));
@@ -1396,7 +1396,7 @@ void BotPolicy::RouteWalkOn(DecideTick& tick, BotTurn& turn, RouteLeg& route)
                         return;
                     auto const known = _bots.find(member.guid);
                     bool const role = known == _bots.end() || (known->second.Role_ != BotState::Role::Dps && known->second.Role_ != BotState::Role::Tank);
-                    if (!role || HealSpellFor(ClassFor(_options, member.guid), member.level) == 0)
+                    if (!role || HealSpellFor(ClassFor(Opt(), member.guid), member.level) == 0)
                         return;
                     float const yards = Distance2d(bot, member);
                     healerNear = healerNear || yards <= kHealerFetchYards;
@@ -1411,8 +1411,8 @@ void BotPolicy::RouteWalkOn(DecideTick& tick, BotTurn& turn, RouteLeg& route)
                     wanted = Decision{ ActionType::kMoveTo, 0, Point{ healer->pos_x, healer->pos_y, healer->pos_z } };
                     moveWhy = "healer_fetch";
                     routeBusy = true;
-                    if (_options.OnEvent && nowMs - state.RouteHoldLoggedMs >= kRouteHoldLogMs)
-                        _options.OnEvent("healer_fetch: bot=" + std::to_string(bot.guid) + " healer=" + std::to_string(healer->guid) + " yards=" + std::to_string(int(healerYards)) +
+                    if (Opt().OnEvent && nowMs - state.RouteHoldLoggedMs >= kRouteHoldLogMs)
+                        Opt().OnEvent("healer_fetch: bot=" + std::to_string(bot.guid) + " healer=" + std::to_string(healer->guid) + " yards=" + std::to_string(int(healerYards)) +
                                          " hp_pct=" + std::to_string(HealthPct(bot, 100)) + " held_ms=" + std::to_string(nowMs - state.RouteHealthHoldSinceMs));
                 }
             }
@@ -1420,7 +1420,7 @@ void BotPolicy::RouteWalkOn(DecideTick& tick, BotTurn& turn, RouteLeg& route)
         else
             state.RouteHealthHoldSinceMs = 0;
         // Why the leader does not walk on, out of combat, at most every kRouteHoldLogMs: its health, a dead member, or the member farthest behind.
-        if (waypoint && bot.in_combat == 0 && _options.OnEvent && nowMs - state.RouteHoldLoggedMs >= kRouteHoldLogMs)
+        if (waypoint && bot.in_combat == 0 && Opt().OnEvent && nowMs - state.RouteHoldLoggedMs >= kRouteHoldLogMs)
         {
             state.RouteHoldLoggedMs = nowMs;
             std::uint64_t farthest = 0;
@@ -1435,7 +1435,7 @@ void BotPolicy::RouteWalkOn(DecideTick& tick, BotTurn& turn, RouteLeg& route)
                     }
             });
             char const* why = !strong ? "health" : !manaReady ? "mana" : !pullReady ? "pull_ready" : deadWaitKind != 0 ? "dead_member" : farthestYards > kRouteWaitYards ? "member_far" : "player_far";
-            _options.OnEvent(std::string("route_hold: bot=") + std::to_string(bot.guid) + " point=" + std::to_string(state.RouteIndex) + "/" +
+            Opt().OnEvent(std::string("route_hold: bot=") + std::to_string(bot.guid) + " point=" + std::to_string(state.RouteIndex) + "/" +
                              std::to_string(routePoints->size()) + " why=" + why + " hp_pct=" +
                              std::to_string(HealthPct(bot, 100)) + " farthest=" + std::to_string(farthest) +
                              " farthest_yards=" + std::to_string(int(farthestYards)) + " pos=" + std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) +
@@ -1463,8 +1463,8 @@ void BotPolicy::RouteSweepBosses(DecideTick& tick, BotTurn& turn, RouteLeg& rout
             continue;
         if (state.RouteSweepSinceMs == 0)
             state.RouteSweepSinceMs = nowMs;
-        if (_options.OnEvent)
-            _options.OnEvent("boss_sweep: bot=" + std::to_string(bot.guid) + " point=" + std::to_string(point) + "/" + std::to_string(end) + " boss=" + std::to_string(entry) +
+        if (Opt().OnEvent)
+            Opt().OnEvent("boss_sweep: bot=" + std::to_string(bot.guid) + " point=" + std::to_string(point) + "/" + std::to_string(end) + " boss=" + std::to_string(entry) +
                              " since_ms=" + std::to_string(nowMs - state.RouteSweepSinceMs));
         state.RouteIndex = point;
         state.RouteSweepLast = point + 1;
@@ -1511,13 +1511,13 @@ void BotPolicy::MoveForQuestOrGoto(DecideTick& tick, BotTurn& turn)
                 state.QuestTeleportSent = false;
             }
             bool const stuck = nowMs - state.WalkStillSinceMs >= kQuestWalkStuckMs;
-            if (stuck && _options.QuestTeleport && !state.QuestTeleportSent)
+            if (stuck && Opt().QuestTeleport && !state.QuestTeleportSent)
             {
                 wanted = Decision{ ActionType::kTeleport, 0, Point{ questStep.Dest.X, questStep.Dest.Y, questStep.Dest.Z }, bot.map_id };
                 state.QuestTeleportSent = true;
                 state.WalkStillSinceMs = nowMs;
-                if (_options.OnEvent)
-                    _options.OnEvent("quest_walk_forced: bot=" + std::to_string(bot.guid) + " map=" + std::to_string(bot.map_id) +
+                if (Opt().OnEvent)
+                    Opt().OnEvent("quest_walk_forced: bot=" + std::to_string(bot.guid) + " map=" + std::to_string(bot.map_id) +
                                      " quest=" + std::to_string(questStep.Quest) + " from=" + std::to_string(int(here.X)) + "," +
                                      std::to_string(int(here.Y)) + "," + std::to_string(int(here.Z)) + " to=" +
                                      std::to_string(int(questStep.Dest.X)) + "," + std::to_string(int(questStep.Dest.Y)) + "," +
@@ -1533,10 +1533,10 @@ void BotPolicy::MoveForQuestOrGoto(DecideTick& tick, BotTurn& turn)
                 state.QuestTeleportSent = false;
                 state.WalkStillSinceMs = 0;
                 state.WalkAnchored = false;
-                if (_options.OnEvent)
-                    _options.OnEvent("quest_walk_blocked: bot=" + std::to_string(bot.guid) + " map=" + std::to_string(bot.map_id) +
+                if (Opt().OnEvent)
+                    Opt().OnEvent("quest_walk_blocked: bot=" + std::to_string(bot.guid) + " map=" + std::to_string(bot.map_id) +
                                      " quest=" + std::to_string(questStep.Quest) + " reason=" +
-                                     (_options.QuestTeleport ? "teleport_stuck" : "teleport_off"));
+                                     (Opt().QuestTeleport ? "teleport_stuck" : "teleport_off"));
                 questStep = {};
                 wanted = Decision{ ActionType::kStop, 0 };
             }
@@ -1564,7 +1564,7 @@ void BotPolicy::MoveForQuestOrGoto(DecideTick& tick, BotTurn& turn)
         {
             // Reading delay (ReadDelay, off by default): the bot reads the quest for a few seconds before it accepts. It stands meanwhile.
             if (questStep.Kind == QuestStepKind::Accept && bot.in_combat == 0 &&
-                !realism::ReadReady(_options.ReadDelay, state.QuestRead, questStep.Quest, _options.RandomSeed, bot.guid, nowMs))
+                !realism::ReadReady(Opt().ReadDelay, state.QuestRead, questStep.Quest, Opt().RandomSeed, bot.guid, nowMs))
                 break;
             realism::Close(state.QuestRead);
             BotAction quest;
@@ -1588,8 +1588,8 @@ void BotPolicy::MoveForQuestOrGoto(DecideTick& tick, BotTurn& turn)
             }
             actions.push_back(quest);
             // A class quest's reward (the GM command .quest reward) has no other trace: neither the quest planner nor the core logs it as taken.
-            if (operation == kQuestReward && _options.OnEvent)
-                _options.OnEvent("quest_reward: bot=" + std::to_string(bot.guid) + " quest=" + std::to_string(questStep.Quest) + " kind=class_quest level=" +
+            if (operation == kQuestReward && Opt().OnEvent)
+                Opt().OnEvent("quest_reward: bot=" + std::to_string(bot.guid) + " quest=" + std::to_string(questStep.Quest) + " kind=class_quest level=" +
                                  std::to_string(bot.level) + " map=" + std::to_string(bot.map_id));
             QuestsFor(bot).NoteSent(state.Quest, operation, questStep.Quest, nowMs);
             wanted = Decision{ ActionType::kStop, 0 };
@@ -1631,7 +1631,7 @@ void BotPolicy::MoveForQuestOrGoto(DecideTick& tick, BotTurn& turn)
                 train.type = ActionType::kTrain;
                 actions.push_back(train);
                 state.LastTrainLevel = bot.level;             // the periodic check does not repeat it right away
-                state.NextTrainMs = nowMs + _options.TrainEveryMs;
+                state.NextTrainMs = nowMs + Opt().TrainEveryMs;
             }
             state.TrainAfterGoto = false;
         }
@@ -1668,7 +1668,7 @@ void BotPolicy::TurnIdle(DecideTick& tick, BotTurn& turn)
     // order (a party waiting in a dungeon) still counts any live creature.
     turn.enemyNear = false;
     auto& enemyNear = turn.enemyNear;
-    if (dungeonHold || (noSelfPull && !_options.IdleEnemyAttackersOnly))
+    if (dungeonHold || (noSelfPull && !Opt().IdleEnemyAttackersOnly))
     {
         for (NearbyUnit const& unit : nearby)
             enemyNear = enemyNear || (IsLiveMob(unit) && (huntEntries.empty() ? !IsGrey(bot, unit) : true));
@@ -1691,13 +1691,13 @@ void BotPolicy::TurnIdle(DecideTick& tick, BotTurn& turn)
     // The death area (DeathAreaCount): a solo bot out of combat does not walk back into the place where it keeps dying, whatever sends it there (a quest, a hub, a
     // grind spot). The walk is dropped while the area is avoided; the death area escape (TurnRevivedAndRoles) moves a bot that is inside it away.
     if (wanted.Type == ActionType::kMoveTo && bot.in_combat == 0 && turn.partyLeader == 0 && !routeOn && nowMs < state.AvoidAreaUntilMs &&
-        state.AvoidAreaMap == bot.map_id && std::hypot(wanted.Dest.X - state.AvoidAreaX, wanted.Dest.Y - state.AvoidAreaY) <= float(_options.DeathAreaYards) &&
-        std::hypot(bot.pos_x - state.AvoidAreaX, bot.pos_y - state.AvoidAreaY) > float(_options.DeathAreaYards))
+        state.AvoidAreaMap == bot.map_id && std::hypot(wanted.Dest.X - state.AvoidAreaX, wanted.Dest.Y - state.AvoidAreaY) <= float(Opt().DeathAreaYards) &&
+        std::hypot(bot.pos_x - state.AvoidAreaX, bot.pos_y - state.AvoidAreaY) > float(Opt().DeathAreaYards))
     {
-        if (_options.OnEvent && (state.AvoidAreaLoggedMs == 0 || nowMs - state.AvoidAreaLoggedMs >= 30000))
+        if (Opt().OnEvent && (state.AvoidAreaLoggedMs == 0 || nowMs - state.AvoidAreaLoggedMs >= 30000))
         {
             state.AvoidAreaLoggedMs = nowMs;
-            _options.OnEvent(std::string("death_area_move_blocked: bot=") + std::to_string(bot.guid) + " why=" + moveWhy + " dest=" + std::to_string(int(wanted.Dest.X)) + "," +
+            Opt().OnEvent(std::string("death_area_move_blocked: bot=") + std::to_string(bot.guid) + " why=" + moveWhy + " dest=" + std::to_string(int(wanted.Dest.X)) + "," +
                              std::to_string(int(wanted.Dest.Y)) + " left_s=" + std::to_string((state.AvoidAreaUntilMs - nowMs) / 1000));
         }
         wanted = Decision{ ActionType::kStop, 0 };
@@ -1719,7 +1719,7 @@ void BotPolicy::TurnIdle(DecideTick& tick, BotTurn& turn)
     // errand fails (errand_failed reason=auctioneer_bad_z), no walk to a place the bot cannot reach.
     auction::StandZ standZ = auction::StandZ::kUse3D;
     auction::StandJudgement standJudged;
-    if (errandTurn && state.Errand->Auction && _options.AuctionWalk3D && bot.map_id == state.Errand->Map)
+    if (errandTurn && state.Errand->Auction && Opt().AuctionWalk3D && bot.map_id == state.Errand->Map)
     {
         Point& dest = state.Errand->Dest;
         if (bot.auctioneer_valid != 0 && std::hypot(bot.auctioneer_x - dest.X, bot.auctioneer_y - dest.Y) <= kAuctionStandLiveYards)
@@ -1735,8 +1735,8 @@ void BotPolicy::TurnIdle(DecideTick& tick, BotTurn& turn)
             state.ErrandResult = ErrandOutcome::kFailed;
             state.Errand.reset();
             state.ErrandNear2dMs = 0;
-            if (_options.OnEvent)
-                _options.OnEvent("errand_failed: bot=" + std::to_string(bot.guid) + " reason=auctioneer_bad_z");
+            if (Opt().OnEvent)
+                Opt().OnEvent("errand_failed: bot=" + std::to_string(bot.guid) + " reason=auctioneer_bad_z");
         }
     }
     if (errandTurn && state.Errand)
@@ -1745,7 +1745,7 @@ void BotPolicy::TurnIdle(DecideTick& tick, BotTurn& turn)
         float const dist = bot.map_id == order.Map ? std::hypot(bot.pos_x - order.Dest.X, bot.pos_y - order.Dest.Y) : 1e9f;
         // AuctionWalk3D: at the house only within the 3D reach of the auctioneer (the core's own measure); until then the bot walks to it. A z judged not
         // trustworthy (kIgnoreZ) falls back to the 2D reach.
-        bool const walk3d = order.Auction && _options.AuctionWalk3D;
+        bool const walk3d = order.Auction && Opt().AuctionWalk3D;
         bool const auctionArrived = order.Auction && (walk3d ? bot.map_id == order.Map && auction::InReachJudged(standZ, true, bot.pos_x, bot.pos_y, bot.pos_z, order.Dest.X,
                                                                                                                  order.Dest.Y, order.Dest.Z)
                                                              : dist <= kTrainReachYards);
@@ -1763,8 +1763,8 @@ void BotPolicy::TurnIdle(DecideTick& tick, BotTurn& turn)
             state.ErrandResult = ErrandOutcome::kFailed;
             state.Errand.reset();
             state.ErrandNear2dMs = 0;
-            if (_options.OnEvent)
-                _options.OnEvent("errand_failed: bot=" + std::to_string(bot.guid) + " reason=auction_reach_3d");
+            if (Opt().OnEvent)
+                Opt().OnEvent("errand_failed: bot=" + std::to_string(bot.guid) + " reason=auction_reach_3d");
             wanted = Decision{};
         }
         else if (auctionArrived)
@@ -1778,8 +1778,8 @@ void BotPolicy::TurnIdle(DecideTick& tick, BotTurn& turn)
                 state.ErrandResult = ErrandOutcome::kDone;
                 state.Errand.reset();
                 state.ErrandArrivedMs = 0;
-                if (_options.OnEvent)
-                    _options.OnEvent("errand_done: bot=" + std::to_string(bot.guid) + " auction");
+                if (Opt().OnEvent)
+                    Opt().OnEvent("errand_done: bot=" + std::to_string(bot.guid) + " auction");
             }
             wanted = Decision{};
         }
@@ -1791,7 +1791,7 @@ void BotPolicy::TurnIdle(DecideTick& tick, BotTurn& turn)
             {
                 if (bot.in_combat == 0 && bot.life_state == 0 && bot.vendor_valid != 0 && bot.vendor_guid != 0 &&
                     std::hypot(bot.vendor_x - order.Dest.X, bot.vendor_y - order.Dest.Y) <= kMountVendorReachYards &&
-                    realism::ReadReady(_options.ReadDelay, state.TrainRead, kTrainReadKey, _options.RandomSeed, bot.guid, nowMs))
+                    realism::ReadReady(Opt().ReadDelay, state.TrainRead, kTrainReadKey, Opt().RandomSeed, bot.guid, nowMs))
                 {
                     realism::Close(state.TrainRead);
                     state.ErrandBuy = BuyRequest{ bot.vendor_guid, order.Item };
@@ -1804,15 +1804,15 @@ void BotPolicy::TurnIdle(DecideTick& tick, BotTurn& turn)
                 state.Errand.reset();
                 state.ErrandBuy.reset();
                 state.ErrandBuySentMs = 0;
-                if (_options.OnEvent)
-                    _options.OnEvent("errand_failed: bot=" + std::to_string(bot.guid) + " reason=mount_no_answer");
+                if (Opt().OnEvent)
+                    Opt().OnEvent("errand_failed: bot=" + std::to_string(bot.guid) + " reason=mount_no_answer");
             }
             wanted = Decision{};
         }
         else if (!order.Vendor && !walk3d && dist <= kTrainReachYards)
         {
             if (bot.in_combat == 0 && bot.life_state == 0 && nowMs >= state.ErrandTrainSentMs &&
-                realism::ReadReady(_options.ReadDelay, state.TrainRead, kTrainReadKey, _options.RandomSeed, bot.guid, nowMs))
+                realism::ReadReady(Opt().ReadDelay, state.TrainRead, kTrainReadKey, Opt().RandomSeed, bot.guid, nowMs))
             {
                 realism::Close(state.TrainRead);
                 BotAction train;
@@ -1862,8 +1862,8 @@ void BotPolicy::TurnIdle(DecideTick& tick, BotTurn& turn)
             {
                 state.VisitResult = ErrandOutcome::kDone;
                 state.Visit.reset();
-                if (_options.OnEvent)
-                    _options.OnEvent("world_event_visit_done: bot=" + std::to_string(bot.guid));
+                if (Opt().OnEvent)
+                    Opt().OnEvent("world_event_visit_done: bot=" + std::to_string(bot.guid));
             }
             wanted = Decision{};
         }

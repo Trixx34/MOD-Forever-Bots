@@ -15,7 +15,7 @@ bool BotPolicy::UpkeepBuffDue(BotSnapshot const& who, BotState& state, std::uint
     state.BuffDue = false;
     if (who.life_state != 0 || who.in_combat != 0 || who.level == 0)
         return false;
-    std::uint32_t const classId = ClassFor(_options, who.guid);
+    std::uint32_t const classId = ClassFor(Opt(), who.guid);
     rotation::Facts const facts = rotation::FactsFor(who, std::span<NearbyUnit const>{}, nullptr, 0);
     for (rotation::Row const& row : RowsFor(classId, SpecFor(who.guid, classId)))
     {
@@ -23,7 +23,7 @@ bool BotPolicy::UpkeepBuffDue(BotSnapshot const& who, BotState& state, std::uint
             continue;
         if (auto const retry = state.RetryAtMs.find(row.Spell); retry != state.RetryAtMs.end() && nowMs < retry->second)
             continue;
-        if (!CanPay(_options.SpellCosts.get(), row.Spell, who) || AuraRunning(who, row.Spell, row.Ranks))
+        if (!CanPay(Opt().SpellCosts.get(), row.Spell, who) || AuraRunning(who, row.Spell, row.Ranks))
             continue;
         state.BuffDue = true;
         break;
@@ -43,7 +43,7 @@ void BotPolicy::TurnSoloReady(DecideTick& tick, BotTurn& turn)
     turn.pullWait = false;
     bool const solo = turn.partyLeader == 0 && !turn.routeOn && bot.in_combat == 0 && bot.threat_target_guid == 0 && bot.life_state == 0 && state.ForcedTarget == 0 &&
                       !state.ChatStay && state.ChatFollow == 0 && bot.group_leader_guid == 0;
-    if (!solo || (_options.SoloPullManaPct == 0 && !_options.PullBuffGate))
+    if (!solo || (Opt().SoloPullManaPct == 0 && !Opt().PullBuffGate))
     {
         state.SoloManaGate = pull_ready::Gate{};
         state.SoloBuffGate = pull_ready::Gate{};
@@ -52,17 +52,17 @@ void BotPolicy::TurnSoloReady(DecideTick& tick, BotTurn& turn)
     bool timedOut = false;
     auto const note = [&](pull_ready::Gate& gate, char const* reason, bool timeout)
     {
-        if (!_options.OnEvent)
+        if (!Opt().OnEvent)
             return;
         if (timeout)
-            _options.OnEvent("pull_wait_timeout: bot=" + std::to_string(bot.guid) + " reason=" + reason + " level=" + std::to_string(bot.level) + " wait_ms=" + std::to_string(nowMs - gate.SinceMs));
+            Opt().OnEvent("pull_wait_timeout: bot=" + std::to_string(bot.guid) + " reason=" + reason + " level=" + std::to_string(bot.level) + " wait_ms=" + std::to_string(nowMs - gate.SinceMs));
         else if (pull_ready::LogDue(gate, nowMs))
-            _options.OnEvent("pull_wait: bot=" + std::to_string(bot.guid) + " reason=" + reason + " level=" + std::to_string(bot.level) + " hp_pct=" + std::to_string(HealthPct(bot, 100)) +
+            Opt().OnEvent("pull_wait: bot=" + std::to_string(bot.guid) + " reason=" + reason + " level=" + std::to_string(bot.level) + " hp_pct=" + std::to_string(HealthPct(bot, 100)) +
                              " mana_pct=" + std::to_string(bot.max_power > 0 ? bot.power * 100 / bot.max_power : 100) + " wait_ms=" + std::to_string(nowMs - gate.SinceMs));
     };
     bool const manaUser = bot.power_type == 0 && bot.max_power > 0;
-    bool const manaNeeded = manaUser && pull_ready::ManaNeeded(bot.power, bot.max_power, _options.SoloPullManaPct, state.SoloManaGate.SinceMs != 0);
-    if (pull_ready::Hold(state.SoloManaGate, manaNeeded, nowMs, _options.PullWaitMaxMs, timedOut))
+    bool const manaNeeded = manaUser && pull_ready::ManaNeeded(bot.power, bot.max_power, Opt().SoloPullManaPct, state.SoloManaGate.SinceMs != 0);
+    if (pull_ready::Hold(state.SoloManaGate, manaNeeded, nowMs, Opt().PullWaitMaxMs, timedOut))
     {
         turn.pullWaitMana = true;
         turn.pullWait = true;
@@ -72,8 +72,8 @@ void BotPolicy::TurnSoloReady(DecideTick& tick, BotTurn& turn)
     }
     else if (timedOut)
         note(state.SoloManaGate, "mana", true);
-    bool const buffNeeded = _options.PullBuffGate && !turn.hurtRest && UpkeepBuffDue(bot, state, nowMs);
-    if (pull_ready::Hold(state.SoloBuffGate, buffNeeded, nowMs, _options.PullWaitMaxMs, timedOut))
+    bool const buffNeeded = Opt().PullBuffGate && !turn.hurtRest && UpkeepBuffDue(bot, state, nowMs);
+    if (pull_ready::Hold(state.SoloBuffGate, buffNeeded, nowMs, Opt().PullWaitMaxMs, timedOut))
     {
         turn.pullWait = true;
         turn.hurtRest = true;

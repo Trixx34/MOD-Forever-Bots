@@ -34,12 +34,17 @@ target_link_libraries(forever_bots_settings PUBLIC forever_bots_policy)
 add_library(forever_bots_store STATIC src/bot_store.cpp)
 target_include_directories(forever_bots_store PUBLIC src)
 
-add_library(forever_bots_policy STATIC src/bot_policy.cpp src/bot_policy_result.cpp src/bot_policy_chat.cpp src/bot_policy_spells.cpp src/bot_policy_units.cpp src/bot_policy_turn_life.cpp src/bot_policy_telegraph.cpp src/bot_policy_raidrules.cpp src/bot_policy_turn_dead.cpp src/bot_policy_turn_target.cpp src/bot_policy_turn_move.cpp src/bot_policy_turn_town.cpp src/bot_policy_turn_cast.cpp src/chat_commands.cpp src/combat_rotation.cpp src/quest_data.cpp src/quest_planner.cpp src/scenario.cpp src/run_telemetry.cpp src/damage_done.cpp src/damage_events.cpp src/grind_data.cpp src/supply_policy.cpp src/auction_policy.cpp src/auction_buy.cpp src/auction_log.cpp src/taxi_policy.cpp src/dungeon_events.cpp src/chat_say.cpp src/errand_policy.cpp src/sell_policy.cpp src/errand_trainers.cpp src/spell_costs.cpp src/crafting_foci.cpp src/ground_avoid.cpp src/tame_beasts.cpp src/level_dungeon.cpp src/duels.cpp src/battlegrounds.cpp src/inn_downtime.cpp src/guild_join.cpp src/mail_gifts.cpp src/riding_training.cpp src/weapon_training.cpp src/fishing.cpp src/rare_hunts.cpp src/ambient_chat.cpp src/chat_reply.cpp src/lfg_fill.cpp src/bot_brackets.cpp src/gather_nodes.cpp src/bot_policy_features.cpp src/bot_policy_social.cpp src/bot_policy_guilds.cpp src/social_actions.cpp src/realism.cpp src/advisor_text.cpp src/advisor_send.cpp src/lfg_queue_fill.cpp src/death_pause.cpp src/trade_ads.cpp src/party_mana.cpp src/whisper_matrix.cpp src/path_jitter.cpp src/ah_batch.cpp src/guild_milestone.cpp src/city_inspect.cpp src/city_greet.cpp src/quest_invite.cpp src/bot_policy_advisor.cpp src/bot_policy_heal_plan.cpp src/heal_plan.cpp src/party_planner.cpp src/party_view_adapter.cpp src/gear_score.cpp src/quest_group.cpp src/party_reason.cpp src/bot_policy_parties.cpp src/raid_rules.cpp src/off_map.cpp src/repair_policy.cpp src/meet_greet.cpp src/group_etiquette.cpp src/mount_plan.cpp src/personality.cpp src/reputation.cpp src/reputation_plan.cpp src/bot_policy_reputation.cpp src/bot_policy_mail.cpp src/bot_mail.cpp src/world_events.cpp src/flex_roles.cpp src/bot_policy_pullready.cpp src/path_variety.cpp src/level_safe.cpp src/below_map.cpp src/bot_policy_level_safe.cpp src/bot_policy_death_loop.cpp)
+add_library(forever_bots_policy STATIC src/bot_policy.cpp src/bot_policy_result.cpp src/bot_policy_chat.cpp src/bot_policy_spells.cpp src/bot_policy_units.cpp src/bot_policy_turn_life.cpp src/bot_policy_telegraph.cpp src/bot_policy_raidrules.cpp src/bot_policy_turn_dead.cpp src/bot_policy_turn_target.cpp src/bot_policy_turn_move.cpp src/bot_policy_turn_town.cpp src/bot_policy_turn_cast.cpp src/chat_commands.cpp src/combat_rotation.cpp src/quest_data.cpp src/quest_planner.cpp src/scenario.cpp src/run_telemetry.cpp src/damage_done.cpp src/damage_events.cpp src/grind_data.cpp src/supply_policy.cpp src/auction_policy.cpp src/auction_buy.cpp src/auction_log.cpp src/taxi_policy.cpp src/dungeon_events.cpp src/chat_say.cpp src/errand_policy.cpp src/sell_policy.cpp src/errand_trainers.cpp src/spell_costs.cpp src/crafting_foci.cpp src/ground_avoid.cpp src/tame_beasts.cpp src/level_dungeon.cpp src/duels.cpp src/battlegrounds.cpp src/inn_downtime.cpp src/guild_join.cpp src/mail_gifts.cpp src/riding_training.cpp src/weapon_training.cpp src/fishing.cpp src/rare_hunts.cpp src/ambient_chat.cpp src/chat_reply.cpp src/lfg_fill.cpp src/bot_brackets.cpp src/gather_nodes.cpp src/bot_policy_features.cpp src/bot_policy_social.cpp src/bot_policy_guilds.cpp src/social_actions.cpp src/realism.cpp src/advisor_text.cpp src/advisor_send.cpp src/lfg_queue_fill.cpp src/death_pause.cpp src/trade_ads.cpp src/party_mana.cpp src/whisper_matrix.cpp src/path_jitter.cpp src/ah_batch.cpp src/guild_milestone.cpp src/city_inspect.cpp src/city_greet.cpp src/quest_invite.cpp src/bot_policy_advisor.cpp src/bot_policy_heal_plan.cpp src/heal_plan.cpp src/party_planner.cpp src/party_view_adapter.cpp src/gear_score.cpp src/quest_group.cpp src/party_reason.cpp src/bot_policy_parties.cpp src/raid_rules.cpp src/off_map.cpp src/repair_policy.cpp src/meet_greet.cpp src/group_etiquette.cpp src/mount_plan.cpp src/personality.cpp src/reputation.cpp src/reputation_plan.cpp src/bot_policy_reputation.cpp src/bot_policy_mail.cpp src/bot_mail.cpp src/world_events.cpp src/flex_roles.cpp src/bot_policy_pullready.cpp src/path_variety.cpp src/level_safe.cpp src/below_map.cpp src/bot_policy_level_safe.cpp src/bot_policy_death_loop.cpp src/ab_split.cpp)
 target_include_directories(forever_bots_policy PUBLIC src)
 target_link_libraries(forever_bots_policy PUBLIC forever_module_sdk forever_bots_guilds)
 
 add_library(forever_bots_files STATIC src/rotating_file.cpp)
 target_include_directories(forever_bots_files PUBLIC src)
+
+# TraceBots: the per-bot trace files (doc/sim-ab.md).
+add_library(forever_bots_trace STATIC src/bot_trace.cpp)
+target_include_directories(forever_bots_trace PUBLIC src)
+target_link_libraries(forever_bots_trace PUBLIC forever_bots_policy forever_bots_files forever_module_sdk)
 
 add_library(forever_bots_telemetry STATIC src/bot_telemetry.cpp)
 target_include_directories(forever_bots_telemetry PUBLIC src)
@@ -56,9 +61,17 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_CURRENT_
 
 add_executable(forever-bots src/main.cpp src/main_pump.cpp src/main_util.cpp src/main_spawn.cpp src/main_sales.cpp src/main_commands.cpp src/main_options.cpp src/main_feeds.cpp)
 target_compile_definitions(forever-bots PRIVATE FOREVER_MODULE_VERSION="${FOREVER_MODULE_VERSION}")
-target_link_libraries(forever-bots PRIVATE forever_bots_live forever_bots_trade forever_bots_roster forever_bots_policy forever_bots_settings forever_bots_store forever_bots_telemetry forever_bots_files forever_module_sdk Threads::Threads)
+target_link_libraries(forever-bots PRIVATE forever_bots_live forever_bots_trade forever_bots_roster forever_bots_policy forever_bots_settings forever_bots_store forever_bots_telemetry forever_bots_trace forever_bots_files forever_module_sdk Threads::Threads)
 
 enable_testing()
+# ArmSplit and TraceBots (doc/sim-ab.md), and the sim read-out script on a made-up journal (tools/sim_readout.sh).
+add_executable(ab_split_test tests/ab_split_test.cpp)
+target_link_libraries(ab_split_test PRIVATE forever_bots_policy forever_bots_settings)
+add_test(NAME ab_split COMMAND ab_split_test)
+add_executable(bot_trace_test tests/bot_trace_test.cpp)
+target_link_libraries(bot_trace_test PRIVATE forever_bots_trace)
+add_test(NAME bot_trace COMMAND bot_trace_test)
+add_test(NAME sim_readout COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/sim_readout_test.sh ${CMAKE_CURRENT_SOURCE_DIR})
 add_executable(roster_test tests/roster_test.cpp)
 target_link_libraries(roster_test PRIVATE forever_bots_roster)
 add_test(NAME roster COMMAND roster_test)

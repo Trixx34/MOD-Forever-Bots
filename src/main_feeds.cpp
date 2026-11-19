@@ -367,11 +367,11 @@ void SetUpErrands(forever_module::ModuleClient& client, BotSettings& settings, s
             {
                 std::uint64_t const botGuid = buy.Bot;
                 std::uint32_t const item = buy.Request.Item;
-                std::cerr << "forever-bots: event mount_buy: bot=" << botGuid << " item=" << item << "\n";
+                std::cerr << "forever-bots: event mount_buy: bot=" << botGuid << " item=" << item << ab_split::ArmField(botGuid) << "\n";
                 client.BuyItemForBot(botGuid, buy.Request.Vendor, item, 1, [feed, botGuid, item](forever_module::ActionReply const& reply)
                 {
                     std::cerr << "forever-bots: event mount_buy_" << (reply.success() ? "done" : "refused") << ": bot=" << botGuid << " item=" << item
-                              << (reply.success() ? "" : " reason=" + reply.reason()) << "\n";
+                              << (reply.success() ? "" : " reason=" + reply.reason()) << ab_split::ArmField(botGuid) << "\n";
                     std::lock_guard<std::mutex> lock(feed->Lock);
                     feed->BuyResults.emplace_back(botGuid, reply.success());
                 });
@@ -381,7 +381,7 @@ void SetUpErrands(forever_module::ModuleClient& client, BotSettings& settings, s
                 mountBook->OnOutcome(guid, outcome == ErrandOutcome::kDone, *ranks, now);
                 scheduler->Finish(guid, now); // done or failed: the trip is over either way
                 if (auto const line = journal->OnEnd(guid, errand::EndReason::kDone, outcome == ErrandOutcome::kFailed, now))
-                    std::cerr << "forever-bots: event " << *line << "\n";
+                    std::cerr << "forever-bots: event " << ab_split::Tag(*line) << "\n";
             }
             if (fedAt == 0 || now - fedAt > kPresenceStaleMs)
                 return;
@@ -458,7 +458,7 @@ void SetUpErrands(forever_module::ModuleClient& client, BotSettings& settings, s
             {
                 mountBook->OnEnded(end.Guid, now);
                 if (auto const line = journal->OnEnd(end.Guid, end.Why, false, now))
-                    std::cerr << "forever-bots: event " << *line << "\n";
+                    std::cerr << "forever-bots: event " << ab_split::Tag(*line) << "\n";
             }
             std::vector<CommandQueue::ErrandItem> items;
             for (errand::End const& end : decisions.Ends)
@@ -483,7 +483,7 @@ void SetUpErrands(forever_module::ModuleClient& client, BotSettings& settings, s
                     item.Order.Auction = true;
                     items.push_back(item);
                     std::cerr << "forever-bots: errand: bot " << start.Guid << " to the auctioneer (city " << start.City << ")\n";
-                    std::cerr << "forever-bots: event " << journal->OnStart(start, now) << "\n";
+                    std::cerr << "forever-bots: event " << ab_split::Tag(journal->OnStart(start, now)) << "\n";
                     continue;
                 }
                 if (auto const planned = mountBook->Planned.find(start.Guid); mountsOn && planned != mountBook->Planned.end() && !bot.TrainDue)
@@ -502,7 +502,7 @@ void SetUpErrands(forever_module::ModuleClient& client, BotSettings& settings, s
                         item.Order.Entry = vendor.Entry;
                         items.push_back(item);
                         std::cerr << "forever-bots: errand: bot " << start.Guid << " to the mount vendor " << vendor.Name << " for " << mountTable->Items[plan.Mount.Item].Name << "\n";
-                        std::cerr << "forever-bots: event " << journal->OnStart(start, now) << "\n";
+                        std::cerr << "forever-bots: event " << ab_split::Tag(journal->OnStart(start, now)) << "\n";
                         continue;
                     }
                     auto const rider = errand::ChooseTrainer(*trainers, bot.Side, kRidingSkillLine, start.City, bot.Map, bot.X, bot.Y, bot.Z);
@@ -517,7 +517,7 @@ void SetUpErrands(forever_module::ModuleClient& client, BotSettings& settings, s
                     item.Order.Entry = trainer.Entry;
                     items.push_back(item);
                     std::cerr << "forever-bots: errand: bot " << start.Guid << " to the riding trainer " << trainer.Name << "\n";
-                    std::cerr << "forever-bots: event " << journal->OnStart(start, now) << "\n";
+                    std::cerr << "forever-bots: event " << ab_split::Tag(journal->OnStart(start, now)) << "\n";
                     continue;
                 }
                 auto const pick = errand::ChooseTrainer(*trainers, bot.Side, bot.Skill, start.City, bot.Map, bot.X, bot.Y, bot.Z);
@@ -532,7 +532,7 @@ void SetUpErrands(forever_module::ModuleClient& client, BotSettings& settings, s
                 item.Order.Entry = trainer.Entry;
                 items.push_back(item);
                 std::cerr << "forever-bots: errand: bot " << start.Guid << " to " << trainer.Name << " (" << trainer.Subname << ") in city " << start.City << "\n";
-                std::cerr << "forever-bots: event " << journal->OnStart(start, now) << "\n";
+                std::cerr << "forever-bots: event " << ab_split::Tag(journal->OnStart(start, now)) << "\n";
             }
             if (!items.empty() && queue)
             {
@@ -593,7 +593,7 @@ void SetUpWorldEvents(forever_module::ModuleClient& client, BotSettings& setting
             std::uint64_t const took = scheduler->Finish(guid, now);
             if (site < sites->size())
                 std::cerr << "forever-bots: event "
-                          << world_events::EndLine(guid, (*sites)[site], world_events::EndReason::kDone, outcome == ErrandOutcome::kFailed, took) << "\n";
+                          << ab_split::Tag(world_events::EndLine(guid, (*sites)[site], world_events::EndReason::kDone, outcome == ErrandOutcome::kFailed, took)) << "\n";
         }
         if (fedAt == 0 || now - fedAt > kPresenceStaleMs)
             return;
@@ -604,7 +604,7 @@ void SetUpWorldEvents(forever_module::ModuleClient& client, BotSettings& setting
         std::vector<CommandQueue::VisitItem> items;
         for (world_events::End const& end : decisions.Ends)
         {
-            std::cerr << "forever-bots: event " << world_events::EndLine(end.Guid, (*sites)[end.Site], end.Why, false, end.TookMs) << "\n";
+            std::cerr << "forever-bots: event " << ab_split::Tag(world_events::EndLine(end.Guid, (*sites)[end.Site], end.Why, false, end.TookMs)) << "\n";
             CommandQueue::VisitItem item;
             item.Guid = end.Guid;
             item.Cancel = true;
@@ -619,7 +619,7 @@ void SetUpWorldEvents(forever_module::ModuleClient& client, BotSettings& setting
             item.Order.Dest = Point{ site.X, site.Y, site.Z };
             item.Order.Quests = site.Quests;
             items.push_back(std::move(item));
-            std::cerr << "forever-bots: event " << world_events::StartLine(start.Guid, site) << "\n";
+            std::cerr << "forever-bots: event " << ab_split::Tag(world_events::StartLine(start.Guid, site)) << "\n";
         }
         if (!items.empty() && queue)
         {

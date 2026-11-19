@@ -30,8 +30,8 @@ BotPolicy::TurnFlow BotPolicy::TurnDead(DecideTick& tick, BotTurn& turn)
 // A dead bot's event line, when there is a log.
 void BotPolicy::LogEvent(std::string const& text) const
 {
-    if (_options.OnEvent)
-        _options.OnEvent(text);
+    if (Opt().OnEvent)
+        Opt().OnEvent(text);
 }
 
 // A dead bot's move or stop, sent only when it differs from the last one and is not a place the core just found no route to.
@@ -88,7 +88,7 @@ bool BotPolicy::DeadGhostFallback(DecideTick& tick, BotTurn& turn)
         return false;
     bool const instanceParty = IsRouteActive(bot.guid) || (turn.deadParty != 0 && tick.tankLed.count(turn.deadParty) != 0);
     // DeathLoopBreaker (bot_policy_death_loop.cpp): a loop's ghost gives up its corpse and revives at a graveyard away from the killer; it may wait first.
-    bool const loopBreak = !instanceParty && _options.DeathLoopBreaker && state.LoopBreak;
+    bool const loopBreak = !instanceParty && Opt().DeathLoopBreaker && state.LoopBreak;
     if (loopBreak && DeathLoopBreakGhost(tick, turn))
         return true;
     if (!instanceParty)
@@ -100,12 +100,12 @@ bool BotPolicy::DeadGhostFallback(DecideTick& tick, BotTurn& turn)
         reason = "death_loop";
     else if (!instanceParty && state.LevelSafeYardSet && state.LevelSafeCorpseHigh)
         reason = "level_unsafe";
-    else if (_options.GhostFallbackMs != 0 && state.RunFailed && nowMs - state.RunFailedAtMs >= _options.GhostFallbackMs)
+    else if (Opt().GhostFallbackMs != 0 && state.RunFailed && nowMs - state.RunFailedAtMs >= Opt().GhostFallbackMs)
         reason = state.RunFailedNoCorpse ? "no_corpse" : "run_failed";
-    else if (!instanceParty && _options.GhostMaxMs != 0 && state.GhostSinceMs != 0 && nowMs - state.GhostSinceMs >= _options.GhostMaxMs)
+    else if (!instanceParty && Opt().GhostMaxMs != 0 && state.GhostSinceMs != 0 && nowMs - state.GhostSinceMs >= Opt().GhostMaxMs)
         reason = "ghost_max";
     else if (!instanceParty && bot.corpse_valid != 0 && nowMs < state.AvoidAreaUntilMs && bot.corpse_map == state.AvoidAreaMap &&
-             std::hypot(bot.corpse_x - state.AvoidAreaX, bot.corpse_y - state.AvoidAreaY) <= float(_options.DeathAreaYards))
+             std::hypot(bot.corpse_x - state.AvoidAreaX, bot.corpse_y - state.AvoidAreaY) <= float(Opt().DeathAreaYards))
         reason = "death_area";
     if (!reason)
         return false;
@@ -220,34 +220,36 @@ void BotPolicy::DeadRecord(DecideTick& tick, BotTurn& turn)
         state.LevelSafeCorpseHigh = false;
         state.LevelSafeJudged = false;
         _deathTally.Note(bot.guid);
+        if (_optionsB)
+            _armDeathTally[std::size_t(ab_split::ArmOf(true, bot.guid))].Note(bot.guid);
         state.DeathHistoryMs.push_back(nowMs);
         // The death area: DeathAreaCount deaths within DeathAreaWindowMs and DeathAreaYards of this one (this one counted) make the bot avoid the area. Not for a bot of a
         // dungeon party: there the route is the content and the dungeon ghost rules apply.
-        if (_options.DeathAreaCount != 0)
+        if (Opt().DeathAreaCount != 0)
         {
             std::size_t drop = 0;
-            while (drop < state.DeathSpots.size() && nowMs - state.DeathSpots[drop].AtMs > _options.DeathAreaWindowMs)
+            while (drop < state.DeathSpots.size() && nowMs - state.DeathSpots[drop].AtMs > Opt().DeathAreaWindowMs)
                 ++drop;
             state.DeathSpots.erase(state.DeathSpots.begin(), state.DeathSpots.begin() + drop);
             state.DeathSpots.push_back(BotDeathSpot{ bot.map_id, bot.pos_x, bot.pos_y, nowMs });
             if (state.DeathSpots.size() > 32)
                 state.DeathSpots.erase(state.DeathSpots.begin());
             bool const instanceParty = IsRouteActive(bot.guid) || (turn.deadParty != 0 && tick.tankLed.count(turn.deadParty) != 0);
-            std::uint32_t const here = DeathsNear(state.DeathSpots, bot.map_id, bot.pos_x, bot.pos_y, float(_options.DeathAreaYards), nowMs, _options.DeathAreaWindowMs);
-            if (!instanceParty && here >= _options.DeathAreaCount)
+            std::uint32_t const here = DeathsNear(state.DeathSpots, bot.map_id, bot.pos_x, bot.pos_y, float(Opt().DeathAreaYards), nowMs, Opt().DeathAreaWindowMs);
+            if (!instanceParty && here >= Opt().DeathAreaCount)
             {
                 state.AvoidAreaMap = bot.map_id;
                 state.AvoidAreaX = bot.pos_x;
                 state.AvoidAreaY = bot.pos_y;
-                state.AvoidAreaUntilMs = nowMs + _options.DeathAreaAvoidMs;
+                state.AvoidAreaUntilMs = nowMs + Opt().DeathAreaAvoidMs;
                 state.AreaEscapeRetryMs = 0;
                 LogEvent("death_area: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id) + " pos=" +
                          std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) + " deaths=" + std::to_string(here) + " avoid_s=" +
-                         std::to_string(_options.DeathAreaAvoidMs / 1000));
+                         std::to_string(Opt().DeathAreaAvoidMs / 1000));
             }
         }
         {
-            std::uint64_t const keepMs = std::max<std::uint64_t>(_options.DeathLockoutWindowMs, 1);
+            std::uint64_t const keepMs = std::max<std::uint64_t>(Opt().DeathLockoutWindowMs, 1);
             std::size_t drop = 0;
             while (drop < state.DeathHistoryMs.size() && nowMs - state.DeathHistoryMs[drop] > keepMs)
                 ++drop;
@@ -284,23 +286,23 @@ void BotPolicy::DeadRecord(DecideTick& tick, BotTurn& turn)
         state.KillerRepeat = killerEntry != 0 && killerEntry == state.LastKillerEntry;
         state.LastKillerEntry = killerEntry;
         DeathLoopBreakNote(tick, turn, killerEntry); // DeathLoopBreaker (bot_policy_death_loop.cpp); clears the last death's loop break
-        if (_options.KillerAvoidMs != 0 && killerEntry != 0 && bot.group_leader_guid == 0 && !IsRouteActive(bot.guid))
+        if (Opt().KillerAvoidMs != 0 && killerEntry != 0 && bot.group_leader_guid == 0 && !IsRouteActive(bot.guid))
         {
             for (auto it = state.KillerAvoidUntilMs.begin(); it != state.KillerAvoidUntilMs.end();)
                 it = nowMs >= it->second ? state.KillerAvoidUntilMs.erase(it) : std::next(it);
             if (state.KillerAvoidUntilMs.size() < kKillerAvoidMax)
             {
-                state.KillerAvoidUntilMs[killerEntry] = nowMs + _options.KillerAvoidMs;
-                if (_options.OnEvent)
-                    _options.OnEvent("killer_avoid: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id) + " entry=" +
-                                     std::to_string(killerEntry) + " avoid_ms=" + std::to_string(_options.KillerAvoidMs));
+                state.KillerAvoidUntilMs[killerEntry] = nowMs + Opt().KillerAvoidMs;
+                if (Opt().OnEvent)
+                    Opt().OnEvent("killer_avoid: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id) + " entry=" +
+                                     std::to_string(killerEntry) + " avoid_ms=" + std::to_string(Opt().KillerAvoidMs));
             }
         }
         LogEvent("died: bot=" + std::to_string(bot.guid) + " life=" + std::to_string(bot.life_state) + " map=" + std::to_string(bot.map_id) +
               " pos=" + std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) +
               " last_decision=" + (state.Last ? std::to_string(int(state.Last->Type)) : std::string("none")) +
               " killer_entry=" + (blow ? (blow->Entry != 0 ? std::to_string(blow->Entry) : std::string("none")) : (killer ? std::to_string(guessEntry) : std::string("none"))) +
-              " in_combat=" + std::to_string(bot.in_combat) + damage_events::DiedFields(blow, _damage.Recent(bot.guid)));
+              " in_combat=" + std::to_string(bot.in_combat) + " level=" + std::to_string(bot.level) + damage_events::DiedFields(blow, _damage.Recent(bot.guid)));
     }
     if (bot.life_state == 2 && was != 2)
     {
@@ -310,8 +312,8 @@ void BotPolicy::DeadRecord(DecideTick& tick, BotTurn& turn)
         state.GhostSpawn = Point{ bot.pos_x, bot.pos_y, bot.pos_z };
         // LevelSafeGraveyard: a ghost seen to rise from its corpse stands at the graveyard the core chose; it is remembered for the level-safe choice (a ghost
         // first seen as a ghost, after a module restart, may stand anywhere and is not).
-        if ((_options.LevelSafe.Graveyard || _options.DeathLoopBreaker) && was == 1)
-            _graveyards.Note(bot.map_id, bot.pos_x, bot.pos_y, bot.pos_z, _options.SideOf ? _options.SideOf(bot.guid) : 0);
+        if ((Opt().LevelSafe.Graveyard || Opt().DeathLoopBreaker) && was == 1)
+            _graveyards.Note(bot.map_id, bot.pos_x, bot.pos_y, bot.pos_z, Opt().SideOf ? Opt().SideOf(bot.guid) : 0);
         state.RunStarted = false;
         state.Inside = false;
         state.Last.reset();
@@ -331,7 +333,7 @@ BotPolicy::TurnFlow BotPolicy::DeadAnswerResurrect(DecideTick& tick, BotTurn& tu
     if (bot.resurrect_from != 0 && !(nowMs < state.AcceptIgnoreUntilMs && bot.resurrect_from == state.AcceptIgnoreFrom))
     {
         // ResurrectBackoff: while the wait after a refusal (out of range) runs, nothing is sent and the corpse run goes on.
-        if (_options.ResurrectBackoff && nowMs < state.AcceptRetryMs)
+        if (Opt().ResurrectBackoff && nowMs < state.AcceptRetryMs)
             return TurnFlow::kNext;
         if (nowMs >= state.AcceptRetryMs)
         {
@@ -373,10 +375,10 @@ bool BotPolicy::ReviveGuardHolds(DecideTick& tick, BotTurn& turn, BotSnapshot co
                 held = true;
                 break;
             }
-    if (held && _options.OnEvent && (state.ReviveHostileLoggedMs == 0 || nowMs - state.ReviveHostileLoggedMs >= kReviveWarderLogMs))
+    if (held && Opt().OnEvent && (state.ReviveHostileLoggedMs == 0 || nowMs - state.ReviveHostileLoggedMs >= kReviveWarderLogMs))
     {
         state.ReviveHostileLoggedMs = nowMs;
-        _options.OnEvent("revive_hostile_hold: bot=" + std::to_string(turn.bot.guid) + " member=" + std::to_string(member.guid) + " window_count=" +
+        Opt().OnEvent("revive_hostile_hold: bot=" + std::to_string(turn.bot.guid) + " member=" + std::to_string(member.guid) + " window_count=" +
                          std::to_string(state.ReviveWindowCount) + " waited_ms=" + std::to_string(nowMs - state.DeathMs));
     }
     return held;
@@ -387,14 +389,14 @@ bool BotPolicy::ReviveGuardHolds(DecideTick& tick, BotTurn& turn, BotSnapshot co
 // and (lockout) for DeathLockoutHoldMs after the first decision when the bot died DeathLockoutCount times within DeathLockoutWindowMs. True: hold back.
 bool BotPolicy::GhostAvoidEnemyHeld(DecideTick& tick, BotTurn& turn, std::uint32_t map, Point const& dest, char const* what)
 {
-    if (_options.GhostHoldAvoidEnemyMaxMs == 0 || !_options.RaidRules || !_options.RaidRules->HasAvoidEnemy(map))
+    if (Opt().GhostHoldAvoidEnemyMaxMs == 0 || !Opt().RaidRules || !Opt().RaidRules->HasAvoidEnemy(map))
         return false;
     std::uint64_t const nowMs = tick.nowMs;
     BotState& state = turn.state;
     if (state.GhostHoldSinceMs == 0)
         state.GhostHoldSinceMs = nowMs;
     std::uint64_t const heldMs = nowMs - state.GhostHoldSinceMs;
-    if (heldMs >= _options.GhostHoldAvoidEnemyMaxMs)
+    if (heldMs >= Opt().GhostHoldAvoidEnemyMaxMs)
         return false;
     WorldTickSnapshotView const& view = tick.view;
     std::uint32_t entry = 0;
@@ -408,7 +410,7 @@ bool BotPolicy::GhostAvoidEnemyHeld(DecideTick& tick, BotTurn& turn, std::uint32
             if (!IsLiveMob(unit) || unit.victim_ref == 0)
                 continue;   // only a hostile that is in a fight
             float yards = 0.0f;
-            for (raid_rules::EnemyZone const& zone : _options.RaidRules->AvoidEnemyFor(map, forever_module::UnitRefEntry(unit.guid)))
+            for (raid_rules::EnemyZone const& zone : Opt().RaidRules->AvoidEnemyFor(map, forever_module::UnitRefEntry(unit.guid)))
                 yards = std::max(yards, std::max(kReviveHostileYards, zone.Yards));
             if (yards > 0.0f && std::hypot(unit.pos_x - dest.X, unit.pos_y - dest.Y) <= yards)
             {
@@ -419,10 +421,10 @@ bool BotPolicy::GhostAvoidEnemyHeld(DecideTick& tick, BotTurn& turn, std::uint32
     }
     if (entry == 0)
         return false;
-    if (_options.OnEvent && (state.GhostHoldLoggedMs == 0 || nowMs - state.GhostHoldLoggedMs >= kGhostHoldLogMs))
+    if (Opt().OnEvent && (state.GhostHoldLoggedMs == 0 || nowMs - state.GhostHoldLoggedMs >= kGhostHoldLogMs))
     {
         state.GhostHoldLoggedMs = nowMs;
-        _options.OnEvent(std::string("ghost_teleport_hold: bot=") + std::to_string(turn.bot.guid) + " reason=avoid_enemy entry=" + std::to_string(entry) + " dest=" + what +
+        Opt().OnEvent(std::string("ghost_teleport_hold: bot=") + std::to_string(turn.bot.guid) + " reason=avoid_enemy entry=" + std::to_string(entry) + " dest=" + what +
                          " map=" + std::to_string(map) + " deaths=" + std::to_string(state.DeathHistoryMs.size()) + " held_ms=" + std::to_string(heldMs) +
                          " waited_ms=" + std::to_string(nowMs - state.DeathMs));
     }
@@ -435,7 +437,7 @@ bool BotPolicy::GhostAvoidEnemyHeld(DecideTick& tick, BotTurn& turn, std::uint32
 // stall). Held at most RaidGhostFightHoldMaxMs from the first held decision of this death (GhostHoldSinceMs, shared with the other ghost holds). True: hold back.
 bool BotPolicy::GhostFightHeld(DecideTick& tick, BotTurn& turn, std::uint32_t map, char const* what)
 {
-    if (_options.RaidGhostFightHoldMaxMs == 0 || !_options.RaidRules || !_options.RaidRules->HasPullSingle(map) || turn.deadParty == 0 ||
+    if (Opt().RaidGhostFightHoldMaxMs == 0 || !Opt().RaidRules || !Opt().RaidRules->HasPullSingle(map) || turn.deadParty == 0 ||
         !PartyFighting(tick, turn.deadParty))
         return false;
     std::uint64_t const nowMs = tick.nowMs;
@@ -443,12 +445,12 @@ bool BotPolicy::GhostFightHeld(DecideTick& tick, BotTurn& turn, std::uint32_t ma
     if (state.GhostHoldSinceMs == 0)
         state.GhostHoldSinceMs = nowMs;
     std::uint64_t const heldMs = nowMs - state.GhostHoldSinceMs;
-    if (heldMs >= _options.RaidGhostFightHoldMaxMs)
+    if (heldMs >= Opt().RaidGhostFightHoldMaxMs)
         return false;
-    if (_options.OnEvent && (state.GhostHoldLoggedMs == 0 || nowMs - state.GhostHoldLoggedMs >= kGhostHoldLogMs))
+    if (Opt().OnEvent && (state.GhostHoldLoggedMs == 0 || nowMs - state.GhostHoldLoggedMs >= kGhostHoldLogMs))
     {
         state.GhostHoldLoggedMs = nowMs;
-        _options.OnEvent(std::string("ghost_teleport_hold: bot=") + std::to_string(turn.bot.guid) + " reason=party_fight dest=" + what + " map=" + std::to_string(map) +
+        Opt().OnEvent(std::string("ghost_teleport_hold: bot=") + std::to_string(turn.bot.guid) + " reason=party_fight dest=" + what + " map=" + std::to_string(map) +
                          " party=" + std::to_string(turn.deadParty) + " held_ms=" + std::to_string(heldMs) + " waited_ms=" + std::to_string(nowMs - state.DeathMs));
     }
     return true;
@@ -460,19 +462,19 @@ bool BotPolicy::GhostFightHeld(DecideTick& tick, BotTurn& turn, std::uint32_t ma
 bool BotPolicy::GhostPartyFightHeld(DecideTick& tick, BotTurn& turn, std::uint64_t party)
 {
     // The leader's own ghost (the tank) is not held: the raid cannot fight on without it (the Onyxia Warder holds of 2026-11-08 kept the raid tankless).
-    if (_options.GhostHoldPartyFightMaxMs == 0 || party == 0 || party == turn.bot.guid || !PartyFighting(tick, party))
+    if (Opt().GhostHoldPartyFightMaxMs == 0 || party == 0 || party == turn.bot.guid || !PartyFighting(tick, party))
         return false;
     std::uint64_t const nowMs = tick.nowMs;
     BotState& state = turn.state;
     if (state.GhostFightHoldSinceMs == 0)
         state.GhostFightHoldSinceMs = nowMs;
     std::uint64_t const heldMs = nowMs - state.GhostFightHoldSinceMs;
-    if (heldMs >= _options.GhostHoldPartyFightMaxMs)
+    if (heldMs >= Opt().GhostHoldPartyFightMaxMs)
         return false;
-    if (_options.OnEvent && (state.GhostHoldLoggedMs == 0 || nowMs - state.GhostHoldLoggedMs >= kGhostHoldLogMs))
+    if (Opt().OnEvent && (state.GhostHoldLoggedMs == 0 || nowMs - state.GhostHoldLoggedMs >= kGhostHoldLogMs))
     {
         state.GhostHoldLoggedMs = nowMs;
-        _options.OnEvent("ghost_teleport_hold: bot=" + std::to_string(turn.bot.guid) + " reason=party_fight dest=entrance party=" + std::to_string(party) +
+        Opt().OnEvent("ghost_teleport_hold: bot=" + std::to_string(turn.bot.guid) + " reason=party_fight dest=entrance party=" + std::to_string(party) +
                          " held_ms=" + std::to_string(heldMs) + " waited_ms=" + std::to_string(nowMs - state.DeathMs));
     }
     return true;
@@ -481,7 +483,7 @@ bool BotPolicy::GhostPartyFightHeld(DecideTick& tick, BotTurn& turn, std::uint64
 // DungeonRevivesPerMinute: the party's ghosts put back into the instance in the last 60 s.
 bool BotPolicy::GhostReviveCapHeld(DecideTick& tick, BotTurn& turn, std::uint64_t party)
 {
-    if (_options.DungeonRevivesPerMinute == 0 || party == 0)
+    if (Opt().DungeonRevivesPerMinute == 0 || party == 0)
         return false;
     std::uint64_t const nowMs = tick.nowMs;
     auto const it = _partyRevivesMs.find(party);
@@ -489,13 +491,13 @@ bool BotPolicy::GhostReviveCapHeld(DecideTick& tick, BotTurn& turn, std::uint64_
         return false;
     std::vector<std::uint64_t>& times = it->second;
     std::erase_if(times, [nowMs](std::uint64_t at) { return at > nowMs || nowMs - at >= kReviveCapWindowMs; });
-    if (times.size() < _options.DungeonRevivesPerMinute)
+    if (times.size() < Opt().DungeonRevivesPerMinute)
         return false;
     BotState& state = turn.state;
-    if (_options.OnEvent && (state.GhostHoldLoggedMs == 0 || nowMs - state.GhostHoldLoggedMs >= kGhostHoldLogMs))
+    if (Opt().OnEvent && (state.GhostHoldLoggedMs == 0 || nowMs - state.GhostHoldLoggedMs >= kGhostHoldLogMs))
     {
         state.GhostHoldLoggedMs = nowMs;
-        _options.OnEvent("ghost_teleport_hold: bot=" + std::to_string(turn.bot.guid) + " reason=revive_cap party=" + std::to_string(party) + " in_minute=" +
+        Opt().OnEvent("ghost_teleport_hold: bot=" + std::to_string(turn.bot.guid) + " reason=revive_cap party=" + std::to_string(party) + " in_minute=" +
                          std::to_string(times.size()) + " waited_ms=" + std::to_string(nowMs - state.DeathMs));
     }
     return true;
@@ -503,7 +505,7 @@ bool BotPolicy::GhostReviveCapHeld(DecideTick& tick, BotTurn& turn, std::uint64_
 
 void BotPolicy::NoteDungeonRevive(std::uint64_t party, std::uint64_t nowMs)
 {
-    if (_options.DungeonRevivesPerMinute != 0 && party != 0)
+    if (Opt().DungeonRevivesPerMinute != 0 && party != 0)
         _partyRevivesMs[party].push_back(nowMs);
 }
 
@@ -513,7 +515,7 @@ bool BotPolicy::GhostTeleportHeld(DecideTick& tick, BotTurn& turn, std::uint32_t
         return true;
     if (GhostAvoidEnemyHeld(tick, turn, map, dest, what))
         return true;
-    if (!_options.GhostTeleportHold)
+    if (!Opt().GhostTeleportHold)
         return false;
     std::uint64_t const nowMs = tick.nowMs;
     BotState& state = turn.state;
@@ -521,16 +523,16 @@ bool BotPolicy::GhostTeleportHeld(DecideTick& tick, BotTurn& turn, std::uint32_t
         state.GhostHoldSinceMs = nowMs;
     std::uint64_t const heldMs = nowMs - state.GhostHoldSinceMs;
     char const* reason = nullptr;
-    if (_options.DeathLockoutCount != 0 && _options.DeathLockoutHoldMs != 0 && heldMs < _options.DeathLockoutHoldMs)
+    if (Opt().DeathLockoutCount != 0 && Opt().DeathLockoutHoldMs != 0 && heldMs < Opt().DeathLockoutHoldMs)
     {
         std::uint32_t recent = 0;
         for (std::uint64_t const at : state.DeathHistoryMs)
-            if (nowMs - at <= _options.DeathLockoutWindowMs)
+            if (nowMs - at <= Opt().DeathLockoutWindowMs)
                 ++recent;
-        if (recent >= _options.DeathLockoutCount)
+        if (recent >= Opt().DeathLockoutCount)
             reason = "lockout";
     }
-    if (!reason && heldMs < _options.GhostTeleportHoldMaxMs)
+    if (!reason && heldMs < Opt().GhostTeleportHoldMaxMs)
     {
         WorldTickSnapshotView const& view = tick.view;
         for (std::size_t i = 0; i < view.bots.size() && !reason; ++i)
@@ -548,10 +550,10 @@ bool BotPolicy::GhostTeleportHeld(DecideTick& tick, BotTurn& turn, std::uint32_t
     }
     if (!reason)
         return false;
-    if (_options.OnEvent && (state.GhostHoldLoggedMs == 0 || nowMs - state.GhostHoldLoggedMs >= kGhostHoldLogMs))
+    if (Opt().OnEvent && (state.GhostHoldLoggedMs == 0 || nowMs - state.GhostHoldLoggedMs >= kGhostHoldLogMs))
     {
         state.GhostHoldLoggedMs = nowMs;
-        _options.OnEvent(std::string("ghost_teleport_hold: bot=") + std::to_string(turn.bot.guid) + " reason=" + reason + " dest=" + what + " map=" + std::to_string(map) +
+        Opt().OnEvent(std::string("ghost_teleport_hold: bot=") + std::to_string(turn.bot.guid) + " reason=" + reason + " dest=" + what + " map=" + std::to_string(map) +
                          " deaths=" + std::to_string(state.DeathHistoryMs.size()) + " held_ms=" + std::to_string(heldMs) + " waited_ms=" + std::to_string(nowMs - state.DeathMs));
     }
     return true;
@@ -590,14 +592,14 @@ BotPolicy::TurnFlow BotPolicy::DeadCorpse(DecideTick& tick, BotTurn& turn)
             });
         bool const dungeonParty = IsRouteActive(bot.guid) || (deadParty != 0 && tankLed.count(deadParty) != 0);
         // The wait for a rezzer is the same 20 s in a dungeon as outside (the owner's rule of 2026-10-27).
-        std::uint64_t const releaseDelayMs = _options.ReleaseDelayMs;
-        std::uint64_t const releaseCombatHoldMs = _options.ReleaseCombatHoldMs;
+        std::uint64_t const releaseDelayMs = Opt().ReleaseDelayMs;
+        std::uint64_t const releaseCombatHoldMs = Opt().ReleaseCombatHoldMs;
         // The Recover tactic (the core's revive order, as for a ghost): the leader is up and nothing is fighting, so the dead member is stood up at the leader's side after a few
         // seconds instead of waiting for the healer's 10 s cast, a release and a corpse run (the members that released were killed again outside by the wolves of Westfall).
         // DungeonLeaderRejoin: the dead leader's own corpse is stood up the same way, next to the living, quiet member nearest to it (the core's revive order takes any
         // member of the group), not released to come back at the entrance alone (the 2026-11-07 sim: 224 of 231 leader deaths ended in a release with a rezzer up).
-        bool const leaderCorpse = _options.DungeonLeaderRejoin && deadParty != 0 && deadParty == bot.guid;
-        if (_options.TacticRecover && _options.DungeonReviveOutOfCombat && dungeonParty && deadParty != 0 && (deadParty != bot.guid || leaderCorpse) && !partyFights &&
+        bool const leaderCorpse = Opt().DungeonLeaderRejoin && deadParty != 0 && deadParty == bot.guid;
+        if (Opt().TacticRecover && Opt().DungeonReviveOutOfCombat && dungeonParty && deadParty != 0 && (deadParty != bot.guid || leaderCorpse) && !partyFights &&
             state.ReviveAttempts < kOutOfCombatReviveTries && waited >= kCorpseReviveDelayMs && bot.resurrect_from == 0)
         {
             BotSnapshot const* leader = nullptr;
@@ -646,7 +648,7 @@ BotPolicy::TurnFlow BotPolicy::DeadCorpse(DecideTick& tick, BotTurn& turn)
             {
                 if (rezIncoming || member.guid == bot.guid || member.life_state != 0 || member.casting_spell == 0)
                     return;
-                std::uint32_t const rezSpell = ResurrectSpellFor(ClassFor(_options, member.guid), member.level);
+                std::uint32_t const rezSpell = ResurrectSpellFor(ClassFor(Opt(), member.guid), member.level);
                 auto const known = _bots.find(member.guid);
                 if (rezSpell == 0 || member.casting_spell != rezSpell || known == _bots.end())
                     return;
@@ -673,7 +675,7 @@ BotPolicy::TurnFlow BotPolicy::DeadCorpse(DecideTick& tick, BotTurn& turn)
             }
             return TurnFlow::kSkip;
         }
-        if (!death_pause::ReleaseAllowed(_options.DeathPause, _options.RandomSeed, bot.guid, state.DeathMs, nowMs))
+        if (!death_pause::ReleaseAllowed(Opt().DeathPause, Opt().RandomSeed, bot.guid, state.DeathMs, nowMs))
             return TurnFlow::kSkip; // DeathPause: a player takes a moment before pressing release
         BotAction release;
         release.bot_guid = bot.guid;
@@ -750,10 +752,10 @@ BotPolicy::TurnFlow BotPolicy::DeadHeldByWarder(DecideTick& tick, BotTurn& turn)
                 if (!WarderWithin(view.NearbyOf(leaderAt->second), leader.pos_x, leader.pos_y, kFireNovaYards))
                     DeadReviveByLeader(tick, turn);
             }
-            if (_options.OnEvent && nowMs - state.ReviveHeldLoggedMs >= kReviveWarderLogMs)
+            if (Opt().OnEvent && nowMs - state.ReviveHeldLoggedMs >= kReviveWarderLogMs)
             {
                 state.ReviveHeldLoggedMs = nowMs;
-                _options.OnEvent("revive_held: bot=" + std::to_string(bot.guid) + " reason=warder_alive yards=" + std::to_string(int(kReviveWarderYards)) +
+                Opt().OnEvent("revive_held: bot=" + std::to_string(bot.guid) + " reason=warder_alive yards=" + std::to_string(int(kReviveWarderYards)) +
                                  " waited_ms=" + std::to_string(nowMs - state.DeathMs));
             }
             return TurnFlow::kSkip;
@@ -777,7 +779,7 @@ BotPolicy::TurnFlow BotPolicy::DeadReviveByLeader(DecideTick& tick, BotTurn& tur
     // map. The ghost waits between tries and walks on only once they are used up (kOutOfCombatReviveTries), or when the leader is not up.
     // Only in the dungeon (the owner's rule of 2026-10-22): a ghost still on the outside map walks to the instance door and is revived on
     // entering it, whatever the leader is doing.
-    if (_options.DungeonReviveOutOfCombat && deadParty != 0 && deadParty != bot.guid && bot.in_combat == 0 && state.ReviveAttempts < kOutOfCombatReviveTries &&
+    if (Opt().DungeonReviveOutOfCombat && deadParty != 0 && deadParty != bot.guid && bot.in_combat == 0 && state.ReviveAttempts < kOutOfCombatReviveTries &&
         (IsRouteActive(bot.guid) || tankLed.count(deadParty) != 0) && bot.corpse_valid != 0 && bot.map_id == bot.corpse_map)
     {
         auto const leaderAt = indexOf.find(deadParty);
@@ -848,11 +850,11 @@ void BotPolicy::DeadGhostRun(DecideTick& tick, BotTurn& turn)
     // A ghost of a dungeon party goes back to the instance entrance and is revived there (the owner's rule of 2026-10-25), not walked back to its corpse.
     // Outside the instance it is teleported in, and inside it is put at the entrance when it is further off. It waits there for the leader's revive
     // (the revive above). Only when no revive comes within kDungeonEntryWaitMs does the ghost fall back to its corpse run.
-    auto const entryOf = _options.DungeonsByMap.find(bot.corpse_map);
+    auto const entryOf = Opt().DungeonsByMap.find(bot.corpse_map);
     bool const instanceParty = IsRouteActive(bot.guid) || (deadParty != 0 && tankLed.count(deadParty) != 0);
-    if (instanceParty && entryOf != _options.DungeonsByMap.end() && entryOf->second.HasEntry && state.EntrySinceMs == 0)
+    if (instanceParty && entryOf != Opt().DungeonsByMap.end() && entryOf->second.HasEntry && state.EntrySinceMs == 0)
         state.EntrySinceMs = nowMs;
-    bool const atEntry = bot.map_id == bot.corpse_map && entryOf != _options.DungeonsByMap.end() && entryOf->second.HasEntry &&
+    bool const atEntry = bot.map_id == bot.corpse_map && entryOf != Opt().DungeonsByMap.end() && entryOf->second.HasEntry &&
                          DistanceTo(bot, entryOf->second.Entry) <= kEntryYards;
     // Out of combat with the party's leader up: the ghost does not wait at the entrance or walk to its corpse. It is teleported to the leader and stays
     // by it for the revive (above). A fight in the party brings back the entrance wait below.
@@ -883,7 +885,7 @@ void BotPolicy::DeadGhostRun(DecideTick& tick, BotTurn& turn)
     // core revives it on entering. While the party still fights it waits where it is, kLeaderGhostWaitMs at most, and only then goes to the entrance as before. At the
     // entrance it came back alone at half health, rested 30-60 s and was put back into the fight it had died in: 55 of 170 leader_recover teleports of the 2026-11-07
     // sim ended in that leader's death within 120 s.
-    if (_options.DungeonLeaderRejoin && instanceParty && deadParty != 0 && deadParty == bot.guid)
+    if (Opt().DungeonLeaderRejoin && instanceParty && deadParty != 0 && deadParty == bot.guid)
     {
         std::uint64_t const ghostSinceMs = state.EntrySinceMs != 0 ? state.EntrySinceMs : state.DeathMs;
         BotSnapshot const* const member = LeaderRejoinMember(tick, bot.guid, bot.corpse_map, bot.corpse_x, bot.corpse_y);
@@ -922,7 +924,7 @@ void BotPolicy::DeadGhostRun(DecideTick& tick, BotTurn& turn)
         }
     }
     bool entryHeld = false;
-    if (instanceParty && entryOf != _options.DungeonsByMap.end() && entryOf->second.HasEntry && !atEntry && nowMs >= state.CorpseTeleportRetryMs)
+    if (instanceParty && entryOf != Opt().DungeonsByMap.end() && entryOf->second.HasEntry && !atEntry && nowMs >= state.CorpseTeleportRetryMs)
     {
         // GhostHoldPartyFightMaxMs: while the party fights, the entrance wait (kDungeonEntryWaitMs) starts over, so a ghost whose hold ends goes to the entrance as
         // before and not on a corpse run into the fight.
@@ -930,11 +932,11 @@ void BotPolicy::DeadGhostRun(DecideTick& tick, BotTurn& turn)
         if (fightHeld)
             state.EntrySinceMs = nowMs;
         else if (state.GhostFightHoldSinceMs != 0)
-            state.EntrySinceMs = std::max(state.EntrySinceMs, std::min(nowMs, state.GhostFightHoldSinceMs + _options.GhostHoldPartyFightMaxMs));
+            state.EntrySinceMs = std::max(state.EntrySinceMs, std::min(nowMs, state.GhostFightHoldSinceMs + Opt().GhostHoldPartyFightMaxMs));
         entryHeld = fightHeld || GhostTeleportHeld(tick, turn, bot.corpse_map, entryOf->second.Entry, "entrance") || GhostReviveCapHeld(tick, turn, deadParty);
     }
     // A held ghost keeps waiting past kDungeonEntryWaitMs: the corpse run would walk it to the pack as well.
-    if (instanceParty && entryOf != _options.DungeonsByMap.end() && entryOf->second.HasEntry && (nowMs - state.EntrySinceMs < kDungeonEntryWaitMs || entryHeld))
+    if (instanceParty && entryOf != Opt().DungeonsByMap.end() && entryOf->second.HasEntry && (nowMs - state.EntrySinceMs < kDungeonEntryWaitMs || entryHeld))
     {
         if (!atEntry && !entryHeld && nowMs >= state.CorpseTeleportRetryMs && GhostTeleportSlot(nowMs))
         {
@@ -953,7 +955,7 @@ void BotPolicy::DeadGhostRun(DecideTick& tick, BotTurn& turn)
         }
         return; // at the entrance it waits for the leader's revive (the revive above); the corpse run is not walked
     }
-    if (instanceParty && entryOf != _options.DungeonsByMap.end() && entryOf->second.HasEntry && !state.RunStarted)
+    if (instanceParty && entryOf != Opt().DungeonsByMap.end() && entryOf->second.HasEntry && !state.RunStarted)
         LogEvent("dungeon_entry_wait_expired: bot=" + std::to_string(bot.guid) + " map=" + std::to_string(bot.map_id) + " waited_ms=" + std::to_string(nowMs - state.EntrySinceMs));
     if (!state.RunStarted)
     {
@@ -973,7 +975,7 @@ void BotPolicy::DeadGhostRun(DecideTick& tick, BotTurn& turn)
         return GhostFightHeld(tick, turn, bot.corpse_map, "corpse") ||
                GhostAvoidEnemyHeld(tick, turn, bot.corpse_map, Point{ bot.corpse_x, bot.corpse_y, bot.corpse_z }, "corpse");
     };
-    if (_options.CorpseRunTeleportMs != 0 && !state.RunTimeoutTeleported && !atCorpse && nowMs - state.RunStartMs > _options.CorpseRunTeleportMs && !corpseHeld() &&
+    if (Opt().CorpseRunTeleportMs != 0 && !state.RunTimeoutTeleported && !atCorpse && nowMs - state.RunStartMs > Opt().CorpseRunTeleportMs && !corpseHeld() &&
         GhostTeleportSlot(nowMs))
     {
         state.RunTimeoutTeleported = true;
@@ -990,7 +992,7 @@ void BotPolicy::DeadGhostRun(DecideTick& tick, BotTurn& turn)
               " reason=run_limit");
         return;
     }
-    if (nowMs - state.RunStartMs > _options.CorpseRunTimeoutMs)
+    if (nowMs - state.RunStartMs > Opt().CorpseRunTimeoutMs)
     {
         // Four minutes of walking and the corpse is not reached: the ghost is put at the corpse once (the core does not refuse a teleport for a ghost),
         // and the run starts over. A ghost that gave up here stayed a ghost for good (34 bots in 55 minutes on the sim).
@@ -1084,8 +1086,8 @@ void BotPolicy::DeadGhostRun(DecideTick& tick, BotTurn& turn)
             }
             // Protocol 28: a hostile that keeps standing at the corpse (or the same killer again) sends the ghost to the spirit healer, not to the reclaim. From
             // then on (SpiritHealerActive) it is asked again every few seconds wherever the ghost is, and no stop is sent: the core walks it to the healer.
-            if (_options.ResurrectBackoff && !state.SpiritHealerActive && nowMs >= state.SpiritHealerRefusedUntilMs && state.GhostSinceMs != 0 &&
-                SpiritHealerWanted(_options.SpiritHealerAfterMs, _options.SpiritHealerOnRepeat, nowMs, state.ReclaimDangerSinceMs, state.KillerRepeat,
+            if (Opt().ResurrectBackoff && !state.SpiritHealerActive && nowMs >= state.SpiritHealerRefusedUntilMs && state.GhostSinceMs != 0 &&
+                SpiritHealerWanted(Opt().SpiritHealerAfterMs, Opt().SpiritHealerOnRepeat, nowMs, state.ReclaimDangerSinceMs, state.KillerRepeat,
                                    state.DeathTimesMs[1], state.DeathTimesMs[2], state.SpiritHealerRefusedUntilMs) &&
                 (bot.map_id != state.GhostSpawnMap || DistanceTo(bot, state.GhostSpawn) > kGhostFallbackHealerYards))
             {
@@ -1097,7 +1099,7 @@ void BotPolicy::DeadGhostRun(DecideTick& tick, BotTurn& turn)
                 return;
             }
             if (state.SpiritHealerActive ||
-                SpiritHealerWanted(_options.SpiritHealerAfterMs, _options.SpiritHealerOnRepeat, nowMs, state.ReclaimDangerSinceMs, state.KillerRepeat,
+                SpiritHealerWanted(Opt().SpiritHealerAfterMs, Opt().SpiritHealerOnRepeat, nowMs, state.ReclaimDangerSinceMs, state.KillerRepeat,
                                    state.DeathTimesMs[1], state.DeathTimesMs[2], state.SpiritHealerRefusedUntilMs))
             {
                 state.SpiritHealerActive = true;

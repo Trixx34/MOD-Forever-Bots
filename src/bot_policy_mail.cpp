@@ -5,7 +5,7 @@
 
 void BotPolicy::DriveMail(forever_module::WorldTickSnapshotView const& view, std::uint64_t nowMs)
 {
-    botmail::Settings const& settings = _options.BotMail;
+    botmail::Settings const& settings = Opt().BotMail;
     if (!settings.Enabled)
         return;
 
@@ -16,15 +16,15 @@ void BotPolicy::DriveMail(forever_module::WorldTickSnapshotView const& view, std
         botmail::Member member;
         member.Guid = bot.guid;
         member.Guild = bot.guild_guid;
-        member.Side = _options.SideOf ? _options.SideOf(bot.guid) : 0;
-        member.ClassId = _options.ClassOf ? _options.ClassOf(bot.guid) : 0;
+        member.Side = Opt().SideOf ? Opt().SideOf(bot.guid) : 0;
+        member.ClassId = Opt().ClassOf ? Opt().ClassOf(bot.guid) : 0;
         member.Level = bot.level;
         member.Copper = bot.copper;
         member.Skill = { bot.profession_skill[0], bot.profession_skill[1] };
         auto const known = _bots.find(bot.guid);
         bool const busy = known != _bots.end() && known->second.SocialBusyUntilMs > nowMs;
         member.Free = !busy && bot.life_state == 0 && bot.in_flight == 0 && bot.in_combat == 0 && bot.group_role == 0;
-        if (_options.IsAlt && _options.IsAlt(bot.guid))
+        if (Opt().IsAlt && Opt().IsAlt(bot.guid))
             member.Free = false;   // a player's own character: never moved by the module
         members.push_back(member);
     }
@@ -46,8 +46,8 @@ void BotPolicy::DriveMail(forever_module::WorldTickSnapshotView const& view, std
         if (auto const known = _bots.find(order.Bot); known != _bots.end())
             known->second.SocialBusyUntilMs = nowMs + 30000;
         _mailTo[order.Bot] = order.Player;
-        if (_options.OnEvent)
-            _options.OnEvent("bot_mail: sender=" + std::to_string(order.Bot) + " recipient=" + std::to_string(order.Player) + " kind=" +
+        if (Opt().OnEvent)
+            Opt().OnEvent("bot_mail: sender=" + std::to_string(order.Bot) + " recipient=" + std::to_string(order.Player) + " kind=" +
                              (order.Op == 0 ? "gold copper=" + std::to_string(order.Copper) : std::string("materials")));
         _socialOrders.push_back(std::move(order));
     }

@@ -56,7 +56,7 @@ void BotPolicy::DeathLoopBreakNote(DecideTick& tick, BotTurn& turn, std::uint32_
     state.LoopBreak = false;
     state.LoopBreakJudged = false;
     state.LoopBreakWait = false;
-    if (!_options.DeathLoopBreaker || killerEntry == 0 || bot.group_leader_guid != 0 || turn.deadParty != 0 || IsRouteActive(bot.guid))
+    if (!Opt().DeathLoopBreaker || killerEntry == 0 || bot.group_leader_guid != 0 || turn.deadParty != 0 || IsRouteActive(bot.guid))
         return;
     std::erase_if(state.LoopDeaths, [nowMs](BotLoopDeath const& death) { return nowMs - death.AtMs > kLoopBreakWindowMs; });
     state.LoopDeaths.push_back(BotLoopDeath{ bot.map_id, bot.pos_x, bot.pos_y, killerEntry, nowMs });
@@ -84,7 +84,7 @@ bool BotPolicy::DeathLoopBreakGhost(DecideTick& tick, BotTurn& turn)
     std::uint64_t const nowMs = tick.nowMs;
     BotSnapshot const& bot = turn.bot;
     BotState& state = turn.state;
-    if (!_options.DeathLoopBreaker || !state.LoopBreak || bot.life_state != 2 || state.GhostSinceMs == 0)
+    if (!Opt().DeathLoopBreaker || !state.LoopBreak || bot.life_state != 2 || state.GhostSinceMs == 0)
         return false;
     std::string const who = "death_loop_break: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(state.GhostSpawnMap);
     if (!state.LoopBreakJudged)
@@ -107,7 +107,7 @@ bool BotPolicy::DeathLoopBreakGhost(DecideTick& tick, BotTurn& turn)
             return false;
         }
         // Another graveyard of the same map (never another map: the Skyborne rule) and side, not unsafe for this level and not beside the loop.
-        std::uint8_t const side = _options.SideOf ? _options.SideOf(bot.guid) : 0;
+        std::uint8_t const side = Opt().SideOf ? Opt().SideOf(bot.guid) : 0;
         std::uint32_t const level = bot.level;
         auto const skip = [&](level_safe::Graveyards::Yard const& yard)
         {
@@ -116,7 +116,7 @@ bool BotPolicy::DeathLoopBreakGhost(DecideTick& tick, BotTurn& turn)
         };
         level_safe::Graveyards::Yard const* yard = nullptr;
         if (!_levelMap.Empty() && level != 0)
-            yard = _graveyards.Fitting(_levelMap, state.GhostSpawnMap, state.LoopBreakX, state.LoopBreakY, level, _options.LevelSafe.MarginLevels, side, skip);
+            yard = _graveyards.Fitting(_levelMap, state.GhostSpawnMap, state.LoopBreakX, state.LoopBreakY, level, Opt().LevelSafe.MarginLevels, side, skip);
         if (!yard)
             yard = _graveyards.Nearest(state.GhostSpawnMap, state.LoopBreakX, state.LoopBreakY, side,
                                        [&](level_safe::Graveyards::Yard const& candidate)
@@ -175,7 +175,7 @@ void BotPolicy::DeathLoopBreakEscape(DecideTick& tick, BotTurn& turn)
     std::uint64_t const nowMs = tick.nowMs;
     BotSnapshot const& bot = turn.bot;
     BotState& state = turn.state;
-    if (!_options.DeathLoopBreaker || state.LoopBreakEscapeUntilMs == 0 || bot.life_state != 0 || nowMs < state.LoopBreakEscapeRetryMs)
+    if (!Opt().DeathLoopBreaker || state.LoopBreakEscapeUntilMs == 0 || bot.life_state != 0 || nowMs < state.LoopBreakEscapeRetryMs)
         return;
     std::string const who = "death_loop_break: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id);
     if (nowMs >= state.LoopBreakEscapeUntilMs)
@@ -199,12 +199,12 @@ void BotPolicy::DeathLoopBreakEscape(DecideTick& tick, BotTurn& turn)
         return;
     }
     state.LoopBreakEscapeUntilMs = 0;
-    if (_options.Grind && !_options.Grind->Spots.empty() && bot.level != 0)
+    if (Opt().Grind && !Opt().Grind->Spots.empty() && bot.level != 0)
         for (std::size_t const index : GrindSpotsForBot(state, bot, nowMs))
         {
-            GrindSpot const& spot = _options.Grind->Spots[index];
+            GrindSpot const& spot = Opt().Grind->Spots[index];
             if (spot.Map != bot.map_id || std::hypot(spot.X - state.LoopBreakX, spot.Y - state.LoopBreakY) < kDeathLoopAwayYards ||
-                (!_levelMap.Empty() && _levelMap.TooHigh(spot.Map, spot.X, spot.Y, bot.level, _options.LevelSafe.MarginLevels)))
+                (!_levelMap.Empty() && _levelMap.TooHigh(spot.Map, spot.X, spot.Y, bot.level, Opt().LevelSafe.MarginLevels)))
                 continue;
             BotAction away;
             away.bot_guid = bot.guid;

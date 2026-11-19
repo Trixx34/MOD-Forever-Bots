@@ -25,7 +25,7 @@ constexpr std::uint32_t kGuildCreateBlockDoublings = 3; // ...up to 8 times that
 
 void BotPolicy::NoteGuildCreateFailed(std::uint64_t master, std::uint64_t nowMs)
 {
-    if (!_options.Guilds.RefusalBackoff)
+    if (!Opt().Guilds.RefusalBackoff)
         return;
     CreateBlock& block = _guildCreateBlocks[master];
     block.Failures = std::min(block.Failures + 1, kGuildCreateBlockDoublings + 1);
@@ -43,8 +43,8 @@ void BotPolicy::RestoreBotGuild(std::uint64_t guild, bot_guilds::Purpose kind, b
         _botGuildNames[guild] = name;
         _guildTakenNames.insert(bot_guilds::NameKey(name));
     }
-    if (_options.OnEvent)
-        _options.OnEvent("guild_restored: guild=" + std::to_string(guild) + " kind=" + bot_guilds::KindName(kind) + " name=" + name);
+    if (Opt().OnEvent)
+        Opt().OnEvent("guild_restored: guild=" + std::to_string(guild) + " kind=" + bot_guilds::KindName(kind) + " name=" + name);
 }
 
 std::vector<BotPolicy::StoreWrite> BotPolicy::TakeGuildStoreWrites()
@@ -56,7 +56,7 @@ std::vector<BotPolicy::StoreWrite> BotPolicy::TakeGuildStoreWrites()
 
 void BotPolicy::DriveGuilds(forever_module::WorldTickSnapshotView const& view, std::uint64_t nowMs)
 {
-    if (!_options.Guilds.Enabled)
+    if (!Opt().Guilds.Enabled)
         return;
 
     auto const busy = [&](std::uint64_t guid)
@@ -113,8 +113,8 @@ void BotPolicy::DriveGuilds(forever_module::WorldTickSnapshotView const& view, s
         _botGuildNames[bot.guild_guid] = pending->second.Name;
         _guildTakenNames.insert(bot_guilds::NameKey(pending->second.Name));
         _guildStoreWrites.push_back(StoreWrite{ bot_guilds::StoreKeyFor(bot.guild_guid), bot_guilds::EncodeRecord(made, pending->second.Name), false });
-        if (_options.OnEvent)
-            _options.OnEvent("guild_created: guild=" + std::to_string(bot.guild_guid) + " master=" + std::to_string(bot.guid) + " kind=" +
+        if (Opt().OnEvent)
+            Opt().OnEvent("guild_created: guild=" + std::to_string(bot.guild_guid) + " master=" + std::to_string(bot.guid) + " kind=" +
                              bot_guilds::KindName(made.Kind) + " name=" + pending->second.Name);
         _pendingGuilds.erase(pending);
     }
@@ -154,13 +154,13 @@ void BotPolicy::DriveGuilds(forever_module::WorldTickSnapshotView const& view, s
         bot_guilds::Bot member;
         member.Guid = bot.guid;
         member.Guild = bot.guild_guid;
-        member.Alliance = _options.SideOf && _options.SideOf(bot.guid) == 1;
+        member.Alliance = Opt().SideOf && Opt().SideOf(bot.guid) == 1;
         member.Online = true;
         member.Level = bot.level;
         pool.push_back(member);
     }
 
-    bot_guilds::Plan const plan = bot_guilds::PlanMoves(_options.Guilds, guilds, pool);
+    bot_guilds::Plan const plan = bot_guilds::PlanMoves(Opt().Guilds, guilds, pool);
     for (std::uint64_t const guild : plan.Dissolved)
     {
         // The name stays taken: the core may still hold the guild.
@@ -208,8 +208,8 @@ void BotPolicy::DriveGuilds(forever_module::WorldTickSnapshotView const& view, s
             if (auto const blocked = _guildCreateBlocks.find(member); blocked != _guildCreateBlocks.end() && blocked->second.UntilMs > nowMs)
             {
                 // One line per block, not per plan: the window is long and the plan runs every 30 s.
-                if (!blocked->second.Logged && _options.OnEvent)
-                    _options.OnEvent("guild_create_skipped: master=" + std::to_string(member) + " failures=" + std::to_string(blocked->second.Failures) +
+                if (!blocked->second.Logged && Opt().OnEvent)
+                    Opt().OnEvent("guild_create_skipped: master=" + std::to_string(member) + " failures=" + std::to_string(blocked->second.Failures) +
                                      " wait_s=" + std::to_string((blocked->second.UntilMs - nowMs) / 1000));
                 blocked->second.Logged = true;
                 continue;
@@ -225,17 +225,17 @@ void BotPolicy::DriveGuilds(forever_module::WorldTickSnapshotView const& view, s
         order.Bot = master;
         order.Text = created.Name;
         bool fromList = false;
-        if (_options.GuildNames && !_options.GuildNames->empty())
+        if (Opt().GuildNames && !Opt().GuildNames->empty())
         {
             std::uint64_t const seed = master * 1000003ull + (++_guildNameDraws);
-            if (std::optional<std::string> picked = bot_guilds::PickName(_options.Guilds, *_options.GuildNames, created.Kind, nameTaken, seed))
+            if (std::optional<std::string> picked = bot_guilds::PickName(Opt().Guilds, *Opt().GuildNames, created.Kind, nameTaken, seed))
             {
                 order.Text = *picked;
                 fromList = true;
             }
         }
-        if (_options.OnEvent)
-            _options.OnEvent("guild_create: master=" + std::to_string(master) + " kind=" + bot_guilds::KindName(created.Kind) + " name=" + order.Text);
+        if (Opt().OnEvent)
+            Opt().OnEvent("guild_create: master=" + std::to_string(master) + " kind=" + bot_guilds::KindName(created.Kind) + " name=" + order.Text);
         _pendingGuilds[master] = PendingGuild{ created.Kind, created.Alliance, nowMs, order.Text, fromList };
         queue(order);
         ++queued;

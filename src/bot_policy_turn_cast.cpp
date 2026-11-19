@@ -101,10 +101,10 @@ BotPolicy::TurnFlow BotPolicy::PartyHeal(DecideTick& tick, BotTurn& turn)
             for (auto it = _healClaims.begin(); it != _healClaims.end();)
                 it = nowMs >= it->second.UntilMs ? _healClaims.erase(it) : std::next(it);
         BotSnapshot const* hurt = nullptr;
-        std::uint64_t hurtPct = (IsRouteActive(bot.guid) && _options.TacticHeal) ? _options.DungeonHealBelowPct : kHealBelowPct;
+        std::uint64_t hurtPct = (IsRouteActive(bot.guid) && Opt().TacticHeal) ? Opt().DungeonHealBelowPct : kHealBelowPct;
         BotSnapshot const* leaderHurt = nullptr;   // the tank with a target: healed first, whatever its share
         heal_plan::Plan const* const healPlan = HealPlanOf(partyLeader);
-        std::uint64_t leaderHurtPct = HealPlanTankThreshold(healPlan, bot.guid, partyLeader, _options.DungeonTankHealBelowPct, nowMs);   // pre-heal window: topped up higher
+        std::uint64_t leaderHurtPct = HealPlanTankThreshold(healPlan, bot.guid, partyLeader, Opt().DungeonTankHealBelowPct, nowMs);   // pre-heal window: topped up higher
         BotSnapshot const* leaderTopUp = nullptr;  // the route leader out of a fight, below kRouteTopUpPct
         // Emergency target: anyone under kEmergencyHealBelowPct gets Flash Heal first.
         BotSnapshot const* emergencyHurt = nullptr;
@@ -194,7 +194,7 @@ BotPolicy::TurnFlow BotPolicy::PartyHeal(DecideTick& tick, BotTurn& turn)
                 // priority chain the member below 55 % was never healed (Stockade, 2026-10-28: a mage held at 44 % for over 30 s while the priest ordered 15 shields).
                 auto const shielded = state.BuffUntilMs.find({ kPowerWordShield, member.guid == bot.guid ? 0 : PlayerRef(member.guid) });
                 bool const shieldLocked = shielded != state.BuffUntilMs.end() && nowMs < shielded->second;
-                if (pct < kShieldBelowPct && !shieldLocked && classId == 5 && ClassFor(_options, member.guid) != kWarriorClass_ && ClassFor(_options, member.guid) != kDruidClass_)
+                if (pct < kShieldBelowPct && !shieldLocked && classId == 5 && ClassFor(Opt(), member.guid) != kWarriorClass_ && ClassFor(Opt(), member.guid) != kDruidClass_)
                 {
                     // Shield preemptive: check if this member's health dropped since the last tick (took damage).
                     // The module keeps a short history via state.StallBotHealth etc; here we approximate by checking
@@ -239,13 +239,13 @@ BotPolicy::TurnFlow BotPolicy::PartyHeal(DecideTick& tick, BotTurn& turn)
                               !(state.BuffUntilMs.count({ kRenew, PlayerRef(tankMember->guid) }) && nowMs < state.BuffUntilMs[{ kRenew, PlayerRef(tankMember->guid) }]);
         // HealWaitTankHold: no Renew on a tank at full health that does not hold its target yet (the heal only puts the healer on the pack's threat list).
         // Renew is the one heal here that goes on a full-health tank; every other branch needs the member below a threshold under 100 %.
-        if (renewDue && _options.HealWaitTankHold && tankMember->health >= tankMember->max_health && !TankHoldsTarget(tick, turn, *tankMember))
+        if (renewDue && Opt().HealWaitTankHold && tankMember->health >= tankMember->max_health && !TankHoldsTarget(tick, turn, *tankMember))
         {
             renewDue = false;
-            if (_options.OnEvent && (state.HealHoldLogMs == 0 || nowMs - state.HealHoldLogMs >= 10000))
+            if (Opt().OnEvent && (state.HealHoldLogMs == 0 || nowMs - state.HealHoldLogMs >= 10000))
             {
                 state.HealHoldLogMs = nowMs;
-                _options.OnEvent("heal_hold: healer=" + std::to_string(bot.guid) + " tank=" + std::to_string(tankMember->guid) + " reason=tank_not_holding target=" +
+                Opt().OnEvent("heal_hold: healer=" + std::to_string(bot.guid) + " tank=" + std::to_string(tankMember->guid) + " reason=tank_not_holding target=" +
                                  std::to_string(forever_module::UnitRefEntry(tankMember->threat_target_guid)));
             }
         }
@@ -300,10 +300,10 @@ BotPolicy::TurnFlow BotPolicy::PartyHeal(DecideTick& tick, BotTurn& turn)
         // HealSpellMix (heal_spell.h): the spell, and its rank, from the target's missing health, the damage it takes, tank or not, mana and what the ranks cost. It replaces the class's one
         // heal (and Flash Heal); Prayer, shield, Renew and Binding Heal of the chain above are left as they are, except that the pulling tank gets a shield or heal over time first.
         bool planExact = false;
-        if (_options.HealSpellMix && healSpell != 0)
+        if (Opt().HealSpellMix && healSpell != 0)
         {
             bool const direct = target && (spellToCast == healSpell || (priest && spellToCast == kFlashHeal));
-            bool const holdBlocked = _options.HealWaitTankHold && tankMember && tankMember->health >= tankMember->max_health && !TankHoldsTarget(tick, turn, *tankMember);
+            bool const holdBlocked = Opt().HealWaitTankHold && tankMember && tankMember->health >= tankMember->max_health && !TankHoldsTarget(tick, turn, *tankMember);
             bool const proactive = !target && tankMember && tankMember->in_combat != 0 && !holdBlocked;
             if (direct || proactive)
             {
@@ -372,13 +372,13 @@ BotPolicy::TurnFlow BotPolicy::PartyHeal(DecideTick& tick, BotTurn& turn)
         }
         // Personality (off by default): a reaction delay on a heal call for an ordinary hurt member (the "normal" pick: not an emergency, the tank, a shield or a Renew, and not
         // below 50 percent). The delay runs once per member until it is healed or the member changes. Not in a dungeon or raid unless PersonalityInstances.
-        if (target && _options.Personality.Enabled && _options.Personality.JitterMaxMs != 0 && target == hurt && note.empty() && hurtPct >= 50)
+        if (target && Opt().Personality.Enabled && Opt().Personality.JitterMaxMs != 0 && target == hurt && note.empty() && hurtPct >= 50)
         {
             if (state.HealReactRef != target->guid || nowMs > state.HealReactUntilMs + 5000)
             {
                 state.HealReactRef = target->guid;
-                state.HealReactUntilMs = nowMs + personality::JitterMs(_options.Personality, personality::TraitsFor(_options.RandomSeed, bot.guid), PersonalityInstanced(bot),
-                                                                       _options.RandomSeed, bot.guid, target->guid + std::uint64_t(++state.PersonalityCounter) * 0x9E3779B1ull);
+                state.HealReactUntilMs = nowMs + personality::JitterMs(Opt().Personality, personality::TraitsFor(Opt().RandomSeed, bot.guid), PersonalityInstanced(bot),
+                                                                       Opt().RandomSeed, bot.guid, target->guid + std::uint64_t(++state.PersonalityCounter) * 0x9E3779B1ull);
             }
             if (nowMs < state.HealReactUntilMs)
             {
@@ -392,7 +392,7 @@ BotPolicy::TurnFlow BotPolicy::PartyHeal(DecideTick& tick, BotTurn& turn)
         {
             // Check we can pay for the chosen spell, so a cheaper heal is used when the healer is low on mana.
             auto const spellRetry = state.RetryAtMs.find(spellToCast);
-            if ((spellRetry == state.RetryAtMs.end() || nowMs >= spellRetry->second) && CanPay(_options.SpellCosts.get(), spellToCast, bot))
+            if ((spellRetry == state.RetryAtMs.end() || nowMs >= spellRetry->second) && CanPay(Opt().SpellCosts.get(), spellToCast, bot))
             {
                 // If we recently lost LoS to the target and are still moving to regain it, wait for movement instead of retrying the cast.
                 if (state.CloserUntilMs > nowMs)
@@ -419,7 +419,7 @@ BotPolicy::TurnFlow BotPolicy::PartyHeal(DecideTick& tick, BotTurn& turn)
                     // Protocol 28 (HealDownrank): the direct heal is cast at the rank that covers the target's deficit, named exactly (dest_x = 1); the core answers kNotKnown for a
                     // rank the bot has not learned, and the downrank then pauses (ReadResult).
                     std::uint32_t downrank = 0;
-                    if (_options.HealDownrank && spellToCast == healSpell && nowMs >= state.HealDownrankPausedUntilMs && target->max_health > target->health)
+                    if (Opt().HealDownrank && spellToCast == healSpell && nowMs >= state.HealDownrankPausedUntilMs && target->max_health > target->health)
                     {
                         std::uint32_t const mana = bot.power_type == 0 ? bot.power : std::numeric_limits<std::uint32_t>::max();
                         downrank = heal_ranks::PickRank(classId, bot.level, target->max_health - target->health, mana);
@@ -449,11 +449,11 @@ BotPolicy::TurnFlow BotPolicy::PartyHeal(DecideTick& tick, BotTurn& turn)
                         state.BuffUntilMs[{ kPowerWordShield, heal.target_guid }] = nowMs + kShieldLockMs;
                     _healClaims[target->guid] = HealClaim{ healGroup, nowMs + kHealClaimMs };
                     if (healPlan && heal_plan::Covers(healPlan, bot.guid) && !heal_plan::IsAssigned(healPlan, bot.guid, target->guid) && !assignedNeed && hurtPct >= kEmergencyHealBelowPct &&
-                        healPlan->HealerOf.count(target->guid) && _options.OnEvent)
-                        _options.OnEvent("heal_assign_switch: healer=" + std::to_string(bot.guid) + " target=" + std::to_string(target->guid) +
+                        healPlan->HealerOf.count(target->guid) && Opt().OnEvent)
+                        Opt().OnEvent("heal_assign_switch: healer=" + std::to_string(bot.guid) + " target=" + std::to_string(target->guid) +
                                          " assigned_healer=" + std::to_string(healPlan->HealerOf.at(target->guid)) + " target_hp_pct=" + std::to_string(hurtPct));
-                    if (_options.OnEvent)
-                        _options.OnEvent("heal: healer=" + std::to_string(bot.guid) + " spell=" + std::to_string(spellToCast) +
+                    if (Opt().OnEvent)
+                        Opt().OnEvent("heal: healer=" + std::to_string(bot.guid) + " spell=" + std::to_string(spellToCast) +
                                          " target=" + std::to_string(target->guid) + " target_hp_pct=" + std::to_string(hurtPct) +
                                          (downrank != 0 ? " rank=" + std::to_string(downrank) : std::string()) + (note.empty() ? "" : " " + note));
                     state.NextCastMs = nowMs + kGlobalCooldownMs;
@@ -481,10 +481,10 @@ BotPolicy::TurnFlow BotPolicy::PartyHealerDps(DecideTick& tick, BotTurn& turn)
     // only out of combat or when the party is not taking damage, and only when healer mana > 40%.
     if (partyLeader != 0 && classId == 5 && bot.in_combat == 0 && PartyFighting(tick, partyLeader) &&
         (state.LosRepositionTarget != 0 ||
-         std::uint64_t(bot.power) * 100 >= std::uint64_t(bot.max_power) * _options.HealerDpsManaPct))
+         std::uint64_t(bot.power) * 100 >= std::uint64_t(bot.max_power) * Opt().HealerDpsManaPct))
     {
-        if (state.LosRepositionTarget != 0 && _options.OnEvent)
-            _options.OnEvent("healer_dps_los_pending: healer=" + std::to_string(bot.guid) +
+        if (state.LosRepositionTarget != 0 && Opt().OnEvent)
+            Opt().OnEvent("healer_dps_los_pending: healer=" + std::to_string(bot.guid) +
                              " target=" + std::to_string(state.LosRepositionTarget));
         // Check if anyone in party needs healing
         bool anyoneHurt = false;
@@ -507,13 +507,13 @@ BotPolicy::TurnFlow BotPolicy::PartyHealerDps(DecideTick& tick, BotTurn& turn)
             // Prefer Smite (always works at 30 yd), then SWP, then Mind Blast (needs clear LoS).
             // If a previous priest DPS cast lost LoS, reposition to its target before retrying any spell.
             bool const losBlocked = state.CloserUntilMs > nowMs || state.LosRepositionTarget != 0;
-            if (CanPay(_options.SpellCosts.get(), kSmite, bot) &&
+            if (CanPay(Opt().SpellCosts.get(), kSmite, bot) &&
                 (state.RetryAtMs.find(kSmite) == state.RetryAtMs.end() || nowMs >= state.RetryAtMs[kSmite]))
                 dpsSpell = kSmite;
-            else if (CanPay(_options.SpellCosts.get(), kSWP, bot) &&
+            else if (CanPay(Opt().SpellCosts.get(), kSWP, bot) &&
                      (state.RetryAtMs.find(kSWP) == state.RetryAtMs.end() || nowMs >= state.RetryAtMs[kSWP]))
                 dpsSpell = kSWP;
-            else if (!losBlocked && CanPay(_options.SpellCosts.get(), kMindBlast, bot) &&
+            else if (!losBlocked && CanPay(Opt().SpellCosts.get(), kMindBlast, bot) &&
                      (state.RetryAtMs.find(kMindBlast) == state.RetryAtMs.end() || nowMs >= state.RetryAtMs[kMindBlast]))
                 dpsSpell = kMindBlast;
             if (dpsSpell != 0)
@@ -540,8 +540,8 @@ BotPolicy::TurnFlow BotPolicy::PartyHealerDps(DecideTick& tick, BotTurn& turn)
                     actions.push_back(dps);
                     state.CastTarget[dpsSpell] = targetGuid;
                     state.NextCastMs = nowMs + kGlobalCooldownMs;
-                    if (_options.OnEvent)
-                        _options.OnEvent("healer_dps: healer=" + std::to_string(bot.guid) + " spell=" + std::to_string(dpsSpell) +
+                    if (Opt().OnEvent)
+                        Opt().OnEvent("healer_dps: healer=" + std::to_string(bot.guid) + " spell=" + std::to_string(dpsSpell) +
                                          " target=" + std::to_string(forever_module::UnitRefEntry(targetGuid)));
                     return TurnFlow::kSkip;
                 }
@@ -592,7 +592,7 @@ BotPolicy::TurnFlow BotPolicy::PartyResurrect(DecideTick& tick, BotTurn& turn)
             });
             if (otherCloser)
                 return;
-            std::uint32_t const deadClass = ClassFor(_options, dead.guid);
+            std::uint32_t const deadClass = ClassFor(Opt(), dead.guid);
             int const rank = HealSpellFor(deadClass, 99) != 0 ? 0 : deadClass == kWarriorClass ? 1 : 2;
             if (!pick || rank < pickRank || (rank == pickRank && dist < pickDist))
             {
@@ -622,8 +622,8 @@ BotPolicy::TurnFlow BotPolicy::PartyResurrect(DecideTick& tick, BotTurn& turn)
                 actions.push_back(rez);
                 state.CastTarget[rezSpell] = rez.target_guid;
                 state.NextCastMs = nowMs + kGlobalCooldownMs;
-                if (_options.OnEvent)
-                    _options.OnEvent("rez_cast: rezzer=" + std::to_string(bot.guid) + " spell=" + std::to_string(rezSpell) + " target=" +
+                if (Opt().OnEvent)
+                    Opt().OnEvent("rez_cast: rezzer=" + std::to_string(bot.guid) + " spell=" + std::to_string(rezSpell) + " target=" +
                                      std::to_string(pick->guid) + " dist=" + std::to_string(int(pickDist)) + " life=" + std::to_string(pick->life_state));
             }
             return TurnFlow::kSkip;
@@ -739,7 +739,7 @@ void BotPolicy::TurnUpkeepBuffs(DecideTick& tick, BotTurn& turn)
             auto const retry = state.RetryAtMs.find(row.Spell);
             if (retry != state.RetryAtMs.end() && nowMs < retry->second)
                 continue;
-            if (!CanPay(_options.SpellCosts.get(), row.Spell, bot))
+            if (!CanPay(Opt().SpellCosts.get(), row.Spell, bot))
                 continue; // a warrior has no rage out of combat: Battle Shout waits until it has some, instead of a cast the core refuses
             // A pet summon (no_pet) is due whenever the snapshot shows no pet: the party claim and the buff timer below would hold it off for the
             // spell's duration (an hour), long after the demon died. The cast in progress and the global cooldown stop it being sent twice.
@@ -793,11 +793,11 @@ void BotPolicy::TurnUpkeepBuffs(DecideTick& tick, BotTurn& turn)
                     continue;
                 // Personality (off by default): the bot forgets this upkeep buff for 30 to 120 s. One roll per buff until it is cast, so the chance does not grow with the ticks it
                 // is due; not in a dungeon or raid unless PersonalityInstances, and never a pet summon (earlier).
-                if (_options.Personality.Enabled && _options.Personality.ForgetBuffPct != 0 && state.BuffForgetRolled.insert(row.Spell).second &&
-                    personality::ForgetsBuff(_options.Personality, personality::TraitsFor(_options.RandomSeed, bot.guid), PersonalityInstanced(bot), _options.RandomSeed, bot.guid,
+                if (Opt().Personality.Enabled && Opt().Personality.ForgetBuffPct != 0 && state.BuffForgetRolled.insert(row.Spell).second &&
+                    personality::ForgetsBuff(Opt().Personality, personality::TraitsFor(Opt().RandomSeed, bot.guid), PersonalityInstanced(bot), Opt().RandomSeed, bot.guid,
                                              row.Spell + std::uint64_t(++state.PersonalityCounter) * 0x9E3779B1ull))
                 {
-                    state.RetryAtMs[row.Spell] = nowMs + personality::ForgetMs(_options.RandomSeed, bot.guid, row.Spell + std::uint64_t(state.PersonalityCounter) * 0x9E3779B1ull);
+                    state.RetryAtMs[row.Spell] = nowMs + personality::ForgetMs(Opt().RandomSeed, bot.guid, row.Spell + std::uint64_t(state.PersonalityCounter) * 0x9E3779B1ull);
                     continue;
                 }
                 BotAction buff;
@@ -826,9 +826,9 @@ void BotPolicy::TurnUpkeepBuffs(DecideTick& tick, BotTurn& turn)
         // Passing-player buff (PassingBuff, off by default): out of combat, a low chance to buff a friendly player within 15 yards. Only when the bot has the mana
         // (a share of its pool, and always the mana of its own next casts of the fight rotation on top of the buff), after its per-bot cooldown, and within the
         // map's rate. It sends one cast and touches nothing of the fight.
-        if (!cast && _options.PassingBuff.Enabled && !state.InFight && !turn.enemyNear && bot.life_state == 0 && bot.power_type == 0 && bot.max_power > 0 &&
+        if (!cast && Opt().PassingBuff.Enabled && !state.InFight && !turn.enemyNear && bot.life_state == 0 && bot.power_type == 0 && bot.max_power > 0 &&
             nowMs >= state.PassingBuffNextMs &&
-            bot_random::Below(bot_random::Draw(_options.RandomSeed, bot.guid, bot_random::kSaltIdle, 0x600000000ull + nowMs / 5000), 100) < _options.PassingBuff.ChancePct)
+            bot_random::Below(bot_random::Draw(Opt().RandomSeed, bot.guid, bot_random::kSaltIdle, 0x600000000ull + nowMs / 5000), 100) < Opt().PassingBuff.ChancePct)
         {
             NearbyUnit const* passer = nullptr;
             float passerDistance = 1e9f;
@@ -847,12 +847,12 @@ void BotPolicy::TurnUpkeepBuffs(DecideTick& tick, BotTurn& turn)
                     }
                 }
             }
-            if (passer && !hostileNear && _options.SpellCosts)
+            if (passer && !hostileNear && Opt().SpellCosts)
             {
                 std::vector<std::uint32_t> fightCosts;
                 for (rotation::Row const& row : RowsFor(classId, spec))
                     if (!row.Buff && (bot.level == 0 || row.MinLevel <= bot.level))
-                        if (auto const payment = _options.SpellCosts->CostAtLevel(row.Spell, bot.level); payment && payment->PowerType == 0)
+                        if (auto const payment = Opt().SpellCosts->CostAtLevel(row.Spell, bot.level); payment && payment->PowerType == 0)
                             fightCosts.push_back(payment->Cost);
                 for (rotation::Row const& row : RowsFor(classId, spec))
                 {
@@ -863,7 +863,7 @@ void BotPolicy::TurnUpkeepBuffs(DecideTick& tick, BotTurn& turn)
                     auto const retry = state.RetryAtMs.find(row.Spell);
                     if (retry != state.RetryAtMs.end() && nowMs < retry->second)
                         continue;
-                    auto const payment = _options.SpellCosts->CostAtLevel(row.Spell, bot.level);
+                    auto const payment = Opt().SpellCosts->CostAtLevel(row.Spell, bot.level);
                     if (!payment || payment->PowerType != 0)
                         continue;
                     realism::BuffFacts facts;
@@ -876,11 +876,11 @@ void BotPolicy::TurnUpkeepBuffs(DecideTick& tick, BotTurn& turn)
                     facts.Power = bot.power;
                     facts.MaxPower = bot.max_power;
                     facts.BuffCost = payment->Cost;
-                    facts.RotationReserve = realism::ReserveMana(fightCosts, _options.PassingBuff.ReserveCasts);
+                    facts.RotationReserve = realism::ReserveMana(fightCosts, Opt().PassingBuff.ReserveCasts);
                     facts.TargetDistance = passerDistance;
-                    if (!realism::BuffAllowed(_options.PassingBuff, facts, nowMs, state.PassingBuffNextMs))
+                    if (!realism::BuffAllowed(Opt().PassingBuff, facts, nowMs, state.PassingBuffNextMs))
                         continue;
-                    if (!_passingBuffRate.TryGrant(bot.map_id, nowMs, _options.PassingBuff.ZonePerMin))
+                    if (!_passingBuffRate.TryGrant(bot.map_id, nowMs, Opt().PassingBuff.ZonePerMin))
                         break;
                     BotAction buff;
                     buff.bot_guid = bot.guid;
@@ -890,7 +890,7 @@ void BotPolicy::TurnUpkeepBuffs(DecideTick& tick, BotTurn& turn)
                     actions.push_back(buff);
                     state.CastTarget[row.Spell] = passer->guid;
                     state.NextCastMs = nowMs + kGlobalCooldownMs;
-                    state.PassingBuffNextMs = nowMs + std::uint64_t(_options.PassingBuff.CooldownSec) * 1000;
+                    state.PassingBuffNextMs = nowMs + std::uint64_t(Opt().PassingBuff.CooldownSec) * 1000;
                     break;
                 }
             }
@@ -912,7 +912,7 @@ void BotPolicy::TurnCraftGather(DecideTick& tick, BotTurn& turn)
     // bot walks to one. The lines take turns.
     bool const calm = !hasTarget && bot.in_combat == 0 && bot.moving == 0 && bot.life_state == 0 && nowMs >= state.NextCastMs && !(IsCasting(bot)) && !state.Sitting &&
                       !state.CraftWalking;
-    if (_options.Crafting && calm)
+    if (Opt().Crafting && calm)
     {
         bool crafted = false;
         for (std::size_t turn = 0; turn < kCraftLineCount && !crafted; ++turn)
@@ -935,7 +935,7 @@ void BotPolicy::TurnCraftGather(DecideTick& tick, BotTurn& turn)
 
     // Gathering (SDK 0.18, off by default): a bot with Mining, Herbalism or Skinning asks the core to gather what is within 30 yards of it: a vein or herb its skill allows, or a
     // corpse it can skin. The core walks the bot there and casts; the next ask takes the loot.
-    if (_options.Gathering && calm && !state.GatherWalking)
+    if (Opt().Gathering && calm && !state.GatherWalking)
     {
         bool gathered = false;
         for (std::size_t index = 0; index < kGatherLineCount && !gathered; ++index)
@@ -959,11 +959,11 @@ void BotPolicy::TurnCraftGather(DecideTick& tick, BotTurn& turn)
 // mana pool. Out of combat the old window (HealerDpsManaPct) still applies; this is the in-combat counterpart.
 bool BotPolicy::HealerBelowManaFloor(BotSnapshot const& bot, BotState const& state, std::uint32_t classId, std::uint64_t partyLeader) const
 {
-    if (_options.HealerCombatManaPct == 0 || partyLeader == 0 || bot.in_combat == 0 || bot.max_power == 0)
+    if (Opt().HealerCombatManaPct == 0 || partyLeader == 0 || bot.in_combat == 0 || bot.max_power == 0)
         return false;
     if (state.Role_ == BotState::Role::Dps || state.Role_ == BotState::Role::Tank || HealSpellFor(classId, bot.level) == 0)
         return false;
-    return std::uint64_t(bot.power) * 100 < std::uint64_t(bot.max_power) * _options.HealerCombatManaPct;
+    return std::uint64_t(bot.power) * 100 < std::uint64_t(bot.max_power) * Opt().HealerCombatManaPct;
 }
 
 BotPolicy::TurnFlow BotPolicy::TurnRotation(DecideTick& tick, BotTurn& turn)
@@ -994,19 +994,19 @@ BotPolicy::TurnFlow BotPolicy::TurnRotation(DecideTick& tick, BotTurn& turn)
         return TurnFlow::kSkip;
     }
 
-    if (_options.TestSpell != 0)
+    if (Opt().TestSpell != 0)
     {
         // Test cast: on the snapshot tick timer, after the attack decision above.
         if (wanted.Type == ActionType::kAttackTarget &&
-            (!state.LastTestCastTick || view.tick_number >= *state.LastTestCastTick + _options.CastEveryTicks))
+            (!state.LastTestCastTick || view.tick_number >= *state.LastTestCastTick + Opt().CastEveryTicks))
         {
             BotAction cast;
             cast.bot_guid = bot.guid;
             cast.type = ActionType::kCastSpell;
-            cast.spell_id = _options.TestSpell;
+            cast.spell_id = Opt().TestSpell;
             cast.target_guid = targetRef;
             actions.push_back(cast);
-            state.CastTarget[_options.TestSpell] = targetRef;
+            state.CastTarget[Opt().TestSpell] = targetRef;
             state.LastTestCastTick = view.tick_number;
         }
         return TurnFlow::kSkip;
@@ -1033,7 +1033,7 @@ BotPolicy::TurnFlow BotPolicy::TurnRotation(DecideTick& tick, BotTurn& turn)
         std::uint32_t const targetEntry = forever_module::UnitRefEntry(targetUnit->guid);
         for (auto const& bossAt : scenario.RouteBossAt)
             facts.BossFight = facts.BossFight || bossAt.second == targetEntry;
-        facts.BossFight = facts.BossFight || (_options.RaidRules && _options.RaidRules->IsBoss(bot.map_id, targetEntry));
+        facts.BossFight = facts.BossFight || (Opt().RaidRules && Opt().RaidRules->IsBoss(bot.map_id, targetEntry));
     }
     state.PetFought = true;
     // Auto Shot runs until the target changes or the bot moves; casting it again would not help (and may toggle it off).
@@ -1087,12 +1087,12 @@ BotPolicy::TurnFlow BotPolicy::TurnRotation(DecideTick& tick, BotTurn& turn)
         {
             // AoeCcProtect: no area damage while a creature a party member holds (Polymorph, Sap, Banish) is within kAoeCcProtectYards of the target; looked at once per turn, and
             // only when an area row is reached.
-            if (!noAoe && _options.AoeCcProtect && !ccChecked)
+            if (!noAoe && Opt().AoeCcProtect && !ccChecked)
             {
                 ccChecked = true;
                 noAoe = CcHeldNearTarget(tick, turn);
-                if (noAoe && _options.OnEvent && pull_ready::LogDue(state.AoeCcGate, nowMs, 10000))
-                    _options.OnEvent("aoe_cc_protect: bot=" + std::to_string(bot.guid) + " spell=" + std::to_string(row.Spell) + " target=" + std::to_string(forever_module::UnitRefEntry(targetRef)));
+                if (noAoe && Opt().OnEvent && pull_ready::LogDue(state.AoeCcGate, nowMs, 10000))
+                    Opt().OnEvent("aoe_cc_protect: bot=" + std::to_string(bot.guid) + " spell=" + std::to_string(row.Spell) + " target=" + std::to_string(forever_module::UnitRefEntry(targetRef)));
             }
             if (noAoe)
                 continue; // the raid rules' noaoe fight, or a held creature next to the target: no area damage now
@@ -1105,7 +1105,7 @@ BotPolicy::TurnFlow BotPolicy::TurnRotation(DecideTick& tick, BotTurn& turn)
             continue;
         if (cooling.count(row.Spell))
             continue;
-        if (!CanPay(_options.SpellCosts.get(), row.Spell, bot))
+        if (!CanPay(Opt().SpellCosts.get(), row.Spell, bot))
             continue; // not enough mana, rage or energy for it now: the next row, not a refused cast
         if (row.OnTarget && castDistance < row.MinRange)
             continue;
@@ -1119,13 +1119,13 @@ BotPolicy::TurnFlow BotPolicy::TurnRotation(DecideTick& tick, BotTurn& turn)
             continue;
         // Personality (off by default): a reaction delay on a new interrupt window. It is only taken when the cast outlasts it by the kick's minimum, so it never makes the
         // interrupt miss; the same cast keeps its delay (InterruptReactRef). Not in a dungeon or raid unless PersonalityInstances.
-        if (_options.Personality.Enabled && _options.Personality.JitterMaxMs != 0 && rotation::RowHasCondition(row, rotation::Cond::TargetCasting))
+        if (Opt().Personality.Enabled && Opt().Personality.JitterMaxMs != 0 && rotation::RowHasCondition(row, rotation::Cond::TargetCasting))
         {
             if (state.InterruptReactRef != targetRef || nowMs > state.InterruptReactUntilMs + 3000)
             {
                 state.InterruptReactRef = targetRef;
-                std::uint64_t delay = personality::JitterMs(_options.Personality, personality::TraitsFor(_options.RandomSeed, bot.guid), PersonalityInstanced(bot),
-                                                            _options.RandomSeed, bot.guid, targetRef + std::uint64_t(++state.PersonalityCounter) * 0x9E3779B1ull);
+                std::uint64_t delay = personality::JitterMs(Opt().Personality, personality::TraitsFor(Opt().RandomSeed, bot.guid), PersonalityInstanced(bot),
+                                                            Opt().RandomSeed, bot.guid, targetRef + std::uint64_t(++state.PersonalityCounter) * 0x9E3779B1ull);
                 if (targetUnit && targetUnit->cast_remaining_ms != 0 && delay + kInterruptMinRemainingMs >= targetUnit->cast_remaining_ms)
                     delay = 0;
                 state.InterruptReactUntilMs = nowMs + delay;
@@ -1135,10 +1135,10 @@ BotPolicy::TurnFlow BotPolicy::TurnRotation(DecideTick& tick, BotTurn& turn)
         }
         // Only one member of the party stops a cast: when a party member already claimed this target's interrupt, this bot uses its next row.
         if (rotation::RowHasCondition(row, rotation::Cond::TargetCasting) &&
-            (InterruptTaken(targetRef, nowMs) || !party_planner::MayInterrupt(_options.PartyPlanner, tick.PlanOf(partyLeader), bot.guid, targetRef, nowMs)))
+            (InterruptTaken(targetRef, nowMs) || !party_planner::MayInterrupt(Opt().PartyPlanner, tick.PlanOf(partyLeader), bot.guid, targetRef, nowMs)))
             continue;
         // The effect is still up (on the target, or on the bot for a self buff): recasting only refreshes it.
-        if (_options.DotPerTarget)
+        if (Opt().DotPerTarget)
         {
             // Per (spell, target): the effect on this target (0 for a self buff or Slice and Dice) is what counts, not the last one cast.
             auto const known = state.DotUntilMs.find({ row.Spell, row.OnTarget && row.Spell != kSliceAndDice ? targetRef : 0 });
@@ -1148,7 +1148,7 @@ BotPolicy::TurnFlow BotPolicy::TurnRotation(DecideTick& tick, BotTurn& turn)
         auto const dot = state.Dots.find(row.Spell);
         // Slice and Dice is cast at the enemy (its first effect needs one) but the buff sits on the rogue: one running buff covers every target.
         bool const sameTarget = dot != state.Dots.end() && dot->second.Target == (row.OnTarget && row.Spell != kSliceAndDice ? targetRef : 0);
-        if (!_options.DotPerTarget && sameTarget && nowMs < dot->second.UntilMs)
+        if (!Opt().DotPerTarget && sameTarget && nowMs < dot->second.UntilMs)
             continue;
 
         // A spell with a cast time cannot start while the bot moves: stop first (the cast follows on the next tick). The stop is
@@ -1193,13 +1193,13 @@ BotPolicy::TurnFlow BotPolicy::TurnRotation(DecideTick& tick, BotTurn& turn)
 // cooldown; the cooldowns of the spells are read from the snapshot and the retry map, so a taunt that is still cooling is not sent again.
 BotPolicy::TurnFlow BotPolicy::TurnTankPickup(DecideTick& tick, BotTurn& turn)
 {
-    if (!_options.PartyViewPlanner || !_options.TankPickup)
+    if (!Opt().PartyViewPlanner || !Opt().TankPickup)
         return TurnFlow::kNext;
     std::uint64_t const nowMs = tick.nowMs;
     BotSnapshot const& bot = turn.bot;
     BotState& state = turn.state;
     std::uint32_t const classId = turn.classId;
-    bool const tankRole = state.Role_ == BotState::Role::Tank || (state.Role_ == BotState::Role::Auto && classId == kWarriorClass && _options.PartySize != 0);
+    bool const tankRole = state.Role_ == BotState::Role::Tank || (state.Role_ == BotState::Role::Auto && classId == kWarriorClass && Opt().PartySize != 0);
     if (!tankRole || bot.in_combat == 0 || bot.life_state != 0 || nowMs < state.NextCastMs || IsCasting(bot))
         return TurnFlow::kNext;
     std::uint32_t single = 0, area = 0;
@@ -1217,22 +1217,22 @@ BotPolicy::TurnFlow BotPolicy::TurnTankPickup(DecideTick& tick, BotTurn& turn)
     // TankLooseSkipAvoidEnemy (ZG lever, default off): a loose mob of an avoid_enemy entry (the Axe Thrower 11350 throwing at a healer from range) is not the tank's: a taunt
     // turns the tank's fight toward it and the pack follows the tank into the thrower's Axe Flurry (2026-11-13/14: tank_loose reason=healer 129, mostly on 11350). The
     // healers keep out of its circle and the ranged kill it (RaidFocusAvoidEnemy).
-    if (_options.TankLooseSkipAvoidEnemy && _options.RaidRules && _options.RaidRules->HasAvoidEnemy(bot.map_id))
+    if (Opt().TankLooseSkipAvoidEnemy && Opt().RaidRules && Opt().RaidRules->HasAvoidEnemy(bot.map_id))
     {
         std::size_t const before = loose.size();
         std::uint32_t skippedEntry = 0;
         std::erase_if(loose, [&](party_view::LooseMob const& mob)
         {
             std::uint32_t const entry = forever_module::UnitRefEntry(mob.Unit);
-            bool const skip = !_options.RaidRules->AvoidEnemyFor(bot.map_id, entry).empty();
+            bool const skip = !Opt().RaidRules->AvoidEnemyFor(bot.map_id, entry).empty();
             if (skip)
                 skippedEntry = entry;
             return skip;
         });
-        if (loose.size() != before && _options.OnEvent && (state.TankLooseSkipLogMs == 0 || nowMs - state.TankLooseSkipLogMs >= 10000))
+        if (loose.size() != before && Opt().OnEvent && (state.TankLooseSkipLogMs == 0 || nowMs - state.TankLooseSkipLogMs >= 10000))
         {
             state.TankLooseSkipLogMs = nowMs;
-            _options.OnEvent("tank_loose_skip: tank=" + std::to_string(bot.guid) + " target=" + std::to_string(skippedEntry) + " reason=avoid_enemy skipped=" +
+            Opt().OnEvent("tank_loose_skip: tank=" + std::to_string(bot.guid) + " target=" + std::to_string(skippedEntry) + " reason=avoid_enemy skipped=" +
                              std::to_string(before - loose.size()) + " left=" + std::to_string(loose.size()));
         }
     }
@@ -1248,7 +1248,7 @@ BotPolicy::TurnFlow BotPolicy::TurnTankPickup(DecideTick& tick, BotTurn& turn)
         for (forever_module::SpellCooldown const& cooldown : bot.spell_cooldowns)
             if (cooldown.spell_id == spell && cooldown.remaining_ms != 0)
                 return false;
-        return CanPay(_options.SpellCosts.get(), spell, bot);
+        return CanPay(Opt().SpellCosts.get(), spell, bot);
     };
     auto const near = [&](std::uint64_t ref, float yards)
     {
@@ -1261,7 +1261,7 @@ BotPolicy::TurnFlow BotPolicy::TurnTankPickup(DecideTick& tick, BotTurn& turn)
     // taunted the same mob in the same second while the casters died). Mobs on healers come first, then on casters, then the ones that are casting, then the newest; a mob
     // whose elected tank is another one is left to it and the next is tried. The elected tank is the nearest with a ready taunt (a claim keeps it for the cooldown).
     bool electedForTop = true;
-    if (_options.TankLoosePickup && turn.routeOn)
+    if (Opt().TankLoosePickup && turn.routeOn)
     {
         auto const unitOf = [&](std::uint64_t ref) -> NearbyUnit const*
         {
@@ -1285,14 +1285,14 @@ BotPolicy::TurnFlow BotPolicy::TurnTankPickup(DecideTick& tick, BotTurn& turn)
             NearbyUnit const* unit = unitOf(mob.Unit);
             if (unit == nullptr || unit->health == 0 || !unit->is_hostile ||
                 (unit->state_flags & (forever_module::kNearbyTauntImmune | forever_module::kNearbyCcLocked | forever_module::kNearbyEvading)) != 0 ||
-                std::hypot(unit->pos_x - bot.pos_x, unit->pos_y - bot.pos_y) > float(_options.TankLooseRangeYards))
+                std::hypot(unit->pos_x - bot.pos_x, unit->pos_y - bot.pos_y) > float(Opt().TankLooseRangeYards))
                 continue;
             Candidate candidate{ mob, *unit, 3 };
             std::uint32_t victimClass = 0;
             for (BotSnapshot const& other : tick.view.bots)
                 if (PlayerRef(other.guid) == mob.Victim)
                 {
-                    victimClass = ClassFor(_options, other.guid);
+                    victimClass = ClassFor(Opt(), other.guid);
                     break;
                 }
             if (mob.VictimIsHealer)
@@ -1325,10 +1325,10 @@ BotPolicy::TurnFlow BotPolicy::TurnTankPickup(DecideTick& tick, BotTurn& turn)
             {
                 if (PlayerRef(other.guid) != member.guid)
                     continue;
-                std::uint32_t const otherClass = ClassFor(_options, other.guid);
+                std::uint32_t const otherClass = ClassFor(Opt(), other.guid);
                 std::uint32_t const otherSpell = otherClass == kWarriorClass ? kTauntSpell : otherClass == kDruidClass_ ? kGrowlSpell : 0;
                 bool ready = otherSpell != 0 && other.life_state == 0 && other.in_combat != 0 && other.map_id == bot.map_id &&
-                             (other.level == 0 || rotation::LearnLevel(otherSpell) <= other.level) && CanPay(_options.SpellCosts.get(), otherSpell, other);
+                             (other.level == 0 || rotation::LearnLevel(otherSpell) <= other.level) && CanPay(Opt().SpellCosts.get(), otherSpell, other);
                 for (forever_module::SpellCooldown const& cooldown : other.spell_cooldowns)
                     if (cooldown.spell_id == otherSpell && cooldown.remaining_ms != 0)
                         ready = false;
@@ -1373,7 +1373,7 @@ BotPolicy::TurnFlow BotPolicy::TurnTankPickup(DecideTick& tick, BotTurn& turn)
                        " victim=" + std::to_string(candidate.Mob.Victim) + " reason=" + why + " act=" + action + " dist=" + std::to_string(int(dist)) +
                        " loose=" + std::to_string(loose.size());
             };
-            std::uint64_t const holdMs = std::max<std::uint64_t>(_options.TankLooseCooldownMs, 500);
+            std::uint64_t const holdMs = std::max<std::uint64_t>(Opt().TankLooseCooldownMs, 500);
             if (dist <= kOnyxiaTauntYards && !losBlocked)
             {
                 BotAction cast;
@@ -1386,15 +1386,15 @@ BotPolicy::TurnFlow BotPolicy::TurnTankPickup(DecideTick& tick, BotTurn& turn)
                 state.PickupAtMs = nowMs + holdMs;
                 state.NextCastMs = nowMs + kGlobalCooldownMs;
                 _looseClaims[candidate.Mob.Unit] = LooseClaim{ bot.guid, nowMs + holdMs };
-                if (_options.OnEvent)
-                    _options.OnEvent(describe("taunt"));
+                if (Opt().OnEvent)
+                    Opt().OnEvent(describe("taunt"));
                 return TurnFlow::kSkip;
             }
             // Out of reach or out of sight: a short walk toward it, last resort, never off the chase leash.
-            if (_options.TankLooseChaseYards != 0 && dist > 0.5f &&
-                !OffPartyLeash(tick, turn.partyLeader, bot.map_id, unit.pos_x, unit.pos_y, _options.DungeonChaseLeashYards, true, false))
+            if (Opt().TankLooseChaseYards != 0 && dist > 0.5f &&
+                !OffPartyLeash(tick, turn.partyLeader, bot.map_id, unit.pos_x, unit.pos_y, Opt().DungeonChaseLeashYards, true, false))
             {
-                float const step = std::min(float(_options.TankLooseChaseYards), losBlocked ? dist : std::max(dist - (kOnyxiaTauntYards - 5.0f), 2.0f));
+                float const step = std::min(float(Opt().TankLooseChaseYards), losBlocked ? dist : std::max(dist - (kOnyxiaTauntYards - 5.0f), 2.0f));
                 Point const dest{ bot.pos_x + (unit.pos_x - bot.pos_x) / dist * step, bot.pos_y + (unit.pos_y - bot.pos_y) / dist * step, bot.pos_z };
                 BotAction move;
                 move.bot_guid = bot.guid;
@@ -1407,8 +1407,8 @@ BotPolicy::TurnFlow BotPolicy::TurnTankPickup(DecideTick& tick, BotTurn& turn)
                 state.LastMove = state.Last;
                 state.PickupAtMs = nowMs + holdMs;
                 _looseClaims[candidate.Mob.Unit] = LooseClaim{ bot.guid, nowMs + holdMs };
-                if (_options.OnEvent)
-                    _options.OnEvent(describe(losBlocked ? "approach_los" : "approach"));
+                if (Opt().OnEvent)
+                    Opt().OnEvent(describe(losBlocked ? "approach_los" : "approach"));
                 return TurnFlow::kSkip;
             }
         }
@@ -1433,15 +1433,15 @@ BotPolicy::TurnFlow BotPolicy::TurnTankPickup(DecideTick& tick, BotTurn& turn)
             state.CastTarget[area] = 0;
             state.PickupAoeAtMs = nowMs + kPickupAoeRetryMs;
             state.NextCastMs = nowMs + kGlobalCooldownMs;
-            if (_options.OnEvent)
-                _options.OnEvent("tank_pickup: bot=" + std::to_string(bot.guid) + " spell=" + std::to_string(area) + " loose=" + std::to_string(loose.size()));
+            if (Opt().OnEvent)
+                Opt().OnEvent("tank_pickup: bot=" + std::to_string(bot.guid) + " spell=" + std::to_string(area) + " loose=" + std::to_string(loose.size()));
             return TurnFlow::kSkip;
         }
     }
-    if (!(_options.TankLoosePickup && turn.routeOn) && nowMs >= state.PickupAtMs && usable(single))
+    if (!(Opt().TankLoosePickup && turn.routeOn) && nowMs >= state.PickupAtMs && usable(single))
     {
         std::uint64_t const target = party_view::TauntTargetFor(tick.view, *party, PlayerRef(bot.guid));
-        bool const skipTarget = _options.TankLooseSkipAvoidEnemy && _options.RaidRules && !_options.RaidRules->AvoidEnemyFor(bot.map_id, forever_module::UnitRefEntry(target)).empty();
+        bool const skipTarget = Opt().TankLooseSkipAvoidEnemy && Opt().RaidRules && !Opt().RaidRules->AvoidEnemyFor(bot.map_id, forever_module::UnitRefEntry(target)).empty();
         if (target != 0 && !skipTarget && near(target, kOnyxiaTauntYards))
         {
             BotAction cast;
@@ -1453,8 +1453,8 @@ BotPolicy::TurnFlow BotPolicy::TurnTankPickup(DecideTick& tick, BotTurn& turn)
             state.CastTarget[single] = target;
             state.PickupAtMs = nowMs + kPickupRetryMs;
             state.NextCastMs = nowMs + kGlobalCooldownMs;
-            if (_options.OnEvent)
-                _options.OnEvent("tank_pickup: bot=" + std::to_string(bot.guid) + " spell=" + std::to_string(single) + " target=" + std::to_string(target) +
+            if (Opt().OnEvent)
+                Opt().OnEvent("tank_pickup: bot=" + std::to_string(bot.guid) + " spell=" + std::to_string(single) + " target=" + std::to_string(target) +
                                  " loose=" + std::to_string(loose.size()));
             return TurnFlow::kSkip;
         }
@@ -1467,7 +1467,7 @@ BotPolicy::TurnFlow BotPolicy::TurnTankPickup(DecideTick& tick, BotTurn& turn)
 // RaidRulesFile and a plan.
 BotPolicy::TurnFlow BotPolicy::TurnRaidRules(DecideTick& tick, BotTurn& turn)
 {
-    if (!_options.RaidRules)
+    if (!Opt().RaidRules)
         return TurnFlow::kNext;
     std::uint64_t const nowMs = tick.nowMs;
     BotSnapshot const& bot = turn.bot;
@@ -1482,7 +1482,7 @@ BotPolicy::TurnFlow BotPolicy::TurnRaidRules(DecideTick& tick, BotTurn& turn)
     {
         for (NearbyUnit const& unit : turn.nearby)
             if (unit.is_hostile && unit.health != 0 && unit.guid != bot.threat_target_guid &&
-                _options.RaidRules->IsBoss(bot.map_id, forever_module::UnitRefEntry(unit.guid)) &&
+                Opt().RaidRules->IsBoss(bot.map_id, forever_module::UnitRefEntry(unit.guid)) &&
                 std::hypot(unit.pos_x - bot.pos_x, unit.pos_y - bot.pos_y) <= kOnyxiaTauntYards)
             {
                 BotAction taunt;
@@ -1494,8 +1494,8 @@ BotPolicy::TurnFlow BotPolicy::TurnRaidRules(DecideTick& tick, BotTurn& turn)
                 state.CastTarget[kTauntSpell] = unit.guid;
                 state.SwapTauntAtMs = nowMs + kOnyxiaTauntCdMs;
                 state.NextCastMs = nowMs + kGlobalCooldownMs;
-                if (_options.OnEvent)
-                    _options.OnEvent("raid_swap_taunt: bot=" + std::to_string(bot.guid) + " boss=" + std::to_string(forever_module::UnitRefEntry(unit.guid)));
+                if (Opt().OnEvent)
+                    Opt().OnEvent("raid_swap_taunt: bot=" + std::to_string(bot.guid) + " boss=" + std::to_string(forever_module::UnitRefEntry(unit.guid)));
                 return TurnFlow::kSkip;
             }
     }
@@ -1519,8 +1519,8 @@ BotPolicy::TurnFlow BotPolicy::TurnRaidRules(DecideTick& tick, BotTurn& turn)
         state.CastTarget[spell] = dispel.target_guid;
         state.RetryAtMs[spell] = nowMs + kDispelRetryMs;   // the aura is still listed for a tick or two after the cast
         state.NextCastMs = nowMs + kGlobalCooldownMs;
-        if (_options.OnEvent)
-            _options.OnEvent("raid_dispel: bot=" + std::to_string(bot.guid) + " spell=" + std::to_string(spell) + " target=" + std::to_string(member.guid) +
+        if (Opt().OnEvent)
+            Opt().OnEvent("raid_dispel: bot=" + std::to_string(bot.guid) + " spell=" + std::to_string(spell) + " target=" + std::to_string(member.guid) +
                              " aura=" + std::to_string(job->Aura));
         return TurnFlow::kSkip;
     }

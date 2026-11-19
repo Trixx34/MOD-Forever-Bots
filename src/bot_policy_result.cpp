@@ -14,7 +14,7 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
         state.PartialActive = false;
         // Below-map recovery (BelowMapRecover): the core applies a walk only with a full navmesh route from where the bot stands, so the bot was on walkable
         // ground at this height (below_map.h, on_path).
-        below_map::NoteRouted(_options.BelowMap, state.BelowMap, bot.pos_z, nowMs);
+        below_map::NoteRouted(Opt().BelowMap, state.BelowMap, bot.pos_z, nowMs);
     }
     bool const chained = moveNoRoute && NotePartialLeg(state, bot, nowMs);
 
@@ -34,16 +34,16 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
     {
         state.ErrandResult = ErrandOutcome::kFailed;
         state.Errand.reset();
-        if (_options.OnEvent)
-            _options.OnEvent("errand_failed: bot=" + std::to_string(bot.guid) + " reason=no_route");
+        if (Opt().OnEvent)
+            Opt().OnEvent("errand_failed: bot=" + std::to_string(bot.guid) + " reason=no_route");
     }
     // A world event visit failed to find a route: the visit cannot be made.
     if (state.Visit && moveNoRoute && !chained)
     {
         state.VisitResult = ErrandOutcome::kFailed;
         state.Visit.reset();
-        if (_options.OnEvent)
-            _options.OnEvent("world_event_visit_failed: bot=" + std::to_string(bot.guid) + " reason=no_route");
+        if (Opt().OnEvent)
+            Opt().OnEvent("world_event_visit_failed: bot=" + std::to_string(bot.guid) + " reason=no_route");
     }
     // A town errand's train order: applied ends the trip; out of range, busy or moving is retried; any other refusal counts toward a failure.
     if (state.Errand && bot.last_action_type == uint8_t(ActionType::kTrain) && bot.last_action_status != BotActionStatus::kNone)
@@ -52,8 +52,8 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
         {
             state.ErrandResult = ErrandOutcome::kDone;
             state.Errand.reset();
-            if (_options.OnEvent)
-                _options.OnEvent("errand_done: bot=" + std::to_string(bot.guid));
+            if (Opt().OnEvent)
+                Opt().OnEvent("errand_done: bot=" + std::to_string(bot.guid));
         }
         else if (bot.last_action_status == BotActionStatus::kOutOfRange || bot.last_action_status == BotActionStatus::kBusy ||
                  bot.last_action_status == BotActionStatus::kMoving)
@@ -64,8 +64,8 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
         {
             state.ErrandResult = ErrandOutcome::kFailed;
             state.Errand.reset();
-            if (_options.OnEvent)
-                _options.OnEvent("errand_failed: bot=" + std::to_string(bot.guid) + " status=" + std::to_string(int(bot.last_action_status)));
+            if (Opt().OnEvent)
+                Opt().OnEvent("errand_failed: bot=" + std::to_string(bot.guid) + " status=" + std::to_string(int(bot.last_action_status)));
         }
         else
         {
@@ -82,8 +82,8 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
                                   : talk && bot.last_action_status == BotActionStatus::kRefused ? dungeon_events::UseResult::Unclear
                                   : talk && bot.last_action_status == BotActionStatus::kInvalidTarget ? dungeon_events::UseResult::GoneAway
                                                                                           : dungeon_events::UseResult::Failed, nowMs);
-        if (_options.OnEvent && bot.last_action_status != BotActionStatus::kApplied)
-            _options.OnEvent(std::string(bot.last_action_type == uint8_t(ActionType::kGossip) ? "gossip_refused" : "use_object_refused") + ": bot=" + std::to_string(bot.guid) +
+        if (Opt().OnEvent && bot.last_action_status != BotActionStatus::kApplied)
+            Opt().OnEvent(std::string(bot.last_action_type == uint8_t(ActionType::kGossip) ? "gossip_refused" : "use_object_refused") + ": bot=" + std::to_string(bot.guid) +
                              " status=" + ActionStatusName(bot.last_action_status) +
                              (talk ? " spot_distance=" + std::to_string(int(std::hypot(bot.pos_x - state.GossipX, bot.pos_y - state.GossipY))) : std::string()));
         return;
@@ -101,10 +101,10 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
     if (bot.last_action_type == uint8_t(ActionType::kTaxi) && bot.last_action_status != BotActionStatus::kApplied &&
         bot.last_action_status != BotActionStatus::kNone)
     {
-        state.TaxiBlockedUntilMs = nowMs + _options.Taxi.BlockedMs;
+        state.TaxiBlockedUntilMs = nowMs + Opt().Taxi.BlockedMs;
         state.TaxiWaitUntilMs = 0;
-        if (state.TaxiFlight.OrderedMs != 0 && _options.OnEvent)
-            _options.OnEvent(taxi::RefusedLine(bot.guid, bot.map_id, ActionStatusName(bot.last_action_status)));
+        if (state.TaxiFlight.OrderedMs != 0 && Opt().OnEvent)
+            Opt().OnEvent(taxi::RefusedLine(bot.guid, bot.map_id, ActionStatusName(bot.last_action_status)));
         state.TaxiFlight = taxi::Flight{};
         return;
     }
@@ -130,14 +130,14 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
     // (the planner picks the next start). Each result is read once, by its sequence. A refused teleport must not be sent again.
     // Diagnostics: a teleport the core did not apply (DungeonTeleport and the scenario's teleports) is logged with the reason the core gave, once per sequence.
     if (bot.last_action_type == uint8_t(ActionType::kTeleport) && bot.last_action_status != BotActionStatus::kApplied &&
-        bot.last_action_status != BotActionStatus::kNone && bot.last_action_sequence != state.TeleportLoggedSequence && _options.OnEvent)
+        bot.last_action_status != BotActionStatus::kNone && bot.last_action_sequence != state.TeleportLoggedSequence && Opt().OnEvent)
     {
         state.TeleportLoggedSequence = bot.last_action_sequence;
-        _options.OnEvent("teleport_refused: bot=" + std::to_string(bot.guid) + " status=" + ActionStatusName(bot.last_action_status) + " pos=" +
+        Opt().OnEvent("teleport_refused: bot=" + std::to_string(bot.guid) + " status=" + ActionStatusName(bot.last_action_status) + " pos=" +
                          std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) + "," + std::to_string(int(bot.pos_z)) + " in_combat=" + std::to_string(bot.in_combat));
     }
     // Diagnostics: what a refusal for no route was for (the log otherwise says only "no route"), at most once in ten seconds for a bot.
-    if (bot.last_action_status == BotActionStatus::kNoRoute && _options.OnEvent && nowMs - state.NoRouteLoggedMs >= 10000)
+    if (bot.last_action_status == BotActionStatus::kNoRoute && Opt().OnEvent && nowMs - state.NoRouteLoggedMs >= 10000)
     {
         state.NoRouteLoggedMs = nowMs;
         std::string what = "action_type=" + std::to_string(int(bot.last_action_type));
@@ -152,7 +152,7 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
                                                                                   state.LastMove && state.LastMove->Target != 0, toDest));
         if (state.Last)
             what += " last_sent=" + std::to_string(int(state.Last->Type));
-        _options.OnEvent("no_route: bot=" + std::to_string(bot.guid) + " " + what + " pos=" + std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) + "," +
+        Opt().OnEvent("no_route: bot=" + std::to_string(bot.guid) + " " + what + " pos=" + std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) + "," +
                          std::to_string(int(bot.pos_z)) + " in_combat=" + std::to_string(bot.in_combat) + " route_index=" + std::to_string(state.RouteIndex));
     }
     bool const noRoute = moveNoRoute && !chained;
@@ -171,7 +171,7 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
             NoteMoveRefused(state, bot, nowMs);
             // Below-map recovery (BelowMapRecover): short walks refused again and again are a sign of a bot under the ground.
             if (state.LastMove && state.LastMove->Target == 0)
-                below_map::NoteNoRoute(_options.BelowMap, state.BelowMap, std::hypot(bot.pos_x - state.LastMove->Dest.X, bot.pos_y - state.LastMove->Dest.Y), nowMs);
+                below_map::NoteNoRoute(Opt().BelowMap, state.BelowMap, std::hypot(bot.pos_x - state.LastMove->Dest.X, bot.pos_y - state.LastMove->Dest.Y), nowMs);
         }
         state.QuestTeleportSent = false;
         if (teleportRefused && state.Quest.HopPending != 0)
@@ -179,15 +179,15 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
             // The hop of a Skyborne exit quest: the quest is blocked (an hour, six hours, then for good), not retried every tick.
             std::uint32_t const quest = state.Quest.HopPending;
             std::uint32_t const times = QuestsFor(bot).NoteHopRefused(state.Quest, nowMs);
-            if (_options.OnEvent)
-                _options.OnEvent("skyborne_hop_refused: bot=" + std::to_string(bot.guid) + " quest=" + std::to_string(quest) + " level=" + std::to_string(bot.level) +
+            if (Opt().OnEvent)
+                Opt().OnEvent("skyborne_hop_refused: bot=" + std::to_string(bot.guid) + " quest=" + std::to_string(quest) + " level=" + std::to_string(bot.level) +
                                  " map=" + std::to_string(bot.map_id) + " reason=teleport_refused status=" + ActionStatusName(bot.last_action_status) +
                                  " refusals=" + std::to_string(times) + (times >= kHopRefusalsForGood ? " blocked=for_good" : ""));
         }
         else
             QuestsFor(bot).NoteNoRoute(state.Quest, nowMs, &bot);
-        if (teleportRefused && _options.OnEvent)
-            _options.OnEvent("quest_walk_blocked: bot=" + std::to_string(bot.guid) + " reason=teleport_refused status=" +
+        if (teleportRefused && Opt().OnEvent)
+            Opt().OnEvent("quest_walk_blocked: bot=" + std::to_string(bot.guid) + " reason=teleport_refused status=" +
                              ActionStatusName(bot.last_action_status));
     }
 
@@ -213,10 +213,10 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
             }
         // The core does not echo the quest in the snapshot (last_action_spell is 0 for a quest action), so the quest is the one the planner sent last.
         // The planner knows the kind too: a hand-in or reward is its PendingHandIn, anything else is an accept or an abandon.
-        if (_options.OnEvent && state.Quest.LastActionQuest != 0)
+        if (Opt().OnEvent && state.Quest.LastActionQuest != 0)
         {
             std::string const kind = state.Quest.PendingHandIn == state.Quest.LastActionQuest ? "hand_in" : "accept_or_abandon";
-            _options.OnEvent("quest_refused: bot=" + std::to_string(bot.guid) + " quest=" + std::to_string(state.Quest.LastActionQuest) + " kind=" + kind +
+            Opt().OnEvent("quest_refused: bot=" + std::to_string(bot.guid) + " quest=" + std::to_string(state.Quest.LastActionQuest) + " kind=" + kind +
                              " bag_free=" + std::to_string(bot.bag_free_slots) + " bag_room=" + (bot.bag_free_slots > 0 ? "yes" : "no") +
                              " reason=" + std::to_string(reason));
         }
@@ -229,14 +229,14 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
         {
             state.QuestPausedUntilMs = nowMs + kQuestPauseMs;
             state.QuestRefusals = 0;
-            if (_options.OnEvent)
-                _options.OnEvent("quest_paused: bot=" + std::to_string(bot.guid) + " reason=refused_run minutes=" + std::to_string(kQuestPauseMs / 60000));
+            if (Opt().OnEvent)
+                Opt().OnEvent("quest_paused: bot=" + std::to_string(bot.guid) + " reason=refused_run minutes=" + std::to_string(kQuestPauseMs / 60000));
         }
         // SkyborneExitMakeRoom: an accept of an exit quest (or the quest before it) refused for full bags, or with no free slot at all (prod 2026-11-19: 93089
         // refused with bag_free=0 reason=10): a vendor visit first, and the quest is tried again after it.
         std::uint32_t const refusedQuest = state.Quest.LastActionQuest;
         bool const accept = state.Quest.PendingHandIn != refusedQuest && !state.Quest.LastActionAbandon;
-        bool const needsRoom = _options.SkyborneExitMakeRoom && accept && bot.map_id == kSkyborneMap && QuestsFor(bot).ExitChain(refusedQuest) &&
+        bool const needsRoom = Opt().SkyborneExitMakeRoom && accept && bot.map_id == kSkyborneMap && QuestsFor(bot).ExitChain(refusedQuest) &&
                                (reason == std::uint32_t(forever_module::ActionReason::kBagsFull) || bot.bag_free_slots == 0) && nowMs >= state.ExitRoomNextMs;
         if (QuestsFor(bot).NoteRefused(state.Quest, nowMs, reason, bot.level))
         {
@@ -251,8 +251,8 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
             state.ServiceUrgent = true;
             state.NextServiceMs = 0;
             QuestsFor(bot).NoteNeedsRoom(state.Quest, refusedQuest);
-            if (_options.OnEvent)
-                _options.OnEvent("skyborne_make_room: bot=" + std::to_string(bot.guid) + " quest=" + std::to_string(refusedQuest) + " level=" + std::to_string(bot.level) +
+            if (Opt().OnEvent)
+                Opt().OnEvent("skyborne_make_room: bot=" + std::to_string(bot.guid) + " quest=" + std::to_string(refusedQuest) + " level=" + std::to_string(bot.level) +
                                  " reason=refused_" + std::to_string(reason) + " bag_free=" + std::to_string(bot.bag_free_slots));
         }
         return;
@@ -263,9 +263,9 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
     if (bot.last_action_type == uint8_t(ActionType::kTransport) && bot.last_action_status != BotActionStatus::kApplied && bot.last_action_status != BotActionStatus::kNone)
     {
         bool const brief = bot.last_action_status == BotActionStatus::kOutOfRange || bot.last_action_status == BotActionStatus::kBusy;
-        state.TransportNextMs = nowMs + (brief ? _options.TransportRide.EveryMs : _options.TransportRide.BackoffMs);
-        if (_options.OnEvent)
-            _options.OnEvent("transport_refused: bot=" + std::to_string(bot.guid) + " status=" + ActionStatusName(bot.last_action_status) + " map=" + std::to_string(bot.map_id) +
+        state.TransportNextMs = nowMs + (brief ? Opt().TransportRide.EveryMs : Opt().TransportRide.BackoffMs);
+        if (Opt().OnEvent)
+            Opt().OnEvent("transport_refused: bot=" + std::to_string(bot.guid) + " status=" + ActionStatusName(bot.last_action_status) + " map=" + std::to_string(bot.map_id) +
                              " transport=" + std::to_string(bot.transport_guid));
         return;
     }
@@ -312,12 +312,12 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
 
     // Protocol 28 (HealDownrank): an exact heal rank the bot has not learned (the level in the ladder is the trainer's, a bot may be behind): the plain heal (the core casts the
     // highest rank it knows) for ten minutes.
-    if (bot.last_action_type == uint8_t(ActionType::kCastSpell) && bot.last_action_status == BotActionStatus::kNotKnown && (_options.HealDownrank || _options.HealSpellMix) &&
+    if (bot.last_action_type == uint8_t(ActionType::kCastSpell) && bot.last_action_status == BotActionStatus::kNotKnown && (Opt().HealDownrank || Opt().HealSpellMix) &&
         heal_ranks::IsLadderSpell(bot.last_action_spell))
     {
         state.HealDownrankPausedUntilMs = nowMs + kHealDownrankPauseMs;
-        if (_options.OnEvent)
-            _options.OnEvent("heal_downrank_off: bot=" + std::to_string(bot.guid) + " spell=" + std::to_string(bot.last_action_spell) + " reason=not_known");
+        if (Opt().OnEvent)
+            Opt().OnEvent("heal_downrank_off: bot=" + std::to_string(bot.guid) + " spell=" + std::to_string(bot.last_action_spell) + " reason=not_known");
     }
 
     // Protocol 28: the answer to kResurrect spell_id 2 (take the spirit healer). Applied, still walking to it (kMoving) and a reclaim delay that is not over (kBusy, the
@@ -327,7 +327,7 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
     // and fell into the generic branch below as "resurrect_accept ... out of range" (prod 2026-11-17: 99,670 of them in 2 h, no offer ever pending). ResurrectBackoff: a kResurrect
     // answer while no offer is pending is the spirit healer's.
     bool const spiritAnswer = bot.last_action_type == uint8_t(ActionType::kResurrect) &&
-                              (bot.last_action_spell == kSpiritHealerSpell || (_options.ResurrectBackoff && bot.resurrect_from == 0));
+                              (bot.last_action_spell == kSpiritHealerSpell || (Opt().ResurrectBackoff && bot.resurrect_from == 0));
     if (spiritAnswer)
     {
         if (bot.last_action_sequence != state.SpiritHealerSeenSeq)
@@ -339,8 +339,8 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
                 state.SpiritHealerRefusedUntilMs = nowMs + kSpiritHealerRefusedMs;
                 state.SpiritHealerActive = false;
                 state.Last.reset();
-                if (_options.OnEvent)
-                    _options.OnEvent(std::string("death_action_refused: bot=") + std::to_string(bot.guid) + " action=spirit_healer status=" + ActionStatusName(status));
+                if (Opt().OnEvent)
+                    Opt().OnEvent(std::string("death_action_refused: bot=") + std::to_string(bot.guid) + " action=spirit_healer status=" + ActionStatusName(status));
             }
         }
         return;
@@ -362,13 +362,13 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
             else
             {
                 logIt = state.AcceptRefusals == 0; // one line per run of refusals
-                if (_options.ResurrectBackoff)
+                if (Opt().ResurrectBackoff)
                 {
                     std::uint64_t const wait = pull_ready::ResurrectBackoffMs(state.AcceptRefusals);
                     ++state.AcceptRefusals;
                     state.AcceptRetryMs = nowMs + wait;
-                    if (_options.OnEvent)
-                        _options.OnEvent("resurrect_backoff: bot=" + std::to_string(bot.guid) + " refusals=" + std::to_string(state.AcceptRefusals) + " wait_ms=" + std::to_string(wait));
+                    if (Opt().OnEvent)
+                        Opt().OnEvent("resurrect_backoff: bot=" + std::to_string(bot.guid) + " refusals=" + std::to_string(state.AcceptRefusals) + " wait_ms=" + std::to_string(wait));
                 }
                 else if (++state.AcceptRefusals >= kAcceptRefusalsMax)
                 {
@@ -378,8 +378,8 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
                 }
             }
         }
-        if (logIt && _options.OnEvent)
-            _options.OnEvent(std::string("death_action_refused: bot=") + std::to_string(bot.guid) + " action=" + what +
+        if (logIt && Opt().OnEvent)
+            Opt().OnEvent(std::string("death_action_refused: bot=") + std::to_string(bot.guid) + " action=" + what +
                              " status=" + ActionStatusName(bot.last_action_status));
         if (ok && bot.last_action_type == uint8_t(ActionType::kReclaimCorpse))
             state.Reclaimed = true;
@@ -403,8 +403,8 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
         std::size_t const index = std::min<std::size_t>(state.CraftSent, kCraftLineCount - 1);
         auto const waitRefused = [&](std::uint64_t base)
         {
-            state.CraftRetryAtMs[index] = nowMs + bot_random::Vary(base, std::min<std::uint32_t>(_options.RandomPct * 2, 90),
-                                                                   bot_random::Draw(_options.RandomSeed, bot.guid, bot_random::kSaltIdle, 0x400000000ull + nowMs / 1000));
+            state.CraftRetryAtMs[index] = nowMs + bot_random::Vary(base, std::min<std::uint32_t>(Opt().RandomPct * 2, 90),
+                                                                   bot_random::Draw(Opt().RandomSeed, bot.guid, bot_random::kSaltIdle, 0x400000000ull + nowMs / 1000));
         };
         if (bot.last_action_status == BotActionStatus::kApplied)
             state.CraftRetryAtMs[index] = nowMs + kSkillUpNextMs;
@@ -415,18 +415,18 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
             // Where the focus is: the nearest object on this map, if the table is loaded and it is not too far; the walk is begun by the idle logic (CraftWalking).
             std::uint32_t const focus = crafting::FocusOfSkill(kCraftLines[index]);
             std::optional<std::size_t> object;
-            if (_options.Foci && focus != 0)
-                object = crafting::NearestFocus(*_options.Foci, focus, bot.map_id, bot.pos_x, bot.pos_y);
-            if (object && std::hypot(bot.pos_x - (*_options.Foci)[*object].X, bot.pos_y - (*_options.Foci)[*object].Y) <= kCraftWalkMaxYards)
+            if (Opt().Foci && focus != 0)
+                object = crafting::NearestFocus(*Opt().Foci, focus, bot.map_id, bot.pos_x, bot.pos_y);
+            if (object && std::hypot(bot.pos_x - (*Opt().Foci)[*object].X, bot.pos_y - (*Opt().Foci)[*object].Y) <= kCraftWalkMaxYards)
             {
                 state.CraftWalking = true;
                 state.CraftWalkLine = std::uint32_t(index);
                 state.CraftWalkIndex = std::uint32_t(*object);
                 state.CraftWalkStartMs = nowMs;
                 state.CraftRetryAtMs[index] = nowMs + kCraftWalkTimeoutMs; // held while the walk runs; its end sets the time
-                if (_options.OnEvent)
-                    _options.OnEvent("craft_walk: bot=" + std::to_string(bot.guid) + " skill=" + std::to_string(kCraftLines[index]) + " focus=" + std::to_string(focus) +
-                                     " object=" + (*_options.Foci)[*object].Name);
+                if (Opt().OnEvent)
+                    Opt().OnEvent("craft_walk: bot=" + std::to_string(bot.guid) + " skill=" + std::to_string(kCraftLines[index]) + " focus=" + std::to_string(focus) +
+                                     " object=" + (*Opt().Foci)[*object].Name);
             }
             else
                 waitRefused(kCraftWalkFailMs);
@@ -453,7 +453,7 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
             // "nothing to gather within 30 yards" is the normal answer where the bot stands, and the module does not look for nodes: the pause doubles with every
             // answer in a row (90 s up to 48 minutes), and starts again after a gather that worked.
             // GatherWalk: nothing in reach, and the table has a node of this skill on the bot's map that is not too far: the bot walks to it (the idle logic does the walk).
-            if (bot.last_action_status == BotActionStatus::kRefused && _options.GatherWalk && _options.GatherNodes && nowMs >= state.GatherWalkNextMs)
+            if (bot.last_action_status == BotActionStatus::kRefused && Opt().GatherWalk && Opt().GatherNodes && nowMs >= state.GatherWalkNextMs)
             {
                 // Only nodes this bot can harvest (its skill value), in areas that suit its level and faction (optional columns of the node table).
                 gather::NodeFilter filter;
@@ -462,18 +462,18 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
                 else if (bot.profession_skill[1] == kGatherLines[index])
                     filter.SkillValue = bot.profession_value[1];
                 filter.Level = bot.level;
-                filter.Side = _options.SideOf ? _options.SideOf(bot.guid) : std::uint8_t(0);
-                std::optional<std::size_t> const node = gather::NearestNode(*_options.GatherNodes, kGatherLines[index], bot.map_id, bot.pos_x, bot.pos_y, filter);
-                if (node && std::hypot(bot.pos_x - (*_options.GatherNodes)[*node].X, bot.pos_y - (*_options.GatherNodes)[*node].Y) <= kGatherWalkMaxYards)
+                filter.Side = Opt().SideOf ? Opt().SideOf(bot.guid) : std::uint8_t(0);
+                std::optional<std::size_t> const node = gather::NearestNode(*Opt().GatherNodes, kGatherLines[index], bot.map_id, bot.pos_x, bot.pos_y, filter);
+                if (node && std::hypot(bot.pos_x - (*Opt().GatherNodes)[*node].X, bot.pos_y - (*Opt().GatherNodes)[*node].Y) <= kGatherWalkMaxYards)
                 {
                     state.GatherWalking = true;
                     state.GatherWalkLine = std::uint32_t(index);
                     state.GatherWalkIndex = std::uint32_t(*node);
                     state.GatherWalkStartMs = nowMs;
                     state.GatherRetryAtMs[index] = nowMs + kGatherWalkTimeoutMs; // held while the walk runs; its end sets the time
-                    if (_options.OnEvent)
-                        _options.OnEvent("gather_walk: bot=" + std::to_string(bot.guid) + " skill=" + std::to_string(kGatherLines[index]) + " node=" +
-                                         std::to_string((*_options.GatherNodes)[*node].Entry));
+                    if (Opt().OnEvent)
+                        Opt().OnEvent("gather_walk: bot=" + std::to_string(bot.guid) + " skill=" + std::to_string(kGatherLines[index]) + " node=" +
+                                         std::to_string((*Opt().GatherNodes)[*node].Entry));
                     return;
                 }
             }
@@ -487,8 +487,8 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
                 }
                 base <<= std::min<std::uint32_t>(state.GatherFails[index] == 0 ? 0 : state.GatherFails[index] - 1, kGatherFailDoublings);
             }
-            state.GatherRetryAtMs[index] = nowMs + bot_random::Vary(base, std::min<std::uint32_t>(_options.RandomPct * 2, 90),
-                                                                    bot_random::Draw(_options.RandomSeed, bot.guid, bot_random::kSaltIdle, 0x500000000ull + nowMs / 1000));
+            state.GatherRetryAtMs[index] = nowMs + bot_random::Vary(base, std::min<std::uint32_t>(Opt().RandomPct * 2, 90),
+                                                                    bot_random::Draw(Opt().RandomSeed, bot.guid, bot_random::kSaltIdle, 0x500000000ull + nowMs / 1000));
         }
         return;
     }
@@ -516,10 +516,10 @@ void BotPolicy::NoteMoveRefused(BotState& state, BotSnapshot const& bot, std::ui
             state.RefusedPlaces.erase(state.RefusedPlaces.begin());
         state.RefusedPlaces.emplace_back(state.LastMove->Dest, nowMs + kRefusedPlaceMs);
         // A walk to a grind spot the core has no route to: reported to the shared list, which blocks the spot for every bot once enough bots agree.
-        if (state.Wandering && state.GrindSpotIndex != std::size_t(-1) && _options.Grind && state.GrindSpotIndex < _options.Grind->Spots.size() &&
+        if (state.Wandering && state.GrindSpotIndex != std::size_t(-1) && Opt().Grind && state.GrindSpotIndex < Opt().Grind->Spots.size() &&
             std::hypot(state.GrindTarget.X - state.LastMove->Dest.X, state.GrindTarget.Y - state.LastMove->Dest.Y) < 1.0f &&
-            _grindBlocks.Report(state.GrindSpotIndex, bot.guid, nowMs) && _options.OnEvent)
-            _options.OnEvent("grind_spot_blocked: spot=" + std::to_string(state.GrindSpotIndex) + " minutes=" + std::to_string(kGrindBlockMs / 60000));
+            _grindBlocks.Report(state.GrindSpotIndex, bot.guid, nowMs) && Opt().OnEvent)
+            Opt().OnEvent("grind_spot_blocked: spot=" + std::to_string(state.GrindSpotIndex) + " minutes=" + std::to_string(kGrindBlockMs / 60000));
     }
 
 }
@@ -581,8 +581,8 @@ void BotPolicy::PartialChainTick(BotState& state, BotSnapshot const& bot, std::u
     {
         // The leg brought the bot nearer: the same move is sent again from here.
         ++state.PartialLegs;
-        if (_options.OnEvent)
-            _options.OnEvent("walk_chained: bot=" + std::to_string(bot.guid) + " leg=" + std::to_string(state.PartialLegs) + " to_dest=" + std::to_string(int(toDest)) +
+        if (Opt().OnEvent)
+            Opt().OnEvent("walk_chained: bot=" + std::to_string(bot.guid) + " leg=" + std::to_string(state.PartialLegs) + " to_dest=" + std::to_string(int(toDest)) +
                              " gained=" + std::to_string(int(state.PartialLastYards - toDest)) + " pos=" + std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)));
         state.PartialLastYards = toDest;
         state.PartialSettleMs = nowMs + kPartialSettleMs;
@@ -592,8 +592,8 @@ void BotPolicy::PartialChainTick(BotState& state, BotSnapshot const& bot, std::u
     }
     // The leg went nowhere: the route is really missing. The walk is refused now, as it would have been at the first answer.
     state.PartialActive = false;
-    if (_options.OnEvent)
-        _options.OnEvent("walk_chain_ended: bot=" + std::to_string(bot.guid) + " legs=" + std::to_string(state.PartialLegs) + " to_dest=" + std::to_string(int(toDest)));
+    if (Opt().OnEvent)
+        Opt().OnEvent("walk_chain_ended: bot=" + std::to_string(bot.guid) + " legs=" + std::to_string(state.PartialLegs) + " to_dest=" + std::to_string(int(toDest)));
     ++state.RouteNoRoute;
     NoteMoveRefused(state, bot, nowMs);
     state.QuestTeleportSent = false;
@@ -606,17 +606,17 @@ void BotPolicy::ReadCastResult(BotState& state, BotSnapshot const& bot, std::uin
         return;
 
     std::uint32_t const spell = bot.last_action_spell;
-    if (ScenarioOf(bot.guid).RouteMap == 36 && _options.OnEvent)
+    if (ScenarioOf(bot.guid).RouteMap == 36 && Opt().OnEvent)
     {
         auto const cast = state.CastTarget.find(spell);
         std::uint64_t const target = cast == state.CastTarget.end() ? 0 : cast->second;
         // The level and what the highest rank of this spell at that level costs (the file's flat cost, -1 when unpriced): a cast whose real power drop
         // is the rank 1 cost at level 23 shows the bot never learned the higher ranks.
         std::int64_t wantCost = -1;
-        if (_options.SpellCosts)
-            if (auto const pay = _options.SpellCosts->CostAtLevel(spell, bot.level))
+        if (Opt().SpellCosts)
+            if (auto const pay = Opt().SpellCosts->CostAtLevel(spell, bot.level))
                 wantCost = pay->Cost;
-        _options.OnEvent("cast_result: time_ms=" + std::to_string(nowMs) + " bot=" + std::to_string(bot.guid) + " spell=" + std::to_string(spell) +
+        Opt().OnEvent("cast_result: time_ms=" + std::to_string(nowMs) + " bot=" + std::to_string(bot.guid) + " spell=" + std::to_string(spell) +
                          " level=" + std::to_string(bot.level) + " want_cost=" + std::to_string(wantCost) +
                          " target=" + std::to_string(target) + " status=" + ActionStatusName(bot.last_action_status) +
                          " hp=" + std::to_string(bot.health) + "/" + std::to_string(bot.max_health) +
@@ -635,8 +635,8 @@ void BotPolicy::ReadCastResult(BotState& state, BotSnapshot const& bot, std::uin
         else
         {
             state.RezRetryAtMs[target] = nowMs + kRezRetryMs;
-            if (++state.RezRefusals[target] == kRezRefusalsLogged && _options.OnEvent)
-                _options.OnEvent("rez_refused: rezzer=" + std::to_string(bot.guid) + " spell=" + std::to_string(spell) + " target=" +
+            if (++state.RezRefusals[target] == kRezRefusalsLogged && Opt().OnEvent)
+                Opt().OnEvent("rez_refused: rezzer=" + std::to_string(bot.guid) + " spell=" + std::to_string(spell) + " target=" +
                                  std::to_string(target) + " status=" + ActionStatusName(bot.last_action_status));
         }
         return;
@@ -669,12 +669,12 @@ void BotPolicy::ReadCastResult(BotState& state, BotSnapshot const& bot, std::uin
                 {
                     state.PetDead = false; // maybe it was alive after all, or there is no pet: Call Pet is tried again after the backoff
                     state.PetMissing = true;
-                    if (state.TamePetFirst && _options.TameDeadPetBackoffMs != 0)
+                    if (state.TamePetFirst && Opt().TameDeadPetBackoffMs != 0)
                     {
                         // Tame Beast refused (a stored pet fills the slot), Call Pet refused (it is dead) and now Revive Pet refused: stop the loop.
-                        state.TameRetryAtMs = std::max(state.TameRetryAtMs, nowMs + _options.TameDeadPetBackoffMs);
-                        if (_options.OnEvent)
-                            _options.OnEvent("tame_failed: bot=" + std::to_string(bot.guid) + " target=" + std::to_string(state.TameTarget) + " why=pet_dead_no_revive");
+                        state.TameRetryAtMs = std::max(state.TameRetryAtMs, nowMs + Opt().TameDeadPetBackoffMs);
+                        if (Opt().OnEvent)
+                            Opt().OnEvent("tame_failed: bot=" + std::to_string(bot.guid) + " target=" + std::to_string(state.TameTarget) + " why=pet_dead_no_revive");
                     }
                     state.TamePetFirst = false; // neither Call Pet nor Revive Pet finds a stored pet: the refusal of Tame Beast had another cause
                     ++state.PetFailures;
@@ -691,12 +691,12 @@ void BotPolicy::ReadCastResult(BotState& state, BotSnapshot const& bot, std::uin
                 break;
             case BotActionStatus::kNotKnown:
             case BotActionStatus::kUnknownSpell:
-                if (spell == kRevivePet && state.TamePetFirst && state.PetDead && _options.TameDeadPetBackoffMs != 0)
+                if (spell == kRevivePet && state.TamePetFirst && state.PetDead && Opt().TameDeadPetBackoffMs != 0)
                 {
                     // Revive Pet is not learned (about half the prod hunters never get it) and the pet is dead: Tame Beast will keep being refused.
-                    state.TameRetryAtMs = std::max(state.TameRetryAtMs, nowMs + _options.TameDeadPetBackoffMs);
-                    if (_options.OnEvent)
-                        _options.OnEvent("tame_failed: bot=" + std::to_string(bot.guid) + " target=" + std::to_string(state.TameTarget) + " why=pet_dead_no_revive");
+                    state.TameRetryAtMs = std::max(state.TameRetryAtMs, nowMs + Opt().TameDeadPetBackoffMs);
+                    if (Opt().OnEvent)
+                        Opt().OnEvent("tame_failed: bot=" + std::to_string(bot.guid) + " target=" + std::to_string(state.TameTarget) + " why=pet_dead_no_revive");
                 }
                 state.TamePetFirst = false; // the spell is not learned: nothing to call or revive
                 break;
@@ -725,7 +725,7 @@ void BotPolicy::ReadCastResult(BotState& state, BotSnapshot const& bot, std::uin
         // still at the Warder stand-off): it is allowed to move for a few seconds to find the member again (TurnMoveSetup's
         // healLosPoint, TurnMoveChoice's "heal_los" branch).
         bool const healOnAlly = cast != state.CastTarget.end() && cast->second != 0 && forever_module::UnitRefType(cast->second) == kPlayerType &&
-                                state.Role_ != BotState::Role::Dps && HealSpellFor(ClassFor(_options, bot.guid), bot.level) != 0;
+                                state.Role_ != BotState::Role::Dps && HealSpellFor(ClassFor(Opt(), bot.guid), bot.level) != 0;
         if (healOnAlly)
         {
             state.HealLosTarget = cast->second;
@@ -738,12 +738,12 @@ void BotPolicy::ReadCastResult(BotState& state, BotSnapshot const& bot, std::uin
             // instead of toward the member it could not see (2026-11-10 report, "a healer's recovery walks toward the enemy").
             state.CloserUntilMs = nowMs + kCloserAfterLosMs;
         if (cast != state.CastTarget.end() && cast->second != 0 &&
-            ClassFor(_options, bot.guid) == 5 && (spell == 585 || spell == 589 || spell == 8092))
+            ClassFor(Opt(), bot.guid) == 5 && (spell == 585 || spell == 589 || spell == 8092))
         {
             state.LosRepositionTarget = cast->second;
             state.Last.reset();
-            if (_options.OnEvent)
-                _options.OnEvent("healer_dps_los_refused: healer=" + std::to_string(bot.guid) + " spell=" +
+            if (Opt().OnEvent)
+                Opt().OnEvent("healer_dps_los_refused: healer=" + std::to_string(bot.guid) + " spell=" +
                                  std::to_string(spell) + " target=" + std::to_string(cast->second));
         }
         if (++state.LosRefusals >= kLosRefusalsAvoid && cast != state.CastTarget.end() && cast->second != 0)
@@ -763,12 +763,12 @@ void BotPolicy::ReadCastResult(BotState& state, BotSnapshot const& bot, std::uin
         auto const cast = state.CastTarget.find(spell);
         if (cast != state.CastTarget.end())
         {
-            std::uint64_t const duration = DurationMsOf(ClassFor(_options, bot.guid), spell, SpecFor(bot.guid, ClassFor(_options, bot.guid)));
+            std::uint64_t const duration = DurationMsOf(ClassFor(Opt(), bot.guid), spell, SpecFor(bot.guid, ClassFor(Opt(), bot.guid)));
             if (duration != 0)
             {
                 state.Dots[spell] = Dot{ spell == kSliceAndDice ? 0 : cast->second, nowMs + duration }; // Slice and Dice: the buff is on the rogue, whoever it was cast at
                 state.BuffUntilMs[{ spell, cast->second }] = nowMs + duration;
-                if (_options.DotPerTarget)
+                if (Opt().DotPerTarget)
                 {
                     if (state.DotUntilMs.size() >= kDotMemory)
                         for (auto it = state.DotUntilMs.begin(); it != state.DotUntilMs.end();)
@@ -794,7 +794,7 @@ void BotPolicy::ReadCastResult(BotState& state, BotSnapshot const& bot, std::uin
     bool const castFailed = bot.last_action_status != BotActionStatus::kApplied && bot.last_action_status != BotActionStatus::kNone &&
                             bot.last_action_status != BotActionStatus::kNotOnline;
     if (castFailed)
-        for (rotation::Row const& row : RowsFor(ClassFor(_options, bot.guid), SpecFor(bot.guid, ClassFor(_options, bot.guid))))
+        for (rotation::Row const& row : RowsFor(ClassFor(Opt(), bot.guid), SpecFor(bot.guid, ClassFor(Opt(), bot.guid))))
             buff = buff || (row.Buff && row.Spell == spell);
     if (buff)
     {
@@ -887,7 +887,7 @@ void BotPolicy::ReadCastResult(BotState& state, BotSnapshot const& bot, std::uin
     }
     // A row with `retry <sec>` (Revenge, Overpower: usable only after a proc) waits that long after a refusal instead of asking again every GCD.
     if (bot.last_action_status == BotActionStatus::kRefused || bot.last_action_status == BotActionStatus::kInvalidTarget)
-        for (rotation::Row const& row : RowsFor(ClassFor(_options, bot.guid), SpecFor(bot.guid, ClassFor(_options, bot.guid))))
+        for (rotation::Row const& row : RowsFor(ClassFor(Opt(), bot.guid), SpecFor(bot.guid, ClassFor(Opt(), bot.guid))))
             if (!row.Buff && row.Spell == spell && row.RetrySec != 0)
             {
                 std::uint64_t& at = state.RetryAtMs[spell];

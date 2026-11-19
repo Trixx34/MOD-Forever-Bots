@@ -13,14 +13,14 @@ constexpr std::uint64_t kGuildPollMs = 60000;          // a bot with no guild as
 
 void BotPolicy::TurnSocial(DecideTick& tick, BotTurn& turn)
 {
-    if (!_options.Duels.Enabled && !_options.Battlegrounds.Enabled && !_options.GuildJoin.Enabled && !_options.MailGifts.Enabled)
+    if (!Opt().Duels.Enabled && !Opt().Battlegrounds.Enabled && !Opt().GuildJoin.Enabled && !Opt().MailGifts.Enabled)
         return;
     BotSnapshot const& bot = turn.bot;
     BotState& state = turn.state;
     std::uint64_t const nowMs = tick.nowMs;
 
     // A battleground the bot stood in and has left is over: the next queue waits out the cooldown.
-    if (_options.Battlegrounds.Enabled)
+    if (Opt().Battlegrounds.Enabled)
     {
         bool const inside = social::IsBattlegroundMap(bot.map_id);
         if (inside)
@@ -28,7 +28,7 @@ void BotPolicy::TurnSocial(DecideTick& tick, BotTurn& turn)
         else if (state.BgWasInside)
         {
             state.BgWasInside = false;
-            battlegrounds::NoteLeft(state.BgState, _options.Battlegrounds, nowMs);
+            battlegrounds::NoteLeft(state.BgState, Opt().Battlegrounds, nowMs);
         }
     }
 
@@ -48,7 +48,7 @@ void BotPolicy::TurnSocial(DecideTick& tick, BotTurn& turn)
 
     // Guild: an invitation is not in the snapshot, so a bot without a guild asks the core to accept a pending one once a minute (the core refuses with
     // "no pending guild invitation" when there is none, which is not logged). A leave was asked for by a player (NoteGuildLeaveRequest).
-    if (_options.GuildJoin.Enabled)
+    if (Opt().GuildJoin.Enabled)
     {
         guild::Context ctx;
         ctx.Idle = idle;
@@ -56,10 +56,10 @@ void BotPolicy::TurnSocial(DecideTick& tick, BotTurn& turn)
         ctx.HasGuild = state.GuildHas;
         ctx.LeaveRequested = state.GuildLeaveRequested;
         ctx.InvitePending = !state.GuildHas && nowMs >= state.GuildPollAtMs;
-        guild::Action const action = guild::Decide(_options.GuildJoin, ctx);
+        guild::Action const action = guild::Decide(Opt().GuildJoin, ctx);
         if (action == guild::Action::Join)
         {
-            state.GuildPollAtMs = nowMs + (_options.Personality.Enabled ? personality::GuildPollMs(_options.Personality, personality::TraitsFor(_options.RandomSeed, bot.guid), kGuildPollMs)
+            state.GuildPollAtMs = nowMs + (Opt().Personality.Enabled ? personality::GuildPollMs(Opt().Personality, personality::TraitsFor(Opt().RandomSeed, bot.guid), kGuildPollMs)
                                                                          : kGuildPollMs);   // personality: sociable bots look sooner
             social::Order order;
             order.What = social::Kind::Guild;
@@ -79,7 +79,7 @@ void BotPolicy::TurnSocial(DecideTick& tick, BotTurn& turn)
     }
 
     // Duels: a challenge to the bot is accepted (NoteDuelChallenge); otherwise an idle bot challenges the nearest player that is not one of ours.
-    if (_options.Duels.Enabled)
+    if (Opt().Duels.Enabled)
     {
         duels::Context ctx;
         ctx.Idle = idle;
@@ -101,7 +101,7 @@ void BotPolicy::TurnSocial(DecideTick& tick, BotTurn& turn)
             }
         }
         ctx.RivalNearby = rival != 0;
-        duels::Action const action = duels::Decide(_options.Duels, state.DuelState, ctx, nowMs);
+        duels::Action const action = duels::Decide(Opt().Duels, state.DuelState, ctx, nowMs);
         if (action == duels::Action::Accept)
         {
             social::Order order;
@@ -109,7 +109,7 @@ void BotPolicy::TurnSocial(DecideTick& tick, BotTurn& turn)
             order.Op = 1;   // kAccept
             order.Player = state.DuelChallenger;
             state.DuelChallenger = 0;
-            duels::NoteStarted(state.DuelState, _options.Duels, nowMs);
+            duels::NoteStarted(state.DuelState, Opt().Duels, nowMs);
             queue(order);
             return;
         }
@@ -119,14 +119,14 @@ void BotPolicy::TurnSocial(DecideTick& tick, BotTurn& turn)
             order.What = social::Kind::Duel;
             order.Op = 0;   // kChallenge
             order.Player = rival;
-            duels::NoteStarted(state.DuelState, _options.Duels, nowMs);
+            duels::NoteStarted(state.DuelState, Opt().Duels, nowMs);
             queue(order);
             return;
         }
     }
 
     // Battlegrounds: an idle bot queues for one its level allows; a queue that has not popped in time is left.
-    if (_options.Battlegrounds.Enabled)
+    if (Opt().Battlegrounds.Enabled)
     {
         battlegrounds::Context ctx;
         ctx.Idle = idle;
@@ -134,14 +134,14 @@ void BotPolicy::TurnSocial(DecideTick& tick, BotTurn& turn)
         ctx.Level = bot.level;
         ctx.InBattleground = social::IsBattlegroundMap(bot.map_id);
         ctx.InGroup = bot.group_role != 0;
-        battlegrounds::Action const action = battlegrounds::Decide(_options.Battlegrounds, state.BgState, ctx, nowMs);
+        battlegrounds::Action const action = battlegrounds::Decide(Opt().Battlegrounds, state.BgState, ctx, nowMs);
         if (action == battlegrounds::Action::Queue)
         {
             std::uint32_t const id = social::PickBattleground(bot.level, bot.guid + nowMs / 3600000);
             if (id != 0)
             {
                 state.BgId = id;
-                battlegrounds::NoteQueueSent(state.BgState, _options.Battlegrounds, nowMs);
+                battlegrounds::NoteQueueSent(state.BgState, Opt().Battlegrounds, nowMs);
                 social::Order order;
                 order.What = social::Kind::Battleground;
                 order.Op = 0;   // kQueue
@@ -156,21 +156,21 @@ void BotPolicy::TurnSocial(DecideTick& tick, BotTurn& turn)
             order.What = social::Kind::Battleground;
             order.Op = 1;   // kLeaveQueue
             order.Id = state.BgId;
-            battlegrounds::NoteLeft(state.BgState, _options.Battlegrounds, nowMs);
+            battlegrounds::NoteLeft(state.BgState, Opt().Battlegrounds, nowMs);
             queue(order);
             return;
         }
     }
 
     // Gifts: one small stack to a player the bot was told to thank. The bags are listed and the stack chosen when the order is sent.
-    if (_options.MailGifts.Enabled)
+    if (Opt().MailGifts.Enabled)
     {
         gifts::Context ctx;
         ctx.Idle = idle;
         ctx.InCombat = fighting;
         ctx.GiftableItems = 1;   // unknown here: the sender lists the bags, and a refund follows an outcome with no gift
         ctx.RecipientKnown = state.GiftRecipient != 0;
-        if (gifts::Decide(_options.MailGifts, state.GiftState, ctx, nowMs) == gifts::Action::Send)
+        if (gifts::Decide(Opt().MailGifts, state.GiftState, ctx, nowMs) == gifts::Action::Send)
         {
             social::Order order;
             order.What = social::Kind::Gift;
@@ -221,18 +221,18 @@ void BotPolicy::NoteSocialOutcome(social::Outcome const& outcome, std::uint64_t 
             default:
                 break;
         }
-        if (_options.OnEvent)
-            _options.OnEvent(std::string("social_done: kind=") + social::GapEventName(outcome.What) + " bot=" + std::to_string(outcome.Bot) + " op=" + std::to_string(outcome.Op));
+        if (Opt().OnEvent)
+            Opt().OnEvent(std::string("social_done: kind=") + social::GapEventName(outcome.What) + " bot=" + std::to_string(outcome.Bot) + " op=" + std::to_string(outcome.Op));
         return;
     }
 
     // A refusal. A queue the core refused (level, faction, deserter) waits out the cooldown; a gift that was not sent gives its daily slot back.
     if (outcome.What == social::Kind::Battleground && outcome.Op == 0)
-        battlegrounds::NoteLeft(state.BgState, _options.Battlegrounds, nowMs);
+        battlegrounds::NoteLeft(state.BgState, Opt().Battlegrounds, nowMs);
     if (outcome.What == social::Kind::Gift && state.GiftState.SentToday > 0)
         --state.GiftState.SentToday;
     // A refused guild create: the master waits (and the creates behind it get the slots) without waiting for the pending entry to expire.
-    if (outcome.What == social::Kind::Guild && outcome.Op == 3 && _options.Guilds.Enabled)
+    if (outcome.What == social::Kind::Guild && outcome.Op == 3 && Opt().Guilds.Enabled)
     {
         auto const pending = _pendingGuilds.find(outcome.Bot);
         if (pending != _pendingGuilds.end())
@@ -273,9 +273,9 @@ void BotPolicy::NoteSocialOutcome(social::Outcome const& outcome, std::uint64_t 
     // The guild poll is expected to be refused nearly always ("no pending guild invitation"): not worth a line.
     if (outcome.What == social::Kind::Guild && outcome.Op == 0 && !social::IsUnknownActionReason(outcome.Reason))
         return;
-    if (!_options.OnEvent)
+    if (!Opt().OnEvent)
         return;
     std::string const line = std::string(social::IsUnknownActionReason(outcome.Reason) ? social::GapEventName(outcome.What) : "social_refused") +
                              ": bot=" + std::to_string(outcome.Bot) + " op=" + std::to_string(outcome.Op) + " reason=" + outcome.Reason;
-    _options.OnEvent(line);
+    Opt().OnEvent(line);
 }

@@ -12,7 +12,7 @@ std::string Hex(std::uint64_t v)
 
 heal_plan::Plan const* BotPolicy::HealPlanOf(std::uint64_t leaderGuid) const
 {
-    if (!_options.HealPlan.Enabled || !_options.PartyPlanner.Enabled)
+    if (!Opt().HealPlan.Enabled || !Opt().PartyPlanner.Enabled)
         return nullptr;
     auto const at = _healPlans.find(leaderGuid);
     return at == _healPlans.end() || at->second.Healers.empty() ? nullptr : &at->second;
@@ -24,15 +24,15 @@ std::uint32_t BotPolicy::HealPlanTankThreshold(heal_plan::Plan const* plan, std:
         return base;
     auto const leader = _bots.find(tank);
     std::uint64_t const started = leader != _bots.end() && leader->second.InFight ? leader->second.FightStartMs : 0;
-    return heal_plan::TankThreshold(_options.HealPlan, plan, healer, tank, base, nowMs, started);
+    return heal_plan::TankThreshold(Opt().HealPlan, plan, healer, tank, base, nowMs, started);
 }
 
 void BotPolicy::UpdateHealPlan(std::uint64_t leaderGuid, std::vector<party_planner::Member> const& members)
 {
-    if (!_options.HealPlan.Enabled)
+    if (!Opt().HealPlan.Enabled)
         return;
-    if (heal_plan::Update(_options.HealPlan, members, _healPlans[leaderGuid]) && _options.OnEvent)
-        _options.OnEvent("heal_plan: leader=" + Hex(leaderGuid) + " " + heal_plan::Describe(_healPlans[leaderGuid]));
+    if (heal_plan::Update(Opt().HealPlan, members, _healPlans[leaderGuid]) && Opt().OnEvent)
+        Opt().OnEvent("heal_plan: leader=" + Hex(leaderGuid) + " " + heal_plan::Describe(_healPlans[leaderGuid]));
 }
 
 void BotPolicy::PruneHealPlans(std::unordered_map<std::uint64_t, std::vector<std::uint64_t>> const& membersOf)

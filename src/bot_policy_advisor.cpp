@@ -28,8 +28,8 @@ std::uint32_t RoleFlagOf(level_dungeon::Role role)
 
 void BotPolicy::OnLfgQueue(forever_module::WorldTickSnapshotView const& view, lfg_queue_fill::Queue const& queue, std::uint64_t nowMs)
 {
-    std::uint32_t const role = lfg_queue_fill::RoleToFill(_options.LfgQueueFill, queue);
-    if (role == 0 || !_lfgQueueLimiter.Ready(queue.MapId, nowMs, _options.LfgQueueFill.CooldownSec))
+    std::uint32_t const role = lfg_queue_fill::RoleToFill(Opt().LfgQueueFill, queue);
+    if (role == 0 || !_lfgQueueLimiter.Ready(queue.MapId, nowMs, Opt().LfgQueueFill.CooldownSec))
         return;
     for (std::size_t i = 0; i < view.bots.size(); ++i)
     {
@@ -37,7 +37,7 @@ void BotPolicy::OnLfgQueue(forever_module::WorldTickSnapshotView const& view, lf
         // Idle: alive, out of combat, no target, no group, not flying, and no hostile in view.
         if (bot.life_state != 0 || bot.in_combat != 0 || bot.threat_target_guid != 0 || bot.group_role != 0 || bot.in_flight != 0 || bot.group_invite_from != 0)
             continue;
-        if (_options.IsAlt && _options.IsAlt(bot.guid))
+        if (Opt().IsAlt && Opt().IsAlt(bot.guid))
             continue;
         auto const state = _bots.find(bot.guid);
         if (state != _bots.end())
@@ -49,7 +49,7 @@ void BotPolicy::OnLfgQueue(forever_module::WorldTickSnapshotView const& view, lf
         bool hostile = false;
         for (forever_module::NearbyUnit const& unit : view.NearbyOf(i))
             hostile = hostile || unit.is_hostile;
-        if (hostile || RoleFlagOf(RoleOfBotGuid(_options, bot.guid)) != role)
+        if (hostile || RoleFlagOf(RoleOfBotGuid(Opt(), bot.guid)) != role)
             continue;
         advisor::Order order;
         order.What = advisor::Kind::LfgJoin;
@@ -58,8 +58,8 @@ void BotPolicy::OnLfgQueue(forever_module::WorldTickSnapshotView const& view, lf
         order.Map = queue.MapId;
         _advisorOrders.push_back(order);
         _lfgQueueLimiter.Note(queue.MapId, nowMs);
-        if (_options.OnEvent)
-            _options.OnEvent("lfg_queue_fill: bot=" + std::to_string(bot.guid) + " role=" + std::to_string(role) + " map=" + std::to_string(queue.MapId) +
+        if (Opt().OnEvent)
+            Opt().OnEvent("lfg_queue_fill: bot=" + std::to_string(bot.guid) + " role=" + std::to_string(role) + " map=" + std::to_string(queue.MapId) +
                              " waited_s=" + std::to_string(queue.QueuedSec));
         return;
     }
@@ -72,23 +72,23 @@ void BotPolicy::TurnAdvisor(DecideTick& tick, BotTurn& turn)
     std::uint64_t const nowMs = tick.nowMs;
     // Out of combat, no target, nothing hostile in view, alive and on the ground: the only bots the advisor features speak or emote for.
     bool const quiet = bot.in_combat == 0 && bot.life_state == 0 && bot.in_flight == 0 && !turn.hasTarget && !turn.enemyNear && bot.threat_target_guid == 0;
-    bool const inDungeonParty = bot.group_role != 0 && bot.group_size <= 5 && _options.DungeonsByMap.count(bot.map_id) != 0;
+    bool const inDungeonParty = bot.group_role != 0 && bot.group_size <= 5 && Opt().DungeonsByMap.count(bot.map_id) != 0;
     group_etiquette::Line etiquetteLine = group_etiquette::Line::Greet;
     std::uint64_t const partyKey = bot.group_role == 2 ? bot.guid : (bot.group_leader_guid & forever_module::kUnitRefCounterMask);
-    if (_options.GroupEtiquette.Enabled && inDungeonParty && bot.life_state != 0)
+    if (Opt().GroupEtiquette.Enabled && inDungeonParty && bot.life_state != 0)
     {
         group_etiquette::ChatFacts dead;
         dead.InDungeonParty = true;
         dead.Alive = false;
         dead.GroupSize = bot.group_size;
-        _etiquetteChat.Note(_options.GroupEtiquette, dead, _options.RandomSeed, bot.guid, partyKey, nowMs, etiquetteLine);   // only notes the death
+        _etiquetteChat.Note(Opt().GroupEtiquette, dead, Opt().RandomSeed, bot.guid, partyKey, nowMs, etiquetteLine);   // only notes the death
     }
     if (!quiet)
         return;
-    std::uint64_t const seed = _options.RandomSeed;
+    std::uint64_t const seed = Opt().RandomSeed;
 
     // Group etiquette (GroupEtiquette): a greeting on joining a dungeon party, "ready?" from the leader after a wait, thanks after being got up again.
-    if (_options.GroupEtiquette.Enabled && inDungeonParty && _options.Pools && !_options.Pools->GroupEtiquette.empty())
+    if (Opt().GroupEtiquette.Enabled && inDungeonParty && Opt().Pools && !Opt().Pools->GroupEtiquette.empty())
     {
         group_etiquette::ChatFacts facts;
         facts.InDungeonParty = true;
@@ -99,9 +99,9 @@ void BotPolicy::TurnAdvisor(DecideTick& tick, BotTurn& turn)
             if (member.guid != bot.guid && member.life_state == 0 && member.map_id == bot.map_id && Distance2d(bot, member) <= 40.0f)
                 facts.GroupMateNear = true;
         });
-        if (_etiquetteChat.Note(_options.GroupEtiquette, facts, seed, bot.guid, partyKey, nowMs, etiquetteLine))
+        if (_etiquetteChat.Note(Opt().GroupEtiquette, facts, seed, bot.guid, partyKey, nowMs, etiquetteLine))
         {
-            std::vector<std::string> const lines = group_etiquette::LinesOf(_options.Pools->GroupEtiquette, etiquetteLine);
+            std::vector<std::string> const lines = group_etiquette::LinesOf(Opt().Pools->GroupEtiquette, etiquetteLine);
             if (!lines.empty())
             {
                 advisor::Order order;
@@ -114,9 +114,9 @@ void BotPolicy::TurnAdvisor(DecideTick& tick, BotTurn& turn)
     }
 
     // Party mana sync (PartyMana): a low healer or caster of a dungeon party says so once; the party's walk holds for it (RouteReadiness asks the tracker).
-    if (_options.PartyMana.Enabled && bot.group_role != 0 && _options.DungeonsByMap.count(bot.map_id) != 0)
+    if (Opt().PartyMana.Enabled && bot.group_role != 0 && Opt().DungeonsByMap.count(bot.map_id) != 0)
     {
-        std::uint32_t const classId = ClassFor(_options, bot.guid);
+        std::uint32_t const classId = ClassFor(Opt(), bot.guid);
         bool const caster = classId == 5 || classId == 7 || classId == 8 || classId == 9 || classId == 11 || HealSpellFor(classId, 99) != 0;
         party_mana::Facts facts;
         facts.InDungeonParty = true;
@@ -125,22 +125,22 @@ void BotPolicy::TurnAdvisor(DecideTick& tick, BotTurn& turn)
         facts.Power = bot.power;
         facts.MaxPower = bot.max_power;
         std::uint64_t const leader = bot.group_role == 2 ? bot.guid : (bot.group_leader_guid & forever_module::kUnitRefCounterMask);
-        if (_partyMana[leader].Note(_options.PartyMana, facts, bot.guid, nowMs) && _options.Pools && !_options.Pools->PartyMana.empty())
+        if (_partyMana[leader].Note(Opt().PartyMana, facts, bot.guid, nowMs) && Opt().Pools && !Opt().Pools->PartyMana.empty())
         {
             advisor::Order order;
             order.What = advisor::Kind::PartySay;
             order.Bot = bot.guid;
-            std::vector<std::string> const& lines = _options.Pools->PartyMana;
+            std::vector<std::string> const& lines = Opt().Pools->PartyMana;
             order.Text = lines[bot_random::Below(bot_random::Draw(seed, bot.guid, 0xF1, nowMs / 1000), std::uint32_t(lines.size()))];
             _advisorOrders.push_back(std::move(order));
         }
     }
 
     // Meeting greeting (MeetGreet): a bot on its own passes a player or another bot in the field and waves, or says a short hello.
-    if (_options.MeetGreet.Enabled && _options.Pools && !_options.Pools->MeetGreetings.empty() && bot.group_role == 0 && bot.group_size <= 1 &&
-        !(bot.in_capital && _options.CityGreet.Enabled))
+    if (Opt().MeetGreet.Enabled && Opt().Pools && !Opt().Pools->MeetGreetings.empty() && bot.group_role == 0 && bot.group_size <= 1 &&
+        !(bot.in_capital && Opt().CityGreet.Enabled))
     {
-        std::vector<std::string> const& pool = _options.Pools->MeetGreetings;
+        std::vector<std::string> const& pool = Opt().Pools->MeetGreetings;
         for (forever_module::NearbyUnit const& unit : turn.nearby)
         {
             if (forever_module::UnitRefType(unit.guid) != 2 || unit.is_hostile)
@@ -151,9 +151,9 @@ void BotPolicy::TurnAdvisor(DecideTick& tick, BotTurn& turn)
             facts.Distance = rotation::DistanceYards(bot, unit);
             std::uint64_t const other = unit.guid & forever_module::kUnitRefCounterMask;
             meet_greet::Greeting greeting;
-            meet_greet::Settings greetSettings = _options.MeetGreet;
-            if (_options.Personality.Enabled)   // sociability scales the chance
-                greetSettings.ChancePct = personality::GreetChancePct(_options.Personality, personality::TraitsFor(_options.RandomSeed, bot.guid), greetSettings.ChancePct);
+            meet_greet::Settings greetSettings = Opt().MeetGreet;
+            if (Opt().Personality.Enabled)   // sociability scales the chance
+                greetSettings.ChancePct = personality::GreetChancePct(Opt().Personality, personality::TraitsFor(Opt().RandomSeed, bot.guid), greetSettings.ChancePct);
             if (!_meetGreet.Try(greetSettings, facts, seed, bot.guid, other, bot.map_id, nowMs, greeting))
                 continue;
             if (greeting.Emote)
@@ -181,11 +181,11 @@ void BotPolicy::TurnAdvisor(DecideTick& tick, BotTurn& turn)
     // Capital inspection (CityInspect) and quest group invites (QuestInvite): both look at the players near an idle bot.
     bool const calm = turn.idle && bot.group_role != 1;
     // The facts come from the snapshot (layout 23): BotSnapshot::in_capital and item_level, NearbyUnit::item_level and shared_objective.
-    if (calm && _options.CityGreet.Enabled && bot.in_capital && _options.Pools && !_options.Pools->CityGreetings.empty())
+    if (calm && Opt().CityGreet.Enabled && bot.in_capital && Opt().Pools && !Opt().Pools->CityGreetings.empty())
     {
         // The auction house: the auctioneer within 10 yards of the bot (snapshot layout 20).
         bool const atAuction = bot.auctioneer_valid != 0 && std::hypot(bot.auctioneer_x - bot.pos_x, bot.auctioneer_y - bot.pos_y) <= 10.0f;
-        std::vector<std::string> const& pool = atAuction && !_options.Pools->AuctionTalk.empty() ? _options.Pools->AuctionTalk : _options.Pools->CityGreetings;
+        std::vector<std::string> const& pool = atAuction && !Opt().Pools->AuctionTalk.empty() ? Opt().Pools->AuctionTalk : Opt().Pools->CityGreetings;
         for (forever_module::NearbyUnit const& unit : turn.nearby)
         {
             if (forever_module::UnitRefType(unit.guid) != 2 || unit.is_hostile)
@@ -195,9 +195,9 @@ void BotPolicy::TurnAdvisor(DecideTick& tick, BotTurn& turn)
             facts.InCapital = true;
             facts.Distance = rotation::DistanceYards(bot, unit);
             std::uint32_t draw = 0;
-            city_greet::Settings cityGreetSettings = _options.CityGreet;
-            if (_options.Personality.Enabled)   // sociability scales the chance
-                cityGreetSettings.ChancePct = personality::GreetChancePct(_options.Personality, personality::TraitsFor(_options.RandomSeed, bot.guid), cityGreetSettings.ChancePct);
+            city_greet::Settings cityGreetSettings = Opt().CityGreet;
+            if (Opt().Personality.Enabled)   // sociability scales the chance
+                cityGreetSettings.ChancePct = personality::GreetChancePct(Opt().Personality, personality::TraitsFor(Opt().RandomSeed, bot.guid), cityGreetSettings.ChancePct);
             if (_cityGreet.Try(cityGreetSettings, facts, seed, bot.guid, unit.guid & forever_module::kUnitRefCounterMask, bot.map_id, nowMs, draw))
             {
                 advisor::Order order;
@@ -210,9 +210,9 @@ void BotPolicy::TurnAdvisor(DecideTick& tick, BotTurn& turn)
             }
         }
     }
-    if (calm && ((_options.CityInspect.Enabled && bot.in_capital) || _options.QuestInvite.Enabled))
+    if (calm && ((Opt().CityInspect.Enabled && bot.in_capital) || Opt().QuestInvite.Enabled))
     {
-        bool const inCapital = _options.CityInspect.Enabled && bot.in_capital != 0;
+        bool const inCapital = Opt().CityInspect.Enabled && bot.in_capital != 0;
         std::uint32_t const botLevel = inCapital ? bot.item_level : 0;
         for (forever_module::NearbyUnit const& unit : turn.nearby)
         {
@@ -229,7 +229,7 @@ void BotPolicy::TurnAdvisor(DecideTick& tick, BotTurn& turn)
                 facts.BotItemLevel = botLevel;
                 facts.PlayerItemLevel = unit.item_level;
                 facts.Distance = distance;
-                if (_cityInspect.Try(_options.CityInspect, facts, seed, bot.guid, player, bot.map_id, nowMs, emote))
+                if (_cityInspect.Try(Opt().CityInspect, facts, seed, bot.guid, player, bot.map_id, nowMs, emote))
                 {
                     advisor::Order order;
                     order.What = advisor::Kind::Emote;
@@ -240,14 +240,14 @@ void BotPolicy::TurnAdvisor(DecideTick& tick, BotTurn& turn)
                     break;
                 }
             }
-            if (_options.QuestInvite.Enabled && bot.group_size < 5)
+            if (Opt().QuestInvite.Enabled && bot.group_size < 5)
             {
                 quest_invite::Facts facts;
                 facts.Idle = true;
                 facts.GroupFull = bot.group_size >= 5;
                 facts.Distance = distance;
                 facts.SameObjective = unit.shared_objective != 0;
-                if (_questInvite.ShouldInvite(_options.QuestInvite, facts, unit.guid, nowMs))
+                if (_questInvite.ShouldInvite(Opt().QuestInvite, facts, unit.guid, nowMs))
                 {
                     BotAction invite;
                     invite.bot_guid = bot.guid;
@@ -256,8 +256,8 @@ void BotPolicy::TurnAdvisor(DecideTick& tick, BotTurn& turn)
                     invite.target_guid = unit.guid;
                     tick.actions.push_back(invite);
                     _questInvite.NoteInvited(unit.guid, nowMs);
-                    if (_options.OnEvent)
-                        _options.OnEvent("quest_invite: bot=" + std::to_string(bot.guid) + " player=" + std::to_string(player));
+                    if (Opt().OnEvent)
+                        Opt().OnEvent("quest_invite: bot=" + std::to_string(bot.guid) + " player=" + std::to_string(player));
                     break;
                 }
             }
@@ -265,11 +265,11 @@ void BotPolicy::TurnAdvisor(DecideTick& tick, BotTurn& turn)
     }
 
     // Trade-chat crafting ad (TradeAds): a bot with a crafting skill posts a templated line now and then. Not in a party (the Trade channel is the zone's).
-    if (_options.TradeAds.Enabled && _options.Pools && bot.group_role == 0 && !_options.Pools->TradeAds.empty())
+    if (Opt().TradeAds.Enabled && Opt().Pools && bot.group_role == 0 && !Opt().Pools->TradeAds.empty())
     {
         std::uint32_t const lines[2] = { bot.profession_skill[0], bot.profession_skill[1] };
         std::uint32_t const values[2] = { bot.profession_value[0], bot.profession_value[1] };
-        std::string line = trade_ads::Next(_options.TradeAds, state.TradeAds, _options.Pools->TradeAds, lines, values, seed, bot.guid, nowMs);
+        std::string line = trade_ads::Next(Opt().TradeAds, state.TradeAds, Opt().Pools->TradeAds, lines, values, seed, bot.guid, nowMs);
         if (!line.empty())
         {
             advisor::Order order;
@@ -284,7 +284,7 @@ void BotPolicy::TurnAdvisor(DecideTick& tick, BotTurn& turn)
 void BotPolicy::OnGuildMemberLevel(forever_module::WorldTickSnapshotView const& view, std::uint64_t guild, std::uint64_t member, std::uint32_t level,
                                    std::uint64_t nowMs)
 {
-    if (!_options.GuildMilestone.Enabled || !_options.Pools || _options.Pools->GuildMilestones.empty() || _bots.count(member) != 0)
+    if (!Opt().GuildMilestone.Enabled || !Opt().Pools || Opt().Pools->GuildMilestones.empty() || _bots.count(member) != 0)
         return;   // off, no lines, or the member is one of our bots
     std::vector<std::uint64_t> members;
     for (forever_module::BotSnapshot const& bot : view.bots)
@@ -292,14 +292,14 @@ void BotPolicy::OnGuildMemberLevel(forever_module::WorldTickSnapshotView const& 
         if (bot.guild_guid == guild && bot.life_state == 0 && bot.in_combat == 0)
             members.push_back(bot.guid);
     }
-    std::uint64_t const speaker = _guildSpeaker.Pick(_options.GuildMilestone, guild, member, level, members, _options.RandomSeed);
+    std::uint64_t const speaker = _guildSpeaker.Pick(Opt().GuildMilestone, guild, member, level, members, Opt().RandomSeed);
     if (speaker == 0)
         return;
-    std::vector<std::string> const& lines = _options.Pools->GuildMilestones;
+    std::vector<std::string> const& lines = Opt().Pools->GuildMilestones;
     advisor::Order order;
     order.What = advisor::Kind::GuildSay;
     order.Bot = speaker;
-    order.Text = advisor::Replace(lines[bot_random::Below(bot_random::Draw(_options.RandomSeed, speaker, 0xE3, nowMs / 1000 + member), std::uint32_t(lines.size()))],
+    order.Text = advisor::Replace(lines[bot_random::Below(bot_random::Draw(Opt().RandomSeed, speaker, 0xE3, nowMs / 1000 + member), std::uint32_t(lines.size()))],
                                   "level", std::to_string(level));
     _advisorOrders.push_back(std::move(order));
 }

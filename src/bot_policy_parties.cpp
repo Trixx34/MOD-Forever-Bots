@@ -33,15 +33,15 @@ void BotPolicy::ApplyPartyReasons(WorldTickSnapshotView const& view, std::unorde
                                   std::unordered_map<std::uint64_t, std::uint64_t>& leaderOf,
                                   std::unordered_map<std::uint64_t, std::vector<std::uint64_t>>& membersOf, std::uint64_t nowMs)
 {
-    party_reason::Settings const& settings = _options.DynamicParties;
+    party_reason::Settings const& settings = Opt().DynamicParties;
     if (!settings.Enabled || membersOf.empty())
         return;
 
     if (!_questGroupSizeBuilt)
     {
         _questGroupSizeBuilt = true;
-        if (_options.Quests)
-            for (QuestStartDef const& start : _options.Quests->Starts)
+        if (Opt().Quests)
+            for (QuestStartDef const& start : Opt().Quests->Starts)
                 for (QuestDef const& quest : start.Quests)
                     if (quest.Group >= 2)
                         _questGroupSize[quest.Id] = quest.Group;
@@ -49,8 +49,8 @@ void BotPolicy::ApplyPartyReasons(WorldTickSnapshotView const& view, std::unorde
 
     auto const event = [&](std::string const& text)
     {
-        if (_options.OnEvent)
-            _options.OnEvent(text);
+        if (Opt().OnEvent)
+            Opt().OnEvent(text);
     };
     auto const snapshotOf = [&](std::uint64_t guid) -> BotSnapshot const*
     {
@@ -76,10 +76,10 @@ void BotPolicy::ApplyPartyReasons(WorldTickSnapshotView const& view, std::unorde
             facts.AfterDeath = state.RepairAfterDeath;
             facts.Copper = bot.copper;
             facts.Level = bot.level;
-            if (repair::Needed(_options.Repair, facts) != repair::Why::None)
+            if (repair::Needed(Opt().Repair, facts) != repair::Why::None)
                 return true;
         }
-        return nowMs >= state.NextSupplyMs && state.SupplyCheckAtMs == 0 && supply::NextStop(supply::Assess(_options.Supplies, FactsOf(bot))) != supply::Stop::None;
+        return nowMs >= state.NextSupplyMs && state.SupplyCheckAtMs == 0 && supply::NextStop(supply::Assess(Opt().Supplies, FactsOf(bot))) != supply::Stop::None;
     };
     auto const busy = [](BotSnapshot const& bot) { return bot.life_state != 0 || bot.in_combat != 0; };
     // In a group quest's party (DriveQuestGroups) that is not this one: led by a registered quest-group leader.
@@ -133,7 +133,7 @@ void BotPolicy::ApplyPartyReasons(WorldTickSnapshotView const& view, std::unorde
 
         // A level dungeon the party is due for (LevelDungeons): its level is the lowest of the leader and the members on its map.
         bool dungeonDue = false;
-        if (_options.LevelDungeons && !leaderBusy)
+        if (Opt().LevelDungeons && !leaderBusy)
         {
             std::uint32_t level = leader->level;
             std::size_t here = 1;
@@ -143,7 +143,7 @@ void BotPolicy::ApplyPartyReasons(WorldTickSnapshotView const& view, std::unorde
                     level = std::min(level, other->level);
                     ++here;
                 }
-            dungeonDue = here >= kDungeonPartyMin && _options.DungeonsByMap.count(leader->map_id) == 0 && LevelDungeonDue(leaderGuid, level);
+            dungeonDue = here >= kDungeonPartyMin && Opt().DungeonsByMap.count(leader->map_id) == 0 && LevelDungeonDue(leaderGuid, level);
         }
         bool leaderGroupQuest = false;
         for (std::size_t i = 0; i < leader->quest_count && i < forever_module::kMaxQuestLog && !leaderGroupQuest; ++i)
