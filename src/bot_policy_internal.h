@@ -556,6 +556,17 @@ constexpr std::uint64_t kRecoverHoldMs = 150000;       // ... for at most this l
 constexpr std::uint64_t kLeaderAwaySoloMs = 120000;
 constexpr float kRecoverSafeYards = 30.0f;              // ... and it sits down only with no live creature this close (it walks away from one that is)
 constexpr float kDeathLoopAwayYards = 400.0f;           // ... one at least this far from where it keeps dying
+// DeathLoopBreaker (bot_policy_death_loop.cpp): this many deaths of a solo bot to one creature entry, within these yards of each other and this time, are a loop.
+constexpr std::uint32_t kLoopBreakDeaths = 3;
+constexpr float kLoopBreakYards = 150.0f;
+constexpr std::uint64_t kLoopBreakWindowMs = 1800000;
+constexpr std::size_t kLoopBreakMemory = 16;            // ... deaths kept per bot
+constexpr std::uint64_t kLoopBreakUnsafeMs = 7200000;   // the loop's graveyard is unsafe for that level this long (two hours)
+constexpr std::size_t kLoopBreakUnsafeMax = 256;        // ... graveyards marked at most (the oldest go)
+constexpr std::uint64_t kLoopBreakGhostWaitMs = 300000; // no safe graveyard: the ghost waits this long (the killer may leash, move or despawn), then revives
+constexpr std::uint32_t kLoopBreakHighLevels = 3;       // no spirit healer revive with a live hostile this many levels above the bot ...
+constexpr float kLoopBreakHostileYards = 40.0f;         // ... this close to the ghost at the graveyard
+constexpr std::uint64_t kLoopBreakEscapeMs = 60000;     // after the revive the bot is moved away from the loop within this (it waits out a fight)
 constexpr std::uint64_t kCorpseTeleportRetryMs = 15000; // a ghost off its corpse's map with no portal is teleported to the corpse, not again before this
 constexpr std::uint64_t kOutOfCombatReviveRetryMs = 10000; // a ghost of a dungeon party is revived by its leader out of combat, not again before this
 constexpr std::uint64_t kCorpseReviveDelayMs = 8000;       // the Recover tactic: a dead member of a dungeon party whose leader is up and quiet is revived by the leader this long after the fight ended

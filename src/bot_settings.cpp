@@ -683,6 +683,7 @@ BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const&
     ReadKey(config, "LevelSafeEscapeMarginLevels", 1, 40, settings.LevelSafeEscapeMarginLevels, warnings);
     ReadKey(config, "LevelSafeRadiusYards", 50, 1000, settings.LevelSafeRadiusYards, warnings);
     ReadKey(config, "LevelSafeEscapeCooldownSec", 60, 86400, settings.LevelSafeEscapeCooldownSec, warnings);
+    ReadBool(config, "DeathLoopBreaker", settings.DeathLoopBreaker, warnings);
     ReadBool(config, "BelowMapRecover", settings.BelowMapRecover, warnings);
     ReadKey(config, "BelowMapDropYards", 20, 1000, settings.BelowMapDropYards, warnings);
     ReadKey(config, "BelowMapStormCount", 0, 100, settings.BelowMapStormCount, warnings);

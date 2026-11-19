@@ -50,3 +50,22 @@ Defaults: the level-safe keys are the fix and default on; the below-map teleport
 ## What the sim read-out should measure
 
 Deaths per bot and `deaths_top` (top10 share, median); repeat deaths at one spot (deaths within 60 yards of each other per bot); `quest_walk_blocked reason=level_unsafe` per hour and per quest; `level_safe_yard` (fitting vs `none_known`), `level_unsafe_escape` and `teleport_refused` counts; `no_route` per bot-hour (and with `BelowMapRecover = 1`, `below_map_recover` per hour and the short-walk share of `no_route`); levels gained per hour.
+
+## Death loop breaker (2026-11-19, `DeathLoopBreaker`, default 0)
+
+The sim arm C (2026-11-19) still had the Raven Hill loop: bots 235 and 66, level 8 to 10 Human hunters, died 260 and 221 times at the Duskwood graveyard (-10606, 294) to one Skeletal Horror (entry 202, level about 24) standing at the spirit healer. Why the level-safe code did not stop it:
+
+- The graveyard swap never applied. The place minimum at Raven Hill is 18, not 23: a level 18-22 spot (-10630, 533) lies 240 yards off, inside the 250 yard radius, and the lowest minimum wins. 18 is not above level 8 plus the wide margin 10, so neither the graveyard nor the corpse counted as too high (no `level_safe_yard` line, `ghost_fallback ... reason=spirit_healer_far` and `ghost_fallback_teleport` without `graveyard=level_safe`), and `LevelSafeEscape` did not fire either (same margin).
+- The escape came too late. The ghost fallback put the ghost back at Raven Hill, the spirit healer revived it beside the Horror, and `death_loop_escape` sent its teleport on the revive tick. The Horror had the bot in combat by then and the core refuses a teleport in combat (ModuleBotActions TeleportAction), so the bot never moved: `died ... pos=-10613,297` 5 s after `death_loop_escape ... from=-10606,294`. The escape then waits out its 120 s cooldown (bot 66: revived 16:07:06, dead 16:07:39, no escape line).
+
+The breaker acts while the bot is a ghost, which the killer cannot follow and the core never refuses a teleport for. A solo bot (no group, no dungeon route) that died 3 times to the same creature entry within 150 yards and 30 minutes:
+
+1. gives up its corpse: no corpse run, no reclaim (the ghost fallback with reason `death_loop`);
+2. marks the graveyard it appeared at unsafe for its level and below for 2 hours when that graveyard lies within 150 yards of the loop (`stage=yard_unsafe`); `LevelSafeGraveyard` treats an unsafe graveyard as too high for every bot of that level (`level_safe_yard ... reason=graveyard_unsafe`), gives up a corpse beside it as well, and never chooses it;
+3. is teleported as a ghost to another graveyard of the same map and side (`stage=yard`): the nearest one seen that fits its level, else the nearest one at least 400 yards from the loop; a ghost that appeared away from the killer revives at its own graveyard (`stage=own_yard`);
+4. asks the spirit healer there, but not while a live hostile 3 or more levels above it stands within 40 yards of the ghost: that graveyard is marked too and the next one is judged (`stage=yard_held`);
+5. with no graveyard known, waits as a ghost (no corpse run) up to 5 minutes (`stage=wait`, `stage=wait_over`), revives at the spirit healer, and on revival is put at a grind spot for its level at least 400 yards from the loop, out of combat only, with a walk there when the core refuses the teleport (`stage=escape`, `stage=in_combat`, `stage=no_spot`; tried for 60 s). A bot that revived away from the loop logs `stage=revived_away`. The old `death_loop_escape` does not run for a death the breaker took.
+
+Every move stays on the bot's map: graveyards and grind spots are chosen on the map the ghost is on, so a Skyborne bot never leaves map 2991. The teleports need `Bot.Actions.Teleport = 1`, as the ghost fallback already does. With the key off nothing changes (graveyards are remembered only when `LevelSafeGraveyard` or the breaker is on).
+
+Sim read-out for the breaker: deaths per bot at one spot (within 150 yards, same killer), `death_loop_break` counts per stage (`detect` should be followed by `yard` or `own_yard`, rarely `wait`), repeat deaths at the same spot within 5 minutes after a `stage=yard` (a failure), `level_safe_yard reason=graveyard_unsafe` lines, and the `deaths_top` top-10 share (arm C peaked at 23.8%).

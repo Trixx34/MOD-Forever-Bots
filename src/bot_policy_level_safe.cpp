@@ -130,8 +130,12 @@ void BotPolicy::LevelSafeGhost(DecideTick& tick, BotTurn& turn)
     bool const corpseHere = bot.corpse_valid != 0 && bot.corpse_map == state.GhostSpawnMap;
     std::uint32_t const yardMin = _levelMap.PlaceMin(state.GhostSpawnMap, state.GhostSpawn.X, state.GhostSpawn.Y);
     std::uint32_t const corpseMin = corpseHere ? _levelMap.PlaceMin(bot.corpse_map, bot.corpse_x, bot.corpse_y) : 0;
-    bool const yardHigh = yardMin != 0 && yardMin > bot.level + wide;
-    bool const corpseHigh = corpseMin != 0 && corpseMin > bot.level + wide;
+    // DeathLoopBreaker: a graveyard where a loop was broken is too high for this level for two hours, whatever its place minimum says.
+    bool const yardUnsafe = _options.DeathLoopBreaker && YardUnsafe(state.GhostSpawnMap, state.GhostSpawn.X, state.GhostSpawn.Y, bot.level, tick.nowMs);
+    bool const yardHigh = (yardMin != 0 && yardMin > bot.level + wide) || yardUnsafe;
+    // ... and a corpse beside such a graveyard is given up as one too high is (the killer stands there).
+    bool const corpseHigh = (corpseMin != 0 && corpseMin > bot.level + wide) ||
+                            (yardUnsafe && corpseHere && std::hypot(bot.corpse_x - state.GhostSpawn.X, bot.corpse_y - state.GhostSpawn.Y) <= kLoopBreakYards);
     if (!yardHigh && !corpseHigh)
         return;
     float const nearX = corpseHere ? bot.corpse_x : state.GhostSpawn.X;
@@ -139,8 +143,13 @@ void BotPolicy::LevelSafeGhost(DecideTick& tick, BotTurn& turn)
     std::uint8_t const side = _options.SideOf ? _options.SideOf(bot.guid) : 0;
     std::string const line = "level_safe_yard: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(state.GhostSpawnMap) +
                              " graveyard=" + std::to_string(int(state.GhostSpawn.X)) + "," + std::to_string(int(state.GhostSpawn.Y)) + " graveyard_min=" +
-                             std::to_string(yardMin) + " corpse_min=" + std::to_string(corpseMin) + " reason=" + (corpseHigh ? "corpse_high" : "graveyard_high");
-    level_safe::Graveyards::Yard const* yard = _graveyards.Fitting(_levelMap, state.GhostSpawnMap, nearX, nearY, bot.level, margin, side);
+                             std::to_string(yardMin) + " corpse_min=" + std::to_string(corpseMin) + " reason=" +
+                             (yardUnsafe ? "graveyard_unsafe" : corpseHigh ? "corpse_high" : "graveyard_high");
+    std::uint64_t const nowMs = tick.nowMs;
+    std::uint32_t const level = bot.level;
+    level_safe::Graveyards::Yard const* yard = _graveyards.Fitting(_levelMap, state.GhostSpawnMap, nearX, nearY, bot.level, margin, side,
+                                                                   [&](level_safe::Graveyards::Yard const& candidate)
+                                                                   { return _options.DeathLoopBreaker && YardUnsafe(candidate.Map, candidate.X, candidate.Y, level, nowMs); });
     if (!yard)
     {
         LogEvent(line + " result=none_known known=" + std::to_string(_graveyards.Size()));

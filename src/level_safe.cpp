@@ -106,7 +106,7 @@ void Graveyards::Note(std::uint32_t map, float x, float y, float z, std::uint8_t
 }
 
 Graveyards::Yard const* Graveyards::Fitting(LevelMap const& levels, std::uint32_t map, float x, float y, std::uint32_t level, std::uint32_t margin,
-                                            std::uint8_t side) const
+                                            std::uint8_t side, std::function<bool(Yard const&)> const& skip) const
 {
     auto const found = _maps.find(map);
     if (found == _maps.end())
@@ -119,6 +119,30 @@ Graveyards::Yard const* Graveyards::Fitting(LevelMap const& levels, std::uint32_
         if (bit != 0 && (yard.Sides & bit) == 0)
             continue;
         if (!levels.Fits(map, yard.X, yard.Y, level, margin))
+            continue;
+        if (skip && skip(yard))
+            continue;
+        float const dist = std::hypot(yard.X - x, yard.Y - y);
+        if (!best || dist < bestDist)
+        {
+            best = &yard;
+            bestDist = dist;
+        }
+    }
+    return best;
+}
+
+Graveyards::Yard const* Graveyards::Nearest(std::uint32_t map, float x, float y, std::uint8_t side, std::function<bool(Yard const&)> const& skip) const
+{
+    auto const found = _maps.find(map);
+    if (found == _maps.end())
+        return nullptr;
+    std::uint8_t const bit = side == 1 ? 1 : side == 2 ? 2 : 0;
+    Yard const* best = nullptr;
+    float bestDist = 0.0f;
+    for (Yard const& yard : found->second)
+    {
+        if ((bit != 0 && (yard.Sides & bit) == 0) || (skip && skip(yard)))
             continue;
         float const dist = std::hypot(yard.X - x, yard.Y - y);
         if (!best || dist < bestDist)

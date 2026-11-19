@@ -197,7 +197,7 @@ off_map::KnownWorld BotPolicy::MakeKnownWorld(PolicyOptions const& options)
 level_safe::LevelMap BotPolicy::MakeLevelMap(PolicyOptions const& options)
 {
     level_safe::LevelMap levels;
-    bool const used = options.LevelSafe.Walks || options.LevelSafe.Graveyard || options.LevelSafe.Escape;
+    bool const used = options.LevelSafe.Walks || options.LevelSafe.Graveyard || options.LevelSafe.Escape || options.DeathLoopBreaker;
     if (used && options.Grind)
         levels.Build(*options.Grind, options.LevelSafe.RadiusYards);
     return levels;

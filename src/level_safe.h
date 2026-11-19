@@ -21,6 +21,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <optional>
 #include <string>
@@ -104,7 +105,11 @@ public:
     void Note(std::uint32_t map, float x, float y, float z, std::uint8_t side);
     // The graveyard on `map` nearest to (x, y) that a bot of `side` may use (seen by its side; side 0 takes any) and whose place fits `level` (known and not too
     // high). Null when none is known.
-    Yard const* Fitting(LevelMap const& levels, std::uint32_t map, float x, float y, std::uint32_t level, std::uint32_t margin, std::uint8_t side) const;
+    // `skip` (DeathLoopBreaker): a graveyard it answers true for is not chosen (marked unsafe, or beside the loop's killer).
+    Yard const* Fitting(LevelMap const& levels, std::uint32_t map, float x, float y, std::uint32_t level, std::uint32_t margin, std::uint8_t side,
+                        std::function<bool(Yard const&)> const& skip = {}) const;
+    // DeathLoopBreaker without level data: the graveyard on `map` nearest to (x, y) that a bot of `side` may use and `skip` does not refuse. Null when none.
+    Yard const* Nearest(std::uint32_t map, float x, float y, std::uint8_t side, std::function<bool(Yard const&)> const& skip = {}) const;
     std::size_t Size() const;
 
 private:

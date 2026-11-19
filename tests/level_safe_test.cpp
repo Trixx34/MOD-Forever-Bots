@@ -366,6 +366,284 @@ void TheSettingsKeysHaveTheirDefaultsAndBounds()
     CHECK(bad.LevelSafeMarginLevels == 5 && bad.LevelSafeRadiusYards == 250 && bad.BelowMapDropYards == 60 && bad.DeathsTopEveryMin == 60 && warnings.size() == 4);
 }
 
+// ---- DeathLoopBreaker (2026-11-19, bot_policy_death_loop.cpp) ----
+
+// Why the swap missed Raven Hill in arm C: the lowest minimum within 250 yards is 18 (a level 18-22 spot 240 yards off), and 18 is not above 8 + 10.
+void TheRavenHillPlaceMinimumWasWithinTheWideMargin()
+{
+    std::vector<std::string> warnings;
+    std::istringstream spots("spot 0 -10572.9 292.2 30.8 23 26 0 6\n"
+                             "spot 0 -10510.6 286.2 31.4 23 27 0 6\n"
+                             "spot 0 -10573.9 408.2 32.8 19 26 0 6\n"
+                             "spot 0 -10629.7 533.1 31.8 18 22 0 6\n");
+    level_safe::LevelMap levels;
+    levels.Build(ParseGrindData(spots, warnings), 250.0f);
+    CHECK(levels.PlaceMin(0, -10606.0f, 294.0f) == 18);
+    CHECK(!levels.TooHigh(0, -10606.0f, 294.0f, 8, 10) && !levels.TooHigh(0, -10606.0f, 294.0f, 10, 10));   // no level_safe_yard for bots 235 and 66
+    CHECK(levels.TooHigh(0, -10606.0f, 294.0f, 7, 10));
+}
+
+NearbyUnit Creature(float x, std::uint32_t level, std::uint32_t entry = 202)
+{
+    NearbyUnit unit;
+    unit.guid = MakeUnitRef(8, entry, 7);
+    unit.pos_x = x;
+    unit.health = 100;
+    unit.max_health = 100;
+    unit.is_hostile = true;
+    unit.level = level;
+    return unit;
+}
+
+WorldTickSnapshotView At(float x, std::uint32_t level, std::vector<NearbyUnit> nearby = {}, std::uint64_t threat = 0)
+{
+    WorldTickSnapshotView view = View(1, threat, nearby);
+    view.bots[0].level = level;
+    view.bots[0].pos_x = x;
+    return view;
+}
+
+// Alive at x, then dead there to `killer` (the threat target).
+void DieAt(BotPolicy& policy, float x, std::uint32_t level, NearbyUnit const& killer, std::uint64_t at)
+{
+    policy.Decide(At(x, level), at);
+    WorldTickSnapshotView dead = At(x, level, { killer }, killer.guid);
+    Corpse(dead.bots[0], x);
+    policy.Decide(dead, at + 1000);
+}
+
+std::vector<BotAction> GhostAt(BotPolicy& policy, float x, float corpseX, std::uint32_t level, std::uint64_t at, std::vector<NearbyUnit> nearby = {})
+{
+    WorldTickSnapshotView ghost = At(x, level, nearby);
+    Ghost(ghost.bots[0], x, 0, corpseX);
+    return policy.Decide(ghost, at);
+}
+
+bool AsksSpiritHealer(std::vector<BotAction> const& actions)
+{
+    for (BotAction const& action : actions)
+        if (action.type == ActionType::kResurrect && action.spell_id == 2)
+            return true;
+    return false;
+}
+
+std::size_t Count(std::vector<std::string> const& events, char const* text)
+{
+    std::size_t n = 0;
+    for (std::string const& event : events)
+        n += event.find(text) != std::string::npos ? 1 : 0;
+    return n;
+}
+
+PolicyOptions BreakerOptions(std::vector<std::string>* events, bool on)
+{
+    PolicyOptions options = LevelOptions(events);
+    options.DeathLoopBreaker = on;
+    options.SideOf = [](std::uint64_t) -> std::uint8_t { return 1; };
+    return options;
+}
+
+// A level 15 bot (Raven Hill, 23, is not too high for it by the wide margin: the arm C case) knows the low graveyard at x = 50, then dies three times at x = 2000 to
+// entry 202, its ghost appearing at the graveyard x = 2050 each time. The third death breaks the loop as a ghost: the corpse is given up, the graveyard is unsafe,
+// the ghost goes to x = 50 and the spirit healer revives it there; no death_loop_escape on the revive.
+void AThirdDeathToOneKillerMovesTheGhostAway()
+{
+    for (bool on : { true, false })
+    {
+        std::vector<std::string> events;
+        BotPolicy policy(BreakerOptions(&events, on));
+        DieAt(policy, 0.0f, 15, Creature(5.0f, 3, 999), 1000);
+        GhostAt(policy, 50.0f, 0.0f, 15, 3000);
+        policy.Decide(At(50.0f, 15), 4000);
+        std::vector<BotAction> third;
+        for (std::uint64_t at : { 100000u, 160000u, 220000u })
+        {
+            DieAt(policy, 2000.0f, 15, Creature(2005.0f, 24), at);
+            third = GhostAt(policy, 2050.0f, 2000.0f, 15, at + 2000);
+            if (at != 220000u)
+                policy.Decide(At(2050.0f, 15), at + 3000);
+        }
+        std::optional<BotAction> const teleport = TeleportOf(third, kBot);
+        if (!on)
+        {
+            CHECK(!Logged(events, "death_loop_break:") && policy.UnsafeYardsKnown() == 0);
+            CHECK(!(teleport && teleport->dest_x == 50.0f));
+            continue;
+        }
+        CHECK(Logged(events, "death_loop_break: bot=42 level=15 map=0 pos=2000,0 entry=202 deaths=3 stage=detect"));
+        CHECK(Count(events, "stage=detect") == 1);   // two deaths are not a loop
+        CHECK(Logged(events, "death_loop_break: bot=42 level=15 map=0 stage=yard_unsafe graveyard=2050,0 entry=202 unsafe_s=7200"));
+        CHECK(Logged(events, "death_loop_break: bot=42 level=15 map=0 stage=yard from=2050,0 to=50,0"));
+        CHECK(Logged(events, "ghost_fallback: bot=42 reason=death_loop"));
+        CHECK(teleport && teleport->dest_x == 50.0f && teleport->spell_id == 0);
+        CHECK(policy.UnsafeYardsKnown() == 1);
+        // At the new graveyard: the spirit healer, no corpse run back to x = 2000.
+        std::vector<BotAction> const there = GhostAt(policy, 50.0f, 2000.0f, 15, 224000);
+        CHECK(AsksSpiritHealer(there));
+        for (BotAction const& action : there)
+            CHECK(!(action.type == ActionType::kMoveTo && action.dest_x > 1000.0f));
+        std::size_t const escapes = Count(events, "death_loop_escape:");
+        CHECK(!TeleportOf(policy.Decide(At(50.0f, 15), 225000), kBot));
+        CHECK(Logged(events, "death_loop_break: bot=42 level=15 map=0 stage=revived_away pos=50,0 loop=2000,0"));
+        CHECK(Count(events, "death_loop_escape:") == escapes);
+    }
+}
+
+// The unsafe graveyard feeds the level-safe choice: a later death there (another killer, no loop) is sent to x = 50 by LevelSafeGraveyard, which alone would not
+// judge Raven Hill too high for level 15.
+void AnUnsafeGraveyardIsSkippedByTheLevelSafeChoice()
+{
+    for (bool on : { true, false })
+    {
+        std::vector<std::string> events;
+        PolicyOptions options = BreakerOptions(&events, on);
+        options.LevelSafe.Graveyard = true;
+        BotPolicy policy(options);
+        DieAt(policy, 0.0f, 15, Creature(5.0f, 3, 999), 1000);
+        GhostAt(policy, 50.0f, 0.0f, 15, 3000);
+        policy.Decide(At(50.0f, 15), 4000);
+        for (std::uint64_t at : { 100000u, 160000u, 220000u })
+        {
+            DieAt(policy, 2000.0f, 15, Creature(2005.0f, 24), at);
+            GhostAt(policy, 2050.0f, 2000.0f, 15, at + 2000);
+            GhostAt(policy, 50.0f, 2000.0f, 15, at + 2500);
+            policy.Decide(At(at == 220000u ? 50.0f : 2050.0f, 15), at + 3000);
+        }
+        DieAt(policy, 2000.0f, 15, Creature(2005.0f, 24, 888), 300000);
+        std::optional<BotAction> const teleport = TeleportOf(GhostAt(policy, 2050.0f, 2000.0f, 15, 302000), kBot);
+        CHECK(LoggedWith(events, "level_safe_yard: bot=42 level=15 map=0 graveyard=2050,0 graveyard_min=23 corpse_min=23 reason=graveyard_unsafe to=50,0") == on);
+        CHECK((teleport && teleport->dest_x == 50.0f) == on);
+        CHECK(!Logged(events, "level_safe_yard: bot=42 level=15 map=0 graveyard=2050,0 graveyard_min=23 corpse_min=23 reason=graveyard_high"));
+    }
+}
+
+// A graveyard with a live hostile 3+ levels above the bot beside the ghost is not revived at: it is marked, and the next graveyard is taken.
+void AGraveyardHeldByAHighHostileIsPassedOver()
+{
+    std::vector<std::string> events;
+    BotPolicy policy(BreakerOptions(&events, true));
+    DieAt(policy, 0.0f, 15, Creature(5.0f, 3, 999), 1000);
+    GhostAt(policy, 50.0f, 0.0f, 15, 3000);
+    policy.Decide(At(50.0f, 15), 4000);
+    DieAt(policy, 300.0f, 15, Creature(305.0f, 3, 998), 10000);
+    GhostAt(policy, 300.0f, 300.0f, 15, 12000);   // a second low graveyard, nearer to the loop
+    policy.Decide(At(300.0f, 15), 13000);
+    for (std::uint64_t at : { 100000u, 160000u, 220000u })
+    {
+        DieAt(policy, 2000.0f, 15, Creature(2005.0f, 24), at);
+        GhostAt(policy, 2050.0f, 2000.0f, 15, at + 2000);
+        if (at != 220000u)
+            policy.Decide(At(2050.0f, 15), at + 3000);
+    }
+    CHECK(Logged(events, "death_loop_break: bot=42 level=15 map=0 stage=yard from=2050,0 to=300,0"));
+    std::vector<BotAction> const held = GhostAt(policy, 300.0f, 2000.0f, 15, 240000, { Creature(320.0f, 18, 555) });
+    CHECK(!AsksSpiritHealer(held));
+    CHECK(Logged(events, "death_loop_break: bot=42 level=15 map=0 stage=yard_held graveyard=300,0 entry=555 hostile_level=18"));
+    std::optional<BotAction> const next = TeleportOf(GhostAt(policy, 300.0f, 2000.0f, 15, 241000, { Creature(320.0f, 18, 555) }), kBot);
+    CHECK(Logged(events, "death_loop_break: bot=42 level=15 map=0 stage=yard from=2050,0 to=50,0"));
+    CHECK(next && next->dest_x == 50.0f);
+    CHECK(policy.UnsafeYardsKnown() == 2);
+    // A hostile only 2 levels above is no reason to wait.
+    std::vector<std::string> other;
+    BotPolicy calm(BreakerOptions(&other, true));
+    DieAt(calm, 0.0f, 15, Creature(5.0f, 3, 999), 1000);
+    GhostAt(calm, 50.0f, 0.0f, 15, 3000);
+    calm.Decide(At(50.0f, 15), 4000);
+    for (std::uint64_t at : { 100000u, 160000u, 220000u })
+    {
+        DieAt(calm, 2000.0f, 15, Creature(2005.0f, 24), at);
+        GhostAt(calm, 2050.0f, 2000.0f, 15, at + 2000);
+        if (at != 220000u)
+            calm.Decide(At(2050.0f, 15), at + 3000);
+    }
+    CHECK(AsksSpiritHealer(GhostAt(calm, 50.0f, 2000.0f, 15, 240000, { Creature(60.0f, 17, 555) })));
+}
+
+// No other graveyard known: the ghost waits (no corpse run, no healer) up to 5 minutes, then revives, and the revived bot is moved to a grind spot away from the loop
+// once it is out of combat.
+void WithNoGraveyardTheGhostWaitsThenTheBotIsMoved()
+{
+    std::vector<std::string> events;
+    BotPolicy policy(BreakerOptions(&events, true));
+    for (std::uint64_t at : { 100000u, 160000u, 220000u })
+    {
+        DieAt(policy, 2000.0f, 15, Creature(2005.0f, 24), at);
+        GhostAt(policy, 2050.0f, 2000.0f, 15, at + 2000);
+        if (at != 220000u)
+            policy.Decide(At(2050.0f, 15), at + 3000);
+    }
+    CHECK(Logged(events, "death_loop_break: bot=42 level=15 map=0 stage=wait result=no_safe_yard known=1 wait_s=300"));
+    for (std::uint64_t at = 223000; at < 222000 + 300000; at += 30000)
+    {
+        std::vector<BotAction> const waiting = GhostAt(policy, 2050.0f, 2000.0f, 15, at);
+        CHECK(!AsksSpiritHealer(waiting) && !TeleportOf(waiting, kBot));
+        for (BotAction const& action : waiting)
+            CHECK(action.type != ActionType::kMoveTo && action.type != ActionType::kReclaimCorpse);
+    }
+    CHECK(AsksSpiritHealer(GhostAt(policy, 2050.0f, 2000.0f, 15, 523000)));
+    CHECK(Logged(events, "death_loop_break: bot=42 level=15 map=0 stage=wait_over"));
+    std::size_t const escapes = Count(events, "death_loop_escape:");
+    WorldTickSnapshotView fighting = At(2050.0f, 15, { Creature(2055.0f, 24) });
+    fighting.bots[0].in_combat = 1;
+    CHECK(!TeleportOf(policy.Decide(fighting, 524000), kBot));   // the core refuses a teleport in combat: not sent
+    CHECK(Logged(events, "death_loop_break: bot=42 level=15 map=0 stage=in_combat pos=2050,0"));
+    std::optional<BotAction> const away = TeleportOf(policy.Decide(At(2050.0f, 15), 525000), kBot);
+    // (spot 3 at x = 400 was the second death's death_loop_escape and is skipped as just visited)
+    CHECK(away && away->dest_x == 300.0f && away->spell_id == 0);
+    CHECK(Logged(events, "death_loop_break: bot=42 level=15 map=0 stage=escape from=2050,0 spot=2 to=300,0"));
+    CHECK(Count(events, "death_loop_escape:") == escapes);
+}
+
+// The Skyborne rule: a loop on map 2991 never sends the ghost or the bot to another map, even with graveyards and grind spots known elsewhere.
+void ASkyborneLoopStaysOnItsMap()
+{
+    std::vector<std::string> events;
+    BotPolicy policy(BreakerOptions(&events, true));
+    DieAt(policy, 0.0f, 15, Creature(5.0f, 3, 999), 1000);
+    GhostAt(policy, 50.0f, 0.0f, 15, 3000);   // a graveyard on map 0
+    policy.Decide(At(50.0f, 15), 4000);
+    auto onSky = [](WorldTickSnapshotView view)
+    {
+        view.bots[0].map_id = 2991;
+        view.bots[0].corpse_map = view.bots[0].corpse_valid ? 2991 : 0;
+        return view;
+    };
+    bool offMap = false;
+    auto watch = [&](std::vector<BotAction> const& actions)
+    {
+        for (BotAction const& action : actions)
+            offMap = offMap || (action.type == ActionType::kTeleport && action.spell_id != 2991);
+    };
+    for (std::uint64_t at : { 100000u, 160000u, 220000u })
+    {
+        watch(policy.Decide(onSky(At(2000.0f, 15)), at));
+        WorldTickSnapshotView dead = At(2000.0f, 15, { Creature(2005.0f, 24, 251707) }, Creature(2005.0f, 24, 251707).guid);
+        Corpse(dead.bots[0], 2000.0f);
+        watch(policy.Decide(onSky(dead), at + 1000));
+        WorldTickSnapshotView ghost = At(2050.0f, 15);
+        Ghost(ghost.bots[0], 2050.0f, 0, 2000.0f);
+        watch(policy.Decide(onSky(ghost), at + 2000));
+        if (at != 220000u)
+            watch(policy.Decide(onSky(At(2050.0f, 15)), at + 3000));
+    }
+    CHECK(Logged(events, "death_loop_break: bot=42 level=15 map=2991 pos=2000,0 entry=251707 deaths=3 stage=detect"));
+    CHECK(Logged(events, "death_loop_break: bot=42 level=15 map=2991 stage=wait result=no_safe_yard"));
+    WorldTickSnapshotView late = At(2050.0f, 15);
+    Ghost(late.bots[0], 2050.0f, 0, 2000.0f);
+    watch(policy.Decide(onSky(late), 523000));
+    watch(policy.Decide(onSky(At(2050.0f, 15)), 524000));
+    CHECK(Logged(events, "death_loop_break: bot=42 level=15 map=2991 stage=no_spot"));
+    CHECK(!offMap);
+}
+
+void TheBreakerKeyIsOffByDefault()
+{
+    std::vector<std::string> warnings;
+    CHECK(!ParseBotSettings({}, warnings).DeathLoopBreaker);
+    CHECK(ParseBotSettings({ { "DeathLoopBreaker", "1" } }, warnings).DeathLoopBreaker && warnings.empty());
+    CHECK(!PolicyOptions{}.DeathLoopBreaker);
+}
+
 } // namespace
 
 int main()
@@ -384,6 +662,13 @@ int main()
     TheDeathsTopLineIsDueOncePerPeriod();
     BelowTheMapThePolicyTeleportsUp();
     TheSettingsKeysHaveTheirDefaultsAndBounds();
+    TheRavenHillPlaceMinimumWasWithinTheWideMargin();
+    AThirdDeathToOneKillerMovesTheGhostAway();
+    AnUnsafeGraveyardIsSkippedByTheLevelSafeChoice();
+    AGraveyardHeldByAHighHostileIsPassedOver();
+    WithNoGraveyardTheGhostWaitsThenTheBotIsMoved();
+    ASkyborneLoopStaysOnItsMap();
+    TheBreakerKeyIsOffByDefault();
     if (failures == 0)
         std::printf("level_safe_test: all checks passed\n");
     return failures == 0 ? 0 : 1;

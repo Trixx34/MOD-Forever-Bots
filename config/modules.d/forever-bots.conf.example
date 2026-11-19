@@ -140,6 +140,15 @@ Module.forever-bots.TelemetrySummarySec = 60
 # LevelSafeRadiusYards = 250   (50 to 1000)
 # LevelSafeEscapeCooldownSec = 600   (60 to 86400)
 
+# Death loop breaker (off by default; the sim first). A solo bot that died 3 times to the same creature entry within 150 yards and 30 minutes (the Raven Hill
+# loop: a level 8 bot revived at the graveyard beside a level 24 Skeletal Horror, killed again within 5 s) gives up its corpse (no corpse run, no reclaim) and is
+# moved as a ghost to another graveyard of its map and side (one that fits its level, else the nearest one 400 yards away) to ask the spirit healer there; never
+# with a live hostile 3 levels above it beside the ghost (that graveyard is marked and the next tried). The loop's graveyard is unsafe for that level (and below)
+# for 2 hours: LevelSafeGraveyard sends other bots elsewhere too. No graveyard known: the ghost waits up to 5 minutes, revives, and is moved to a grind spot for
+# its level at once when out of combat (teleport, and a walk when the core refuses it). Never off its map (Skyborne 2991 stays on 2991). Log: death_loop_break
+# stage=detect|yard_unsafe|yard|own_yard|wait|wait_over|yard_held|escape|revived_away|in_combat|no_spot. Needs Bot.Actions.Teleport = 1 in the core.
+# DeathLoopBreaker = 0
+
 # Below-map recovery (off by default; the sim first). A living bot whose nearest known place within 60 yards lies more than BelowMapDropYards above it for
 # 20 s, or that got BelowMapStormCount no-route answers for walks under 100 yards within 5 minutes (0 = that sign off), is teleported to the nearest known
 # place, at most once per BelowMapCooldownSec. Log: below_map_recover reason=z_below|no_route_storm. Needs Bot.Actions.Teleport = 1 in the core.

@@ -274,7 +274,16 @@ void BotPolicy::TurnRevivedAndRoles(DecideTick& tick, BotTurn& turn)
         // A death loop: the bot stands up among what killed it and dies again (a party member following a leader into a zone far above its level, a
         // grind spot with something strong on it; 470 of 942 deaths in 55 minutes on the sim, 17 bots dying every few seconds). The third death within
         // kDeathLoopMs, or the second one to the same creature entry within it, puts the bot at the nearest grind spot for its level that is not near its corpse.
-        if (!stagingHold && _options.Grind && !_options.Grind->Spots.empty() && bot.level != 0 && nowMs >= state.EscapeUntilMs &&
+        // DeathLoopBreaker: a death the breaker took is moved by DeathLoopBreakEscape (below), not here.
+        bool const loopBroken = _options.DeathLoopBreaker && state.LoopBreak;
+        if (loopBroken)
+        {
+            state.LoopBreak = false;
+            state.LoopBreakEscapeUntilMs = nowMs + kLoopBreakEscapeMs;
+            state.LoopBreakEscapeRetryMs = 0;
+            state.LoopBreakLoggedMs = 0;
+        }
+        if (!loopBroken && !stagingHold && _options.Grind && !_options.Grind->Spots.empty() && bot.level != 0 && nowMs >= state.EscapeUntilMs &&
             ((state.DeathTimesMs[0] != 0 && nowMs - state.DeathTimesMs[0] <= kDeathLoopMs) ||
              (state.KillerRepeat && state.DeathTimesMs[1] != 0 && nowMs - state.DeathTimesMs[1] <= kDeathLoopMs)))
         {
@@ -345,6 +354,7 @@ void BotPolicy::TurnRevivedAndRoles(DecideTick& tick, BotTurn& turn)
     auto const& partyMember = turn.partyMember;
     turn.routeOn = IsRouteActive(bot.guid) || (partyLeader != 0 && tankLed.count(partyLeader) != 0);   // the dungeon party rules apply to this bot
     auto const& routeOn = turn.routeOn;
+    DeathLoopBreakEscape(tick, turn); // DeathLoopBreaker (bot_policy_death_loop.cpp), before the death area escape
     DeathAreaEscape(tick, turn);
     LevelUnsafeEscape(tick, turn); // LevelSafeEscape (bot_policy_level_safe.cpp)
     // A solo bot out of combat that is hurt (a reclaim brings it up at 50% health) rests before it fights or walks to a quest giver, up to kRecoverHoldMs: it is

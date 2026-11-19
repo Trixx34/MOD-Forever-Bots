@@ -208,6 +208,12 @@ struct BotSettings
     std::uint32_t LevelSafeEscapeMarginLevels = 10;
     std::uint32_t LevelSafeRadiusYards = 250;
     std::uint32_t LevelSafeEscapeCooldownSec = 600;
+    // DeathLoopBreaker (default 0; bot_policy_death_loop.cpp, doc/level-safe.md): a solo bot that died 3 times to the same creature entry within 150 yards and 30 minutes
+    // gives up its corpse, is moved as a ghost to another graveyard of its map (one that fits its level, else the nearest one 400 yards off the loop; never one with a live
+    // hostile 3 levels above it beside the ghost) and revives there; the loop's graveyard is unsafe for that level for 2 hours (LevelSafeGraveyard skips it). No such
+    // graveyard known: the ghost waits up to 5 minutes, revives, and is moved to a grind spot at once (out of combat). Never off its map (Skyborne 2991). Event
+    // death_loop_break. The graveyard and grind spot teleports need Bot.Actions.Teleport = 1 in the core (the grind spot move walks when refused).
+    bool DeathLoopBreaker = false;
     // Below-map recovery (below_map.h): BelowMapRecover (default 0) teleports a living bot to the nearest known place when the nearest known place within 60 yards
     // lies more than BelowMapDropYards (default 60, 20..1000) above it for 20 s, or after BelowMapStormCount (default 8, 0 = that sign off, 0..100) no-route
     // answers for walks under 100 yards within 5 minutes; at most once per BelowMapCooldownSec (default 600, 60..86400). Event below_map_recover.

@@ -153,6 +153,16 @@ struct BotDeathSpot
     std::uint64_t AtMs = 0;
 };
 
+// DeathLoopBreaker: one recent death of a solo bot with the creature entry that killed it (bot_policy_death_loop.cpp).
+struct BotLoopDeath
+{
+    std::uint32_t Map = 0;
+    float X = 0.0f;
+    float Y = 0.0f;
+    std::uint32_t Entry = 0;
+    std::uint64_t AtMs = 0;
+};
+
 // Options for the policy. TestSpell (0 = off) replaces the rotation: it is cast at the target every CastEveryTicks
 // ticks, which exercises the cast path (milestone M1). ClassId selects the rotation (0 = none).
 struct PolicyOptions
@@ -397,6 +407,12 @@ struct PolicyOptions
     // KillerAvoidMs: a solo bot that died to a creature leaves creatures of that entry alone for this long (it does not pull them; one already on it is fought as before), so a leveling
     // bot does not walk back into what killed it (prod 2026-11-14: 81 and 82 deaths in 90 minutes). 0 = off here (the tests); the module's settings default to off.
     std::uint64_t KillerAvoidMs = 0;
+    // DeathLoopBreaker (config, default off; bot_policy_death_loop.cpp, doc/level-safe.md): a solo bot that died kLoopBreakDeaths times to the same creature entry within
+    // kLoopBreakYards and kLoopBreakWindowMs (the Raven Hill loop of the 2026-11-19 sim: two level 8 hunters, 481 deaths to one Skeletal Horror at the graveyard) gives up
+    // its corpse, is moved as a ghost (the core never refuses a ghost's teleport) to a graveyard away from the killer and asks the spirit healer there, never beside a live
+    // hostile kLoopBreakHighLevels above it; the graveyard of the loop is unsafe for that level for kLoopBreakUnsafeMs (the level-safe choice skips it). No safe graveyard
+    // known: the ghost waits (kLoopBreakGhostWaitMs), then revives and is moved to a grind spot at once (out of combat). Event death_loop_break. Off here (the tests).
+    bool DeathLoopBreaker = false;
     // The ready gate before a pull (bot_policy_pullready.cpp, doc/ai-plan-next.md). SoloPullManaPct: a solo mana user below this mana percent starts no fight, it sits and drinks up to
     // this plus 20 (pull_wait reason=mana). PullBuffGate: a bot (solo, or the route leader for its party) that has an upkeep buff to cast waits for it (pull_wait / pull_hold reason=buff).
     // Each wait lasts at most PullWaitMaxMs. 0 / false = off here (the tests); the module's settings default to off.
@@ -625,6 +641,7 @@ public:
     std::optional<std::string> TakeDeathsTopLine(std::uint64_t nowMs);
     // The graveyards seen so far (level_safe::Graveyards), for the tests.
     std::size_t GraveyardsKnown() const { return _graveyards.Size(); }
+    std::size_t UnsafeYardsKnown() const { return _unsafeYards.size(); }
     void SetStagingHoldFor(std::function<bool(std::uint64_t)> fn) { _stagingHoldFn = std::move(fn); }
     // Wipe recovery (the scenario director, scenario.cpp): after a wipe the members hold (rest, no pull) while Hold; the route leader holds until LeaderFree (it goes first,
     // the tank gets to the pack before the members); after a backoff RewindTo is the route point the leader is set back to once per Epoch.
@@ -1245,6 +1262,18 @@ private:
         bool LevelSafeJudged = false;                    // this death was judged (once per death)
         std::uint32_t LevelSafeYardMap = 0;
         Point LevelSafeYard;
+        // DeathLoopBreaker (bot_policy_death_loop.cpp): the recent deaths with their killer, and this death's loop break.
+        std::vector<BotLoopDeath> LoopDeaths;            // newest last, trimmed to kLoopBreakWindowMs and kLoopBreakMemory
+        bool LoopBreak = false;                          // this death is the kLoopBreakDeaths-th to one killer at one place: the loop is broken
+        bool LoopBreakJudged = false;                    // the ghost's graveyard was judged (again after a graveyard turned out held by a high hostile)
+        bool LoopBreakWait = false;                      // no safe graveyard known: the ghost waits, no corpse run
+        std::uint32_t LoopBreakEntry = 0;
+        std::uint32_t LoopBreakMap = 0;
+        float LoopBreakX = 0.0f;
+        float LoopBreakY = 0.0f;
+        std::uint64_t LoopBreakEscapeUntilMs = 0;        // revived from a loop break: moved away from the loop until this (0 = nothing to do)
+        std::uint64_t LoopBreakEscapeRetryMs = 0;
+        std::uint64_t LoopBreakLoggedMs = 0;             // the last held / in_combat line
         std::uint64_t GhostStuckLoggedMs = 0;            // the last ghost_stuck line
         std::uint64_t LevelGapLoggedFor = 0;             // engage_skipped: the target last logged
         std::uint64_t NoSpellLoggedFor = 0;              // caster_no_spell_melee: the target last logged
@@ -1338,6 +1367,13 @@ private:
     void LevelUnsafeEscape(DecideTick& tick, BotTurn& turn);
     void LevelSafeQuestWalk(DecideTick& tick, BotTurn& turn);
     void LevelSafeGhost(DecideTick& tick, BotTurn& turn);
+    // DeathLoopBreaker (bot_policy_death_loop.cpp): note a death and its killer (true: a loop, break it), the ghost's part (true: it took the ghost's turn), the move away
+    // after the revive, and the graveyards marked unsafe for a level.
+    void DeathLoopBreakNote(DecideTick& tick, BotTurn& turn, std::uint32_t killerEntry);
+    bool DeathLoopBreakGhost(DecideTick& tick, BotTurn& turn);
+    void DeathLoopBreakEscape(DecideTick& tick, BotTurn& turn);
+    bool YardUnsafe(std::uint32_t map, float x, float y, std::uint32_t level, std::uint64_t nowMs) const;
+    void MarkYardUnsafe(std::uint32_t map, float x, float y, std::uint32_t level, std::uint64_t nowMs);
     TurnFlow TurnBelowMap(DecideTick& tick, BotTurn& turn);  // below-map recovery (below_map.h, bot_policy_turn_life.cpp)
     void LogEvent(std::string const& text) const;
     void TurnRevivedAndRoles(DecideTick& tick, BotTurn& turn);
@@ -1558,6 +1594,15 @@ private:
     static level_safe::LevelMap MakeLevelMap(PolicyOptions const& options);
     level_safe::LevelMap _levelMap;
     level_safe::Graveyards _graveyards;
+    struct UnsafeYard
+    {
+        std::uint32_t Map = 0;
+        float X = 0.0f;
+        float Y = 0.0f;
+        std::uint32_t Level = 0;     // unsafe for bots of this level and below
+        std::uint64_t UntilMs = 0;
+    };
+    std::vector<UnsafeYard> _unsafeYards;   // DeathLoopBreaker: graveyards where a loop was broken, for kLoopBreakUnsafeMs
     level_safe::DeathTally _deathTally;
     std::uint64_t _deathsTopAtMs = 0;
     std::size_t _botsInView = 0;

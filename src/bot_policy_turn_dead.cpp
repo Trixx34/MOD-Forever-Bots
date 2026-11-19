@@ -87,11 +87,17 @@ bool BotPolicy::DeadGhostFallback(DecideTick& tick, BotTurn& turn)
     if (bot.life_state != 2)
         return false;
     bool const instanceParty = IsRouteActive(bot.guid) || (turn.deadParty != 0 && tick.tankLed.count(turn.deadParty) != 0);
+    // DeathLoopBreaker (bot_policy_death_loop.cpp): a loop's ghost gives up its corpse and revives at a graveyard away from the killer; it may wait first.
+    bool const loopBreak = !instanceParty && _options.DeathLoopBreaker && state.LoopBreak;
+    if (loopBreak && DeathLoopBreakGhost(tick, turn))
+        return true;
     if (!instanceParty)
         LevelSafeGhost(tick, turn);
     char const* reason = nullptr;
     if (state.GhostFallbackActive)
         reason = "active";
+    else if (loopBreak)
+        reason = "death_loop";
     else if (!instanceParty && state.LevelSafeYardSet && state.LevelSafeCorpseHigh)
         reason = "level_unsafe";
     else if (_options.GhostFallbackMs != 0 && state.RunFailed && nowMs - state.RunFailedAtMs >= _options.GhostFallbackMs)
@@ -119,6 +125,11 @@ bool BotPolicy::DeadGhostFallback(DecideTick& tick, BotTurn& turn)
             state.GhostStuckLoggedMs = nowMs;
             LogEvent(std::string("ghost_stuck: bot=") + std::to_string(bot.guid) + " reason=spirit_healer_refused would=" + reason + " corpse_valid=" +
                      std::to_string(bot.corpse_valid) + " ghost_s=" + std::to_string(state.GhostSinceMs != 0 ? (nowMs - state.GhostSinceMs) / 1000 : 0));
+        }
+        if (loopBreak)
+        {
+            DeadEmit(tick, turn, Decision{ ActionType::kStop, 0 }); // a loop's ghost waits for the healer again, no corpse run into the killer
+            return true;
         }
         return false;
     }
@@ -272,6 +283,7 @@ void BotPolicy::DeadRecord(DecideTick& tick, BotTurn& turn)
         std::uint32_t const killerEntry = blow ? blow->Entry : guessEntry;
         state.KillerRepeat = killerEntry != 0 && killerEntry == state.LastKillerEntry;
         state.LastKillerEntry = killerEntry;
+        DeathLoopBreakNote(tick, turn, killerEntry); // DeathLoopBreaker (bot_policy_death_loop.cpp); clears the last death's loop break
         if (_options.KillerAvoidMs != 0 && killerEntry != 0 && bot.group_leader_guid == 0 && !IsRouteActive(bot.guid))
         {
             for (auto it = state.KillerAvoidUntilMs.begin(); it != state.KillerAvoidUntilMs.end();)
@@ -298,7 +310,7 @@ void BotPolicy::DeadRecord(DecideTick& tick, BotTurn& turn)
         state.GhostSpawn = Point{ bot.pos_x, bot.pos_y, bot.pos_z };
         // LevelSafeGraveyard: a ghost seen to rise from its corpse stands at the graveyard the core chose; it is remembered for the level-safe choice (a ghost
         // first seen as a ghost, after a module restart, may stand anywhere and is not).
-        if (_options.LevelSafe.Graveyard && was == 1)
+        if ((_options.LevelSafe.Graveyard || _options.DeathLoopBreaker) && was == 1)
             _graveyards.Note(bot.map_id, bot.pos_x, bot.pos_y, bot.pos_z, _options.SideOf ? _options.SideOf(bot.guid) : 0);
         state.RunStarted = false;
         state.Inside = false;
