@@ -402,6 +402,14 @@ void LoadPolicyTables(PolicyOptions& policyOptions, BotSettings& settings)
     policyOptions.LevelSafe.EscapeCooldownMs = std::uint64_t(settings.LevelSafeEscapeCooldownSec) * 1000;
     policyOptions.LevelSafe.LogThrottleMs = std::uint64_t(settings.LevelSafeLogThrottleSec) * 1000;
     policyOptions.DeathLoopBreaker = settings.DeathLoopBreaker;
+    policyOptions.SafeRevive.Enabled = settings.SafeRevive;
+    policyOptions.SafeRevive.LevelMargin = settings.SafeReviveLevelMargin;
+    policyOptions.FightRisk.Enabled = settings.FightRiskRetreat;
+    policyOptions.FightRisk.MarginPct = settings.FightRiskMarginPct;
+    policyOptions.FightRisk.Teleport = settings.FightRiskTeleport;
+    policyOptions.DangerMap.Enabled = settings.DangerMap;
+    policyOptions.DangerMap.DeathsPerHour = settings.DangerMapDeathsPerHour;
+    policyOptions.DangerMap.DecayMs = std::uint64_t(settings.DangerMapDecayMin) * 60000;
     policyOptions.BelowMap.Enabled = settings.BelowMapRecover;
     policyOptions.BelowMap.DropYards = float(settings.BelowMapDropYards);
     policyOptions.BelowMap.StormCount = settings.BelowMapStormCount;

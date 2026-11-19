@@ -573,6 +573,24 @@ constexpr std::uint64_t kLoopBreakGhostWaitMs = 300000; // no safe graveyard: th
 constexpr std::uint32_t kLoopBreakHighLevels = 3;       // no spirit healer revive with a live hostile this many levels above the bot ...
 constexpr float kLoopBreakHostileYards = 40.0f;         // ... this close to the ghost at the graveyard
 constexpr std::uint64_t kLoopBreakEscapeMs = 60000;     // after the revive the bot is moved away from the loop within this (it waits out a fight)
+// The survival system (2026-11-19, doc/survival.md). SafeRevive: a live hostile this many yards from the revive point (and SafeRevive.LevelMargin levels above the bot)
+// holds the revive; a graveyard held for a hostile is unsafe for that level this long, one held for the danger map that long; a ghost waits at most this long.
+constexpr float kSafeReviveHostileYards = 40.0f;
+constexpr std::uint64_t kSafeReviveHostileUnsafeMs = 600000;
+constexpr std::uint64_t kSafeReviveDangerUnsafeMs = 1800000;
+constexpr std::uint64_t kSafeReviveMaxWaitMs = 600000;
+constexpr std::uint64_t kSafeReviveLogMs = 30000;
+// DangerMap: a quest walk's first yards (where the bot stands) are not judged, and a judged walk is judged again after this; explore tries this many directions.
+constexpr float kDangerSkipNearYards = 60.0f;
+constexpr std::uint64_t kDangerWalkJudgeMs = 30000;
+constexpr std::uint32_t kDangerExploreTries = 4;
+// FightRiskRetreat: the safe point is where a solo bot stood out of combat at this health or more with no live hostile this near; a retreat without one walks this far
+// straight away from its target; a rescue teleport goes to a grind spot at least this far from the fight.
+constexpr std::uint32_t kRiskSafeHealthPct = 80;
+constexpr float kRiskSafeHostileYards = 30.0f;
+constexpr float kRiskAwayYards = 40.0f;
+constexpr float kRiskRescueMinYards = 100.0f;
+constexpr float kRiskSafePointMaxYards = 300.0f;
 constexpr std::uint64_t kCorpseTeleportRetryMs = 15000; // a ghost off its corpse's map with no portal is teleported to the corpse, not again before this
 constexpr std::uint64_t kOutOfCombatReviveRetryMs = 10000; // a ghost of a dungeon party is revived by its leader out of combat, not again before this
 constexpr std::uint64_t kCorpseReviveDelayMs = 8000;       // the Recover tactic: a dead member of a dungeon party whose leader is up and quiet is revived by the leader this long after the fight ended

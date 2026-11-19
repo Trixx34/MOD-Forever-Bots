@@ -128,7 +128,10 @@ void BotPolicy::TurnQuestsAndHold(DecideTick& tick, BotTurn& turn)
     if (questsAllowed)
         questStep = QuestsFor(bot).Next(bot, state.Quest, nowMs, QuestBotInfo{ classId, Opt().RaceOf ? Opt().RaceOf(bot.guid) : 0u, Opt().PathVariety.Enabled ? &Opt().PathVariety : nullptr, Opt().RandomSeed, bot.guid });
     if (questsAllowed)
+    {
         LevelSafeQuestWalk(tick, turn); // LevelSafeWalks: a walk to or through a place far above the bot is dropped (bot_policy_level_safe.cpp)
+        DangerQuestWalk(tick, turn);    // DangerMap: a walk into a cell where bots of its band keep dying is dropped (bot_policy_survival.cpp)
+    }
     // SkyborneExitMakeRoom: full bags before the accept of an exit quest (or the quest before it): the vendor first (the urgent errand of a refused hand-in).
     if (questsAllowed && Opt().SkyborneExitMakeRoom && bot.map_id == kSkyborneMap && bot.bag_free_slots == 0 && nowMs >= state.ExitRoomNextMs &&
         (questStep.Kind == QuestStepKind::Accept || (questStep.Kind == QuestStepKind::WalkTo && questStep.StartGiver)) && QuestsFor(bot).ExitChain(questStep.Quest))

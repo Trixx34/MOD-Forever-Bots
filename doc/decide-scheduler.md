@@ -78,6 +78,11 @@ S/R = bot-ticks seen / turns run per tier in the period; `skipped` = turns not d
 reactions; `starved` = turns forced by `DecideMaxSkipTicks`; `overruns` = ticks over the budget; `max_turn_us` = the longest single bot turn (the
 47 ms max of arm C: is it one bot or the sum?). Counts reset with each line.
 
+With `ArmSplit = 1` (`doc/sim-ab.md`) the scheduler is per arm: arm A's keys make a scheduler over the arm A bots, arm B's (`ArmBOverrides`,
+`Arm.B.<Key>`) one over the arm B bots, each with its own budget (that arm's turns only). The tail then moves from the `pump:` line to each
+`pump_arm: arm=A|B` line (empty for an arm with the scheduler off). Arm A's bots take their turns before arm B's while either scheduler is on
+(`doc/sim-arm-d2.md`).
+
 ## Tests
 
 `tests/decide_scheduler_test.cpp` (ctest `decide_scheduler`): tier choice; off runs every bot in view order; cadence (idle 10 of 60 ticks, walk 20,

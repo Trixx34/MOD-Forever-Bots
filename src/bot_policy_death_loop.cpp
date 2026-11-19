@@ -31,19 +31,21 @@ bool BotPolicy::YardUnsafe(std::uint32_t map, float x, float y, std::uint32_t le
     return false;
 }
 
-void BotPolicy::MarkYardUnsafe(std::uint32_t map, float x, float y, std::uint32_t level, std::uint64_t nowMs)
+// `forMs` 0: kLoopBreakUnsafeMs (the loop breaker); SafeRevive marks a graveyard held by a high hostile for a shorter while. A mark never shrinks.
+void BotPolicy::MarkYardUnsafe(std::uint32_t map, float x, float y, std::uint32_t level, std::uint64_t nowMs, std::uint64_t forMs)
 {
+    std::uint64_t const until = nowMs + (forMs != 0 ? forMs : kLoopBreakUnsafeMs);
     std::erase_if(_unsafeYards, [nowMs](UnsafeYard const& yard) { return nowMs >= yard.UntilMs; });
     for (UnsafeYard& yard : _unsafeYards)
         if (yard.Map == map && std::hypot(yard.X - x, yard.Y - y) <= level_safe::Graveyards::kSameYards)
         {
             yard.Level = std::max(yard.Level, level);
-            yard.UntilMs = nowMs + kLoopBreakUnsafeMs;
+            yard.UntilMs = std::max(yard.UntilMs, until);
             return;
         }
     if (_unsafeYards.size() >= kLoopBreakUnsafeMax)
         _unsafeYards.erase(_unsafeYards.begin());
-    _unsafeYards.push_back(UnsafeYard{ map, x, y, level, nowMs + kLoopBreakUnsafeMs });
+    _unsafeYards.push_back(UnsafeYard{ map, x, y, level, until });
 }
 
 // Just died (DeadRecord): the death and its killer are kept; the kLoopBreakDeaths-th death to the same entry within kLoopBreakYards of this one, in the window, is a loop.

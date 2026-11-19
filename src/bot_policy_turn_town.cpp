@@ -556,13 +556,21 @@ void BotPolicy::TurnWander(DecideTick& tick, BotTurn& turn)
         // Starts a walk to a new random point; scale shortens it (a retry after a refused point). The point is at the bot's own height, so
         // the core often has no route to it (open ground the navmesh does not cover): a refused point is retried nearer, not after the idle pause.
         auto const startExploreWalk = [&](float scale) {
-            float const angle = float((bot.guid * 2654435761ull) % 628) * 0.01f + float(state.ExploreStep) * 2.399963f;
-            float radius = (50.0f + 25.0f * float(state.ExploreStep % 3)) * scale;
-            if (Opt().RandomPct > 0)
-                radius = float(bot_random::Vary(std::uint64_t(radius), Opt().RandomPct,
-                                                bot_random::Draw(Opt().RandomSeed, bot.guid, bot_random::kSaltJitter, 0x200000000ull + state.ExploreStep)));
-            ++state.ExploreStep;
-            state.ExploreTarget = Point{ bot.pos_x + std::cos(angle) * radius, bot.pos_y + std::sin(angle) * radius, bot.pos_z };
+            // DangerMap: a point in a dangerous cell for the bot's band is passed over for the next direction (kDangerExploreTries at most; the last one is walked).
+            for (std::uint32_t tries = 0;; ++tries)
+            {
+                float const angle = float((bot.guid * 2654435761ull) % 628) * 0.01f + float(state.ExploreStep) * 2.399963f;
+                float radius = (50.0f + 25.0f * float(state.ExploreStep % 3)) * scale;
+                if (Opt().RandomPct > 0)
+                    radius = float(bot_random::Vary(std::uint64_t(radius), Opt().RandomPct,
+                                                    bot_random::Draw(Opt().RandomSeed, bot.guid, bot_random::kSaltJitter, 0x200000000ull + state.ExploreStep)));
+                ++state.ExploreStep;
+                state.ExploreTarget = Point{ bot.pos_x + std::cos(angle) * radius, bot.pos_y + std::sin(angle) * radius, bot.pos_z };
+                if (!Opt().DangerMap.Enabled || tries + 1 >= kDangerExploreTries ||
+                    !_dangerMap.Dangerous(bot.map_id, state.ExploreTarget.X, state.ExploreTarget.Y, bot.level, nowMs))
+                    break;
+                _dangerMap.NoteSkip("explore");
+            }
             state.Wandering = true;
             state.WanderStartMs = nowMs;
             wanted = Decision{ ActionType::kMoveTo, 0, state.ExploreTarget };

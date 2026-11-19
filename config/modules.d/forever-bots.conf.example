@@ -161,6 +161,29 @@ Module.forever-bots.TelemetrySummarySec = 60
 # stage=detect|yard_unsafe|yard|own_yard|wait|wait_over|yard_held|escape|revived_away|in_combat|no_spot. Needs Bot.Actions.Teleport = 1 in the core.
 # DeathLoopBreaker = 0
 
+# Survival system (2026-11-19, doc/survival.md; every key off by default, the sim first).
+# SafeRevive: a solo ghost never takes the spirit healer or reclaims its corpse with a live hostile SafeReviveLevelMargin or more levels above it within 40 yards,
+# nor at a place the danger map counts as dangerous for its level band (DangerMapDeathsPerHour; the map is kept with SafeRevive alone too). It is moved as a ghost
+# to another graveyard of its map and side (never another map: Skyborne 2991 stays on 2991); with none known it waits, at most 10 minutes. Log: safe_revive
+# stage=held|yard|wait|give_up, ghost_fallback reason=safe_revive. The ghost teleport needs Bot.Actions.Teleport = 1 in the core.
+# SafeRevive = 0
+# SafeReviveLevelMargin = 3   (1 to 20)
+# FightRiskRetreat: a solo bot in the open world that is losing a fight (time to die below time to kill x FightRiskMarginPct / 100, at 70% health or less; from its
+# own health loss and the core's damage events against its target's health loss) drinks a health potion or bandages (what it carries), then walks away to the last
+# place it stood safe. FightRiskTeleport: still losing after 8 s of that, a rescue teleport to a level-safe grind spot of the same map, once per fight and 10
+# minutes. Set FightRiskTeleport only with the core's Bot.Actions.TeleportInCombat = 1 (else stage=teleport_refused). Never in a group, a dungeon or raid, or on
+# a transport. Log: fight_retreat stage=potion|bandage|disengage|teleport|teleport_refused|no_spot|end|died.
+# FightRiskRetreat = 0
+# FightRiskMarginPct = 100   (50 to 400; above 100 the bot leaves earlier)
+# FightRiskTeleport = 0
+# DangerMap: the deaths of all bots per 40 yard cell and map, by level band (1-5, 6-10, ...) and killer entry, each counting less over DangerMapDecayMin. Grind
+# spots, quest walks and explore walks skip a cell where bots of the bot's band (or a higher one) died DangerMapDeathsPerHour or more per hour. Log: danger_cell
+# (a cell turned dangerous for a band), quest_walk_blocked reason=danger; the deaths_top line ends with danger_cells= danger_hot= danger_deaths= danger_skips=
+# danger_top=.
+# DangerMap = 0
+# DangerMapDeathsPerHour = 6   (1 to 1000)
+# DangerMapDecayMin = 120   (10 to 1440)
+
 # Below-map recovery (off by default; the sim first). A living bot below every known place within 60 yards by more than BelowMapDropYards (the lowest of
 # them is the ground) for 20 s and five looks in a row (one every 2 s), or that got BelowMapStormCount no-route answers for walks under 100 yards within
 # 5 minutes (0 = that sign off), is teleported to that place (storm: the nearest known place of its side), at most once per BelowMapCooldownSec. Not acted

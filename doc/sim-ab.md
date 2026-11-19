@@ -55,7 +55,8 @@ Module.forever-bots.TraceMaxMB = 20                     Module.forever-bots.Trac
   `not done` lines too. With `ArmSplit = 0` nothing changes.
 - After each `deaths_top:` line come two more, `deaths_top: arm=A window_min=...` and `deaths_top: arm=B ...`, with the same fields.
 - After each `pump:` line come `pump_arm: arm=A bots=N turn_avg_us=T per_bot_us=P ticks=K` and the same for B: the bots in view (average per
-  tick) and the time of their own turns. The shared steps are only in the `pump:` line.
+  tick) and the time of their own turns. The shared steps are only in the `pump:` line. With `DecideScheduler` on in an arm, that arm's
+  scheduler tail (` sched=on ...`) ends its `pump_arm` line (the scheduler is per arm, `doc/decide-scheduler.md`).
 - Always (also without the split): `died` carries `level=` after `in_combat=`, and a bot seen at a higher level than at its last turn writes
   `level_up: bot= level= from= map=`. Both are for the read-out.
 

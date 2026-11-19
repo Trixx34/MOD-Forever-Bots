@@ -226,6 +226,24 @@ struct BotSettings
     // graveyard known: the ghost waits up to 5 minutes, revives, and is moved to a grind spot at once (out of combat). Never off its map (Skyborne 2991). Event
     // death_loop_break. The graveyard and grind spot teleports need Bot.Actions.Teleport = 1 in the core (the grind spot move walks when refused).
     bool DeathLoopBreaker = false;
+    // The survival system (2026-11-19, doc/survival.md; every key default 0 = today's behaviour).
+    // SafeRevive: a solo ghost never takes the spirit healer or reclaims its corpse with a live hostile SafeReviveLevelMargin (default 3, 1..20) or more levels above it
+    // within 40 yards, nor at a place the danger map counts as dangerous for its level band; it is moved as a ghost to another graveyard of its map, or waits (at most
+    // 10 minutes). Event safe_revive. The ghost teleport needs Bot.Actions.Teleport = 1 in the core.
+    bool SafeRevive = false;
+    std::uint32_t SafeReviveLevelMargin = 3;
+    // FightRiskRetreat: a solo bot losing a fight (time to die < time to kill x FightRiskMarginPct / 100; default 100, 50..400) drinks a health potion or bandages, then
+    // walks away to the last safe point. FightRiskTeleport (default 0): then a rescue teleport to a level-safe grind spot of the same map; set it only with the core's
+    // Bot.Actions.TeleportInCombat = 1 (else the core refuses it, logged as stage=teleport_refused). Event fight_retreat.
+    bool FightRiskRetreat = false;
+    std::uint32_t FightRiskMarginPct = 100;
+    bool FightRiskTeleport = false;
+    // DangerMap: grind spots, quest walks and explore walks skip the 40 yard cells where bots of the bot's level band (or higher) died at DangerMapDeathsPerHour
+    // (default 6, 1..1000) or more; a death counts less and less over DangerMapDecayMin (default 120, 10..1440). Events danger_cell, quest_walk_blocked reason=danger;
+    // the hourly deaths_top line ends with danger_cells= danger_hot= danger_deaths= danger_skips= danger_top=.
+    bool DangerMap = false;
+    std::uint32_t DangerMapDeathsPerHour = 6;
+    std::uint32_t DangerMapDecayMin = 120;
     // Below-map recovery (below_map.h): BelowMapRecover (default 0) teleports a living bot to the nearest known place when the nearest known place within 60 yards
     // lies more than BelowMapDropYards (default 60, 20..1000) above it for 20 s, or after BelowMapStormCount (default 8, 0 = that sign off, 0..100) no-route
     // answers for walks under 100 yards within 5 minutes; at most once per BelowMapCooldownSec (default 600, 60..86400). Event below_map_recover.

@@ -240,6 +240,77 @@ void DeathsTopPerArm()
     CHECK(policy.TakeArmDeathsTopLines().empty());
 }
 
+// The survival and decide scheduler keys are policy options: ArmBOverrides sets them for arm B only, arm A keeps the base values (the arm D2 A/B, doc/sim-arm-d2.md).
+void SurvivalAndSchedulerKeysPerArm()
+{
+    std::vector<std::string> warnings;
+    BotSettings const on = ParseBotSettings({ { "ArmSplit", "1" }, { "ArmBOverrides", "SafeRevive=1,FightRiskRetreat=1,DangerMap=1,DecideScheduler=1" },
+                                              { "Arm.B.FightRiskTeleport", "1" }, { "Arm.B.DecideBudgetUs", "4000" } },
+                                            warnings);
+    CHECK(warnings.empty());
+    CHECK(on.ArmSplit && on.ArmB);
+    if (!on.ArmB)
+        return;
+    BotSettings const& b = *on.ArmB;
+    CHECK(b.SafeRevive && b.FightRiskRetreat && b.DangerMap && b.DecideScheduler && b.FightRiskTeleport && b.DecideBudgetUs == 4000);
+    // The keys not overridden keep their defaults in arm B as well.
+    CHECK(b.SafeReviveLevelMargin == 3 && b.FightRiskMarginPct == 100 && b.DangerMapDeathsPerHour == 6 && b.DangerMapDecayMin == 120);
+    CHECK(b.DecideTierWalk == 3 && b.DecideTierIdle == 6 && b.DecideMaxSkipTicks == 12);
+    // Arm A: the base values (all off).
+    CHECK(!on.SafeRevive && !on.FightRiskRetreat && !on.DangerMap && !on.DecideScheduler && !on.FightRiskTeleport && on.DecideBudgetUs == 0);
+    CHECK(on.ArmBApplied.size() == 6);
+}
+
+// Two bots standing idle, nothing near: the scheduler's idle tier.
+WorldTickSnapshotView TwoIdleBots(std::uint64_t tick, std::uint64_t a, std::uint64_t b)
+{
+    WorldTickSnapshotView view;
+    view.tick_number = tick;
+    view.max_nearby_units = 4;
+    view.nearby.resize(8);
+    for (std::uint64_t guid : { a, b })
+    {
+        BotSnapshot bot;
+        bot.guid = guid;
+        bot.health = 1000;
+        bot.max_health = 1000;
+        bot.level = 10;
+        view.bots.push_back(bot);
+    }
+    return view;
+}
+
+// DecideScheduler per arm: each arm's scheduler runs over its own bots with its own keys; an arm with the scheduler off runs its bots every tick.
+void SchedulerPerArm()
+{
+    for (bool armB : { true, false })
+    {
+        PolicyOptions a = Aggressive();
+        a.WanderWhenIdle = false;
+        a.DecideClockUs = [] { return std::uint64_t(0); };
+        PolicyOptions b = a;
+        PolicyOptions& on = armB ? b : a;
+        on.DecideScheduler.Enabled = true;
+        on.DecideScheduler.TierIdle = 6;
+        BotPolicy policy(a);
+        policy.SetArmB(b);
+        std::uint64_t const scheduled = armB ? 43 : 42;
+        std::uint64_t const every = armB ? 42 : 43;
+        int maxWaited = 0;
+        for (std::uint64_t tick = 1; tick <= 8; ++tick)
+        {
+            policy.Decide(TwoIdleBots(tick, 42, 43), 1000 * tick);
+            maxWaited = std::max(maxWaited, policy.SchedulerWaitedOf(scheduled));
+            CHECK(policy.SchedulerWaitedOf(every) == -1);   // its arm's scheduler is off: no memory, it runs every tick
+        }
+        CHECK(maxWaited > 0);
+        std::string const onLine = policy.TakeSchedulerLine(armB ? 1 : 0);
+        CHECK(onLine.rfind(" sched=on walk=3 idle=6", 0) == 0);
+        CHECK(onLine.find("idle:8/") != std::string::npos);   // one bot seen on 8 ticks
+        CHECK(policy.TakeSchedulerLine(armB ? 0 : 1).empty());
+    }
+}
+
 } // namespace
 
 int main()
@@ -252,6 +323,8 @@ int main()
     SettingsBothArms();
     PolicyTakesArmBOptionsForOddGuids();
     DeathsTopPerArm();
+    SurvivalAndSchedulerKeysPerArm();
+    SchedulerPerArm();
     if (failures == 0)
         std::printf("ab_split_test: all passed\n");
     return failures == 0 ? 0 : 1;

@@ -162,6 +162,13 @@ bool BotPolicy::DeadGhostFallback(DecideTick& tick, BotTurn& turn)
         }
         // The teleport is not due yet (or was refused): the spirit healer is asked from here, the core walks to one within its reach or falls back to the reclaim.
     }
+    // SafeRevive (bot_policy_survival.cpp): not beside a live hostile far above the ghost, nor at a dangerous place; it is sent to another graveyard or waits.
+    if (!instanceParty && nowMs >= state.SpiritHealerRetryMs)
+    {
+        bool const atYard = bot.map_id == yardMap && DistanceTo(bot, yard) <= kGhostFallbackHealerYards;
+        if (SafeReviveHeld(tick, turn, bot.map_id, atYard ? yard : Point{ bot.pos_x, bot.pos_y, bot.pos_z }, atYard ? "spirit_healer" : "spirit_healer_far"))
+            return true;
+    }
     if (nowMs >= state.SpiritHealerRetryMs)
     {
         BotAction spirit;
@@ -219,6 +226,9 @@ void BotPolicy::DeadRecord(DecideTick& tick, BotTurn& turn)
         state.LevelSafeYardSet = false;
         state.LevelSafeCorpseHigh = false;
         state.LevelSafeJudged = false;
+        state.SafeReviveSinceMs = 0;
+        state.SafeReviveLoggedMs = 0;
+        state.SafeReviveGaveUp = false;
         _deathTally.Note(bot.guid);
         if (_optionsB)
             _armDeathTally[std::size_t(ab_split::ArmOf(true, bot.guid))].Note(bot.guid);
@@ -286,6 +296,18 @@ void BotPolicy::DeadRecord(DecideTick& tick, BotTurn& turn)
         state.KillerRepeat = killerEntry != 0 && killerEntry == state.LastKillerEntry;
         state.LastKillerEntry = killerEntry;
         DeathLoopBreakNote(tick, turn, killerEntry); // DeathLoopBreaker (bot_policy_death_loop.cpp); clears the last death's loop break
+        DangerNoteDeath(tick, turn, killerEntry);    // DangerMap / SafeRevive: the shared danger map (bot_policy_survival.cpp)
+        if (state.RiskStep != fight_risk::Step::kNone)
+        {
+            // FightRiskRetreat: the retreat did not save it (bot_policy_fight_risk.cpp)
+            LogEvent("fight_retreat: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id) + " stage=died last=" +
+                     fight_risk::StepName(state.RiskStep) + " entry=" + std::to_string(state.RiskEntry) + " killer_entry=" + std::to_string(killerEntry));
+            state.RiskStep = fight_risk::Step::kNone;
+        }
+        state.RiskWatch.Reset();
+        state.RiskDisengageSinceMs = 0;
+        state.RiskBandaged = false;
+        state.RiskTeleportSent = false;
         if (Opt().KillerAvoidMs != 0 && killerEntry != 0 && bot.group_leader_guid == 0 && !IsRouteActive(bot.guid))
         {
             for (auto it = state.KillerAvoidUntilMs.begin(); it != state.KillerAvoidUntilMs.end();)
@@ -1028,6 +1050,9 @@ void BotPolicy::DeadGhostRun(DecideTick& tick, BotTurn& turn)
     {
         if (nowMs < state.SpiritHealerRetryMs)
             return;
+        // SafeRevive: asked from the corpse, the core walks to a healer near it or reclaims the corpse there.
+        if (SafeReviveHeld(tick, turn, bot.map_id, Point{ bot.pos_x, bot.pos_y, bot.pos_z }, "spirit_healer_near_corpse"))
+            return;
         BotAction spirit;
         spirit.bot_guid = bot.guid;
         spirit.type = ActionType::kResurrect;
@@ -1108,7 +1133,8 @@ void BotPolicy::DeadGhostRun(DecideTick& tick, BotTurn& turn)
             }
             DeadEmit(tick, turn, Decision{ ActionType::kStop, 0 });
             bool const holdForDanger = danger && nowMs - state.ReclaimDangerSinceMs < kReclaimDangerWaitMs;
-            if (bot.reclaim_wait_ms == 0 && nowMs >= state.ReclaimRetryMs && !holdForDanger)
+            // SafeRevive: no reclaim beside a live hostile far above the ghost or in a dangerous cell; the ghost turns to the spirit healer of a safe graveyard.
+            if (bot.reclaim_wait_ms == 0 && nowMs >= state.ReclaimRetryMs && !holdForDanger && !SafeReviveHeld(tick, turn, bot.map_id, corpse, "reclaim"))
             {
                 BotAction reclaim;
                 reclaim.bot_guid = bot.guid;

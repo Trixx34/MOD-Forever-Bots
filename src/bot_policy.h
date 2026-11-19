@@ -95,6 +95,8 @@
 #include "level_safe.h"
 #include "below_map.h"
 #include "auction_policy.h"
+#include "danger_map.h"
+#include "fight_risk.h"
 
 #include <array>
 #include <cstdint>
@@ -445,6 +447,19 @@ struct PolicyOptions
     // hostile kLoopBreakHighLevels above it; the graveyard of the loop is unsafe for that level for kLoopBreakUnsafeMs (the level-safe choice skips it). No safe graveyard
     // known: the ghost waits (kLoopBreakGhostWaitMs), then revives and is moved to a grind spot at once (out of combat). Event death_loop_break. Off here (the tests).
     bool DeathLoopBreaker = false;
+    // The survival system (2026-11-19, doc/survival.md; all off here and in the module settings). SafeRevive (bot_policy_safe_revive.cpp): a solo ghost never takes the
+    // spirit healer or reclaims its corpse with a live hostile LevelMargin or more levels above it within kSafeReviveHostileYards, nor at a place the danger map counts as
+    // dangerous for its level band; it is moved as a ghost to another graveyard of its map, or waits (kSafeReviveMaxWaitMs at most). FightRisk (fight_risk.h,
+    // bot_policy_fight_risk.cpp): a solo bot losing a fight drinks a potion or bandages, walks away to the last safe point, and (FightRisk.Teleport) takes a rescue teleport
+    // to a level-safe spot of its map. DangerMap (danger_map.h): the deaths of all bots per 40 yard cell; grind spots, quest walks and explore walks skip the dangerous ones.
+    struct SafeReviveOptions
+    {
+        bool Enabled = false;
+        std::uint32_t LevelMargin = 3;
+    };
+    SafeReviveOptions SafeRevive;
+    fight_risk::Options FightRisk;
+    danger_map::Options DangerMap;
     // The ready gate before a pull (bot_policy_pullready.cpp, doc/ai-plan-next.md). SoloPullManaPct: a solo mana user below this mana percent starts no fight, it sits and drinks up to
     // this plus 20 (pull_wait reason=mana). PullBuffGate: a bot (solo, or the route leader for its party) that has an upkeep buff to cast waits for it (pull_wait / pull_hold reason=buff).
     // Each wait lasts at most PullWaitMaxMs. 0 / false = off here (the tests); the module's settings default to off.
@@ -656,6 +671,7 @@ public:
                                                      _whispers(options.WhisperCooldownMs, options.WhisperMaxPerMin)
     {
         _scheduler[0] = decide_scheduler::Scheduler(_optionsA.DecideScheduler);
+        _dangerMap.SetOptions(options.DangerMap);
     }
 
     // Actions for the bots in `view`. nowMs is a monotonic clock in milliseconds (cooldowns, retries, fight time).
@@ -690,6 +706,8 @@ public:
     // The graveyards seen so far (level_safe::Graveyards), for the tests.
     std::size_t GraveyardsKnown() const { return _graveyards.Size(); }
     std::size_t UnsafeYardsKnown() const { return _unsafeYards.size(); }
+    // The shared danger map (DangerMap, SafeRevive), for the tests.
+    danger_map::Map const& DangerMapView() const { return _dangerMap; }
     void SetStagingHoldFor(std::function<bool(std::uint64_t)> fn) { _stagingHoldFn = std::move(fn); }
     // Wipe recovery (the scenario director, scenario.cpp): after a wipe the members hold (rest, no pull) while Hold; the route leader holds until LeaderFree (it goes first,
     // the tank gets to the pack before the members); after a backoff RewindTo is the route point the leader is set back to once per Epoch.
@@ -710,10 +728,14 @@ public:
     // shared step (parties, guilds, level dungeons, chat) with the constructor's. The tables the constructor derives (quest sets, known world, level map) stay
     // arm A's. Call before the first Decide; the deaths_top and per-arm timing lines then come per arm as well.
     // Arm B's DecideScheduler keys make arm B's own scheduler (over the arm B bots only).
+    // The danger map is one map for both arms (every open-world death of either arm goes in while DangerMap or SafeRevive is on in either arm); its
+    // DangerMapDeathsPerHour / DangerMapDecayMin are arm A's when arm A uses the map, arm B's when only arm B does.
     void SetArmB(PolicyOptions options)
     {
         _optionsB = std::make_shared<PolicyOptions>(std::move(options));
         _scheduler[1] = decide_scheduler::Scheduler(_optionsB->DecideScheduler);
+        if (!_optionsA.DangerMap.Enabled && !_optionsA.SafeRevive.Enabled && (_optionsB->DangerMap.Enabled || _optionsB->SafeRevive.Enabled))
+            _dangerMap.SetOptions(_optionsB->DangerMap);
     }
     bool ArmSplitOn() const { return _optionsB != nullptr; }
     // The per-arm lines due with the last TakeDeathsTopLine ("deaths_top: arm=A window_min=..."), empty without ArmSplit. Taken once.
@@ -1354,6 +1376,27 @@ private:
         std::uint64_t LoopBreakEscapeUntilMs = 0;        // revived from a loop break: moved away from the loop until this (0 = nothing to do)
         std::uint64_t LoopBreakEscapeRetryMs = 0;
         std::uint64_t LoopBreakLoggedMs = 0;             // the last held / in_combat line
+        // SafeRevive (bot_policy_safe_revive.cpp): when this death's revive was first held, the last line, and whether the wait ran out.
+        std::uint64_t SafeReviveSinceMs = 0;
+        std::uint64_t SafeReviveLoggedMs = 0;
+        bool SafeReviveGaveUp = false;
+        // FightRiskRetreat (bot_policy_fight_risk.cpp): the fight's samples, the step reached, and the last place the bot stood safe (out of combat, healthy, no
+        // hostile near), where a retreat walks to.
+        fight_risk::Watch RiskWatch;
+        fight_risk::Step RiskStep = fight_risk::Step::kNone;
+        std::uint64_t RiskDisengageSinceMs = 0;
+        bool RiskBandaged = false;
+        bool RiskTeleportSent = false;
+        std::uint64_t RiskTeleportAtMs = 0;              // the last rescue teleport (kTeleportCooldownMs)
+        std::uint64_t RiskTeleportSeq = 0;               // the action sequence a refused rescue teleport was logged for
+        std::uint32_t RiskEntry = 0;                     // the target's entry when the retreat began
+        bool SafePointSet = false;
+        std::uint32_t SafePointMap = 0;
+        Point SafePoint;
+        // DangerMap: the quest walk last judged (re-judged after kDangerWalkJudgeMs, the map changes as bots die).
+        std::uint32_t DangerWalkQuest = 0;
+        Point DangerWalkDest;
+        std::uint64_t DangerWalkJudgedMs = 0;
         std::uint64_t GhostStuckLoggedMs = 0;            // the last ghost_stuck line
         std::uint64_t LevelGapLoggedFor = 0;             // engage_skipped: the target last logged
         std::uint64_t NoSpellLoggedFor = 0;              // caster_no_spell_melee: the target last logged
@@ -1453,7 +1496,18 @@ private:
     bool DeathLoopBreakGhost(DecideTick& tick, BotTurn& turn);
     void DeathLoopBreakEscape(DecideTick& tick, BotTurn& turn);
     bool YardUnsafe(std::uint32_t map, float x, float y, std::uint32_t level, std::uint64_t nowMs) const;
-    void MarkYardUnsafe(std::uint32_t map, float x, float y, std::uint32_t level, std::uint64_t nowMs);
+    void MarkYardUnsafe(std::uint32_t map, float x, float y, std::uint32_t level, std::uint64_t nowMs, std::uint64_t forMs = 0);
+    // SafeRevive (bot_policy_safe_revive.cpp): true when a solo ghost must not revive at `at` now (`what`: spirit_healer or reclaim); it then has been sent on (another
+    // graveyard, or the wait), and the caller holds the revive. A held reclaim turns the ghost to the spirit healer fallback.
+    bool SafeReviveHeld(DecideTick& tick, BotTurn& turn, std::uint32_t map, Point const& at, char const* what);
+    // DangerMap (danger_map.h): a death noted in the shared map (DeadRecord); a quest walk into a dangerous cell dropped (after LevelSafeQuestWalk); the grind
+    // spots of a bot without the dangerous ones (GrindSpotsForBot).
+    void DangerNoteDeath(DecideTick& tick, BotTurn& turn, std::uint32_t killerEntry);
+    void DangerQuestWalk(DecideTick& tick, BotTurn& turn);
+    std::vector<std::size_t> DangerFilterSpots(forever_module::BotSnapshot const& bot, std::vector<std::size_t> spots, std::uint64_t nowMs);
+    // FightRiskRetreat (bot_policy_fight_risk.cpp): after TurnTargeting; kSkip while the bot walks away (or was teleported) from a fight it is losing.
+    TurnFlow TurnFightRisk(DecideTick& tick, BotTurn& turn);
+    void FightRiskLine(BotTurn const& turn, char const* stage, fight_risk::Estimate const& estimate, std::string const& extra);
     TurnFlow TurnBelowMap(DecideTick& tick, BotTurn& turn);  // below-map recovery (below_map.h, bot_policy_turn_life.cpp)
     // AuctionWalk3D: the errand walk's `auction_reach: bot= check=<check> where=errand ...` line, at most once per bot per kAuctionReachLogMs.
     void AuctionReachLine(BotState& state, forever_module::BotSnapshot const& bot, char const* check, Point const& dest, auction::StandJudgement const& judged,
@@ -1671,6 +1725,11 @@ private:
     std::unordered_map<std::uint64_t, party_planner::Order> _partyOrders; // party leader guid -> its plan (Phase 2)
     // The options of the bot whose turn it is: arm B's inside an arm B bot's DecideBot (ArmSplit), arm A's (the constructor's) everywhere else.
     PolicyOptions const& Opt() const { return _armBTurn ? *_optionsB : _optionsA; }
+    // The shared danger map is kept (deaths noted, deaths_top fields) when DangerMap or SafeRevive is on in either arm; each bot acts on it by its own arm's keys (Opt()).
+    bool DangerMapOn() const
+    {
+        return _optionsA.DangerMap.Enabled || _optionsA.SafeRevive.Enabled || (_optionsB && (_optionsB->DangerMap.Enabled || _optionsB->SafeRevive.Enabled));
+    }
     PolicyOptions _optionsA;
     std::shared_ptr<PolicyOptions> _optionsB;            // ArmSplit: arm B's options (SetArmB); null when the split is off
     bool _armBTurn = false;                              // an arm B bot's turn is running (DecideBot)
@@ -1698,6 +1757,9 @@ private:
     };
     std::vector<UnsafeYard> _unsafeYards;   // DeathLoopBreaker: graveyards where a loop was broken, for kLoopBreakUnsafeMs
     level_safe::DeathTally _deathTally;
+    // The survival system: the shared danger map (DangerMap, SafeRevive) and the throttle of its skip lines.
+    danger_map::Map _dangerMap;
+    level_safe::LogThrottle _dangerLog;
     std::uint64_t _deathsTopAtMs = 0;
     std::size_t _botsInView = 0;
     // Arm C fixes (2026-11-19): the level-safe line throttle (LevelSafeLogThrottleSec) and the below-map counts, both in the hourly deaths_top line.

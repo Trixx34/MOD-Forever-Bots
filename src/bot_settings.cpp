@@ -694,6 +694,14 @@ BotSettings ParseOneConfig(std::unordered_map<std::string, std::string> const& c
     ReadKey(config, "LevelSafeEscapeCooldownSec", 60, 86400, settings.LevelSafeEscapeCooldownSec, warnings);
     ReadKey(config, "LevelSafeLogThrottleSec", 0, 3600, settings.LevelSafeLogThrottleSec, warnings);
     ReadBool(config, "DeathLoopBreaker", settings.DeathLoopBreaker, warnings);
+    ReadBool(config, "SafeRevive", settings.SafeRevive, warnings);
+    ReadKey(config, "SafeReviveLevelMargin", 1, 20, settings.SafeReviveLevelMargin, warnings);
+    ReadBool(config, "FightRiskRetreat", settings.FightRiskRetreat, warnings);
+    ReadKey(config, "FightRiskMarginPct", 50, 400, settings.FightRiskMarginPct, warnings);
+    ReadBool(config, "FightRiskTeleport", settings.FightRiskTeleport, warnings);
+    ReadBool(config, "DangerMap", settings.DangerMap, warnings);
+    ReadKey(config, "DangerMapDeathsPerHour", 1, 1000, settings.DangerMapDeathsPerHour, warnings);
+    ReadKey(config, "DangerMapDecayMin", 10, 1440, settings.DangerMapDecayMin, warnings);
     ReadBool(config, "BelowMapRecover", settings.BelowMapRecover, warnings);
     ReadKey(config, "BelowMapDropYards", 20, 1000, settings.BelowMapDropYards, warnings);
     ReadKey(config, "BelowMapStormCount", 0, 100, settings.BelowMapStormCount, warnings);

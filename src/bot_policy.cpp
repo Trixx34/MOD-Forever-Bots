@@ -245,6 +245,9 @@ std::optional<std::string> BotPolicy::TakeDeathsTopLine(std::uint64_t nowMs)
             _armDeathsTop.push_back(head + "arm=" + ab_split::ArmLetter(ab_split::Arm(arm)) + " " + armLine);
         }
     }
+    // The survival system: the danger map's cells, hot cells, deaths noted, skips and the hottest cells (DangerMap or SafeRevive on in either arm).
+    if (DangerMapOn())
+        line += _dangerMap.TakeFields(nowMs);
     return line;
 }
 
@@ -1149,6 +1152,8 @@ void BotPolicy::DecideBot(DecideTick& tick, std::size_t i)
     TurnTalentsAndGear(tick, turn);
     TurnQuestsAndHold(tick, turn);
     TurnTargeting(tick, turn);
+    if (TurnFightRisk(tick, turn) == TurnFlow::kSkip)   // FightRiskRetreat (bot_policy_fight_risk.cpp)
+        return;
     if (TurnCrowdControl(tick, turn) == TurnFlow::kSkip)
         return;
     if (TurnOnyxiaCasts(tick, turn) == TurnFlow::kSkip)
@@ -1209,7 +1214,7 @@ decide_scheduler::BotFacts BotPolicy::SchedulerFactsOf(BotSnapshot const& bot, s
                           DistanceTo(bot, Point{ bot.corpse_x, bot.corpse_y, bot.corpse_z }) <= kReclaimYards + 5.0f;
     facts.GhostReviving = atCorpse || bot.resurrect_from != 0;
     facts.Busy = bot.casting_spell != 0 || bot.transport_guid != 0 || bot.ground_effect_count != 0 || bot.telegraph_count != 0 || bot.pet_state == 2 ||
-                 (state && (state->ForcedHeal != 0 || state->LosRepositionTarget != 0));
+                 (state && (state->ForcedHeal != 0 || state->LosRepositionTarget != 0 || state->RiskStep != fight_risk::Step::kNone));
     for (NearbyUnit const& unit : nearby)
         if (unit.is_hostile && unit.health != 0 && rotation::DistanceYards(bot, unit) <= kSchedulerHostileYards)
         {
