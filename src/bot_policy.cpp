@@ -908,6 +908,18 @@ std::vector<BotAction> BotPolicy::Decide(WorldTickSnapshotView const& view, std:
     _botsInView = view.bots.size();
     if (_optionsB)
     {
+        // ArmSplitMode = strata: the bots seen for the first time get their arm here, as one batch (ab_split::Strata), before anything reads it.
+        if (ab_split::Mode() == ab_split::SplitMode::Strata)
+        {
+            ab_split::Strata& strata = ab_split::ProcessStrata();
+            std::vector<ab_split::Strata::Bot> fresh;
+            ab_split::Arm known = ab_split::Arm::A;
+            for (BotSnapshot const& bot : view.bots)
+                if (!strata.Find(bot.guid, known))
+                    fresh.push_back({ bot.guid, _optionsA.RaceOf ? _optionsA.RaceOf(bot.guid) : 0u, _optionsA.ClassOf ? _optionsA.ClassOf(bot.guid) : 0u });
+            if (!fresh.empty())
+                strata.Assign(std::move(fresh));
+        }
         _armBotsInView = {};
         for (BotSnapshot const& bot : view.bots)
             ++_armBotsInView[std::size_t(ab_split::ArmOf(true, bot.guid))];

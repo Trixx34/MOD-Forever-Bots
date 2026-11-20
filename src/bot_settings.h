@@ -6,6 +6,7 @@
 #include <memory>
 #include <unordered_set>
 
+#include "ab_split.h"
 #include "battlegrounds.h"
 #include "repair_policy.h"
 #include "quest_group.h"
@@ -259,7 +260,11 @@ struct BotSettings
     // with ArmBOverrides ("Key=Value,Key=Value", default empty) and the Arm.B.<Key> keys applied; the even guids are arm A (the config as written). Every event
     // line naming a bot gets " arm=A|B", and the deaths_top and pump lines come per arm too. Ignored (warning) while a scenario runs. ArmB is arm B's settings
     // (null when off) and ArmBApplied the overrides as "Key=new (A: old)".
+    // ArmSplitMode (default "guid"; "guid" or "strata"): guid = the parity split above; strata = each bot gets its arm at first sight per stratum (Skyborne
+    // races 95/96 as one group, every other race its own, crossed with the class), alternating A/B within a stratum, so each stratum and the whole run end
+    // within one bot of 50/50 (ab_split::Strata). Kept for the life of the process.
     bool ArmSplit = false;
+    ab_split::SplitMode ArmSplitMode = ab_split::SplitMode::Guid;
     std::string ArmBOverrides;
     std::shared_ptr<BotSettings> ArmB;
     std::vector<std::string> ArmBApplied;

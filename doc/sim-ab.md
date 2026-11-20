@@ -11,7 +11,8 @@ All of it is for the sim. The keys are off by default and stay off on test and p
 
 | Key | Default | What it does |
 |---|---|---|
-| `ArmSplit` | 0 | 1 = the bots with an odd guid are arm B, the even ones arm A |
+| `ArmSplit` | 0 | 1 = the bots with an odd guid are arm B, the even ones arm A (or per stratum, `ArmSplitMode`) |
+| `ArmSplitMode` | guid | `guid` = the parity split above; `strata` = balanced per stratum (Skyborne or race, crossed with class), see below |
 | `ArmBOverrides` | "" | Arm B's changes, `Key=Value,Key=Value` (for example `PathVariety=1,LevelSafeWalks=0`) |
 | `Arm.B.<Key>` | unset | One override per key (`Module.forever-bots.Arm.B.PathVariety = 1`); wins over the same key in `ArmBOverrides` |
 | `TraceBots` | "" | Bot guids to trace, comma list (`235,66`) |
@@ -26,6 +27,7 @@ window):
 ```
 # sim (until a calibration or A/B run sets them)        # test and prod
 Module.forever-bots.ArmSplit = 0                        Module.forever-bots.ArmSplit = 0
+Module.forever-bots.ArmSplitMode = guid                 Module.forever-bots.ArmSplitMode = guid
 Module.forever-bots.ArmBOverrides = ""                  Module.forever-bots.ArmBOverrides = ""
 Module.forever-bots.TraceBots = ""                      Module.forever-bots.TraceBots = ""
 Module.forever-bots.TraceDir = ""                       Module.forever-bots.TraceDir = ""
@@ -60,8 +62,26 @@ Module.forever-bots.TraceMaxMB = 20                     Module.forever-bots.Trac
 - Always (also without the split): `died` carries `level=` after `in_combat=`, and a bot seen at a higher level than at its last turn writes
   `level_up: bot= level= from= map=`. Both are for the read-out.
 
-Parity is not random: guid order follows creation order. Bots made by the ramp get a random race and class, so both arms get the same mix in a
-large run; check the "levels now ... classes" section of the read-out (bots per class per arm) before trusting a result.
+Parity is not random: guid order follows creation order. Bots made by the ramp get a random race and class, so both arms should get the same mix
+in a large run, but the 2026-11-20 A=B calibration (200 bots per arm, parity) showed they do not: arm A 3.88 deaths per bot-hour, arm B 3.40 (a
+12% gap, the pass rule is 10%), and 1,670 Skyborne (map 2991) deaths in arm A against 1,049 in arm B. Use `ArmSplitMode = strata` for
+calibrations and A/B runs; check the "levels now ... classes" section of the read-out (bots per class per arm) before trusting a result.
+
+### ArmSplitMode = strata
+
+Each bot gets its arm the first time the policy sees it (`ab_split::Strata`, at the top of `BotPolicy::Decide`):
+
+- The stratum is the race group crossed with the class. Skyborne (races 95 and 96) is one group, every other race its own; a bot whose race or
+  class is not known yet (0) falls in a stratum of its own.
+- The bots seen first in one tick are one batch, sorted by stratum and guid, so the login order inside the batch does not matter. In a stratum
+  that leans one way the next bot goes to the other arm, the pairs go A then B, and the one left over of each stratum goes to the arm with fewer
+  bots overall. Every stratum stays within one bot of 50/50; the bots of one batch also overall (with bots coming in over many batches each
+  stratum still does, overall within a bot or two).
+- The arm is kept for the life of the process: a bot that goes offline and comes back keeps its arm. A restart assigns afresh.
+- Everything that reads the arm (arm B's options in the bot's turn, the scheduler per arm, ` arm=A|B`, `deaths_top` and `pump_arm` per arm,
+  `tools/sim_readout.sh`) reads the assigned arm. An event line from another thread about a bot the policy has not seen yet gets its parity
+  arm (rare: the policy sees a bot in its first tick online).
+- The start-up line reads `arm split on: strata, each (Skyborne|race) x class stratum alternates A/B at first sight; arm B overrides: ...`.
 
 ## Tracing a bot
 
@@ -99,7 +119,7 @@ the journal and the database (the test, `tests/sim_readout_test.sh`, does).
 Before any real A/B, run both arms with the same config to see how far apart two equal arms land. If equal arms differ by more than the
 effect you want to measure, a real A/B cannot show it.
 
-1. Sim config (outside a sim run; it needs a restart): `ArmSplit = 1`, `ArmBOverrides = ""`, no `Arm.B.*` keys. Everything else as for the
+1. Sim config (outside a sim run; it needs a restart): `ArmSplit = 1`, `ArmSplitMode = strata`, `ArmBOverrides = ""`, no `Arm.B.*` keys. Everything else as for the
    real run (bot count, ramp, keys). Optionally `TraceBots` for two bots of each arm.
 2. Purge or keep bots as the run needs (standing rule: stay under the bot limit), restart the sim, note the start time once the ramp is done.
 3. Run 2 hours, no pushes or config changes meanwhile.
@@ -112,7 +132,7 @@ effect you want to measure, a real A/B cannot show it.
 
 ## A real A/B
 
-1. `ArmSplit = 1`, `ArmBOverrides = "<the change>"` (for example `"LevelSafeWalks=0"`, or `"DeathLoopBreaker=1"`). Arm A is the config as
+1. `ArmSplit = 1`, `ArmSplitMode = strata`, `ArmBOverrides = "<the change>"` (for example `"LevelSafeWalks=0"`, or `"DeathLoopBreaker=1"`). Arm A is the config as
    written, the baseline.
 2. One change per run where possible; several keys are fine when they are one feature.
 3. Run as long as the effect needs (8 h for deaths per bot-hour by band; the overnight window), read out with the same command.

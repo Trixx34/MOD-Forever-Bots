@@ -208,7 +208,10 @@ Module.forever-bots.TelemetrySummarySec = 60
 # Telemetry*, Presence*, Auction*, Errand*, WorldEvents*, AmbientChat*, scenarios, the party/guild/dungeon drivers, the quest sets) stay arm A's for both.
 # TraceBots: bot guids whose every event, action, action result and state (with the hostiles within 40 yards) go to TraceDir/bot-<guid>.trace, never to
 # the journal; at most TraceMaxMB per bot (rotated at half, one old file kept). TraceDir empty = no trace.
+# ArmSplitMode: guid = the parity split above; strata = each bot gets its arm at first sight per stratum (Skyborne races 95/96 as one group, every
+# other race its own, crossed with class), alternating A/B, so every stratum ends within one bot of 50/50; kept for the life of the process.
 # ArmSplit = 0
+# ArmSplitMode = guid                # guid or strata (use strata for calibrations and A/B runs)
 # ArmBOverrides = ""                 # e.g. "PathVariety=1,LevelSafeWalks=0"
 # Arm.B.PathVariety = 1              # one key at a time, same effect as the list
 # TraceBots = ""                     # e.g. "235,66"

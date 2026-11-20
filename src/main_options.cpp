@@ -510,7 +510,10 @@ std::shared_ptr<PolicyOptions> ArmBOptions(PolicyOptions const& armA, BotSetting
     std::string applied;
     for (std::string const& item : settings.ArmBApplied)
         applied += (applied.empty() ? "" : ", ") + item;
-    std::cerr << "forever-bots: arm split on: even guids are arm A, odd guids arm B; arm B overrides: " << (applied.empty() ? std::string("none (an A=B run)") : applied)
+    std::cerr << "forever-bots: arm split on: "
+              << (settings.ArmSplitMode == ab_split::SplitMode::Strata ? "strata, each (Skyborne|race) x class stratum alternates A/B at first sight"
+                                                                       : "even guids are arm A, odd guids arm B")
+              << "; arm B overrides: " << (applied.empty() ? std::string("none (an A=B run)") : applied)
               << "; the table lines up to 'arm B ready' are arm B's\n";
     auto out = std::make_shared<PolicyOptions>();
     PolicyFromSettings(*out, b);

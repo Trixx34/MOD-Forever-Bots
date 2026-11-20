@@ -279,6 +279,7 @@ int main(int argc, char** argv)
     // The policy's class lookup: a bot's own class, or the configured class (0 = none) for a bot the table does not know.
     // ArmSplit tags the event lines of every thread from here on; TraceBots opens its files.
     ab_split::SetTagging(settings.ArmSplit && settings.ArmB != nullptr);
+    ab_split::SetMode(settings.ArmSplitMode);   // ArmSplitMode: guid parity or strata (the policy assigns at first sight)
     std::shared_ptr<bot_trace::Tracer> const trace = MakeTracer(settings);
     PolicyOptions policyOptions;
     PolicyFromSettings(policyOptions, settings);

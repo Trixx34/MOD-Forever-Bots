@@ -1382,6 +1382,8 @@ BotSettings ParseOneConfig(std::unordered_map<std::string, std::string> const& c
     if (auto const it = config.find("AttunementFile"); it != config.end())
         settings.AttunementFile = it->second;
     ReadBool(config, "ArmSplit", settings.ArmSplit, warnings);
+    if (auto const it = config.find("ArmSplitMode"); it != config.end() && !ab_split::ParseSplitMode(it->second, settings.ArmSplitMode))
+        warnings.push_back("Module.forever-bots.ArmSplitMode: '" + it->second + "' is not guid or strata; guid.");
     if (auto const it = config.find("ArmBOverrides"); it != config.end())
         settings.ArmBOverrides = it->second;
     if (auto const it = config.find("TraceBots"); it != config.end())

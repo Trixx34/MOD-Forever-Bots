@@ -17,7 +17,7 @@ Per arm (`ArmBOverrides` / `Arm.B.<Key>`; read through `Opt()` in the bot's own 
 - every arm D key that acts in a bot's turn: `DeathLoopBreaker`, `LevelSafe*`, `BelowMap*`, `SkyborneExit*`, and the rest of the policy options;
 - the survival keys: `SafeRevive`, `SafeReviveLevelMargin`, `FightRiskRetreat`, `FightRiskMarginPct`, `FightRiskTeleport`, `DangerMap`;
 - the scheduler keys: `DecideScheduler`, `DecideBudgetUs`, `DecideTierWalk`, `DecideTierIdle`, `DecideMaxSkipTicks`. With `ArmSplit = 1` each arm has
-  its own scheduler over its own bots (arm A's over the even guids, arm B's over the odd ones), with its own keys and its own budget. An arm with
+  its own scheduler over its own bots (arm A's over the arm A bots, arm B's over the arm B bots; even/odd guids with `ArmSplitMode = guid`), with its own keys and its own budget. An arm with
   `DecideScheduler = 0` runs its bots every tick. With the scheduler on in either arm, arm A's bots take their turns before arm B's in a tick (with
   both off the order is the view order, as before).
 
@@ -55,6 +55,7 @@ Both arms the arm D config; the survival and scheduler keys off in both; no trac
 ```
 # zz-arm-d2.conf: A=B calibration (arm D keys from zz-arm-d.conf apply to both arms)
 Module.forever-bots.ArmSplit = 1
+Module.forever-bots.ArmSplitMode = strata
 Module.forever-bots.ArmBOverrides = ""
 Module.forever-bots.TraceBots = ""
 Module.forever-bots.TraceDir = ""
@@ -74,9 +75,16 @@ Module.forever-bots.DecideTierIdle = 6
 Module.forever-bots.DecideMaxSkipTicks = 12
 ```
 
-No `Module.forever-bots.Arm.B.*` key in any drop-in. Check the start-up line: `arm split on: even guids are arm A, odd guids arm B; arm B overrides:
-none (an A=B run)`. Run 2 h after the ramp is done; pass when arm A and arm B are within 10% on `deaths_per_bot_hour` and `levels_per_bot_hour`
-(`doc/sim-ab.md`, "A=B calibration"). Write the gap down: the real A/B below must beat it.
+No `Module.forever-bots.Arm.B.*` key in any drop-in. Check the start-up line: `arm split on: strata, each (Skyborne|race) x class stratum alternates
+A/B at first sight; arm B overrides: none (an A=B run)`. Run 2 h after the ramp is done; pass when arm A and arm B are within 10% on
+`deaths_per_bot_hour` and `levels_per_bot_hour` (`doc/sim-ab.md`, "A=B calibration"). Write the gap down: the real A/B below must beat it.
+
+`ArmSplitMode = strata` needs `fix/arm-split-balance-20261120` (on top of this branch); a build without it does not know the key and splits by guid
+parity. Every run below sets it too: an A/B is judged against a calibration with the same split.
+
+Result of the first calibration, 2026-11-20 (guid parity, before `ArmSplitMode`; 200 bots per arm): arm A 3.88 deaths per bot-hour, arm B 3.40, a
+12% gap (the pass rule is 10%): a fail. Arm A had 1,670 Skyborne (map 2991) deaths against 1,049 for arm B: the parity split was not balanced by
+race, start zone or class. Rerun (1) with `ArmSplitMode = strata` before (2) and (3).
 
 ### (2) Real A/B: survival (8 h, overnight)
 
@@ -85,6 +93,7 @@ Arm A = arm D (the base, survival off); arm B = arm D plus the survival keys wit
 ```
 # zz-arm-d2.conf: survival A/B (arm A = arm D, arm B = arm D + survival)
 Module.forever-bots.ArmSplit = 1
+Module.forever-bots.ArmSplitMode = strata
 Module.forever-bots.ArmBOverrides = "SafeRevive=1,FightRiskRetreat=1,DangerMap=1,FightRiskTeleport=1"
 Module.forever-bots.TraceBots = ""
 Module.forever-bots.TraceDir = ""
@@ -121,6 +130,7 @@ only arm B's turns (about half the bots), so it is half the 12000 us of `doc/dec
 ```
 # zz-arm-d2.conf: scheduler A/B (arm A = arm D, arm B = arm D + DecideScheduler)
 Module.forever-bots.ArmSplit = 1
+Module.forever-bots.ArmSplitMode = strata
 Module.forever-bots.ArmBOverrides = "DecideScheduler=1,DecideBudgetUs=6000"
 Module.forever-bots.TraceBots = ""
 Module.forever-bots.TraceDir = ""

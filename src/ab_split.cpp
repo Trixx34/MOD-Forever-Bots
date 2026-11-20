@@ -11,6 +11,7 @@ namespace
 {
 
 std::atomic<bool> g_tagging{ false };
+std::atomic<SplitMode> g_mode{ SplitMode::Guid };
 
 std::string Trim(std::string const& text)
 {
@@ -147,6 +148,120 @@ std::string ArmField(std::uint64_t guid)
     if (!Tagging() || guid == 0)
         return std::string();
     return std::string(" arm=") + ArmLetter(ArmOf(true, guid));
+}
+
+bool ParseSplitMode(std::string const& text, SplitMode& mode)
+{
+    std::string const value = Trim(text);
+    if (value == "guid")
+        mode = SplitMode::Guid;
+    else if (value == "strata")
+        mode = SplitMode::Strata;
+    else
+        return false;
+    return true;
+}
+
+char const* SplitModeName(SplitMode mode) { return mode == SplitMode::Strata ? "strata" : "guid"; }
+
+std::uint64_t Strata::KeyOf(std::uint32_t race, std::uint32_t cls)
+{
+    std::uint32_t const group = (race == 95 || race == 96) ? kSkyborneGroup : race;
+    return (std::uint64_t(group) << 32) | cls;
+}
+
+void Strata::Assign(std::vector<Bot> bots)
+{
+    std::unique_lock<std::shared_mutex> lock(_lock);
+    // The new bots by stratum, each in guid order.
+    std::sort(bots.begin(), bots.end(), [](Bot const& x, Bot const& y) {
+        std::uint64_t const kx = KeyOf(x.Race, x.Class);
+        std::uint64_t const ky = KeyOf(y.Race, y.Class);
+        return kx != ky ? kx < ky : x.Guid < y.Guid;
+    });
+    auto const give = [this](std::uint64_t guid, std::uint64_t key, Arm arm) {
+        _arm[guid] = arm;
+        ++_count[key][std::size_t(arm)];
+        ++_total[std::size_t(arm)];
+    };
+    std::vector<std::pair<std::uint64_t, std::uint64_t>> leftOver;   // (guid, stratum): one per stratum at most, placed last by the overall count
+    std::size_t i = 0;
+    while (i < bots.size())
+    {
+        std::uint64_t const key = KeyOf(bots[i].Race, bots[i].Class);
+        std::vector<std::uint64_t> fresh;
+        for (; i < bots.size() && KeyOf(bots[i].Race, bots[i].Class) == key; ++i)
+            if (!_arm.count(bots[i].Guid) && (fresh.empty() || fresh.back() != bots[i].Guid))
+                fresh.push_back(bots[i].Guid);
+        std::size_t next = 0;
+        std::array<std::size_t, 2> const have = _count[key];
+        // A stratum that leans one way (by one at most) evens out first.
+        if (next < fresh.size() && have[0] != have[1])
+            give(fresh[next++], key, have[0] < have[1] ? Arm::A : Arm::B);
+        for (; next + 1 < fresh.size(); next += 2)
+        {
+            give(fresh[next], key, Arm::A);
+            give(fresh[next + 1], key, Arm::B);
+        }
+        if (next < fresh.size())
+            leftOver.emplace_back(fresh[next], key);
+    }
+    for (auto const& [guid, key] : leftOver)
+        give(guid, key, _total[1] < _total[0] ? Arm::B : Arm::A);
+}
+
+Arm Strata::Assign(std::uint64_t guid, std::uint32_t race, std::uint32_t cls)
+{
+    Assign(std::vector<Bot>{ Bot{ guid, race, cls } });
+    Arm arm = Arm::A;
+    Find(guid, arm);
+    return arm;
+}
+
+bool Strata::Find(std::uint64_t guid, Arm& arm) const
+{
+    std::shared_lock<std::shared_mutex> lock(_lock);
+    auto const it = _arm.find(guid);
+    if (it == _arm.end())
+        return false;
+    arm = it->second;
+    return true;
+}
+
+std::array<std::size_t, 2> Strata::Totals() const
+{
+    std::shared_lock<std::shared_mutex> lock(_lock);
+    return _total;
+}
+
+std::map<std::uint64_t, std::array<std::size_t, 2>> Strata::PerStratum() const
+{
+    std::shared_lock<std::shared_mutex> lock(_lock);
+    return _count;
+}
+
+void Strata::Clear()
+{
+    std::unique_lock<std::shared_mutex> lock(_lock);
+    _arm.clear();
+    _count.clear();
+    _total = {};
+}
+
+void SetMode(SplitMode mode) { g_mode.store(mode, std::memory_order_relaxed); }
+SplitMode Mode() { return g_mode.load(std::memory_order_relaxed); }
+
+Strata& ProcessStrata()
+{
+    static Strata strata;
+    return strata;
+}
+
+Arm StrataArmOf(std::uint64_t guid)
+{
+    Arm arm = ParityArm(guid);
+    ProcessStrata().Find(guid, arm);
+    return arm;
 }
 
 } // namespace ab_split
