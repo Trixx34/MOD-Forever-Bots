@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // forever-bots: the Tier 2 pump thread (PumpTier2), split out of main.cpp.
+#include "log_throttle.h"
 #include "main_internal.h"
 
 void main_detail::PumpTier2(forever_module::Tier2Session& session, std::atomic<bool> const& running, PolicyOptions options,
@@ -43,6 +44,7 @@ void main_detail::PumpTier2(forever_module::Tier2Session& session, std::atomic<b
     std::uint64_t visitFedMs = 0;
     // Last action sequence seen per bot, so each result is reported once.
     std::unordered_map<std::uint64_t, std::uint32_t> seenSequence;
+    log_throttle::KeyedThrottle notDoneThrottle; // the "not done" lines (LogThrottleSec)
     std::unordered_map<std::uint64_t, std::uint64_t> serviceNoticeMs; // bot -> when a service refusal was last logged
     std::unordered_map<std::uint64_t, std::uint64_t> auctionReachLoggedMs; // bot -> when its auction_reach line was last written (AuctionLogReach)
     std::unordered_set<std::uint32_t> unknownSpellsReported; // spell ids the core does not know, reported once each
@@ -155,10 +157,15 @@ void main_detail::PumpTier2(forever_module::Tier2Session& session, std::atomic<b
                         continue;
                     serviceNoticeMs[bot.guid] = now;
                 }
-                std::cerr << "forever-bots: bot " << bot.guid << " " << ActionTypeName(static_cast<forever_module::ActionType>(bot.last_action_type))
-                          << (bot.last_action_spell ? " spell " + std::to_string(bot.last_action_spell) : std::string())
-                          << " not done: " << ActionStatusName(bot.last_action_status) << RefusedReasonField(bot, settings.LogRefusedReason)
-                          << ab_split::ArmField(bot.guid) << "\n";
+                std::string const what = std::string(ActionTypeName(static_cast<forever_module::ActionType>(bot.last_action_type))) +
+                                         (bot.last_action_spell ? " spell " + std::to_string(bot.last_action_spell) : std::string());
+                std::string const why = std::string(ActionStatusName(bot.last_action_status)) + RefusedReasonField(bot, settings.LogRefusedReason);
+                // LogThrottleSec (default 0 = every line): one line per bot, action and reason per period; the next line carries suppressed=N.
+                std::uint32_t held = 0;
+                if (!notDoneThrottle.Allow(bot.guid, what + " not done: " + why, nowMs(), std::uint64_t(settings.LogThrottleSec) * 1000, held))
+                    continue;
+                std::cerr << "forever-bots: bot " << bot.guid << " " << what << " not done: " << why << ab_split::ArmField(bot.guid)
+                          << log_throttle::KeyedThrottle::Field(held) << "\n";
             }
         }
 

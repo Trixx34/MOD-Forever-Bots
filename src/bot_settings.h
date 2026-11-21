@@ -254,6 +254,9 @@ struct BotSettings
     std::uint32_t BelowMapCooldownSec = 600;
     // LogRefusedReason (default 1, logging only): the "<action> not done: <status>" lines carry the ActionResult reason code the core gave (reason=N, 0 = none).
     bool LogRefusedReason = true;
+    // LogThrottleSec (default 0 = off, every line; 0..3600; logging only): the repeating lines that are not events (bot N <action> not done: <status>) are
+    // written once per bot, action and reason per this many seconds, and the next line of that run ends with suppressed=N. Events are never throttled here.
+    std::uint32_t LogThrottleSec = 0;
     // DeathsTopEveryMin (default 60, 0 = off, 0..1440; logging only): the `forever-bots: deaths_top:` line (deaths, median per bot, share of the worst ten).
     std::uint32_t DeathsTopEveryMin = 60;
     // ArmSplit (default 0 = off, 0..1; sim measuring, doc/sim-ab.md): two configs in one run. The bots with an odd guid are arm B: their own turn uses the config

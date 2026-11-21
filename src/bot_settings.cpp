@@ -707,6 +707,7 @@ BotSettings ParseOneConfig(std::unordered_map<std::string, std::string> const& c
     ReadKey(config, "BelowMapStormCount", 0, 100, settings.BelowMapStormCount, warnings);
     ReadKey(config, "BelowMapCooldownSec", 60, 86400, settings.BelowMapCooldownSec, warnings);
     ReadBool(config, "LogRefusedReason", settings.LogRefusedReason, warnings);
+    ReadKey(config, "LogThrottleSec", 0, 3600, settings.LogThrottleSec, warnings);
     ReadKey(config, "DeathsTopEveryMin", 0, 1440, settings.DeathsTopEveryMin, warnings);
     ReadBool(config, "ChatCommands", settings.ChatCommands, warnings);
     ReadBool(config, "ChatOrders", settings.ChatOrders, warnings);
@@ -1396,8 +1397,28 @@ BotSettings ParseOneConfig(std::unordered_map<std::string, std::string> const& c
 
 } // namespace
 
-BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const& config, std::vector<std::string>& warnings)
+// A value that starts with '#' is commented-out text, not a value (a line like "Key = # Other = 2", two lines run together, hands the core's
+// config reader the rest of the line): the key counts as not set, so its default applies, and a warning says so.
+static std::unordered_map<std::string, std::string> DropCommentedValues(std::unordered_map<std::string, std::string> const& config,
+                                                                        std::vector<std::string>& warnings)
 {
+    std::unordered_map<std::string, std::string> clean;
+    for (auto const& [key, value] : config)
+    {
+        std::size_t const first = value.find_first_not_of(" \t");
+        if (first != std::string::npos && value[first] == '#')
+        {
+            warnings.push_back("Module.forever-bots." + key + ": the value is a comment ('" + value + "'); the key is taken as not set.");
+            continue;
+        }
+        clean.emplace(key, value);
+    }
+    return clean;
+}
+
+BotSettings ParseBotSettings(std::unordered_map<std::string, std::string> const& rawConfig, std::vector<std::string>& warnings)
+{
+    std::unordered_map<std::string, std::string> const config = DropCommentedValues(rawConfig, warnings);
     BotSettings settings = ParseOneConfig(config, warnings);
     if (!settings.ArmSplit)
         return settings;

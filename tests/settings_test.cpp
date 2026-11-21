@@ -659,6 +659,17 @@ void WorldEventsSettings()
     BotSettings const bad = ParseBotSettings({ { "WorldEventsPct", "90" }, { "WorldEventsPerSite", "0" }, { "WorldEventsActive", "7,x" } }, warnings);
     CHECK(bad.WorldEvents.SharePct == 2 && bad.WorldEvents.MaxPerSite == 3 && bad.WorldEventsActive == std::vector<std::uint32_t>{ 7 });
     CHECK(warnings.size() == 3);
+    // a commented value is never taken: the key is not set, so the default applies, with one warning each
+    warnings.clear();
+    BotSettings const commented = ParseBotSettings({ { "WorldEventsActive", "# Module.forever-bots.WorldEventsPct = 2" }, { "WorldEventsPct", "  #5" },
+                                                     { "WorldEventsMaxBots", "4" } }, warnings);
+    CHECK(commented.WorldEventsActive.empty() && commented.WorldEvents.SharePct == 2 && commented.WorldEvents.MaxBots == 4);
+    CHECK(warnings.size() == 2);
+    // LogThrottleSec: off by default, 0..3600
+    warnings.clear();
+    CHECK(ParseBotSettings({}, warnings).LogThrottleSec == 0 && warnings.empty());
+    CHECK(ParseBotSettings({ { "LogThrottleSec", "60" } }, warnings).LogThrottleSec == 60 && warnings.empty());
+    CHECK(ParseBotSettings({ { "LogThrottleSec", "9999" } }, warnings).LogThrottleSec == 0 && warnings.size() == 1);
 }
 
 void ErrandSettings()

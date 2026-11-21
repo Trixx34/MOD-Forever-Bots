@@ -201,6 +201,9 @@ Module.forever-bots.TelemetrySummarySec = 60
 # "forever-bots: deaths_top: window_min= deaths= bots_online= bots_died= median= median_died= top10= top10_pct= top=guid:n,..." (0 = off).
 # LogRefusedReason = 1
 # DeathsTopEveryMin = 60   (0 to 1440)
+# LogThrottleSec: 0 = off (every line). Above 0, the "<action> not done: <status>" lines are written once per bot, action and reason per this many
+# seconds; the next line of that run ends with suppressed=N. Events are never throttled.
+# LogThrottleSec = 0   (0 to 3600)
 
 # Sim measuring (doc/sim-ab.md). ArmSplit = 1 runs two configs in one run: odd bot guids are arm B and take their own turn with the config plus
 # ArmBOverrides ("Key=Value,Key=Value") and any Arm.B.<Key> key (the key wins over the list); even guids are arm A (the config as written). Every event

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Unit tests for the module's main helpers (src/main_util.cpp) and the shared text helpers (src/text_split.h). No core needed.
+#include "log_throttle.h"
 #include "main_internal.h"
 #include "text_split.h"
 
@@ -116,8 +117,32 @@ static void RefusedReason()
     CHECK(RefusedReasonField(bot, true) == " reason=11");
 }
 
+// LogThrottleSec: one line per (bot, reason) per period; the next line carries the held-back count.
+static void KeyedThrottleLines()
+{
+    log_throttle::KeyedThrottle t;
+    std::uint32_t held = 99;
+    CHECK(t.Allow(1, "cast spell 5 not done: refused", 1000, 60000, held) && held == 0);
+    CHECK(!t.Allow(1, "cast spell 5 not done: refused", 2000, 60000, held));
+    CHECK(!t.Allow(1, "cast spell 5 not done: refused", 30000, 60000, held));
+    CHECK(t.Allow(2, "cast spell 5 not done: refused", 3000, 60000, held) && held == 0);   // another bot
+    CHECK(t.Allow(1, "cast spell 6 not done: refused", 3000, 60000, held) && held == 0);   // another reason
+    CHECK(t.Allow(1, "cast spell 5 not done: refused", 61000, 60000, held) && held == 2);  // period over: the two held back
+    CHECK(log_throttle::KeyedThrottle::Field(held) == " suppressed=2");
+    CHECK(log_throttle::KeyedThrottle::Field(0).empty());
+    CHECK(!t.Allow(1, "cast spell 5 not done: refused", 62000, 60000, held));
+    CHECK(t.Allow(1, "cast spell 5 not done: refused", 121000, 60000, held) && held == 1);
+    for (int i = 0; i < 5; ++i)   // period 0 (the default): every line, nothing held back
+        CHECK(t.Allow(7, "x", 5, 0, held) && held == 0);
+    log_throttle::KeyedThrottle big;   // bounded
+    for (std::uint64_t i = 0; i < 6000; ++i)
+        big.Allow(i, "r", i * 100000, 60000, held);
+    CHECK(big.Size() <= 4097);
+}
+
 int main()
 {
+    KeyedThrottleLines();
     RefusedReason();
     LootFacts();
     Names();
