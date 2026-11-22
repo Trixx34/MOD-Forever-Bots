@@ -912,6 +912,11 @@ void BotPolicy::TurnCraftGather(DecideTick& tick, BotTurn& turn)
     // bot walks to one. The lines take turns.
     bool const calm = !hasTarget && bot.in_combat == 0 && bot.moving == 0 && bot.life_state == 0 && nowMs >= state.NextCastMs && !(IsCasting(bot)) && !state.Sitting &&
                       !state.CraftWalking;
+    // Professions (off by default; professions.h): the profession_skillup lines; no new craft or gather ask for a primary at its cap (SkillCapPerLevel x level); the
+    // craft plan names a recipe (kCraft) where kSkillUp had nothing to make; gathering asks run with Professions as with Gathering.
+    bool const prof = Opt().Professions.Enabled;
+    if (prof)
+        ProfessionSkillUps(state, bot);
     if (Opt().Crafting && calm)
     {
         bool crafted = false;
@@ -920,10 +925,43 @@ void BotPolicy::TurnCraftGather(DecideTick& tick, BotTurn& turn)
             std::size_t const index = (state.CraftTurn + turn) % kCraftLineCount;
             if (nowMs < state.CraftRetryAtMs[index] || !HasLine(bot, kCraftLines[index]))
                 continue;
+            if (prof && !ProfessionBelowCap(state, bot, kCraftLines[index]))
+            {
+                state.CraftRetryAtMs[index] = nowMs + kSkillUpRefusedMs; // asked again after a level (the cap rises)
+                continue;
+            }
             BotAction craft;
             craft.bot_guid = bot.guid;
             craft.type = ActionType::kSkillUp;
             craft.spell_id = kCraftLines[index];
+            if (prof && state.CraftPlanDue[index])
+            {
+                state.CraftPlanDue[index] = false;
+                if (state.CraftPlanLevel != bot.level)
+                {
+                    state.CraftPlanUnknown.clear();
+                    state.CraftPlanLevel = bot.level;
+                }
+                std::uint32_t value = 0;
+                for (int slot = 0; slot < 2; ++slot)
+                    if (bot.profession_skill[slot] == kCraftLines[index])
+                        value = bot.profession_value[slot];
+                std::optional<std::size_t> const recipe =
+                    Opt().ProfessionRecipes ? professions::PlanRecipe(*Opt().ProfessionRecipes, kCraftLines[index], value,
+                                                                      [&](std::uint32_t spell) {
+                                                                          return std::find(state.CraftPlanUnknown.begin(), state.CraftPlanUnknown.end(), spell) !=
+                                                                                 state.CraftPlanUnknown.end();
+                                                                      })
+                                            : std::nullopt;
+                if (!recipe)
+                {
+                    state.CraftRetryAtMs[index] = nowMs + kSkillUpRefusedMs;
+                    continue;
+                }
+                craft.type = ActionType::kCraft;
+                craft.spell_id = (*Opt().ProfessionRecipes)[*recipe].Spell;
+                state.CraftPlanSpell = craft.spell_id;
+            }
             actions.push_back(craft);
             state.CraftTurn = std::uint32_t(index + 1);
             state.CraftSent = std::uint32_t(index);
@@ -935,13 +973,18 @@ void BotPolicy::TurnCraftGather(DecideTick& tick, BotTurn& turn)
 
     // Gathering (SDK 0.18, off by default): a bot with Mining, Herbalism or Skinning asks the core to gather what is within 30 yards of it: a vein or herb its skill allows, or a
     // corpse it can skin. The core walks the bot there and casts; the next ask takes the loot.
-    if (Opt().Gathering && calm && !state.GatherWalking)
+    if ((Opt().Gathering || prof) && calm && !state.GatherWalking)
     {
         bool gathered = false;
         for (std::size_t index = 0; index < kGatherLineCount && !gathered; ++index)
         {
             if (nowMs < state.GatherRetryAtMs[index] || !HasLine(bot, kGatherLines[index]))
                 continue;
+            if (prof && !ProfessionBelowCap(state, bot, kGatherLines[index]))
+            {
+                state.GatherRetryAtMs[index] = nowMs + kGatherRefusedMs; // asked again later (the cap rises with the level)
+                continue;
+            }
             BotAction gather;
             gather.bot_guid = bot.guid;
             gather.type = ActionType::kGather;

@@ -124,7 +124,34 @@ void PolicyFromSettings(PolicyOptions& policyOptions, BotSettings& settings)
             std::cerr << "forever-bots: crafting foci: " << foci->size() << " object(s) from " << settings.CraftingFociFile << "\n";
         policyOptions.Foci = std::move(foci);
     }
-    if (settings.GatherWalk && !settings.GatherNodesFile.empty())
+    // Professions (doc/professions.md): the options, and the recipe table of the craft plan.
+    policyOptions.Professions.Enabled = settings.Professions;
+    policyOptions.Professions.SkillCapPerLevel = settings.ProfessionSkillCapPerLevel;
+    policyOptions.Professions.SkinAfterLoot = settings.ProfessionSkinAfterLoot;
+    policyOptions.Professions.NodeWalk = settings.ProfessionNodeWalk;
+    policyOptions.Professions.NodeMaxYards = float(settings.ProfessionNodeMaxYards);
+    policyOptions.Professions.NodeGapMs = std::uint64_t(settings.ProfessionNodeGapSec) * 1000;
+    policyOptions.Professions.NodeEmptyMs = std::uint64_t(settings.ProfessionNodeEmptyMin) * 60000;
+    policyOptions.Professions.CraftPlan = settings.ProfessionCraftPlan;
+    if (settings.Professions && settings.ProfessionCraftPlan && !settings.ProfessionRecipeFile.empty())
+    {
+        std::ifstream recipeFile(settings.ProfessionRecipeFile);
+        std::stringstream recipeText;
+        recipeText << recipeFile.rdbuf();
+        std::vector<std::string> recipeErrors;
+        auto recipes = std::make_shared<std::vector<professions::Recipe>>(professions::ParseRecipeTable(recipeText.str(), recipeErrors));
+        for (std::string const& error : recipeErrors)
+            std::cerr << "forever-bots: ProfessionRecipeFile: " << error << "\n";
+        if (!recipeFile || recipes->empty())
+            std::cerr << "forever-bots: ProfessionRecipeFile: cannot read '" << settings.ProfessionRecipeFile << "' (or it holds no recipe); no craft plan\n";
+        else
+        {
+            std::cerr << "forever-bots: profession recipes: " << recipes->size() << " recipe(s) from " << settings.ProfessionRecipeFile << "\n";
+            policyOptions.ProfessionRecipes = std::move(recipes);
+        }
+    }
+    // The node table is read for GatherWalk, and for the Professions node walk (which does not switch GatherWalk on).
+    if ((settings.GatherWalk || (settings.Professions && settings.ProfessionNodeWalk)) && !settings.GatherNodesFile.empty())
     {
         std::ifstream nodesFile(settings.GatherNodesFile);
         std::stringstream nodesText;
@@ -138,7 +165,7 @@ void PolicyFromSettings(PolicyOptions& policyOptions, BotSettings& settings)
         else
         {
             std::cerr << "forever-bots: gather nodes: " << nodes->size() << " node(s) from " << settings.GatherNodesFile << "\n";
-            policyOptions.GatherWalk = true;
+            policyOptions.GatherWalk = settings.GatherWalk;
             policyOptions.GatherNodes = std::move(nodes);
         }
     }
@@ -574,6 +601,7 @@ void SetUpScenario(PolicyOptions& policyOptions, PumpExtras& extras, BotSettings
     policyOptions.DynamicParties.Enabled = false; // and stays in it: a scenario's parties (ZG, Onyxia, MC/BWL) are assigned groups
     policyOptions.RandomPct = 0;      // and a scenario is a test run: it is not varied
     policyOptions.Crafting = false;
+    policyOptions.Professions.Enabled = false; // no profession asks or node walks in a dungeon test run
     policyOptions.ServiceEveryMs = 0;
     policyOptions.AutoGearing = false;
     // 40-man raid support (doc 108): a raid scenario's roster is one raid group of 8 subgroups, not a flat party (bot_policy.cpp's

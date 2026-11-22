@@ -208,6 +208,19 @@ void SayAndSupplySettings()
     CHECK(!gear.Auction.GearSell && gear.Auction.GearHoldLevels == 4 && warnings.empty());
     // The exact rule from the core's item facts is off by default (the hold applies).
     CHECK(off.GatherWalkGapSec == 0 && ParseBotSettings({ { "GatherWalkGapSec", "600" } }, warnings).GatherWalkGapSec == 600);
+    // Professions (doc/professions.md): off by default; the sub-keys are on under it, the cap is 5 x level.
+    CHECK(!off.Professions && off.ProfessionSkillCapPerLevel == 5 && off.ProfessionSkinAfterLoot && off.ProfessionNodeWalk && off.ProfessionCraftPlan);
+    CHECK(off.ProfessionNodeMaxYards == 150 && off.ProfessionNodeGapSec == 300 && off.ProfessionNodeEmptyMin == 20 && off.ProfessionRecipeFile.empty());
+    BotSettings const prof = ParseBotSettings({ { "Professions", "1" }, { "ProfessionSkillCapPerLevel", "4" }, { "ProfessionSkinAfterLoot", "0" },
+                                                { "ProfessionNodeWalk", "0" }, { "ProfessionNodeMaxYards", "200" }, { "ProfessionNodeGapSec", "60" },
+                                                { "ProfessionNodeEmptyMin", "30" }, { "ProfessionCraftPlan", "0" }, { "ProfessionRecipeFile", "/x/r.txt" } },
+                                              warnings);
+    CHECK(prof.Professions && prof.ProfessionSkillCapPerLevel == 4 && !prof.ProfessionSkinAfterLoot && !prof.ProfessionNodeWalk && !prof.ProfessionCraftPlan);
+    CHECK(prof.ProfessionNodeMaxYards == 200 && prof.ProfessionNodeGapSec == 60 && prof.ProfessionNodeEmptyMin == 30 && prof.ProfessionRecipeFile == "/x/r.txt");
+    CHECK(warnings.empty());
+    std::vector<std::string> profWarnings;
+    CHECK(ParseBotSettings({ { "ProfessionSkillCapPerLevel", "0" }, { "ProfessionNodeMaxYards", "5" } }, profWarnings).ProfessionSkillCapPerLevel == 5);
+    CHECK(profWarnings.size() == 2);
     CHECK(!off.Auction.ResolveNearby && ParseBotSettings({ { "AuctionResolveNearby", "1" } }, warnings).Auction.ResolveNearby);
     CHECK(!off.Auction.GearExact && ParseBotSettings({ { "AuctionGearExact", "1" } }, warnings).Auction.GearExact && warnings.empty());
     CHECK(!off.Auction.Enabled && off.Auction.SellPctGreen == 300 && off.Auction.RunMinutes == 120 && off.Auction.EveryMs == 1800000);

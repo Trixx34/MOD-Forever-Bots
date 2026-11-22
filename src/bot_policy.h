@@ -60,6 +60,7 @@
 #include "tame_beasts.h"
 #include "crafting_foci.h"
 #include "gather_nodes.h"
+#include "professions.h"
 #include "bot_random.h"
 #include "chat_say.h"
 #include "battlegrounds.h"
@@ -261,6 +262,10 @@ struct PolicyOptions
     bool GatherWalk = false;
     std::uint64_t GatherWalkGapMs = 0;   // after a walk ends, no new walk for this long (GatherWalkGapSec); 0 = none
     std::shared_ptr<std::vector<gather::NodePoint> const> GatherNodes;
+    // Profession progression (Professions, off by default; professions.h, doc/professions.md): the skill cap per level, skinning after a loot, safe node walks near
+    // the bot (GatherNodes), the craft plan (ProfessionRecipes, data/profession_recipes.txt) and the profession_* event lines. Cooking and First Aid are unchanged.
+    professions::Options Professions;
+    std::shared_ptr<std::vector<professions::Recipe> const> ProfessionRecipes;
     std::uint32_t RandomPct = 0;
     std::uint32_t PartyPercent = 100;
     // Hubs (M7): the places an idle bot walks to when it has seen nothing for a while, per map, in order. The bot's map
@@ -976,6 +981,18 @@ private:
         std::uint64_t QuestPausedUntilMs = 0;            // no quest actions before this (a run of refusals: the bot grinds meanwhile)
         std::uint32_t GatherSeenSeq = 0;                 // the last kGather result read
         std::uint32_t GatherFails[3] = { 0, 0, 0 };      // gathers refused in a row per line: the pause doubles
+        // Professions (professions.h): the primary professions last seen (profession_skillup), the cap line written (per slot, the cap it was written for),
+        // the node a walk arrived at (its next "nothing near" marks it empty; -1 none), the craft plan due per craft line after a kSkillUp with nothing to make,
+        // the recipe last named (kCraft) and the recipes the core said the bot does not know (bounded).
+        std::uint16_t ProfSeenSkill[2] = { 0, 0 };
+        std::uint16_t ProfSeenValue[2] = { 0, 0 };
+        std::uint32_t ProfCapLogged[2] = { 0, 0 };
+        std::size_t GatherArrivedNode = std::size_t(-1);
+        bool CraftPlanDue[8] = { false, false, false, false, false, false, false, false };
+        std::uint32_t CraftPlanSpell = 0;
+        std::vector<std::uint32_t> CraftPlanUnknown;
+        std::uint32_t CraftPlanLevel = 0;                // the level CraftPlanUnknown is for (a level-up teaches recipes: the list starts again)
+        std::uint32_t CraftPlanMisses = 0;               // unknown recipes in a row
         std::uint32_t SpellFailSeq = 0;                  // the last spell answer counted in SpellFails
         std::map<std::uint32_t, std::uint32_t> SpellFails; // per spell: refusals in a row that are not a fight's business (buffs; a spell not known): the pause doubles
         std::uint64_t NextServiceMs = 0;                 // next vendor visit (sell grey, repair, equip)
@@ -1572,6 +1589,14 @@ private:
     TurnFlow TurnHunterPet(DecideTick& tick, BotTurn& turn);
     void TurnUpkeepBuffs(DecideTick& tick, BotTurn& turn);
     void TurnCraftGather(DecideTick& tick, BotTurn& turn);
+    // Professions (bot_policy_professions.cpp): the profession_skillup lines of a bot's primaries; whether a line may still rise under the cap (writes profession_cap
+    // once per cap); whether a gathering node is no place to walk to (found empty, too high for the bot, dangerous, or the straight way there is); the safe node walk
+    // after "nothing near" (true when a walk began); the skinning ask after a loot.
+    void ProfessionSkillUps(BotState& state, forever_module::BotSnapshot const& bot);
+    bool ProfessionBelowCap(BotState& state, forever_module::BotSnapshot const& bot, std::uint32_t line);
+    bool ProfessionNodeUnsafe(forever_module::BotSnapshot const& bot, std::size_t node, std::uint64_t nowMs) const;
+    bool ProfessionNodeWalk(BotState& state, forever_module::BotSnapshot const& bot, std::size_t gatherIndex, std::uint64_t nowMs);
+    void ProfessionSkinAfterLoot(BotState& state, forever_module::BotSnapshot const& bot, std::uint32_t corpseLevel, std::uint64_t nowMs);
     TurnFlow TurnRotation(DecideTick& tick, BotTurn& turn);
     bool HealerBelowManaFloor(forever_module::BotSnapshot const& bot, BotState const& state, std::uint32_t classId, std::uint64_t partyLeader) const;
     // What the steps ask about the bots of this tick.
@@ -1759,6 +1784,8 @@ private:
     level_safe::DeathTally _deathTally;
     // The survival system: the shared danger map (DangerMap, SafeRevive) and the throttle of its skip lines.
     danger_map::Map _dangerMap;
+    // Professions: the gathering nodes found empty, for every bot (ProfessionNodeEmptyMin).
+    professions::EmptyNodes _emptyNodes;
     level_safe::LogThrottle _dangerLog;
     std::uint64_t _deathsTopAtMs = 0;
     std::size_t _botsInView = 0;

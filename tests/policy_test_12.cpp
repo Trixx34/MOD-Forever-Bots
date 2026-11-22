@@ -508,6 +508,124 @@ void LevelDungeonFileDurationCapsTheRun()
     CHECK(LevelRunTimedOut(false, 2000 + 46 * 60 * 1000));
 }
 
+
+// Professions (doc/professions.md): the craft plan names the easiest recipe of the table after a kSkillUp with nothing to make, skips a recipe the bot does not
+// know, and stops at the cap; a rise of the skill writes profession_skillup.
+std::vector<std::uint32_t> PlannedCrafts(std::vector<BotAction> const& actions)
+{
+    std::vector<std::uint32_t> spells;
+    for (BotAction const& action : actions)
+        if (action.type == ActionType::kCraft)
+            spells.push_back(action.spell_id);
+    return spells;
+}
+
+void ProfessionsCraftPlanNamesTheEasiestRecipeAndStopsAtTheCap()
+{
+    std::vector<std::string> events;
+    PolicyOptions options = AggressiveOptions();
+    options.Crafting = true;
+    options.Professions.Enabled = true;
+    options.OnEvent = [&events](std::string const& text) { events.push_back(text); };
+    std::vector<std::string> errors;
+    options.ProfessionRecipes = std::make_shared<std::vector<professions::Recipe>>(professions::ParseRecipeTable("197 100 1 40 75 2589:1\n197 101 1 25 50 2589:2\n", errors));
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = View(1, 0, {});
+    view.bots[0].level = 10;
+    view.bots[0].profession_skill[0] = 197; // Tailoring
+    view.bots[0].profession_value[0] = 10;
+    view.bots[0].profession_max[0] = 75;
+    CHECK((CraftsOf(policy.Decide(view, 1000)) == std::vector<std::uint32_t>{ 129 }));
+    CraftAnswer(view, BotActionStatus::kRefused, 1);
+    CHECK((CraftsOf(policy.Decide(view, 3000)) == std::vector<std::uint32_t>{ 185 }));
+    CraftAnswer(view, BotActionStatus::kRefused, 2);
+    CHECK((CraftsOf(policy.Decide(view, 5000)) == std::vector<std::uint32_t>{ 197 }));
+    CraftAnswer(view, BotActionStatus::kRefused, 3);                                     // no recipe with materials
+    policy.Decide(view, 7000);
+    CHECK((PlannedCrafts(policy.Decide(view, 9000)) == std::vector<std::uint32_t>{ 101 })); // the easiest that still raises 10
+    view.bots[0].last_action_type = std::uint8_t(ActionType::kCraft);
+    view.bots[0].last_action_status = BotActionStatus::kNotKnown;
+    view.bots[0].last_action_sequence = 4;
+    policy.Decide(view, 11000);
+    CHECK(HasEvent(events, "profession_craft_plan: bot=42 skill=197 recipe=101 status=not_known"));
+    CHECK((PlannedCrafts(policy.Decide(view, 13000)) == std::vector<std::uint32_t>{ 100 })); // the next one
+    // A rise of the skill: one line.
+    view.bots[0].profession_value[0] = 11;
+    policy.Decide(view, 14000);
+    CHECK(HasEvent(events, "profession_skillup: bot=42 skill=197 from=10 to=11"));
+    // At the cap (level 2: 10): no Tailoring ask, one profession_cap line.
+    PolicyOptions capped = options;
+    BotPolicy low(capped);
+    WorldTickSnapshotView lowView = View(1, 0, {});
+    lowView.bots[0].level = 2;
+    lowView.bots[0].profession_skill[0] = 197;
+    lowView.bots[0].profession_value[0] = 10;
+    lowView.bots[0].profession_max[0] = 75;
+    for (std::uint64_t t = 1000; t < 20000; t += 2000)
+    {
+        for (std::uint32_t skill : CraftsOf(low.Decide(lowView, t)))
+            CHECK(skill != 197);
+        CraftAnswer(lowView, BotActionStatus::kRefused, std::uint32_t(t));
+    }
+    CHECK(HasEvent(events, "profession_cap: bot=42 skill=197 value=10 cap=10 level=2"));
+}
+
+// Professions node walk: a node near the bot, never one found empty, never one beyond ProfessionNodeMaxYards; Gathering itself may be off.
+void ProfessionsNodeWalkSkipsEmptyAndFarNodes()
+{
+    auto nodes = std::make_shared<std::vector<gather::NodePoint>>();
+    for (float x : { 100.0f, 160.0f, 400.0f })   // 60 yards apart: more than the 25 yards of "arrived"
+    {
+        gather::NodePoint node;
+        node.Skill = 186; node.Map = 0; node.X = x; node.RequiredSkill = 1; node.AreaLevel = 1; node.Entry = std::uint32_t(x);
+        nodes->push_back(node);
+    }
+    std::vector<std::string> events;
+    PolicyOptions options = AggressiveOptions();
+    options.Professions.Enabled = true;
+    options.Professions.NodeGapMs = 0;
+    options.GatherNodes = nodes;
+    options.OnEvent = [&events](std::string const& text) { events.push_back(text); };
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = View(1, 0, {});
+    view.bots[0].level = 10;
+    view.bots[0].profession_skill[0] = 186; // Mining
+    view.bots[0].profession_value[0] = 10;
+    CHECK((GathersOf(policy.Decide(view, 1000)) == std::vector<std::uint32_t>{ 186 }));
+    view.bots[0].last_action_type = std::uint8_t(ActionType::kGather);
+    view.bots[0].last_action_status = BotActionStatus::kRefused;
+    view.bots[0].last_action_sequence = 1;
+    float const first = WalkTo(policy.Decide(view, 3000), kBot);
+    float const second = WalkTo(policy.Decide(view, 4000), kBot);
+    CHECK(first == 100.0f || second == 100.0f);                                             // the walk starts with the answer (or the tick after a mount)
+    CHECK(HasEvent(events, "profession_node_walk: bot=42 skill=186 node=100 yards=100"));
+    view.bots[0].pos_x = 98.0f;                                                             // arrived
+    view.bots[0].last_action_type = std::uint8_t(ActionType::kMoveTo);
+    view.bots[0].last_action_status = BotActionStatus::kApplied;
+    CHECK((GathersOf(policy.Decide(view, 20000)) == std::vector<std::uint32_t>{ 186 }));
+    view.bots[0].last_action_type = std::uint8_t(ActionType::kGather);
+    view.bots[0].last_action_status = BotActionStatus::kRefused;                            // the node is empty
+    view.bots[0].last_action_sequence = 2;
+    float const third = WalkTo(policy.Decide(view, 23000), kBot);
+    CHECK(HasEvent(events, "profession_node_empty: bot=42 skill=186 node=100"));
+    float const fourth = WalkTo(policy.Decide(view, 24000), kBot);
+    CHECK(third == 160.0f || fourth == 160.0f);  // the next one, not the empty one
+    view.bots[0].pos_x = 158.0f;
+    view.bots[0].last_action_type = std::uint8_t(ActionType::kMoveTo);
+    view.bots[0].last_action_status = BotActionStatus::kApplied;
+    CHECK((GathersOf(policy.Decide(view, 40000)) == std::vector<std::uint32_t>{ 186 }));
+    view.bots[0].last_action_type = std::uint8_t(ActionType::kGather);
+    view.bots[0].last_action_status = BotActionStatus::kRefused;
+    view.bots[0].last_action_sequence = 3;
+    policy.Decide(view, 43000);
+    CHECK(WalkTo(policy.Decide(view, 44000), kBot) < 0.0f);                                 // 400 is beyond 150 yards: no walk
+    // Off: Gathering and Professions both off, no ask at all.
+    BotPolicy off(AggressiveOptions());
+    WorldTickSnapshotView miner = View(1, 0, {});
+    miner.bots[0].profession_skill[0] = 186;
+    miner.bots[0].profession_value[0] = 10;
+    CHECK(GathersOf(off.Decide(miner, 1000)).empty());
+}
 } // namespace
 
 void RunPolicyTestsPart12()
@@ -533,4 +651,6 @@ void RunPolicyTestsPart12()
     LevelDungeonNeedRolesWantsATankAndAHealer();
     LevelDungeonFileDurationCapsTheRun();
     LevelDungeonLogNamesWhyADuePartyWaits();
+    ProfessionsCraftPlanNamesTheEasiestRecipeAndStopsAtTheCap();
+    ProfessionsNodeWalkSkipsEmptyAndFarNodes();
 }
