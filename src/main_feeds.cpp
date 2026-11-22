@@ -171,9 +171,11 @@ void SetUpAuction(forever_module::ModuleClient& client, RunContext& run, BotSett
             filter.onlyUpgrades = true;
             std::uint64_t const botGuid = bot.Guid;
             std::uint64_t const auctioneer = bot.AuctioneerGuid;
-            std::string const reach = settings.Auction.LogReach ? auction::ReachFields(bot.X, bot.Y, bot.Z, bot.AuctioneerX, bot.AuctioneerY, bot.AuctioneerZ) : std::string();
+            auction::CallFacts const facts = bot.Facts;
+            std::string const reach = settings.Auction.LogReach ? auction::ReachFields(facts.BotX, facts.BotY, facts.BotZ, facts.AuctioneerX, facts.AuctioneerY,
+                                                                                       facts.AuctioneerZ) : std::string();
             client.AuctionBrowseByFilterForBot(botGuid, auctioneer, filter,
-                                               [&client, &settings, botGuid, auctioneer, spend, reach](forever_module::ActionReply const& reply)
+                                               [&client, &settings, botGuid, auctioneer, spend, reach, facts](forever_module::ActionReply const& reply)
             {
                 if (!reply.success())
                     return;
@@ -194,12 +196,13 @@ void SetUpAuction(forever_module::ModuleClient& client, RunContext& run, BotSett
                     return;
                 auction::Offer const offer = *pick;
                 client.AuctionHouseForBot(botGuid, forever_module::ModuleClient::AuctionHouseOp::kBuyout, auctioneer, 0, offer.AuctionGuid, offer.Entry, 0, 0,
-                                          static_cast<std::uint32_t>(offer.Buyout), [botGuid, offer, reach](forever_module::ActionReply const& bought)
+                                          static_cast<std::uint32_t>(offer.Buyout), [botGuid, offer, reach, facts](forever_module::ActionReply const& bought)
                 {
                     if (bought.success())
                         std::cerr << "forever-bots: " << auction::BoughtLine(botGuid, offer, bought.copper_spent() ? bought.copper_spent() : offer.Buyout) << "\n";
                     else
-                        std::cerr << "forever-bots: " << auction::BuyFailedLine(botGuid, offer, bought.reason()) << reach << "\n";
+                        std::cerr << "forever-bots: " << auction::BuyFailedLine(botGuid, offer, bought.reason()) << reach
+                                  << auction::RefusalFields(bought.reason(), facts) << "\n";
                 });
             });
         };
@@ -226,7 +229,9 @@ void SetUpAuction(forever_module::ModuleClient& client, RunContext& run, BotSett
                 continue;
             }
             standing.LastVisitMs = now;
-            std::string const reach = settings.Auction.LogReach ? auction::ReachFields(bot.X, bot.Y, bot.Z, bot.AuctioneerX, bot.AuctioneerY, bot.AuctioneerZ) : std::string();
+            auction::CallFacts const facts = bot.Facts;
+            std::string const reach = settings.Auction.LogReach ? auction::ReachFields(facts.BotX, facts.BotY, facts.BotZ, facts.AuctioneerX, facts.AuctioneerY,
+                                                                                       facts.AuctioneerZ) : std::string();
 
             for (auction::Listing const& listing : auction::PlanListings(settings.Auction, bags, standing, items))
             {
@@ -234,7 +239,7 @@ void SetUpAuction(forever_module::ModuleClient& client, RunContext& run, BotSett
                     break;
                 std::uint64_t const botGuid = bot.Guid;
                 client.AuctionHouseForBot(botGuid, forever_module::ModuleClient::AuctionHouseOp::kList, bot.AuctioneerGuid, listing.ItemGuid, 0, listing.Entry, 1,
-                                          listing.Bid, listing.Buyout, [book, botGuid, listing, reach](forever_module::ActionReply const& reply)
+                                          listing.Bid, listing.Buyout, [book, botGuid, listing, reach, facts](forever_module::ActionReply const& reply)
                 {
                     auto& items = book->Items[botGuid];
                     if (reply.success())
@@ -245,7 +250,8 @@ void SetUpAuction(forever_module::ModuleClient& client, RunContext& run, BotSett
                         std::cerr << "forever-bots: " << auction::ListedLine(botGuid, listing, 1) << "\n";
                         return;
                     }
-                    std::cerr << "forever-bots: " << auction::ListRefusedLine(botGuid, listing, reply.reason()) << reach << "\n";
+                    std::cerr << "forever-bots: " << auction::ListRefusedLine(botGuid, listing, reply.reason()) << reach << auction::RefusalFields(reply.reason(), facts)
+                              << "\n";
                     // A refusal for the place or the money is tried again on a later visit; a refusal about the item drops it.
                     if (auction::ClassifyListFailure(reply.reason()) == auction::ListFailure::Skip)
                         items.erase(listing.ItemGuid);
@@ -259,7 +265,7 @@ void SetUpAuction(forever_module::ModuleClient& client, RunContext& run, BotSett
                         break;
                     std::uint64_t const botGuid = bot.Guid;
                     client.AuctionHouseForBot(botGuid, forever_module::ModuleClient::AuctionHouseOp::kListCommodity, bot.AuctioneerGuid, goods.ItemGuid, 0,
-                                              goods.Entry, goods.Count, goods.UnitPrice, 0, [book, botGuid, goods, reach](forever_module::ActionReply const& reply)
+                                              goods.Entry, goods.Count, goods.UnitPrice, 0, [book, botGuid, goods, reach, facts](forever_module::ActionReply const& reply)
                     {
                         auto& items = book->Items[botGuid];
                         if (reply.success())
@@ -270,7 +276,8 @@ void SetUpAuction(forever_module::ModuleClient& client, RunContext& run, BotSett
                             return;
                         }
                         auction::Listing const refused{ goods.ItemGuid, goods.Entry, goods.UnitPrice, 0, 120, 1 };
-                        std::cerr << "forever-bots: " << auction::ListRefusedLine(botGuid, refused, reply.reason()) << reach << "\n";
+                        std::cerr << "forever-bots: " << auction::ListRefusedLine(botGuid, refused, reply.reason()) << reach
+                                  << auction::RefusalFields(reply.reason(), facts) << "\n";
                         if (auction::ClassifyListFailure(reply.reason()) == auction::ListFailure::Skip)
                             items.erase(goods.ItemGuid);
                     });

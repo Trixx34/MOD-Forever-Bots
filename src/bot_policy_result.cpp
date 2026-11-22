@@ -29,8 +29,12 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
         state.Last.reset();
     }
 
+    // AuctionWalk3D: the auction errand's walk to a stand point the core has no route to moves on to the next point of the ring (bot_policy_turn_move.cpp)
+    // instead of failing the errand; the last point fails it there.
+    if (state.Errand && state.Errand->Auction && Opt().AuctionWalk3D && moveNoRoute && !chained)
+        state.Errand->StandNoRoute = true;
     // A town errand whose walk to the trainer has no route: the trip cannot be made, so it fails.
-    if (state.Errand && moveNoRoute && !chained)
+    else if (state.Errand && moveNoRoute && !chained)
     {
         state.ErrandResult = ErrandOutcome::kFailed;
         state.Errand.reset();

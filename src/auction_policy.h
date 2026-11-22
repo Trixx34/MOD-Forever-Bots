@@ -183,6 +183,7 @@ struct NearUnit
     std::uint64_t Ref = 0;
     float X = 0.0f;
     float Y = 0.0f;
+    float Z = 0.0f;   // the live unit's height (the auctioneer's real z, FindLive)
 };
 
 // The reference of the live auctioneer for a bot that stands in reach of the one the snapshot names. `spotRef` is the snapshot's reference (unit type and
@@ -190,6 +191,61 @@ struct NearUnit
 // the nearest such unit within kResolveYards of the spawn position, or 0 when none is in the bot's nearby list (the caller then makes no house call).
 constexpr float kResolveYards = 8.0f;
 std::uint64_t ResolveNearby(std::uint64_t spotRef, float ax, float ay, std::vector<NearUnit> const& nearby);
+// The same match, with the live unit itself: its reference and its own position (x, y, z), the place the core measures the reach from. None when the bot
+// does not see it (not loaded, another phase, or crowded out of the nearby list).
+std::optional<NearUnit> FindLive(std::uint64_t spotRef, float ax, float ay, std::vector<NearUnit> const& nearby);
+
+// ---- the house call gate and the refusal causes (doc/auction-reach-fix.md, 2026-11-20) ----
+//
+// The core takes a house call (list, browse, buyout, cancel) only when Player::GetNPCIfCanInteractWith passes: the bot is not on a flight, alive, the
+// auctioneer alive, not hostile (reaction above unfriendly), not in combat, in the bot's phase, and within the auctioneer's combat reach + 4 yards in 3D, the
+// two combat reaches added (WorldObject::IsWithinDistInMap: 1.5 + 4 + 1.5 + 1.5 for a player and a humanoid auctioneer). The module's own reach was 5 yards
+// in 2D, so a bot on another floor of the house (2D 3.7, 3D 14.2) or under the city (bot z 7, Ironforge's auctioneers at z 505), on a flight over the house,
+// or walking past it was "in reach" and every call it made was refused with "auctioneer not found or cannot interact with it".
+constexpr float kCoreReach3dYards = 8.5f;
+// What a call from where the bot stands would meet (the facts of the bot's snapshot when the call is planned).
+struct CallFacts
+{
+    bool AuctioneerValid = false;
+    float BotX = 0.0f, BotY = 0.0f, BotZ = 0.0f;
+    float AuctioneerX = 0.0f, AuctioneerY = 0.0f, AuctioneerZ = 0.0f;   // the live auctioneer's position when the bot sees it, else the spawn's
+    bool Moving = false;      // the snapshot's moving: a bot walking through the 5 yards is gone when the call lands
+    bool InFlight = false;    // on a taxi flight (the core refuses any interaction then)
+    bool LiveLooked = false;  // the bot's nearby units were searched for the live auctioneer (FindLive) ...
+    bool LiveSeen = false;    // ... and it was there
+};
+// kOk, or the first reason a call from here is refused: no auctioneer, on a flight, farther than kReachYards in 2D, in 2D reach but beyond kCoreReach3dYards in
+// 3D (another floor, under or above the house), moving. The plain bug fix (no key): no call is made unless this is kOk.
+enum class CallBlock : std::uint8_t { kOk, kNoAuctioneer, kInFlight, kFar2d, kFarHeight, kMoving };
+CallBlock JudgeCall(CallFacts const& facts);
+char const* CallBlockName(CallBlock block);   // "ok", "no_auctioneer", "in_flight", "far_2d", "far_height", "moving"
+// A house refusal's short code, from the core's words (ModuleActions.cpp): "auctioneer_missing" (not found on the bot's map), "cannot_interact" (found, but
+// GetNPCIfCanInteractWith said no), "no_money", "no_player", "item_gone", "item_mismatch", "no_house", "not_listed", "auction_gone", "own_auction", or "other".
+char const* RefusalCode(std::string const& reason);
+// What the module knows of a cannot_interact (or auctioneer_missing) refusal: a CallBlockName when the facts at send already broke the reach, "not_seen" when
+// the bot did not see the live auctioneer, else "in_reach_other" (in reach as far as the module can tell: the auctioneer's phase, combat or the bot's standing
+// with its faction, which the snapshot does not carry, or the bot moved between the snapshot and the call). "-" for the other codes.
+std::string RefusalCause(std::string const& reason, CallFacts const& facts);
+// " code=<RefusalCode> cause=<RefusalCause>", appended to the list_refused and buy_failed lines.
+std::string RefusalFields(std::string const& reason, CallFacts const& facts);
+
+// ---- AuctionWalk3D: the stand point (2026-11-20) ----
+//
+// The auction errand walked to the auctioneer's own spot. That spot is usually behind the counter, off the navmesh: the core answers kNoRoute (the errand
+// failed with reason=no_route once the walk was shorter than a partial leg) and moves the bot to the nearest point the mesh snaps it to, often the floor
+// above or below (the arm C sim: 194 auction_reach check=failed_3d, 2D 3.7 yards, 3D 14.2). With AuctionWalk3D the walk goes to a stand point instead: on
+// a ring of kStandRingYards around the auctioneer, at its height (the live creature's when the bot sees it), first on the side the bot comes from, then
+// 45 degrees to one side, to the other, 90, and so on, the far side last. A point the core finds no route to, or one that leaves the bot in 2D reach
+// but out of the 3D reach for kStandTryMs, gives way to the next; after kStandTries points the errand fails.
+constexpr float kStandRingYards = 2.5f;
+constexpr std::uint32_t kStandTries = 8;
+constexpr std::uint64_t kStandTryMs = 15000;
+// Stand point `attempt` (0-based, taken modulo kStandTries) around `anchor` for a bot coming from (fromX, fromY); at the anchor's height.
+RefPoint StandPoint(RefPoint const& anchor, float fromX, float fromY, std::uint32_t attempt);
+enum class StandNext : std::uint8_t { kStay, kNextPoint, kGiveUp };
+// After stand point `attempt`: kStay while it may still work; kNextPoint when the core found no route to it (noRoute) or the bot has been in 2D reach without
+// the 3D reach since near2dSinceMs (0 = not) for kStandTryMs; kGiveUp instead of kNextPoint when it was the last point.
+StandNext JudgeStandTry(std::uint32_t attempt, bool noRoute, std::uint64_t near2dSinceMs, std::uint64_t nowMs);
 
 struct Listing
 {

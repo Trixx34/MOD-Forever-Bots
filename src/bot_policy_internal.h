@@ -483,10 +483,10 @@ constexpr std::uint64_t kErrandTrainRetryMs = 3000; // the next train order of a
 // An auction errand keeps the bot standing at the auctioneer this long before it ends: the listing visit runs on the module's own timer (every 10 s,
 // from a feed refreshed every 2 s), so a bot that walked on at once was gone before the visit saw it in reach.
 constexpr std::uint64_t kAuctionDwellMs = 25000;
-// AuctionWalk3D, the z-aware stand point (2026-11-19): the snapshot's live auctioneer replaces the errand's spot (height included) when it stands within this
-// of it; a bot in 2D reach but not in 3D reach this long ends the errand as failed (another floor, under the house: the walk does not get there).
+// AuctionWalk3D, the z-aware stand point (2026-11-19): the auctioneer the snapshot names (or the live creature the bot sees) replaces the errand's spot
+// (height included) when it stands within this of it. A bot in 2D reach but not in 3D reach, or refused a route, moves on to the next stand point of the
+// ring (auction::JudgeStandTry, kStandTryMs per point, kStandTries points; this replaced the single 60 s limit of 2026-11-19).
 constexpr float kAuctionStandLiveYards = 30.0f;
-constexpr std::uint64_t kAuctionNear2dMaxMs = 60000;
 constexpr std::uint64_t kAuctionReachLogMs = 600000;   // the errand's auction_reach line: at most once per bot this often
 constexpr std::uint64_t kErrandBuyWaitMs = 30000;   // a mount purchase handed to the Run() thread: no answer within this ends the errand as failed
 constexpr float kMountVendorReachYards = 8.0f;     // a mount vendor errand: the nearest vendor the snapshot names counts as the errand's vendor within this of its spot
