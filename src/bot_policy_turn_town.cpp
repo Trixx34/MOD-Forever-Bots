@@ -1238,8 +1238,27 @@ void BotPolicy::TurnSendMove(DecideTick& tick, BotTurn& turn)
     // A move to a place the core found no route to a moment ago is not sent again yet.
     bool const blockedMove = wanted.Type == ActionType::kMoveTo && nowMs < state.NoRouteUntilMs &&
                              std::hypot(wanted.Dest.X - state.NoRouteDest.X, wanted.Dest.Y - state.NoRouteDest.Y) < kNoRouteSameYards;
-    if (!blockedMove && (!state.Last || state.Last->Type != wanted.Type || state.Last->Target != wanted.Target ||
-        state.Last->Dest.X != wanted.Dest.X || state.Last->Dest.Y != wanted.Dest.Y || state.Last->Dest.Z != wanted.Dest.Z))
+    bool const changed = !state.Last || state.Last->Type != wanted.Type || state.Last->Target != wanted.Target || state.Last->Dest.X != wanted.Dest.X ||
+                         state.Last->Dest.Y != wanted.Dest.Y || state.Last->Dest.Z != wanted.Dest.Z;
+    // NoRouteBackoff (no_route_backoff.h): a point walk to a place the core refused for this bot is held back for its wait (no core call, so no no_route
+    // line and no straight-line walk), and the walk ends as a refusal would (WalkBlockedAtMs), so the wander, gather and craft walks pick something else.
+    bool backoffHeld = false;
+    if (!blockedMove && changed && Opt().NoRouteBackoff.Enabled && wanted.Type == ActionType::kMoveTo && wanted.Target == 0 && bot.in_combat == 0 &&
+        !IsRouteActive(bot.guid))
+        if (no_route_backoff::Entry* entry = no_route_backoff::Blocked(Opt().NoRouteBackoff, state.NoRouteBook, bot.map_id, wanted.Dest.X, wanted.Dest.Y, nowMs))
+        {
+            backoffHeld = true;
+            state.WalkBlockedAtMs = nowMs;
+            if (!entry->HeldLogged)
+            {
+                entry->HeldLogged = true;
+                LogEvent("no_route_backoff: bot=" + std::to_string(bot.guid) + " stage=held why=" + (*moveWhy ? moveWhy : "other") + " caller=" +
+                         route_triage::Caller(moveWhy) + " map=" + std::to_string(bot.map_id) + " dest=" + std::to_string(int(entry->X)) + "," +
+                         std::to_string(int(entry->Y)) + "," + std::to_string(int(entry->Z)) + " fails=" + std::to_string(entry->Fails) + " wait_s=" +
+                         std::to_string((entry->UntilMs - nowMs) / 1000));
+            }
+        }
+    if (!blockedMove && !backoffHeld && changed)
     {
         BotAction action;
         action.bot_guid = bot.guid;
@@ -1252,6 +1271,9 @@ void BotPolicy::TurnSendMove(DecideTick& tick, BotTurn& turn)
         actions.push_back(action);
         state.Last = wanted;
         if (wanted.Type == ActionType::kMoveTo)
+        {
             state.LastMove = wanted;
+            state.LastMoveWhy = moveWhy ? moveWhy : "";
+        }
     }
 }

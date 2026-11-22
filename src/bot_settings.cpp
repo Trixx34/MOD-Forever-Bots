@@ -706,6 +706,13 @@ BotSettings ParseOneConfig(std::unordered_map<std::string, std::string> const& c
     ReadKey(config, "BelowMapDropYards", 20, 1000, settings.BelowMapDropYards, warnings);
     ReadKey(config, "BelowMapStormCount", 0, 100, settings.BelowMapStormCount, warnings);
     ReadKey(config, "BelowMapCooldownSec", 60, 86400, settings.BelowMapCooldownSec, warnings);
+    ReadKey(config, "BelowMapChecks", 1, 100, settings.BelowMapChecks, warnings);
+    ReadKey(config, "BelowMapMinPlaces", 1, 20, settings.BelowMapMinPlaces, warnings);
+    ReadBool(config, "BelowMapRequireStill", settings.BelowMapRequireStill, warnings);
+    ReadKey(config, "BelowMapStormRiseYards", 0, 500, settings.BelowMapStormRiseYards, warnings);
+    ReadBool(config, "BelowMapStormDistinct", settings.BelowMapStormDistinct, warnings);
+    ReadBool(config, "NoRouteBackoff", settings.NoRouteBackoff, warnings);
+    ReadKey(config, "NoRouteBackoffSec", 5, 3600, settings.NoRouteBackoffSec, warnings);
     ReadBool(config, "LogRefusedReason", settings.LogRefusedReason, warnings);
     ReadKey(config, "DeathsTopEveryMin", 0, 1440, settings.DeathsTopEveryMin, warnings);
     ReadBool(config, "ChatCommands", settings.ChatCommands, warnings);

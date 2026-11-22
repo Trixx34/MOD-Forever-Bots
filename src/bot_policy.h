@@ -94,6 +94,7 @@
 #include "off_map.h"
 #include "level_safe.h"
 #include "below_map.h"
+#include "no_route_backoff.h"
 #include "auction_policy.h"
 #include "danger_map.h"
 #include "fight_risk.h"
@@ -293,6 +294,9 @@ struct PolicyOptions
     // Below-map recovery (below_map.h; config BelowMapRecover, default off): a bot far below the known places around it, or with a storm of no-route answers
     // for short walks, is teleported to the nearest known place. Needs Bot.Actions.Teleport in the core.
     below_map::Options BelowMap;
+    // No-route backoff (no_route_backoff.h; config NoRouteBackoff, default off; NoRouteBackoffSec): a point walk the core refused for no route is held
+    // back per (bot, destination) for a wait that doubles with each refusal of that place; event no_route_backoff.
+    no_route_backoff::Options NoRouteBackoff;
     // AuctionWalk3D (config, default off): the auction errand counts the bot as arrived only within kAuctionReach3dYards in 3D (not 5 yards in 2D) and walks
     // it to the auctioneer until then; the listing visit (main_feeds.cpp) uses the same 3D reach.
     bool AuctionWalk3D = false;
@@ -1016,6 +1020,8 @@ private:
         Point NoRouteDest{};                             // the destination of the last move the core found no route to
         std::uint64_t NoRouteUntilMs = 0;                // a move to (about) that place is not sent before this time
         std::uint32_t NoRouteStreak = 0;                 // no-route answers in a row for that place: the pause doubles each time
+        no_route_backoff::Book NoRouteBook;              // NoRouteBackoff: the places the core refused for this bot, each with its wait
+        char const* LastMoveWhy = "";                    // the move reason (BotTurn::moveWhy) of LastMove, for the no_route line's why= and caller=
         std::vector<std::pair<Point, std::uint64_t>> RefusedPlaces;   // the last few places the core found no route to, each with the time it is forgotten (the Warder kite steps past all of them, not only the last)
         std::uint64_t ReclaimDangerSinceMs = 0;          // since when a live hostile has stood near the ghost at its corpse (0 = none)
         std::uint64_t FocusLoggedFor = 0;                // the unit a focus event was last written for (once per target)

@@ -103,6 +103,7 @@ BotPolicy::TurnFlow BotPolicy::TurnBegin(DecideTick& tick, BotTurn& turn)
                         actions.push_back(move);
                         state.Last = Decision{ ActionType::kMoveTo, state.LosRepositionTarget, dest };
                         state.LastMove = state.Last;
+                        state.LastMoveWhy = "los_reposition";
                         if (Opt().OnEvent)
                             Opt().OnEvent("healer_dps_los: healer=" + std::to_string(bot.guid) +
                                              " moving_to=" + std::to_string(int(dest.X)) + "," +
@@ -198,6 +199,7 @@ BotPolicy::TurnFlow BotPolicy::TurnGroundEffects(DecideTick& tick, BotTurn& turn
                 actions.push_back(move);
                 state.Last = out;
                 state.LastMove = out;
+                state.LastMoveWhy = "ground_avoid";
             }
             return TurnFlow::kSkip;
         }

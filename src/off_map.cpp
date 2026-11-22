@@ -83,6 +83,7 @@ KnownWorld::Around KnownWorld::Near(std::uint32_t map, float x, float y, float z
             continue;
         if (!around.Lowest || place.Z < around.Lowest->Z)
             around.Lowest = &place;
+        around.Within.push_back(&place);
         around.NearestDz = std::min(around.NearestDz, std::fabs(place.Z - z));
     }
     return around;

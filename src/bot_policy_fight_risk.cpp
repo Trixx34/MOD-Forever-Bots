@@ -241,6 +241,7 @@ BotPolicy::TurnFlow BotPolicy::TurnFightRisk(DecideTick& tick, BotTurn& turn)
         tick.actions.push_back(move);
         state.Last = walk;
         state.LastMove = walk;
+        state.LastMoveWhy = "fight_risk_retreat";
     }
     return TurnFlow::kSkip;
 }

@@ -108,6 +108,7 @@ void BelowTheMapIsSeenByHeightOrByAStorm()
     below_map::Facts facts;
     facts.HasGround = true;
     facts.GroundZ = 505.0f;
+    facts.Places = 2;   // 2026-11-20: z_below needs MinPlaces (2) known places near
     facts.Z = 19.0f;   // the Ironforge auction house, 2026-11-18
     CHECK(below_map::Check(options, watch, facts, 1000) == below_map::Verdict::kWaiting);
     CHECK(below_map::Check(options, watch, facts, 20999) == below_map::Verdict::kWaiting);
@@ -119,23 +120,24 @@ void BelowTheMapIsSeenByHeightOrByAStorm()
     CHECK(below_map::Check(options, watch, facts, 50000) == below_map::Verdict::kCooldown);
     facts.Z = 500.0f;
     CHECK(below_map::Check(options, watch, facts, 60000) == below_map::Verdict::kFine);       // on the floor
-    // The storm: eight short walks refused within five minutes. Arrivals (under 6 yards) and long walks do not count.
+    // The storm: eight short walks refused within five minutes. Arrivals (under 6 yards) and long walks do not count. 2026-11-20: eight different
+    // destinations, each 50 yards above the bot (BelowMapStormDistinct, BelowMapStormRiseYards).
     below_map::Watch storm;
     below_map::Facts open;
-    below_map::NoteNoRoute(options, storm, 3.0f, 1000);
-    below_map::NoteNoRoute(options, storm, 400.0f, 1000);
+    below_map::NoteNoRoute(options, storm, 3.0f, 500.0f, 0.0f, 69.0f, 19.0f, 1000);
+    below_map::NoteNoRoute(options, storm, 400.0f, 520.0f, 0.0f, 69.0f, 19.0f, 1000);
     for (int i = 0; i < 7; ++i)
-        below_map::NoteNoRoute(options, storm, 40.0f, 1000 + std::uint64_t(i) * 1000);
+        below_map::NoteNoRoute(options, storm, 40.0f, float(i) * 20.0f, 0.0f, 69.0f, 19.0f, 1000 + std::uint64_t(i) * 1000);
     CHECK(below_map::Check(options, storm, open, 9000) == below_map::Verdict::kFine);
-    below_map::NoteNoRoute(options, storm, 40.0f, 9000);
+    below_map::NoteNoRoute(options, storm, 40.0f, 200.0f, 0.0f, 69.0f, 19.0f, 9000);
     CHECK(below_map::Check(options, storm, open, 9500) == below_map::Verdict::kSendStorm);
     CHECK(storm.NoRoutes.empty());
     for (int i = 0; i < 8; ++i)
-        below_map::NoteNoRoute(options, storm, 40.0f, 10000);
+        below_map::NoteNoRoute(options, storm, 40.0f, float(i) * 20.0f, 0.0f, 69.0f, 19.0f, 10000);
     CHECK(below_map::Check(options, storm, open, 400000) == below_map::Verdict::kFine);     // the window ran out
     below_map::Options off;
     below_map::Watch none;
-    below_map::NoteNoRoute(off, none, 40.0f, 1000);
+    below_map::NoteNoRoute(off, none, 40.0f, 0.0f, 0.0f, 69.0f, 19.0f, 1000);
     CHECK(none.NoRoutes.empty() && below_map::Check(off, none, facts, 1000) == below_map::Verdict::kFine);
 }
 
@@ -328,7 +330,10 @@ void BelowTheMapThePolicyTeleportsUp()
 {
     std::vector<std::string> events;
     std::vector<std::string> warnings;
-    std::istringstream spots("spot 0 0 0 505 1 6 0 10\n");
+    // 2026-11-20: the map must be known (10 places or more) and two places must lie near the bot (BelowMapMinPlaces).
+    std::istringstream spots("spot 0 0 0 505 1 6 0 10\nspot 0 10 0 505 1 6 0 10\nspot 0 1000 0 0 1 6 0 10\nspot 0 1100 0 0 1 6 0 10\n"
+                             "spot 0 1200 0 0 1 6 0 10\nspot 0 1300 0 0 1 6 0 10\nspot 0 1400 0 0 1 6 0 10\nspot 0 1500 0 0 1 6 0 10\n"
+                             "spot 0 1600 0 0 1 6 0 10\nspot 0 1700 0 0 1 6 0 10\n");
     PolicyOptions options = LevelOptions(&events);
     options.Grind = std::make_shared<GrindData>(ParseGrindData(spots, warnings));
     options.BelowMap.Enabled = true;
@@ -336,7 +341,7 @@ void BelowTheMapThePolicyTeleportsUp()
     WorldTickSnapshotView under = Alive(20.0f, 6);
     under.bots[0].pos_z = 19.0f;
     CHECK(!TeleportOf(policy.Decide(under, 1000), kBot));
-    // Looked at every 2 s (CheckEveryMs); the drop holds 20 s and five looks: up at 21 s.
+    // Looked at every 2 s (CheckEveryMs); the drop holds 20 s and ten looks (BelowMapChecks): up at 21 s, the eleventh look.
     std::optional<BotAction> up;
     for (std::uint64_t now = 2000; now <= 22000 && !up; now += 1000)
     {
@@ -344,7 +349,8 @@ void BelowTheMapThePolicyTeleportsUp()
         CHECK(!up || now == 21000);
     }
     CHECK(up.has_value() && up->dest_z == 505.0f && up->dest_x == 0.0f);
-    CHECK(Logged(events, "below_map_recover: bot=42 reason=z_below map=0 pos=20,0,19 ground_z=505 to=0,0,505"));
+    CHECK(Logged(events, "below_map_recover: bot=42 reason=z_below map=0 pos=20,0,19 ground_z=505 z=19 drop=486 places=2 floors=1 low_z=505 high_z=505 checks=11 "
+                         "moving=0 to=0,0,505"));
     options.BelowMap.Enabled = false;
     BotPolicy off(options);
     CHECK(!TeleportOf(off.Decide(under, 1000), kBot) && !TeleportOf(off.Decide(under, 22000), kBot));

@@ -6,6 +6,7 @@
 namespace
 {
 constexpr std::uint64_t kLevelEscapeCheckMs = 5000; // LevelSafeEscape: a bot in a fitting place is looked at again after this
+constexpr std::uint32_t kMoveFlagFlying = 1u << 1;   // BotSnapshot::movement_flags bit 1 (layout 24)
 constexpr std::uint32_t kMoveFlagFalling = 1u << 2;  // BotSnapshot::movement_flags bit 2 (layout 24; bits 0 and 3 are in transport_ride.h)
 }
 
@@ -191,20 +192,43 @@ BotPolicy::TurnFlow BotPolicy::TurnBelowMap(DecideTick& tick, BotTurn& turn)
     facts.OnTransport = bot.transport_guid != 0 || (bot.movement_flags & transport_ride::kFlagOnTransport) != 0;
     facts.Swimming = (bot.movement_flags & transport_ride::kFlagSwimming) != 0;
     facts.Falling = (bot.movement_flags & kMoveFlagFalling) != 0;
+    facts.Flying = (bot.movement_flags & kMoveFlagFlying) != 0;
+    facts.Moving = bot.moving != 0;
     facts.Held = turn.stagingHold || IsRouteActive(bot.guid) || state.TankLead || tick.tankLed.count(bot.guid) != 0 || (_tamingFn && _tamingFn(bot.guid));
     facts.Z = bot.pos_z;
-    // The ground: the lowest known place within NearYards (any side), not the nearest one; a giver on a tower beside a lower place is not the ground.
-    off_map::KnownWorld::Around const around = _knownWorld.Near(bot.map_id, bot.pos_x, bot.pos_y, bot.pos_z, Opt().BelowMap.NearYards);
-    off_map::Place const* ground = around.Lowest;
+    // The ground (2026-11-20): the closest floor to the bot's height among the known places within NearYards (any side), so a giver on a tower beside a
+    // lower place is not the ground; the lowest of them when all lie above. A map the known world does not cover (an instance, a battleground) has none.
+    off_map::Place const* ground = nullptr;
+    below_map::Ground found;
+    if (_knownWorld.Knows(bot.map_id))
+    {
+        off_map::KnownWorld::Around const around = _knownWorld.Near(bot.map_id, bot.pos_x, bot.pos_y, bot.pos_z, Opt().BelowMap.NearYards);
+        std::vector<float> heights;
+        heights.reserve(around.Within.size());
+        for (off_map::Place const* place : around.Within)
+            heights.push_back(place->Z);
+        found = below_map::FindGround(heights, bot.pos_z, Opt().BelowMap.FloorBandYards);
+        if (found.HasGround)
+            ground = around.Within[found.Index];
+    }
     if (ground)
     {
         facts.HasGround = true;
-        facts.GroundZ = ground->Z;
-        facts.NearestDz = around.NearestDz;
+        facts.GroundZ = found.GroundZ;
+        facts.NearestDz = found.NearestDz;
+        facts.Places = found.Places;
+        facts.Floors = found.Floors;
     }
     below_map::Verdict const verdict = below_map::Check(Opt().BelowMap, state.BelowMap, facts, nowMs);
-    std::string const where = " map=" + std::to_string(bot.map_id) + " pos=" + std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) + "," +
-                              std::to_string(int(bot.pos_z)) + " ground_z=" + (facts.HasGround ? std::to_string(int(facts.GroundZ)) : std::string("none"));
+    // The fields to read a verdict by (2026-11-20): z, the closest floor, the drop, the places and floors seen within NearYards, the lowest and highest.
+    std::string where = " map=" + std::to_string(bot.map_id) + " pos=" + std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) + "," +
+                        std::to_string(int(bot.pos_z)) + " ground_z=" + (facts.HasGround ? std::to_string(int(facts.GroundZ)) : std::string("none"));
+    if (below_map::IsSkip(verdict) || below_map::IsSend(verdict))
+        where += " z=" + std::to_string(int(bot.pos_z)) + " drop=" + (facts.HasGround ? std::to_string(int(facts.GroundZ - facts.Z)) : std::string("none")) +
+                 " places=" + std::to_string(facts.Places) + " floors=" + std::to_string(facts.Floors) + " low_z=" +
+                 (facts.HasGround ? std::to_string(int(found.LowZ)) : std::string("none")) + " high_z=" +
+                 (facts.HasGround ? std::to_string(int(found.HighZ)) : std::string("none")) + " checks=" + std::to_string(state.BelowMap.LastChecks) +
+                 " moving=" + std::to_string(int(bot.moving != 0));
     if (below_map::IsSkip(verdict))
     {
         // below_map_skip: at most once per bot every SkipLogMs (10 min), and counted then (the hourly line), so the count compares with below_map_recover.
@@ -218,7 +242,7 @@ BotPolicy::TurnFlow BotPolicy::TurnBelowMap(DecideTick& tick, BotTurn& turn)
     }
     if (!below_map::IsSend(verdict))
         return TurnFlow::kNext;
-    // z_below: back up to that place. A storm: the nearest place of its side.
+    // z_below: back up to that floor. A storm: the nearest place of its side.
     std::uint8_t const side = Opt().PartySideOf ? Opt().PartySideOf(bot.guid) : (Opt().SideOf ? Opt().SideOf(bot.guid) : 0);
     off_map::Place const* to = verdict == below_map::Verdict::kSendBelow ? ground : _knownWorld.Home(bot.map_id, bot.pos_x, bot.pos_y, side);
     if (!to)

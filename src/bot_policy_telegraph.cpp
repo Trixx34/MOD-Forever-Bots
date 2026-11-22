@@ -70,6 +70,7 @@ BotPolicy::TurnFlow BotPolicy::TurnTelegraphEscape(DecideTick& tick, BotTurn& tu
         tick.actions.push_back(move);
         state.Last = out;
         state.LastMove = out;
+        state.LastMoveWhy = "telegraph_dodge";
     }
     return TurnFlow::kSkip;
 }

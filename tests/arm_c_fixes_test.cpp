@@ -220,6 +220,7 @@ below_map::Options BelowOn()
 {
     below_map::Options options;
     options.Enabled = true;
+    options.BelowChecks = 5;   // the arm C value; the 2026-11-20 default (10) is tested in belowmap_noroute_test.cpp
     return options;
 }
 
@@ -245,6 +246,8 @@ below_map::Facts Teldrassil()
     facts.HasGround = true;
     facts.GroundZ = 1326.0f;
     facts.NearestDz = 193.0f;
+    facts.Places = 2;   // 2026-11-20: BelowMapMinPlaces
+    facts.Floors = 1;
     facts.Z = 1133.0f;
     return facts;
 }
@@ -287,12 +290,14 @@ void ABotThatWalkedThereIsNotBelowTheMap()
     std::vector<Verdict> const onPath = Checks(options, walked, facts, 2000, 30000);
     CHECK(onPath[10] == Verdict::kSkipOnPath && CountOf(onPath, Verdict::kSkipOnPath) == 1 && CountOf(onPath, Verdict::kSendBelow) == 0);
     CHECK(std::string(below_map::VerdictName(Verdict::kSkipOnPath)) == "on_path" && walked.LastSkipBelow && walked.BelowChecks == 4);
-    // ... unless it is falling (the drop is happening now), or it dropped more than 20 yards since that walk, or the walk is older than 60 s.
+    // ... unless it is falling (the drop is happening now), or it dropped more than 20 yards since that walk, or the walk is older than 60 s. 2026-11-20:
+    // a fall is skipped for its first 30 s (FallGraceMs), then the drop must persist: a fall of 50 s is sent.
     below_map::Watch falling;
     below_map::NoteRouted(options, falling, 1133.0f, 0);
     below_map::Facts fall = facts;
     fall.Falling = true;
-    CHECK(CountOf(Checks(options, falling, fall, 2000, 30000), Verdict::kSendBelow) == 1);
+    std::vector<Verdict> const fallen = Checks(options, falling, fall, 2000, 60000);
+    CHECK(CountOf(fallen, Verdict::kSendBelow) == 1 && fallen[0] == Verdict::kSkipFalling && fallen[14] == Verdict::kSkipFalling && fallen[15] == Verdict::kWaiting);
     below_map::Watch dropped;
     below_map::NoteRouted(options, dropped, 1300.0f, 0);
     CHECK(CountOf(Checks(options, dropped, facts, 2000, 30000), Verdict::kSendBelow) == 1);
@@ -315,6 +320,7 @@ void TransportsAndWaterAreSkipped()
     ironforge.HasGround = true;
     ironforge.GroundZ = 505.0f;
     ironforge.NearestDz = 486.0f;
+    ironforge.Places = 2;
     ironforge.Z = 19.0f;
     using below_map::Verdict;
     below_map::Watch real;
@@ -346,10 +352,14 @@ void AStormBesideAPlaceAtTheBotsHeightIsSkipped()
     skyborne.HasGround = true;
     skyborne.GroundZ = 980.0f;
     skyborne.NearestDz = 4.0f;
+    skyborne.Places = 2;
     skyborne.Z = 976.0f;
+    // 2026-11-20: eight different destinations, each 44 yards above the bot (the storm counts nothing else).
+    auto const refuse = [&](below_map::Watch& watch, int i, std::uint64_t at)
+    { below_map::NoteNoRoute(options, watch, 40.0f, 4126.0f + float(i) * 20.0f, 1953.0f, 1020.0f, 976.0f, at); };
     below_map::Watch storm;
     for (int i = 0; i < 8; ++i)
-        below_map::NoteNoRoute(options, storm, 40.0f, 1000 + std::uint64_t(i) * 1000);
+        refuse(storm, i, 1000 + std::uint64_t(i) * 1000);
     below_map::Verdict const near = below_map::Check(options, storm, skyborne, 10000);
     CHECK(near == below_map::Verdict::kSkipNearGround && !storm.LastSkipBelow && storm.NoRoutes.empty());
     // No place near the bot's height: the storm is sent, unless a walk was applied after the storm began.
@@ -357,13 +367,13 @@ void AStormBesideAPlaceAtTheBotsHeightIsSkipped()
     lost.NearestDz = 80.0f;
     below_map::Watch walked;
     for (int i = 0; i < 8; ++i)
-        below_map::NoteNoRoute(options, walked, 40.0f, 1000 + std::uint64_t(i) * 1000);
+        refuse(walked, i, 1000 + std::uint64_t(i) * 1000);
     below_map::NoteRouted(options, walked, 976.0f, 5000);
     CHECK(below_map::Check(options, walked, lost, 10000) == below_map::Verdict::kSkipOnPath);
     below_map::Watch stuck;
     below_map::NoteRouted(options, stuck, 976.0f, 500);   // before the storm
     for (int i = 0; i < 8; ++i)
-        below_map::NoteNoRoute(options, stuck, 40.0f, 1000 + std::uint64_t(i) * 1000);
+        refuse(stuck, i, 1000 + std::uint64_t(i) * 1000);
     CHECK(below_map::Check(options, stuck, lost, 10000) == below_map::Verdict::kSendStorm);
 }
 
@@ -393,7 +403,10 @@ void ThePolicySkipsABotOnItsPathAndCountsIt()
 {
     std::vector<std::string> events;
     std::vector<std::string> warnings;
-    std::istringstream spots("spot 1 10311 832 1326 1 6 0 10\n");
+    // 2026-11-20: the map must be known (10 places or more) and two places must lie within 60 yards (BelowMapMinPlaces).
+    std::istringstream spots("spot 1 10311 832 1326 1 6 0 10\nspot 1 10335 870 1330 1 6 0 10\nspot 1 0 0 0 1 6 0 10\nspot 1 100 0 0 1 6 0 10\n"
+                             "spot 1 200 0 0 1 6 0 10\nspot 1 300 0 0 1 6 0 10\nspot 1 400 0 0 1 6 0 10\nspot 1 500 0 0 1 6 0 10\n"
+                             "spot 1 600 0 0 1 6 0 10\nspot 1 700 0 0 1 6 0 10\n");
     PolicyOptions options = AggressiveOptions();
     options.Grind = std::make_shared<GrindData>(ParseGrindData(spots, warnings));
     options.WanderWhenIdle = false;
@@ -426,7 +439,8 @@ void ThePolicySkipsABotOnItsPathAndCountsIt()
     for (std::string const& event : events)
         skipLines += event.rfind("below_map_skip:", 0) == 0;
     CHECK(skipLines == 1);   // once per bot per 10 minutes
-    CHECK(Logged(events, "below_map_recover: bot=42 reason=z_below map=1 pos=10329,848,1133 ground_z=1326 to=10311,832,1326"));
+    CHECK(Logged(events, "below_map_recover: bot=42 reason=z_below map=1 pos=10329,848,1133 ground_z=1326 z=1133 drop=193 places=2 floors=1 low_z=1326 "
+                         "high_z=1330 checks=11 moving=0 to=10311,832,1326"));
     std::optional<std::string> const line = policy.TakeDeathsTopLine(3600500);
     CHECK(line && line->find(" below_map_recover=1 below_map_skip=on_path:1") != std::string::npos);
 }

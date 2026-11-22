@@ -414,6 +414,13 @@ void LoadPolicyTables(PolicyOptions& policyOptions, BotSettings& settings)
     policyOptions.BelowMap.DropYards = float(settings.BelowMapDropYards);
     policyOptions.BelowMap.StormCount = settings.BelowMapStormCount;
     policyOptions.BelowMap.CooldownMs = std::uint64_t(settings.BelowMapCooldownSec) * 1000;
+    policyOptions.BelowMap.BelowChecks = settings.BelowMapChecks;
+    policyOptions.BelowMap.MinPlaces = settings.BelowMapMinPlaces;
+    policyOptions.BelowMap.RequireStill = settings.BelowMapRequireStill;
+    policyOptions.BelowMap.StormRiseYards = float(settings.BelowMapStormRiseYards);
+    policyOptions.BelowMap.StormDistinct = settings.BelowMapStormDistinct;
+    policyOptions.NoRouteBackoff.Enabled = settings.NoRouteBackoff;
+    policyOptions.NoRouteBackoff.BaseMs = std::uint64_t(settings.NoRouteBackoffSec) * 1000;
     policyOptions.AuctionWalk3D = settings.Auction.Enabled && settings.Auction.Walk3D;
     policyOptions.DeathsTopEveryMs = std::uint64_t(settings.DeathsTopEveryMin) * 60000;
     policyOptions.QuestGroups = settings.QuestGroups;

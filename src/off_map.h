@@ -49,6 +49,7 @@ public:
     {
         Place const* Lowest = nullptr;
         float NearestDz = 1e9f;
+        std::vector<Place const*> Within;   // every place within the radius (below_map::FindGround picks the closest floor of them)
     };
     Around Near(std::uint32_t map, float x, float y, float z, float radius) const;
     std::size_t PlacesOn(std::uint32_t map) const;

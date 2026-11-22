@@ -3,6 +3,8 @@
 // cause (cause=...), so the refusals can be split by it without re-reading the policy. Pure logic, unit-tested in tests/route_triage_test.cpp.
 #pragma once
 
+#include <string_view>
+
 namespace route_triage
 {
 
@@ -29,6 +31,36 @@ inline NoRouteCause Classify(bool inCombat, bool haveMove, bool toUnit, float di
     if (!haveMove)
         return NoRouteCause::kNoMove;
     return toUnit ? NoRouteCause::kToUnit : NoRouteCause::kToPoint;
+}
+
+// The part of the policy that chose the refused walk (2026-11-20, the no_route line's caller= field), from its move reason (BotTurn::moveWhy, the
+// move_why line's why=): grind, explore, hub, quest, errand, vendor, goto, event, combat, dungeon, death, other. An empty or unknown reason is other.
+inline char const* Caller(char const* why)
+{
+    if (!why || !*why)
+        return "other";
+    std::string_view const w(why);
+    struct Group
+    {
+        std::string_view Why;
+        char const* Caller;
+    };
+    static constexpr Group kGroups[] = {
+        { "state.GrindTarget", "grind" }, { "state.ExploreTarget", "explore" }, { "hub", "hub" }, { "list[state.NextHub % list.size()]", "hub" },
+        { "quest_walk", "quest" }, { "quest_hunt", "quest" }, { "order.Dest", "errand" }, { "vendor", "vendor" }, { "rep_vendor", "vendor" },
+        { "repair_wait", "vendor" }, { "gather_walk", "errand" }, { "point_walk", "errand" }, { "state.GotoPoint", "goto" }, { "visit.Dest", "event" },
+        { "event_move", "event" }, { "event_escort", "event" }, { "death_area", "death" }, { "return_to_instance", "dungeon" }, { "*waypoint", "dungeon" },
+        { "flee", "combat" }, { "kite", "combat" }, { "band_kite", "combat" }, { "heal_los", "combat" }, { "pull_rest", "combat" },
+        { "pull_hold", "combat" }, { "pull_unreachable", "combat" }, { "fight_height_avoid", "combat" }, { "approach_target", "combat" },
+        { "tank_spot", "dungeon" }, { "tank_spot_hold", "dungeon" }, { "boss_flank", "dungeon" }, { "warder_hold", "dungeon" },
+        { "regroup_rally", "dungeon" }, { "healer_fetch", "dungeon" }, { "raid_rule_move", "dungeon" }, { "dead_walk", "death" },
+        { "fight_risk_retreat", "combat" }, { "telegraph_dodge", "combat" }, { "cast_reposition", "combat" }, { "los_reposition", "combat" },
+        { "ground_avoid", "combat" },
+    };
+    for (Group const& group : kGroups)
+        if (group.Why == w)
+            return group.Caller;
+    return "other";
 }
 
 inline char const* Name(NoRouteCause cause)

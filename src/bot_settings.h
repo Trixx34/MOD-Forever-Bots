@@ -252,6 +252,19 @@ struct BotSettings
     std::uint32_t BelowMapDropYards = 60;
     std::uint32_t BelowMapStormCount = 8;
     std::uint32_t BelowMapCooldownSec = 600;
+    // 2026-11-20 (doc/belowmap-noroute-20261120.md), the false positives; each defaults to the safe side. BelowMapChecks (default 10, 1..100): checks in a row
+    // (one every 2 s) the drop must hold. BelowMapMinPlaces (default 2, 1..20): known places within 60 yards needed to judge z_below. BelowMapRequireStill
+    // (default 1): a moving bot is not judged (below_map_skip reason=moving). BelowMapStormRiseYards (default 30, 0..500): the storm counts a refused walk only
+    // to a place this much above the bot. BelowMapStormDistinct (default 1): each refused destination once.
+    std::uint32_t BelowMapChecks = 10;
+    std::uint32_t BelowMapMinPlaces = 2;
+    bool BelowMapRequireStill = true;
+    std::uint32_t BelowMapStormRiseYards = 30;
+    bool BelowMapStormDistinct = true;
+    // No-route backoff (no_route_backoff.h): NoRouteBackoff (default 0) holds back a point walk to a place the core refused for that bot for NoRouteBackoffSec
+    // (default 60, 5..3600), doubled with each further refusal of the place up to 30 minutes. Event no_route_backoff stage=armed|held.
+    bool NoRouteBackoff = false;
+    std::uint32_t NoRouteBackoffSec = 60;
     // LogRefusedReason (default 1, logging only): the "<action> not done: <status>" lines carry the ActionResult reason code the core gave (reason=N, 0 = none).
     bool LogRefusedReason = true;
     // DeathsTopEveryMin (default 60, 0 = off, 0..1440; logging only): the `forever-bots: deaths_top:` line (deaths, median per bot, share of the worst ten).
