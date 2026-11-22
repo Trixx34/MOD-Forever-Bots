@@ -161,6 +161,7 @@ BotPolicy::TurnFlow BotPolicy::TurnRaidSpacing(DecideTick& tick, BotTurn& turn)
         tick.actions.push_back(move);
         state.Last = out;
         state.LastMove = out;
+        state.LastMoveWhy = "raid_rule_move";
     }
     return TurnFlow::kSkip;
 }

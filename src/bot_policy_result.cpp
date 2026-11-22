@@ -15,6 +15,9 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
         // Below-map recovery (BelowMapRecover): the core applies a walk only with a full navmesh route from where the bot stands, so the bot was on walkable
         // ground at this height (below_map.h, on_path).
         below_map::NoteRouted(Opt().BelowMap, state.BelowMap, bot.pos_z, nowMs);
+        // NoRouteBackoff: the place is reachable now, it is forgotten.
+        if (state.LastMove && state.LastMove->Target == 0)
+            no_route_backoff::NoteReached(Opt().NoRouteBackoff, state.NoRouteBook, bot.map_id, state.LastMove->Dest.X, state.LastMove->Dest.Y);
     }
     bool const chained = moveNoRoute && NotePartialLeg(state, bot, nowMs);
 
@@ -156,6 +159,10 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
                                                                                   state.LastMove && state.LastMove->Target != 0, toDest));
         if (state.Last)
             what += " last_sent=" + std::to_string(int(state.Last->Type));
+        // 2026-11-20: which part of the policy chose the walk (why= the move reason, caller= its group), its length and its height over the bot.
+        if (state.LastMove)
+            what += std::string(" why=") + (*state.LastMoveWhy ? state.LastMoveWhy : "other") + " caller=" + route_triage::Caller(state.LastMoveWhy) +
+                    " dist=" + std::to_string(int(toDest)) + " dz=" + std::to_string(int(state.LastMove->Dest.Z - bot.pos_z)) + " map=" + std::to_string(bot.map_id);
         Opt().OnEvent("no_route: bot=" + std::to_string(bot.guid) + " " + what + " pos=" + std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) + "," +
                          std::to_string(int(bot.pos_z)) + " in_combat=" + std::to_string(bot.in_combat) + " route_index=" + std::to_string(state.RouteIndex));
     }
@@ -175,7 +182,8 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
             NoteMoveRefused(state, bot, nowMs);
             // Below-map recovery (BelowMapRecover): short walks refused again and again are a sign of a bot under the ground.
             if (state.LastMove && state.LastMove->Target == 0)
-                below_map::NoteNoRoute(Opt().BelowMap, state.BelowMap, std::hypot(bot.pos_x - state.LastMove->Dest.X, bot.pos_y - state.LastMove->Dest.Y), nowMs);
+                below_map::NoteNoRoute(Opt().BelowMap, state.BelowMap, std::hypot(bot.pos_x - state.LastMove->Dest.X, bot.pos_y - state.LastMove->Dest.Y),
+                                       state.LastMove->Dest.X, state.LastMove->Dest.Y, state.LastMove->Dest.Z, bot.pos_z, nowMs);
         }
         state.QuestTeleportSent = false;
         if (teleportRefused && state.Quest.HopPending != 0)
@@ -524,6 +532,18 @@ void BotPolicy::NoteMoveRefused(BotState& state, BotSnapshot const& bot, std::ui
             std::hypot(state.GrindTarget.X - state.LastMove->Dest.X, state.GrindTarget.Y - state.LastMove->Dest.Y) < 1.0f &&
             _grindBlocks.Report(state.GrindSpotIndex, bot.guid, nowMs) && Opt().OnEvent)
             Opt().OnEvent("grind_spot_blocked: spot=" + std::to_string(state.GrindSpotIndex) + " minutes=" + std::to_string(kGrindBlockMs / 60000));
+        // NoRouteBackoff (no_route_backoff.h): the place is remembered for this bot with a wait that doubles with each refusal of it. Only a point walk of
+        // a living bot out of combat and off a dungeon route, and not an arrival (a walk to where the bot stands is refused as a path of no length).
+        float const toDest = std::hypot(bot.pos_x - state.LastMove->Dest.X, bot.pos_y - state.LastMove->Dest.Y);
+        if (Opt().NoRouteBackoff.Enabled && state.LastMove->Target == 0 && bot.life_state == 0 && bot.in_combat == 0 && !IsRouteActive(bot.guid) &&
+            toDest >= route_triage::kArrivedYards)
+            if (no_route_backoff::Entry const* entry = no_route_backoff::NoteRefused(Opt().NoRouteBackoff, state.NoRouteBook, bot.map_id, state.LastMove->Dest.X,
+                                                                                     state.LastMove->Dest.Y, state.LastMove->Dest.Z, nowMs))
+                LogEvent("no_route_backoff: bot=" + std::to_string(bot.guid) + " stage=armed why=" + (*state.LastMoveWhy ? state.LastMoveWhy : "other") +
+                         " caller=" + route_triage::Caller(state.LastMoveWhy) + " map=" + std::to_string(bot.map_id) + " dest=" +
+                         std::to_string(int(entry->X)) + "," + std::to_string(int(entry->Y)) + "," + std::to_string(int(entry->Z)) + " dist=" +
+                         std::to_string(int(toDest)) + " fails=" + std::to_string(entry->Fails) + " wait_s=" + std::to_string((entry->UntilMs - nowMs) / 1000) +
+                         " places=" + std::to_string(state.NoRouteBook.Entries.size()));
     }
 
 }

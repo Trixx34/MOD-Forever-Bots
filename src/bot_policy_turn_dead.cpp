@@ -57,6 +57,7 @@ void BotPolicy::DeadEmit(DecideTick& tick, BotTurn& turn, Decision const& wanted
     state.Last = wantedDead;
     if (wantedDead.Type == ActionType::kMoveTo)
         state.LastMove = wantedDead;
+        state.LastMoveWhy = "dead_walk";
 }
 
 // The corpse run is given up: the ghost stands, and why is logged.

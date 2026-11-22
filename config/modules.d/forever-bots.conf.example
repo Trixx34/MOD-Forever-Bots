@@ -195,6 +195,22 @@ Module.forever-bots.TelemetrySummarySec = 60
 # BelowMapDropYards = 60   (20 to 1000)
 # BelowMapStormCount = 8   (0 to 100)
 # BelowMapCooldownSec = 600   (60 to 86400)
+# 2026-11-20 (doc/belowmap-noroute-20261120.md): the ground is the closest floor to the bot among the near places; z_below needs BelowMapMinPlaces places
+# within 60 yards and BelowMapChecks looks in a row with the bot standing still (BelowMapRequireStill; also skipped: flying, falling for under 30 s:
+# below_map_skip reason=moving|flying|falling|few_places); the storm counts only refused walks to a place BelowMapStormRiseYards or more above the bot
+# (0 = any), each destination once (BelowMapStormDistinct). Every default is the safe side. The events carry z= drop= places= floors= low_z= high_z= checks=.
+# BelowMapChecks = 10   (1 to 100)
+# BelowMapMinPlaces = 2   (1 to 20)
+# BelowMapRequireStill = 1
+# BelowMapStormRiseYards = 30   (0 to 500)
+# BelowMapStormDistinct = 1
+
+# No-route backoff (off by default; the sim first). A point walk the core answered "no route" is held back for that bot and that place (12 yards) for
+# NoRouteBackoffSec, doubled with each further refusal of the place up to 30 minutes; an applied walk there clears it. The held walk ends as a refusal
+# would, so the bot picks another grind spot, hub or explore point. Not for walks to a unit, in combat, while dead or on a dungeon route. Log:
+# no_route_backoff stage=armed (a refusal: fails=, wait_s=) and stage=held (once per wait); the no_route line carries why= caller= dist= dz= map=.
+# NoRouteBackoff = 0
+# NoRouteBackoffSec = 60   (5 to 3600)
 
 # Logging only. LogRefusedReason: the "<action> not done: <status>" lines (gather, craft, vendor, ...) end with reason=N, the ActionResult reason code the
 # core gave (0 = none; the core classifies quest accepts, other actions mostly give 0). DeathsTopEveryMin: every this many minutes the line

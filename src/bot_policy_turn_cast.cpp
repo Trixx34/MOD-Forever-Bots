@@ -1405,6 +1405,7 @@ BotPolicy::TurnFlow BotPolicy::TurnTankPickup(DecideTick& tick, BotTurn& turn)
                 tick.actions.push_back(move);
                 state.Last = Decision{ ActionType::kMoveTo, candidate.Mob.Unit, dest };
                 state.LastMove = state.Last;
+                state.LastMoveWhy = "cast_reposition";
                 state.PickupAtMs = nowMs + holdMs;
                 _looseClaims[candidate.Mob.Unit] = LooseClaim{ bot.guid, nowMs + holdMs };
                 if (Opt().OnEvent)
