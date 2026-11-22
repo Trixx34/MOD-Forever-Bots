@@ -423,9 +423,47 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
     // A craft (SDK 0.17): started, the next one comes when the cast is done; busy or moving, soon; kNeedsFocus (SDK 0.18): the bot walks to the nearest anvil, forge or
     // fire and asks again there; any other answer (no recipe, no materials, a skill too high for the recipes) means there is nothing to make now: that skill waits five
     // minutes, varied per bot. The answer is for the line that was sent (CraftSent), whatever spell the core reports.
-    if (bot.last_action_type == uint8_t(ActionType::kSkillUp))
+    // Professions (off by default): a kCraft is the craft plan's named recipe (professions.h); its answer is read here as a kSkillUp's, with a profession_craft_plan
+    // line. A kSkillUp of a crafting profession with nothing to make makes the plan due (the next ask names the easiest recipe of the table that still raises
+    // the skill, so the core notes its first missing reagent for the supply trip); a recipe the bot does not know is left out and the next one is named.
+    bool const planAnswer = bot.last_action_type == uint8_t(ActionType::kCraft);
+    if (bot.last_action_type == uint8_t(ActionType::kSkillUp) || planAnswer)
     {
         std::size_t const index = std::min<std::size_t>(state.CraftSent, kCraftLineCount - 1);
+        bool const planOn = Opt().Professions.Enabled && Opt().Professions.CraftPlan && Opt().ProfessionRecipes && index >= 2; // 0, 1: First Aid, Cooking
+        if (planAnswer && Opt().OnEvent && bot.last_action_status != BotActionStatus::kBusy && bot.last_action_status != BotActionStatus::kMoving)
+            Opt().OnEvent("profession_craft_plan: bot=" + std::to_string(bot.guid) + " skill=" + std::to_string(kCraftLines[index]) + " recipe=" +
+                          std::to_string(state.CraftPlanSpell) + " status=" +
+                          (bot.last_action_status == BotActionStatus::kApplied     ? "applied"
+                           : bot.last_action_status == BotActionStatus::kRefused   ? "refused"
+                           : bot.last_action_status == BotActionStatus::kNotKnown  ? "not_known"
+                           : bot.last_action_status == BotActionStatus::kNeedsFocus ? "needs_focus"
+                                                                                    : "other"));
+        if (planAnswer && bot.last_action_status == BotActionStatus::kNotKnown)
+        {
+            if (state.CraftPlanUnknown.size() >= kCraftPlanUnknownKept)
+                state.CraftPlanUnknown.erase(state.CraftPlanUnknown.begin());
+            state.CraftPlanUnknown.push_back(state.CraftPlanSpell);
+            // A few unknown recipes in a row: the next is named soon; then the line waits as after a refusal (the level-up teaches more).
+            if (++state.CraftPlanMisses < kCraftPlanMissesInRow)
+            {
+                state.CraftPlanDue[index] = true;
+                state.CraftRetryAtMs[index] = nowMs + kSkillUpBusyMs;
+                return;
+            }
+            state.CraftPlanMisses = 0;
+            state.CraftPlanDue[index] = true;
+            state.CraftRetryAtMs[index] = nowMs + kSkillUpRefusedMs;
+            return;
+        }
+        if (planAnswer)
+            state.CraftPlanMisses = 0;
+        if (!planAnswer && planOn && bot.last_action_status == BotActionStatus::kRefused)
+        {
+            state.CraftPlanDue[index] = true;
+            state.CraftRetryAtMs[index] = nowMs + kSkillUpBusyMs;
+            return;
+        }
         auto const waitRefused = [&](std::uint64_t base)
         {
             state.CraftRetryAtMs[index] = nowMs + bot_random::Vary(base, std::min<std::uint32_t>(Opt().RandomPct * 2, 90),
@@ -470,15 +508,31 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
             state.GatherRetryAtMs[index] = nowMs + kSkillUpNextMs;
             state.GatherFails[index] = 0;
             state.GatherWalking = false;
+            state.GatherArrivedNode = std::size_t(-1);
         }
         else if (bot.last_action_status == BotActionStatus::kBusy || bot.last_action_status == BotActionStatus::kMoving)
             state.GatherRetryAtMs[index] = nowMs + kSkillUpBusyMs;
         else
         {
+            // Professions: "nothing near" right after a walk arrived at a node: that node is empty (a pooled spawn point, or gathered); every bot skips it for a while.
+            if (Opt().Professions.Enabled && state.GatherArrivedNode != std::size_t(-1) && bot.last_action_status == BotActionStatus::kRefused &&
+                Opt().GatherNodes && state.GatherArrivedNode < Opt().GatherNodes->size())
+            {
+                _emptyNodes.Mark(state.GatherArrivedNode, nowMs + Opt().Professions.NodeEmptyMs);
+                if (Opt().OnEvent)
+                    Opt().OnEvent("profession_node_empty: bot=" + std::to_string(bot.guid) + " skill=" + std::to_string(kGatherLines[index]) + " node=" +
+                                  std::to_string((*Opt().GatherNodes)[state.GatherArrivedNode].Entry) + " kept=" + std::to_string(_emptyNodes.Size()));
+            }
+            state.GatherArrivedNode = std::size_t(-1);
+            // Professions: the safe node walk near the bot (ProfessionNodeWalk) instead of GatherWalk's nearest node anywhere.
+            if (bot.last_action_status == BotActionStatus::kRefused && Opt().Professions.Enabled && Opt().Professions.NodeWalk && Opt().GatherNodes &&
+                nowMs >= state.GatherWalkNextMs && ProfessionNodeWalk(state, bot, index, nowMs))
+                return;
             // "nothing to gather within 30 yards" is the normal answer where the bot stands, and the module does not look for nodes: the pause doubles with every
             // answer in a row (90 s up to 48 minutes), and starts again after a gather that worked.
             // GatherWalk: nothing in reach, and the table has a node of this skill on the bot's map that is not too far: the bot walks to it (the idle logic does the walk).
-            if (bot.last_action_status == BotActionStatus::kRefused && Opt().GatherWalk && Opt().GatherNodes && nowMs >= state.GatherWalkNextMs)
+            if (bot.last_action_status == BotActionStatus::kRefused && Opt().GatherWalk && !(Opt().Professions.Enabled && Opt().Professions.NodeWalk) &&
+                Opt().GatherNodes && nowMs >= state.GatherWalkNextMs)
             {
                 // Only nodes this bot can harvest (its skill value), in areas that suit its level and faction (optional columns of the node table).
                 gather::NodeFilter filter;

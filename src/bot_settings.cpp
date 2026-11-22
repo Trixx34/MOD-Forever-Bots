@@ -1177,6 +1177,16 @@ BotSettings ParseOneConfig(std::unordered_map<std::string, std::string> const& c
     ReadKey(config, "GatherWalkGapSec", 0, 86400, settings.GatherWalkGapSec, warnings);
     if (auto const it = config.find("GatherNodesFile"); it != config.end())
         settings.GatherNodesFile = it->second;
+    ReadBool(config, "Professions", settings.Professions, warnings);
+    ReadKey(config, "ProfessionSkillCapPerLevel", 1, 75, settings.ProfessionSkillCapPerLevel, warnings);
+    ReadBool(config, "ProfessionSkinAfterLoot", settings.ProfessionSkinAfterLoot, warnings);
+    ReadBool(config, "ProfessionNodeWalk", settings.ProfessionNodeWalk, warnings);
+    ReadKey(config, "ProfessionNodeMaxYards", 20, 600, settings.ProfessionNodeMaxYards, warnings);
+    ReadKey(config, "ProfessionNodeGapSec", 0, 86400, settings.ProfessionNodeGapSec, warnings);
+    ReadKey(config, "ProfessionNodeEmptyMin", 1, 1440, settings.ProfessionNodeEmptyMin, warnings);
+    ReadBool(config, "ProfessionCraftPlan", settings.ProfessionCraftPlan, warnings);
+    if (auto const it = config.find("ProfessionRecipeFile"); it != config.end())
+        settings.ProfessionRecipeFile = it->second;
     if (auto const it = config.find("DungeonFile"); it != config.end())
         settings.DungeonFile = it->second;
     if (auto const it = config.find("DungeonDataDir"); it != config.end())

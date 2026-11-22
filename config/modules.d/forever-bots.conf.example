@@ -832,6 +832,24 @@ Module.forever-bots.TelemetrySummarySec = 60
 # GatherWalkGapSec = 0 (0..86400; after a walk to a node ends, no new walk starts for this long, so a gatherer grinds in between; 600 is a sane first value)
 # Module.forever-bots.GatherNodesFile = /srv/forever/sim/modules_runtime/forever-bots/data/gather_nodes.txt
 
+# Profession progression (doc/professions.md), off by default. Professions = 1: a skill cap of ProfessionSkillCapPerLevel x level per primary profession (1..75,
+# default 5; never above the rank's maximum), gathering asks as with Gathering = 1, and the parts below (each 1 by default, only with Professions = 1):
+# ProfessionSkinAfterLoot: a skinner skins the corpse it just looted. ProfessionNodeWalk (needs GatherNodesFile): after "nothing near", a walk to the nearest node
+# at most ProfessionNodeMaxYards away (20..600, default 150), not found empty in the last ProfessionNodeEmptyMin minutes (1..1440, default 20), not too high for the
+# bot (level-safe places) and not dangerous (danger map), one walk per ProfessionNodeGapSec (0..86400, default 300), never while grouped.
+# ProfessionCraftPlan (needs ProfessionRecipeFile, data/profession_recipes.txt, absolute path): when kSkillUp has nothing to make for a crafting profession, the
+# easiest recipe that still raises the skill is named (kCraft); the core notes its first missing reagent, which the supply trip buys with SupplyReagents = 1.
+# Cooking and First Aid are unchanged. Events: profession_skillup, profession_cap, profession_skin, profession_node_walk, profession_node_empty, profession_craft_plan.
+# Module.forever-bots.Professions = 0
+# Module.forever-bots.ProfessionSkillCapPerLevel = 5
+# Module.forever-bots.ProfessionSkinAfterLoot = 1
+# Module.forever-bots.ProfessionNodeWalk = 1
+# Module.forever-bots.ProfessionNodeMaxYards = 150
+# Module.forever-bots.ProfessionNodeGapSec = 300
+# Module.forever-bots.ProfessionNodeEmptyMin = 20
+# Module.forever-bots.ProfessionCraftPlan = 1
+# Module.forever-bots.ProfessionRecipeFile = /srv/forever/sim/modules_runtime/forever-bots/data/profession_recipes.txt
+
 # Second-list features, all off by default (each reads a data file that ships empty until its entries are checked against the world DB).
 # RidingTraining = 1 learns the riding ranks of RidingRankFile; WeaponTraining = 1 learns the class weapon skills at the class trainer.
 # Fishing = 1 walks a bot with a pole to the nearest spot of FishingSpotFile (the cast needs a core action: doc/fishing.md).

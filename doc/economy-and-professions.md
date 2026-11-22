@@ -4,6 +4,7 @@ Status 2026-11-14. Owner direction: **autogear stays off on prod**; bots earn ge
 This page traces each link of that chain from config key to core handler, says what the sim and prod show, and gives the exact keys and data
 files to switch the chain on in prod, in order. Design background: `doc/economy.md`. All module keys below are `Module.forever-bots.<Key>` in
 `worldserver.conf.d/modules.d/forever-bots.conf`; `Bot.*` keys are the core's (`worldserver.conf` or `worldserver.conf.d/*.conf`).
+Why the profession skills stay at their start value on prod (2026-11-20) and the `Professions` keys: `doc/professions.md`.
 
 ## Why no bot ever listed anything (found 2026-11-14, fixed on `feature/economy-professions`)
 

@@ -582,6 +582,22 @@ struct BotSettings
     std::string GatherNodesFile;
     // GatherWalkGapSec (0..86400, default 0 = none): after a walk to a node ends, no new walk starts for this long, so a gatherer goes back to grinding in between.
     std::uint32_t GatherWalkGapSec = 0;
+    // Professions = 1 (off by default; doc/professions.md, professions.h): profession progression. A skill cap of ProfessionSkillCapPerLevel (1..75, default 5)
+    // x level per primary profession (no new craft or gather ask at the cap); gathering asks as with Gathering; ProfessionSkinAfterLoot (default 1): a skinner skins
+    // the corpse it just looted; ProfessionNodeWalk (default 1, needs GatherNodesFile): after "nothing near", a walk to the nearest node at most
+    // ProfessionNodeMaxYards (20..600, default 150) away that is not empty (ProfessionNodeEmptyMin, 1..1440, default 20), not too high for the bot and not dangerous
+    // (level_safe, danger_map), one walk per ProfessionNodeGapSec (0..86400, default 300), never while grouped; ProfessionCraftPlan (default 1, needs
+    // ProfessionRecipeFile = data/profession_recipes.txt, an absolute path): where kSkillUp had nothing to make, the easiest recipe that still raises the skill is
+    // named (kCraft), so the core notes the missing reagent for the supply trip (SupplyReagents). Every step writes a profession_* event line.
+    bool Professions = false;
+    std::uint32_t ProfessionSkillCapPerLevel = 5;
+    bool ProfessionSkinAfterLoot = true;
+    bool ProfessionNodeWalk = true;
+    std::uint32_t ProfessionNodeMaxYards = 150;
+    std::uint32_t ProfessionNodeGapSec = 300;
+    std::uint32_t ProfessionNodeEmptyMin = 20;
+    bool ProfessionCraftPlan = true;
+    std::string ProfessionRecipeFile;
     // AvoidGroundEffects = 1 (off by default): a bot standing inside a harmful ground effect (SDK 0.19: the core must have Bot.Snapshot.GroundEffects = 1) walks out of it.
     // AvoidSpellsFile (absolute path, data/avoid_spells.txt): the Classic dungeons' spells that leave one; a spell in it counts as harmful even if the caster is not
     // known to be hostile. The dungeon files' bosses[].strategy.avoid_spells and avoid (fixed zones) add to it for their map.

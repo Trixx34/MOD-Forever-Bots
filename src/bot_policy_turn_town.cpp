@@ -399,6 +399,12 @@ void BotPolicy::TurnWander(DecideTick& tick, BotTurn& turn)
         {
             state.GatherWalking = false;
             state.GatherWalkNextMs = nowMs + Opt().GatherWalkGapMs;
+            if (Opt().Professions.Enabled)
+            {
+                // Professions: the gap between node walks is at least ProfessionNodeGapSec, and the next "nothing near" at this node marks it empty for every bot.
+                state.GatherWalkNextMs = nowMs + std::max(Opt().GatherWalkGapMs, Opt().Professions.NodeGapMs);
+                state.GatherArrivedNode = arrived ? std::size_t(state.GatherWalkIndex) : std::size_t(-1);
+            }
             state.GatherRetryAtMs[state.GatherWalkLine] = arrived ? nowMs : nowMs + kGatherNothingMs;
         }
         else
@@ -1010,6 +1016,7 @@ void BotPolicy::TurnLootTaxiMount(DecideTick& tick, BotTurn& turn)
             actions.push_back(loot);
             state.LootedUntilMs[unit.guid] = nowMs + kLootWindowMs;
             state.FoughtAtMs.erase(unit.guid);
+            ProfessionSkinAfterLoot(state, bot, unit.level, nowMs); // Professions (off by default): a skinner skins it next
             break; // one corpse per tick
         }
     }
