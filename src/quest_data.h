@@ -26,6 +26,12 @@
 //                                      walks to the dock point (without one: the quest's giver), is teleported to (<map>, x, y, z) and then hands the quest in at
 //                                      its ender, whose coordinates are on <map>. Only the Skyborne exit quests use it (map 2991 to 0 or 1, config
 //                                      SkyborneExitQuests, doc/world-quests.md); the planner ignores the quest when the key is off or the pair is another one
+//   use <quest> <entry> <x> <y> <z> [land <x> <y> <z>]
+//                                      the quest's objective is met by using the game object <entry> that stands at (x, y, z) on the start's map (kUseObject, as a
+//                                      click): a portal whose spell is the objective's criterion (objective type 14, a criteria tree of "cast spell"). With 'land':
+//                                      the object's spell puts the bot at that point of the same map; a use that does not move the bot is followed by a teleport
+//                                      there (the fallback). Only the quest right after a Skyborne exit hop uses it (94947, the Skyborne Portal to Stormwind in
+//                                      Dalaran; config SkyborneExitQuests, doc/skyborne-alliance-94947.md); the planner ignores the quest otherwise
 #pragma once
 
 #include <cstdint>
@@ -69,6 +75,12 @@ struct QuestDef
     QuestPoint Hop;                           // where the teleport puts the bot on HopMap
     bool HasDock = false;                     // a dock point on HopFrom to walk to before the teleport (without one: the giver)
     QuestPoint Dock;
+    bool HasUse = false;                      // use record: the objective is met by using the game object UseEntry at Use, on UseMap (the start's map)
+    std::uint32_t UseEntry = 0;
+    std::uint32_t UseMap = 0;
+    QuestPoint Use;
+    bool HasLand = false;                     // where the object's spell puts the bot on UseMap (a portal): the fallback teleport goes there
+    QuestPoint Land;
 };
 
 struct QuestStartDef

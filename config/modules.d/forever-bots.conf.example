@@ -117,6 +117,9 @@ Module.forever-bots.TelemetrySummarySec = 60
 # records in QuestFileAlliance / QuestFileHorde), walks to the dock (the quest giver), is teleported to map 0 or 1 and hands the quest in there. Needs
 # Bot.Actions.Teleport = 1 in the core; a refused teleport (or no move in 20 s) blocks the quest for an hour, then six hours, then for good. No other map
 # hop exists. Log: skyborne_hop_start, skyborne_hop_done, skyborne_hop_refused. 0 (default): those quests are ignored (today's behaviour).
+# In Dalaran an Alliance bot then takes 94947 and uses the Skyborne Portal to Stormwind ('use' record; kUseObject, needs Bot.Actions.UseObject = 1); two
+# uses that do not move it end in a teleport to the portal's landing point in Stormwind (doc/skyborne-alliance-94947.md). Log: skyborne_portal_use,
+# skyborne_portal_done, skyborne_portal_refused, skyborne_portal_fallback.
 # SkyborneExitQuests = 0
 # With SkyborneExitQuests: a bot on map 2991 with full bags visits a vendor before it takes an exit quest or the quest before it (93089, 93090), and after
 # such an accept is refused for bags (reason 9) or with no free slot. At most once per 10 minutes. Log: skyborne_make_room.

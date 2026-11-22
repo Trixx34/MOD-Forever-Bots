@@ -209,7 +209,8 @@ the data uses `spell_target_position` 1278902, the Dalaran arrival, instead). Th
 
 Planner, with the quest in the log and the bot on map 2991 (before every other step): walk to the dock or giver (within 8 yards), then the **Hop** step sends
 `kTeleport` (map, x, y, z). The bot waits; on the other map the quest is handed in as any other (the ender stands at the landing point) and the next quests of that
-map follow (95350 to Orgrimmar is in the Horde file; 94947 "Take the Skyborne Portal to Stormwind" is not in the data, objective type 14). A refused teleport
+map follow (95350 to Orgrimmar is in the Horde file; 94947 "Take the Skyborne Portal to Stormwind", objective type 14, is in the Alliance file since
+2026-11-20 with a `use` record: the bot uses the portal object in Dalaran, see `doc/skyborne-alliance-94947.md`). A refused teleport
 (`Bot.Actions.Teleport = 0`, combat ...) or no move within 20 seconds blocks the quest for an hour, then six hours, then for good; the bot grinds meanwhile.
 The exit chain (the hop quests and 93089/93090) is taken even when grey (a level 21 Skyborne must still be able to leave). LevelSafeWalks does not drop the
 dock walk or the hand-in after the hop. The off-map recovery puts the ender under the hop's map. After the hop the bot works the starts and grind spots of the
@@ -223,5 +224,5 @@ visit). It uses the urgent vendor errand of a refused hand-in, at most once per 
 Events: `skyborne_hop_start: bot= quest= level= from=map:x,y to=map:x,y,z bag_free=`, `skyborne_hop_done: bot= level= map= pos=`,
 `skyborne_hop_refused: bot= [quest=] level= map= reason=teleport_refused|no_move ...`, `skyborne_make_room: bot= quest= level= reason= bag_free=`.
 
-Unverified: whether the core's teleport works for these points (the arrival points are on the ground, not on the ships), whether a bot can meet 94947's
-objective, and whether the prod world database matches the sim's for these quests and spawns.
+Unverified: whether the core's teleport works for these points (the arrival points are on the ground, not on the ships), whether a bot meets 94947's
+objective on the sim (doc/skyborne-alliance-94947.md), and whether the prod world database matches the sim's for these quests and spawns.

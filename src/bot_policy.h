@@ -287,6 +287,8 @@ struct PolicyOptions
     // Skyborne exit quests (config SkyborneExitQuests, off by default; quest_planner.h, doc/world-quests.md): a quest with a 'hop' record (94946 to Dalaran,
     // 95349 to Mulgore) is taken on map 2991; with it in the log the bot walks to the dock (or giver) and is teleported to the other map (kTeleport, needs
     // Bot.Actions.Teleport in the core; a refusal blocks the quest). Events skyborne_hop_start, skyborne_hop_done, skyborne_hop_refused.
+    // Then, in Dalaran, 94947 ('use' record): the bot uses the Skyborne Portal to Stormwind (kUseObject, needs Bot.Actions.UseObject); uses that do nothing
+    // end in a teleport to the land point (doc/skyborne-alliance-94947.md). Events skyborne_portal_use, _done, _refused, _fallback.
     bool SkyborneExitQuests = false;
     // SkyborneExitMakeRoom (off by default, used with SkyborneExitQuests): a bot on map 2991 with no free bag slot that is about to take an exit quest (or the
     // quest before it, 93089 or 93090), or whose accept of one was refused for bags (reason 9) or with no free slot (reason 10 with bag_free=0), visits a vendor

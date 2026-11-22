@@ -82,6 +82,18 @@ QuestPlanner::QuestPlanner(std::shared_ptr<QuestData const> data, std::shared_pt
                             _exitChain.insert(quest.PrevQuest);
                     }
                 }
+    // A 'use' quest (94947) is known only right after a usable hop quest (94946): the portal out of the hop's landing place, nothing else.
+    for (auto const& [id, quest] : _index)
+        if (QuestDef const* prev = quest->HasUse && _options.SkyborneExitQuests ? Lookup(quest->PrevQuest) : nullptr; prev && HopUsable(*prev, _options))
+        {
+            _useQuests.insert(id);
+            _exitChain.insert(id);
+        }
+}
+
+bool QuestPlanner::Hidden(QuestDef const& quest) const
+{
+    return HopHidden(quest, _options) || (quest.HasUse && !_useQuests.count(quest.Id));
 }
 
 QuestDef const* QuestPlanner::Lookup(std::uint32_t quest) const
@@ -113,8 +125,8 @@ bool QuestPlanner::Eligible(QuestDef const& quest, BotSnapshot const& bot, Quest
 {
     if (quest.Group > 1 && !_options.GroupQuests)
         return false; // a quest for a party: only with QuestGroups on
-    if (HopHidden(quest, _options))
-        return false; // a hop quest with SkyborneExitQuests off (or a pair other than 2991 to 0 or 1)
+    if (Hidden(quest))
+        return false; // a hop quest with SkyborneExitQuests off (or a pair other than 2991 to 0 or 1), or a 'use' quest not after such a hop
     std::uint32_t const level = bot.level;
     if (level != 0)
     {
@@ -175,7 +187,7 @@ QuestStep QuestPlanner::Next(BotSnapshot const& bot, QuestMemory& memory, std::u
     // The quests in the log that the data knows, whichever start they belong to.
     std::vector<QuestDef const*> logged;
     for (std::size_t i = 0; i < bot.quest_count && i < forever_module::kMaxQuestLog; ++i)
-        if (QuestDef const* def = Lookup(bot.quests[i].quest_id); def && !HopHidden(*def, _options))
+        if (QuestDef const* def = Lookup(bot.quests[i].quest_id); def && !Hidden(*def))
             logged.push_back(def);
 
     // Progress bookkeeping for the stuck rule: the total of a quest's objective counts, and since when it has been that.
@@ -243,14 +255,57 @@ QuestStep QuestPlanner::Next(BotSnapshot const& bot, QuestMemory& memory, std::u
         return step;
     }
 
-    // 1. A complete quest: hand it in. (A hop quest only on the map of its ender.)
+    // 0b. A 'use' quest in the log while the bot is near its object (94947 in Dalaran, after the hop): walk to the object and use it (the portal moves the bot;
+    // its spell is the objective). Complete or not: the ender is where the portal leads. Uses that do nothing: the fallback teleport to the 'land' point.
+    auto const atObject = [&](QuestDef const& quest) { return quest.HasUse && bot.map_id == quest.UseMap && Distance2d(bot, quest.Use) <= kPortalAreaYards; };
+    for (QuestDef const* quest : logged)
+    {
+        if (!atObject(*quest) || Blocked(memory, quest->Id, nowMs))
+            continue;
+        memory.Progress[quest->Id].SinceMs = nowMs; // the way to the object is not being stuck
+        QuestStep step;
+        step.Quest = quest->Id;
+        step.HopLeg = true;
+        if (memory.UsePending == quest->Id || memory.HopPending == quest->Id)
+        {
+            step.Kind = QuestStepKind::Wait; // the use or the teleport is on its way (CheckUse, CheckHop)
+            return step;
+        }
+        auto const fails = memory.UseFails.find(quest->Id);
+        if (fails != memory.UseFails.end() && fails->second >= kUseTriesBeforeHop)
+        {
+            if (!quest->HasLand)
+            {
+                memory.UseFails.erase(fails);
+                memory.BlockedUntilMs[quest->Id] = nowMs + kHopRefusedBlockMs; // no fallback known: left alone, tried again later
+                continue;
+            }
+            step.Kind = nowMs >= memory.NextActionMs ? QuestStepKind::Hop : QuestStepKind::Wait;
+            step.Dest = quest->Land;
+            step.Map = quest->UseMap;
+            return step;
+        }
+        float const reach = memory.NearEnough.count(quest->Id) ? kQuestNearTryYards : kUseReachYards;
+        if (Distance2d(bot, quest->Use) > reach)
+        {
+            step.Kind = QuestStepKind::WalkTo;
+            step.Dest = quest->Use;
+            return walking(step);
+        }
+        step.Kind = nowMs >= memory.NextActionMs ? QuestStepKind::UseObject : QuestStepKind::Wait;
+        step.Dest = quest->Use;
+        step.Object = quest->UseEntry;
+        return step;
+    }
+
+    // 1. A complete quest: hand it in. (A hop quest only on the map of its ender; a 'use' quest only away from its object.)
     for (QuestDef const* quest : logged)
     {
         QuestEntry const* entry = InLog(bot, quest->Id);
-        if (entry->status == 2 && !Blocked(memory, quest->Id, nowMs) && !awayFromEnder(*quest))
+        if (entry->status == 2 && !Blocked(memory, quest->Id, nowMs) && !awayFromEnder(*quest) && !atObject(*quest))
         {
             QuestStep step = WalkOrAct(bot, memory, quest->Ender, QuestStepKind::HandIn, quest->Id, nowMs);
-            step.HopLeg = quest->HasHop; // the hand-in right after the hop: the ender stands at the landing point
+            step.HopLeg = quest->HasHop || quest->HasUse; // the hand-in right after the hop or the portal
             return walking(step);
         }
     }
@@ -271,7 +326,7 @@ QuestStep QuestPlanner::Next(BotSnapshot const& bot, QuestMemory& memory, std::u
     for (QuestDef const* quest : logged)
     {
         QuestEntry const* entry = InLog(bot, quest->Id);
-        if (entry->status != 1 || awayFromEnder(*quest))
+        if (entry->status != 1 || awayFromEnder(*quest) || atObject(*quest))
             continue;
         if (quest->Group > 1 && _options.GroupQuests && !Blocked(memory, quest->Id, nowMs))
         {
@@ -351,6 +406,9 @@ QuestStep QuestPlanner::Next(BotSnapshot const& bot, QuestMemory& memory, std::u
             bool const prevKnown = quest.PrevQuest == 0 || memory.Done.count(quest.PrevQuest) || InLog(bot, quest.PrevQuest);
             if (needPrevDone != prevKnown)
                 continue;
+            // A 'use' quest of the Skyborne exit (94947) with its hop quest not known done (a restart forgot it) is tried by Skyborne bots only.
+            if (!prevKnown && quest.HasUse && info.Race != 0 && info.Race != kRaceSkyborneAlliance && info.Race != kRaceSkyborneHorde)
+                continue;
             if (!info.Variety)
                 return &quest;
             // a quest that is the 'prev' of another is never skipped: a skipped chain head would leave the rest of the chain refused
@@ -416,6 +474,7 @@ QuestStep QuestPlanner::Next(BotSnapshot const& bot, QuestMemory& memory, std::u
                 step.StartFrom = quest->StartItem != 0 || quest->StartObject != 0;
                 step.StartEntry = quest->StartObject;
                 step.StartGiver = true;
+                step.HopLeg = quest->HasUse; // the accept of the portal quest at the hop's landing place (Dalaran): LevelSafeWalks does not drop it
                 memory.WalkingToStart = step.Kind == QuestStepKind::WalkTo;
                 return walking(step);
             }
@@ -490,12 +549,48 @@ void QuestPlanner::NoteLevelUnsafe(QuestMemory& memory, std::uint32_t quest, Que
     memory.BlockedUntilMs[quest] = nowMs + kLevelUnsafeBlockMs;
 }
 
-void QuestPlanner::NoteHopSent(QuestMemory& memory, std::uint32_t quest, std::uint32_t map, std::uint64_t nowMs) const
+void QuestPlanner::NoteHopSent(QuestMemory& memory, std::uint32_t quest, std::uint32_t map, std::uint64_t nowMs, bool sameMap, QuestPoint dest) const
 {
     memory.HopPending = quest;
     memory.HopPendingMap = map;
     memory.HopSentMs = nowMs;
+    memory.HopPendingDest = dest;
+    memory.HopSameMap = sameMap;
     memory.NextActionMs = nowMs + kQuestActionGapMs;
+}
+
+void QuestPlanner::NoteUseSent(QuestMemory& memory, std::uint32_t quest, BotSnapshot const& bot, std::uint64_t nowMs) const
+{
+    memory.UsePending = quest;
+    memory.UseSentMs = nowMs;
+    memory.UseFromMap = bot.map_id;
+    memory.UseFrom = QuestPoint{ bot.pos_x, bot.pos_y, bot.pos_z };
+    memory.NextActionMs = nowMs + kQuestActionGapMs;
+}
+
+std::uint32_t QuestPlanner::NoteUseRefused(QuestMemory& memory) const
+{
+    if (memory.UsePending == 0)
+        return 0;
+    std::uint32_t const quest = memory.UsePending;
+    memory.UsePending = 0;
+    return ++memory.UseFails[quest];
+}
+
+UseCheck QuestPlanner::CheckUse(BotSnapshot const& bot, QuestMemory& memory, std::uint64_t nowMs) const
+{
+    if (memory.UsePending == 0)
+        return UseCheck::None;
+    if (bot.map_id != memory.UseFromMap || Distance2d(bot, memory.UseFrom) > kPortalMovedYards)
+    {
+        memory.UseFails.erase(memory.UsePending);
+        memory.UsePending = 0;
+        return UseCheck::Moved;
+    }
+    if (nowMs - memory.UseSentMs < kUseWaitMs)
+        return UseCheck::None;
+    NoteUseRefused(memory);
+    return UseCheck::NoMove;
 }
 
 std::uint32_t QuestPlanner::NoteHopRefused(QuestMemory& memory, std::uint64_t nowMs) const
@@ -515,7 +610,7 @@ HopCheck QuestPlanner::CheckHop(BotSnapshot const& bot, QuestMemory& memory, std
 {
     if (memory.HopPending == 0)
         return HopCheck::None;
-    if (bot.map_id == memory.HopPendingMap)
+    if (bot.map_id == memory.HopPendingMap && (!memory.HopSameMap || Distance2d(bot, memory.HopPendingDest) <= kPortalMovedYards))
     {
         memory.HopRefusals.erase(memory.HopPending);
         memory.HopPending = 0;

@@ -80,6 +80,19 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
         }
     }
 
+    // The portal of a 'use' quest (94947): a refusal (Bot.Actions.UseObject off, out of range, no object in reach) is a failed use; kUseTriesBeforeHop of them
+    // and the planner sends the fallback teleport. An applied use is settled by CheckUse (the bot moved, or not).
+    if (bot.last_action_type == uint8_t(ActionType::kUseObject) && state.Quest.UsePending != 0 && bot.last_action_status != BotActionStatus::kApplied &&
+        bot.last_action_status != BotActionStatus::kNone)
+    {
+        std::uint32_t const quest = state.Quest.UsePending;
+        std::uint32_t const fails = QuestsFor(bot).NoteUseRefused(state.Quest);
+        if (Opt().OnEvent)
+            Opt().OnEvent("skyborne_portal_refused: bot=" + std::to_string(bot.guid) + " quest=" + std::to_string(quest) + " level=" + std::to_string(bot.level) +
+                             " map=" + std::to_string(bot.map_id) + " reason=use_refused status=" + ActionStatusName(bot.last_action_status) +
+                             " fails=" + std::to_string(fails));
+    }
+
     // A click or an item used on a door, a lever or a charge (dungeon events): the answer goes to the event that sent it.
     if ((bot.last_action_type == uint8_t(ActionType::kUseObject) || bot.last_action_type == uint8_t(ActionType::kGossip)) && state.Events)
     {
