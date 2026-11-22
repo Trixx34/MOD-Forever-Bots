@@ -2509,10 +2509,17 @@ quest 8413 giver 250.8 -1470.6 55.4 ender 250.8 -1470.6 55.4
 req 8413 level 52 prev 8412 classes 64
 reward 8413
 
-start W0_0_0   # 1 quests, levels 37-37
+start W0_0_0   # 2 quests, levels 13-37
 anchor 0 34.9 255.9 42.0
 quest 603 giver 34.9 255.9 42.0 ender -14467.0 479.8 20.5
 req 603 level 37 prev 602 races 77
+# Skyborne exit, step 2 (2026-11-20, core sniff 2026_10_01_03 and portals 2026_10_10_00; config SkyborneExitQuests; doc/skyborne-alliance-94947.md):
+# 94947 Take the Skyborne Portal to Stormwind, giver Denaaris Stargale 259084 in Dalaran, ender Bolvar Fordragon 1748 in Stormwind Keep. Its one objective
+# (type 14, criteria tree 231275 -> criterion 116403, cast spell 1284041) is met by using the Skyborne Portal to Stormwind 631299, whose spell 1284041 is that
+# criterion and triggers the teleport 1284040 (spell_target_position: Stormwind, -8999.8 856.45 29.62, the 'land' point).
+quest 94947 giver 449.0 439.0 111.3 ender -8440.0 329.4 122.6
+req 94947 level 13 minlevel 7 prev 94946
+use 94947 631299 450.66 446.31 110.75 land -8999.80 856.45 29.62
 
 start W0_1_-7   # 1 quests, levels 48-48
 anchor 0 500.2 -3475.1 116.5
@@ -4492,7 +4499,7 @@ area 92834 2467.9 609.3 688.4
 quest 92860 giver 1991.9 525.0 658.0 ender 2113.6 550.1 735.3
 req 92860 level 12 prev 92840 races 2973060173
 # Skyborne exit (2026-11-19, sim world DB; config SkyborneExitQuests): 94946 The Magical City of Dalaran, ender Denaaris Stargale 259084 in Dalaran on map 0.
-# The hop point is spell_target_position 1278902 (the Dalaran arrival). The follow-up 94947 (Skyborne portal to Stormwind, objective type 14) is not in the data.
+# The hop point is spell_target_position 1278902 (the Dalaran arrival). The follow-up 94947 (Skyborne Portal to Stormwind, a 'use' record) is in start W0_0_0.
 quest 94946 giver 1991.9 525.0 658.0 ender 449.0 439.0 111.3
 req 94946 level 13 minlevel 7 prev 93089
 hop 94946 0 448.96 439.35 111.33

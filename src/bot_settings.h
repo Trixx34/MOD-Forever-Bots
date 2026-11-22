@@ -192,6 +192,7 @@ struct BotSettings
     bool QuestTeleport = false;
     // SkyborneExitQuests (0 or 1, off by default): Skyborne bots on map 2991 take the exit quests ('hop' records: 94946 to Dalaran, 95349 to Mulgore), walk to
     // the dock and are teleported to map 0 or 1 to hand them in. Needs Bot.Actions.Teleport = 1 in the core; a refused teleport blocks the quest (event).
+    // The same key: in Dalaran the Alliance bots take 94947 and use the portal to Stormwind ('use' record; Bot.Actions.UseObject = 1), a teleport as fallback.
     // SkyborneExitMakeRoom (0 or 1, off by default): such a bot with full bags visits a vendor before it takes an exit quest (or 93089/93090).
     bool SkyborneExitQuests = false;
     bool SkyborneExitMakeRoom = false;

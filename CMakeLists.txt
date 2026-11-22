@@ -104,6 +104,11 @@ target_link_libraries(skyborne_exit_test PRIVATE forever_bots_policy)
 target_compile_definitions(skyborne_exit_test PRIVATE FOREVER_BOTS_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data")
 add_test(NAME skyborne_exit COMMAND skyborne_exit_test)
 
+add_executable(skyborne_portal_test tests/skyborne_portal_test.cpp)
+target_link_libraries(skyborne_portal_test PRIVATE forever_bots_policy)
+target_compile_definitions(skyborne_portal_test PRIVATE FOREVER_BOTS_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data")
+add_test(NAME skyborne_portal COMMAND skyborne_portal_test)
+
 add_executable(chat_test tests/chat_test.cpp)
 target_link_libraries(chat_test PRIVATE forever_bots_policy)
 add_test(NAME chat COMMAND chat_test)

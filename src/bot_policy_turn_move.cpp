@@ -1601,11 +1601,40 @@ void BotPolicy::MoveForQuestOrGoto(DecideTick& tick, BotTurn& turn)
             // core refuses it unless Bot.Actions.Teleport is on; the refusal (or no move within kHopWaitMs) blocks the quest (skyborne_hop_refused).
             wanted = Decision{ ActionType::kTeleport, 0, Point{ questStep.Dest.X, questStep.Dest.Y, questStep.Dest.Z }, questStep.Map };
             state.Last.reset(); // sent even when the last order was the same teleport (a retry after a block)
-            QuestsFor(bot).NoteHopSent(state.Quest, questStep.Quest, questStep.Map, nowMs);
-            LogEvent("skyborne_hop_start: bot=" + std::to_string(bot.guid) + " quest=" + std::to_string(questStep.Quest) + " level=" + std::to_string(bot.level) +
+            QuestsFor(bot).NoteHopSent(state.Quest, questStep.Quest, questStep.Map, nowMs, questStep.Map == bot.map_id, questStep.Dest);
+            // The same map: the fallback of a portal quest (94947) whose object did nothing kUseTriesBeforeHop times.
+            LogEvent(std::string(questStep.Map == bot.map_id ? "skyborne_portal_fallback" : "skyborne_hop_start") + ": bot=" + std::to_string(bot.guid) +
+                     " quest=" + std::to_string(questStep.Quest) + " level=" + std::to_string(bot.level) +
                      " from=" + std::to_string(bot.map_id) + ":" + std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) + " to=" +
                      std::to_string(questStep.Map) + ":" + std::to_string(int(questStep.Dest.X)) + "," + std::to_string(int(questStep.Dest.Y)) + "," +
                      std::to_string(int(questStep.Dest.Z)) + " bag_free=" + std::to_string(bot.bag_free_slots));
+            break;
+        }
+        case QuestStepKind::UseObject:
+        {
+            // A portal quest (94947, 'use' record) at its object: use it as a click would (kUseObject; the core needs Bot.Actions.UseObject). The object's spell
+            // is the quest's objective and moves the bot; CheckUse sees the move, or counts a use that did nothing (the fallback teleport after kUseTriesBeforeHop).
+            if (!(state.Last && state.Last->Type == ActionType::kStop))
+            {
+                BotAction stop;
+                stop.bot_guid = bot.guid;
+                stop.type = ActionType::kStop;
+                actions.push_back(stop);
+                state.Last = Decision{ ActionType::kStop, 0 };
+            }
+            BotAction use;
+            use.bot_guid = bot.guid;
+            use.type = ActionType::kUseObject;
+            use.spell_id = questStep.Object;
+            use.dest_x = questStep.Dest.X;
+            use.dest_y = questStep.Dest.Y;
+            use.dest_z = questStep.Dest.Z;
+            actions.push_back(use);
+            QuestsFor(bot).NoteUseSent(state.Quest, questStep.Quest, bot, nowMs);
+            LogEvent("skyborne_portal_use: bot=" + std::to_string(bot.guid) + " quest=" + std::to_string(questStep.Quest) + " object=" + std::to_string(questStep.Object) +
+                     " level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id) + " pos=" + std::to_string(int(bot.pos_x)) + "," +
+                     std::to_string(int(bot.pos_y)) + "," + std::to_string(int(bot.pos_z)));
+            wanted = Decision{ ActionType::kStop, 0 };
             break;
         }
         case QuestStepKind::WaitGroup:

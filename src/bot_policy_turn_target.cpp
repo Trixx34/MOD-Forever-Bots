@@ -125,6 +125,25 @@ void BotPolicy::TurnQuestsAndHold(DecideTick& tick, BotTurn& turn)
         case HopCheck::None:
             break;
     }
+    // The portal of a 'use' quest (94947): the object's spell moved the bot, or the use did nothing for kUseWaitMs (a failed use).
+    {
+        std::uint32_t const usePending = state.Quest.UsePending;
+        switch (QuestsFor(bot).CheckUse(bot, state.Quest, nowMs))
+        {
+            case UseCheck::Moved:
+                LogEvent("skyborne_portal_done: bot=" + std::to_string(bot.guid) + " quest=" + std::to_string(usePending) + " level=" + std::to_string(bot.level) +
+                         " map=" + std::to_string(bot.map_id) + " pos=" + std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) + "," +
+                         std::to_string(int(bot.pos_z)));
+                break;
+            case UseCheck::NoMove:
+                LogEvent("skyborne_portal_refused: bot=" + std::to_string(bot.guid) + " quest=" + std::to_string(usePending) + " level=" + std::to_string(bot.level) +
+                         " map=" + std::to_string(bot.map_id) + " reason=no_move wait_ms=" + std::to_string(kUseWaitMs) + " fails=" +
+                         std::to_string(state.Quest.UseFails[usePending]));
+                break;
+            case UseCheck::None:
+                break;
+        }
+    }
     if (questsAllowed)
         questStep = QuestsFor(bot).Next(bot, state.Quest, nowMs, QuestBotInfo{ classId, Opt().RaceOf ? Opt().RaceOf(bot.guid) : 0u, Opt().PathVariety.Enabled ? &Opt().PathVariety : nullptr, Opt().RandomSeed, bot.guid });
     if (questsAllowed)
@@ -154,7 +173,7 @@ void BotPolicy::TurnQuestsAndHold(DecideTick& tick, BotTurn& turn)
     if (Opt().OnEvent && nowMs - state.QuestDiagAtMs >= 300000)
     {
         state.QuestDiagAtMs = nowMs;
-        static constexpr char const* kinds[] = { "none", "walk_to", "accept", "hand_in", "hunt", "abandon", "reward", "wait", "wait_group", "hop" };
+        static constexpr char const* kinds[] = { "none", "walk_to", "accept", "hand_in", "hunt", "abandon", "reward", "wait", "wait_group", "hop", "use_object" };
         Opt().OnEvent("quest_state: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id) +
                          " allowed=" + std::to_string(questsAllowed) + " enabled=" + std::to_string(QuestsFor(bot).Enabled()) +
                          " party=" + std::to_string(partyMember) + " low_health=" + std::to_string(lowHealth) + " in_combat=" + std::to_string(bot.in_combat) +
