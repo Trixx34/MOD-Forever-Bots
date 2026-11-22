@@ -132,6 +132,14 @@ struct ErrandOrder
     // The purchase itself is a Tier 1 call made by the module's Run() thread (TakeBuyRequest / FinishBuy); the trip ends with its answer.
     bool Vendor = false;
     std::uint32_t Item = 0;     // the mount's item entry
+    // AuctionWalk3D, the stand point (auction::StandPoint, 2026-11-20): which point of the ring around the auctioneer the walk goes to, the side the bot came
+    // from (set on the first turn of the walk), whether Dest holds the live creature's own position, and a kNoRoute answer to the walk not yet acted on.
+    std::uint32_t StandTry = 0;
+    bool StandFromSet = false;
+    float StandFromX = 0.0f;
+    float StandFromY = 0.0f;
+    bool LiveDest = false;
+    bool StandNoRoute = false;
 };
 
 // A purchase the policy wants made at the vendor the bot stands at (the vendor's unit reference is the snapshot's vendor_guid).
@@ -1509,9 +1517,10 @@ private:
     TurnFlow TurnFightRisk(DecideTick& tick, BotTurn& turn);
     void FightRiskLine(BotTurn const& turn, char const* stage, fight_risk::Estimate const& estimate, std::string const& extra);
     TurnFlow TurnBelowMap(DecideTick& tick, BotTurn& turn);  // below-map recovery (below_map.h, bot_policy_turn_life.cpp)
-    // AuctionWalk3D: the errand walk's `auction_reach: bot= check=<check> where=errand ...` line, at most once per bot per kAuctionReachLogMs.
+    // AuctionWalk3D: the errand walk's `auction_reach: bot= check=<check> where=errand ...` line, at most once per bot per kAuctionReachLogMs; `extra` ends
+    // it (the stand point's " live= try=").
     void AuctionReachLine(BotState& state, forever_module::BotSnapshot const& bot, char const* check, Point const& dest, auction::StandJudgement const& judged,
-                          std::uint64_t nowMs);
+                          std::uint64_t nowMs, std::string const& extra = std::string());
     void LogEvent(std::string const& text) const;
     void TurnRevivedAndRoles(DecideTick& tick, BotTurn& turn);
     void TurnTransport(DecideTick& tick, BotTurn& turn); // TransportRide (bot_policy_turn_life.cpp)

@@ -538,10 +538,15 @@ Module.forever-bots.TelemetrySummarySec = 60
 #                               visit waits for it and the auction errand walks the bot to the auctioneer until it is in it. doc/level-safe.md)
 #                               z-aware stand point (2026-11-19): the walk goes to the live auctioneer's own x, y, z; a stored z more than 60 yards from
 #                               the nearest vendor, banker or graveyard within 200 yards of it is bad data (no errand, errand_failed reason=auctioneer_bad_z,
-#                               no listing); a bot in 2D reach but not in 3D for 60 s ends the errand (reason=auction_reach_3d)
+#                               no listing). Stand points (2026-11-20, doc/auction-reach-fix.md): the walk goes to one of 8 points 2.5 yards around the
+#                               auctioneer (the live creature's own x, y, z when the bot sees it), the bot's side first; no route to a point, or 15 s in
+#                               2D reach without the 3D reach there, moves on to the next (event auction_stand_retry); after the last the errand fails
+#                               (reason=auction_reach_3d or auction_stand_no_route)
 # AuctionLogReach = 1           (logging only: event auction_reach check=ok_3d|failed_3d|skip_bad_z|ignore_z for a bot in 2D reach of the auctioneer,
-#                               once per bot every 10 minutes, with ref_z= and in_reach=; the errand walk logs the same with where=errand; the refusal lines
-#                               end with dist2d= dist3d= bot_z= auctioneer_z=)
+#                               once per bot every 10 minutes, with ref_z=, in_reach=, live= and gate=; the errand walk logs the same with where=errand;
+#                               the refusal lines end with dist2d= dist3d= bot_z= auctioneer_z=)
+# With or without these keys (a plain fix, 2026-11-20): no house call is made from a flight, while the bot moves, or when it is in 2D reach but beyond the
+# core's 3D reach (8.5 yards: another floor, under the house); list_refused and buy_failed end with code= and cause=.
 # Auction = 0
 # AuctionSellPctGreen = 300     (green items: listed at this percent of the vendor price, 100..2000)
 # AuctionSellPctBlue = 400      (blue items, 100..2000)

@@ -52,8 +52,9 @@ void PruneExpired(std::vector<std::uint64_t>& endsMs, std::uint64_t nowMs)
 
 ListFailure ClassifyListFailure(std::string const& reason)
 {
-    // The core's own words (ModuleActions.cpp, kList): the auctioneer is out of reach, the owner is offline, or the money is short.
-    static char const* const kRetry[] = { "auctioneer not found", "not enough money", "no online player" };
+    // The core's own words (ModuleActions.cpp, kList): the auctioneer is out of reach (or not one with a house: a place fault, not the item's), the owner is
+    // offline, or the money is short.
+    static char const* const kRetry[] = { "auctioneer not found", "auctioneer has no auction house", "not enough money", "no online player" };
     for (char const* text : kRetry)
         if (reason.find(text) != std::string::npos)
             return ListFailure::Retry;
@@ -133,11 +134,11 @@ bool HasListable(Settings const& settings, std::vector<Candidate> const& items, 
     return !PlanGoods(settings, Standing{}, ready).empty();
 }
 
-std::uint64_t ResolveNearby(std::uint64_t spotRef, float ax, float ay, std::vector<NearUnit> const& nearby)
+std::optional<NearUnit> FindLive(std::uint64_t spotRef, float ax, float ay, std::vector<NearUnit> const& nearby)
 {
     if (spotRef == 0)
-        return 0;
-    std::uint64_t best = 0;
+        return std::nullopt;
+    std::optional<NearUnit> best;
     float bestSq = kResolveYards * kResolveYards;
     for (NearUnit const& unit : nearby)
     {
@@ -149,10 +150,112 @@ std::uint64_t ResolveNearby(std::uint64_t spotRef, float ax, float ay, std::vect
         if (sq <= bestSq)
         {
             bestSq = sq;
-            best = unit.Ref;
+            best = unit;
         }
     }
     return best;
+}
+
+std::uint64_t ResolveNearby(std::uint64_t spotRef, float ax, float ay, std::vector<NearUnit> const& nearby)
+{
+    std::optional<NearUnit> const live = FindLive(spotRef, ax, ay, nearby);
+    return live ? live->Ref : 0;
+}
+
+CallBlock JudgeCall(CallFacts const& facts)
+{
+    if (!facts.AuctioneerValid)
+        return CallBlock::kNoAuctioneer;
+    if (facts.InFlight)
+        return CallBlock::kInFlight;
+    float const dx = facts.BotX - facts.AuctioneerX;
+    float const dy = facts.BotY - facts.AuctioneerY;
+    float const dz = facts.BotZ - facts.AuctioneerZ;
+    float const sq2d = dx * dx + dy * dy;
+    if (sq2d > kReachYards * kReachYards)
+        return CallBlock::kFar2d;
+    if (sq2d + dz * dz > kCoreReach3dYards * kCoreReach3dYards)
+        return CallBlock::kFarHeight;
+    if (facts.Moving)
+        return CallBlock::kMoving;
+    return CallBlock::kOk;
+}
+
+char const* CallBlockName(CallBlock block)
+{
+    switch (block)
+    {
+        case CallBlock::kOk: return "ok";
+        case CallBlock::kNoAuctioneer: return "no_auctioneer";
+        case CallBlock::kInFlight: return "in_flight";
+        case CallBlock::kFar2d: return "far_2d";
+        case CallBlock::kFarHeight: return "far_height";
+        case CallBlock::kMoving: return "moving";
+    }
+    return "?";
+}
+
+char const* RefusalCode(std::string const& reason)
+{
+    // The core's words (ModuleActions.cpp, AuctionHouseAction), most specific first.
+    static struct
+    {
+        char const* Text;
+        char const* Code;
+    } const kCodes[] = {
+        { "auctioneer not found on the player's map", "auctioneer_missing" },
+        { "auctioneer not found or cannot interact", "cannot_interact" },
+        { "auctioneer has no auction house", "no_house" },
+        { "not enough money", "no_money" },
+        { "no online player", "no_player" },
+        { "has no acting player", "no_player" },
+        { "no longer in the player's bags", "item_gone" },
+        { "item entry does not match", "item_mismatch" },
+        { "auction was not listed", "not_listed" },
+        { "cannot bid on your own auction", "own_auction" },
+        { "auction not found", "auction_gone" },
+    };
+    for (auto const& entry : kCodes)
+        if (reason.find(entry.Text) != std::string::npos)
+            return entry.Code;
+    return "other";
+}
+
+std::string RefusalCause(std::string const& reason, CallFacts const& facts)
+{
+    std::string const code = RefusalCode(reason);
+    if (code != "cannot_interact" && code != "auctioneer_missing")
+        return "-";
+    if (CallBlock const block = JudgeCall(facts); block != CallBlock::kOk)
+        return CallBlockName(block);
+    if (facts.LiveLooked && !facts.LiveSeen)
+        return "not_seen";
+    return "in_reach_other";
+}
+
+std::string RefusalFields(std::string const& reason, CallFacts const& facts)
+{
+    return std::string(" code=") + RefusalCode(reason) + " cause=" + RefusalCause(reason, facts);
+}
+
+RefPoint StandPoint(RefPoint const& anchor, float fromX, float fromY, std::uint32_t attempt)
+{
+    float const dx = fromX - anchor.X;
+    float const dy = fromY - anchor.Y;
+    float const base = dx * dx + dy * dy > 0.01f ? std::atan2(dy, dx) : 0.0f;
+    // 0, +45, -45, +90, -90, +135, -135, 180 degrees from the side the bot comes from.
+    std::uint32_t const k = attempt % kStandTries;
+    float const step = float((k + 1) / 2) * (3.14159265f / 4.0f);
+    float const angle = base + (k % 2 == 1 ? step : -step);
+    return { anchor.X + kStandRingYards * std::cos(angle), anchor.Y + kStandRingYards * std::sin(angle), anchor.Z };
+}
+
+StandNext JudgeStandTry(std::uint32_t attempt, bool noRoute, std::uint64_t near2dSinceMs, std::uint64_t nowMs)
+{
+    bool const stuck = near2dSinceMs != 0 && nowMs >= near2dSinceMs && nowMs - near2dSinceMs >= kStandTryMs;
+    if (!noRoute && !stuck)
+        return StandNext::kStay;
+    return attempt + 1 < kStandTries ? StandNext::kNextPoint : StandNext::kGiveUp;
 }
 
 bool InReach(bool auctioneerValid, float botX, float botY, float auctioneerX, float auctioneerY)

@@ -260,9 +260,12 @@ struct AuctionBot
     bool Idle = false;
     std::uint64_t Copper = 0;   // for the budget of a purchase (AuctionBuy)
     std::uint32_t Level = 0;
-    bool InReach = false;       // in reach of the auctioneer (auction::InReach, or InReach3D with AuctionWalk3D): the core refuses a listing, a browse or a buyout from farther
-    float X = 0.0f, Y = 0.0f, Z = 0.0f;                         // the bot's place when fed (AuctionLogReach: the refusal lines)
-    float AuctioneerX = 0.0f, AuctioneerY = 0.0f, AuctioneerZ = 0.0f;
+    // In reach of the auctioneer: auction::JudgeCall passed (2D within 5 yards, 3D within the core's reach, not moving, not on a flight), and with
+    // AuctionWalk3D the 3D reach of 4.5 yards too. The core refuses a listing, a browse or a buyout from farther.
+    bool InReach = false;
+    // The bot's place, the auctioneer's (the live creature's when the bot saw it) and the rest of what the gate judged, when fed: the refusal lines'
+    // dist/z fields and their code= and cause= (auction::RefusalFields).
+    auction::CallFacts Facts;
 };
 
 struct AuctionFeed

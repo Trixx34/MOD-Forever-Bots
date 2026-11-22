@@ -10,6 +10,7 @@
 #include "off_map.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <sstream>
 
@@ -165,8 +166,11 @@ void TheAuctionErrandWalksToTheAuctioneersOwnPlace()
         bot.vendor_x = 120.0f;
         bot.vendor_z = -55.0f;
     }, 3000);
-    CHECK(!live.lastMoves.empty() && live.lastMoves.back().dest_x == 110.0f && live.lastMoves.back().dest_z == -56.8f);
-    // Arm C sample 1: in 2D reach (3.7 yards), 13.7 yards above the auctioneer. The walk goes on; after 60 s the errand fails with one line.
+    // 2026-11-20: the walk goes to a stand point on the ring around it (2.5 yards, on the bot's side), at its height, not into the auctioneer's own spot.
+    CHECK(!live.lastMoves.empty() && std::fabs(std::hypot(live.lastMoves.back().dest_x - 110.0f, live.lastMoves.back().dest_y) - auction::kStandRingYards) < 0.01f &&
+          live.lastMoves.back().dest_x < 110.0f && live.lastMoves.back().dest_z == -56.8f);
+    // Arm C sample 1: in 2D reach (3.7 yards), 13.7 yards above the auctioneer. The walk goes on, to one stand point after another (15 s each); after the
+    // last of the eight the errand fails with one line.
     ErrandRun const above = RunAuctionErrand(Point{ 3.7f, 0.0f, -56.8f }, [](BotSnapshot& bot)
     {
         bot.pos_z = -43.1f;
@@ -176,11 +180,13 @@ void TheAuctionErrandWalksToTheAuctioneersOwnPlace()
         bot.vendor_valid = 1;
         bot.vendor_x = 20.0f;
         bot.vendor_z = -55.0f;
-    }, 120000);
+    }, 200000);
     CHECK(!above.lastMoves.empty() && above.lastMoves.back().dest_z == -56.8f);
     CHECK(above.outcome == ErrandOutcome::kFailed);
     CHECK(Logged(above.events, "auction_reach: bot=42 check=failed_3d where=errand walk3d=1 dist2d=3.7 dist3d=14.2 bot_z=-43.1 auctioneer_z=-56.8 ref_z=-55"));
-    CHECK(Logged(above.events, "errand_failed: bot=42 reason=auction_reach_3d"));
+    CHECK(Logged(above.events, "errand_failed: bot=42 reason=auction_reach_3d tries=8"));
+    CHECK(LoggedWith(above.events, "auction_reach: bot=42 check=failed_3d") && LoggedWith(above.events, " live=0 try=7"));
+    CHECK(std::count_if(above.events.begin(), above.events.end(), [](std::string const& e) { return e.rfind("auction_stand_retry: bot=42 ", 0) == 0; }) == 7);
     // On the auctioneer's floor: arrived (ok_3d), stands its 25 s, done.
     ErrandRun const there = RunAuctionErrand(Point{ 3.7f, 0.0f, -56.8f }, [](BotSnapshot& bot)
     {

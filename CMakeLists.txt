@@ -536,6 +536,10 @@ add_executable(arm_c_fixes_test tests/arm_c_fixes_test.cpp)
 target_link_libraries(arm_c_fixes_test PRIVATE forever_bots_policy forever_bots_settings)
 add_test(NAME arm_c_fixes COMMAND arm_c_fixes_test)
 
+add_executable(auction_reach_test tests/auction_reach_test.cpp)
+target_link_libraries(auction_reach_test PRIVATE forever_bots_policy)
+add_test(NAME auction_reach COMMAND auction_reach_test)
+
 add_executable(survival_test tests/survival_test.cpp)
 target_link_libraries(survival_test PRIVATE forever_bots_policy forever_bots_settings)
 add_test(NAME survival COMMAND survival_test)

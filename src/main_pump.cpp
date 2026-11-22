@@ -659,19 +659,53 @@ void main_detail::PumpTier2(forever_module::Tier2Session& session, std::atomic<b
                     forever_module::BotSnapshot const& bot = view.bots[botIndex];
                     if ((extras.Alts && extras.Alts->Has(bot.guid)) || bot.group_role != 0)
                         continue;
-                    bool const inReach2d = auction::InReach(bot.auctioneer_valid != 0, bot.pos_x, bot.pos_y, bot.auctioneer_x, bot.auctioneer_y);
-                    bool const inReach3d = auction::InReach3D(bot.auctioneer_valid != 0, bot.pos_x, bot.pos_y, bot.pos_z, bot.auctioneer_x, bot.auctioneer_y,
-                                                              bot.auctioneer_z);
+                    // The live auctioneer (auction::FindLive): the creature the core measures from, with its own height, when the bot sees it. Looked
+                    // for only near the house (the nearby list is not copied for the other bots).
+                    float const toSpawn2d = std::hypot(bot.pos_x - bot.auctioneer_x, bot.pos_y - bot.auctioneer_y);
+                    auction::CallFacts facts;
+                    facts.AuctioneerValid = bot.auctioneer_valid != 0;
+                    facts.BotX = bot.pos_x;
+                    facts.BotY = bot.pos_y;
+                    facts.BotZ = bot.pos_z;
+                    facts.AuctioneerX = bot.auctioneer_x;
+                    facts.AuctioneerY = bot.auctioneer_y;
+                    facts.AuctioneerZ = bot.auctioneer_z;
+                    facts.Moving = bot.moving != 0;
+                    facts.InFlight = bot.in_flight != 0;
+                    std::optional<auction::NearUnit> live;
+                    if (facts.AuctioneerValid && toSpawn2d <= auction::kReachYards + auction::kResolveYards)
+                    {
+                        std::vector<auction::NearUnit> near;
+                        for (forever_module::NearbyUnit const& unit : view.NearbyOf(botIndex))
+                            near.push_back({ unit.guid, unit.pos_x, unit.pos_y, unit.pos_z });
+                        live = auction::FindLive(bot.auctioneer_guid, bot.auctioneer_x, bot.auctioneer_y, near);
+                        facts.LiveLooked = true;
+                        facts.LiveSeen = live.has_value();
+                        if (live)
+                        {
+                            facts.AuctioneerX = live->X;
+                            facts.AuctioneerY = live->Y;
+                            facts.AuctioneerZ = live->Z;
+                        }
+                    }
+                    bool const inReach2d = auction::InReach(facts.AuctioneerValid, bot.pos_x, bot.pos_y, facts.AuctioneerX, facts.AuctioneerY);
+                    bool const inReach3d = auction::InReach3D(facts.AuctioneerValid, bot.pos_x, bot.pos_y, bot.pos_z, facts.AuctioneerX, facts.AuctioneerY,
+                                                              facts.AuctioneerZ);
                     // AuctionWalk3D, the z-aware stand point (auction::JudgeStandZ): the auctioneer's stored z against the vendors and banker near it; a z off by more
-                    // than 60 yards is bad data (no listing there), otherwise the 3D reach counts. Judged only for a bot at the house (in 2D reach).
+                    // than 60 yards is bad data (no listing there), otherwise the 3D reach counts. Judged only for a bot at the house (in 2D reach). The live
+                    // creature's z is the real one and is not judged.
                     auction::StandJudgement judgement;
-                    if (inReach2d || inReach3d)
+                    if ((inReach2d || inReach3d) && !live)
                         judgement = auction::JudgeStandZ(bot.auctioneer_x, bot.auctioneer_y, bot.auctioneer_z, std::nullopt, auction::SnapshotRefs(bot));
-                    bool const inReach = settings.Auction.Walk3D ? auction::InReachJudged(judgement.Verdict, bot.auctioneer_valid != 0, bot.pos_x, bot.pos_y, bot.pos_z,
-                                                                                           bot.auctioneer_x, bot.auctioneer_y, bot.auctioneer_z)
-                                                                 : inReach2d;
+                    // The call gate (the plain fix, every config, auction::JudgeCall): no call from a flight, from beyond the core's 3D reach (another floor,
+                    // under the house) or while walking past; AuctionWalk3D narrows the reach further (4.5 yards in 3D, the z judgement).
+                    auction::CallBlock const block = auction::JudgeCall(facts);
+                    bool const inReach = block == auction::CallBlock::kOk &&
+                                         (!settings.Auction.Walk3D || auction::InReachJudged(judgement.Verdict, facts.AuctioneerValid, bot.pos_x, bot.pos_y, bot.pos_z,
+                                                                                            facts.AuctioneerX, facts.AuctioneerY, facts.AuctioneerZ));
                     // AuctionLogReach: a bot at the house (2D reach) is said once per bot every ten minutes with the result (check=ok_3d|failed_3d|skip_bad_z|ignore_z),
-                    // both heights and the reference's (ref_z=none when no vendor or banker stands within 200 yards of the auctioneer).
+                    // both heights and the reference's (ref_z=none when no vendor or banker stands within 200 yards of the auctioneer), whether the live
+                    // auctioneer was seen (live=1, its own position measured) and what the call gate said (gate=ok|far_height|moving|in_flight).
                     if (settings.Auction.Enabled && settings.Auction.LogReach && inReach2d)
                     {
                         std::uint64_t const now = nowMs();
@@ -681,22 +715,26 @@ void main_detail::PumpTier2(forever_module::Tier2Session& session, std::atomic<b
                             auctionReachLoggedMs[bot.guid] = now;
                             std::cerr << "forever-bots: event auction_reach: bot=" << bot.guid << " check=" << auction::ReachCheckName(judgement.Verdict, inReach3d)
                                       << " walk3d=" << (settings.Auction.Walk3D ? 1 : 0)
-                                      << auction::ReachFields(bot.pos_x, bot.pos_y, bot.pos_z, bot.auctioneer_x, bot.auctioneer_y, bot.auctioneer_z)
+                                      << auction::ReachFields(bot.pos_x, bot.pos_y, bot.pos_z, facts.AuctioneerX, facts.AuctioneerY, facts.AuctioneerZ)
                                       << " ref_z=" << (judgement.RefKnown ? std::to_string(int(judgement.RefZ)) : std::string("none")) << " in_reach=" << (inReach ? 1 : 0)
-                                      << ab_split::ArmField(bot.guid) << "\n";
+                                      << " live=" << (live ? 1 : 0) << " gate=" << auction::CallBlockName(block) << ab_split::ArmField(bot.guid) << "\n";
                         }
                     }
                     std::uint64_t auctioneer = bot.auctioneer_guid;
+                    // The core cannot find the snapshot's spawn-based reference (a core without the spawn id fallback): name the live auctioneer from the bot's
+                    // nearby units (0 = none, no call is made).
                     if (settings.Auction.ResolveNearby && inReach)
-                    {
-                        // The core cannot find the snapshot's spawn-based reference: name the live auctioneer from the bot's nearby units (0 = none, no call is made).
-                        std::vector<auction::NearUnit> near;
-                        for (forever_module::NearbyUnit const& unit : view.NearbyOf(botIndex))
-                            near.push_back({ unit.guid, unit.pos_x, unit.pos_y });
-                        auctioneer = auction::ResolveNearby(bot.auctioneer_guid, bot.auctioneer_x, bot.auctioneer_y, near);
-                    }
-                    list.push_back({ bot.guid, bot.bag_free_slots, auctioneer, bot.life_state == 0 && bot.in_combat == 0, bot.copper, bot.level, inReach, bot.pos_x, bot.pos_y, bot.pos_z,
-                                    bot.auctioneer_x, bot.auctioneer_y, bot.auctioneer_z });
+                        auctioneer = live ? live->Ref : 0;
+                    AuctionBot entry;
+                    entry.Guid = bot.guid;
+                    entry.FreeSlots = bot.bag_free_slots;
+                    entry.AuctioneerGuid = auctioneer;
+                    entry.Idle = bot.life_state == 0 && bot.in_combat == 0;
+                    entry.Copper = bot.copper;
+                    entry.Level = bot.level;
+                    entry.InReach = inReach;
+                    entry.Facts = facts;
+                    list.push_back(entry);
                 }
                 std::lock_guard<std::mutex> lock(extras.Auction->Lock);
                 extras.Auction->Bots.swap(list);

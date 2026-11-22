@@ -1714,21 +1714,46 @@ void BotPolicy::TurnIdle(DecideTick& tick, BotTurn& turn)
     // A town errand (errand_trainers.h): walk to the trainer, then train once in reach. Only for a bot free to walk, as the vendor visit is. The
     // walk is a kMoveTo, so the taxi rules below apply to it as to any walk.
     bool const errandTurn = state.Errand && !hasTarget && !enemyNear && wanted.Type == ActionType::kStop && questStep.Kind == QuestStepKind::None && !routeBusy;
-    // AuctionWalk3D, the z-aware stand point (2026-11-19, auction::JudgeStandZ): the walk goes to the auctioneer's own (x, y, z), the snapshot's live one when
-    // it is the one the errand names; its z is judged against the vendors, banker and graveyard near it first. Bad data (more than 60 yards off): the
-    // errand fails (errand_failed reason=auctioneer_bad_z), no walk to a place the bot cannot reach.
+    // AuctionWalk3D, the z-aware stand point (2026-11-19, auction::JudgeStandZ; the ring, 2026-11-20, auction::StandPoint): the anchor is the auctioneer's own
+    // (x, y, z), the live creature's when the bot sees it (its real height, not judged), else the snapshot's spawn when it is the one the errand names, its z
+    // judged against the vendors, banker and graveyard near it first. Bad data (more than 60 yards off): the errand fails (errand_failed
+    // reason=auctioneer_bad_z), no walk to a place the bot cannot reach. The walk goes to a stand point on a ring around the anchor, not to the anchor
+    // itself (behind the counter, off the navmesh).
     auction::StandZ standZ = auction::StandZ::kUse3D;
     auction::StandJudgement standJudged;
+    Point standPoint;
     if (errandTurn && state.Errand->Auction && Opt().AuctionWalk3D && bot.map_id == state.Errand->Map)
     {
-        Point& dest = state.Errand->Dest;
+        ErrandOrder& order = *state.Errand;
+        Point& dest = order.Dest;
         if (bot.auctioneer_valid != 0 && std::hypot(bot.auctioneer_x - dest.X, bot.auctioneer_y - dest.Y) <= kAuctionStandLiveYards)
-            dest = Point{ bot.auctioneer_x, bot.auctioneer_y, bot.auctioneer_z };
-        std::vector<auction::RefPoint> refs = auction::SnapshotRefs(bot);
-        if (level_safe::Graveyards::Yard const* yard = _graveyards.Nearest(bot.map_id, dest.X, dest.Y))
-            refs.push_back({ yard->X, yard->Y, yard->Z });
-        standJudged = auction::JudgeStandZ(dest.X, dest.Y, dest.Z, std::nullopt, refs);
+        {
+            std::vector<auction::NearUnit> near;
+            if (std::hypot(bot.pos_x - bot.auctioneer_x, bot.pos_y - bot.auctioneer_y) <= kAuctionStandLiveYards)
+                for (NearbyUnit const& unit : turn.nearby)
+                    near.push_back({ unit.guid, unit.pos_x, unit.pos_y, unit.pos_z });
+            if (std::optional<auction::NearUnit> const live = auction::FindLive(bot.auctioneer_guid, bot.auctioneer_x, bot.auctioneer_y, near))
+            {
+                dest = Point{ live->X, live->Y, live->Z };
+                order.LiveDest = true;
+            }
+            else if (!order.LiveDest)
+                dest = Point{ bot.auctioneer_x, bot.auctioneer_y, bot.auctioneer_z };
+        }
+        if (!order.LiveDest)
+        {
+            std::vector<auction::RefPoint> refs = auction::SnapshotRefs(bot);
+            if (level_safe::Graveyards::Yard const* yard = _graveyards.Nearest(bot.map_id, dest.X, dest.Y))
+                refs.push_back({ yard->X, yard->Y, yard->Z });
+            standJudged = auction::JudgeStandZ(dest.X, dest.Y, dest.Z, std::nullopt, refs);
+        }
         standZ = standJudged.Verdict;
+        if (!order.StandFromSet)
+        {
+            order.StandFromSet = true;
+            order.StandFromX = bot.pos_x;
+            order.StandFromY = bot.pos_y;
+        }
         if (standZ == auction::StandZ::kSkip)
         {
             AuctionReachLine(state, bot, "skip_bad_z", dest, standJudged, nowMs);
@@ -1741,30 +1766,54 @@ void BotPolicy::TurnIdle(DecideTick& tick, BotTurn& turn)
     }
     if (errandTurn && state.Errand)
     {
-        ErrandOrder const& order = *state.Errand;
+        ErrandOrder& order = *state.Errand;
         float const dist = bot.map_id == order.Map ? std::hypot(bot.pos_x - order.Dest.X, bot.pos_y - order.Dest.Y) : 1e9f;
-        // AuctionWalk3D: at the house only within the 3D reach of the auctioneer (the core's own measure); until then the bot walks to it. A z judged not
-        // trustworthy (kIgnoreZ) falls back to the 2D reach.
+        // AuctionWalk3D: at the house only within the 3D reach of the auctioneer (the core's own measure); until then the bot walks to the stand point. A z
+        // judged not trustworthy (kIgnoreZ) falls back to the 2D reach.
         bool const walk3d = order.Auction && Opt().AuctionWalk3D;
         bool const auctionArrived = order.Auction && (walk3d ? bot.map_id == order.Map && auction::InReachJudged(standZ, true, bot.pos_x, bot.pos_y, bot.pos_z, order.Dest.X,
                                                                                                                  order.Dest.Y, order.Dest.Z)
                                                              : dist <= kTrainReachYards);
+        std::string const standFields = walk3d ? " live=" + std::string(order.LiveDest ? "1" : "0") + " try=" + std::to_string(order.StandTry) : std::string();
         if (walk3d && auctionArrived && state.ErrandArrivedMs == 0)
-            AuctionReachLine(state, bot, standZ == auction::StandZ::kIgnoreZ ? "ignore_z" : "ok_3d", order.Dest, standJudged, nowMs);
-        // In 2D reach but not in 3D (another floor, under the house) for kAuctionNear2dMaxMs: the walk does not get there; the errand fails, with a line.
+            AuctionReachLine(state, bot, standZ == auction::StandZ::kIgnoreZ ? "ignore_z" : "ok_3d", order.Dest, standJudged, nowMs, standFields);
+        // In 2D reach but not in 3D (another floor, under the house), or no route to the stand point: the next stand point of the ring (auction::JudgeStandTry);
+        // after the last one the errand fails, with a line.
         bool const near2dOnly = walk3d && !auctionArrived && dist <= auction::kReachYards;
         if (!near2dOnly)
             state.ErrandNear2dMs = 0;
         else if (state.ErrandNear2dMs == 0)
             state.ErrandNear2dMs = std::max<std::uint64_t>(nowMs, 1);
-        if (near2dOnly && nowMs - state.ErrandNear2dMs >= kAuctionNear2dMaxMs)
+        auction::StandNext const standNext = walk3d && !auctionArrived ? auction::JudgeStandTry(order.StandTry, order.StandNoRoute, state.ErrandNear2dMs, nowMs)
+                                                                       : auction::StandNext::kStay;
+        if (standNext == auction::StandNext::kNextPoint)
         {
-            AuctionReachLine(state, bot, "failed_3d", order.Dest, standJudged, nowMs);
+            if (Opt().OnEvent)
+                Opt().OnEvent("auction_stand_retry: bot=" + std::to_string(bot.guid) + " try=" + std::to_string(order.StandTry + 1) + " why=" +
+                              (order.StandNoRoute ? "no_route" : "near_2d_only") + " live=" + (order.LiveDest ? "1" : "0") +
+                              auction::ReachFields(bot.pos_x, bot.pos_y, bot.pos_z, order.Dest.X, order.Dest.Y, order.Dest.Z));
+            ++order.StandTry;
+            order.StandNoRoute = false;
+            state.ErrandNear2dMs = 0;
+            // The refused point's pause (NoteMoveRefused) would hold the next point too: it lies within kNoRouteSameYards of it.
+            state.NoRouteUntilMs = 0;
+            state.NoRouteStreak = 0;
+        }
+        if (walk3d)
+        {
+            auction::RefPoint const stand = auction::StandPoint({ order.Dest.X, order.Dest.Y, order.Dest.Z }, order.StandFromX, order.StandFromY, order.StandTry);
+            standPoint = Point{ stand.X, stand.Y, stand.Z };
+        }
+        if (standNext == auction::StandNext::kGiveUp)
+        {
+            bool const noRouteEnd = order.StandNoRoute;
+            AuctionReachLine(state, bot, noRouteEnd ? "no_route" : "failed_3d", order.Dest, standJudged, nowMs, standFields);
             state.ErrandResult = ErrandOutcome::kFailed;
             state.Errand.reset();
             state.ErrandNear2dMs = 0;
             if (Opt().OnEvent)
-                Opt().OnEvent("errand_failed: bot=" + std::to_string(bot.guid) + " reason=auction_reach_3d");
+                Opt().OnEvent("errand_failed: bot=" + std::to_string(bot.guid) + " reason=" + (noRouteEnd ? "auction_stand_no_route" : "auction_reach_3d") +
+                              " tries=" + std::to_string(auction::kStandTries));
             wanted = Decision{};
         }
         else if (auctionArrived)
@@ -1822,6 +1871,11 @@ void BotPolicy::TurnIdle(DecideTick& tick, BotTurn& turn)
                 state.ErrandTrainSentMs = nowMs + kErrandTrainRetryMs;
             }
             wanted = Decision{};
+        }
+        else if (walk3d)
+        {
+            wanted = Decision{ ActionType::kMoveTo, 0, standPoint };
+            moveWhy = "auction.stand";
         }
         else
         {

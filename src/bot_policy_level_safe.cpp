@@ -243,7 +243,7 @@ BotPolicy::TurnFlow BotPolicy::TurnBelowMap(DecideTick& tick, BotTurn& turn)
 // AuctionWalk3D, the z-aware stand point (auction::JudgeStandZ): the errand walk's result, at most once per bot per kAuctionReachLogMs, in the same form as the
 // listing feed's auction_reach line (main_pump.cpp) with where=errand.
 void BotPolicy::AuctionReachLine(BotState& state, BotSnapshot const& bot, char const* check, Point const& dest, auction::StandJudgement const& judged,
-                                 std::uint64_t nowMs)
+                                 std::uint64_t nowMs, std::string const& extra)
 {
     if (state.AuctionReachLogged && nowMs - state.AuctionReachLoggedMs < kAuctionReachLogMs)
         return;
@@ -251,5 +251,5 @@ void BotPolicy::AuctionReachLine(BotState& state, BotSnapshot const& bot, char c
     state.AuctionReachLoggedMs = nowMs;
     LogEvent("auction_reach: bot=" + std::to_string(bot.guid) + " check=" + check + " where=errand walk3d=1" +
              auction::ReachFields(bot.pos_x, bot.pos_y, bot.pos_z, dest.X, dest.Y, dest.Z) + " ref_z=" +
-             (judged.RefKnown ? std::to_string(int(judged.RefZ)) : std::string("none")));
+             (judged.RefKnown ? std::to_string(int(judged.RefZ)) : std::string("none")) + extra);
 }
