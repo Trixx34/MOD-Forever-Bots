@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // main_detail: presence, the loot books, the Auction House and the town errands (the Run() thread's timers and the pump's feeds) (declared in main_internal.h, called from main()).
 #include "main_internal.h"
+#include "log_throttle.h"
 
 namespace main_detail {
 
@@ -355,7 +356,8 @@ void SetUpErrands(forever_module::ModuleClient& client, BotSettings& settings, s
         auto journal = std::make_shared<errand::Journal>(errand::CityName); // the event lines (errand_policy.h)
         std::shared_ptr<CommandQueue> queue = commands;
         auto mountBook = std::make_shared<MountBook>();
-        client.AddTimer(kErrandInterval, [&client, feed, scheduler, journal, trainers, queue, book, ranks, mountTable, mountsOn, mountBook, &settings]
+        auto dueThrottle = std::make_shared<log_throttle::KeyedThrottle>(); // the auction_due lines (LogThrottleSec, at least 60 s)
+        client.AddTimer(kErrandInterval, [&client, feed, scheduler, journal, trainers, queue, book, ranks, mountTable, mountsOn, mountBook, dueThrottle, &settings]
         {
             std::uint64_t const now = nowMs();
             std::vector<ErrandBot> list;
@@ -443,19 +445,42 @@ void SetUpErrands(forever_module::ModuleClient& client, BotSettings& settings, s
                 // visit (the listing timer) lists the items once the bot is there. Off until both the errands and the auction are on.
                 // Only items the bot may list now: equipment on its hold (auction::GearReady) is no reason for a trip.
                 bool auctionDue = false;
+                std::size_t itemCount = 0;
                 if (settings.Auction.Enabled && bot.Side != 0 && bot.AuctioneerValid)
                 {
                     if (auto const looted = book->Items.find(bot.Guid); looted != book->Items.end() && !looted->second.empty())
+                    {
+                        itemCount = looted->second.size();
                         auctionDue = auction::HasListable(settings.Auction, StampedItems(looted->second, bot.Level), bot.Level);
+                    }
                 }
+                std::vector<std::uint32_t> auctionCities; // the faction's capitals, as for training; the city is only the errand count per capital
+                if (bot.Side == errand::kAlliance)
+                    auctionCities = { errand::kStormwind, errand::kIronforge, errand::kDarnassus };
+                else
+                    auctionCities = { errand::kUndercity, errand::kOrgrimmar, errand::kThunderBluff };
+                std::uint32_t const bagPct = errand::BagPct(bot.FreeSlots, kBagSlotsAssumed);
                 if (!b.TrainDue && auctionDue)
                 {
                     b.AuctionDue = true;
-                    // The faction's capitals, as for training; the city is only the errand count per capital.
-                    if (bot.Side == errand::kAlliance)
-                        b.Cities = { errand::kStormwind, errand::kIronforge, errand::kDarnassus };
-                    else
-                        b.Cities = { errand::kUndercity, errand::kOrgrimmar, errand::kThunderBluff };
+                    b.Cities = auctionCities;
+                }
+                else if (settings.Errand.AuctionPriority != 0 && b.TrainDue && auctionDue && bagPct >= settings.Auction.BagFullPct)
+                {
+                    // AuctionErrandPriority: goods to list and full bags; the scheduler may send it to the house before training.
+                    b.AuctionDue = true;
+                    b.AuctionReady = true;
+                    b.AuctionCities = auctionCities;
+                }
+                // The diagnostic for the read-out: why an auction errand did or did not start (only bots with loot or full bags, throttled per bot).
+                if (settings.Auction.Enabled && bot.Side != 0 && bot.AuctioneerValid && (itemCount != 0 || bagPct >= settings.Auction.BagFullPct))
+                {
+                    std::uint32_t held = 0;
+                    std::uint64_t const period = std::max<std::uint64_t>(settings.LogThrottleSec, 60) * 1000;
+                    if (dueThrottle->Allow(bot.Guid, "auction_due", now, period, held))
+                        std::cerr << "forever-bots: event " << ab_split::Tag("auction_due bot=" + std::to_string(bot.Guid) + " items=" + std::to_string(itemCount) +
+                                                                          " listable=" + (auctionDue ? "1" : "0") + " train_due=" + (b.TrainDue ? "1" : "0") +
+                                                                          " bag_pct=" + std::to_string(bagPct)) << log_throttle::KeyedThrottle::Field(held) << "\n";
                 }
                 bots.push_back(std::move(b));
             }

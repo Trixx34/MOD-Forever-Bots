@@ -1371,6 +1371,7 @@ BotSettings ParseOneConfig(std::unordered_map<std::string, std::string> const& c
     ReadKey(config, "ErrandMaxMin", 5, 240, settings.Errand.MaxMinutes, warnings);
     ReadKey(config, "ErrandPerCity", 1, 20, settings.Errand.MaxPerCity, warnings);
     ReadKey(config, "ErrandStartsPerTick", 1, 10, settings.Errand.MaxStartsPerTick, warnings);
+    ReadKey(config, "AuctionErrandPriority", 0, 2, settings.Errand.AuctionPriority, warnings);
     if (auto const it = config.find("ErrandTrainerFile"); it != config.end())
         settings.ErrandTrainerFile = it->second;
     // A target below its "low" mark would send a bot shopping that then buys nothing: the target is raised to the mark.

@@ -608,6 +608,7 @@ void main_detail::PumpTier2(forever_module::Tier2Session& session, std::atomic<b
                     entry.Race = options.RaceOf ? options.RaceOf(bot.guid) : 0;
                     entry.Copper = bot.copper;
                     entry.MountRefusals = policy.MountRefusals(bot.guid);
+                    entry.FreeSlots = bot.bag_free_slots;
                     list.push_back(entry);
                 }
                 std::lock_guard<std::mutex> lock(extras.Errand->Lock);

@@ -1015,6 +1015,8 @@ Module.forever-bots.TelemetrySummarySec = 60
 # ErrandMaxMin = 60                  # (5..240) one errand runs no longer than this
 # ErrandPerCity = 2                  # (1..20) bots out on an errand to one capital at once
 # ErrandStartsPerTick = 2            # (1..10) errands started in one tick, the whole module
+# AuctionErrandPriority = 0          # (0..2) 0: training before the Auction House always. 1: a bot due both with listable goods and bags at AuctionBagFullPct goes to the house first.
+#                                      2: such a bot alternates (training, house, ...). See doc/auction-errand-priority.md
 # ErrandTrainerFile = data/errand_trainers.txt   # the trainer table
 
 # Spell costs: what each spell costs in mana, rage or energy, so a bot does not try a cast it cannot pay for.

@@ -557,3 +557,7 @@ add_test(NAME survival COMMAND survival_test)
 add_executable(belowmap_noroute_test tests/belowmap_noroute_test.cpp)
 target_link_libraries(belowmap_noroute_test PRIVATE forever_bots_policy forever_bots_settings)
 add_test(NAME belowmap_noroute COMMAND belowmap_noroute_test)
+
+add_executable(auction_errand_priority_test tests/auction_errand_priority_test.cpp)
+target_link_libraries(auction_errand_priority_test PRIVATE forever_bots_policy forever_bots_settings)
+add_test(NAME auction_errand_priority COMMAND auction_errand_priority_test)

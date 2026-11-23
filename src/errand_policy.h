@@ -20,6 +20,15 @@ namespace errand {
 
 enum class Kind : std::uint8_t { kTrain, kAuction };
 
+// Share of the bag slots in use, in percent, from the free slots the snapshot gives and an assumed total (16 for the backpack); 0 when the total is 0.
+inline std::uint32_t BagPct(std::uint32_t freeSlots, std::uint32_t totalSlots)
+{
+    if (totalSlots == 0)
+        return 0;
+    std::uint32_t const free = freeSlots < totalSlots ? freeSlots : totalSlots;
+    return (totalSlots - free) * 100 / totalSlots;
+}
+
 struct Settings
 {
     bool Enabled = false;                 // config key Errands (off by default)
@@ -28,6 +37,9 @@ struct Settings
     std::uint32_t MaxMinutes = 60;        // one errand runs no longer than this (ErrandMaxMin)
     std::uint32_t MaxPerCity = 2;         // bots out on an errand to one capital at once (ErrandPerCity)
     std::uint32_t MaxStartsPerTick = 2;   // errands started in one tick, the whole module (ErrandStartsPerTick)
+    // AuctionErrandPriority (default 0 = training always first): 1 = a bot that is due both and has AuctionReady goes to the Auction House first;
+    // 2 = such a bot alternates, the kind it did not do last first (training the first time). Only a bot with AuctionReady is touched.
+    std::uint32_t AuctionPriority = 0;
 };
 
 // One bot as the module sees it this tick.
@@ -39,6 +51,10 @@ struct Bot
     bool TrainDue = false;                // a profession rank is due at a trainer (the module decides, see the profession rule)
     bool AuctionDue = false;              // sale money, mail or a full bag to take to the house
     std::vector<std::uint32_t> Cities;    // the capitals this bot may travel to (its faction's)
+    // Set by the module only when AuctionErrandPriority is on: the bot has listable goods and its bags are at or above BagFullPct, so an auction errand may
+    // come before training. AuctionCities are the capitals with an auctioneer for it (Cities are the training ones when TrainDue).
+    bool AuctionReady = false;
+    std::vector<std::uint32_t> AuctionCities;
 };
 
 struct Start
@@ -104,6 +120,7 @@ private:
     Settings _settings;
     std::unordered_map<std::uint64_t, Running> _active;
     std::unordered_map<std::uint64_t, std::uint64_t> _lastEndMs;
+    std::unordered_map<std::uint64_t, Kind> _lastKind; // the kind of a bot's last started errand (AuctionPriority 2)
     std::vector<Record> _records;
 };
 

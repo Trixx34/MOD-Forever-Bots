@@ -294,6 +294,7 @@ struct ErrandBot
     std::uint32_t Race = 0;   // the bot's race id (mounts: its race's vendor)
     std::uint64_t Copper = 0; // money carried (mounts)
     std::uint32_t MountRefusals = 0; // mount requests the core refused in a row: no riding skill or no mount (mounts)
+    std::uint32_t FreeSlots = 0;     // free bag slots (the auction errand priority)
 };
 
 struct ErrandFeed

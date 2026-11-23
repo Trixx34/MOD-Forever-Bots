@@ -58,7 +58,7 @@ Decisions Scheduler::Tick(std::uint64_t nowMs, std::vector<Bot> const& bots)
     {
         if (decisions.Starts.size() >= _settings.MaxStartsPerTick)
             break;
-        if (!bot.Available || bot.Called || Active(bot.Guid) || (!bot.TrainDue && !bot.AuctionDue) || bot.Cities.empty())
+        if (!bot.Available || bot.Called || Active(bot.Guid) || (!bot.TrainDue && !bot.AuctionDue) || (bot.Cities.empty() && bot.AuctionCities.empty()))
             continue;
         if (MinutesUsed(bot.Guid, nowMs) >= _settings.DailyMinutes)
             continue;
@@ -66,10 +66,22 @@ Decisions Scheduler::Tick(std::uint64_t nowMs, std::vector<Bot> const& bots)
         if (last != _lastEndMs.end() && nowMs < last->second + _settings.GapMinutes * kMinMs)
             continue;
 
+        // AuctionPriority 0: training first, as ever. 1 and 2 only touch a bot that is due both with goods and full bags (AuctionReady).
+        Kind what = bot.TrainDue ? Kind::kTrain : Kind::kAuction;
+        if (_settings.AuctionPriority != 0 && bot.TrainDue && bot.AuctionDue && bot.AuctionReady)
+        {
+            auto const before = _lastKind.find(bot.Guid);
+            if (_settings.AuctionPriority == 1)
+                what = Kind::kAuction;
+            else if (before != _lastKind.end() && before->second == Kind::kTrain)
+                what = Kind::kAuction;
+        }
+        std::vector<std::uint32_t> const& cities = (what == Kind::kAuction && !bot.AuctionCities.empty()) ? bot.AuctionCities : bot.Cities;
+
         bool found = false;
         std::uint32_t city = 0;
         std::uint32_t fewest = 0;
-        for (std::uint32_t candidate : bot.Cities)
+        for (std::uint32_t candidate : cities)
         {
             std::uint32_t const out = ActiveCount(candidate);
             if (out >= _settings.MaxPerCity)
@@ -84,7 +96,7 @@ Decisions Scheduler::Tick(std::uint64_t nowMs, std::vector<Bot> const& bots)
         if (!found)
             continue;
 
-        Kind const what = bot.TrainDue ? Kind::kTrain : Kind::kAuction;
+        _lastKind[bot.Guid] = what;
         _active[bot.Guid] = Running{ what, city, nowMs };
         decisions.Starts.push_back(Start{ bot.Guid, what, city });
     }
