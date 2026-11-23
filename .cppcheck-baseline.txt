@@ -1,0 +1,61 @@
+# clang-tidy accepted findings: count<TAB>check<TAB>file<TAB>message (no line numbers). Rewrite with scripts/tidy.sh --update-baseline.
+1	performance:passedByValue	src/ambient_chat.cpp	Function parameter 'limits' should be passed by const reference.
+1	warning:uninitMemberVarNoCtor	src/auction_policy.cpp	Member variable 'Ranked::Value' has no initializer.
+1	warning:uninitMemberVarNoCtor	src/bot_guilds.cpp	Member variable 'Pending::From' has no initializer.
+1	warning:uninitMemberVarNoCtor	src/bot_guilds.cpp	Member variable 'Pending::Member' has no initializer.
+1	warning:uninitMemberVarNoCtor	src/bot_policy.cpp	Member variable 'CalmRecorder::calm' has no initializer.
+1	warning:uninitMemberVarNoCtor	src/bot_policy.cpp	Member variable 'CalmRecorder::on' has no initializer.
+1	error:containerOutOfBounds	src/bot_policy_features.cpp	Out of bounds access in expression 'zones[homeAt]'
+1	performance:passedByValue	src/bot_policy_features.cpp	Function parameter 'spots' should be passed by const reference.
+1	error:iterators1	src/bot_policy_internal.h	Same iterator is used with different containers 'avoidUntil' and 'counters'.
+1	warning:uninitMemberVarNoCtor	src/bot_policy_internal.h	Member variable 'BotTurn::i' has no initializer.
+1	warning:uninitMemberVarNoCtor	src/bot_policy_internal.h	Member variable 'BotTurn::nowMs' has no initializer.
+1	warning:uninitMemberVarNoCtor	src/bot_policy_internal.h	Member variable 'DecideTick::actions' has no initializer.
+1	warning:uninitMemberVarNoCtor	src/bot_policy_internal.h	Member variable 'DecideTick::indexOf' has no initializer.
+1	warning:uninitMemberVarNoCtor	src/bot_policy_internal.h	Member variable 'DecideTick::leaderOf' has no initializer.
+1	warning:uninitMemberVarNoCtor	src/bot_policy_internal.h	Member variable 'DecideTick::membersOf' has no initializer.
+1	warning:uninitMemberVarNoCtor	src/bot_policy_internal.h	Member variable 'DecideTick::nowMs' has no initializer.
+1	warning:uninitMemberVarNoCtor	src/bot_policy_internal.h	Member variable 'DecideTick::present' has no initializer.
+1	warning:uninitMemberVarNoCtor	src/bot_policy_internal.h	Member variable 'DecideTick::tankLed' has no initializer.
+1	warning:uninitMemberVarNoCtor	src/bot_policy_internal.h	Member variable 'RouteLeg::killedNow' has no initializer.
+1	warning:uninitMemberVarNoCtor	src/bot_policy_internal.h	Member variable 'RouteLeg::routeBoss' has no initializer.
+1	warning:uninitMemberVarNoCtor	src/bot_policy_internal.h	Member variable 'RouteLeg::routeEvents' has no initializer.
+1	warning:uninitMemberVarNoCtor	src/bot_policy_internal.h	Member variable 'RouteLeg::routePoints' has no initializer.
+1	error:returnDanglingLifetime	src/bot_policy_turn_cast.cpp	Returning pointer that will be invalid when returning.
+1	error:danglingTemporaryLifetime	src/bot_policy_turn_life.cpp	Using pointer that is a temporary.
+1	error:returnDanglingLifetime	src/bot_policy_turn_target.cpp	Returning pointer to local variable 'units' that will be invalid when returning.
+1	error:returnDanglingLifetime	src/bot_policy_units.cpp	Returning pointer to local variable 'units' that will be invalid when returning.
+1	performance:passedByValue	src/bot_telemetry.h	Function parameter 'options' should be passed by const reference.
+1	warning:uninitMemberVarNoCtor	src/combat_rotation.h	Member variable 'Row::MaxRange' has no initializer.
+1	warning:uninitMemberVarNoCtor	src/combat_rotation.h	Member variable 'Row::MinRange' has no initializer.
+1	warning:uninitMemberVarNoCtor	src/combat_rotation.h	Member variable 'Row::OnTarget' has no initializer.
+1	warning:uninitMemberVarNoCtor	src/combat_rotation.h	Member variable 'Row::Spell' has no initializer.
+1	performance:passedByValue	src/dungeon_data.cpp	Function parameter 'text' should be passed by const reference.
+1	warning:uninitMemberVarNoCtor	src/main_internal.h	Member variable 'RunContext::StartMs' has no initializer.
+1	warning:uninitMemberVarNoCtor	src/main_internal.h	Member variable 'RunContext::StartSecOfDay' has no initializer.
+1	performance:passedByValue	src/path_variety.cpp	Function parameter 'spots' should be passed by const reference.
+1	warning:uninitMemberVarNoCtor	src/whisper_matrix.cpp	Member variable 'Phrases::Key' has no initializer.
+1	warning:nullPointerRedundantCheck	tests/dungeon_files_test.cpp	Either the condition 'ok.Root.Find("a")' is redundant or there is possible null pointer dereference: ok.Root.Find("a").
+1	warning:uninitMemberVarNoCtor	tests/dungeon_files_test.cpp	Member variable 'CutOff::After' has no initializer.
+1	warning:uninitMemberVarNoCtor	tests/dungeon_files_test.cpp	Member variable 'CutOff::BX' has no initializer.
+1	warning:uninitMemberVarNoCtor	tests/dungeon_files_test.cpp	Member variable 'CutOff::BY' has no initializer.
+1	warning:uninitMemberVarNoCtor	tests/dungeon_files_test.cpp	Member variable 'CutOff::BZ' has no initializer.
+1	warning:uninitMemberVarNoCtor	tests/dungeon_files_test.cpp	Member variable 'CutOff::BackId' has no initializer.
+1	warning:uninitMemberVarNoCtor	tests/dungeon_files_test.cpp	Member variable 'CutOff::Boss' has no initializer.
+1	warning:uninitMemberVarNoCtor	tests/dungeon_files_test.cpp	Member variable 'CutOff::BridgeId' has no initializer.
+1	warning:uninitMemberVarNoCtor	tests/dungeon_files_test.cpp	Member variable 'CutOff::Map' has no initializer.
+1	performance:passedByValue	tests/party_planner_test.cpp	Function parameter 'spells' should be passed by const reference.
+1	performance:passedByValue	tests/policy_test_01.cpp	Function parameter 'options' should be passed by const reference.
+1	performance:passedByValue	tests/policy_test_09.cpp	Function parameter 'options' should be passed by const reference.
+1	performance:stlIfStrFind	tests/policy_test_09.cpp	Inefficient usage of string::find() in condition; string::starts_with() could be faster.
+1	performance:passedByValue	tests/policy_test_support.h	Function parameter 'nearby' should be passed by const reference.
+1	warning:containerOutOfBounds	tests/rotation_test.cpp	Either the condition 'warrior.empty()' is redundant or expression 'warrior.front()' causes access out of bounds.
+1	performance:passedByValue	tests/scale_test.cpp	Function parameter 'unit' should be passed by const reference.
+1	performance:passedByValue	tests/scenario_test_support.h	Function parameter 'plan' should be passed by const reference.
+1	performance:passedByValue	tests/social_test.cpp	Function parameter 'nearby' should be passed by const reference.
+3	performance:stlIfStrFind	tests/social_test.cpp	Inefficient usage of string::find() in condition; string::starts_with() could be faster.
+1	performance:passedByValue	tests/telemetry_test.cpp	Function parameter 'nearby' should be passed by const reference.
+1	performance:passedByValue	tests/telemetry_test.cpp	Function parameter 'options' should be passed by const reference.
+2	performance:passedByValue	tests/trade_ads_test.cpp	Function parameter 'bot' should be passed by const reference.
+1	performance:passedByValue	tests/trade_ads_test.cpp	Function parameter 'options' should be passed by const reference.
+1	performance:passedByValue	tests/whisper_matrix_test.cpp	Function parameter 'bot' should be passed by const reference.
