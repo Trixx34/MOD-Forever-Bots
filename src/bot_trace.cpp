@@ -22,7 +22,11 @@ std::string LocalStamp()
     std::time_t const seconds = std::chrono::system_clock::to_time_t(now);
     long const ms = long(std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count() % 1000);
     std::tm local{};
+#ifdef _WIN32
+    localtime_s(&local, &seconds);
+#else
     localtime_r(&seconds, &local);
+#endif
     char buffer[80];
     std::snprintf(buffer, sizeof(buffer), "%04d-%02d-%02dT%02d:%02d:%02d.%03ld", local.tm_year + 1900, local.tm_mon + 1, local.tm_mday, local.tm_hour, local.tm_min,
                   local.tm_sec, ms);
