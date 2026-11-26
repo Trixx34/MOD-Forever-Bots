@@ -40,13 +40,16 @@ struct Settings
     // AuctionErrandPriority (default 0 = training always first): 1 = a bot that is due both and has AuctionReady goes to the Auction House first;
     // 2 = such a bot alternates, the kind it did not do last first (training the first time). Only a bot with AuctionReady is touched.
     std::uint32_t AuctionPriority = 0;
+    // ErrandKeepInterrupted (off by default): a running errand goes on through a fight, a flight or a death (the walk resumes after). Without it, any of
+    // these ends the errand as unavailable. A bot that leaves the view, a call and the time limit still end it.
+    bool KeepInterrupted = false;
 };
 
 // One bot as the module sees it this tick.
 struct Bot
 {
     std::uint64_t Guid = 0;
-    bool Available = false;               // online, alive, out of combat: an errand may start or go on
+    bool Available = false;               // alive, out of combat, not in flight: an errand may start (and go on, without KeepInterrupted)
     bool Called = false;                  // called to a party or a dungeon: an errand is abandoned
     bool TrainDue = false;                // a profession rank is due at a trainer (the module decides, see the profession rule)
     bool AuctionDue = false;              // sale money, mail or a full bag to take to the house

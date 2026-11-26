@@ -43,7 +43,7 @@ Decisions Scheduler::Tick(std::uint64_t nowMs, std::vector<Bot> const& bots)
             Close(guid, nowMs, EndReason::kUnavailable, decisions.Ends);
         else if (bot->Called)
             Close(guid, nowMs, EndReason::kCalled, decisions.Ends);
-        else if (!bot->Available)
+        else if (!bot->Available && !_settings.KeepInterrupted)
             Close(guid, nowMs, EndReason::kUnavailable, decisions.Ends);
         else if (nowMs - errand.StartMs >= _settings.MaxMinutes * kMinMs)
             Close(guid, nowMs, EndReason::kTimeLimit, decisions.Ends);

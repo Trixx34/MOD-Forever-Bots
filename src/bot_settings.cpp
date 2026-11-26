@@ -1305,6 +1305,7 @@ BotSettings ParseOneConfig(std::unordered_map<std::string, std::string> const& c
     ReadKey(config, "SellPerVisit", 1, 20, settings.Sell.MaxSalesPerVisit, warnings);
     ReadBool(config, "SellVendorGoods", settings.Sell.SellGoods, warnings);
     ReadBool(config, "Errands", settings.Errand.Enabled, warnings);
+    ReadBool(config, "ErrandKeepInterrupted", settings.Errand.KeepInterrupted, warnings);
     ReadBool(config, "RidingTraining", settings.RidingTraining, warnings);
     if (auto const it = config.find("RidingRankFile"); it != config.end())
         settings.RidingRankFile = it->second;

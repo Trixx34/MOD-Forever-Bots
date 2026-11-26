@@ -404,6 +404,12 @@ void SetUpErrands(forever_module::ModuleClient& client, BotSettings& settings, s
                 b.Guid = bot.Guid;
                 b.Available = bot.Available;
                 b.Called = bot.Called;
+                // ErrandKeepInterrupted: a bot in a fight, in flight or dead only keeps its errand; nothing is planned for it (a mount trip keeps its plan).
+                if (!bot.Available && settings.Errand.KeepInterrupted)
+                {
+                    bots.push_back(std::move(b));
+                    continue;
+                }
                 if (bot.TrainDue && bot.Side != 0)
                 {
                     // Only the capitals of the bot's faction that have a trainer for its skill: a start always has a trainer to walk to.

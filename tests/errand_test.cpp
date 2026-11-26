@@ -74,6 +74,28 @@ void BusyOrCalledBotsDoNotStart()
     CHECK(decisions.Starts.empty());
 }
 
+void KeepInterruptedOutlivesAFight()
+{
+    for (bool keep : { false, true })
+    {
+        Settings settings = On();
+        settings.KeepInterrupted = keep;
+        Scheduler scheduler(settings);
+        CHECK(scheduler.Tick(0, { Free(10, true, false) }).Starts.size() == 1);
+        Bot fighting = Free(10, true, false);
+        fighting.Available = false;
+        Decisions const decisions = scheduler.Tick(1000, { fighting });
+        CHECK(scheduler.Active(10) == keep);
+        CHECK(decisions.Ends.empty() == keep);
+        CHECK(decisions.Starts.empty());
+        if (keep)
+        {
+            fighting.Called = true; // a call still ends it
+            CHECK(scheduler.Tick(2000, { fighting }).Ends.size() == 1);
+        }
+    }
+}
+
 void OffMeansNoStarts()
 {
     Settings settings;
@@ -217,6 +239,7 @@ int main()
     TrainingBeforeTheHouse();
     NothingDueNothingStarts();
     BusyOrCalledBotsDoNotStart();
+    KeepInterruptedOutlivesAFight();
     OffMeansNoStarts();
     SpreadsOverTheCapitals();
     StartsPerTickAreCapped();

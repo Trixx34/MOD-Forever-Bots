@@ -586,11 +586,11 @@ void main_detail::PumpTier2(forever_module::Tier2Session& session, std::atomic<b
                         buys.push_back(ErrandFeed::Buy{ bot.guid, *request });
                     if (ErrandOutcome const outcome = policy.TakeErrandOutcome(bot.guid); outcome != ErrandOutcome::kNone)
                         outcomes.emplace_back(bot.guid, outcome);
-                    if ((extras.Alts && extras.Alts->Has(bot.guid)) || bot.life_state != 0)
+                    if ((extras.Alts && extras.Alts->Has(bot.guid)) || (bot.life_state != 0 && !settings.Errand.KeepInterrupted))
                         continue;
                     ErrandBot entry;
                     entry.Guid = bot.guid;
-                    entry.Available = bot.in_combat == 0 && bot.in_flight == 0;
+                    entry.Available = bot.life_state == 0 && bot.in_combat == 0 && bot.in_flight == 0;
                     entry.Called = bot.group_role != 0 || bot.group_leader_guid != 0;
                     int const slot = errand::TrainingDueSlot(bot.profession_skill, bot.profession_value, bot.profession_max);
                     entry.TrainDue = slot >= 0;
