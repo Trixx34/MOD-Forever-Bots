@@ -575,6 +575,13 @@ constexpr std::size_t kLoopBreakUnsafeMax = 256;        // ... graveyards marked
 constexpr std::uint64_t kLoopBreakGhostWaitMs = 300000; // no safe graveyard: the ghost waits this long (the killer may leash, move or despawn), then revives
 constexpr std::uint32_t kLoopBreakHighLevels = 3;       // no spirit healer revive with a live hostile this many levels above the bot ...
 constexpr float kLoopBreakHostileYards = 40.0f;         // ... this close to the ghost at the graveyard
+constexpr float kDeathPlaceYards = 200.0f;              // DeathPlaceMemory: no grind spot this near a remembered place ...
+constexpr float kDeathPlaceSameYards = 50.0f;
+constexpr std::uint64_t kDeathPlaceMs = 14400000;       // ... for four hours
+constexpr std::size_t kDeathPlaceMax = 6;
+constexpr float kTravelGainYards = 40.0f;               // TravelGraph: each leg must shorten the known way by this
+constexpr std::uint32_t kTravelLegsMax = 60;
+constexpr std::uint64_t kTravelMs = 300000;             // a detour leg is kept this long
 constexpr std::uint64_t kLoopBreakEscapeMs = 60000;     // after the revive the bot is moved away from the loop within this (it waits out a fight)
 // The survival system (2026-11-19, doc/survival.md). SafeRevive: a live hostile this many yards from the revive point (and SafeRevive.LevelMargin levels above the bot)
 // holds the revive; a graveyard held for a hostile is unsafe for that level this long, one held for the danger map that long; a ghost waits at most this long.

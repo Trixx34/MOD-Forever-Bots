@@ -1019,6 +1019,8 @@ Module.forever-bots.TelemetrySummarySec = 60
 # ErrandOwnWalkOnly = 0              # (0|1) 1: only a no-route answer to the errand's (or vendor visit's) own walk fails it or moves on the auction stand point.
 #                                      0: a refused flee, quest or kite move made while the errand is set counts too.
 # ErrandNearCity = 0                 # (0|1) 1: a training or riding trip goes to the capital with the nearest trainer on the bot's map; none there, no trip.
+# TravelGraph = 0                    # (0|1) 1: a long walk with no route goes leg by leg along ways bots have walked since the start (doc/travel-graph.md).
+# DeathPlaceMemory = 0               # (0|1) 1: no grind spot within 200 yards of where the bot kept dying, for 4 hours (doc/level-safe.md).
 # AuctionErrandPriority = 0          # (0..2) 0: training before the Auction House always. 1: a bot due both with listable goods and bags at AuctionBagFullPct goes to the house first.
 #                                      2: such a bot alternates (training, house, ...). See doc/auction-errand-priority.md
 # ErrandTrainerFile = data/errand_trainers.txt   # the trainer table

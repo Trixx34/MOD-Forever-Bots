@@ -672,6 +672,25 @@ void ASkyborneLoopStaysOnItsMap()
     CHECK(!offMap);
 }
 
+// DeathPlaceMemory: after a loop break at x = 0 the grind spots at x = 0 and 100 are left out of the bot's choice.
+void ADeathPlaceIsNoGrindSpot()
+{
+    for (bool on : { true, false })
+    {
+        std::vector<std::string> events;
+        PolicyOptions options = BreakerOptions(&events, true);
+        options.DeathPlaceMemory = on;
+        BotPolicy policy(options);
+        for (std::uint64_t at : { 100000u, 160000u, 220000u })
+            DieAt(policy, 0.0f, 3, Creature(5.0f, 3, 999), at);
+        policy.Decide(At(0.0f, 3), 223000);
+        CHECK(Logged(events, "death_loop_break: bot=42 level=3 map=0 pos=0,0 entry=999 deaths=3 stage=detect"));
+        CHECK((Count(events, "death_place_skip: bot=42") != 0) == on);
+        if (on)
+            CHECK(Count(events, "to=0,0") == 0 && Count(events, "to=100,0") == 0);
+    }
+}
+
 void TheBreakerKeyIsOffByDefault()
 {
     std::vector<std::string> warnings;
@@ -705,6 +724,7 @@ int main()
     AGraveyardHeldByAHighHostileIsPassedOver();
     WithNoGraveyardTheGhostWaitsThenTheBotIsMoved();
     ASkyborneLoopStaysOnItsMap();
+    ADeathPlaceIsNoGrindSpot();
     TheBreakerKeyIsOffByDefault();
     if (failures == 0)
         std::printf("level_safe_test: all checks passed\n");

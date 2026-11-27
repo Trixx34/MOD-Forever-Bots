@@ -429,6 +429,8 @@ void LoadPolicyTables(PolicyOptions& policyOptions, BotSettings& settings)
     policyOptions.LevelSafe.EscapeCooldownMs = std::uint64_t(settings.LevelSafeEscapeCooldownSec) * 1000;
     policyOptions.LevelSafe.LogThrottleMs = std::uint64_t(settings.LevelSafeLogThrottleSec) * 1000;
     policyOptions.DeathLoopBreaker = settings.DeathLoopBreaker;
+    policyOptions.DeathPlaceMemory = settings.DeathPlaceMemory;
+    policyOptions.TravelGraph = settings.TravelGraph;
     policyOptions.SafeRevive.Enabled = settings.SafeRevive;
     policyOptions.SafeRevive.LevelMargin = settings.SafeReviveLevelMargin;
     policyOptions.FightRisk.Enabled = settings.FightRiskRetreat;

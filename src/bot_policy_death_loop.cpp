@@ -76,6 +76,7 @@ void BotPolicy::DeathLoopBreakNote(DecideTick& tick, BotTurn& turn, std::uint32_
     state.LoopBreakMap = bot.map_id;
     state.LoopBreakX = bot.pos_x;
     state.LoopBreakY = bot.pos_y;
+    NoteDeathPlace(state, bot.map_id, bot.pos_x, bot.pos_y, nowMs);
     LogEvent("death_loop_break: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id) + " pos=" +
              Pos(bot.pos_x, bot.pos_y) + " entry=" + std::to_string(killerEntry) + " deaths=" + std::to_string(here) + " stage=detect");
 }

@@ -694,6 +694,8 @@ BotSettings ParseOneConfig(std::unordered_map<std::string, std::string> const& c
     ReadKey(config, "LevelSafeEscapeCooldownSec", 60, 86400, settings.LevelSafeEscapeCooldownSec, warnings);
     ReadKey(config, "LevelSafeLogThrottleSec", 0, 3600, settings.LevelSafeLogThrottleSec, warnings);
     ReadBool(config, "DeathLoopBreaker", settings.DeathLoopBreaker, warnings);
+    ReadBool(config, "DeathPlaceMemory", settings.DeathPlaceMemory, warnings);
+    ReadBool(config, "TravelGraph", settings.TravelGraph, warnings);
     ReadBool(config, "SafeRevive", settings.SafeRevive, warnings);
     ReadKey(config, "SafeReviveLevelMargin", 1, 20, settings.SafeReviveLevelMargin, warnings);
     ReadBool(config, "FightRiskRetreat", settings.FightRiskRetreat, warnings);

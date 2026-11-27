@@ -1231,6 +1231,8 @@ void BotPolicy::TurnSendMove(DecideTick& tick, BotTurn& turn)
         wanted.Dest.Y = moved.Y;
     }
 
+    TravelApply(state, bot, wanted, nowMs);
+
     if (Opt().OnEvent && scenario.RouteMap != 0 && partyLeader != 0 && (wanted.Type == ActionType::kMoveTo || (wanted.Type == ActionType::kFollow && partyLeaderBot)) &&
         nowMs - state.MoveWhyLoggedMs >= 5000 && (wanted.Type == ActionType::kFollow || std::hypot(wanted.Dest.X - state.MoveWhyDest.X, wanted.Dest.Y - state.MoveWhyDest.Y) > 8.0f))
     {

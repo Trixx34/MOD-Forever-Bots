@@ -228,6 +228,10 @@ struct BotSettings
     // graveyard known: the ghost waits up to 5 minutes, revives, and is moved to a grind spot at once (out of combat). Never off its map (Skyborne 2991). Event
     // death_loop_break. The graveyard and grind spot teleports need Bot.Actions.Teleport = 1 in the core (the grind spot move walks when refused).
     bool DeathLoopBreaker = false;
+    // DeathPlaceMemory (default 0; doc/level-safe.md): no grind spot within 200 yards of where the bot kept dying, for 4 hours. Event death_place_skip.
+    bool DeathPlaceMemory = false;
+    // TravelGraph (default 0; doc/travel-graph.md): a long walk with no route goes leg by leg along ways bots have walked since the start. Event travel_detour.
+    bool TravelGraph = false;
     // The survival system (2026-11-19, doc/survival.md; every key default 0 = today's behaviour).
     // SafeRevive: a solo ghost never takes the spirit healer or reclaims its corpse with a live hostile SafeReviveLevelMargin (default 3, 1..20) or more levels above it
     // within 40 yards, nor at a place the danger map counts as dangerous for its level band; it is moved as a ghost to another graveyard of its map, or waits (at most

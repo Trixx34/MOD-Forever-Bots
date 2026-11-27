@@ -1105,6 +1105,8 @@ void BotPolicy::DecideBot(DecideTick& tick, std::size_t i)
         LogEvent("level_up: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " from=" + std::to_string(turn.state.SeenLevel) + " map=" +
                  std::to_string(bot.map_id));
     turn.state.SeenLevel = bot.level;
+    if (Opt().TravelGraph) // learned from every living bot, on every look (travel_graph.h)
+        _travel.Observe(bot.guid, bot.map_id, { bot.pos_x, bot.pos_y, bot.pos_z }, tick.nowMs, bot.life_state == 0);
     // WalkDecideEvery: a calm walker (calm_walk.h) takes its full turn on one tick in N. The turn that ends decides the next one: Gate.Ran records whether the bot was calm
     // and the last result sequence it had seen, so a new result or any change in the snapshot ends the skipping at once.
     calm_walk::Facts const calmFacts = CalmFactsOf(turn.state, bot, tick.nowMs);

@@ -254,6 +254,7 @@ void BotPolicy::DeadRecord(DecideTick& tick, BotTurn& turn)
                 state.AvoidAreaY = bot.pos_y;
                 state.AvoidAreaUntilMs = nowMs + Opt().DeathAreaAvoidMs;
                 state.AreaEscapeRetryMs = 0;
+                NoteDeathPlace(state, bot.map_id, bot.pos_x, bot.pos_y, nowMs);
                 LogEvent("death_area: bot=" + std::to_string(bot.guid) + " level=" + std::to_string(bot.level) + " map=" + std::to_string(bot.map_id) + " pos=" +
                          std::to_string(int(bot.pos_x)) + "," + std::to_string(int(bot.pos_y)) + " deaths=" + std::to_string(here) + " avoid_s=" +
                          std::to_string(Opt().DeathAreaAvoidMs / 1000));

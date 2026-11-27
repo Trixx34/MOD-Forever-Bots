@@ -17,6 +17,7 @@ std::vector<std::size_t> BotPolicy::GrindSpotsForBot(BotState& state, BotSnapsho
     }
     if (Opt().DangerMap.Enabled && !spots.empty())
         spots = DangerFilterSpots(bot, std::move(spots), nowMs);
+    spots = DeathPlaceFilter(state, bot, std::move(spots), nowMs);
     if (Opt().PathVariety.Enabled && Opt().PathZones && spots.size() > 1)
         spots = PathVarySpots(state, bot, std::move(spots));
     if (spots.empty() && Opt().OnEvent)

@@ -49,6 +49,7 @@
 #include "combat_rotation.h"
 #include "grind_data.h"
 #include "path_variety.h"
+#include "travel_graph.h"
 #include "reputation_plan.h"
 #include "level_dungeon.h"
 #include "ground_avoid.h"
@@ -169,6 +170,18 @@ struct BotDeathSpot
     float X = 0.0f;
     float Y = 0.0f;
     std::uint64_t AtMs = 0;
+};
+
+// TravelGraph: a long walk taken leg by leg along a known way (bot_policy_travel.cpp).
+struct BotTravel
+{
+    bool Active = false;
+    std::uint32_t Map = 0;
+    Point Final;
+    Point Via;
+    float Remaining = 0.0f;
+    std::uint32_t Legs = 0;
+    std::uint64_t UntilMs = 0;
 };
 
 // DeathLoopBreaker: one recent death of a solo bot with the creature entry that killed it (bot_policy_death_loop.cpp).
@@ -468,6 +481,10 @@ struct PolicyOptions
     // hostile kLoopBreakHighLevels above it; the graveyard of the loop is unsafe for that level for kLoopBreakUnsafeMs (the level-safe choice skips it). No safe graveyard
     // known: the ghost waits (kLoopBreakGhostWaitMs), then revives and is moved to a grind spot at once (out of combat). Event death_loop_break. Off here (the tests).
     bool DeathLoopBreaker = false;
+    // DeathPlaceMemory (config, default off; bot_policy_travel.cpp): a bot remembers where it kept dying (death area, death loop) and picks no grind spot near it for a while.
+    bool DeathPlaceMemory = false;
+    // TravelGraph (config, default off; travel_graph.h): a long walk with no route is taken leg by leg along ways bots have walked.
+    bool TravelGraph = false;
     // The survival system (2026-11-19, doc/survival.md; all off here and in the module settings). SafeRevive (bot_policy_safe_revive.cpp): a solo ghost never takes the
     // spirit healer or reclaims its corpse with a live hostile LevelMargin or more levels above it within kSafeReviveHostileYards, nor at a place the danger map counts as
     // dangerous for its level band; it is moved as a ghost to another graveyard of its map, or waits (kSafeReviveMaxWaitMs at most). FightRisk (fight_risk.h,
@@ -1399,6 +1416,9 @@ private:
         bool LevelSafeJudged = false;                    // this death was judged (once per death)
         std::uint32_t LevelSafeYardMap = 0;
         Point LevelSafeYard;
+        std::vector<BotDeathSpot> DeathPlaces;           // DeathPlaceMemory: where the bot kept dying (AtMs: when noted)
+        std::uint64_t DeathPlaceLoggedMs = 0;
+        BotTravel Travel;                                // TravelGraph: the detour of a long walk
         // DeathLoopBreaker (bot_policy_death_loop.cpp): the recent deaths with their killer, and this death's loop break.
         std::vector<BotLoopDeath> LoopDeaths;            // newest last, trimmed to kLoopBreakWindowMs and kLoopBreakMemory
         bool LoopBreak = false;                          // this death is the kLoopBreakDeaths-th to one killer at one place: the loop is broken
@@ -1530,6 +1550,11 @@ private:
     void DeathLoopBreakNote(DecideTick& tick, BotTurn& turn, std::uint32_t killerEntry);
     bool DeathLoopBreakGhost(DecideTick& tick, BotTurn& turn);
     void DeathLoopBreakEscape(DecideTick& tick, BotTurn& turn);
+    // bot_policy_travel.cpp (TravelGraph, DeathPlaceMemory).
+    bool TravelDetour(BotState& state, forever_module::BotSnapshot const& bot, std::uint64_t nowMs);
+    void TravelApply(BotState& state, forever_module::BotSnapshot const& bot, Decision& wanted, std::uint64_t nowMs) const;
+    void NoteDeathPlace(BotState& state, std::uint32_t map, float x, float y, std::uint64_t nowMs) const;
+    std::vector<std::size_t> DeathPlaceFilter(BotState& state, forever_module::BotSnapshot const& bot, std::vector<std::size_t> spots, std::uint64_t nowMs);
     bool YardUnsafe(std::uint32_t map, float x, float y, std::uint32_t level, std::uint64_t nowMs) const;
     void MarkYardUnsafe(std::uint32_t map, float x, float y, std::uint32_t level, std::uint64_t nowMs, std::uint64_t forMs = 0);
     // SafeRevive (bot_policy_safe_revive.cpp): true when a solo ghost must not revive at `at` now (`what`: spirit_healer or reclaim); it then has been sent on (another
@@ -1799,6 +1824,7 @@ private:
         std::uint32_t Level = 0;     // unsafe for bots of this level and below
         std::uint64_t UntilMs = 0;
     };
+    travel_graph::Graph _travel;            // TravelGraph: the ways bots have walked
     std::vector<UnsafeYard> _unsafeYards;   // DeathLoopBreaker: graveyards where a loop was broken, for kLoopBreakUnsafeMs
     level_safe::DeathTally _deathTally;
     // The survival system: the shared danger map (DangerMap, SafeRevive) and the throttle of its skip lines.

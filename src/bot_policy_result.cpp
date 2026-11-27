@@ -685,8 +685,10 @@ void BotPolicy::PartialChainTick(BotState& state, BotSnapshot const& bot, std::u
         state.Last.reset(); // the move is the same, so it would not be sent again otherwise
         return;
     }
-    // The leg went nowhere: the route is really missing. The walk is refused now, as it would have been at the first answer.
+    // The leg went nowhere: the route is really missing. The walk is refused now, as it would have been at the first answer, unless a known way leads on.
     state.PartialActive = false;
+    if (TravelDetour(state, bot, nowMs))
+        return;
     if (Opt().OnEvent)
         Opt().OnEvent("walk_chain_ended: bot=" + std::to_string(bot.guid) + " legs=" + std::to_string(state.PartialLegs) + " to_dest=" + std::to_string(int(toDest)));
     ++state.RouteNoRoute;

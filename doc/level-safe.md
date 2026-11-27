@@ -94,3 +94,10 @@ The breaker acts while the bot is a ghost, which the killer cannot follow and th
 Every move stays on the bot's map: graveyards and grind spots are chosen on the map the ghost is on, so a Skyborne bot never leaves map 2991. The teleports need `Bot.Actions.Teleport = 1`, as the ghost fallback already does. With the key off nothing changes (graveyards are remembered only when `LevelSafeGraveyard` or the breaker is on).
 
 Sim read-out for the breaker: deaths per bot at one spot (within 150 yards, same killer), `death_loop_break` counts per stage (`detect` should be followed by `yard` or `own_yard`, rarely `wait`), repeat deaths at the same spot within 5 minutes after a `stage=yard` (a failure), `level_safe_yard reason=graveyard_unsafe` lines, and the `deaths_top` top-10 share (arm C peaked at 23.8%).
+
+## DeathPlaceMemory (2026-11-27)
+
+Key `DeathPlaceMemory` (default 0). The death area only holds walks that end inside it, and the grind spot choice did not look at it: sim bot 397 was
+sent to a spot 70 yards from where it had just been marked and died there to the same creature again. With the key, a bot remembers up to 6 places
+(death area and death loop break) for 4 hours and picks no grind spot within 200 yards of one; with no other spot left, the choice stays as it was.
+Event `death_place_skip` (at most once a minute per bot).
