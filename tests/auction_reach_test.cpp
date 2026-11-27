@@ -265,6 +265,54 @@ void WithoutTheKeyNoRouteFailsTheErrandAsBefore()
     CHECK(!walk.moves.empty() && walk.moves.front().dest_x == 3.7f && walk.moves.front().dest_z == -56.8f);
 }
 
+// A training errand; after its first walk the bot dies and every walk it is then sent (the ghost's walk to its corpse) is refused.
+ErrandOutcome RefusedGhostWalkDuringAnErrand(bool ownWalkOnly)
+{
+    PolicyOptions options;
+    options.ErrandOwnWalkOnly = ownWalkOnly;
+    BotPolicy policy(options);
+    WorldTickSnapshotView view = View(1, 0, {});
+    BotSnapshot& bot = view.bots[0];
+    policy.Decide(view, 500);
+    ErrandOrder order;
+    order.Map = 0;
+    order.Dest = Point{ 30.0f, 0.0f, 0.0f };
+    policy.StartErrand(kBot, order);
+    std::size_t errandWalks = 0;
+    for (BotAction const& action : policy.Decide(view, 1000))
+        errandWalks += action.type == ActionType::kMoveTo && action.dest_x == 30.0f;
+    CHECK(errandWalks == 1);
+    bot.life_state = 2;
+    bot.corpse_valid = 1;
+    bot.corpse_map = 0;
+    bot.corpse_x = 100.0f;                  // under the length a refused walk is chained at
+    std::uint64_t sequence = 0;
+    std::size_t refused = 0;
+    for (std::uint64_t now = 2000; now <= 30000; now += 1000)
+    {
+        bool moved = false;
+        for (BotAction const& action : policy.Decide(view, now))
+            moved = moved || (action.type == ActionType::kMoveTo && action.dest_x != 30.0f);
+        if (ErrandOutcome const outcome = policy.TakeErrandOutcome(kBot); outcome != ErrandOutcome::kNone)
+            return outcome;
+        if (moved)
+        {
+            ++refused;
+            bot.last_action_sequence = ++sequence;
+            bot.last_action_type = uint8_t(ActionType::kMoveTo);
+            bot.last_action_status = BotActionStatus::kNoRoute;
+        }
+    }
+    CHECK(refused != 0);
+    return ErrandOutcome::kNone;
+}
+
+void ARefusedWalkThatIsNotTheErrandsOwnLeavesTheErrandRunning()
+{
+    CHECK(RefusedGhostWalkDuringAnErrand(false) == ErrandOutcome::kFailed);   // as before
+    CHECK(RefusedGhostWalkDuringAnErrand(true) == ErrandOutcome::kNone);
+}
+
 void TheLiveAuctioneersHeightIsTheOneWalkedTo()
 {
     // The snapshot's spawn says z -56.8; the creature the bot sees stands at -55.2 (its real place). The walk and the reach use the live one; a bot standing
@@ -292,6 +340,7 @@ int main()
     TheErrandWalksToAStandPointAndNotIntoTheCounter();
     NoRouteToAStandPointTriesTheNextAndOnlyTheLastFailsTheErrand();
     WithoutTheKeyNoRouteFailsTheErrandAsBefore();
+    ARefusedWalkThatIsNotTheErrandsOwnLeavesTheErrandRunning();
     TheLiveAuctioneersHeightIsTheOneWalkedTo();
     if (failures == 0)
         std::printf("auction_reach_test: all checks passed\n");

@@ -1016,6 +1016,9 @@ Module.forever-bots.TelemetrySummarySec = 60
 # ErrandPerCity = 2                  # (1..20) bots out on an errand to one capital at once
 # ErrandStartsPerTick = 2            # (1..10) errands started in one tick, the whole module
 # ErrandKeepInterrupted = 0          # (0|1) 1: a running errand goes on through a fight, a flight or a death. 0: any of these ends it (reason=unavailable).
+# ErrandOwnWalkOnly = 0              # (0|1) 1: only a no-route answer to the errand's (or vendor visit's) own walk fails it or moves on the auction stand point.
+#                                      0: a refused flee, quest or kite move made while the errand is set counts too.
+# ErrandNearCity = 0                 # (0|1) 1: a training or riding trip goes to the capital with the nearest trainer on the bot's map; none there, no trip.
 # AuctionErrandPriority = 0          # (0..2) 0: training before the Auction House always. 1: a bot due both with listable goods and bags at AuctionBagFullPct goes to the house first.
 #                                      2: such a bot alternates (training, house, ...). See doc/auction-errand-priority.md
 # ErrandTrainerFile = data/errand_trainers.txt   # the trainer table

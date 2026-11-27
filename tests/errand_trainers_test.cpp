@@ -122,6 +122,23 @@ void TrainerChoice()
     CHECK(!ChooseTrainer(t, kAlliance, 171, kIronforge, 0, 0.0f, 0.0f, 0.0f));
 }
 
+void NearCityIsTheNearestOnTheBotsMap()
+{
+    std::vector<std::string> errors;
+    std::vector<Trainer> const t = ParseTrainerTable(
+        "1|Stormwind|0|1|164|100 0 0|Near|X|Y|10\n"
+        "1|Ironforge|0|2|164|900 0 0|Far|X|Y|11\n"
+        "1|Darnassus|1|3|164|5 0 0|Other map|X|Y|12\n"
+        "2|Undercity|0|4|164|1 0 0|Horde|X|Y|13\n",
+        errors);
+    CHECK(errors.empty() && t.size() == 4);
+    CHECK((NearestCity(t, kAlliance, 164, 0, 0.0f, 0.0f, 0.0f) == std::vector<std::uint32_t>{ kStormwind }));
+    CHECK((NearestCity(t, kAlliance, 164, 0, 800.0f, 0.0f, 0.0f) == std::vector<std::uint32_t>{ kIronforge }));
+    CHECK((NearestCity(t, kAlliance, 164, 1, 800.0f, 0.0f, 0.0f) == std::vector<std::uint32_t>{ kDarnassus }));
+    CHECK(NearestCity(t, kAlliance, 164, 530, 0.0f, 0.0f, 0.0f).empty());
+    CHECK(NearestCity(t, kAlliance, 171, 0, 0.0f, 0.0f, 0.0f).empty());
+}
+
 void ShippedTableParses()
 {
     std::ifstream in(FOREVER_ERRAND_TRAINERS_FILE);
@@ -149,6 +166,7 @@ int main()
     CityNamesAreMapped();
     TrainingDueRule();
     TrainerChoice();
+    NearCityIsTheNearestOnTheBotsMap();
     ShippedTableParses();
     if (failures == 0)
         std::printf("errand_trainers_test: all passed\n");

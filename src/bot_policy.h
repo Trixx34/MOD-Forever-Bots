@@ -315,6 +315,8 @@ struct PolicyOptions
     // AuctionWalk3D (config, default off): the auction errand counts the bot as arrived only within kAuctionReach3dYards in 3D (not 5 yards in 2D) and walks
     // it to the auctioneer until then; the listing visit (main_feeds.cpp) uses the same 3D reach.
     bool AuctionWalk3D = false;
+    // ErrandOwnWalkOnly (config, default off): only a refusal of the errand's or visit's own walk fails it or moves on the auction stand point.
+    bool ErrandOwnWalkOnly = false;
     // DeathsTopEveryMs (config DeathsTopEveryMin, default 60; 0 = off): how often the `deaths_top` line (level_safe::DeathTally) is due; TakeDeathsTopLine.
     std::uint64_t DeathsTopEveryMs = 0;
     // Group quests (config QuestGroups, off by default; quest_group.h): quests marked 'group <n>' are taken, and the bot waits for a party of n.

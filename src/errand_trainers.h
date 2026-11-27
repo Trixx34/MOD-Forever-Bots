@@ -63,4 +63,8 @@ int TrainingDueSlot(std::uint16_t const skill[2], std::uint16_t const value[2], 
 std::optional<std::size_t> ChooseTrainer(std::vector<Trainer> const& trainers, std::uint32_t side, std::uint32_t skill, std::uint32_t city,
                                          std::uint32_t map, float x, float y, float z);
 
+// ErrandNearCity: the one capital with the nearest trainer of this side and skill on the bot's map, or empty when the map has none.
+std::vector<std::uint32_t> NearestCity(std::vector<Trainer> const& trainers, std::uint32_t side, std::uint32_t skill, std::uint32_t map, float x,
+                                       float y, float z);
+
 } // namespace errand

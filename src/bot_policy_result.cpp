@@ -34,10 +34,14 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
 
     // AuctionWalk3D: the auction errand's walk to a stand point the core has no route to moves on to the next point of the ring (bot_policy_turn_move.cpp)
     // instead of failing the errand; the last point fails it there.
-    if (state.Errand && state.Errand->Auction && Opt().AuctionWalk3D && moveNoRoute && !chained)
+    // ErrandOwnWalkOnly: a refused flee, quest or kite move says nothing about the way to the errand.
+    auto const ownWalk = [&](std::string_view first, std::string_view second)
+    { return !Opt().ErrandOwnWalkOnly || first == state.LastMoveWhy || second == state.LastMoveWhy; };
+    bool const errandRefused = moveNoRoute && !chained && ownWalk("order.Dest", "auction.stand");
+    if (state.Errand && state.Errand->Auction && Opt().AuctionWalk3D && errandRefused)
         state.Errand->StandNoRoute = true;
     // A town errand whose walk to the trainer has no route: the trip cannot be made, so it fails.
-    else if (state.Errand && moveNoRoute && !chained)
+    else if (state.Errand && errandRefused)
     {
         state.ErrandResult = ErrandOutcome::kFailed;
         state.Errand.reset();
@@ -45,7 +49,7 @@ void BotPolicy::ReadResult(BotState& state, BotSnapshot const& bot, std::uint64_
             Opt().OnEvent("errand_failed: bot=" + std::to_string(bot.guid) + " reason=no_route");
     }
     // A world event visit failed to find a route: the visit cannot be made.
-    if (state.Visit && moveNoRoute && !chained)
+    if (state.Visit && moveNoRoute && !chained && ownWalk("visit.Dest", "visit.Dest"))
     {
         state.VisitResult = ErrandOutcome::kFailed;
         state.Visit.reset();

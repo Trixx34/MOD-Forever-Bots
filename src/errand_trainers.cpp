@@ -210,6 +210,25 @@ std::optional<std::size_t> ChooseTrainer(std::vector<Trainer> const& trainers, s
     return best;
 }
 
+std::vector<std::uint32_t> NearestCity(std::vector<Trainer> const& trainers, std::uint32_t side, std::uint32_t skill, std::uint32_t map, float x,
+                                       float y, float z)
+{
+    std::vector<std::uint32_t> city;
+    float bestDist = 0.0f;
+    for (Trainer const& t : trainers)
+    {
+        if (t.Side != side || t.Skill != skill || t.Map != map)
+            continue;
+        float const dist = std::hypot(t.X - x, t.Y - y, t.Z - z);
+        if (city.empty() || dist < bestDist)
+        {
+            city.assign(1, t.City);
+            bestDist = dist;
+        }
+    }
+    return city;
+}
+
 std::vector<taxi::Place> CityPlaces(std::vector<Trainer> const& trainers)
 {
     struct Sum

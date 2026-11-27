@@ -449,6 +449,7 @@ void LoadPolicyTables(PolicyOptions& policyOptions, BotSettings& settings)
     policyOptions.NoRouteBackoff.Enabled = settings.NoRouteBackoff;
     policyOptions.NoRouteBackoff.BaseMs = std::uint64_t(settings.NoRouteBackoffSec) * 1000;
     policyOptions.AuctionWalk3D = settings.Auction.Enabled && settings.Auction.Walk3D;
+    policyOptions.ErrandOwnWalkOnly = settings.Errand.OwnWalkOnly;
     policyOptions.DeathsTopEveryMs = std::uint64_t(settings.DeathsTopEveryMin) * 60000;
     policyOptions.QuestGroups = settings.QuestGroups;
     policyOptions.DynamicParties = settings.DynamicParties;

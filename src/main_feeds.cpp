@@ -418,6 +418,8 @@ void SetUpErrands(forever_module::ModuleClient& client, BotSettings& settings, s
                         if (errand::ChooseTrainer(*trainers, bot.Side, bot.Skill, city, bot.Map, bot.X, bot.Y, bot.Z))
                             b.Cities.push_back(city);
                     }
+                    if (settings.Errand.NearCity)
+                        b.Cities = errand::NearestCity(*trainers, bot.Side, bot.Skill, bot.Map, bot.X, bot.Y, bot.Z);
                     b.TrainDue = !b.Cities.empty();
                 }
                 // Mounts: a bot with no profession to train that the core refused a mount goes to the riding trainer or the mount vendor (mount_plan.h).
@@ -432,6 +434,8 @@ void SetUpErrands(forever_module::ModuleClient& client, BotSettings& settings, s
                             if (pick && (*trainers)[*pick].Map == bot.Map)
                                 b.Cities.push_back(city);
                         }
+                        if (settings.Errand.NearCity)
+                            b.Cities = errand::NearestCity(*trainers, bot.Side, kRidingSkillLine, bot.Map, bot.X, bot.Y, bot.Z);
                         b.TrainDue = !b.Cities.empty();
                     }
                     else if (plan.What == mounts::Step::Buy)

@@ -43,6 +43,12 @@ struct Settings
     // ErrandKeepInterrupted (off by default): a running errand goes on through a fight, a flight or a death (the walk resumes after). Without it, any of
     // these ends the errand as unavailable. A bot that leaves the view, a call and the time limit still end it.
     bool KeepInterrupted = false;
+    // ErrandOwnWalkOnly (off by default): a no-route answer counts against an errand (or a vendor visit) only when the refused move was its own walk.
+    // Without it, a refused flee, quest or kite move made while the errand is set fails the errand too.
+    bool OwnWalkOnly = false;
+    // ErrandNearCity (off by default): a training or riding trip goes only to the capital with the nearest trainer on the bot's own map; none there, no trip.
+    // Without it, any capital with a trainer for the skill may be picked, on either continent.
+    bool NearCity = false;
 };
 
 // One bot as the module sees it this tick.
