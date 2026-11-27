@@ -502,6 +502,29 @@ void AThirdDeathToOneKillerMovesTheGhostAway()
     }
 }
 
+// A bot the party plan holds (PartySize) but that sits in no group in the game is on its own: its loop is broken too (arm F: 82 to 318 such loops went unseen
+// on single bots). One that is in a group is left to the party's rules.
+void APlannedPartyWithoutAGroupDoesNotStopTheBreaker()
+{
+    for (bool grouped : { false, true })
+    {
+        std::vector<std::string> events;
+        PolicyOptions options = BreakerOptions(&events, true);
+        options.PartySize = 5;
+        BotPolicy policy(options);
+        for (std::uint64_t at : { 100000u, 160000u, 220000u })
+        {
+            policy.Decide(At(2000.0f, 15), at);
+            WorldTickSnapshotView dead = At(2000.0f, 15, { Creature(2005.0f, 24) }, Creature(2005.0f, 24).guid);
+            Corpse(dead.bots[0], 2000.0f);
+            if (grouped)
+                dead.bots[0].group_leader_guid = kBot;
+            policy.Decide(dead, at + 1000);
+        }
+        CHECK((Count(events, "stage=detect") != 0) == !grouped);
+    }
+}
+
 // The unsafe graveyard feeds the level-safe choice: a later death there (another killer, no loop) is sent to x = 50 by LevelSafeGraveyard, which alone would not
 // judge Raven Hill too high for level 15.
 void AnUnsafeGraveyardIsSkippedByTheLevelSafeChoice()
@@ -677,6 +700,7 @@ int main()
     TheSettingsKeysHaveTheirDefaultsAndBounds();
     TheRavenHillPlaceMinimumWasWithinTheWideMargin();
     AThirdDeathToOneKillerMovesTheGhostAway();
+    APlannedPartyWithoutAGroupDoesNotStopTheBreaker();
     AnUnsafeGraveyardIsSkippedByTheLevelSafeChoice();
     AGraveyardHeldByAHighHostileIsPassedOver();
     WithNoGraveyardTheGhostWaitsThenTheBotIsMoved();

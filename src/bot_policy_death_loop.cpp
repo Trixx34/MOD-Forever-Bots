@@ -49,7 +49,8 @@ void BotPolicy::MarkYardUnsafe(std::uint32_t map, float x, float y, std::uint32_
 }
 
 // Just died (DeadRecord): the death and its killer are kept; the kLoopBreakDeaths-th death to the same entry within kLoopBreakYards of this one, in the window, is a loop.
-// Solo bots only (not in a group, not on a dungeon route): a party's ghosts have their own rules.
+// Solo bots only (not in a group, not on a dungeon route): a party's ghosts have their own rules. A bot the party plan holds but that is in no group in the game
+// (turn.deadParty set, group_leader_guid 0) is solo.
 void BotPolicy::DeathLoopBreakNote(DecideTick& tick, BotTurn& turn, std::uint32_t killerEntry)
 {
     std::uint64_t const nowMs = tick.nowMs;
@@ -58,7 +59,7 @@ void BotPolicy::DeathLoopBreakNote(DecideTick& tick, BotTurn& turn, std::uint32_
     state.LoopBreak = false;
     state.LoopBreakJudged = false;
     state.LoopBreakWait = false;
-    if (!Opt().DeathLoopBreaker || killerEntry == 0 || bot.group_leader_guid != 0 || turn.deadParty != 0 || IsRouteActive(bot.guid))
+    if (!Opt().DeathLoopBreaker || killerEntry == 0 || bot.group_leader_guid != 0 || IsRouteActive(bot.guid))
         return;
     std::erase_if(state.LoopDeaths, [nowMs](BotLoopDeath const& death) { return nowMs - death.AtMs > kLoopBreakWindowMs; });
     state.LoopDeaths.push_back(BotLoopDeath{ bot.map_id, bot.pos_x, bot.pos_y, killerEntry, nowMs });
